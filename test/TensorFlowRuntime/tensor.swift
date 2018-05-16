@@ -422,12 +422,10 @@ TensorTests.testAllBackends("ReshapeTensor") {
 }
 
 TensorTests.testAllBackends("BroadcastTensor") {
-  // NOTE: TensorFlow lacks an explicit broadcasting op. `broadcast(to:)`
-  // currently works only for numeric tensors, using a workaround.
   // 1 -> 2 x 3 x 4
   let one = Tensor<Float>(1)
   let target = Tensor<Float>(shape: [2, 3, 4], repeating: 0.0)
-  let broadcasted = one.broadcast(to: target)
+  let broadcasted = one.broadcast(like: target)
   expectEqual([2, 3, 4], broadcasted.shape)
   expectEqual(Array(repeating: 1, count: 24), broadcasted.scalars)
 }
@@ -435,7 +433,7 @@ TensorTests.testAllBackends("BroadcastTensor") {
 TensorTests.testAllBackends("Unbroadcast1") {
   let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
   let y = Tensor<Float>(shape: [4, 5], repeating: 1)
-  let z = x.unbroadcast(to: y)
+  let z = x.unbroadcast(like: y)
   expectEqual(ShapedArray<Float>(shape: [4, 5],
                                  repeating: 6),
               z.array)
@@ -444,7 +442,7 @@ TensorTests.testAllBackends("Unbroadcast1") {
 TensorTests.testAllBackends("Unbroadcast2") {
   let x = Tensor<Float>(shape: [2, 3, 4, 5], repeating: 1)
   let y = Tensor<Float>(shape: [3, 1, 5], repeating: 1)
-  let z = x.unbroadcast(to: y)
+  let z = x.unbroadcast(like: y)
   expectEqual(ShapedArray<Float>(shape: [3, 1, 5],
                                  repeating: 8),
               z.array)

@@ -514,8 +514,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     switch (attr->getMode()) {
     case AutoDiffMode::Forward:
       Printer << "forward";
+      break;
     case AutoDiffMode::Reverse:
       Printer << "reverse";
+      break;
     }
     Printer << ", ";
     auto params = attr->getParameters();
