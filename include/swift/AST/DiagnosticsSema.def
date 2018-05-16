@@ -1025,6 +1025,15 @@ NOTE(archetype_declared_in_type,none,
 NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(invalid_dynamic_callable_type,none,
+      "@dynamicCallable attribute requires %0 to have either a valid "
+      "'dynamicallyCall(withArguments:)' method or a valid "
+      "'dynamicallyCall(withKeywordArguments:)' method", (Type))
+ERROR(ambiguous_dynamic_callable_method,none,
+      "@dynamicCallable attribute does not support ambiguous method %0",
+      (DeclName))
+
 ERROR(type_invalid_dml,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
       "'subscript(dynamicMember:)' member with a string index", (Type))

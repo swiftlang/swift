@@ -47,6 +47,8 @@ IDENTIFIER(decode)
 IDENTIFIER(decodeIfPresent)
 IDENTIFIER(Decoder)
 IDENTIFIER(decoder)
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(dynamicCallable)
 IDENTIFIER(dynamicMember)
 IDENTIFIER(Element)
 IDENTIFIER(Encodable)
