@@ -2328,6 +2328,49 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  internal func copyEntries(
+    from: Buffer,
+    count: Int,
+    at source: Int,
+    to target: Int) {
+    defer { _fixLifetime(self) }
+    _sanityCheck(
+      (source..<source+count).allSatisfy { from.isInitializedEntry(at: $0)})
+    _sanityCheck(
+      (target..<target+count).allSatisfy { !isInitializedEntry(at: $0)})
+    (keys + target).initialize(from: from.keys + source, count: count)
+    (values + target).initialize(from: from.values + source, count: count)
+    // FIXME: Add a direct bitmap operation for setting a range of bits
+    for bucket in target ..< target + count {
+      self._storage.initializedEntries[bucket] = true
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  internal func moveEntries(
+    from: Buffer,
+    count: Int,
+    at source: Int,
+    to target: Int) {
+    defer { _fixLifetime(self) }
+    _sanityCheck(
+      (source..<source+count).allSatisfy { from.isInitializedEntry(at: $0)})
+    _sanityCheck(
+      (target..<target+count).allSatisfy { !isInitializedEntry(at: $0)})
+    (keys + target).moveInitialize(from: from.keys + source, count: count)
+    (values + target).moveInitialize(from: from.values + source, count: count)
+    // FIXME: Add direct bitmap operations for clearing/setting a range of bits
+    for bucket in source ..< source + count {
+      from._storage.initializedEntries[bucket] = false
+    }
+    for bucket in target ..< target + count {
+      self._storage.initializedEntries[bucket] = true
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   internal func value(at i: Int) -> Value {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -3317,22 +3360,41 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   ) -> NativeBuffer {
     let oldBuffer = asNative
     var newBuffer = NativeBuffer(bucketCount: bucketCount)
-    _sanityCheck(oldBuffer.bucketCount != newBuffer.bucketCount)
-    for i in 0..<oldBuffer.bucketCount {
-      if oldBuffer.isInitializedEntry(at: i) {
-        let j = newBuffer._findNew(oldBuffer.key(at: i))
-        if movingEntries {
-          newBuffer.moveEntry(from: oldBuffer, at: i, to: j)
-        } else {
-          newBuffer.initializeKey(
-            oldBuffer.key(at: i),
-            value: oldBuffer.value(at: i),
-            at: j)
-        }
-        newBuffer.count += 1
+    let count = oldBuffer.count
+    let oldBucketCount = oldBuffer.bucketCount
+    _sanityCheck(count <= newBuffer.bucketCount)
+    _sanityCheck(oldBucketCount != newBuffer.bucketCount)
+    if oldBuffer.isSmall, newBuffer.isSmall {
+      // When both buffers are small, we can bulk-initialize the new
+      // buffer. This has the added benefit of keeping elements in their
+      // original order.
+      let oldBucket = oldBuffer.bucketCount - count
+      let newBucket = newBuffer.bucketCount - count
+      if movingEntries {
+        newBuffer.moveEntries(
+          from: oldBuffer, count: count, at: oldBucket, to: newBucket)
+      } else {
+        newBuffer.copyEntries(
+          from: oldBuffer, count: count, at: oldBucket, to: newBucket)
       }
+      newBuffer.count = oldBuffer.count
+    } else {
+      for i in 0..<oldBuffer.bucketCount {
+        if oldBuffer.isInitializedEntry(at: i) {
+          let j = newBuffer._findNew(oldBuffer.key(at: i))
+          if movingEntries {
+            newBuffer.moveEntry(from: oldBuffer, at: i, to: j)
+          } else {
+            newBuffer.initializeKey(
+              oldBuffer.key(at: i),
+              value: oldBuffer.value(at: i),
+              at: j)
+          }
+          newBuffer.count += 1
+        }
+      }
+      _sanityCheck(newBuffer.count == count)
     }
-    _sanityCheck(newBuffer.count == oldBuffer.count)
     if movingEntries { oldBuffer._storage.count = 0 }
     return newBuffer
   }
