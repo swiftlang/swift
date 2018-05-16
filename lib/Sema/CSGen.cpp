@@ -1277,15 +1277,10 @@ namespace {
     Type handleReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
                                    bool preservingOriginalResult) {
       auto &TC = CS.getTypeChecker();
-      auto &ctx = CS.getASTContext();
       auto *originalExpr = GE->getOriginalExpr();
-      auto *originalTy = CS.getType(originalExpr)->getAs<AnyFunctionType>();
       auto locator = CS.getConstraintLocator(GE);
-      ProtocolDecl *vectorNumericProto =
-        ctx.getProtocol(KnownProtocolKind::VectorNumeric);
-      ProtocolDecl *floatingPointProto =
-        ctx.getProtocol(KnownProtocolKind::FloatingPoint);
-      // Original type must be a function.
+      // The original type must be a function.
+      auto *originalTy = CS.getType(originalExpr)->getAs<AnyFunctionType>();
       if (!originalTy) {
         TC.diagnose(originalExpr->getLoc(),
             diag::gradient_expr_not_a_function, CS.getType(originalExpr));
