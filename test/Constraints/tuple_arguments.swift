@@ -1666,7 +1666,7 @@ do {
   f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '(() -> Void)?'}}
 
   func g() {}
-  g(()) // expected-error {{argument passed to call that takes no arguments}}
+  g(()) // expected-error {{argument passed to call that takes no arguments}} {{5-7=}}
 
   func h(_: ()) {} // expected-note {{'h' declared here}}
   h() // expected-error {{missing argument for parameter #1 in call}}
