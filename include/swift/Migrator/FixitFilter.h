@@ -117,6 +117,16 @@ struct FixitFilter {
     if (Kind == DiagnosticKind::Error)
       return true;
 
+    if (Info.ID == diag::note_deprecated_rename.ID) {
+      // deprecated_rename FixIts may not always be equivalent, so filter down
+      // to those we want to apply.
+      for (auto FixIt: Info.FixIts) {
+        // flatMap -> compactMap
+        if (FixIt.getText().contains("compactMap"))
+          return true;
+      }
+    }
+
     // Fixits from warnings/notes that should be applied.
     if (Info.ID == diag::forced_downcast_coercion.ID ||
         Info.ID == diag::forced_downcast_noop.ID ||
