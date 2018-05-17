@@ -61,6 +61,48 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0185][]
+
+  Protocol conformances are now able to be synthesized in extensions in the same
+  file as the type definition, allowing automatic synthesis of conditional
+  conformances to `Hashable`, `Equatable` and `Codable` (both `Encodable` and
+  `Decodable`). For instance, if there is a generic wrapper type that can only
+  be `Equatable` when its wrapped type is also `Equatable`, the `==` method can
+  be automatically constructed by the compiler:
+
+  ```swift
+  struct Generic<Param> {
+    var property: Param
+  }
+
+  extension Generic: Equatable where Param: Equatable {}
+  // Automatically synthesized inside the extension:
+  // static func ==(lhs: Generic, rhs: Generic) -> Bool {
+  //   return lhs.property == rhs.property
+  // }
+  ```
+
+  Code that wants to be as precise as possible should generally not
+  conditionally conform to `Codable` directly, but rather its two constituent
+  protocols `Encodable` and `Decodable`, or else one can only (for instance)
+  decode a `Generic<Param>` if `Param` is `Encodable` in addition to
+  `Decodable`, even though `Encodable` is likely not required:
+
+  ```swift
+  // Unnecessarily restrictive:
+  extension Generic: Codable where Param: Codable {}
+
+  // More precise:
+  extension Generic: Encodable where Param: Encodable {}
+  extension Generic: Decodable where Param: Decodable {}
+  ```
+
+  Finally, due to `Decodable` having an `init` requirement, it is not possible
+  to conform to `Decodable` in an extension of a non-final class: such a class
+  needs to have any `init`s from protocols be `required`, which means they need
+  to be in the class definition.
+
+
 * [SE-0206][]
 
     The standard library now uses a high-quality, randomly seeded, universal
