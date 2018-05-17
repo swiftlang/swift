@@ -1498,7 +1498,7 @@ ERROR(witness_argument_name_mismatch,none,
       "%select{method|initializer}0 %1 has different argument labels from those "
       "required by protocol %2 (%3)", (bool, DeclName, Type, DeclName))
 ERROR(witness_initializer_not_required,none,
-      "initializer requirement %0 can only be satisfied by a `required` "
+      "initializer requirement %0 can only be satisfied by a 'required' "
       "initializer in%select{| the definition of}1 non-final class %2",
       (DeclName, bool, Type))
 ERROR(witness_initializer_failability,none,
@@ -1520,12 +1520,12 @@ NOTE(witness_self_weaken_same_type,none,
       "consider weakening the same-type requirement %0 == %1 to a superclass "
       "requirement", (Type, Type))
 ERROR(witness_requires_dynamic_self,none,
-      "method %0 in non-final class %1 must return `Self` to conform to "
+      "method %0 in non-final class %1 must return 'Self' to conform to "
       "protocol %2",
       (DeclName, Type, Type))
 ERROR(witness_requires_class_implementation,none,
       "method %0 in non-final class %1 cannot be implemented in a "
-      "protocol extension because it returns `Self` and has associated type "
+      "protocol extension because it returns 'Self' and has associated type "
       "requirements",
       (DeclName, Type))
 ERROR(witness_not_accessible_proto,none,
@@ -1553,6 +1553,9 @@ ERROR(type_witness_objc_generic_parameter,none,
       "type %0 involving Objective-C type parameter%select{| %1}2 cannot be "
       "used for associated type %3 of protocol %4",
       (Type, Type, bool, DeclName, DeclName))
+NOTE(witness_fix_access,none,
+     "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
+     "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 
 ERROR(protocol_refine_access,none,
       "%select{protocol must be declared %select{"
@@ -2162,6 +2165,9 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 // Derived conformances
+ERROR(swift3_cannot_synthesize_in_extension,none,
+      "implementation of %0 cannot be automatically synthesized in an extension "
+      "in Swift 3", (Type))
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
       "synthesized in extension because initializer requirement %1 can only be "
@@ -2412,6 +2418,8 @@ ERROR(lazy_must_be_property,none,
       "lazy is only valid for members of a struct or class", ())
 ERROR(lazy_not_observable,none,
       "lazy properties must not have observers", ())
+ERROR(lazy_not_strong,none,
+      "lazy properties cannot be %0", (ReferenceOwnership))
 
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
@@ -2555,6 +2563,9 @@ NOTE(silence_inject_forced_downcast,none,
 ERROR(conditional_downcast_foreign,none,
       "conditional downcast to CoreFoundation type %0 will always succeed",
       (Type))
+NOTE(note_explicitly_compare_cftypeid,none,
+      "did you mean to explicitly compare the CFTypeIDs of %0 and %1?",
+      (DeclBaseName, Type))
 
 ERROR(optional_used_as_boolean,none,
      "optional type %0 cannot be used as a boolean; "
@@ -3387,10 +3398,10 @@ WARNING(objc_inference_swift3_objc_derived,none,
         "deprecated", ())
 
 NOTE(objc_inference_swift3_addobjc,none,
-     "add `@objc` to continue exposing an Objective-C entry point (Swift 3 "
+     "add '@objc' to continue exposing an Objective-C entry point (Swift 3 "
      "behavior)", ())
 NOTE(objc_inference_swift3_addnonobjc,none,
-     "add `@nonobjc` to suppress the Objective-C entry point (Swift 4 "
+     "add '@nonobjc' to suppress the Objective-C entry point (Swift 4 "
      "behavior)", ())
 
 ERROR(objc_for_generic_class,none,
@@ -3784,9 +3795,6 @@ ERROR(availability_protocol_requires_version,
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
-
-NOTE(availability_conformance_introduced_here, none,
-     "conformance introduced here", ())
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked

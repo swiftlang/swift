@@ -47,7 +47,7 @@ namespace swift {
 template <class T> class Lazy {
   alignas(T) char Value[sizeof(T)] = { 0 };
 
-  OnceToken_t OnceToken;
+  OnceToken_t OnceToken = {};
 
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();

@@ -372,14 +372,14 @@ void SILDeclRef::dump() const {
 static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
-    SubstitutionList Subs = SubstitutionList()) {
+    SubstitutionMap Subs = { }) {
   if (!SpecializationInfo)
     return;
 
-  auto PrintSubstitutions = [&](SubstitutionList Subs) {
+  auto PrintSubstitutions = [&](SubstitutionMap Subs) {
     OS << '<';
-    interleave(Subs,
-               [&](const Substitution &s) { OS << s.getReplacement(); },
+    interleave(Subs.getReplacementTypes(),
+               [&](Type type) { OS << type; },
                [&] { OS << ", "; });
     OS << '>';
   };
@@ -396,7 +396,7 @@ static void printGenericSpecializationInfo(
     OS << "// Caller: " << SpecializationInfo->getCaller()->getName() << '\n';
     OS << "// Parent: " << SpecializationInfo->getParent()->getName() << '\n';
     OS << "// Substitutions: ";
-    PrintSubstitutions(SpecializationInfo->getSubstitutions().toList());
+    PrintSubstitutions(SpecializationInfo->getSubstitutions());
     OS << '\n';
     OS << "//\n";
     if (!SpecializationInfo->getCaller()->isSpecialization())
@@ -638,7 +638,7 @@ public:
           if (AI.getSpecializationInfo() && AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
-                AI.getSpecializationInfo(), AI.getSubstitutions());
+                AI.getSpecializationInfo(), AI.getSubstitutionMap());
       }
       print(&I);
     }
@@ -1065,25 +1065,30 @@ public:
     printDebugVar(ABI->getVarInfo());
   }
 
-  void printSubstitutions(SubstitutionMap Subs) {
-    printSubstitutions(Subs.toList());
-  }
+  void printSubstitutions(SubstitutionMap Subs,
+                          GenericSignature *Sig = nullptr) {
+    if (!Subs.hasAnySubstitutableParams()) return;
 
-  void printSubstitutions(SubstitutionList Subs) {
-    if (Subs.empty())
-      return;
-    
+    // FIXME: This is a hack to cope with cases where the substitution map uses
+    // a generic signature that's close-to-but-not-the-same-as expected.
+    auto genericSig = Sig ? Sig : Subs.getGenericSignature();
+
     *this << '<';
-    interleave(Subs,
-               [&](const Substitution &s) { *this << s.getReplacement(); },
-               [&] { *this << ", "; });
+    bool first = true;
+    for (auto gp : genericSig->getGenericParams()) {
+      if (first) first = false;
+      else *this << ", ";
+
+      *this << Type(gp).subst(Subs);
+    }
     *this << '>';
   }
 
   template <class Inst>
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
-    printSubstitutions(AI->getSubstitutions());
+    printSubstitutions(AI->getSubstitutionMap(),
+                       AI->getOrigCalleeType()->getGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -1846,6 +1851,7 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
@@ -1856,12 +1862,14 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
-    *this << (EAI->isAborting() ? "[abort] " : "")
-          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+    *this << (EAI->isAborting() ? "[abort] " : "") << '['
+          << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+          << (EAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(EAI->getOperand());
   }
 
@@ -2942,9 +2950,9 @@ void SILDefaultWitnessTable::dump() const {
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << QuotedString(getPGOFuncName()) << " " << getHash() << " {\t// "
-     << demangleSymbol(getName()) << "\n";
+  OS << "sil_coverage_map " << QuotedString(getFile()) << " "
+     << QuotedString(getName()) << " " << QuotedString(getPGOFuncName()) << " "
+     << getHash() << " {\t// " << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())
     std::sort(MappedRegions.begin(), MappedRegions.end(),
               [](const MappedRegion &LHS, const MappedRegion &RHS) {
@@ -3009,9 +3017,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     SILFunction *F = getFunction();
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
-    assert(GenericEnv);
     interleave(getRequirements(),
                [&](Requirement req) {
+                 if (!GenericEnv) {
+                   req.print(OS, SubPrinter);
+                   return;
+                 }
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
                  auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());

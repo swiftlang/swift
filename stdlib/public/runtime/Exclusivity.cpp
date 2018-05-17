@@ -366,7 +366,7 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 // This is only intended to be used in the debugger.
 void swift::swift_dumpTrackedAccesses() {
   getAccessSet().forEach([](Access *a) {
-      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s",
+      fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s\n",
               a->Pointer, a->PC, getAccessName(a->getAccessAction()));
   });
 }

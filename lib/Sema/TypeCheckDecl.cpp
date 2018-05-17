@@ -1193,9 +1193,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   }
 
   // If we have any type-adjusting attributes, apply them here.
-  if (binding->getPattern(entryNumber)->hasType())
-    if (auto var = binding->getSingleVar())
-      tc.checkTypeModifyingDeclAttributes(var);
+  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
+  if (auto var = binding->getSingleVar())
+    tc.checkTypeModifyingDeclAttributes(var);
 }
 
 /// Validate the entries in the given pattern binding declaration.
@@ -1408,8 +1408,7 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
       return Action::Stop;
 
     if (!CanonicalizeParentTypes) {
-      return isa<NameAliasType>(T.getPointer()) ? Action::SkipChildren
-                                                     : Action::Continue;
+      return Action::Continue;
     }
     
     Type nominalParentTy;
@@ -4209,7 +4208,7 @@ public:
         // Stored type variables in a generic context need to logically
         // occur once per instantiation, which we don't yet handle.
         } else if (DC->getAsProtocolExtensionContext()) {
-            unimplementedStatic(ProtocolExtensions);
+          unimplementedStatic(ProtocolExtensions);
         } else if (DC->isGenericContext()
                && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
           unimplementedStatic(GenericTypes);
@@ -8307,7 +8306,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
     }
 
     resultType = NameAliasType::get(typealias, parentType, subMap,
-                                         resultType);
+                                    resultType);
   }
 
   return resultType;

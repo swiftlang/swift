@@ -388,7 +388,8 @@ namespace {
       auto left = cast<BeginAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
           && left->getEnforcement() == right->getEnforcement()
-          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndAccessInst(const EndAccessInst *right) {
@@ -400,13 +401,15 @@ namespace {
       auto left = cast<BeginUnpairedAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
           && left->getEnforcement() == right->getEnforcement()
-          && left->hasNoNestedConflict() == right->hasNoNestedConflict();
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
       auto left = cast<EndUnpairedAccessInst>(LHS);
       return left->getEnforcement() == right->getEnforcement()
-          && left->isAborting() == right->isAborting();
+             && left->isAborting() == right->isAborting()
+             && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
@@ -606,7 +609,7 @@ namespace {
 
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
-      return X->getSubstitutions() == RHS->getSubstitutions();
+      return X->getSubstitutionMap() == RHS->getSubstitutionMap();
     }
 
     bool visitBuiltinInst(BuiltinInst *RHS) {
@@ -1304,7 +1307,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeBegin = TypedRange.begin();
   auto TRangeIter = TRangeBegin;
   auto TRangeEnd = TypedRange.end();
-  assert(MVResults.size() == unsigned(std::distance(VRangeBegin, VRangeEnd)));
+  assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());

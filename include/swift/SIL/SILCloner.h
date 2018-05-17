@@ -107,13 +107,6 @@ protected:
   const SILDebugScope *getOpScope(const SILDebugScope *DS) {
     return asImpl().remapScope(DS);
   }
-  SmallVector<Substitution, 4> getOpSubstitutions(SubstitutionList Subs) {
-    SmallVector<Substitution, 4> NewSubs;
-    for (auto Sub : Subs) {
-      NewSubs.push_back(getOpSubstitution(Sub));
-    }
-    return NewSubs;
-  }
 
   SubstitutionMap remapSubstitutionMap(SubstitutionMap Subs) {
     return Subs;
@@ -205,14 +198,6 @@ protected:
     return ty->getASTContext().AllocateCopy(newConformances);
   }
   
-  Substitution getOpSubstitution(Substitution sub) {
-    CanType newReplacement =
-      getOpASTType(sub.getReplacement()->getCanonicalType());
-    auto conformances = getOpConformances(sub.getReplacement(),
-                                          sub.getConformances());
-    return Substitution(newReplacement, conformances);
-  }
-
   SILValue getOpValue(SILValue Value) {
     return asImpl().remapValue(Value);
   }
@@ -592,7 +577,7 @@ SILCloner<ImplClass>::visitApplyInst(ApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createApply(getOpLocation(Inst->getLoc()),
                              getOpValue(Inst->getCallee()),
-                             getOpSubstitutions(Inst->getSubstitutions()),
+                             getOpSubstitutionMap(Inst->getSubstitutionMap()),
                              Args,
                              Inst->isNonThrowing(),
                              GenericSpecializationInformation::create(
@@ -607,7 +592,8 @@ SILCloner<ImplClass>::visitTryApplyInst(TryApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createTryApply(getOpLocation(Inst->getLoc()),
                                 getOpValue(Inst->getCallee()),
-                                getOpSubstitutions(Inst->getSubstitutions()),
+                                getOpSubstitutionMap(
+                                                  Inst->getSubstitutionMap()),
                                 Args,
                                 getOpBasicBlock(Inst->getNormalBB()),
                                 getOpBasicBlock(Inst->getErrorBB()),
@@ -624,7 +610,7 @@ SILCloner<ImplClass>::visitPartialApplyInst(PartialApplyInst *Inst) {
                 getBuilder().createPartialApply(
                     getOpLocation(Inst->getLoc()),
                     getOpValue(Inst->getCallee()),
-                    getOpSubstitutions(Inst->getSubstitutions()), Args,
+                    getOpSubstitutionMap(Inst->getSubstitutionMap()), Args,
                     Inst->getType().getAs<SILFunctionType>()
                       ->getCalleeConvention(),
                     GenericSpecializationInformation::create(Inst,
@@ -639,7 +625,8 @@ SILCloner<ImplClass>::visitBeginApplyInst(BeginApplyInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createBeginApply(getOpLocation(Inst->getLoc()),
                                   getOpValue(Inst->getCallee()),
-                                  getOpSubstitutions(Inst->getSubstitutions()),
+                                  getOpSubstitutionMap(
+                                                    Inst->getSubstitutionMap()),
                                   Args,
                                   Inst->isNonThrowing(),
                                   GenericSpecializationInformation::create(
@@ -809,7 +796,8 @@ void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
                                            getOpValue(Inst->getOperand()),
                                            Inst->getAccessKind(),
                                            Inst->getEnforcement(),
-                                           Inst->hasNoNestedConflict()));
+                                           Inst->hasNoNestedConflict(),
+                                           Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>
@@ -831,18 +819,19 @@ void SILCloner<ImplClass>::visitBeginUnpairedAccessInst(
                                            getOpValue(Inst->getBuffer()),
                                            Inst->getAccessKind(),
                                            Inst->getEnforcement(),
-                                           Inst->hasNoNestedConflict()));
+                                           Inst->hasNoNestedConflict(),
+                                           Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitEndUnpairedAccessInst(
                                              EndUnpairedAccessInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createEndUnpairedAccess(getOpLocation(Inst->getLoc()),
-                                                 getOpValue(Inst->getOperand()),
-                                                 Inst->getEnforcement(),
-                                                 Inst->isAborting()));
+  doPostProcess(Inst,
+                getBuilder().createEndUnpairedAccess(
+                    getOpLocation(Inst->getLoc()),
+                    getOpValue(Inst->getOperand()), Inst->getEnforcement(),
+                    Inst->isAborting(), Inst->isFromBuiltin()));
 }
 
 template <typename ImplClass>

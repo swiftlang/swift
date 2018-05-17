@@ -355,6 +355,11 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
+def emit_public_type_metadata_accessors :
+  Flag<["-"], "emit-public-type-metadata-accessors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit all type metadata accessors as public">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "

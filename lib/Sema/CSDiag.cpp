@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -194,11 +194,13 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       break;
 
-    case ConstraintLocator::Load:
+    case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::RvalueAdjustment:
     case ConstraintLocator::ScalarToTuple:
     case ConstraintLocator::UnresolvedMember:
-      // Loads, rvalue adjustment, and scalar-to-tuple conversions are implicit.
+      // Arguments in autoclosure positions, rvalue adjustments, and
+      // scalar-to-tuple conversions, and unresolved members are
+      // implicit.
       path = path.slice(1);
       continue;
 
@@ -893,7 +895,8 @@ public:
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError(Expr *expr, Type contextualType,
-                                         ContextualTypePurpose CTP);
+                                         ContextualTypePurpose CTP,
+                                         Type suggestedType = Type());
 
   /// For an expression being type checked with a CTP_CalleeResult contextual
   /// type, try to diagnose a problem.
@@ -2788,7 +2791,8 @@ static bool tryDiagnoseNonEscapingParameterToEscaping(
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(
-    Expr *expr, Type contextualType, ContextualTypePurpose CTP) {
+    Expr *expr, Type contextualType, ContextualTypePurpose CTP,
+    Type suggestedType) {
   // If the constraint system has a contextual type, then we can test to see if
   // this is the problem that prevents us from solving the system.
   if (!contextualType) {
@@ -2807,11 +2811,16 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (contextualType->is<InOutType>())
     options |= TCC_AllowLValue;
 
-  auto recheckedExpr = typeCheckChildIndependently(expr, options);
+  auto *recheckedExpr = typeCheckChildIndependently(expr, options);
   auto exprType = recheckedExpr ? CS.getType(recheckedExpr) : Type();
 
+  // If there is a suggested type and re-typecheck failed, let's use it.
+  if (!exprType)
+    exprType = suggestedType;
+
   // If it failed and diagnosed something, then we're done.
-  if (!exprType) return true;
+  if (!exprType)
+    return CS.TC.Diags.hadAnyError();
 
   // If we contextually had an inout type, and got a non-lvalue result, then
   // we fail with a mutability error.
@@ -5274,7 +5283,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
     }
   };
 
-  SmallVector<Type, 4> possibleTypes;
+  SmallPtrSet<TypeBase *, 4> possibleTypes;
   auto currentType = CS.getType(fnExpr);
 
   // If current type has type variables or unresolved types
@@ -5294,10 +5303,10 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
       return diagnoseContextualConversionError(callExpr, contextualType,
                                                CS.getContextualTypePurpose());
   } else {
-    possibleTypes.push_back(currentType);
+    possibleTypes.insert(currentType.getPointer());
   }
 
-  for (auto type : possibleTypes) {
+  for (Type type : possibleTypes) {
     auto *fnType = type->getAs<AnyFunctionType>();
     if (!fnType)
       continue;
@@ -5388,7 +5397,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   auto *DC = CS.DC;
 
   auto typeCheckExpr = [](TypeChecker &TC, Expr *expr, DeclContext *DC,
-                          SmallVectorImpl<Type> &types,
+                          SmallPtrSetImpl<TypeBase *> &types,
                           Type contextualType = Type()) {
     CalleeListener listener(contextualType);
     TC.getPossibleTypesOfExpressionWithoutApplying(
@@ -5398,7 +5407,7 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   // First let's type-check expression without contextual type, and
   // see if that's going to produce a type, if so, let's type-check
   // again, this time using given contextual type.
-  SmallVector<Type, 4> withoutContextual;
+  SmallPtrSet<TypeBase *, 4> withoutContextual;
   typeCheckExpr(TC, callExpr, DC, withoutContextual);
 
   // If there are no types returned, it means that problem was
@@ -5407,12 +5416,17 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   if (withoutContextual.empty())
     return false;
 
-  SmallVector<Type, 4> withContextual;
+  SmallPtrSet<TypeBase *, 4> withContextual;
   typeCheckExpr(TC, callExpr, DC, withContextual, contextualType);
   // If type-checking with contextual type didn't produce any results
   // it means that we have a contextual mismatch.
-  if (withContextual.empty())
-    return diagnoseContextualConversionError(callExpr, contextualType, CTP);
+  if (withContextual.empty()) {
+    // If there is just a single choice, we can hit contextual diagnostics
+    // about it in case re-typecheck fails.
+    Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
+    return diagnoseContextualConversionError(callExpr, contextualType, CTP,
+                                             exprType);
+  }
 
   // If call produces a single type when type-checked with contextual
   // expression, it means that the problem is elsewhere, any other
@@ -5431,7 +5445,7 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
   if (!isa<UnresolvedDotExpr>(fnExpr))
     return true;
 
-  SmallVector<Type, 4> fnTypes;
+  SmallPtrSet<TypeBase *, 4> fnTypes;
   TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, DC, fnTypes,
                                        FreeTypeVariableBinding::UnresolvedType);
 
@@ -5439,7 +5453,7 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
     // Some member types depend on the arguments to produce a result type,
     // type-checking such expressions without associated arguments is
     // going to produce unrelated diagnostics.
-    if (auto fn = fnTypes[0]->getAs<AnyFunctionType>()) {
+    if (auto fn = (*fnTypes.begin())->getAs<AnyFunctionType>()) {
       auto resultType = fn->getResult();
       if (resultType->hasUnresolvedType() || resultType->hasTypeVariable())
         return false;
@@ -5494,7 +5508,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     isa<UnresolvedDotExpr>(callExpr->getFn())) {
     fnExpr = callExpr->getFn();
 
-    SmallVector<Type, 4> types;
+    SmallPtrSet<TypeBase *, 4> types;
     CS.TC.getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS.DC, types);
 
     auto isFunctionType = [getFuncType](Type type) -> bool {
@@ -6323,23 +6337,25 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         auto diag =
           diagnose(CE->getStartLoc(), diag::closure_argument_list_missing,
                    inferredArgCount);
-        StringRef fixText;  // We only handle the most common cases.
-        if (inferredArgCount == 1)
-          fixText = " _ in ";
-        else if (inferredArgCount == 2)
-          fixText = " _,_ in ";
-        else if (inferredArgCount == 3)
-          fixText = " _,_,_ in ";
-        
+        std::string fixText; // Let's provide fixits for up to 10 args.
+
+        if (inferredArgCount <= 10) {
+          fixText += " _";
+          for (unsigned i = 0; i < inferredArgCount - 1; i ++) {
+            fixText += ",_";
+          }
+          fixText += " in ";
+        }
+
         if (!fixText.empty()) {
           // Determine if there is already a space after the { in the closure to
           // make sure we introduce the right whitespace.
           auto afterBrace = CE->getStartLoc().getAdvancedLoc(1);
           auto text = CS.TC.Context.SourceMgr.extractText({afterBrace, 1});
           if (text.size() == 1 && text == " ")
-            fixText = fixText.drop_back();
+            fixText = fixText.erase(fixText.size() - 1);
           else
-            fixText = fixText.drop_front();
+            fixText = fixText.erase(0, 1);
           diag.fixItInsertAfter(CE->getStartLoc(), fixText);
         }
         return true;

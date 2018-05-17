@@ -247,6 +247,7 @@ enum class TypeMemberDiffItemSubKind {
   HoistSelfOnly,
   HoistSelfAndRemoveParam,
   HoistSelfAndUseProperty,
+  FuncRename,
 };
 
 struct TypeMemberDiffItem: public APIDiffItem {

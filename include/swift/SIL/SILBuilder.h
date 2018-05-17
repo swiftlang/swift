@@ -247,7 +247,7 @@ public:
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                          SILModule &M,
-                                         SubstitutionList subs,
+                                         SubstitutionMap subs,
                                          ParameterConvention calleeConvention);
 
   //===--------------------------------------------------------------------===//
@@ -357,7 +357,7 @@ public:
   }
 
   ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, bool isNonThrowing,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
@@ -370,12 +370,12 @@ public:
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
                                        getModule());
-    return createApply(Loc, Fn, SubstitutionList(), Args, isNonThrowing,
+    return createApply(Loc, Fn, SubstitutionMap(), Args, isNonThrowing,
                        SpecializationInfo);
   }
 
   TryApplyInst *createTryApply(
-      SILLocation Loc, SILValue fn, SubstitutionList subs,
+      SILLocation Loc, SILValue fn, SubstitutionMap subs,
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insertTerminator(TryApplyInst::create(getSILDebugLocation(Loc),
@@ -386,7 +386,7 @@ public:
   }
 
   PartialApplyInst *createPartialApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(PartialApplyInst::create(getSILDebugLocation(Loc), Fn,
@@ -396,7 +396,7 @@ public:
   }
 
   BeginApplyInst *createBeginApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, bool isNonThrowing,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(getSILDebugLocation(Loc), Fn, Subs,
@@ -669,10 +669,11 @@ public:
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
-                                     bool noNestedConflict) {
+                                     bool noNestedConflict,
+                                     bool fromBuiltin) {
     return insert(new (getModule()) BeginAccessInst(
         getSILDebugLocation(loc), address, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -685,18 +686,19 @@ public:
   createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
                             SILAccessKind accessKind,
                             SILAccessEnforcement enforcement,
-                            bool noNestedConflict) {
+                            bool noNestedConflict,
+                            bool fromBuiltin) {
     return insert(new (getModule()) BeginUnpairedAccessInst(
         getSILDebugLocation(loc), address, buffer, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
-  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
-                                                 SILValue buffer,
-                                              SILAccessEnforcement enforcement,
-                                                 bool aborted) {
+  EndUnpairedAccessInst *
+  createEndUnpairedAccess(SILLocation loc, SILValue buffer,
+                          SILAccessEnforcement enforcement, bool aborted,
+                          bool fromBuiltin) {
     return insert(new (getModule()) EndUnpairedAccessInst(
-        getSILDebugLocation(loc), buffer, enforcement, aborted));
+        getSILDebugLocation(loc), buffer, enforcement, aborted, fromBuiltin));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "accessed-storage"
+#define DEBUG_TYPE "sil-sea"
 
 #include "swift/SILOptimizer/Analysis/AccessedStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -94,42 +94,60 @@ bool FunctionAccessedStorage::updateUnidentifiedAccess(
   return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
 }
 
+// Merge the given FunctionAccessedStorage in `other` into this
+// FunctionAccessedStorage. Use the given `transformStorage` to map `other`
+// AccessedStorage into this context. If `other` is from a callee, argument
+// substitution will be performed if possible. However, there's no guarantee
+// that the merged access values will belong to this function.
+//
+// Note that we may have `this` == `other` for self-recursion. We still need to
+// propagate and merge in that case in case arguments are recursively dependent.
 bool FunctionAccessedStorage::mergeAccesses(
-    const FunctionAccessedStorage &RHS,
+    const FunctionAccessedStorage &other,
     std::function<AccessedStorage(const AccessedStorage &)> transformStorage) {
 
+  // Insertion in DenseMap invalidates the iterator in the rare case of
+  // self-recursion (`this` == `other`) that passes accessed storage though an
+  // argument. Rather than complicate the code, make a temporary copy of the
+  // AccessedStorage.
+  SmallVector<std::pair<AccessedStorage, StorageAccessInfo>, 8> otherAccesses;
+  otherAccesses.reserve(other.storageAccessMap.size());
+  otherAccesses.append(other.storageAccessMap.begin(),
+                       other.storageAccessMap.end());
+
   bool changed = false;
-
-  for (auto &accessEntry : RHS.storageAccessMap) {
-
+  for (auto &accessEntry : otherAccesses) {
     const AccessedStorage &storage = transformStorage(accessEntry.first);
-    // transformStorage returns invalid storage object for local storage
+    // transformStorage() returns invalid storage object for local storage
     // that should not be merged with the caller.
     if (!storage)
       continue;
 
-    if (storage.getKind() == AccessedStorage::Unidentified)
+    if (storage.getKind() == AccessedStorage::Unidentified) {
       changed |= updateUnidentifiedAccess(accessEntry.second.accessKind);
-    else {
-      auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
-      if (result.second)
-        changed = true;
-      else
-        changed |= result.first->second.mergeFrom(accessEntry.second);
+      continue;
     }
+    // Attempt to add identified AccessedStorage to this map.
+    auto result = storageAccessMap.try_emplace(storage, accessEntry.second);
+    if (result.second) {
+      // A new AccessedStorage key was added to this map.
+      changed = true;
+      continue;
+    }
+    // Merge StorageAccessInfo into already-mapped AccessedStorage.
+    changed |= result.first->second.mergeFrom(accessEntry.second);
   }
-
-  if (RHS.unidentifiedAccess != None)
-    changed |= updateUnidentifiedAccess(RHS.unidentifiedAccess.getValue());
+  if (other.unidentifiedAccess != None)
+    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.getValue());
 
   return changed;
 }
 
-bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &RHS) {
-  // Merge accesses from RHS. Both `this` and `RHS` are either from the same
+bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &other) {
+  // Merge accesses from other. Both `this` and `other` are either from the same
   // function or are both callees of the same call site, so their parameters
   // indices coincide. transformStorage is the identity function.
-  return mergeAccesses(RHS, [](const AccessedStorage &s) { return s; });
+  return mergeAccesses(other, [](const AccessedStorage &s) { return s; });
 }
 
 /// Returns the argument of the full apply or partial apply corresponding to the
@@ -184,8 +202,12 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
   case AccessedStorage::Argument: {
     // Transitively search for the storage base in the caller.
     SILValue argVal = getCallerArg(fullApply, storage.getParamIndex());
-    assert(argVal && "AccessedStorage argument missing?");
-    return findAccessedStorageOrigin(argVal);
+    if (argVal)
+      return findAccessedStorageNonNested(argVal);
+
+    // If the argument can't be transformed, demote it to an unidentified
+    // access.
+    return AccessedStorage(storage.getValue(), AccessedStorage::Unidentified);
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
@@ -198,9 +220,8 @@ static AccessedStorage transformCalleeStorage(const AccessedStorage &storage,
 
 bool FunctionAccessedStorage::mergeFromApply(
     const FunctionAccessedStorage &calleeAccess, FullApplySite fullApply) {
-  // Merge accesses from RHS using the identity transform on it's
-  // AccessedStorage. Transform any Argument type AccessedStorage into the
-  // caller context to be added to `this` storage map.
+  // Merge accesses from calleeAccess. Transform any Argument type
+  // AccessedStorage into the caller context to be added to `this` storage map.
   return mergeAccesses(calleeAccess, [&fullApply](const AccessedStorage &s) {
     return transformCalleeStorage(s, fullApply);
   });
@@ -208,8 +229,11 @@ bool FunctionAccessedStorage::mergeFromApply(
 
 template <typename B>
 void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
+  if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+    return;
+
   const AccessedStorage &storage =
-      findAccessedStorageOrigin(beginAccess->getSource());
+      findAccessedStorageNonNested(beginAccess->getSource());
 
   if (storage.getKind() == AccessedStorage::Unidentified) {
     updateOptionalAccessKind(unidentifiedAccess, beginAccess->getAccessKind());
@@ -244,7 +268,7 @@ bool FunctionAccessedStorage::mayConflictWith(
     if (!accessKindMayConflict(otherAccessKind, accessInfo.accessKind))
       continue;
 
-    if (!otherStorage.isDistinct(storage))
+    if (!otherStorage.isDistinctFrom(storage))
       return true;
   }
   return false;

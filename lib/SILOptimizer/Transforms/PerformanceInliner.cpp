@@ -178,7 +178,7 @@ public:
 // Returns true if it is possible to perform a generic
 // specialization for a given call.
 static bool canSpecializeGeneric(ApplySite AI, SILFunction *F,
-                                 SubstitutionList Subs) {
+                                 SubstitutionMap Subs) {
   return ReabstractionInfo::canBeSpecialized(AI, F, Subs);
 }
 
@@ -240,7 +240,7 @@ bool SILPerformanceInliner::isProfitableToInline(
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
   SILFunction *Callee = AI.getReferencedFunction();
-  bool IsGeneric = !AI.getSubstitutions().empty();
+  bool IsGeneric = AI.hasSubstitutions();
 
   assert(EnableSILInliningOfGenerics || !IsGeneric);
 
@@ -279,7 +279,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // Bail out if this generic call can be optimized by means of
   // the generic specialization, because we prefer generic specialization
   // to inlining of generics.
-  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutions())) {
+  if (IsGeneric && canSpecializeGeneric(AI, Callee, AI.getSubstitutionMap())) {
     return false;
   }
 
@@ -296,12 +296,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   int CalleeCost = 0;
   int Benefit = 0;
 
-  SubstitutionMap CalleeSubstMap;
-  if (IsGeneric) {
-    CalleeSubstMap = Callee->getLoweredFunctionType()
-      ->getGenericSignature()
-      ->getSubstitutionMap(AI.getSubstitutions());
-  }
+  SubstitutionMap CalleeSubstMap = AI.getSubstitutionMap();
 
   CallerWeight.updateBenefit(Benefit, BaseBenefit);
 
@@ -330,7 +325,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         if (!def)
           continue;
 
-        auto Subs = FAI.getSubstitutions();
+        auto Subs = FAI.getSubstitutionMap();
 
         // Bail if it is not a generic call or inlining of generics is forbidden.
         if (!EnableSILInliningOfGenerics || Subs.empty())
@@ -346,12 +341,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 
         // Create the list of substitutions as they will be after
         // inlining.
-        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
-        auto SubMap = Sig->getSubstitutionMap(Subs);
-        SubMap = SubMap.subst(CalleeSubstMap);
-
-        SmallVector<Substitution, 4> NewSubs;
-        Sig->getSubstitutions(SubMap, NewSubs);
+        auto SubMap = Subs.subst(CalleeSubstMap);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||
@@ -368,7 +358,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         // Check if a generic specialization would be possible.
         if (isa<FunctionRefInst>(def)) {
           auto CalleeF = FAI.getCalleeFunction();
-          if (!canSpecializeGeneric(FAI, CalleeF, NewSubs))
+          if (!canSpecializeGeneric(FAI, CalleeF, SubMap))
             continue;
           DEBUG(llvm::dbgs() << "Generic specialization will be possible after "
                                 "inlining for the call:\n";
@@ -485,7 +475,7 @@ bool SILPerformanceInliner::isProfitableToInline(
 /// It returns None if the decision cannot be made without a more complex
 /// analysis.
 static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
-  assert(!AI.getSubstitutions().empty() &&
+  assert(AI.hasSubstitutions() &&
          "Expected a generic apply");
 
   SILFunction *Callee = AI.getReferencedFunction();
@@ -515,7 +505,7 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!hasArchetypes(AI.getSubstitutions()))
+  if (!AI.getSubstitutionMap().hasArchetypes())
     return false;
 
   // It is not clear yet if this function should be decided or not.
@@ -526,7 +516,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
     const llvm::DenseMap<SILBasicBlock *, uint64_t> &BBToWeightMap) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())
@@ -550,7 +540,7 @@ bool SILPerformanceInliner::decideInWarmBlock(
 /// Return true if inlining this call site into a cold block is profitable.
 bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
                                               SILFunction *Callee) {
-  if (!AI.getSubstitutions().empty()) {
+  if (AI.hasSubstitutions()) {
     // Only inline generics if definitively clear that it should be done.
     auto ShouldInlineGeneric = shouldInlineGeneric(AI);
     if (ShouldInlineGeneric.hasValue())
@@ -847,7 +837,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
 
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
-                       AI.getSubstitutions(),
+                       AI.getSubstitutionMap(),
                        OpenedArchetypesTracker);
 
     // We've already determined we should be able to inline this, so

@@ -1105,7 +1105,8 @@ public:
 
 ProjectionTree::
 ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
+                     << "\n");
 
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);

@@ -264,8 +264,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
   return isStructNode(Dem.demangleType(mangledName));
 }
 
-namespace swift {
-namespace Demangle {
+using namespace swift;
+using namespace Demangle;
 
 //////////////////////////////////
 // Node member functions        //
@@ -1324,6 +1324,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
       break;
+    case Node::Kind::TypeAlias:
+      kind = Node::Kind::BoundGenericTypeAlias;
+      break;
     default:
       return nullptr;
   }
@@ -1978,6 +1981,24 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
         default:
           return nullptr;
       }
+    }
+    case 'e': {
+      unsigned Value =
+          unsigned(FunctionSigSpecializationParamKind::ExistentialToGeneric);
+      if (nextIf('D'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::Dead);
+      if (nextIf('G'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
+      if (nextIf('O'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+      if (nextIf('X'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     Value));
     }
     case 'd': {
       unsigned Value = unsigned(FunctionSigSpecializationParamKind::Dead);
@@ -2695,6 +2716,3 @@ NodePointer Demangler::demangleObjCTypeName() {
 
   return Global;
 }
-
-} // namespace Demangle
-} // namespace swift

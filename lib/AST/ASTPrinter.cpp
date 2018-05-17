@@ -4157,8 +4157,8 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getSubstitutionMap().toList(),
-               [&](const Substitution &s) { s.print(os, PO); },
+    interleave(spec->getSubstitutionMap().getReplacementTypes(),
+               [&](Type type) { type.print(os, PO); },
                [&] { os << ", "; });
 
     os << "> (";
@@ -4174,11 +4174,6 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     break;
   }
   }
-}
-
-void Substitution::print(llvm::raw_ostream &os,
-                         const PrintOptions &PO) const {
-  Replacement->print(os, PO);
 }
 
 void swift::printEnumElementsAsCases(

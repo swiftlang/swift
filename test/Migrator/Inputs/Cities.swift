@@ -54,3 +54,23 @@ public class Container {
   public func getSingleAttr() -> String { return "" }
   public func getOptionalSingleAttr() -> String? { return nil }
 }
+
+open class ToplevelType {
+  public init() {}
+  public init(recordName: String) {}
+  open func member(_ x: @escaping ([Any]?) -> Void) {}
+}
+
+public var GlobalAttribute: String = ""
+
+public enum FontWeighting: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public enum FontWeight: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}

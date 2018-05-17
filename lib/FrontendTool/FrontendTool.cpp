@@ -404,7 +404,7 @@ private:
     }
   }
 
-  bool finishProcessing() override {
+  bool finishProcessing(SourceManager &) override {
     std::error_code EC;
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
@@ -948,9 +948,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
@@ -1527,6 +1531,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
       subConsumers.emplace_back(input.file(), std::move(subConsumer));
     return false;
   });
+  // For batch mode, the compiler must swallow diagnostics pertaining to
+  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // multiple times. So, create a diagnostic "eater" for those non-primary
+  // files.
+  // To avoid introducing bugs into WMO or single-file modes, test for multiple
+  // primaries.
+  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+    inputsAndOutputs.forEachNonPrimaryInput(
+        [&](const InputFile &input) -> bool {
+          subConsumers.emplace_back(input.file(), nullptr);
+          return false;
+        });
+  }
 
   if (subConsumers.empty())
     return nullptr;
@@ -1634,7 +1651,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   auto finishDiagProcessing = [&](int retValue) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing();
+    bool err = Instance->getDiags().finishProcessing(Instance->getSourceMgr());
     return retValue ? retValue : err;
   };
 
@@ -1739,15 +1756,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
-  {
-    const FrontendInputsAndOutputs &io =
-        Invocation.getFrontendOptions().InputsAndOutputs;
-    if (io.hasDependencyTrackerPath() ||
-        !Invocation.getFrontendOptions().IndexStorePath.empty()) {
-      Instance->setDependencyTracker(&depTracker);
-    }
-  }
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasDependencyTrackerPath() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty())
+    Instance->createDependencyTracker();
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

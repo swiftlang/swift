@@ -1536,35 +1536,34 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-
-  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
-                              DeclAttrKind kind, bool warning) {
-    if (DK == DAK_Count && Tok.getText() == oldName) {
+  
+  auto checkInvalidAttrName = [&](StringRef invalidName, StringRef correctName,
+                              DeclAttrKind kind, Diag<StringRef, StringRef> diag) {
+    if (DK == DAK_Count && Tok.getText() == invalidName) {
       // We renamed @availability to @available, so if we see the former,
       // treat it as the latter and emit a Fix-It.
       DK = kind;
-      if (warning) {
-        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      } else {
-        diagnose(Tok, diag::attr_renamed, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      }
+      
+      diagnose(Tok, diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
     }
   };
 
   // FIXME: This renaming happened before Swift 3, we can probably remove
   // the specific fallback path at some point.
-  checkRenamedAttr("availability", "available", DAK_Available, false);
+  checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
+
+  // Check if attr is inlineable, and suggest inlinable instead
+  checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
 
   // In Swift 5 and above, these become hard errors. Otherwise, emit a
   // warning for compatibility.
   if (!Context.isSwiftVersionAtLeast(5)) {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
@@ -2407,6 +2406,14 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   Identifier name = D->getBaseName().getIdentifier();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
+}
+
+void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
+  for (auto P : *PL) {
+    if (!P->hasName() || P->isImplicit())
+      continue;
+    setLocalDiscriminator(P);
+  }
 }
 
 void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
@@ -4282,6 +4289,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
       // Establish the new context.
       ParseFunctionBody CC(*this, TheDecl);
+      for (auto PL : TheDecl->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       // Parse the body.
       SmallVector<ASTNode, 16> Entries;
@@ -4373,6 +4382,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -4470,8 +4481,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   if (!PrimaryVar || !primaryVarIsWellFormed) {
     diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
-  } else {
-    setLocalDiscriminator(PrimaryVar);
   }
 
   TypeLoc TyLoc;
@@ -4881,6 +4890,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+      setLocalDiscriminator(VD);
       Decls.push_back(VD);
     });
 
@@ -5326,6 +5336,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
+    for (auto PL : FD->getParameterLists())
+      setLocalDiscriminatorToParamList(PL);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5396,6 +5408,8 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -6258,6 +6272,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
+      for (auto PL : CD->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)

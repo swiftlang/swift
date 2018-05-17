@@ -120,7 +120,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
          "Generic witnesses not supported");
 
   auto *dc = cast<FuncDecl>(witness)->getDeclContext();
-  auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
 
@@ -152,14 +151,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
     swiftValue = ManagedValue::forUnmanaged(tmp);
   }
 
-  SmallVector<Substitution, 4> subs;
-  if (genericSig)
-    genericSig->getSubstitutions(typeSubMap, subs);
-
   // Call the witness.
   SILType resultTy = SGF.getLoweredType(objcType);
   SILValue bridgedValue =
-      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, subs,
+      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, typeSubMap,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
@@ -241,8 +236,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   ArgumentScope argScope(SGF, loc);
   RValue result =
       SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
-                    ManagedValue::forUnmanaged(witnessRef),
-                    subs.toList(),
+                    ManagedValue::forUnmanaged(witnessRef), subs,
                     {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
                     calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);
@@ -946,9 +940,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  SmallVector<Substitution, 4> subs;
   if (auto genericSig = thunkTy->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
     substFnTy = thunkTy->substGenericArgs(F.getModule(),
                                           interfaceSubs);
   }
@@ -956,8 +948,8 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs,
-      block,
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
+      interfaceSubs, block,
       SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
 
   if (!loweredFuncTy->isNoEscape()) {
@@ -1252,7 +1244,7 @@ static SILValue emitObjCUnconsumedArgument(SILGenFunction &SGF,
 }
 
 static CanAnyFunctionType substGenericArgs(CanAnyFunctionType fnType,
-                                           const SubstitutionList &subs) {
+                                           SubstitutionMap subs) {
   if (auto genericFnType = dyn_cast<GenericFunctionType>(fnType)) {
     return cast<FunctionType>(genericFnType->substGenericArgs(subs)
                                            ->getCanonicalType());
@@ -1271,7 +1263,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                                                CanType &bridgedFormalResultTy) {
   SILDeclRef native = thunk.asForeign(false);
 
-  auto subs = SGF.F.getForwardingSubstitutions();
+  auto subs = SGF.F.getForwardingSubstitutionMap();
 
   auto objcInfo = SGF.SGM.Types.getConstantInfo(thunk);
   auto objcFnTy = objcInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs);
@@ -1392,7 +1384,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(thunk.isForeign);
   SILDeclRef native = thunk.asForeign(false);
   auto nativeInfo = getConstantInfo(native);
-  auto subs = F.getForwardingSubstitutions();
+  auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
   SILFunctionConventions substConv(substTy, SGM.M);
@@ -1557,7 +1549,6 @@ getThunkedForeignFunctionRef(SILGenFunction &SGF,
                              SILLocation loc,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
-                             SubstitutionList subs,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");
@@ -1759,8 +1750,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     maybeAddForeignErrorArg();
     
     // Call the original.
-    auto subs = getForwardingSubstitutions();
-    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args, subs,
+    auto subs = getForwardingSubstitutionMap();
+    auto fn = getThunkedForeignFunctionRef(*this, fd, foreignDeclRef, args,
                                            foreignCI);
 
     auto fnType = fn->getType().castTo<SILFunctionType>();
@@ -1788,8 +1779,8 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     ArgumentScope argScope(*this, fd);
     ManagedValue resultMV =
         emitApply(std::move(resultPlan), std::move(argScope), fd,
-                  ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
-                  ApplyOptions::None, context)
+                  ManagedValue::forUnmanaged(fn), subs, args,
+                  calleeTypeInfo, ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
 
     if (indirectResult) {

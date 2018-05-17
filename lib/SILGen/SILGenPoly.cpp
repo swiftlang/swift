@@ -2655,8 +2655,7 @@ buildThunkSignature(SILGenFunction &SGF,
   if (openedExistential == nullptr) {
     auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = SGF.F.getGenericEnvironment();
-    auto subsArray = SGF.F.getForwardingSubstitutions();
-    interfaceSubs = genericSig->getSubstitutionMap(subsArray);
+    interfaceSubs = SGF.F.getForwardingSubstitutionMap();
     contextSubs = interfaceSubs;
     return genericSig;
   }
@@ -2912,9 +2911,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
   CanSILFunctionType substFnType = thunkType;
 
-  SmallVector<Substitution, 4> subs;
   if (auto genericSig = thunkType->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
     substFnType = thunkType->substGenericArgs(SGF.F.getModule(),
                                               interfaceSubs);
   }
@@ -2924,7 +2921,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   ManagedValue thunkedFn =
     SGF.B.createPartialApply(loc, thunkValue,
                              SILType::getPrimitiveObjectType(substFnType),
-                             subs, fn.ensurePlusOne(SGF, loc),
+                             interfaceSubs, fn.ensurePlusOne(SGF, loc),
                              SILType::getPrimitiveObjectType(toType));
 
   if (!expectedType->isNoEscape()) {
@@ -3017,7 +3014,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   }
 
   CanSILFunctionType substFnType = thunkType->substGenericArgs(
-      F.getModule(), thunk->getForwardingSubstitutions());
+      F.getModule(), thunk->getForwardingSubstitutionMap());
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
@@ -3026,7 +3023,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   SingleValueInstruction *thunkedFn = B.createPartialApply(
       loc, thunkValue,
       SILType::getPrimitiveObjectType(substFnType),
-      thunk->getForwardingSubstitutions(),
+      thunk->getForwardingSubstitutionMap(),
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
@@ -3251,10 +3248,10 @@ SILGenFunction::emitVTableThunk(SILDeclRef derived,
 
   auto fTy = implFn->getLoweredFunctionType();
   
-  SubstitutionList subs;
+  SubstitutionMap subs;
   if (auto *genericEnv = fd->getGenericEnvironment()) {
     F.setGenericEnvironment(genericEnv);
-    subs = getForwardingSubstitutions();
+    subs = getForwardingSubstitutionMap();
     fTy = fTy->substGenericArgs(SGM.M, subs);
 
     inputSubstType = cast<FunctionType>(
@@ -3400,7 +3397,7 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
                                          CanAnyFunctionType reqtSubstTy,
                                          SILDeclRef requirement,
                                          SILDeclRef witness,
-                                         SubstitutionList witnessSubs,
+                                         SubstitutionMap witnessSubs,
                                          IsFreeFunctionWitness_t isFree) {
   // FIXME: Disable checks that the protocol witness carries debug info.
   // Should we carry debug info for witnesses?
@@ -3419,11 +3416,10 @@ void SILGenFunction::emitProtocolWitness(AbstractionPattern reqtOrigTy,
   // Get the type of the witness.
   auto witnessInfo = getConstantInfo(witness);
   CanAnyFunctionType witnessSubstTy = witnessInfo.LoweredType;
-  if (!witnessSubs.empty()) {
-    witnessSubstTy = cast<FunctionType>(
-      cast<GenericFunctionType>(witnessSubstTy)
-        ->substGenericArgs(witnessSubs)
-        ->getCanonicalType());
+  if (auto genericFnType = dyn_cast<GenericFunctionType>(witnessSubstTy)) {
+    witnessSubstTy = cast<FunctionType>(genericFnType
+                                          ->substGenericArgs(witnessSubs)
+                                          ->getCanonicalType());
   }
   CanType reqtSubstInputTy = F.mapTypeIntoContext(reqtSubstTy.getInput())
       ->getCanonicalType();
@@ -3613,16 +3609,15 @@ SILGenFunction::emitCanonicalFunctionThunk(SILLocation loc, ManagedValue fn,
 
   CanSILFunctionType substFnTy = thunkTy;
 
-  SmallVector<Substitution, 4> subs;
   if (auto genericSig = thunkTy->getGenericSignature()) {
-    genericSig->getSubstitutions(interfaceSubs, subs);
     substFnTy = thunkTy->substGenericArgs(F.getModule(), interfaceSubs);
   }
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy), subs, {fn},
+      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
+      interfaceSubs, {fn},
       SILType::getPrimitiveObjectType(canonicalTy));
   if (canonicalTy->isNoEscape()) {
     auto &funcTL = getTypeLowering(canonicalTy);

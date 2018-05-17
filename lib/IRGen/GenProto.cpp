@@ -1166,6 +1166,21 @@ public:
   }
 };
 
+/// Emit a reference to the witness table for a foreign type.
+llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
+                                          llvm::Value *candidate,
+                                          llvm::Value *typeDescriptorRef,
+                                          llvm::Value *protocolDescriptor) {
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetForeignWitnessTableFn(),
+      {candidate, typeDescriptorRef, protocolDescriptor});
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::NoUnwind);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  return call;
+}
+
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
     IRGenModule &IGM;
@@ -1866,15 +1881,31 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   wtable = llvm::ConstantExpr::getBitCast(wtable, IGM.WitnessTablePtrTy);
 
+  auto conformingType = Conformance.getType()->getCanonicalType();
+  bool needsUniquing = Conformance.isSynthesizedNonUnique();
+
+  // We will unique the witness table if it is for a non-unique foreign type.
+  auto uniqueWitnessTableIfIsForeignType =
+      [&](llvm::Value *witness) -> llvm::Value * {
+    if (!needsUniquing)
+      return witness;
+    auto *nominal = conformingType->getAnyNominal();
+    auto *proto = Conformance.getProtocol();
+    return uniqueForeignWitnessTableRef(
+        IGF, witness,
+        IGM.getAddrOfTypeContextDescriptor(nominal, DontRequireMetadata),
+        IGM.getAddrOfProtocolDescriptor(proto));
+  };
+
   // If specialization isn't required, just return immediately.
   // TODO: allow dynamic specialization?
   if (!RequiresSpecialization) {
-    IGF.Builder.CreateRet(wtable);
+    auto res = uniqueWitnessTableIfIsForeignType(wtable);
+    IGF.Builder.CreateRet(res);
     return;
   }
 
-  // The target metadata is the first argument.
-  assert(isDependentConformance(&Conformance));
+  assert(isDependentConformance(&Conformance) || needsUniquing);
 
   Explosion params = IGF.collectParameters();
   llvm::Value *metadata;
@@ -1977,7 +2008,8 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   call->setDoesNotThrow();
 
-  IGF.Builder.CreateRet(call);
+  // Possibly unique the witness table if this is a foreign type.
+  IGF.Builder.CreateRet(uniqueWitnessTableIfIsForeignType(call));
 }
 
 llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
@@ -2129,7 +2161,10 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
-  if (isDependentConformance(normalConformance)) {
+  if (isDependentConformance(normalConformance) ||
+      // Foreign types need to go through the accessor to unique the witness
+      // table.
+      normalConformance->isSynthesizedNonUnique()) {
     info = new AccessorConformanceInfo(conformance);
     Conformances.insert({conformance, info});
   } else {
@@ -2195,8 +2230,10 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     // Make sure we emit the nominal type descriptor.
     auto *nominal = conformingType->getAnyNominal();
     auto entity = LinkEntity::forNominalTypeDescriptor(nominal);
-    if (auto entry = GlobalVars[entity])
-      return;
+    if (auto entry = GlobalVars[entity]) {
+      if (!cast<llvm::GlobalValue>(entry)->isDeclaration())
+        return;
+    }
 
     emitLazyTypeContextDescriptor(*this, nominal, RequireMetadata);
   }
@@ -2815,32 +2852,6 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     LocalTypeDataKind::forConcreteProtocolWitnessTable(concreteConformance),
     wtable);
   return wtable;
-}
-
-/// Emit the witness table references required for the given type
-/// substitution.
-void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
-                                 const Substitution &sub,
-                                 llvm::Value **metadataCache,
-                                 SmallVectorImpl<llvm::Value*> &out) {
-  auto conformances = sub.getConformances();
-
-  // We don't need to do anything if we have no protocols to conform to.
-  if (conformances.empty()) return;
-
-  // Look at the replacement type.
-  CanType replType = sub.getReplacement()->getCanonicalType();
-
-  for (auto &conformance : conformances) {
-    auto *proto = conformance.getRequirement();
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      continue;
-
-    auto wtable = emitWitnessTableRef(IGF, replType, metadataCache,
-                                      conformance);
-
-    out.push_back(wtable);
-  }
 }
 
 static CanType getSubstSelfType(CanSILFunctionType origFnType,

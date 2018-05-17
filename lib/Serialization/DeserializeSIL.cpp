@@ -1265,11 +1265,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     if (OpCode == SILInstructionKind::ApplyInst) {
       ResultVal = Builder.createApply(Loc, getLocalValue(ValID, FnTy),
-                                      Substitutions.toList(), Args,
+                                      Substitutions, Args,
                                       IsNonThrowingApply != 0);
     } else {
       ResultVal = Builder.createBeginApply(Loc, getLocalValue(ValID, FnTy),
-                                           Substitutions.toList(), Args,
+                                           Substitutions, Args,
                                            IsNonThrowingApply != 0);
     }
     break;
@@ -1300,7 +1300,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);
 
     ResultVal = Builder.createTryApply(Loc, getLocalValue(ValID, FnTy),
-                                       Substitutions.toList(), Args, normalBB,
+                                       Substitutions, Args, normalBB,
                                        errorBB);
     break;
   }
@@ -1331,7 +1331,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
-        Loc, FnVal, Substitutions.toList(), Args,
+        Loc, FnVal, Substitutions, Args,
         closureTy.castTo<SILFunctionType>()->getCalleeConvention());
     break;
   }
@@ -1690,10 +1690,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     auto accessKind = SILAccessKind(Attr & 0x3);
     auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x3);
-    bool noNestedConflict = Attr >> 4;
+    bool noNestedConflict = (Attr >> 4) & 0x01;
+    bool fromBuiltin = (Attr >> 5) & 0x01;
     ResultVal =
         Builder.createBeginAccess(Loc, op, accessKind, enforcement,
-                                  noNestedConflict);
+                                  noNestedConflict, fromBuiltin);
     break;
   }
   case SILInstructionKind::EndAccessInst: {
@@ -1710,17 +1711,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ValID2, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     auto accessKind = SILAccessKind(Attr & 0x3);
     auto enforcement = SILAccessEnforcement((Attr >> 2) & 0x03);
-    bool noNestedConflict = Attr >> 4;
+    bool noNestedConflict = (Attr >> 4) & 0x01;
+    bool fromBuiltin = (Attr >> 5) & 0x01;
     ResultVal = Builder.createBeginUnpairedAccess(
-        Loc, source, buffer, accessKind, enforcement, noNestedConflict);
+      Loc, source, buffer, accessKind, enforcement, noNestedConflict,
+      fromBuiltin);
     break;
   }
   case SILInstructionKind::EndUnpairedAccessInst: {
     SILValue op = getLocalValue(
         ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
     bool aborted = Attr & 0x1;
-    auto enforcement = SILAccessEnforcement(Attr >> 1);
-    ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted);
+    auto enforcement = SILAccessEnforcement((Attr >> 1) & 0x03);
+    bool fromBuiltin = (Attr >> 3) & 0x01;
+    ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
+                                                fromBuiltin);
     break;
   }
   case SILInstructionKind::StoreUnownedInst: {

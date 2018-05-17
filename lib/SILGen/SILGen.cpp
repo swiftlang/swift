@@ -1264,9 +1264,9 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     return;
   }
   
-  SubstitutionList subs = {};
+  SubstitutionMap subs;
   if (genericEnv)
-    subs = genericEnv->getForwardingSubstitutions();
+    subs = genericEnv->getForwardingSubstitutionMap();
   
   if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
     for (auto *index : *sub->getIndices()) {
@@ -1381,14 +1381,6 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
 
   // Otherwise, just remember the fact we used this conformance.
   usedConformances.insert(root);
-}
-
-void
-SILGenModule::useConformancesFromSubstitutions(SubstitutionList subs) {
-  for (auto &sub : subs) {
-    for (auto conformance : sub.getConformances())
-      useConformance(conformance);
-  }
 }
 
 void SILGenModule::useConformancesFromSubstitutions(

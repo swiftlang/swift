@@ -33,7 +33,7 @@ static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 }
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
-    : Ctx(LangOpts, SearchPathOpts, SourceMgr, Diags) {
+    : Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SourceMgr, Diags)) {
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);
   Ctx.LoadedModules[stdlibID] = module;

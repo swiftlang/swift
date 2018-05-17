@@ -11,7 +11,7 @@
 // Input validation tests.
 // RUN: not %lldb-moduleimport-test patatino 2>&1 | %FileCheck %s \
 // RUN:   --check-prefix=INVALID-INPUT
-// INVALID-INPUT: patatino does not exists, exiting.
+// INVALID-INPUT: patatino No such file or directory
 
 // RUN: not %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   --decl-from-mangled=patatino 2>&1 | \

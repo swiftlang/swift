@@ -148,7 +148,7 @@ class BugReducerTester : public SILFunctionTransform {
         RuntimeCrasherFunc->dump();
         SILBuilder B(Apply->getIterator());
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
-                      SubstitutionList(),
+                      SubstitutionMap(),
                       ArrayRef<SILValue>(), false /*NoThrow*/);
 
         Apply->replaceAllUsesWith(SILUndef::get(Apply->getType(), M));

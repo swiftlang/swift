@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_TRANSFORMS_FUNCTIONSIGNATUREOPTS_H
 #define SWIFT_SILOPTIMIZER_TRANSFORMS_FUNCTIONSIGNATUREOPTS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -26,6 +27,8 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 
@@ -197,6 +200,144 @@ struct ResultDescriptor {
     return ResultInfo.getConvention() == R;
   }
 };
+
+struct FunctionSignatureTransformDescriptor {
+  /// The original function that we are analyzing/transforming.
+  SILFunction *OriginalFunction;
+
+  /// The new optimize function that we will create.
+  NullablePtr<SILFunction> OptimizedFunction;
+
+  /// A map from a pre-transformed argument to a post-transformed argument.
+  llvm::SmallDenseMap<int, int> &AIM;
+
+  /// Set to true if we are going to modify self during our transformation.
+  ///
+  /// TODO: Rename to willModifySelfArgument.
+  bool shouldModifySelfArgument;
+
+  /// Keep a "view" of precompiled information on arguments that we use
+  /// during our optimization.
+  MutableArrayRef<ArgumentDescriptor> ArgumentDescList;
+
+  /// Keep a "view" of precompiled information on the direct results that we
+  /// will use during our optimization.
+  MutableArrayRef<ResultDescriptor> ResultDescList;
+
+  /// Return a function name based on the current state of ArgumentDescList and
+  /// ResultDescList.
+  ///
+  /// FIXME: Change this to take a SmallString as an out parameter?
+  std::string createOptimizedSILFunctionName();
+
+  /// Return a function type based on the current state of ArgumentDescList and
+  /// ResultDescList.
+  CanSILFunctionType createOptimizedSILFunctionType();
+
+  /// Compute the optimized function type based on the given argument
+  /// descriptor.
+  void computeOptimizedArgInterface(ArgumentDescriptor &A,
+                                    SmallVectorImpl<SILParameterInfo> &O);
+
+  /// Setup the thunk arguments based on the given argument descriptor info.
+  /// Every transformation must defines this interface. Default implementation
+  /// simply passes it through.
+  void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
+                        SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs);
+};
+
+class FunctionSignatureTransform {
+  /// A struct that contains all data that we use during our
+  /// transformation. This is an initial step towards splitting this struct into
+  /// multiple "transforms" that can be tested independently of each other.
+  FunctionSignatureTransformDescriptor TransformDescriptor;
+
+  /// The RC identity analysis we are using.
+  RCIdentityAnalysis *RCIA;
+
+  /// Post order analysis we are using.
+  EpilogueARCAnalysis *EA;
+
+private:
+  /// ----------------------------------------------------------///
+  /// Dead argument transformation.                             ///
+  /// ----------------------------------------------------------///
+  /// Find any dead argument opportunities.
+  bool DeadArgumentAnalyzeParameters();
+  /// Modify the current function so that later function signature analysis
+  /// are more effective.
+  void DeadArgumentTransformFunction();
+  /// Remove the dead argument once the new function is created.
+  void DeadArgumentFinalizeOptimizedFunction();
+
+  /// ----------------------------------------------------------///
+  /// Owned to guaranteed transformation.                       ///
+  /// ----------------------------------------------------------///
+  bool OwnedToGuaranteedAnalyzeResults();
+  bool OwnedToGuaranteedAnalyzeParameters();
+
+  /// Modify the current function so that later function signature analysis
+  /// are more effective.
+  void OwnedToGuaranteedTransformFunctionResults();
+  void OwnedToGuaranteedTransformFunctionParameters();
+
+  /// Find any owned to guaranteed opportunities.
+  bool OwnedToGuaranteedAnalyze();
+
+  /// Do the actual owned to guaranteed transformations.
+  void OwnedToGuaranteedTransform();
+
+  /// Set up epilogue work for the thunk result based in the given argument.
+  void OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD,
+                                         SILBuilder &Builder, SILFunction *F);
+
+  /// Set up epilogue work for the thunk argument based in the given argument.
+  void OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD,
+                                           SILBuilder &Builder, SILFunction *F);
+
+  /// Add the release for converted arguments and result.
+  void OwnedToGuaranteedFinalizeThunkFunction(SILBuilder &B, SILFunction *F);
+
+  /// ----------------------------------------------------------///
+  /// Argument explosion transformation.                        ///
+  /// ----------------------------------------------------------///
+  /// Find any argument explosion opportunities.
+  bool ArgumentExplosionAnalyzeParameters();
+  /// Explode the argument in the optimized function and replace the uses of
+  /// the original argument.
+  void ArgumentExplosionFinalizeOptimizedFunction();
+
+  /// Take ArgumentDescList and ResultDescList and create an optimized function
+  /// based on the current function we are analyzing. This also has the side
+  /// effect of turning the current function into a thunk.
+  void createFunctionSignatureOptimizedFunction();
+
+public:
+  /// Constructor.
+  FunctionSignatureTransform(
+      SILFunction *F, RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
+      Mangle::FunctionSignatureSpecializationMangler &Mangler,
+      llvm::SmallDenseMap<int, int> &AIM,
+      llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
+      llvm::SmallVector<ResultDescriptor, 4> &RDL)
+      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL}, RCIA(RCIA),
+        EA(EA) {}
+
+  /// Return the optimized function.
+  SILFunction *getOptimizedFunction() {
+    return TransformDescriptor.OptimizedFunction.getPtrOrNull();
+  }
+
+  /// Run the optimization.
+  bool run(bool hasCaller);
+
+  /// Run dead argument elimination of partially applied functions.
+  ///
+  /// After this optimization CapturePropagation can replace the partial_apply
+  /// by a direct reference to the specialized function.
+  bool removeDeadArgs(int minPartialAppliedArgs);
+};
+
 } // namespace swift
 
 #endif

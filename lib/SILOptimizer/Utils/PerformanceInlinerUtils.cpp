@@ -560,12 +560,12 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
     return false;
 
   SILFunction *Callee = AI.getReferencedFunction();
-  auto Subs = AI.getSubstitutions();
+  auto SubsMap = AI.getSubstitutionMap();
 
   // Bail if there are no open existentials in the list of substitutions.
   bool HasNoOpenedExistentials = true;
-  for (auto Sub : Subs) {
-    if (Sub.getReplacement()->hasOpenedExistential()) {
+  for (auto Replacement : SubsMap.getReplacementTypes()) {
+    if (Replacement->hasOpenedExistential()) {
       HasNoOpenedExistentials = false;
       break;
     }
@@ -574,20 +574,15 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   if (HasNoOpenedExistentials)
     return false;
 
-  auto SubsMap = Callee->getLoweredFunctionType()
-    ->getGenericSignature()->getSubstitutionMap(Subs);
-
   for (auto &BB : *Callee) {
     for (auto &I : BB) {
       if (auto PAI = dyn_cast<PartialApplyInst>(&I)) {
-        auto PAISubs = PAI->getSubstitutions();
-        if (PAISubs.empty())
+        if (!PAI->hasSubstitutions())
           continue;
 
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        auto PAISubMap = PAI->getOrigCalleeType()
-          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        auto PAISubMap = PAI->getSubstitutionMap();
         PAISubMap = PAISubMap.subst(SubsMap);
         if (PAISubMap.hasOpenedExistential())
           return true;
@@ -632,7 +627,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunction();
   auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto SubstParams = CalleeSig->getSubstitutableParams();
-  auto AISubs = AI.getSubstitutions();
+  auto AISubs = AI.getSubstitutionMap();
   for (auto idx : indices(SubstParams)) {
     auto Param = SubstParams[idx];
     // Map the parameter into context
@@ -645,7 +640,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
       continue;
     // The generic parameter has a layout constraint.
     // Check that the substitution has the same constraint.
-    auto AIReplacement = AISubs[idx].getReplacement();
+    auto AIReplacement = Type(Param).subst(AISubs);
     auto AIArchetype = AIReplacement->getAs<ArchetypeType>();
     if (!AIArchetype)
       return false;

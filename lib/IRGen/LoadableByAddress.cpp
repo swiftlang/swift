@@ -2086,7 +2086,8 @@ static void rewriteFunction(StructLoweringState &pass,
       auto *convInstr = cast<BeginAccessInst>(instr);
       newInstr = resultTyBuilder.createBeginAccess(
           Loc, convInstr->getOperand(), convInstr->getAccessKind(),
-          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict(),
+          convInstr->isFromBuiltin());
       break;
     }
     case SILInstructionKind::EnumInst: {
@@ -2374,7 +2375,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<ApplyInst>(applyInst);
     SILValue newApply =
       applyBuilder.createApply(castedApply->getLoc(), callee,
-                               applySite.getSubstitutions(),
+                               applySite.getSubstitutionMap(),
                                callArgs, castedApply->isNonThrowing());
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2383,7 +2384,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<TryApplyInst>(applyInst);
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
-        applySite.getSubstitutions(), callArgs,
+        applySite.getSubstitutionMap(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
     break;
   }
@@ -2391,7 +2392,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto oldApply = cast<BeginApplyInst>(applyInst);
     auto newApply =
       applyBuilder.createBeginApply(oldApply->getLoc(), callee,
-                                    applySite.getSubstitutions(), callArgs,
+                                    applySite.getSubstitutionMap(), callArgs,
                                     oldApply->isNonThrowing());
 
     // Use the new token result.
@@ -2437,7 +2438,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
 
     auto newApply =
       applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      applySite.getSubstitutions(), callArgs,
+                                      applySite.getSubstitutionMap(), callArgs,
                                       partialApplyConvention);
     castedApply->replaceAllUsesWith(newApply);
     break;

@@ -1456,6 +1456,11 @@ public:
     if (tl.isTrivial()) {
       if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
         return ResultConvention::UnownedInnerPointer;
+
+      auto type = tl.getLoweredType();
+      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
+          == type.getASTContext().getUnmanagedDecl())
+        return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
     }
 
@@ -2449,23 +2454,6 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
   return subst(silModule,
                QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
-}
-
-/// Apply a substitution to this polymorphic SILFunctionType so that
-/// it has the form of the normal SILFunctionType for the substituted
-/// type, except using the original conventions.
-CanSILFunctionType
-SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  SubstitutionList subs) {
-  if (subs.empty()) {
-    assert(
-        (!isPolymorphic() || getGenericSignature()->areAllParamsConcrete()) &&
-        "no args for non-concrete polymorphic substitution");
-    return CanSILFunctionType(this);
-  }
-
-  auto subMap = GenericSig->getSubstitutionMap(subs);
-  return substGenericArgs(silModule, subMap);
 }
 
 /// Apply a substitution to this polymorphic SILFunctionType so that

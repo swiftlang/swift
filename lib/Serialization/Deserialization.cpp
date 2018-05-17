@@ -1687,8 +1687,11 @@ giveUpFastPath:
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
         paramList = alias->getGenericParams();
-      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
+      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
         paramList = fn->getGenericParams();
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
+        paramList = subscript->getGenericParams();
+      }
 
       if (!paramList) {
         return llvm::make_error<XRefError>(
@@ -4303,6 +4306,31 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto nominalOrError = getDeclChecked(declID);
     if (!nominalOrError)
       return nominalOrError.takeError();
+
+    // Look through compatibility aliases.
+    if (auto *alias = dyn_cast<TypeAliasDecl>(nominalOrError.get())) {
+      // Reminder: TypeBase::getAs will look through sugar. But we don't want to
+      // do that here, so we do isa<> checks on the TypeBase itself instead of
+      // using the Type wrapper.
+      const TypeBase *underlyingTy = nullptr;
+      while (alias->isCompatibilityAlias()) {
+        underlyingTy = alias->getUnderlyingTypeLoc().getType().getPointer();
+
+        // If the underlying type is itself a typealias, it might be another
+        // compatibility alias, meaning we need to go around the loop again.
+        auto aliasTy = dyn_cast<NameAliasType>(underlyingTy);
+        if (!aliasTy)
+          break;
+        alias = aliasTy->getDecl();
+      }
+
+      // We only want to use the type we found if it's a simple non-generic
+      // nominal type.
+      if (auto simpleNominalTy = dyn_cast_or_null<NominalType>(underlyingTy)) {
+        nominalOrError = simpleNominalTy->getDecl();
+        (void)!nominalOrError; // "Check" the llvm::Expected<> value.
+      }
+    }
 
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {

@@ -65,3 +65,17 @@ public protocol DangerousEscaper {
 public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
   villian.malicious(closure)
 }
+
+// We need to store nil on the back-edge.
+// CHECK  sil {{.*}}dontCrash
+// CHECK:  is_escaping_closure [objc]
+// CHECK:  cond_fail
+// CHECK:  destroy_addr %0
+// CHECK:  [[NONE:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK:  store [[NONE]] to %0 : $*Optional<@callee_guaranteed () -> ()>
+public func dontCrash() {
+  for i in 0 ..< 2 {
+    let queue = DispatchQueue(label: "Foo")
+    queue.sync { }
+  }
+}

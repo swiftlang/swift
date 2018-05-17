@@ -208,8 +208,7 @@ ERROR(number_cant_start_decl_name,none,
 ERROR(expected_identifier_after_case_comma,none,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
-      "%select{declaration|definition}0 conflicts with previous value",
-      (bool))
+      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,
@@ -1322,6 +1321,8 @@ ERROR(attr_renamed, none,
       "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+ERROR(attr_name_close_match, none,
+      "No attribute named '@%0', did you mean '@%1'?", (StringRef, StringRef))
 
 // availability
 ERROR(attr_availability_platform,none,

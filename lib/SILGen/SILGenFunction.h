@@ -550,7 +550,7 @@ public:
                            CanAnyFunctionType reqtSubstTy,
                            SILDeclRef requirement,
                            SILDeclRef witness,
-                           SubstitutionList witnessSubs,
+                           SubstitutionMap witnessSubs,
                            IsFreeFunctionWitness_t isFree);
   
   /// Convert a block to a native function with a thunk.
@@ -1083,7 +1083,7 @@ public:
                                   CanType baseFormalType,
                                   bool isSuper, AbstractStorageDecl *storage,
                                   RValue indexes,
-                                  SubstitutionList substitutions,
+                                  SubstitutionMap substitutions,
                                   AccessSemantics semantics, Type propTy,
                                   SGFContext C,
                                   bool isBaseGuaranteed = false);
@@ -1099,20 +1099,20 @@ public:
   ManagedValue emitClosureValue(SILLocation loc,
                                 SILDeclRef function,
                                 CanType expectedType,
-                                SubstitutionList subs);
+                                SubstitutionMap subs);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
 
   RValue emitGetAccessor(SILLocation loc, SILDeclRef getter,
-                         SubstitutionList substitutions,
+                         SubstitutionMap substitutions,
                          ArgumentSource &&optionalSelfValue,
                          bool isSuper, bool isDirectAccessorUse,
                          RValue &&optionalSubscripts, SGFContext C);
 
   void emitSetAccessor(SILLocation loc, SILDeclRef setter,
-                       SubstitutionList substitutions,
+                       SubstitutionMap substitutions,
                        ArgumentSource &&optionalSelfValue,
                        bool isSuper, bool isDirectAccessorUse,
                        RValue &&optionalSubscripts,
@@ -1120,7 +1120,7 @@ public:
 
   MaterializedLValue
   emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
-                                SubstitutionList substitutions,
+                                SubstitutionMap substitutions,
                                 ArgumentSource &&optionalSelfValue,
                                 bool isSuper, bool isDirectAccessorUse,
                                 RValue &&optionalSubscripts,
@@ -1131,12 +1131,12 @@ public:
                                        GenericEnvironment *genericEnv,
                                        AccessorDecl *requirement,
                                        AccessorDecl *witness,
-                                       SubstitutionList witnessSubs);
+                                       SubstitutionMap witnessSubs);
   void emitMaterializeForSet(AccessorDecl *decl);
 
   std::pair<ManagedValue,ManagedValue>
   emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
-                        SubstitutionList substitutions,
+                        SubstitutionMap substitutions,
                         ArgumentSource &&optionalSelfValue,
                         bool isSuper, bool isDirectAccessorUse,
                         RValue &&optionalSubscripts,
@@ -1297,7 +1297,7 @@ public:
   /// result does need to be turned back into something matching a
   /// formal type.
   RValue emitApply(ResultPlanPtr &&resultPlan, ArgumentScope &&argScope,
-                   SILLocation loc, ManagedValue fn, SubstitutionList subs,
+                   SILLocation loc, ManagedValue fn, SubstitutionMap subs,
                    ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
@@ -1312,7 +1312,7 @@ public:
   RValue emitApplyOfStoredPropertyInitializer(
       SILLocation loc,
       const PatternBindingEntry &entry,
-      SubstitutionList subs,
+      SubstitutionMap subs,
       CanType resultType,
       AbstractionPattern origResultType,
       SGFContext C);
@@ -1335,15 +1335,9 @@ public:
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
-  RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
-                                     FuncDecl *fn,
-                                     const SubstitutionList &subs,
-                                     ArrayRef<ManagedValue> args,
-                                     SGFContext ctx);
-
   SILValue emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                 SILType substFnType,
-                                SubstitutionList subs,
+                                SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
   /// Emit a literal that applies the various initializers.
@@ -1818,10 +1812,6 @@ public:
       if (Loc) finish();
     }
   };
-
-  /// Return forwarding substitutions for the archetypes in the current
-  /// function.
-  SubstitutionList getForwardingSubstitutions();
 
   /// Return forwarding substitutions for the archetypes in the current
   /// function.

@@ -300,7 +300,7 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     for (auto &Op : TAI->getArgumentOperands())
       Arguments.push_back(Op.get());
 
-    B.createTryApply(TAI->getLoc(), TAI->getCallee(), TAI->getSubstitutions(),
+    B.createTryApply(TAI->getLoc(), TAI->getCallee(), TAI->getSubstitutionMap(),
                      Arguments, NormalBB, ErrorBB);
 
     TAI->eraseFromParent();

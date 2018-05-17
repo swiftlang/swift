@@ -79,6 +79,8 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
   // is not used by the program itself.
   if (!Opts.shouldOptimize())
     return false;
+  if (Opts.UseJIT)
+    return false;
 
   switch (Nominal->getKind()) {
     case DeclKind::Enum:
@@ -1065,7 +1067,6 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
   }
-  PrimaryIGM->emitCoverageMapping();
   
   // Emit SIL functions.
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
@@ -1099,6 +1100,9 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     IGM->emitSILProperty(&prop);
   }
   
+  // Emit code coverage mapping data.
+  PrimaryIGM->emitCoverageMapping();
+
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
@@ -2819,7 +2823,8 @@ namespace {
       llvm::Constant *witnessTableVar;
 
       if (Conformance->getConditionalRequirements().empty()) {
-        if (!isDependentConformance(Conformance)) {
+        if (!isDependentConformance(Conformance) &&
+            !Conformance->isSynthesizedNonUnique()) {
           Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
           witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
         } else {
@@ -4062,8 +4067,10 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  if (Types.isCompletelyFragile())
+  if (expansion == ResilienceExpansion::Maximal &&
+      Types.isCompletelyFragile()) {
     return false;
+  }
   return D->isResilient(getSwiftModule(), expansion);
 }
 

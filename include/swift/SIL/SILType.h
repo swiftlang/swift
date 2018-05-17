@@ -373,17 +373,6 @@ public:
   /// pointer.
   bool isPointerSizeAndAligned();
 
-  /// Return true if the layout of `toType` is an ABI compatible prefix of
-  /// `fromType` ignoring reference types. `fromType` may be larger than
-  /// `toType` and still be unsafe castable. `fromType` may contain references
-  /// in positions where `toType` does not contain references and still be
-  /// unsafe castable. This is used solely to determine whether an address cast
-  /// can be promoted to a cast between aggregates of scalar values without
-  /// confusing IRGen.
-  static bool canPerformABICompatibleUnsafeCastValue(SILType fromType,
-                                                     SILType toType,
-                                                     SILModule &M);
-
   /// True if `operTy` can be cast by single-reference value into `resultTy`.
   static bool canRefCast(SILType operTy, SILType resultTy, SILModule &M);
 
@@ -444,13 +433,6 @@ public:
   SILType getReferenceStorageReferentType() const {
     return SILType(getASTType().getReferenceStorageReferent(), getCategory());
   }
-
-  /// Transform the function type SILType by replacing all of its interface
-  /// generic args with the appropriate item from the substitution.
-  ///
-  /// Only call this with function types!
-  SILType substGenericArgs(SILModule &M,
-                           SubstitutionList Subs) const;
 
   /// Transform the function type SILType by replacing all of its interface
   /// generic args with the appropriate item from the substitution.

@@ -81,6 +81,34 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
 #endif
 }
 
+static llvm::Value *calcInitOffset(swift::irgen::IRGenFunction &IGF,
+                                   unsigned int i,
+                                   const swift::irgen::HeapLayout &layout) {
+  llvm::Value *offset = nullptr;
+  if (i == 0) {
+    auto startoffset = layout.getSize();
+    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, startoffset.getValue());
+    return offset;
+  }
+  auto &prevElt = layout.getElement(i - 1);
+  auto prevType = layout.getElementTypes()[i - 1];
+  // Start calculating offsets from the last fixed-offset field.
+  Size lastFixedOffset = layout.getElement(i - 1).getByteOffset();
+  if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
+    // If the last fixed-offset field is also fixed-size, we can
+    // statically compute the end of the fixed-offset fields.
+    auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
+    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedEnd.getValue());
+  } else {
+    // Otherwise, we need to add the dynamic size to the fixed start
+    // offset.
+    offset = llvm::ConstantInt::get(IGF.IGM.SizeTy, lastFixedOffset.getValue());
+    offset = IGF.Builder.CreateAdd(
+        offset, prevElt.getTypeForLayout().getSize(IGF, prevType));
+  }
+  return offset;
+}
+
 HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
                                          const HeapLayout &layout) {
   if (!layout.isFixedLayout()) {
@@ -107,34 +135,8 @@ HeapNonFixedOffsets::HeapNonFixedOffsets(IRGenFunction &IGF,
       case ElementLayout::Kind::NonFixed:
         // Start calculating non-fixed offsets from the end of the first fixed
         // field.
-        if (i == 0) {
-          totalAlign = elt.getTypeForLayout().getAlignmentMask(IGF, eltTy);
-          offset = totalAlign;
-          Offsets.push_back(totalAlign);
-          break;
-        }
-
-        assert(i > 0 && "shouldn't begin with a non-fixed field");
-        auto &prevElt = layout.getElement(i-1);
-        auto prevType = layout.getElementTypes()[i-1];
-        // Start calculating offsets from the last fixed-offset field.
         if (!offset) {
-          Size lastFixedOffset = layout.getElement(i-1).getByteOffset();
-          if (auto *fixedType = dyn_cast<FixedTypeInfo>(&prevElt.getTypeForLayout())) {
-            // If the last fixed-offset field is also fixed-size, we can
-            // statically compute the end of the fixed-offset fields.
-            auto fixedEnd = lastFixedOffset + fixedType->getFixedSize();
-            offset
-              = llvm::ConstantInt::get(IGF.IGM.SizeTy, fixedEnd.getValue());
-          } else {
-            // Otherwise, we need to add the dynamic size to the fixed start
-            // offset.
-            offset
-              = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-                                       lastFixedOffset.getValue());
-            offset = IGF.Builder.CreateAdd(offset,
-                                     prevElt.getTypeForLayout().getSize(IGF, prevType));
-          }
+          offset = calcInitOffset(IGF, i, layout);
         }
         
         // Round up to alignment to get the offset.
@@ -1304,7 +1306,8 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
 /// optimizer not to touch this value.
 void IRGenFunction::emitFixLifetime(llvm::Value *value) {
   // If we aren't running the LLVM ARC optimizer, we don't need to emit this.
-  if (!IGM.IRGen.Opts.shouldOptimize() || IGM.IRGen.Opts.DisableLLVMARCOpts)
+  if (!IGM.IRGen.Opts.shouldOptimize() ||
+      IGM.IRGen.Opts.DisableSwiftSpecificLLVMOptzns)
     return;
   if (doesNotRequireRefCounting(value)) return;
   emitUnaryRefCountCall(*this, IGM.getFixLifetimeFn(), value);

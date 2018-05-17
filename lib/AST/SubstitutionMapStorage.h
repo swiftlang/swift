@@ -18,7 +18,6 @@
 #define SWIFT_AST_SUBSTITUTION_MAP_STORAGE_H
 
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "llvm/Support/TrailingObjects.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -36,10 +35,10 @@ class SubstitutionMap::Storage final
 
   /// The number of conformance requirements, cached to avoid constantly
   /// recomputing it on conformance-buffer access.
-  const unsigned numConformanceRequirements;
+  const unsigned numConformanceRequirements : 31;
 
-  /// Cache of an ASTContext-allocated list of flat substitutions.
-  SubstitutionList flatSubstitutions;
+  /// Whether we've populated all replacement types already.
+  unsigned populatedAllReplacements : 1;
 
   Storage() = delete;
 

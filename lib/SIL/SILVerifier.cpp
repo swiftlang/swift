@@ -437,6 +437,10 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+
+  // Used for dominance checking within a basic block.
+  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
+
   DeadEndBlocks DEBlocks;
   bool SingleFunction = true;
 
@@ -615,20 +619,32 @@ public:
     }
   }
 
+  static unsigned numInstsInFunction(const SILFunction &F) {
+    unsigned numInsts = 0;
+    for (auto &BB : F) {
+      numInsts += std::distance(BB.begin(), BB.end());
+    }
+    return numInsts;
+  }
+
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
         TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
+        InstNumbers(numInstsInFunction(F)),
         DEBlocks(&F), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
+    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
+      for (auto &I : BB)
+        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
@@ -642,6 +658,20 @@ public:
   ~SILVerifier() {
     if (Dominance)
       delete Dominance;
+  }
+
+  // Checks dominance between two instructions.
+  // This does not use DominanceInfo.properlyDominates, because for large basic
+  // blocks it would result in quadratic behavior.
+  bool properlyDominates(SILInstruction *a, SILInstruction *b) {
+    auto aBlock = a->getParent(), bBlock = b->getParent();
+
+    // If the blocks are different, it's as easy as whether A's block
+    // dominates B's block.
+    if (aBlock != bBlock)
+      return Dominance->properlyDominates(aBlock, bBlock);
+
+    return InstNumbers[a] < InstNumbers[b];
   }
 
   // FIXME: For sanity, address-type block args should be prohibited at all SIL
@@ -775,7 +805,7 @@ public:
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
-          require(Dominance->properlyDominates(valueI, I),
+          require(properlyDominates(valueI, I),
                   "instruction isn't dominated by its operand");
         }
       }
@@ -939,7 +969,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), I),
+                properlyDominates(cast<SILInstruction>(Def), I),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1019,12 +1049,12 @@ public:
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
-  CanSILFunctionType checkApplySubstitutions(SubstitutionList subs,
+  CanSILFunctionType checkApplySubstitutions(SubstitutionMap subs,
                                              SILType calleeTy) {
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (subs.empty()) {
+    if (!subs.hasAnySubstitutableParams()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
@@ -1034,8 +1064,8 @@ public:
 
     // Each archetype occurring in the substitutions list should belong to the
     // current function.
-    for (auto sub : subs) {
-      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+    for (auto replacementType : subs.getReplacementTypes()) {
+      replacementType->getCanonicalType().visit([&](CanType t) {
         auto A = dyn_cast<ArchetypeType>(t);
         if (!A)
           return;
@@ -1071,7 +1101,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
+                properlyDominates(cast<SILInstruction>(Def), AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -1081,8 +1111,8 @@ public:
     };
 
     // Search for opened archetypes and dynamic self.
-    for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement()->getCanonicalType().visit(HandleType);
+    for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
+      Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
@@ -1118,7 +1148,7 @@ public:
 
     // Then make sure that we have a type that can be substituted for the
     // callee.
-    auto substTy = checkApplySubstitutions(site.getSubstitutions(),
+    auto substTy = checkApplySubstitutions(site.getSubstitutionMap(),
                                            site.getCallee()->getType());
     require(site.getOrigCalleeType()->getRepresentation() ==
             site.getSubstCalleeType()->getRepresentation(),
@@ -1274,7 +1304,7 @@ public:
 
     checkApplyTypeDependentArguments(PAI);
 
-    auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
+    auto substTy = checkApplySubstitutions(PAI->getSubstitutionMap(),
                                         PAI->getCallee()->getType());
 
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
@@ -1783,6 +1813,8 @@ public:
             "Dest address should be lvalue");
     require(SI->getDest()->getType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
+    require(F.getModule().isTypeABIAccessible(SI->getDest()->getType()),
+            "cannot directly copy type with inaccessible ABI");
   }
 
   void checkRetainValueInst(RetainValueInst *I) {
@@ -2215,6 +2247,8 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
+    require(F.getModule().isTypeABIAccessible(DI->getOperand()->getType()),
+            "cannot directly destroy type with inaccessible ABI");
   }
 
   void checkBindMemoryInst(BindMemoryInst *BI) {
@@ -2440,7 +2474,7 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto subs = env->getForwardingSubstitutions();
+      auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
@@ -4043,7 +4077,7 @@ public:
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
     
-    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions().toList(),
+    invokeTy = checkApplySubstitutions(IBSHI->getSubstitutions(),
                                     SILType::getPrimitiveObjectType(invokeTy));
     
     auto storageParam = invokeTy->getParameters()[0];

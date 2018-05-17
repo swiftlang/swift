@@ -2085,14 +2085,14 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
       TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-                                                TAI->getSubstitutions());
+                                                TAI->getSubstitutionMap());
     }
     SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutions());
+                                            TAI->getSubstitutionMap());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
@@ -2112,7 +2112,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
-                                           TAI->getSubstitutions(),
+                                           TAI->getSubstitutionMap(),
                                            Args, CalleeFnTy->hasErrorResult());
 
     auto Loc = TAI->getLoc();
