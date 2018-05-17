@@ -107,6 +107,11 @@ swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
 }
 
 bool SILModule::isTypeMetadataAccessible(CanType type) {
+  // SILModules built for the debugger have special powers to access metadata
+  // for types in other files/modules.
+  if (getASTContext().LangOpts.DebuggerSupport)
+    return true;
+
   assert(type->isLegalFormalType());
 
   return !type.findIf([&](CanType type) {
