@@ -1,9 +1,9 @@
 # Swift for TensorFlow
 
-| | **Swift + TensorFlow** |
-|---|:---:|
-| **macOS** | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) |
-| **Linux** | *coming soon* |
+| OS | CI platform | x86_64 | GPU |
+|---|:---:|:---:|:---:|
+| **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | _coming soon_ |
+| **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | N/A |
 
 Welcome to Swift for TensorFlow!
 
