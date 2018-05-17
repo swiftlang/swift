@@ -1775,7 +1775,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 bool FloatingRequirementSource::isRecursive(
                                     Type rootType,
                                     GenericSignatureBuilder &builder) const {
-  llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 4> visitedAssocReqs;
+  llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 32> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
        storedSource; storedSource = storedSource->parent) {
     // FIXME: isRecursive() is completely misnamed
