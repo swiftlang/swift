@@ -2881,7 +2881,7 @@ reference-counted types, this can produce a different value from the operand
 if the block is copied from the stack to the heap.
 
 copy_block_without_escaping
-``````````
+```````````````````````````
 ::
 
   sil-instruction :: 'copy_block_without_escaping' sil-operand 'withoutEscaping' sil-operand
