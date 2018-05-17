@@ -722,6 +722,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     std::string Rename;
     Optional<NodeAnnotation> Kind;
+    StringRef LeftComment;
     StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
       if (isSimpleReplacement(Item, Rename)) {
@@ -729,6 +730,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         if (CI->isStringRepresentableChange() &&
             CI->NodeKind == SDKNodeKind::DeclVar) {
           Kind = CI->DiffKind;
+          LeftComment = CI->LeftComment;
           RightComment = CI->RightComment;
         }
       }
@@ -737,7 +739,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
     if (Kind && !isNilExpr(WrapperTarget)) {
       SmallString<256> Buffer;
-      auto Func = insertHelperFunction(*Kind, RightComment, Buffer, FromString);
+      auto Func = insertHelperFunction(*Kind, LeftComment, RightComment, Buffer,
+        FromString);
       Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
       Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
     }
@@ -768,7 +771,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return wrapAttributeReference(E, E, false);
   }
 
-  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef NewType,
+  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
+                                 StringRef NewType,
                                  SmallString<256> &Buffer, bool FromString) {
     llvm::raw_svector_ostream OS(Buffer);
     OS << "\n";
@@ -780,13 +784,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     StringRef guard = "\tguard let input = input else { return nil }\n";
     switch(Anno) {
     case NodeAnnotation::OptionalArrayMemberUpdate:
-      Segs = {"Optional", "Array", "[String]?"};
+      Segs = {"Optional", "Array", (Twine("[") + RawType + "]?").str()};
       Segs.push_back((Twine("[") + NewType +"]?").str());
       Segs.push_back((Twine(guard) + "\treturn input.map { key in " + NewType +"(key) }").str());
       Segs.push_back((Twine(guard) + "\treturn input.map { key in key.rawValue }").str());
       break;
     case NodeAnnotation::OptionalDictionaryKeyUpdate:
-      Segs = {"Optional", "Dictionary", "[String: Any]?"};
+      Segs = {"Optional", "Dictionary", (Twine("[") + RawType + ": Any]?").str()};
       Segs.push_back((Twine("[") + NewType +": Any]?").str());
       Segs.push_back((Twine(guard) +
                       "\treturn Dictionary(uniqueKeysWithValues: input.map"
@@ -796,13 +800,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                       " {key, value in (key.rawValue, value)})").str());
       break;
     case NodeAnnotation::ArrayMemberUpdate:
-      Segs = {"", "Array", "[String]"};
+      Segs = {"", "Array", (Twine("[") + RawType + "]").str()};
       Segs.push_back((Twine("[") + NewType +"]").str());
       Segs.push_back((Twine("\treturn input.map { key in ") + NewType +"(key) }").str());
       Segs.push_back("\treturn input.map { key in key.rawValue }");
       break;
     case NodeAnnotation::DictionaryKeyUpdate:
-      Segs = {"", "Dictionary", "[String: Any]"};
+      Segs = {"", "Dictionary", (Twine("[") + RawType + ": Any]").str()};
       Segs.push_back((Twine("[") + NewType +": Any]").str());
       Segs.push_back((Twine("\treturn Dictionary(uniqueKeysWithValues: input.map"
         " { key, value in (") + NewType + "(rawValue: key), value)})").str());
@@ -810,13 +814,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                      " {key, value in (key.rawValue, value)})");
       break;
     case NodeAnnotation::SimpleStringRepresentableUpdate:
-      Segs = {"", "", "String"};
+      Segs = {"", "", RawType};
       Segs.push_back(NewType);
       Segs.push_back((Twine("\treturn ") + NewType + "(rawValue: input)").str());
       Segs.push_back("\treturn input.rawValue");
       break;
     case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
-      Segs = {"Optional", "", "String?"};
+      Segs = {"Optional", "", (Twine(RawType) +"?").str()};
       Segs.push_back((Twine(NewType) +"?").str());
       Segs.push_back((Twine(guard) + "\treturn " + NewType + "(rawValue: input)").str());
       Segs.push_back((Twine(guard) + "\treturn input.rawValue").str());
@@ -850,12 +854,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     Editor.disableCache();
     SWIFT_DEFER { Editor.enableCache(); };
     NodeAnnotation Kind;
+    StringRef RawType;
     StringRef NewAttributeType;
     uint8_t ArgIdx;
     for (auto Item: getRelatedDiffItems(FD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange()) {
           Kind = CI->DiffKind;
+          RawType = CI->LeftComment;
           NewAttributeType = CI->RightComment;
           assert(CI->getChildIndices().size() == 1);
           ArgIdx = CI->getChildIndices().front();
@@ -880,7 +886,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     assert(WrapTarget);
     SmallString<256> Buffer;
-    auto FuncName = insertHelperFunction(Kind, NewAttributeType, Buffer,
+    auto FuncName = insertHelperFunction(Kind, RawType, NewAttributeType, Buffer,
                                          FromString);
     Editor.insert(WrapTarget->getStartLoc(), (Twine(FuncName) + "(").str());
     Editor.insertAfterToken(WrapTarget->getEndLoc(), ")");
