@@ -16,7 +16,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -38,7 +38,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -60,7 +60,7 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -82,7 +82,7 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -104,7 +104,7 @@
     "NodeAnnotation": "ArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -126,7 +126,7 @@
     "NodeAnnotation": "ArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -148,7 +148,7 @@
     "NodeAnnotation": "OptionalArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -170,7 +170,7 @@
     "NodeAnnotation": "OptionalArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -192,7 +192,7 @@
     "NodeAnnotation": "SimpleOptionalStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleOptionalAttribute:",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -203,7 +203,18 @@
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",
-    "LeftComment": "",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "AnimalAttributeName",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"
@@ -236,7 +247,7 @@
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "0",
     "LeftUsr": "c:@globalAttributeName",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "AnimalAttributeName",
     "ModuleName": "APINotesTest"

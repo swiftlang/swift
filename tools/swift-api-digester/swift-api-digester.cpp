@@ -411,6 +411,7 @@ public:
   ChildIt getChildBegin() { return Children.begin(); }
   void annotate(NodeAnnotation Anno) { Annotations.insert(Anno); }
   void annotate(NodeAnnotation Anno, StringRef Comment);
+  void removeAnnotate(NodeAnnotation Anno);
   NodePtr getParent() const { return Parent; };
   unsigned getChildrenCount() const { return Children.size(); }
   NodePtr childAt(unsigned I) const;
@@ -631,9 +632,18 @@ void SDKNode::removeChild(NodePtr C) {
 
 void SDKNode::annotate(NodeAnnotation Anno, StringRef Comment) {
   assert(!Comment.empty());
-  assert(!isAnnotatedAs(Anno) || AnnotateComments[Anno] == Comment);
+  if(isAnnotatedAs(Anno))
+    return;
   annotate(Anno);
   AnnotateComments[Anno] = Comment;
+}
+
+void SDKNode::removeAnnotate(NodeAnnotation Anno) {
+  assert(isAnnotatedAs(Anno));
+  Annotations.erase(Anno);
+  AnnotateComments.erase(Anno);
+  assert(!isAnnotatedAs(Anno));
+  assert(AnnotateComments.count(Anno) == 0);
 }
 
 StringRef SDKNode::getAnnotateComment(NodeAnnotation Anno) const {
@@ -2706,12 +2716,29 @@ class InterfaceTypeChangeDetector {
     return false;
   }
 
-  static StringRef getStringRepresentableChange(SDKNode *L, SDKNode *R) {
-    auto* LKey = dyn_cast<SDKNodeTypeNominal>(L);
-    auto* RKey = dyn_cast<SDKNodeTypeNominal>(R);
-    if (!LKey || !RKey)
+  static bool isRawType(const SDKNodeType *T, StringRef &Raw) {
+    if (auto Alias = dyn_cast<SDKNodeTypeAlias>(T)) {
+      // In case this type is an alias of the raw type.
+      return isRawType(Alias->getUnderlyingType(), Raw);
+    }
+    switch(T->getTypeKind()) {
+    case KnownTypeKind::String:
+    case KnownTypeKind::Int:
+      Raw = T->getName();
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static StringRef getStringRepresentableChange(SDKNode *L, SDKNode *R,
+                                                StringRef &Raw) {
+    if (!isRawType(L->getAs<SDKNodeType>(), Raw))
       return StringRef();
-    if (LKey->getTypeKind() != KnownTypeKind::String)
+    auto* RKey = dyn_cast<SDKNodeTypeNominal>(R);
+    if (!RKey)
+      return StringRef();
+    if (Raw.empty())
       return StringRef();
     auto Results = RKey->getRootNode()->getDescendantsByUsr(RKey->getUsr());
     if (Results.empty())
@@ -2725,7 +2752,8 @@ class InterfaceTypeChangeDetector {
   }
 
   static StringRef detectDictionaryKeyChangeInternal(SDKNodeType *L,
-                                                     SDKNodeType *R) {
+                                                     SDKNodeType *R,
+                                                     StringRef &Raw) {
     if (L->getTypeKind() != KnownTypeKind::Dictionary ||
         R->getTypeKind() != KnownTypeKind::Dictionary)
       return StringRef();
@@ -2735,13 +2763,14 @@ class InterfaceTypeChangeDetector {
     assert(Left->getChildrenCount() == 2);
     assert(Right->getChildrenCount() == 2);
     return getStringRepresentableChange(*Left->getChildBegin(),
-      *Right->getChildBegin());
+      *Right->getChildBegin(), Raw);
   }
 
   bool detectDictionaryKeyChange(SDKNodeType *L, SDKNodeType *R) {
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
+    StringRef Raw;
     StringRef KeyChangedTo;
     bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
       R->getTypeKind() == KnownTypeKind::Optional;
@@ -2749,17 +2778,19 @@ class InterfaceTypeChangeDetector {
       // Detect [String: Any]? to [StringRepresentableStruct: Any]? Chnage
       KeyChangedTo =
         detectDictionaryKeyChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
-                                          R->getOnlyChild()->getAs<SDKNodeType>());
+                                          R->getOnlyChild()->getAs<SDKNodeType>(),
+                                          Raw);
     } else {
       // Detect [String: Any] to [StringRepresentableStruct: Any] Chnage
-      KeyChangedTo = detectDictionaryKeyChangeInternal(L, R);
+      KeyChangedTo = detectDictionaryKeyChangeInternal(L, R, Raw);
     }
     if (!KeyChangedTo.empty()) {
       if (IsVisitingLeft) {
         L->annotate(HasOptional ?
                     NodeAnnotation::OptionalDictionaryKeyUpdate :
                     NodeAnnotation::DictionaryKeyUpdate);
-        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
       } else {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
@@ -2771,7 +2802,7 @@ class InterfaceTypeChangeDetector {
   }
 
   static StringRef detectArrayMemberChangeInternal(SDKNodeType *L,
-      SDKNodeType *R) {
+      SDKNodeType *R, StringRef &Raw) {
     if (L->getTypeKind() != KnownTypeKind::Array ||
         R->getTypeKind() != KnownTypeKind::Array)
       return StringRef();
@@ -2781,13 +2812,14 @@ class InterfaceTypeChangeDetector {
     assert(Left->getChildrenCount() == 1);
     assert(Right->getChildrenCount() == 1);
     return getStringRepresentableChange(Left->getOnlyChild(),
-      Right->getOnlyChild());
+      Right->getOnlyChild(), Raw);
   }
 
   bool detectArrayMemberChange(SDKNodeType* L, SDKNodeType *R) {
     // We only care if this the top-level type node.
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
+    StringRef Raw;
     StringRef KeyChangedTo;
     bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
       R->getTypeKind() == KnownTypeKind::Optional;
@@ -2795,17 +2827,19 @@ class InterfaceTypeChangeDetector {
       // Detect [String]? to [StringRepresentableStruct]? Chnage
       KeyChangedTo =
         detectArrayMemberChangeInternal(L->getOnlyChild()->getAs<SDKNodeType>(),
-                                        R->getOnlyChild()->getAs<SDKNodeType>());
+                                        R->getOnlyChild()->getAs<SDKNodeType>(),
+                                        Raw);
     } else {
       // Detect [String] to [StringRepresentableStruct] Chnage
-      KeyChangedTo = detectArrayMemberChangeInternal(L, R);
+      KeyChangedTo = detectArrayMemberChangeInternal(L, R, Raw);
     }
     if (!KeyChangedTo.empty()) {
       if (IsVisitingLeft) {
         L->annotate(HasOptional ?
                     NodeAnnotation::OptionalArrayMemberUpdate :
                     NodeAnnotation::ArrayMemberUpdate);
-        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
       } else {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalArrayMemberUpdate :
@@ -2820,20 +2854,23 @@ class InterfaceTypeChangeDetector {
     if (!L->isTopLevelType() || !R->isTopLevelType())
       return false;
     StringRef KeyChangedTo;
+    StringRef Raw;
     bool HasOptional = L->getTypeKind() == KnownTypeKind::Optional &&
         R->getTypeKind() == KnownTypeKind::Optional;
     if (HasOptional) {
       // Detect String? changes to StringRepresentableStruct? change.
       KeyChangedTo =
         getStringRepresentableChange(L->getOnlyChild()->getAs<SDKNodeType>(),
-                                     R->getOnlyChild()->getAs<SDKNodeType>());
+                                     R->getOnlyChild()->getAs<SDKNodeType>(),
+                                     Raw);
     } else {
       // Detect String changes to StringRepresentableStruct change.
-      KeyChangedTo = getStringRepresentableChange(L, R);
+      KeyChangedTo = getStringRepresentableChange(L, R, Raw);
     }
     if (!KeyChangedTo.empty()) {
       if (IsVisitingLeft) {
-        L->annotate(NodeAnnotation::TypeRewrittenRight, KeyChangedTo);
+        L->annotate(NodeAnnotation::RawTypeLeft, Raw);
+        L->annotate(NodeAnnotation::RawTypeRight, KeyChangedTo);
         L->annotate(HasOptional ?
                     NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
                     NodeAnnotation::SimpleStringRepresentableUpdate);
@@ -2852,6 +2889,14 @@ class InterfaceTypeChangeDetector {
            Counter->getTypeKind() == KnownTypeKind::Void;
   }
 
+  static void clearTypeRewritten(SDKNode *N) {
+    if (!N->isAnnotatedAs(NodeAnnotation::TypeRewritten))
+      return;
+    N->removeAnnotate(NodeAnnotation::TypeRewritten);
+    N->removeAnnotate(NodeAnnotation::TypeRewrittenLeft);
+    N->removeAnnotate(NodeAnnotation::TypeRewrittenRight);
+  }
+
 public:
   InterfaceTypeChangeDetector(bool IsVisitingLeft):
     IsVisitingLeft(IsVisitingLeft) {}
@@ -2860,14 +2905,23 @@ public:
     auto *Counter = dyn_cast<SDKNodeType>(Right);
     if (!Node || !Counter || isUnhandledCase(Node, Counter))
       return;
-    bool Result = detectWrapOptional(Node, Counter)||
-              detectOptionalUpdate(Node, Counter)||
-              detectWrapImplicitOptional(Node, Counter)||
-              detectUnmanagedUpdate(Node, Counter)||
-              detectDictionaryKeyChange(Node, Counter) ||
-              detectArrayMemberChange(Node, Counter) ||
-              detectSimpleStringRepresentableUpdate(Node, Counter) ||
-              detectTypeRewritten(Node, Counter);
+    if (detectWrapOptional(Node, Counter) ||
+        detectOptionalUpdate(Node, Counter) ||
+        detectWrapImplicitOptional(Node, Counter) ||
+        detectUnmanagedUpdate(Node, Counter)) {
+
+      // we may have detected type rewritten before (when visiting left),
+      // so clear the annotation here.
+      clearTypeRewritten(Node);
+      clearTypeRewritten(Counter);
+    } else {
+      // Detect type re-written then.
+      detectTypeRewritten(Node, Counter);
+    }
+    // The raw representable changes can co-exist with above attributes.
+    auto Result = detectDictionaryKeyChange(Node, Counter) ||
+      detectArrayMemberChange(Node, Counter) ||
+      detectSimpleStringRepresentableUpdate(Node, Counter);
     (void) Result;
     return;
   }
@@ -2993,6 +3047,13 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   static StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
     switch(Anno) {
+      case NodeAnnotation::ArrayMemberUpdate:
+      case NodeAnnotation::OptionalArrayMemberUpdate:
+      case NodeAnnotation::DictionaryKeyUpdate:
+      case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      case NodeAnnotation::SimpleStringRepresentableUpdate:
+      case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+        return Node->getAnnotateComment(NodeAnnotation::RawTypeLeft);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
       case NodeAnnotation::Rename:
@@ -3010,6 +3071,7 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::SimpleStringRepresentableUpdate:
       case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+        return Node->getAnnotateComment(NodeAnnotation::RawTypeRight);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
       case NodeAnnotation::ModernizeEnum:
@@ -3026,16 +3088,14 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
   void handleAnnotations(NodePtr Node, SDKNodeDecl *NonTypeParent,
                          StringRef Index, ArrayRef<NodeAnnotation> Annotations) {
-    for (auto Annotation: Annotations) {
-      if (isInterested(NonTypeParent, Annotation) &&
-          Node->isAnnotatedAs(Annotation)) {
+    for (auto Anno: Annotations) {
+      if (isInterested(NonTypeParent, Anno) && Node->isAnnotatedAs(Anno)) {
         auto Kind = NonTypeParent->getKind();
-        StringRef LC = getLeftComment(Node, Annotation);
-        StringRef RC = getRightComment(Node, Annotation);
-        AllItems.emplace_back(Kind, Annotation, Index,
+        StringRef LC = getLeftComment(Node, Anno);
+        StringRef RC = getRightComment(Node, Anno);
+        AllItems.emplace_back(Kind, Anno, Index,
                               NonTypeParent->getUsr(), StringRef(), LC, RC,
                               NonTypeParent->getModuleName());
-        return;
       }
     }
   }
