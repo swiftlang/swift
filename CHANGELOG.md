@@ -63,9 +63,9 @@ Swift 4.2
 
 * [SE-0185][]
 
-  Protocol conformances are now synthesized in extensions in the same file as
-  the type definition, allowing automatic synthesis of conditional conformances
-  to `Hashable`, `Equatable` and `Codable` (both `Encodable` and
+  Protocol conformances are now able to be synthesized in extensions in the same
+  file as the type definition, allowing automatic synthesis of conditional
+  conformances to `Hashable`, `Equatable` and `Codable` (both `Encodable` and
   `Decodable`). For instance, if there is a generic wrapper type that can only
   be `Equatable` when its wrapped type is also `Equatable`, the `==` method can
   be automatically constructed by the compiler:
