@@ -3686,7 +3686,10 @@ namespace {
       auto *locator = cs.getConstraintLocator(expr);
 
       if (!choice) {
-        choice = solution.getDisjunctionChoice(locator);
+        if (tc.Context.LangOpts.EnableObjCInterop)
+          choice = solution.getDisjunctionChoice(locator);
+        else
+          choice = 0;
       }
 
       // Handle the coercion/bridging of the underlying subexpression, where

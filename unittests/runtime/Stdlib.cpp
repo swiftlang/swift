@@ -135,12 +135,7 @@ void _bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
   abort();
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
-                                       OpaqueValue *result,
-                                       const Metadata *destinationType) {
-  abort();
-}
+
 // ErrorObject
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
