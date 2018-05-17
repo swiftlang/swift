@@ -62,3 +62,15 @@ open class ToplevelType {
 }
 
 public var GlobalAttribute: String = ""
+
+public enum FontWeighting: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public enum FontWeight: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
