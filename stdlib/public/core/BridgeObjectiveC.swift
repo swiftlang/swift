@@ -817,7 +817,6 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
     if let value = wrapper.unwrap() {
       result = value as AnyObject
     } else {
-      print("_bridgeAnythingToObjectiveC: Bridging to the null p")
       result = _nullPlaceholder
     }
     
