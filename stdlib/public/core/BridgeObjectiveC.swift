@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if _runtime(_ObjC)
 /// A Swift Array or Dictionary of types conforming to
 /// `_ObjectiveCBridgeable` can be passed to Objective-C as an NSArray or
 /// NSDictionary, respectively.  The elements of the resulting NSArray
@@ -82,6 +81,8 @@ public protocol _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self
 }
+
+#if _runtime(_ObjC)
 
 //===--- Bridging for metatypes -------------------------------------------===//
 
@@ -640,3 +641,200 @@ public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
 }
 
 #endif
+
+//===--- Bridging without the ObjC runtime --------------------------------===//
+
+#if !_runtime(_ObjC)
+
+/// Convert `x` from its Objective-C representation to its Swift
+/// representation.
+/// COMPILER_INTRINSIC
+@_inlineable // FIXME(sil-serialize-all)
+public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
+  _ x: T._ObjectiveCType,
+  _: T.Type
+) -> T {
+  var result: T?
+  T._forceBridgeFromObjectiveC(x, result: &result)
+  return result!
+}
+
+/// Attempt to convert `x` from its Objective-C representation to its Swift
+/// representation.
+/// COMPILER_INTRINSIC
+@_inlineable // FIXME(sil-serialize-all)
+public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
+  _ x: T._ObjectiveCType,
+  _: T.Type
+) -> T? {
+  var result: T?
+  T._conditionallyBridgeFromObjectiveC (x, result: &result)
+  return result
+}
+
+public // SPI(Foundation)
+protocol _NSSwiftValue: class {
+  init(_ value: Any)
+  var value: Any { get }
+  static var null: AnyObject { get }
+}
+
+@usableFromInline
+internal class _SwiftValue {
+  @usableFromInline
+  let value: Any
+  
+  @usableFromInline
+  init(_ value: Any) {
+    self.value = value
+  }
+  
+  @usableFromInline
+  static let null = _SwiftValue(Optional<Any>.none as Any)
+}
+
+/// COMPILER_INTRISIC
+@_silgen_name("swift_unboxFromSwiftValueWithType")
+public func swift_unboxFromSwiftValueWithType<T>(
+  _ source: inout AnyObject,
+  _ result: UnsafeMutablePointer<T>
+  ) -> Bool {
+
+  if source === _nullPlaceholder {
+    if let unpacked = Optional<Any>.none as? T {
+      result.initialize(to: unpacked)
+      return true
+    }
+  }
+    
+  if let box = source as? _SwiftValue {
+    if let value = box.value as? T {
+      result.initialize(to: value)
+      return true
+    }
+  } else if let box = source as? _NSSwiftValue {
+    if let value = box.value as? T {
+      result.initialize(to: value)
+      return true
+    }
+  }
+  
+  return false
+}
+
+@_silgen_name("_swift_extractDynamicValue")
+public func _extractDynamicValue<T>(_ value: T) -> AnyObject?
+
+@_silgen_name("_swift_bridgeToObjectiveCUsingProtocolIfPossible")
+public func _bridgeToObjectiveCUsingProtocolIfPossible<T>(_ value: T) -> AnyObject?
+
+@usableFromInline
+protocol _Unwrappable {
+  func unwrap() -> Any?
+}
+
+extension Optional: _Unwrappable {
+  func unwrap() -> Any? {
+    return self
+  }
+}
+
+// This is a best-effort tripmine for detecting the situation
+// (which should never happen) of Swift._SwiftValue and
+// Foundation._SwiftValue/Foundation.NSNull being used 
+// in the same process.
+
+@usableFromInline
+internal enum _SwiftValueFlavor: Equatable {
+  case stdlib
+  case foundation
+}
+
+@usableFromInline
+func _currentSwiftValueFlavor() -> _SwiftValueFlavor {
+  if _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type != nil {
+    return .foundation
+  } else {
+    return .stdlib
+  }
+}
+
+@usableFromInline
+internal var _selectedSwiftValueFlavor: _SwiftValueFlavor = _currentSwiftValueFlavor()
+
+@usableFromInline
+internal func _assertSwiftValueFlavorIsConsistent() {
+  assert(_selectedSwiftValueFlavor == _currentSwiftValueFlavor())
+}
+
+@usableFromInline
+internal var _nullPlaceholder: AnyObject {
+  _assertSwiftValueFlavorIsConsistent()
+  if let foundationType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type {
+    return foundationType.null
+  } else {
+    return _SwiftValue.null
+  }
+}
+
+@usableFromInline
+func _makeSwiftValue(_ value: Any) -> AnyObject {
+  _assertSwiftValueFlavorIsConsistent()
+  if let foundationType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type {
+    return foundationType.init(value)
+  } else {
+    return _SwiftValue(value)
+  }
+}
+
+/// Bridge an arbitrary value to an Objective-C object.
+///
+/// - If `T` is a class type, it is always bridged verbatim, the function
+///   returns `x`;
+///
+/// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`,
+///   returns the result of `x._bridgeToObjectiveC()`;
+///
+/// - otherwise, we use **boxing** to bring the value into Objective-C.
+///   The value is wrapped in an instance of a private Objective-C class
+///   that is `id`-compatible and dynamically castable back to the type of
+///   the boxed value, but is otherwise opaque.
+///
+/// COMPILER_INTRINSIC
+@inlinable // FIXME(sil-serialize-all)
+public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
+  var done = false
+  var result: AnyObject!
+  
+  var source: Any = x
+  
+  if let dynamicSource = _extractDynamicValue(x) {
+    result = dynamicSource as AnyObject
+    done = true 
+  }
+  
+  if !done, let wrapper = source as? _Unwrappable {
+    if let value = wrapper.unwrap() {
+      result = value as AnyObject
+    } else {
+      result = _nullPlaceholder
+    }
+    
+    done = true
+  }
+
+  if !done {
+    if type(of: source) as? AnyClass != nil {
+      result = unsafeBitCast(x, to: AnyObject.self)
+    } else if let object = _bridgeToObjectiveCUsingProtocolIfPossible(source) {
+      result = object
+    } else {
+      result = _makeSwiftValue(source)
+    }
+  }
+  
+  return result
+}
+
+#endif // !_runtime(_ObjC)
+
