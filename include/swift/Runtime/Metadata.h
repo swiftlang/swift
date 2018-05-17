@@ -4165,6 +4165,13 @@ SWIFT_RUNTIME_EXPORT
 const ForeignTypeMetadata *
 swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
 
+/// \brief Fetch a unique witness table for a foreign witness table.
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_getForeignWitnessTable(const WitnessTable *nonUniqueWitnessCandidate,
+                             const TypeContextDescriptor *forForeignType,
+                             const ProtocolDescriptor *forProtocol);
+
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///
 /// The labels argument is null if and only if there are no element
