@@ -966,18 +966,22 @@ extension _StringGuts {
       }
     }
 
-    // TODO (TODO: JIRA): check if we're small and still within capacity
+    // Small strings can accomodate small capacities
+    if capacity <= _SmallUTF8String.capacity {
+      return
+    }
 
+    let selfCount = self.count
     if isASCII {
       let storage = _copyToNativeStorage(
         of: UInt8.self,
-        from: 0..<self.count,
+        from: 0..<selfCount,
         unusedCapacity: Swift.max(capacity - count, 0))
       self = _StringGuts(_large: storage)
     } else {
       let storage = _copyToNativeStorage(
         of: UTF16.CodeUnit.self,
-        from: 0..<self.count,
+        from: 0..<selfCount,
         unusedCapacity: Swift.max(capacity - count, 0))
       self = _StringGuts(_large: storage)
     }
