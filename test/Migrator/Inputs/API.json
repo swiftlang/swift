@@ -528,5 +528,16 @@
     "RightUsr": "",
     "RightComment": "Int",
     "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities10FontWeightO",
+    "LeftComment": "FontWeight",
+    "RightUsr": "",
+    "RightComment": "FontWeighting",
+    "ModuleName": "Cities"
   }
 ]
