@@ -1134,19 +1134,22 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
     if (!objectType.isAnyClassReferenceType())
       return false;
     
+    if (M.getASTContext().LangOpts.EnableObjCInterop) {
       auto super = archetype->getSuperclass();
       if (super.isNull())
         return false;
 
-    // A base class constraint that isn't NSError rules out the archetype being
-    // bound to NSError.
-    if (M.getASTContext().LangOpts.EnableObjCInterop) {
-      if (auto nserror = M.Types.getNSErrorType())
-         return !super->isEqual(nserror);
+      // A base class constraint that isn't NSError rules out the archetype being
+      // bound to NSError.
+        if (auto nserror = M.Types.getNSErrorType())
+          return !super->isEqual(nserror);
+      // If NSError wasn't loaded, any base class constraint must not be NSError.
+      return true;
+    } else {
+      // If ObjC bridging isn't enabled, we can do a scalar cast from any
+      // reference type to any class-constrained archetype.
+      return archetype->requiresClass();
     }
-    
-    // If NSError wasn't loaded, any base class constraint must not be NSError.
-    return true;
   }
   
   if (M.getASTContext().LangOpts.EnableObjCInterop
