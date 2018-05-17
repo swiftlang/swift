@@ -3100,6 +3100,58 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   return uniqueMetadata;
 }
 
+/// Unique-ing of foreign types' witness tables.
+namespace {
+  class ForeignWitnessTableCacheEntry {
+  public:
+    struct Key {
+      const TypeContextDescriptor *type;
+      const ProtocolDescriptor *protocol;
+    };
+
+    const Key key;
+    const WitnessTable *data;
+
+    ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
+                                  const WitnessTable *d)
+        : key(k), data(d) {}
+
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(key.type);
+    }
+
+    int compareWithKey(const Key other) const {
+      if (auto r = comparePointers(other.protocol, key.protocol))
+        return r;
+      return strcmp(other.type->Name.get(), key.type->Name.get());
+    }
+
+    static size_t getExtraAllocationSize(const Key,
+                                         const WitnessTable *) {
+      return 0;
+    }
+
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
+  };
+}
+
+static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
+
+const WitnessTable *swift::swift_getForeignWitnessTable(
+    const WitnessTable *witnessTableCandidate,
+    const TypeContextDescriptor *contextDescriptor,
+    const ProtocolDescriptor *protocol) {
+  auto result =
+      ForeignWitnessTables
+          .getOrInsert(
+              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
+              witnessTableCandidate)
+          .first->data;
+  return result;
+}
+
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
