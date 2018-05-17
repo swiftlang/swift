@@ -1059,18 +1059,21 @@ namespace {
         subscripts(copied.subscripts.copy(SGF, loc)) ,
         baseFormalType(copied.baseFormalType) {}
 
-    virtual SILDeclRef getAccessor(SILGenFunction &SGF,
-                                   AccessKind kind) const  = 0;
+    virtual bool doesAccessMutateSelf(SILGenFunction &SGF,
+                                      AccessKind kind) const = 0;
 
+    bool doesAccessorMutateSelf(SILGenFunction &SGF,
+                                SILDeclRef accessor) const {
+      auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
+      return accessorSelf.getType() && accessorSelf.isIndirectMutating();
+    }
+    
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
-      SILDeclRef accessor = getAccessor(SGF, kind);
-      auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
-      if (accessorSelf.getType() && accessorSelf.isIndirectMutating()) {
+      if (doesAccessMutateSelf(SGF, kind))
         return AccessKind::ReadWrite;
-      } else {
+      else
         return AccessKind::Read;
-      }
     }
 
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
@@ -1110,13 +1113,25 @@ namespace {
     {
     }
 
-    SILDeclRef getAccessor(SILGenFunction &SGF,
-                           AccessKind accessKind) const override {
-      if (accessKind == AccessKind::Read) {
-        return SGF.SGM.getGetterDeclRef(decl);
-      } else {
-        return SGF.SGM.getSetterDeclRef(decl);
+    bool doesAccessMutateSelf(SILGenFunction &SGF,
+                              AccessKind accessKind) const override {
+      switch (accessKind) {
+      case AccessKind::Read: {
+        auto getter = SGF.SGM.getGetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, getter);
       }
+      case AccessKind::Write: {
+        auto setter = SGF.SGM.getSetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, setter);
+      }
+      case AccessKind::ReadWrite: {
+        auto getter = SGF.SGM.getGetterDeclRef(decl);
+        auto setter = SGF.SGM.getSetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, getter)
+            || doesAccessorMutateSelf(SGF, setter);
+      }
+      }
+      llvm_unreachable("unknown access kind");
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
@@ -1585,9 +1600,10 @@ namespace {
     {
     }
 
-    SILDeclRef getAccessor(SILGenFunction &SGF,
-                           AccessKind accessKind) const override {
-      return SGF.SGM.getAddressorDeclRef(decl, accessKind);
+    bool doesAccessMutateSelf(SILGenFunction &SGF,
+                              AccessKind kind) const override {
+      auto addressor = SGF.SGM.getAddressorDeclRef(decl, kind);
+      return doesAccessorMutateSelf(SGF, addressor);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,

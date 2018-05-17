@@ -1896,16 +1896,19 @@ private:
     CanType resultType;
     AbstractionPattern origResultType;
     ClaimedParamsRef paramsToEmit;
+    SILFunctionTypeRepresentation functionRepresentation;
     
     DefaultArgumentStorage(SILLocation loc,
                            ConcreteDeclRef defaultArgsOwner,
                            unsigned destIndex,
                            CanType resultType,
                            AbstractionPattern origResultType,
-                           ClaimedParamsRef paramsToEmit)
+                           ClaimedParamsRef paramsToEmit,
+                           SILFunctionTypeRepresentation functionRepresentation)
       : loc(loc), defaultArgsOwner(defaultArgsOwner), destIndex(destIndex),
         resultType(resultType), origResultType(origResultType),
-        paramsToEmit(paramsToEmit)
+        paramsToEmit(paramsToEmit),
+        functionRepresentation(functionRepresentation)
     {}
   };
 
@@ -1991,12 +1994,14 @@ public:
                   unsigned destIndex,
                   CanType resultType,
                   AbstractionPattern origResultType,
-                  ClaimedParamsRef params)
+                  ClaimedParamsRef params,
+                  SILFunctionTypeRepresentation functionTypeRepresentation)
     : Kind(DefaultArgument) {
     Value.emplace<DefaultArgumentStorage>(Kind, loc, defaultArgsOwner,
                                           destIndex,
                                           resultType,
-                                          origResultType, params);
+                                          origResultType, params,
+                                          functionTypeRepresentation);
   }
 
   DelayedArgument(DelayedArgument &&other)
@@ -2892,14 +2897,16 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
   
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
-  auto emitter = ArgEmitter(SGF, SILFunctionTypeRepresentation::Thin,
+  Optional<ForeignErrorConvention> errorConvention = None;
+  auto emitter = ArgEmitter(SGF, info.functionRepresentation,
                             info.paramsToEmit,
                             loweredArgs, delayedArgs,
-                            None, ImportAsMemberStatus());
+                            errorConvention, ImportAsMemberStatus());
   
   emitter.emitTopLevel(ArgumentSource(info.loc, std::move(value)),
                        info.origResultType);
   assert(delayedArgs.empty());
+  assert(!errorConvention);
   
   // Splice the emitted default argument into the argument list.
   if (loweredArgs.size() == 1) {
@@ -3208,7 +3215,8 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
                                               ImportAsMemberStatus());
       parent.DelayedArguments.emplace_back(outer, defaultArgsOwner,
                                          outerIndex, eltType, origType,
-                                         parent.ParamInfos.slice(0, numParams));
+                                         parent.ParamInfos.slice(0, numParams),
+                                         parent.Rep);
       parent.ParamInfos = parent.ParamInfos.slice(numParams);
       parent.Args.push_back(ManagedValue());
       continue;
