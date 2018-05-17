@@ -39,3 +39,19 @@ func patatino() -> Int {
 }
 
 patatino()
+
+class Foo<T> {
+  var x : T
+  init(_ x : T) {
+    self.x = x
+  }
+}
+
+typealias Patatino<T> = Foo<T>
+
+func main() -> Int {
+  var p : Patatino<Int> = Patatino(23);
+  return 0
+}
+
+let _ = main()
