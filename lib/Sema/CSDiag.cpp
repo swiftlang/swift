@@ -5510,14 +5510,19 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (candidates.closeness != CC_ExactMatch)
           return hadError();
 
-        diag.fixItReplace(SourceRange(argExpr->getStartLoc()), "[");
+        auto l_bracket = getTokenText(swift::tok::l_square);
+        auto r_bracket = getTokenText(swift::tok::r_square);
+        auto r_paren = getTokenText(swift::tok::r_paren);
+        auto lastArgSym =
+          Lexer::getCharSourceRangeFromSourceRange(CS.TC.Context.SourceMgr,
+                                                   argExpr->getEndLoc());
+        diag.fixItReplace(SourceRange(argExpr->getStartLoc()), l_bracket);
         diag.fixItRemove(nameLoc.getSourceRange());
         diag.fixItRemove(SourceRange(UDE->getDotLoc()));
-
-        if (CS.TC.Context.SourceMgr.extractText({argExpr->getEndLoc(), 1}) == ")")
-          diag.fixItReplace(SourceRange(argExpr->getEndLoc()), "]");
+        if (CS.TC.Context.SourceMgr.extractText(lastArgSym) == r_paren)
+          diag.fixItReplace(SourceRange(argExpr->getEndLoc()), r_bracket);
         else
-          diag.fixItInsertAfter(argExpr->getEndLoc(), "]");
+          diag.fixItInsertAfter(argExpr->getEndLoc(), r_bracket);
       }
       return hadError();
     }
