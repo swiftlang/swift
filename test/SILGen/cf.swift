@@ -29,7 +29,7 @@ func useEmAll(_ model: CCMagnetismModel) {
 // CHECK: function_ref @CCRefrigeratorDestroy : $@convention(c) (@owned Optional<CCRefrigerator>) -> ()
   CCRefrigeratorDestroy(clone)
 
-// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>?, $@convention(objc_method) (CCMagnetismModel) -> Optional<Unmanaged<CCRefrigerator>>
+// CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.refrigerator!1.foreign : (CCMagnetismModel) -> () -> Unmanaged<CCRefrigerator>?, $@convention(objc_method) (CCMagnetismModel) -> @unowned_inner_pointer Optional<Unmanaged<CCRefrigerator>>
   let f0 = model.refrigerator()
 
 // CHECK: objc_method [[ARG]] : $CCMagnetismModel, #CCMagnetismModel.getRefrigerator!1.foreign : (CCMagnetismModel) -> () -> CCRefrigerator?, $@convention(objc_method) (CCMagnetismModel) -> @autoreleased Optional<CCRefrigerator>
