@@ -86,14 +86,15 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     // Selector for the partial_application_of_function_invalid diagnostic
     // message.
     struct PartialApplication {
-      unsigned level : 29;
       enum : unsigned {
         Function,
         MutatingMethod,
         SuperInit,
         SelfInit,
       };
+      // 'kind' before 'level' is better for code gen.
       unsigned kind : 3;
+      unsigned level : 29;
     };
 
     // Partial applications of functions that are not permitted.  This is
@@ -121,7 +122,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
         // Partial applications of delegated initializers aren't allowed, and
         // don't really make sense to begin with.
-        InvalidPartialApplications.insert({ expr, {1, kind} });
+        InvalidPartialApplications.insert({ expr, {kind, 1} });
         return;
       }
 
@@ -141,7 +142,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (!expr->getArg()->getType()->isMaterializable()) {
         // We need to apply all argument clauses.
         InvalidPartialApplications.insert({
-          fnExpr, {fn->getNumParameterLists(), kind}
+          fnExpr, {kind, fn->getNumParameterLists()}
         });
       }
     }
@@ -172,7 +173,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.erase(foundApplication);
         if (level > 1) {
           // We have remaining argument clauses.
-          InvalidPartialApplications.insert({ AE, {level - 1, kind} });
+          InvalidPartialApplications.insert({ AE, {kind, level - 1} });
         }
         return;
       }
