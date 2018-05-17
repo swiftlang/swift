@@ -464,10 +464,7 @@ extension _SmallUTF8String {
 
   // NOTE: This exists to facilitate _fromCodeUnits, which is awful for this use
   // case. Please don't call this from anywhere else.
-  @usableFromInline
-  @inline(never) // @outlined
-  // @_specialize(where Encoding == UTF16)
-  // @_specialize(where Encoding == UTF8)
+  @inlinable
   init?<S: Sequence, Encoding: Unicode.Encoding>(
     _fromCodeUnits codeUnits: S,
     utf16Length: Int,
