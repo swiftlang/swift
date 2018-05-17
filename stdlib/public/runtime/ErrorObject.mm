@@ -498,18 +498,7 @@ swift::tryDynamicCastNSErrorToValue(OpaqueValue *dest,
     break;
   }
   // Not a class.
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Function:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
-  case MetadataKind::Metatype:
-  case MetadataKind::Opaque:
-  case MetadataKind::Struct:
-  case MetadataKind::Tuple:
+  default:
     return false;
   }
 
