@@ -425,7 +425,7 @@ namespace {
 
     void printRec(Decl *D) { D->dump(OS, Indent + 2); }
     void printRec(Expr *E) { E->print(OS, Indent + 2); }
-    void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent + 2); }
+    void printRec(Stmt *S) { S->print(OS, Indent + 2); }
     void printRec(TypeRepr *T);
     void printRec(const Pattern *P) {
       PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
@@ -553,7 +553,7 @@ namespace {
     
     void printRec(Decl *D) { PrintDecl(OS, Indent + 2).visit(D); }
     void printRec(Expr *E) { E->print(OS, Indent+2); }
-    void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent+2); }
+    void printRec(Stmt *S) { S->print(OS, Indent+2); }
     void printRec(Pattern *P) { PrintPattern(OS, Indent+2).visit(P); }
     void printRec(TypeRepr *T);
 
@@ -574,13 +574,6 @@ namespace {
 
       if (D->isImplicit())
         PrintWithColorRAII(OS, DeclModifierColor) << " implicit";
-
-      auto R = D->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                D->getASTContext().SourceMgr, /*PrintText=*/false);
-      }
 
       if (D->TrailingSemiLoc.isValid())
         PrintWithColorRAII(OS, DeclModifierColor) << " trailing_semi";
@@ -991,7 +984,7 @@ namespace {
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
-    void printParameterList(const ParameterList *params, const ASTContext *ctx = nullptr) {
+    void printParameterList(const ParameterList *params) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
       PrintWithColorRAII(OS, ParameterColor) << "parameter_list";
@@ -1000,19 +993,6 @@ namespace {
         OS << '\n';
         printParameter(P);
       }
-
-      if (!ctx && params->size() != 0 && params->get(0))
-        ctx = &params->get(0)->getASTContext();
-
-      if (ctx) {
-        auto R = params->getSourceRange();
-        if (R.isValid()) {
-          PrintWithColorRAII(OS, RangeColor) << " range=";
-          R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                  ctx->SourceMgr, /*PrintText=*/false);
-        }
-      }
-
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
       Indent -= 2;
     }
@@ -1021,7 +1001,7 @@ namespace {
       for (auto pl : D->getParameterLists()) {
         OS << '\n';
         Indent += 2;
-        printParameterList(pl, &D->getASTContext());
+        printParameterList(pl);
         Indent -= 2;
      }
       if (auto FD = dyn_cast<FuncDecl>(D)) {
@@ -1038,7 +1018,7 @@ namespace {
       }
       if (auto Body = D->getBody(/*canSynthesize=*/false)) {
         OS << '\n';
-        printRec(Body, D->getASTContext());
+        printRec(Body);
       }
     }
 
@@ -1085,12 +1065,12 @@ namespace {
       printCommon(TLCD, "top_level_code_decl");
       if (TLCD->getBody()) {
         OS << "\n";
-        printRec(TLCD->getBody(), static_cast<Decl *>(TLCD)->getASTContext());
+        printRec(TLCD->getBody());
       }
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
     
-    void printASTNodes(const ArrayRef<ASTNode> &Elements, const ASTContext &Ctx, StringRef Name) {
+    void printASTNodes(const ArrayRef<ASTNode> &Elements, StringRef Name) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << "(";
       PrintWithColorRAII(OS, ASTNodeColor) << Name;
@@ -1099,7 +1079,7 @@ namespace {
         if (auto *SubExpr = Elt.dyn_cast<Expr*>())
           printRec(SubExpr);
         else if (auto *SubStmt = Elt.dyn_cast<Stmt*>())
-          printRec(SubStmt, Ctx);
+          printRec(SubStmt);
         else
           printRec(Elt.get<Decl*>());
       }
@@ -1122,7 +1102,7 @@ namespace {
 
         OS << '\n';
         Indent += 2;
-        printASTNodes(Clause.Elements, ICD->getASTContext(), "elements");
+        printASTNodes(Clause.Elements, "elements");
         Indent -= 2;
       }
 
@@ -1369,11 +1349,9 @@ namespace {
 class PrintStmt : public StmtVisitor<PrintStmt> {
 public:
   raw_ostream &OS;
-  const ASTContext *Ctx;
   unsigned Indent;
 
-  PrintStmt(raw_ostream &os, const ASTContext *ctx, unsigned indent)
-    : OS(os), Ctx(ctx), Indent(indent) {
+  PrintStmt(raw_ostream &os, unsigned indent) : OS(os), Indent(indent) {
   }
 
   void printRec(Stmt *S) {
@@ -1440,15 +1418,6 @@ public:
     if (S->isImplicit())
       OS << " implicit";
 
-    if (Ctx) {
-      auto R = S->getSourceRange();
-      if (R.isValid()) {
-        PrintWithColorRAII(OS, RangeColor) << " range=";
-        R.print(PrintWithColorRAII(OS, RangeColor).getOS(),
-                Ctx->SourceMgr, /*PrintText=*/false);
-      }
-    }
-
     if (S->TrailingSemiLoc.isValid())
       OS << " trailing_semi";
 
@@ -1456,12 +1425,13 @@ public:
   }
 
   void visitBraceStmt(BraceStmt *S) {
-    printCommon(S, "brace_stmt");
-    printASTNodes(S->getElements());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+    printASTNodes(S->getElements(), "brace_stmt");
   }
 
-  void printASTNodes(const ArrayRef<ASTNode> &Elements) {
+  void printASTNodes(const ArrayRef<ASTNode> &Elements, StringRef Name) {
+    OS.indent(Indent);
+    PrintWithColorRAII(OS, ParenthesisColor) << "(";
+    PrintWithColorRAII(OS, ASTNodeColor) << Name;
     for (auto Elt : Elements) {
       OS << '\n';
       if (auto *SubExpr = Elt.dyn_cast<Expr*>())
@@ -1471,6 +1441,7 @@ public:
       else
         printRec(Elt.get<Decl*>());
     }
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
   void visitReturnStmt(ReturnStmt *S) {
@@ -1654,8 +1625,8 @@ void Stmt::dump() const {
   llvm::errs() << '\n';
 }
 
-void Stmt::print(raw_ostream &OS, const ASTContext *Ctx, unsigned Indent) const {
-  PrintStmt(OS, Ctx, Indent).visit(const_cast<Stmt*>(this));
+void Stmt::print(raw_ostream &OS, unsigned Indent) const {
+  PrintStmt(OS, Indent).visit(const_cast<Stmt*>(this));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1700,7 +1671,7 @@ public:
   /// FIXME: This should use ExprWalker to print children.
 
   void printRec(Decl *D) { D->dump(OS, Indent + 2); }
-  void printRec(Stmt *S, const ASTContext &Ctx) { S->print(OS, &Ctx, Indent + 2); }
+  void printRec(Stmt *S) { S->print(OS, Indent + 2); }
   void printRec(const Pattern *P) {
     PrintPattern(OS, Indent+2).visit(const_cast<Pattern *>(P));
   }
@@ -2303,14 +2274,14 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
     }
 
     OS << '\n';
     if (E->hasSingleExpressionBody()) {
       printRec(E->getSingleExpressionBody());
     } else {
-      printRec(E->getBody(), E->getASTContext());
+      printRec(E->getBody());
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
@@ -2319,7 +2290,7 @@ public:
 
     if (E->getParameters()) {
       OS << '\n';
-      PrintDecl(OS, Indent+2).printParameterList(E->getParameters(), &E->getASTContext());
+      PrintDecl(OS, Indent+2).printParameterList(E->getParameters());
     }
 
     OS << '\n';
