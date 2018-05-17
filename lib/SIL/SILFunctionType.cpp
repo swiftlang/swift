@@ -1456,6 +1456,11 @@ public:
     if (tl.isTrivial()) {
       if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
         return ResultConvention::UnownedInnerPointer;
+
+      auto type = tl.getLoweredType();
+      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
+          == type.getASTContext().getUnmanagedDecl())
+        return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
     }
 
