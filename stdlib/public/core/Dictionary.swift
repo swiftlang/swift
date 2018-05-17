@@ -3439,6 +3439,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
 #if _runtime(_ObjC)
   @usableFromInline // blacklisted
+  @effects(releasenone)
   internal mutating func ensureUniqueNativeBufferCocoa(
     withBucketCount desiredBucketCount: Int
   ) -> (reallocated: Bool, rehashed: Bool) {
