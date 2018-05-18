@@ -23,6 +23,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
@@ -341,6 +342,17 @@ struct unvalidatedObjectTraits : public std::integral_constant<bool,
 && !has_ObjectValidateTraits<T>::value> {};
 
 class Output {
+public:
+  /// Enum of all Output subclasses to dynamically cast the output object and
+  /// thus pass serialization options specific to the serialization of a
+  /// specific object, e.g. to omit nodes from a syntax tree that have been
+  /// reused since the last serialization.
+  enum OutputKind {
+    Normal,
+    SyntaxTree
+  };
+
+private:
   enum State {
     ArrayFirstValue,
     ArrayOtherValue,
@@ -353,12 +365,21 @@ class Output {
   bool PrettyPrint;
   bool NeedBitValueComma;
   bool EnumerationMatchFound;
+  OutputKind Kind;
+
+protected:
+  Output(llvm::raw_ostream &os, bool PrettyPrint, OutputKind Kind)
+      : Stream(os), PrettyPrint(PrettyPrint), NeedBitValueComma(false),
+        EnumerationMatchFound(false), Kind(Kind) {}
 
 public:
-  Output(llvm::raw_ostream &os, bool PrettyPrint = true) : Stream(os),
-      PrettyPrint(PrettyPrint), NeedBitValueComma(false),
-      EnumerationMatchFound(false) {}
+  Output(llvm::raw_ostream &os, bool PrettyPrint = true)
+      : Output(os, PrettyPrint, OutputKind::Normal) {}
   virtual ~Output() = default;
+
+  static bool classof(const Output *out) { return out->Kind == Normal; }
+
+  OutputKind getKind() const { return Kind; }
 
   unsigned beginArray();
   bool preflightElement(unsigned, void *&);
