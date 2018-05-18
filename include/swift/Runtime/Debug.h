@@ -82,13 +82,6 @@ static inline void crash(const char *message) {
   swift_runtime_unreachable("Expected compiler to crash.");
 }
 
-/// Report a corrupted type object.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static inline void _failCorruptType(const Metadata *type) {
-  swift::crash("Corrupt Swift type object");
-}
-
 // swift::fatalError() halts with a crash log message, 
 // but makes no attempt to preserve register state.
 LLVM_ATTRIBUTE_NORETURN
