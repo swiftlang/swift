@@ -162,13 +162,13 @@
                       "leadingTrivia": [],
                       "trailingTrivia": [],
                       "presence": "Present",
-                      "id": 3
+                      "id": 11
                     },
                     {
                       "kind": "MemberDeclList",
                       "layout": [],
                       "presence": "Present",
-                      "id": 11
+                      "id": 12
                     },
                     {
                       "tokenKind": {
@@ -182,25 +182,25 @@
                       ],
                       "trailingTrivia": [],
                       "presence": "Present",
-                      "id": 5
+                      "id": 13
                     }
                   ],
                   "presence": "Present",
-                  "id": 12
+                  "id": 14
                 }
               ],
               "presence": "Present",
-              "id": 13
+              "id": 15
             },
             null,
             null
           ],
           "presence": "Present",
-          "id": 14
+          "id": 16
         }
       ],
       "presence": "Present",
-      "id": 17
+      "id": 19
     },
     {
       "tokenKind": {
@@ -215,9 +215,9 @@
       ],
       "trailingTrivia": [],
       "presence": "Present",
-      "id": 16
+      "id": 18
     }
   ],
   "presence": "Present",
-  "id": 18
+  "id": 20
 }
