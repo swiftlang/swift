@@ -5384,12 +5384,12 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
 
 // Offer a fix-it for using `subscript` instead of the operator
 // if the inputs are compatible.
-static void diagnoseSubscriptMisuse(ApplyExpr *callExpr,
+static bool diagnoseSubscriptMisuse(ApplyExpr *callExpr,
                                     ConstraintSystem &CS,
                                     FailureDiagnosis &FD) {
   auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
   if (!UDE)
-    return;
+    return false;
 
   auto baseExpr = UDE->getBase();
   if (baseExpr && UDE->getName().getBaseName() == "subscript") {
@@ -5398,12 +5398,12 @@ static void diagnoseSubscriptMisuse(ApplyExpr *callExpr,
     auto lookup = CS.lookupMember(baseType->getRValueType(),
                                   DeclName(DeclBaseName::createSubscript()));
     if (lookup.empty())
-      return;
+      return false;
 
     auto argExpr = FD.typeCheckChildIndependently(callExpr->getArg(),
                                                   Type(), CTP_CallArgument);
     if (!argExpr)
-      return;
+      return CS.TC.Diags.hadAnyError();
 
     SmallVector<Identifier, 2> scratch;
     ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
@@ -5494,7 +5494,7 @@ static void diagnoseSubscriptMisuse(ApplyExpr *callExpr,
     auto diag = CS.TC.diagnose(baseLoc, diag::did_you_mean_subscript_operator);
 
     if (candidates.closeness != CC_ExactMatch)
-      return;
+      return false;
 
     auto l_bracket = getTokenText(swift::tok::l_square);
     auto r_bracket = getTokenText(swift::tok::r_square);
@@ -5510,6 +5510,7 @@ static void diagnoseSubscriptMisuse(ApplyExpr *callExpr,
     else
       diag.fixItInsertAfter(argExpr->getEndLoc(), r_bracket);
   }
+  return true;
 }
 
 // Check if there is a structural problem in the function expression
