@@ -27,7 +27,10 @@ class Node(object):
         self.traits = traits or []
         self.children = children or []
         self.base_kind = kind
-        self.base_type = kind_to_type(self.base_kind)
+        if self.base_kind == 'SyntaxCollection':
+            self.base_type = 'Syntax'
+        else:
+            self.base_type = kind_to_type(self.base_kind)
 
         if self.base_kind not in SYNTAX_BASE_KINDS:
             error("unknown base kind '%s' for node '%s'" %
