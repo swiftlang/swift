@@ -378,26 +378,30 @@ extension _UnmanagedString where CodeUnit == UInt8 {
   // TODO: These should be SIMD-ized
   internal func _findDiffIdx(_ other: _UnmanagedString<UInt16>) -> Int {
     let count = Swift.min(self.count, other.count)
-    for idx in 0..<count {
-      guard UInt16(self[idx]) == other[idx] else {
-        return idx
-      }
-    }
-    return count
+    return swift_stdlib_findDiffIdx_UInt8UInt16(start, other.start, count)
   }
 }
 
+@_silgen_name("swift_stdlib_findDiffIdx_UInt8UInt16")
+@effects(readonly)
+func swift_stdlib_findDiffIdx_UInt8UInt16(_ lhs: UnsafePointer<UInt8>,
+  _ rhs: UnsafePointer<UInt16>,
+  _ count: Int) -> Int
+
 internal func _findDiffIdx(
-  _ left: UnsafeBufferPointer<UInt8>,
-  _ right: UnsafeBufferPointer<UInt16>
+  _ lhs: UnsafeBufferPointer<UInt8>,
+  _ rhs: UnsafeBufferPointer<UInt16>
 ) -> Int {
-  let count = Swift.min(left.count, right.count)
-  for idx in 0..<count {
-    guard UInt16(left[idx]) == right[idx] else {
-      return idx
-    }
+  let count = Swift.min(lhs.count, rhs.count)
+  // Check if count is 0. If count is 0, we may have empty .none base addresses,
+  // so bail early.
+  if count == 0 {
+    return 0
   }
-  return count
+  let lhsAddr = lhs.baseAddress._unsafelyUnwrappedUnchecked
+  let rhsAddr = rhs.baseAddress._unsafelyUnwrappedUnchecked
+  return swift_stdlib_findDiffIdx_UInt8UInt16(lhsAddr,
+    rhsAddr, count)
 }
 
 internal func _findDiffIdx<CodeUnit>(
