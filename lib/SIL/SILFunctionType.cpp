@@ -1741,8 +1741,12 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  /// Does the given selector start with the given string as a
-  /// prefix, in the sense of the selector naming conventions?
+  // Does the given selector start with the given string as a prefix, in the
+  // sense of the selector naming conventions?
+  // This implementation matches the one used by
+  // clang::Selector::getMethodFamily, to make sure we behave the same as Clang
+  // ARC. We're not just calling that method here because it means allocating a
+  // clang::IdentifierInfo, which requires a Clang ASTContext.
   auto hasPrefix = [](StringRef text, StringRef prefix) {
     if (!text.startswith(prefix)) return false;
     if (text.size() == prefix.size()) return true;
