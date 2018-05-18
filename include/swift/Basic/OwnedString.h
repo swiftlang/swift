@@ -71,7 +71,7 @@ public:
   OwnedString(): OwnedString(nullptr, 0, StringOwnership::Unowned) {}
 
   OwnedString(const char *Data, size_t Length):
-    OwnedString(Data, Length, StringOwnership::Unowned) {}
+    OwnedString(Data, Length, StringOwnership::Copied) {}
 
   OwnedString(StringRef Str) : OwnedString(Str.data(), Str.size()) {}
 
@@ -106,7 +106,7 @@ public:
     return *this;
   }
 
-  OwnedString copy() {
+  OwnedString copy() const {
     return OwnedString(Data, Length, StringOwnership::Copied);
   }
 
