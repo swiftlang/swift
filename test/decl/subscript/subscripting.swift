@@ -272,7 +272,7 @@ struct SubscriptTest1 {
   subscript(arg: SubClass) -> Bool { return true }
   subscript(arg: Protocol) -> Bool { return true }
 
-  subscript(arg: (foo: Bool, bar: (Int, baz: Int))) -> Bool { return true }
+  subscript(arg: (foo: Bool, bar: (Int, baz: SubClass)), arg2: String) -> Bool { return true }
 }
 
 func testSubscript1(_ s1 : SubscriptTest1) {
@@ -280,9 +280,15 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 
   if s1["hello"] {}
 
-  _ = s1.subscript((true, (5, 6)))
+  _ = s1.subscript((true, (5, SubClass())), "hello")
   // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
-  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{34-35=]}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{52-53=]}}
+  _ = s1.subscript((true, (5, baz: SubSubClass())), "hello")
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
+  _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
+  // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
+  // expected-note@-2 {{did you mean to use the subscript operator?}}
   _ = s1.subscript(SubSubClass())
   // expected-error@-1 {{type 'SubscriptTest1' has no member property or method named 'subscript'}}
   // expected-note@-2 {{did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}

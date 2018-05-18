@@ -5466,32 +5466,68 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
         CalleeCandidateInfo candidates(baseType, choices,
                                        hasTrailClosure, CS, true);
-
         auto argType = CS.getType(argExpr);
         auto params = swift::decomposeArgType(argType, argLabels);
 
-        using Closeness = CalleeCandidateInfo::ClosenessResultTy;
+        using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
+        using Closeness = swift::CandidateCloseness;
 
-        candidates.filterList([&](UncurriedCandidate candidate) -> Closeness {
-          auto candFuncType = candidate.getUncurriedFunctionType();
+        struct TypeConvertibleChecker {
+          ConstraintSystem &CS;
+
+          TypeConvertibleChecker(ConstraintSystem &CS) : CS(CS) {}
+          // Checks whether type1 can is implicitly convertible to type2
+          // Returns 'Closeness' for further convenience.
+          Closeness checkType(Type type1, Type type2) {
+            if (!type1 || !type2)
+              return CC_GeneralMismatch;
+
+            if (auto tup1 = type1->getAs<TupleType>()) {
+              if (auto tup2 = type2->getAs<TupleType>())
+                return checkTuple(tup1, tup2);
+              else
+                return CC_GeneralMismatch;
+            }
+            if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
+                CS.TC.isSubtypeOf(type1, type2, CS.DC))
+              return CC_ExactMatch;
+            return CC_GeneralMismatch;
+          }
+
+          Closeness checkTuple(TupleType *tup1, TupleType *tup2) {
+            if (tup1->getNumElements() != tup2->getNumElements())
+              return CC_GeneralMismatch;
+
+            for (unsigned i = 0, e = tup1->getNumElements(); i < e; i ++) {
+              auto element1 = tup1->getElement(i);
+              auto element2 = tup2->getElement(i);
+              if (element1.hasName()) {
+                if (!element2.hasName() || element1.getName() !=
+                                           element2.getName())
+                  return CC_GeneralMismatch;
+              }
+              if (checkType(element1.getType(),
+                            element2.getType()) != CC_ExactMatch)
+                return CC_GeneralMismatch;
+            }
+            return CC_ExactMatch;
+          }
+        };
+
+        candidates.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
+          auto candFuncType = cand.getUncurriedFunctionType();
           if (!candFuncType)
             return {CC_GeneralMismatch, {}};
 
           auto candParams = candFuncType->getParams();
-
           if (params.size() != candParams.size())
             return {CC_GeneralMismatch, {}};
 
+          auto checker = TypeConvertibleChecker(CS);
           for (unsigned i = 0, e = params.size(); i < e; i ++) {
-            auto type1 = params[i].getType()->
-              getUnlabeledType(CS.getASTContext());
-            auto type2 = candParams[i].getType()->
-              getUnlabeledType(CS.getASTContext());
-
-            if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
-                CS.TC.isSubtypeOf(type1, type2, CS.DC))
+            if (checker.checkType(params[i].getType(),
+                                  candParams[i].getType()) == CC_ExactMatch)
               continue;
-
             return {CC_GeneralMismatch, {}};
           }
           return {CC_ExactMatch, {}};
