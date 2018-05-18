@@ -249,7 +249,7 @@ internal struct _BufferingHasher<Core: _HasherCore> {
   }
 }
 
-/// Represents the universal hash function used by `Set` and `Dictionary`.
+/// The universal hash function used by `Set` and `Dictionary`.
 ///
 /// `Hasher` can be used to map an arbitrary sequence of bytes to an integer
 /// hash value. You can feed data to the hasher using a series of calls to
