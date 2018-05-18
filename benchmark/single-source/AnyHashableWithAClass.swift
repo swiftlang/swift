@@ -33,9 +33,11 @@ class TestHashableBase : Hashable {
   init(_ value: Int) {
     self.value = value
   }
-  var hashValue: Int {
-    return value
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
+
   static func == (
     lhs: TestHashableBase,
     rhs: TestHashableBase

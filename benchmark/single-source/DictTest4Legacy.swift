@@ -13,18 +13,24 @@
 import TestsUtils
 
 // This benchmark mostly measures lookups in dictionaries with complex keys,
-// exercising the default hash compression function.
+// using the legacy hashValue API.
 
-public let Dictionary4 = [
+public let Dictionary4Legacy = [
   BenchmarkInfo(
-    name: "Dictionary4",
-    runFunction: run_Dictionary4,
+    name: "Dictionary4Legacy",
+    runFunction: run_Dictionary4Legacy,
     tags: [.validation, .api, .Dictionary]),
   BenchmarkInfo(
-    name: "Dictionary4OfObjects",
-    runFunction: run_Dictionary4OfObjects,
+    name: "Dictionary4OfObjectsLegacy",
+    runFunction: run_Dictionary4OfObjectsLegacy,
     tags: [.validation, .api, .Dictionary]),
 ]
+
+extension Int {
+  mutating func combine(_ value: Int) {
+    self = 16777619 &* self ^ value
+  }
+}
 
 struct LargeKey: Hashable {
   let i: Int
@@ -36,6 +42,19 @@ struct LargeKey: Hashable {
   let o: Bool
   let p: Bool
   let q: Bool
+
+  var hashValue: Int {
+    var hash = i.hashValue
+    hash.combine(j.hashValue)
+    hash.combine(k.hashValue)
+    hash.combine(l.hashValue)
+    hash.combine(m.hashValue)
+    hash.combine(n.hashValue)
+    hash.combine(o.hashValue)
+    hash.combine(p.hashValue)
+    hash.combine(q.hashValue)
+    return hash
+  }
 
   init(_ value: Int) {
     self.i = value
@@ -51,7 +70,7 @@ struct LargeKey: Hashable {
 }
 
 @inline(never)
-public func run_Dictionary4(_ N: Int) {
+public func run_Dictionary4Legacy(_ N: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
@@ -95,13 +114,17 @@ class Box<T : Hashable> : Hashable {
     hasher.combine(value)
   }
 
+  var hashValue: Int {
+    return value.hashValue
+  }
+
   static func ==(lhs: Box, rhs: Box) -> Bool {
     return lhs.value == rhs.value
   }
 }
 
 @inline(never)
-public func run_Dictionary4OfObjects(_ N: Int) {
+public func run_Dictionary4OfObjectsLegacy(_ N: Int) {
   let size1 = 100
   let reps = 20
   let ref_result = "1 99 \(reps) \(reps * 99)"
