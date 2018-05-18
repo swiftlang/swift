@@ -478,6 +478,11 @@ extension Character : Comparable {
 
 extension Character: Hashable {
   // not @inlinable (performance)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @effects(releasenone)
   public func hash(into hasher: inout Hasher) {
     // FIXME(performance): constructing a temporary string is extremely
