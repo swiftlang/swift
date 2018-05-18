@@ -2355,16 +2355,14 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     // Log reuse information
     if (SyntaxCache.hasValue()) {
       Consumer.handleSyntaxReuseRegions(SyntaxCache->getReusedRanges());
-      if (Logger::isLoggingEnabledForLevel(Logger::Level::InfoLowPrio)) {
-        std::string Message;
-        llvm::raw_string_ostream MessageStream(Message);
-        MessageStream << "Reused ";
+      LOG_SECTION("SyntaxCache", InfoMediumPrio) {
+        Log->getOS() << "Reused ";
 
         bool FirstIteration = true;
         unsigned LastPrintedBufferID;
         for (auto ReuseRegion : SyntaxCache->getReusedRanges()) {
           if (!FirstIteration) {
-            MessageStream << ", ";
+            Log->getOS() << ", ";
           } else {
             FirstIteration = false;
           }
@@ -2374,12 +2372,10 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
           auto Start = SM.getLocForOffset(BufferID, ReuseRegion.first);
           auto End = SM.getLocForOffset(BufferID, ReuseRegion.second);
 
-          Start.print(MessageStream, SM, LastPrintedBufferID);
-          MessageStream << " - ";
-          End.print(MessageStream, SM, LastPrintedBufferID);
+          Start.print(Log->getOS(), SM, LastPrintedBufferID);
+          Log->getOS() << " - ";
+          End.print(Log->getOS(), SM, LastPrintedBufferID);
         }
-
-        LOG_INFO("SyntaxCache", Low, MessageStream.str());
       }
     } else {
       Consumer.handleSyntaxReuseRegions({});
