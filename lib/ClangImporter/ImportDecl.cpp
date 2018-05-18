@@ -7494,11 +7494,6 @@ void ClangImporter::Implementation::importAttributes(
       clang::VersionTuple obsoleted = avail->getObsoleted();
       clang::VersionTuple introduced = avail->getIntroduced();
 
-      // Swift only allows "." separators.
-      obsoleted.UseDotAsSeparator();
-      introduced.UseDotAsSeparator();
-      deprecated.UseDotAsSeparator();
-
       const auto &replacement = avail->getReplacement();
 
       StringRef swiftReplacement = "";
