@@ -2623,11 +2623,11 @@ RValue RValueEmitter::visitTupleElementExpr(TupleElementExpr *E,
 
 RValue
 SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
-                                               ConcreteDeclRef defaultArgsOwner,
-                                               unsigned destIndex,
-                                               CanType resultType,
+                                             ConcreteDeclRef defaultArgsOwner,
+                                             unsigned destIndex,
+                                             CanType resultType,
                                              AbstractionPattern origResultType,
-                                               SGFContext C) {
+                                             SGFContext C) {
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
@@ -5389,34 +5389,15 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
 void SILGenFunction::emitOpenExistentialExprImpl(
        OpenExistentialExpr *E,
        llvm::function_ref<void(Expr *)> emitSubExpr) {
+  Optional<FormalEvaluationScope> writebackScope;
+
   // Emit the existential value.
   if (E->getExistentialValue()->getType()->is<LValueType>()) {
-    // Open the existential container right away. We need the dynamic type
-    // to be opened in order to evaluate the subexpression.
-    AccessKind accessKind;
-    if (E->hasLValueAccessKind())
-      accessKind = E->getLValueAccessKind();
-    else
-      accessKind = E->getExistentialValue()->getLValueAccessKind();
-    auto lv = emitLValue(E->getExistentialValue(), accessKind);
-    auto formalOpenedType = E->getOpaqueValue()->getType()
-                                    ->getWithoutSpecifierType()
-                                    ->getCanonicalType();
-    lv = emitOpenExistentialLValue(E, std::move(lv),
-                                   CanArchetypeType(E->getOpenedArchetype()),
-                                   formalOpenedType,
-                                   accessKind);
-    
-    auto addr = emitAddressOfLValue(E, std::move(lv), accessKind);
-    bool inserted = OpaqueLValues.insert({E->getOpaqueValue(),
-                                          {addr.getValue(), formalOpenedType}})
-      .second;
+    bool inserted = OpaqueValueExprs.insert({E->getOpaqueValue(), E}).second;
     (void)inserted;
     assert(inserted && "already have this opened existential?");
 
     emitSubExpr(E->getSubExpr());
-    assert(OpaqueLValues.count(E->getOpaqueValue()) == 0
-           && "opened existential not removed?");
     return;
   }
 
@@ -5443,12 +5424,6 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
     return RValue(SGF, E, *result);
   }
 
-  Optional<FormalEvaluationScope> scope;
-  // Begin an evaluation scope for an lvalue existential opened into an
-  // rvalue expression.
-  if (E->getExistentialValue()->getType()->is<LValueType>())
-    scope.emplace(SGF);
-  
   return SGF.emitOpenExistentialExpr<RValue>(E,
                                              [&](Expr *subExpr) -> RValue {
                                                return visit(subExpr, C);

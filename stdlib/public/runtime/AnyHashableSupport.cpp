@@ -194,32 +194,10 @@ void _swift_makeAnyHashableUpcastingToHashableBaseType(
     return;
   }
 
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
+  default:
     _swift_makeAnyHashableUsingDefaultRepresentation(
         value, anyHashableResultPointer, type, hashableWT);
     return;
-
-  case MetadataKind::ErrorObject:
-    // ErrorObject metadata is not used for any Swift-level values, so
-    // this case is unreachable.
-    _failCorruptType(type);
-
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-    // We assume that the value can not be an existential,
-    // because existentials can't conform to Hashable today.
-    //
-    // FIXME: handle generalized existentials when Swift has them.
-    _failCorruptType(type);
   }
-  _failCorruptType(type);
 }
 
