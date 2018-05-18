@@ -3332,7 +3332,8 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   FunctionPointer witnessFnPtr(witness, sig);
 
   // Call the accessor.
-  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
+  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation() ||
+          !IGF.CurFn->getSubprogram()) &&
          "creating a function call without a debug location");
   auto call = IGF.Builder.CreateCall(witnessFnPtr,
                                      { request.get(IGF),
