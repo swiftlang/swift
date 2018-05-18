@@ -87,11 +87,24 @@ public struct Bool {
     self = value
   }
 
-  /// Returns a random Boolean value
+  /// Returns a random Boolean value, using the given generator as a source for
+  /// randomness.
   ///
-  /// - Parameter generator: The random number generator to use when getting a
-  ///   random Boolean.
-  /// - Returns: A random Boolean value.
+  /// This method returns `true` and `false` with equal probability. Use this
+  /// method to generate a random Boolean value when you are using a custom
+  /// random number generator.
+  ///
+  ///     let flippedHeads = Boolean.random(using: &myGenerator)
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// - Parameter generator: The random number generator to use when creating
+  ///   the new random value.
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
   @inlinable
   public static func random<T: RandomNumberGenerator>(
     using generator: inout T
@@ -99,11 +112,23 @@ public struct Bool {
     return (generator.next() >> 17) & 1 == 0
   }
   
-  /// Returns a random Boolean value
+  /// Returns a random Boolean value.
   ///
-  /// - Returns: A random Boolean value.
+  /// This method returns `true` and `false` with equal probability.
   ///
-  /// This uses the standard library's default random number generator.
+  ///     let flippedHeads = Boolean.random()
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// `Bool.random()` uses the default random generator, `Random.default`. The
+  /// call in the example above is equivalent to
+  /// `Bool.random(using: &Random.default)`.
+  ///
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
   @inlinable
   public static func random() -> Bool {
     return Bool.random(using: &Random.default)
@@ -179,6 +204,11 @@ extension Bool : Equatable, Hashable {
     return _hashValue(for: self)
   }
 
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)

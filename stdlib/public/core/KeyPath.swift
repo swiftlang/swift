@@ -46,11 +46,17 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   @usableFromInline // FIXME(sil-serialize-all)
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
   
+  /// The hash value.
   @inlinable // FIXME(sil-serialize-all)
   final public var hashValue: Int {
     return _hashValue(for: self)
   }
 
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     return withBuffer {

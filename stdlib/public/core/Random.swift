@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-/// A type that can provide uniformly distributed random data.
+/// A type that provides uniformly distributed random data.
 ///
 /// When you call methods that use random data, such as creating new random
 /// values or shuffling a collection, you can pass a `RandomNumberGenerator`
@@ -24,14 +24,14 @@ import SwiftShims
 /// version that uses the default generator. For example, this `Weekday`
 /// enumeration provides static methods that return a random day of the week:
 ///
-///     enum Weekday : CaseIterable {
+///     enum Weekday: CaseIterable {
 ///         case sunday, monday, tuesday, wednesday, thursday, friday, saturday
 ///
-///         static func randomWeekday<G: RandomNumberGenerator>(using generator: inout G) -> Weekday {
+///         static func random<G: RandomNumberGenerator>(using generator: inout G) -> Weekday {
 ///             return Weekday.allCases.randomElement(using: &generator)!
 ///         }
 ///
-///         static func randomWeekday() -> Weekday {
+///         static func random() -> Weekday {
 ///             return Weekday.randomWeekday(using: &Random.default)
 ///         }
 ///     }
@@ -118,18 +118,20 @@ extension RandomNumberGenerator {
 ///     let x = Int.random(in: 1...100)
 ///     let y = Int.random(in: 1...100, using: &Random.default)
 ///
-/// `Random.default` is safe to use in multiple threads, and uses a
-/// cryptographically secure algorithm whenever possible.
+/// `Random.default` is automatically seeded, is safe to use in multiple
+/// threads, and uses a cryptographically secure algorithm whenever possible.
 ///
 /// Platform Implementation of `Random`
 /// ===================================
 ///
-/// - Apple platforms all use `arc4random_buf(3)`.
-/// - `Linux`, `Android`, `Cygwin`, `Haiku`, `FreeBSD`, and `PS4` all try to
-///   use `getrandom(2)`, but if it doesn't exist then they read from
-///   `/dev/urandom`.
-/// - `Fuchsia` calls `getentropy(3)`.
-/// - `Windows` calls `BCryptGenRandom`.
+/// While the `Random.default` generator is automatically seeded and
+/// thread-safe on every platform, the cryptographic quality of the stream of
+/// random data produced by the generator may vary. For more detail, see the
+/// documentation for the APIs used by each platform.
+///
+/// - Apple platforms use `arc4random_buf(3)`.
+/// - Linux platforms use `getrandom(2)` when available; otherwise, they read
+///   from `/dev/urandom`.
 public struct Random : RandomNumberGenerator {
   /// The default instance of the `Random` random number generator.
   public static var `default`: Random {
