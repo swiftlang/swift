@@ -4030,7 +4030,7 @@ public:
   }
 };
 
-/// PostfixUnaryExpr - Prefix unary expressions like '!y'.
+/// PostfixUnaryExpr - Postfix unary expressions like 'y!'.
 class PostfixUnaryExpr : public ApplyExpr {
 public:
   PostfixUnaryExpr(Expr *Fn, Expr *Arg, Type Ty = Type())
