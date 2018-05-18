@@ -682,9 +682,9 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
   auto attr = decl->getAttr<clang::SwiftNameAttr>();
   if (!attr) return nullptr;
 
-  // API notes produce implicit attributes; ignore them because they weren't
-  // used for naming in Swift 2.
-  if (attr->isImplicit()) return nullptr;
+  // API notes produce attributes with no source location; ignore them because
+  // they weren't used for naming in Swift 2.
+  if (attr->getLocation().isInvalid()) return nullptr;
 
   // Hardcode certain kinds of explicitly-written Swift names that were
   // permitted and used in Swift 2. All others are ignored, so that we are
