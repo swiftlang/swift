@@ -755,6 +755,51 @@ static void VisitNodeAssociatedTypeRef(
       ident->getText().str().c_str());
 }
 
+static void VisitNodeGenericTypealias(ASTContext *ast,
+                                      Demangle::NodePointer cur_node,
+                                      VisitNodeResult &result) {
+  VisitNodeResult generic_type_result;
+  VisitNodeResult template_types_result;
+
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    switch (child_node_kind) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, *pos, generic_type_result);
+      break;
+    case Demangle::Node::Kind::TypeList:
+      VisitNode(ast, *pos, template_types_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (generic_type_result._decls.size() != 1 ||
+      generic_type_result._types.size() != 1 ||
+      template_types_result._types.empty())
+    return;
+
+  auto *genericTypeAlias =
+      cast<TypeAliasDecl>(generic_type_result._decls.front());
+  GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  // FIXME: handle conformances.
+  SubstitutionMap subMap =
+      SubstitutionMap::get(signature, template_types_result._types,
+                           ArrayRef<ProtocolConformanceRef>({}));
+  Type parentType;
+  if (auto nominal = genericTypeAlias->getDeclContext()
+                         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    parentType = nominal->getDeclaredInterfaceType();
+  }
+  NameAliasType *NAT =
+      NameAliasType::get(genericTypeAlias, parentType, subMap,
+                         genericTypeAlias->getUnderlyingTypeLoc().getType());
+  result._types.push_back(NAT);
+  result._decls.push_back(genericTypeAlias);
+}
+
 static void VisitNodeBoundGeneric(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2201,6 +2246,10 @@ static void VisitNode(
   case Demangle::Node::Kind::BoundGenericEnum:
   case Demangle::Node::Kind::BoundGenericOtherNominalType:
     VisitNodeBoundGeneric(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::BoundGenericTypeAlias:
+    VisitNodeGenericTypealias(ast, node, result);
     break;
 
   case Demangle::Node::Kind::BuiltinTypeName:
