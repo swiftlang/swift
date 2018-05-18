@@ -1059,18 +1059,21 @@ namespace {
         subscripts(copied.subscripts.copy(SGF, loc)) ,
         baseFormalType(copied.baseFormalType) {}
 
-    virtual SILDeclRef getAccessor(SILGenFunction &SGF,
-                                   AccessKind kind) const  = 0;
+    virtual bool doesAccessMutateSelf(SILGenFunction &SGF,
+                                      AccessKind kind) const = 0;
 
+    bool doesAccessorMutateSelf(SILGenFunction &SGF,
+                                SILDeclRef accessor) const {
+      auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
+      return accessorSelf.getType() && accessorSelf.isIndirectMutating();
+    }
+    
     AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                  AccessKind kind) const override {
-      SILDeclRef accessor = getAccessor(SGF, kind);
-      auto accessorSelf = SGF.SGM.Types.getConstantSelfParameter(accessor);
-      if (accessorSelf.getType() && accessorSelf.isIndirectMutating()) {
+      if (doesAccessMutateSelf(SGF, kind))
         return AccessKind::ReadWrite;
-      } else {
+      else
         return AccessKind::Read;
-      }
     }
 
     void printBase(raw_ostream &OS, unsigned indent, StringRef name) const {
@@ -1110,13 +1113,25 @@ namespace {
     {
     }
 
-    SILDeclRef getAccessor(SILGenFunction &SGF,
-                           AccessKind accessKind) const override {
-      if (accessKind == AccessKind::Read) {
-        return SGF.SGM.getGetterDeclRef(decl);
-      } else {
-        return SGF.SGM.getSetterDeclRef(decl);
+    bool doesAccessMutateSelf(SILGenFunction &SGF,
+                              AccessKind accessKind) const override {
+      switch (accessKind) {
+      case AccessKind::Read: {
+        auto getter = SGF.SGM.getGetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, getter);
       }
+      case AccessKind::Write: {
+        auto setter = SGF.SGM.getSetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, setter);
+      }
+      case AccessKind::ReadWrite: {
+        auto getter = SGF.SGM.getGetterDeclRef(decl);
+        auto setter = SGF.SGM.getSetterDeclRef(decl);
+        return doesAccessorMutateSelf(SGF, getter)
+            || doesAccessorMutateSelf(SGF, setter);
+      }
+      }
+      llvm_unreachable("unknown access kind");
     }
 
     void emitAssignWithSetter(SILGenFunction &SGF, SILLocation loc,
@@ -1586,9 +1601,10 @@ namespace {
     {
     }
 
-    SILDeclRef getAccessor(SILGenFunction &SGF,
-                           AccessKind accessKind) const override {
-      return SGF.SGM.getAddressorDeclRef(decl, accessKind);
+    bool doesAccessMutateSelf(SILGenFunction &SGF,
+                              AccessKind kind) const override {
+      auto addressor = SGF.SGM.getAddressorDeclRef(decl, kind);
+      return doesAccessorMutateSelf(SGF, addressor);
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
@@ -2350,18 +2366,20 @@ LValue SILGenLValue::visitOpaqueValueExpr(OpaqueValueExpr *e,
                                           AccessKind accessKind,
                                           LValueOptions options) {
   // Handle an opaque lvalue that refers to an opened existential.
-  auto known = SGF.OpaqueLValues.find(e);
-  if (known != SGF.OpaqueLValues.end()) {
-    // Dig the opened address out of the list.
-    SILValue opened = known->second.first;
-    CanType openedType = known->second.second;
-    SGF.OpaqueLValues.erase(known);
+  auto known = SGF.OpaqueValueExprs.find(e);
+  if (known != SGF.OpaqueValueExprs.end()) {
+    // Dig the open-existential expression out of the list.
+    OpenExistentialExpr *opened = known->second;
+    SGF.OpaqueValueExprs.erase(known);
 
-    // Continue formal evaluation of the lvalue from this address.
-    return LValue::forAddress(ManagedValue::forLValue(opened),
-                              None,
-                              AbstractionPattern(openedType),
-                              openedType);
+    // Do formal evaluation of the underlying existential lvalue.
+    auto lv = visitRec(opened->getExistentialValue(), accessKind, options);
+    lv = SGF.emitOpenExistentialLValue(
+        opened, std::move(lv),
+        CanArchetypeType(opened->getOpenedArchetype()),
+        e->getType()->getWithoutSpecifierType()->getCanonicalType(),
+        accessKind);
+    return lv;
   }
 
   assert(SGF.OpaqueValues.count(e) && "Didn't bind OpaqueValueExpr");
@@ -2655,12 +2673,29 @@ LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
 LValue SILGenLValue::visitOpenExistentialExpr(OpenExistentialExpr *e,
                                               AccessKind accessKind,
                                               LValueOptions options) {
-  return SGF.emitOpenExistentialExpr<LValue>(e,
-                                             [&](Expr *subExpr) -> LValue {
-                                               return visitRec(subExpr,
-                                                               accessKind,
-                                                               options);
-                                             });
+  // If the opaque value is not an lvalue, open the existential immediately.
+  if (!e->getOpaqueValue()->getType()->is<LValueType>()) {
+    return SGF.emitOpenExistentialExpr<LValue>(e,
+                                               [&](Expr *subExpr) -> LValue {
+                                                 return visitRec(subExpr,
+                                                                 accessKind,
+                                                                 options);
+                                               });
+  }
+
+  // Record the fact that we're opening this existential. The actual
+  // opening operation will occur when we see the OpaqueValueExpr.
+  bool inserted = SGF.OpaqueValueExprs.insert({e->getOpaqueValue(), e}).second;
+  (void)inserted;
+  assert(inserted && "already have this opened existential?");
+
+  // Visit the subexpression.
+  LValue lv = visitRec(e->getSubExpr(), accessKind, options);
+
+  // Sanity check that we did see the OpaqueValueExpr.
+  assert(SGF.OpaqueValueExprs.count(e->getOpaqueValue()) == 0 &&
+         "opened existential not removed?");
+  return lv;
 }
 
 static LValueTypeData
