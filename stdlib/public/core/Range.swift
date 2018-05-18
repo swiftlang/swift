@@ -186,7 +186,6 @@ where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Iterator = IndexingIterator<Range<Bound>>
 }
 
-// FIXME: should just be RandomAccessCollection
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
 where Bound : Strideable, Bound.Stride : SignedInteger
 {
