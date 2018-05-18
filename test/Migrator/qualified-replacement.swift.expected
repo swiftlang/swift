@@ -10,10 +10,12 @@ func foo() {
   _ = NewPropertyUserInterface.newFieldPlus
   NewPropertyUserInterface.newMethodPlus(1)
   _ = NewFooComparisonResult.NewFooOrderedSame
-  let _ : FooComparisonResult = NewFooComparisonResult.NewFooOrderedSame
+  let _ : FooComparisonResult = .NewFooOrderedSame
   _ = NewCityKind.NewTown
   _ = ToplevelWrapper.internalType()
   _ = ToplevelWrapper.internalType(recordName: "")
+  bar(.NewFooOrderedSame)
 }
 
 func foo(_: ToplevelWrapper.internalType) {}
+func bar(_ : FooComparisonResult) {}
