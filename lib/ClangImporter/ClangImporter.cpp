@@ -2476,29 +2476,28 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
 
       // Find the enclosing extension, if there is one.
       ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
+        results.push_back(ext);
 
-      if (!ext) {
-        // If this is compatibility typealias and it's not in extension, the
-        // canonical extension may exists in another extension.
-        if (auto alias = dyn_cast_or_null<TypeAliasDecl>(importedDecl)) {
-          if (alias->isCompatibilityAlias()) {
-            auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
-            
-            // Note: We can't use getAnyGeneric() here because `aliasedTy`
-            // might be typealias.
-            if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
-              importedDecl = Ty->getDecl();
-            else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
-              importedDecl = Ty->getDecl();
-            if (!importedDecl) continue;
+      // If this is a compatibility typealias, the canonical extension may
+      // exists in another extension.
+      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+      if (!alias || !alias->isCompatibilityAlias()) continue;
 
-            ext = findEnclosingExtension(importedDecl);
-          }
-        }
-      }
-      if (!ext) continue;
+      auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
+      ext = nullptr;
+      importedDecl = nullptr;
 
-      if (knownExtensions.insert(ext).second)
+      // Note: We can't use getAnyGeneric() here because `aliasedTy`
+      // might be typealias.
+      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      if (!importedDecl) continue;
+
+      ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
     }
   }

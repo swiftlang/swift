@@ -2175,7 +2175,9 @@ namespace {
         if (canonicalVersion != getActiveSwiftVersion()) {
           auto activeName = Impl.importFullName(D, getActiveSwiftVersion());
           if (activeName &&
-              activeName.getDeclName() == canonicalName.getDeclName()) {
+              activeName.getDeclName() == canonicalName.getDeclName() &&
+              activeName.getEffectiveContext().equalsWithoutResolving(
+                  canonicalName.getEffectiveContext())) {
             return ImportedName();
           }
         }
@@ -2192,7 +2194,9 @@ namespace {
       if (!alternateName)
         return ImportedName();
 
-      if (alternateName.getDeclName() == canonicalName.getDeclName()) {
+      if (alternateName.getDeclName() == canonicalName.getDeclName() &&
+          alternateName.getEffectiveContext().equalsWithoutResolving(
+              canonicalName.getEffectiveContext())) {
         if (getVersion() == getActiveSwiftVersion()) {
           assert(canonicalVersion != getActiveSwiftVersion());
           return alternateName;
