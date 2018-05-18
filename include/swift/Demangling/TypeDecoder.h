@@ -127,7 +127,7 @@ class TypeDecoder {
     case NodeKind::BoundGenericEnum:
     case NodeKind::BoundGenericStructure:
     case NodeKind::BoundGenericOtherNominalType: {
-      if (Node->getNumChildren() != 2)
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
@@ -161,7 +161,7 @@ class TypeDecoder {
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
-      if (Node->getNumChildren() == 2) {
+      if (Node->getNumChildren() >= 2) {
         auto repr = Node->getChild(i++);
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
