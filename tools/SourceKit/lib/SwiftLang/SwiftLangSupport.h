@@ -111,9 +111,12 @@ public:
   const llvm::Optional<swift::SourceFileSyntax> &getSyntaxTree() const;
 
   const swift::SourceManager &getSourceManager() const;
+  swift::SourceManager &getSourceManager();
 
   /// Get the buffer ID of this file in its source manager
   unsigned getBufferID() const;
+
+  std::string getFilePath() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
