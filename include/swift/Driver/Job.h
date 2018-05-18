@@ -277,7 +277,7 @@ private:
   /// Argument vector containing a single argument pointing to the response file
   /// path with the '@' prefix.
   /// The argument string must be kept alive as long as the Job is alive.
-  llvm::opt::ArgStringList ResponseFileArg;
+  const char *ResponseFileArg;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
@@ -291,14 +291,14 @@ public:
       EnvironmentVector ExtraEnvironment = {},
       std::vector<FilelistInfo> Infos = {},
       const char *ResponseFilePath = nullptr,
-      llvm::opt::ArgStringList ResponseFileArg = {})
+      const char *ResponseFileArg = nullptr)
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)),
         ResponseFilePath(ResponseFilePath),
-        ResponseFileArg(std::move(ResponseFileArg)) {}
+        ResponseFileArg(ResponseFileArg) {}
 
   virtual ~Job();
 
@@ -308,7 +308,7 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
-  const llvm::opt::ArgStringList &getResponseFileArg() const { return ResponseFileArg; }
+  const char * const &getResponseFileArg() const { return ResponseFileArg; }
   ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }

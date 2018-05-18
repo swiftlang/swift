@@ -115,13 +115,12 @@ std::unique_ptr<Job> ToolChain::constructJob(
   }
 
   const char *responseFilePath = nullptr;
-  llvm::opt::ArgStringList responseFileArg = {};
+  const char *responseFileArg = nullptr;
   if (invocationInfo.allowsResponseFiles &&
       !llvm::sys::commandLineFitsWithinSystemLimits(
           executablePath, invocationInfo.Arguments)) {
     responseFilePath = context.getTemporaryFilePath("arguments", "resp");
-    responseFileArg.push_back(
-        C.getArgs().MakeArgString(Twine("@") + responseFilePath));
+    responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
   }
 
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
@@ -130,7 +129,7 @@ std::unique_ptr<Job> ToolChain::constructJob(
                                 std::move(invocationInfo.ExtraEnvironment),
                                 std::move(invocationInfo.FilelistInfos),
                                 responseFilePath,
-                                std::move(responseFileArg));
+                                responseFileArg);
 }
 
 std::string
