@@ -246,9 +246,7 @@ struct MapRegionCounters : public ASTWalker {
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
       mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      CounterMap[CS] = NextCounter++;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
+      mapRegion(CS);
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
       mapRegion(CS->getBody());
     }
@@ -565,10 +563,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[CS] = NextCounter++;
       auto csCount = loadExecutionCount(CS);
       LoadedCounterMap[CS] = csCount;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
-      auto dcsCount = loadExecutionCount(DCS);
-      LoadedCounterMap[DCS] = dcsCount;
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
       auto csBody = CS->getBody();
       CounterMap[csBody] = NextCounter++;
@@ -629,6 +623,9 @@ private:
 
   /// \brief A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
+
+  /// \brief A stack of active do-catch statements.
+  std::vector<DoCatchStmt *> DoCatchStack;
 
   CounterExpr *ExitCounter = nullptr;
 
@@ -915,10 +912,16 @@ public:
       assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      // The do-catch body is visited the same number of times as its parent.
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
-      assignCounter(DCS);
+
+      // Initialize the exit count of the do-catch to the entry count, then
+      // subtract off non-local exits as they are visited.
+      assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
+      DoCatchStack.push_back(DCS);
 
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
       assignCounter(CS->getBody());
     }
     return {true, S};
@@ -957,11 +960,17 @@ public:
 
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
       // When we break from a loop, we need to adjust the exit count.
-      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BS->getTarget())) {
+      Stmt *BreakTarget = BS->getTarget();
+      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
         subtractFromCounter(RWS->getCond(), getCurrentCounter());
-      } else if (!isa<SwitchStmt>(BS->getTarget())) {
+      } else if (!isa<SwitchStmt>(BreakTarget)) {
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
+
+      // The break also affects the exit counts of active do-catch statements.
+      for (auto *DCS : DoCatchStack)
+        subtractFromCounter(DCS, getCurrentCounter());
+
       terminateRegion(S);
 
     } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
@@ -974,13 +983,23 @@ public:
     } else if (isa<CaseStmt>(S)) {
       popRegions(S);
 
-    } else if (isa<DoCatchStmt>(S)) {
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
+      DoCatchStack.pop_back();
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
+    } else if (isa<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
+
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
-      // When we return, we may need to adjust some loop condition counts.
-      for (auto *RWS : RepeatWhileStack)
-        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+      // When we return, adjust loop condition counts and do-catch exit counts
+      // to reflect the early exit.
+      if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
+        for (auto *RWS : RepeatWhileStack)
+          subtractFromCounter(RWS->getCond(), getCurrentCounter());
+        for (auto *DCS : DoCatchStack)
+          subtractFromCounter(DCS, getCurrentCounter());
+      }
 
       terminateRegion(S);
     }
