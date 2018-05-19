@@ -812,7 +812,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
   ///     let randomName = names.randomElement(using: &myGenerator)!
-  ///     // randomName == "Amani" (maybe)
+  ///     // randomName == "Amani"
   ///
   /// - Parameter generator: The random number generator to use when choosing
   ///   a random element.
@@ -1038,13 +1038,13 @@ extension Collection {
   /// Returns a random element of the collection, using the given generator as
   /// a source for randomness.
   ///
-  /// You use this method to select a random element from a collection when you
-  /// are using a custom random number generator. For example, call
-  /// `randomElement(using:)` to select a random element from an array of names.
+  /// Call `randomElement(using:)` to select a random element from an array or
+  /// another collection when you are using a custom random number generator.
+  /// This example picks a name at random from an array:
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
   ///     let randomName = names.randomElement(using: &myGenerator)!
-  ///     // randomName == "Amani" (maybe)
+  ///     // randomName == "Amani"
   ///
   /// - Parameter generator: The random number generator to use when choosing
   ///   a random element.
@@ -1065,12 +1065,12 @@ extension Collection {
 
   /// Returns a random element of the collection.
   ///
-  /// For example, call `randomElement()` to select a random element from an
-  /// array of names.
+  /// Call `randomElement()` to select a random element from an array or
+  /// another collection. This example picks a name at random from an array:
   ///
   ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
   ///     let randomName = names.randomElement()!
-  ///     // randomName == "Amani" (perhaps)
+  ///     // randomName == "Amani"
   ///
   /// This method uses the default random generator, `Random.default`. The call
   /// to `names.randomElement()` above is equivalent to calling

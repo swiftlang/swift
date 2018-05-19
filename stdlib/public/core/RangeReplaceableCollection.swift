@@ -1086,7 +1086,15 @@ extension RangeReplaceableCollection {
 }
 
 extension RangeReplaceableCollection where Self: MutableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     // numbers == [6, 8, 10]
   ///
   /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
@@ -1112,7 +1120,16 @@ extension RangeReplaceableCollection where Self: MutableCollection {
 }
 
 extension RangeReplaceableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the vowels from a string:
+  ///
+  ///     var phrase = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     phrase.removeAll(where: { vowels.contains($0) })
+  ///     // phrase == "Th rn n Spn stys mnly n th pln."
   ///
   /// - Parameter predicate: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
