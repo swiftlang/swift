@@ -2967,7 +2967,15 @@ namespace {
     }
 
     Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
-      return simplifyExprType(expr);
+      Type optType = simplifyType(cs.getType(expr));
+      
+      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
+                                   cs.getConstraintLocator(expr));
+      if (!subExpr) return nullptr;
+      
+      expr->setSubExpr(subExpr);
+      cs.setType(expr, optType);
+      return expr;
     }
 
     Expr *visitParenExpr(ParenExpr *expr) {

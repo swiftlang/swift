@@ -1527,8 +1527,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
   } else {
     ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
-    branchArg = wrapped.forward(SGF);
+    branchArg = subExprValue.forward(SGF);
   }
 
   localCleanups.pop();
