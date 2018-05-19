@@ -415,7 +415,7 @@ SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
 }
 
-SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
+SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap) const {
   return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));
 }
@@ -530,8 +530,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 }
 
 SubstitutionMap
-SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
-                                         const SubstitutionMap &secondSubMap,
+SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
+                                         SubstitutionMap secondSubMap,
                                          CombineSubstitutionMaps how,
                                          unsigned firstDepthOrIndex,
                                          unsigned secondDepthOrIndex,

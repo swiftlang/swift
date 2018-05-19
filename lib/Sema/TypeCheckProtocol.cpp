@@ -687,7 +687,7 @@ RequirementMatch swift::matchWitness(TypeChecker &tc,
     cs.emplace(tc, dc, ConstraintSystemOptions());
 
     auto reqGenericEnv = reqEnvironment->getSyntheticEnvironment();
-    auto &reqSubMap = reqEnvironment->getRequirementToSyntheticMap();
+    auto reqSubMap = reqEnvironment->getRequirementToSyntheticMap();
 
     Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
     if (reqGenericEnv)

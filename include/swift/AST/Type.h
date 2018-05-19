@@ -88,14 +88,6 @@ struct QueryTypeSubstitutionMapOrIdentity {
   Type operator()(SubstitutableType *type) const;
 };
 
-/// A function object suitable for use as a \c TypeSubstitutionFn that
-/// queries an underlying \c SubstitutionMap.
-struct QuerySubstitutionMap {
-  const SubstitutionMap &subMap;
-
-  Type operator()(SubstitutableType *type) const;
-};
-
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
   Type conformingReplacementType,
@@ -110,20 +102,6 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule(ModuleDecl *M)
     : M(M) {}
-  
-  Optional<ProtocolConformanceRef>
-  operator()(CanType dependentType,
-             Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
-};
-
-/// Functor class suitable for use as a \c LookupConformanceFn to look up a
-/// conformance in a \c SubstitutionMap.
-class LookUpConformanceInSubstitutionMap {
-  const SubstitutionMap &Subs;
-public:
-  explicit LookUpConformanceInSubstitutionMap(const SubstitutionMap &Subs)
-    : Subs(Subs) {}
   
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
@@ -314,7 +292,7 @@ public:
   /// \param options Options that affect the substitutions.
   ///
   /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(const SubstitutionMap &substitutions,
+  Type subst(SubstitutionMap substitutions,
              SubstOptions options = None) const;
 
   /// Replace references to substitutable types with new, concrete types and

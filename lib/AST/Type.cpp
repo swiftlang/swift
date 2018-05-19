@@ -2762,7 +2762,7 @@ bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
+GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
   return FunctionType::get(input, result, getExtInfo());
@@ -3116,7 +3116,7 @@ static Type substType(Type derivedType,
   });
 }
 
-Type Type::subst(const SubstitutionMap &substitutions,
+Type Type::subst(SubstitutionMap substitutions,
                  SubstOptions options) const {
   return substType(*this,
                    QuerySubstitutionMap{substitutions},
