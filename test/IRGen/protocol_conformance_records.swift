@@ -119,7 +119,7 @@ public protocol Spoon { }
 // -- flags
 // CHECK-SAME:           i32 258
 // -- conditional requirement #1
-// CHECK-SAME:           i32 64,
+// CHECK-SAME:           i32 128,
 // CHECK-SAME:           i32 0,
 // CHECK-SAME:           @"$S28protocol_conformance_records5SpoonMp"
 // CHECK-SAME:         }

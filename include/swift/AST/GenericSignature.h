@@ -19,7 +19,6 @@
 
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -32,7 +31,6 @@ namespace swift {
 class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
-class Substitution;
 class SubstitutionMap;
 
 /// An access path used to find a particular protocol conformance within
@@ -177,9 +175,9 @@ public:
     return Mem;
   }
 
-  /// Build an interface type substitution map from a vector of Substitutions
-  /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
+  /// Build a substitution map for this generic signature by looking up
+  /// substitutions in the given substitution map.
+  SubstitutionMap getSubstitutionMap(SubstitutionMap subs) const;
 
   /// Build an interface type substitution map from a type substitution function
   /// and conformance lookup function.
@@ -193,35 +191,13 @@ public:
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(const SubstitutionMap &subMap,
-                        SmallVectorImpl<Substitution> &result) const;
-
-  /// Enumerate all of the dependent types in the type signature that will
-  /// occur in substitution lists (in order), along with the set of
-  /// conformance requirements placed on that dependent type.
-  ///
-  /// \param fn Callback function that will receive each (type, requirements)
-  /// pair, in the order they occur within a list of substitutions. If this
-  /// returns \c true, the enumeration will be aborted.
-  ///
-  /// \returns true if any call to \c fn returned \c true, otherwise \c false.
-  bool enumeratePairedRequirements(
-         llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
-
   /// Return a vector of all generic parameters that are not subject to
   /// a concrete same-type constraint.
   SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
 
   /// Check if the generic signature makes all generic parameters
   /// concrete.
-  bool areAllParamsConcrete() const {
-    return !enumeratePairedRequirements(
-      [](Type, ArrayRef<Requirement>) -> bool {
-        return true;
-      });
-  }
+  bool areAllParamsConcrete() const;
 
   /// Compute the number of conformance requirements in this signature.
   unsigned getNumConformanceRequirements() const {
@@ -231,20 +207,6 @@ public:
         ++result;
     }
 
-    return result;
-  }
-
-  /// Return the size of a SubstitutionList built from this signature.
-  ///
-  /// Don't add new calls of this -- the representation of SubstitutionList
-  /// will be changing soon.
-  unsigned getSubstitutionListSize() const {
-    unsigned result = 0;
-    enumeratePairedRequirements(
-      [&](Type, ArrayRef<Requirement>) -> bool {
-        result++;
-        return false;
-      });
     return result;
   }
 

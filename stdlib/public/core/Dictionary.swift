@@ -1254,7 +1254,7 @@ extension Dictionary {
 
     @inlinable // FIXME(sil-serialize-all)
     public func _customContainsEquatableElement(_ element: Element) -> Bool? {
-      return _variantBuffer.index(forKey: element) != nil
+      return _variantBuffer.containsKey(element)
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -1449,6 +1449,11 @@ extension Dictionary: Equatable where Value: Equatable {
 }
 
 extension Dictionary: Hashable where Value: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
@@ -3294,8 +3299,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaDictionaryBuffer
   ) {
@@ -3420,6 +3425,23 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  @inline(__always)
+  internal func containsKey(_ key: Key) -> Bool {
+    if _fastPath(guaranteedNative) {
+      return asNative.index(forKey: key) != nil
+    }
+
+    switch self {
+    case .native:
+      return asNative.index(forKey: key) != nil
+#if _runtime(_ObjC)
+    case .cocoa(let cocoaBuffer):
+      return SelfType.maybeGetFromCocoaBuffer(cocoaBuffer, forKey: key) != nil
+#endif
+    }
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   internal func assertingGet(_ i: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
       return asNative.assertingGet(i._nativeIndex)
@@ -3459,8 +3481,8 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {

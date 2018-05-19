@@ -3714,11 +3714,11 @@ public:
     }
 
     // The arguments to the layout, if any, do come from the outer environment.
-    if (!T->getGenericArgs().empty()) {
+    if (auto subMap = T->getSubstitutions()) {
       Printer << " <";
-      interleave(T->getGenericArgs(),
-                 [&](const Substitution &arg) {
-                   visit(arg.getReplacement());
+      interleave(subMap.getReplacementTypes(),
+                 [&](Type type) {
+                   visit(type);
                  }, [&]{
                    Printer << ", ";
                  });
@@ -4157,9 +4157,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os, PO); },
+    interleave(spec->getSubstitutionMap().getReplacementTypes(),
+               [&](Type type) { type.print(os, PO); },
                [&] { os << ", "; });
+
     os << "> (";
     spec->getGenericConformance()->printName(os, PO);
     os << ")";
@@ -4173,11 +4174,6 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     break;
   }
   }
-}
-
-void Substitution::print(llvm::raw_ostream &os,
-                         const PrintOptions &PO) const {
-  Replacement->print(os, PO);
 }
 
 void swift::printEnumElementsAsCases(

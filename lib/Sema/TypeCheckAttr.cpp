@@ -70,6 +70,7 @@ public:
   bool visitDeclAttribute(DeclAttribute *A) = delete;
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
+  IGNORED_ATTR(Available)
   IGNORED_ATTR(CDecl)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
@@ -114,14 +115,6 @@ public:
   IGNORED_ATTR(UsableFromInline)
   IGNORED_ATTR(WeakLinked)
 #undef IGNORED_ATTR
-
-  void visitAvailableAttr(AvailableAttr *attr) {
-    if (!isa<ExtensionDecl>(D))
-      return;
-    if (attr->hasPlatform())
-      return;
-    diagnoseAndRemoveAttr(attr, diag::availability_extension_platform_agnostic);
-  }
 
   // @noreturn has been replaced with a 'Never' return type.
   void visitNoReturnAttr(NoReturnAttr *attr) {
@@ -603,6 +596,11 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
   // that supports it.
   if (VD->isLet())
     diagnoseAndRemoveAttr(attr, diag::lazy_not_on_let);
+
+  auto attrs = VD->getAttrs();
+  // 'lazy' is not allowed to have reference attributes
+  if (auto *refAttr = attrs.getAttribute<ReferenceOwnershipAttr>())
+    diagnoseAndRemoveAttr(attr, diag::lazy_not_strong, refAttr->get());
 
   // lazy is not allowed on a protocol requirement.
   auto varDC = VD->getDeclContext();
@@ -1573,7 +1571,7 @@ AttributeChecker::visitSetterAccessAttr(SetterAccessAttr *attr) {
 
 /// Collect all used generic parameter types from a given type.
 static void collectUsedGenericParameters(
-    Type Ty, SmallPtrSet<TypeBase *, 4> &ConstrainedGenericParams) {
+    Type Ty, SmallPtrSetImpl<TypeBase *> &ConstrainedGenericParams) {
   if (!Ty)
     return;
 

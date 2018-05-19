@@ -100,7 +100,7 @@ public:
                                 const DiagnosticInfo &Info) = 0;
 
   /// \returns true if an error occurred while finishing-up.
-  virtual bool finishProcessing() { return false; }
+  virtual bool finishProcessing(SourceManager &) { return false; }
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -131,6 +131,8 @@ public:
   /// be associated with. An empty string means that a consumer is not
   /// associated with any particular buffer, and should only receive diagnostics
   /// that are not in any of the other consumers' files.
+  /// A null pointer for the DiagnosticConsumer means that diagnostics for this
+  /// file should not be emitted.
   using ConsumerPair =
       std::pair<std::string, std::unique_ptr<DiagnosticConsumer>>;
 
@@ -138,9 +140,22 @@ private:
   /// All consumers owned by this FileSpecificDiagnosticConsumer.
   const SmallVector<ConsumerPair, 4> SubConsumers;
 
-  using ConsumersOrderedByRangeEntry =
-    std::pair<CharSourceRange, DiagnosticConsumer *>;
+public:
+  // The commented-out consts are there because the data does not change
+  // but the swap method gets called on this structure.
+  struct ConsumerSpecificInformation {
+    /*const*/ CharSourceRange range;
+    /// The DiagnosticConsumer may be empty if those diagnostics are not to be
+    /// emitted.
+    DiagnosticConsumer * /*const*/ consumer;
+    bool hasAnErrorBeenEmitted = false;
 
+    ConsumerSpecificInformation(const CharSourceRange range,
+                                DiagnosticConsumer *const consumer)
+        : range(range), consumer(consumer) {}
+  };
+
+private:
   /// The consumers owned by this FileSpecificDiagnosticConsumer, sorted by
   /// the end locations of each file so that a lookup by position can be done
   /// using binary search.
@@ -149,16 +164,20 @@ private:
   /// This allows diagnostics to be emitted before files are actually opened,
   /// as long as they don't have source locations.
   ///
-  /// \see #consumerForLocation
-  SmallVector<ConsumersOrderedByRangeEntry, 4> ConsumersOrderedByRange;
+  /// \see #consumerSpecificInformationForLocation
+  SmallVector<ConsumerSpecificInformation, 4> ConsumersOrderedByRange;
 
   /// Indicates which consumer to send Note diagnostics too.
   ///
   /// Notes are always considered attached to the error, warning, or remark
   /// that was most recently emitted.
   ///
-  /// If null, Note diagnostics are sent to every consumer.
-  DiagnosticConsumer *ConsumerForSubsequentNotes = nullptr;
+  /// If None, Note diagnostics are sent to every consumer.
+  /// If null, diagnostics are suppressed.
+  Optional<ConsumerSpecificInformation *>
+      ConsumerSpecificInfoForSubsequentNotes = None;
+
+  bool HasAnErrorBeenConsumed = false;
 
 public:
   /// Takes ownership of the DiagnosticConsumers specified in \p consumers.
@@ -174,12 +193,22 @@ public:
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-   bool finishProcessing() override;
+  bool finishProcessing(SourceManager &) override;
 
 private:
+  /// In batch mode, any error causes failure for all primary files, but
+  /// Xcode will only see an error for a particular primary in that primary's
+  /// serialized diagnostics file. So, emit errors for all other primaries here.
+  void addNonSpecificErrors(SourceManager &SM);
+
   void computeConsumersOrderedByRange(SourceManager &SM);
-  DiagnosticConsumer *consumerForLocation(SourceManager &SM,
-                                          SourceLoc loc) const;
+
+  /// Returns nullptr if diagnostic is to be suppressed,
+  /// None if diagnostic is to be distributed to every consumer,
+  /// a particular consumer if diagnostic goes there.
+  Optional<ConsumerSpecificInformation *>
+  consumerSpecificInformationForLocation(SourceManager &SM,
+                                         SourceLoc loc) const;
 };
   
 } // end namespace swift

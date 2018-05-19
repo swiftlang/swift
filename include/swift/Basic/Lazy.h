@@ -45,9 +45,9 @@ namespace swift {
 /// A template for lazily-constructed, zero-initialized, leaked-on-exit
 /// global objects.
 template <class T> class Lazy {
-  typename std::aligned_storage<sizeof(T), alignof(T)>::type Value;
+  alignas(T) char Value[sizeof(T)] = { 0 };
 
-  OnceToken_t OnceToken;
+  OnceToken_t OnceToken = {};
 
   static void defaultInitCallback(void *ValueAddr) {
     ::new (ValueAddr) T();

@@ -589,6 +589,17 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   return false;
 }
 
+/// Determine whether we should promote the type metadata access function
+/// for the given nominal type to "public".
+static bool promoteMetadataAccessFunctionToPublic(
+                                              const NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+
+  // When -emit-public-type-metadata-accessors is provided, promote all
+  // of the metadata access functions to public.
+  return ctx.LangOpts.EmitPublicTypeMetadataAccessors;
+}
+
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
 MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
@@ -621,8 +632,12 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     case FormalLinkage::PublicUnique:
       return MetadataAccessStrategy::PublicUniqueAccessor;
     case FormalLinkage::HiddenUnique:
+      if (promoteMetadataAccessFunctionToPublic(nominal))
+        return MetadataAccessStrategy::PublicUniqueAccessor;
       return MetadataAccessStrategy::HiddenUniqueAccessor;
     case FormalLinkage::Private:
+      if (promoteMetadataAccessFunctionToPublic(nominal))
+        return MetadataAccessStrategy::PublicUniqueAccessor;
       return MetadataAccessStrategy::PrivateAccessor;
 
     case FormalLinkage::PublicNonUnique:
@@ -1896,6 +1911,9 @@ namespace {
   /// not to cache the result as if it were the metadata for a formal type
   /// unless the type actually cannot possibly be a formal type, e.g. because
   /// it is one of the special lowered type kinds like SILFunctionType.
+  ///
+  /// NOTE: If you modify the special cases in this, you should update
+  /// isTypeMetadataForLayoutAccessible in SIL.cpp.
   class EmitTypeMetadataRefForLayout
     : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
                             DynamicMetadataRequest> {
@@ -2046,7 +2064,7 @@ llvm::Value *
 IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType(),
+  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
                                                    request);
 }
 
@@ -2145,7 +2163,7 @@ namespace {
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
                                              silTy, ResilienceExpansion::Maximal))
-        return visit(singletonFieldTy.getSwiftRValueType(), request);
+        return visit(singletonFieldTy.getASTType(), request);
 
       // If the type is fixed-layout, emit a copy of its layout.
       if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
@@ -2327,7 +2345,7 @@ llvm::Value *irgen::emitTypeLayoutRef(IRGenFunction &IGF, SILType type,
     DynamicMetadataRequest::getNonBlocking(MetadataState::LayoutComplete,
                                            collector);
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeLayoutRef(IGF).visit(type.getSwiftRValueType(), request);
+  return EmitTypeLayoutRef(IGF).visit(type.getASTType(), request);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

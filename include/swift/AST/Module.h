@@ -206,6 +206,7 @@ private:
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
     unsigned ResilienceStrategy : 1;
+    unsigned HasResolvedImports : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -255,6 +256,13 @@ public:
   }
   void setFailedToLoad(bool failed = true) {
     Flags.FailedToLoad = failed;
+  }
+
+  bool hasResolvedImports() const {
+    return Flags.HasResolvedImports;
+  }
+  void setHasResolvedImports() {
+    Flags.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
@@ -407,6 +415,23 @@ public:
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
                             llvm::function_ref<bool(ImportedModule)> fn);
+
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            llvm::function_ref<void(ImportedModule)> fn) {
+    return forAllVisibleModules(topLevelAccessPath,
+                                [=](const ImportedModule &import) -> bool {
+      fn(import);
+      return true;
+    });
+  }
+
+  template <typename Fn>
+  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
+                            Fn &&fn) {
+    using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
+    llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
+    return forAllVisibleModules(topLevelAccessPath, wrapped);
+  }
 
   /// @}
 
@@ -654,6 +679,23 @@ public:
   ///         due to the callback.
   bool
   forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
+
+  bool
+  forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
+    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
+      fn(import);
+      return true;
+    });
+  }
+  
+  template <typename Fn>
+  bool forAllVisibleModules(Fn &&fn) {
+    using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
+    llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
+      std::forward<Fn>(fn)
+    };
+    return forAllVisibleModules(wrapped);
+  }
 
   /// @}
 

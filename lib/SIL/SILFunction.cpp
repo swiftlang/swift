@@ -424,7 +424,7 @@ bool SILFunction::hasSelfMetadataParam() const {
   if (!silTy.isObject())
     return false;
 
-  auto selfTy = silTy.getSwiftRValueType();
+  auto selfTy = silTy.getASTType();
 
   if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
     selfTy = metaTy.getInstanceType();
@@ -482,16 +482,14 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
+SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
+  if (ForwardingSubMap)
+    return ForwardingSubMap;
 
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
+  if (auto *env = getGenericEnvironment())
+    ForwardingSubMap = env->getForwardingSubstitutionMap();
 
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
+  return ForwardingSubMap;
 }
 
 bool SILFunction::shouldVerifyOwnership() const {

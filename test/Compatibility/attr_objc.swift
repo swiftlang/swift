@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3
+// RUN: %target-swift-frontend -enable-objc-interop -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 3
 
 class Load1 {
   class func load() { }

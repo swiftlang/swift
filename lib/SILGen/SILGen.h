@@ -344,7 +344,7 @@ public:
                               GenericEnvironment *genericEnv,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
-                              SubstitutionList subs,
+                              SubstitutionMap subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
@@ -426,7 +426,7 @@ public:
   void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionList subs);
+  void useConformancesFromSubstitutions(SubstitutionMap subs);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
@@ -435,7 +435,7 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  SubstitutionList
+  SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
   /// Emit a property descriptor for the given storage decl if it needs one.

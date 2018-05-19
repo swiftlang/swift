@@ -144,8 +144,8 @@ namespace {
   };
 } // end anonymous namespace
 
-SubstitutionList SILGenFunction::getForwardingSubstitutions() {
-  return F.getForwardingSubstitutions();
+SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
+  return F.getForwardingSubstitutionMap();
 }
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
@@ -394,7 +394,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.getLoweredType(decl->getType()).getASTType(),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -861,7 +861,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Reabstract to the substituted type, if needed.
         CanType substEltTy =
             value.getType()
-                .getSwiftRValueType()
+                .getASTType()
                 ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();

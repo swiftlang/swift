@@ -153,7 +153,7 @@ public struct Int64 : ExpressibleByIntegerLiteral, _ExpressibleByBuiltinIntegerL
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$Ss17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW : $@convention(witness_method: Equatable) (@in_guaranteed FloatingPointSign, @in_guaranteed FloatingPointSign, @thick FloatingPointSign.Type) -> Bool {
 // CHECK: bb0(%0 : @trivial $FloatingPointSign, %1 : @trivial $FloatingPointSign, %2 : @trivial $@thick FloatingPointSign.Type):
 // CHECK:   %3 = function_ref @$Ss2eeoiySbx_xts16RawRepresentableRzs9Equatable0B5ValueRpzlF : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
-// CHECK:   %4 = apply %3<FloatingPointSign, Int64>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
+// CHECK:   %4 = apply %3<FloatingPointSign>(%0, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : RawRepresentable, τ_0_0.RawValue : Equatable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0) -> Bool
 // CHECK:   return %4 : $Bool
 // CHECK-LABEL: } // end sil function '$Ss17FloatingPointSignOs9EquatablessACP2eeoiySbx_xtFZTW'
 public enum FloatingPointSign: Int64 {

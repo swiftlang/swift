@@ -484,6 +484,11 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
@@ -2824,8 +2829,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal mutating func migrateDataToNativeBuffer(
     _ cocoaBuffer: _CocoaSetBuffer
   ) {
@@ -2987,8 +2992,8 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   }
 
 #if _runtime(_ObjC)
-  @inlinable // FIXME(sil-serialize-all)
   @inline(never)
+  @usableFromInline
   internal static func maybeGetFromCocoaBuffer(
     _ cocoaBuffer: CocoaBuffer, forKey key: Key
   ) -> Value? {
@@ -3648,6 +3653,11 @@ extension Set.Index {
     }
   }
 
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)

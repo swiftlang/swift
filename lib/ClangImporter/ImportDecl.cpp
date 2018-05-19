@@ -476,10 +476,12 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   paramRef->setType(param->getType());
 
   auto reinterpretCast
-    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
-                                  { Substitution(rawTy, {}),
-                                    Substitution(enumTy, {}) });
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { rawTy, enumTy }, { });
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   reinterpretCastRef->setType(FunctionType::get({rawTy}, enumTy));
@@ -563,10 +565,13 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   selfRef->setType(selfDecl->getType());
 
   auto reinterpretCast
-    = getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast"));
-  ConcreteDeclRef concreteDeclRef(C, reinterpretCast,
-                                  { Substitution(enumTy, {}),
-                                    Substitution(rawTy, {}) });
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { enumTy, rawTy }, { });
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+
   auto reinterpretCastRef
     = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
   reinterpretCastRef->setType(FunctionType::get({enumTy}, rawTy));
@@ -1207,9 +1212,12 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
   // Construct the right-hand call to Builtin.zeroInitializer.
   Identifier zeroInitID = context.getIdentifier("zeroInitializer");
-  auto zeroInitializerFunc = getBuiltinValueDecl(context, zeroInitID);
-  ConcreteDeclRef concreteDeclRef(context, zeroInitializerFunc,
-                                  { Substitution(selfType, {}) });
+  auto zeroInitializerFunc =
+    cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
+                         llvm::makeArrayRef(selfType), { });
+  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
   auto zeroInitializerRef =
     new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
                               /*implicit*/ true);
@@ -2351,19 +2359,31 @@ namespace {
             PlatformAgnosticAvailabilityKind::UnavailableInSwift);
       } else {
         unsigned majorVersion = getVersion().majorVersionNumber();
+        unsigned minorVersion = getVersion().minorVersionNumber();
         if (getVersion() < getActiveSwiftVersion()) {
           // A Swift 2 name, for example, was obsoleted in Swift 3.
+          // However, a Swift 4 name is obsoleted in Swift 4.2.
+          // FIXME: it would be better to have a unified place
+          // to represent Swift versions for API versioning.
+          clang::VersionTuple obsoletedVersion =
+            (majorVersion == 4 && minorVersion < 2)
+                ? clang::VersionTuple(4, 2)
+                : clang::VersionTuple(majorVersion + 1);
           attr = AvailableAttr::createPlatformAgnostic(
               ctx, /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-              clang::VersionTuple(majorVersion + 1));
+              obsoletedVersion);
         } else {
           // Future names are introduced in their future version.
           assert(getVersion() > getActiveSwiftVersion());
+          clang::VersionTuple introducedVersion =
+            (majorVersion == 4 && minorVersion == 2)
+                ? clang::VersionTuple(4, 2)
+                : clang::VersionTuple(majorVersion);
           attr = new (ctx) AvailableAttr(
               SourceLoc(), SourceRange(), PlatformKind::none,
               /*Message*/StringRef(), ctx.AllocateCopy(renamed.str()),
-              /*Introduced*/clang::VersionTuple(majorVersion), SourceRange(),
+              /*Introduced*/introducedVersion, SourceRange(),
               /*Deprecated*/clang::VersionTuple(), SourceRange(),
               /*Obsoleted*/clang::VersionTuple(), SourceRange(),
               PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
@@ -4271,7 +4291,7 @@ namespace {
     /// given vector, guarded by the known set of protocols.
     void addProtocols(ProtocolDecl *protocol,
                       SmallVectorImpl<ProtocolDecl *> &protocols,
-                      llvm::SmallPtrSet<ProtocolDecl *, 4> &known);
+                      llvm::SmallPtrSetImpl<ProtocolDecl *> &known);
 
     // Import the given Objective-C protocol list, along with any
     // implicitly-provided protocols, and attach them to the given
@@ -6774,7 +6794,7 @@ SwiftDeclConverter::importAccessor(clang::ObjCMethodDecl *clangAccessor,
 
 void SwiftDeclConverter::addProtocols(
     ProtocolDecl *protocol, SmallVectorImpl<ProtocolDecl *> &protocols,
-    llvm::SmallPtrSet<ProtocolDecl *, 4> &known) {
+    llvm::SmallPtrSetImpl<ProtocolDecl *> &known) {
   if (!known.insert(protocol).second)
     return;
 

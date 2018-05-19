@@ -200,6 +200,17 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
+    "NodeAnnotation": "RevertSimpleStringRepresentableUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",

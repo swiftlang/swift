@@ -2291,13 +2291,13 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   
   // Resolve the generic arguments.
   // Start by building a TypeSubstitutionMap.
-  SmallVector<Substitution, 4> genericArgs;
+  SubstitutionMap subMap;
   if (genericSig) {
     TypeSubstitutionMap genericArgMap;
 
     auto params = genericSig->getGenericParams();
     if (repr->getGenericArguments().size()
-          != genericSig->getSubstitutionListSize()) {
+          != genericSig->getGenericParams().size()) {
       TC.diagnose(repr->getLoc(), diag::sil_box_arg_mismatch);
       return ErrorType::get(Context);
     }
@@ -2308,7 +2308,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    auto subMap = genericSig->getSubstitutionMap(
+    subMap = genericSig->getSubstitutionMap(
       QueryTypeSubstitutionMap{genericArgMap},
       [&](CanType depTy, Type replacement, ProtocolType *proto)
       -> ProtocolConformanceRef {
@@ -2322,14 +2322,13 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
         
         return *result;
       });
-    genericSig->getSubstitutions(subMap, genericArgs);
 
     if (!ok)
       return ErrorType::get(Context);
   }
   
   auto layout = SILLayout::get(Context, genericSig, fields);
-  return SILBoxType::get(Context, layout, genericArgs);
+  return SILBoxType::get(Context, layout, subMap);
 }
 
 Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,

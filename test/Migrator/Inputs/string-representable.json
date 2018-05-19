@@ -5,7 +5,7 @@
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC5ValueSSvp",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "NewAttribute",
     "ModuleName": "Cities"
@@ -16,7 +16,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC16addingAttributesyys10DictionaryVySSypGF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "Cities.Container.Attribute",
     "ModuleName": "Cities"
@@ -27,7 +27,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC6adding10attributesys10DictionaryVySSypG_tF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -38,7 +38,7 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC6adding18optionalAttributesys10DictionaryVySSypGSg_tF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -49,7 +49,7 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC18optionalAttributesACs10DictionaryVySSypGSg_tcfc",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -60,7 +60,7 @@
     "NodeAnnotation": "ArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC6adding9attrArrayySaySSG_tF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -71,7 +71,7 @@
     "NodeAnnotation": "OptionalArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC17optionalAttrArrayACSaySSGSg_tcfc",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -82,7 +82,7 @@
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC3add6singleySS_tF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -93,7 +93,7 @@
     "NodeAnnotation": "SimpleOptionalStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "s:6Cities9ContainerC3add14singleOptionalySSSg_tF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -104,7 +104,7 @@
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC13getSingleAttrSSyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -115,7 +115,7 @@
     "NodeAnnotation": "SimpleOptionalStringRepresentableUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC21getOptionalSingleAttrSSSgyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -126,7 +126,7 @@
     "NodeAnnotation": "ArrayMemberUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC12getAttrArraySaySSGyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -137,7 +137,7 @@
     "NodeAnnotation": "OptionalArrayMemberUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC20getOptionalAttrArraySaySSGSgyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -148,7 +148,7 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC25getOptionalAttrDictionarys0F0VySSypGSgyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -159,7 +159,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC17getAttrDictionarys0E0VySSypGyF",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -170,7 +170,7 @@
     "NodeAnnotation": "DictionaryKeyUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC8attrDicts10DictionaryVySSypGvp",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -181,7 +181,7 @@
     "NodeAnnotation": "ArrayMemberUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC7attrArrSaySSGvp",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
@@ -192,9 +192,28 @@
     "NodeAnnotation": "OptionalDictionaryKeyUpdate",
     "ChildIndex": "0",
     "LeftUsr": "s:6Cities9ContainerC16optionalAttrDicts10DictionaryVySSypGSgvp",
-    "LeftComment": "",
+    "LeftComment": "String",
     "RightUsr": "",
     "RightComment": "SimpleAttribute",
     "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "SimpleStringRepresentableUpdate",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities15GlobalAttributeSSvp",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NewAttribute",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities15GlobalAttributeSSvp",
+    "OldPrintedName": "GlobalAttribute",
+    "OldTypeName": "",
+    "NewPrintedName": "NewAttribute",
+    "NewTypeName": "AttributeWrapper"
   },
 ]

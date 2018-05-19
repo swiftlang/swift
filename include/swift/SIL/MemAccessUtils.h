@@ -24,6 +24,10 @@ namespace swift {
 
 // stripAddressAccess() is declared in InstructionUtils.h.
 
+inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
+  return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
+}
+
 /// Represents the identity of a stored class property as a combination
 /// of a base and a single projection. Eventually the goal is to make this
 /// more precise and consider, casts, etc.
@@ -85,17 +89,51 @@ class AccessedStorage {
 public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if findAccessedAddressBase ever adds a case.
-  enum Kind {
-    Box, Stack, Global, Class, Argument, Nested, Unidentified
+  enum Kind : uint8_t {
+    Box,
+    Stack,
+    Global,
+    Class,
+    Argument,
+    Nested,
+    Unidentified,
+    NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
   };
+
+  static const char *getKindName(Kind k);
 
   /// If the given address source is an identified access base, return the kind
   /// of access base. Otherwise, return Unidentified.
   static AccessedStorage::Kind classify(SILValue base);
 
-private:
-  Kind kind;
+protected:
+  // Form a bitfield that is effectively a union over any pass-specific data
+  // with the fields used within this class as a common prefix.
+  //
+  // This allows passes to embed analysis flags, and reserves enough space to
+  // embed a unique access index.
+  union {
+    uint64_t OpaqueBits;
+    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, bitmax(NumKindBits, 8), Kind
+                               : bitmax(NumKindBits, 8));
 
+    // Define bits for use in the AccessEnforcementOpts pass. Reserve the high
+    // bit for a seenNestedConflict flag, which is the result of pass-specific
+    // analysis. The remaning bits are sufficient to index all
+    // begin_[unpaired_]access instructions.
+    //
+    // `AccessEnforcementOpts` does not need to be a defined class. This macro
+    // simply defines the pass-specific name "AccessEnforcementOptsBitfield".
+    //
+    // `AccessedStorage` identifies the AccessedStoredBitfield defined above,
+    // setting aside enough bits for common data.
+    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessedStorage,
+                               64 - NumAccessedStorageBits,
+                               beginAccessIndex : 63 - NumAccessedStorageBits,
+                               seenNestedConflict : 1);
+  } Bits;
+
+private:
   union {
     SILValue value;
     unsigned paramIndex;
@@ -103,48 +141,56 @@ private:
     ObjectProjection objProj;
   };
 
+  void initKind(Kind k) {
+    Bits.OpaqueBits = 0;
+    Bits.AccessedStorage.Kind = k;
+  }
+
 public:
-  AccessedStorage(): kind(Unidentified), value() {}
+  AccessedStorage() : value() { initKind(Unidentified); }
 
   AccessedStorage(SILValue base, Kind kind);
 
-  // Return true if this is a valid storage location.
-  operator bool() const {
-    return kind != Unidentified || value;
+  AccessedStorage(SILValue object, Projection projection)
+      : objProj(object, projection) {
+    initKind(Class);
   }
 
-  Kind getKind() const { return kind; }
+  // Return true if this is a valid storage location.
+  operator bool() const { return getKind() != Unidentified || value; }
+
+  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.Kind); }
 
   SILValue getValue() const {
-    assert(kind != Argument && kind != Global && kind != Class);
+    assert(getKind() != Argument && getKind() != Global && getKind() != Class);
     return value;
   }
 
   unsigned getParamIndex() const {
-    assert(kind == Argument);
+    assert(getKind() == Argument);
     return paramIndex;
   }
 
   SILArgument *getArgument(SILFunction *F) const {
-    assert(kind == Argument);
+    assert(getKind() == Argument);
     return F->getArgument(paramIndex);
   }
 
   SILGlobalVariable *getGlobal() const {
-    assert(kind == Global);
+    assert(getKind() == Global);
     return global;
   }
 
   const ObjectProjection &getObjectProjection() const {
-    assert(kind == Class);
+    assert(getKind() == Class);
     return objProj;
   }
 
-  bool operator==(const AccessedStorage &other) const {
-    if (kind != other.kind)
+  bool hasIdenticalBase(const AccessedStorage &other) const {
+    if (getKind() != other.getKind())
       return false;
-    
-    switch (kind) {
+
+    switch (getKind()) {
     case Box:
     case Stack:
     case Nested:
@@ -159,12 +205,8 @@ public:
     }
   }
 
-  bool operator!=(const AccessedStorage &other) const {
-    return !(*this == other);
-  }
-
   bool isUniquelyIdentified() const {
-    switch (kind) {
+    switch (getKind()) {
     case Box:
     case Stack:
     case Global:
@@ -176,22 +218,26 @@ public:
       return false;
     }
   }
-  
-  bool isDistinct(const AccessedStorage &other) const {
+
+  bool isDistinctFrom(const AccessedStorage &other) const {
     return isUniquelyIdentified() && other.isUniquelyIdentified()
-      && (*this != other);
+           && !hasIdenticalBase(other);
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
   /// determined. Otherwise returns null. For diagnostics and checking via the
   /// ValueDecl if we are processing a `let` variable.
   const ValueDecl *getDecl(SILFunction *F) const;
+
+  void print(raw_ostream &os) const;
+  void dump() const;
 };
 } // end namespace swift
 
 namespace llvm {
 
 /// Enable using AccessedStorage as a key in DenseMap.
+/// Do *not* include any extra pass data in key equality.
 template <> struct DenseMapInfo<swift::AccessedStorage> {
   static swift::AccessedStorage getEmptyKey() {
     return swift::AccessedStorage(swift::SILValue::getFromOpaqueValue(
@@ -274,7 +320,7 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 ///
 /// This is identical to findAccessedStorage(), but never returns Nested
 /// storage.
-AccessedStorage findAccessedStorageOrigin(SILValue sourceAddr);
+AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
 /// initializes the memory at that address, implying that the previous value is
@@ -288,6 +334,10 @@ bool memInstMustInitialize(Operand *memOper);
 /// a begin_access marker. To determine whether to emit begin_access:
 ///   storage = findAccessedStorage(address)
 ///   needsAccessMarker = storage && isPossibleFormalAccessBase(storage)
+///
+/// Warning: This is only valid for SIL with well-formed accessed. For example,
+/// it will not handle address-type phis. Optimization passes after
+/// DiagnoseStaticExclusivity may violate these assumptions.
 bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
 
 /// Visit each address accessed by the given memory operation.

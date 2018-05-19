@@ -33,7 +33,6 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
-class Substitution;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;

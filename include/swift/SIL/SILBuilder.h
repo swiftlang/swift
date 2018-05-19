@@ -247,7 +247,7 @@ public:
 
   static SILType getPartialApplyResultType(SILType Ty, unsigned ArgCount,
                                          SILModule &M,
-                                         SubstitutionList subs,
+                                         SubstitutionMap subs,
                                          ParameterConvention calleeConvention);
 
   //===--------------------------------------------------------------------===//
@@ -357,7 +357,7 @@ public:
   }
 
   ApplyInst *createApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, bool isNonThrowing,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(ApplyInst::create(getSILDebugLocation(Loc), Fn, Subs, Args,
@@ -370,12 +370,12 @@ public:
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     SILFunctionConventions conventions(Fn->getType().castTo<SILFunctionType>(),
                                        getModule());
-    return createApply(Loc, Fn, SubstitutionList(), Args, isNonThrowing,
+    return createApply(Loc, Fn, SubstitutionMap(), Args, isNonThrowing,
                        SpecializationInfo);
   }
 
   TryApplyInst *createTryApply(
-      SILLocation Loc, SILValue fn, SubstitutionList subs,
+      SILLocation Loc, SILValue fn, SubstitutionMap subs,
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insertTerminator(TryApplyInst::create(getSILDebugLocation(Loc),
@@ -386,7 +386,7 @@ public:
   }
 
   PartialApplyInst *createPartialApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(PartialApplyInst::create(getSILDebugLocation(Loc), Fn,
@@ -396,7 +396,7 @@ public:
   }
 
   BeginApplyInst *createBeginApply(
-      SILLocation Loc, SILValue Fn, SubstitutionList Subs,
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
       ArrayRef<SILValue> Args, bool isNonThrowing,
       const GenericSpecializationInformation *SpecializationInfo = nullptr) {
     return insert(BeginApplyInst::create(getSILDebugLocation(Loc), Fn, Subs,
@@ -415,7 +415,7 @@ public:
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
-                             SubstitutionList Subs,
+                             SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name,
                                       ResultTy, Subs, Args, getModule()));
@@ -457,14 +457,13 @@ public:
     assert(Args[0]->getType() == Args[1]->getType() &&
            "Binary operands must match");
     assert(Args[2]->getType().is<BuiltinIntegerType>() &&
-           Args[2]->getType().getSwiftRValueType()->isBuiltinIntegerType(1) &&
+           Args[2]->getType().getASTType()->isBuiltinIntegerType(1) &&
            "Must have a third Int1 operand");
 
     SILType OpdTy = Args[0]->getType();
     SILType Int1Ty = Args[2]->getType();
 
-    TupleTypeElt ResultElts[] = {OpdTy.getSwiftRValueType(),
-                                 Int1Ty.getSwiftRValueType()};
+    TupleTypeElt ResultElts[] = {OpdTy.getASTType(), Int1Ty.getASTType()};
     Type ResultTy = TupleType::get(ResultElts, getASTContext());
     SILType SILResultTy =
         SILType::getPrimitiveObjectType(ResultTy->getCanonicalType());
@@ -582,7 +581,7 @@ public:
   
   KeyPathInst *createKeyPath(SILLocation Loc,
                              KeyPathPattern *Pattern,
-                             SubstitutionList Subs,
+                             SubstitutionMap Subs,
                              ArrayRef<SILValue> Args,
                              SILType Ty) {
     return insert(KeyPathInst::create(getSILDebugLocation(Loc),
@@ -670,10 +669,11 @@ public:
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
-                                     bool noNestedConflict) {
+                                     bool noNestedConflict,
+                                     bool fromBuiltin) {
     return insert(new (getModule()) BeginAccessInst(
         getSILDebugLocation(loc), address, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -686,18 +686,19 @@ public:
   createBeginUnpairedAccess(SILLocation loc, SILValue address, SILValue buffer,
                             SILAccessKind accessKind,
                             SILAccessEnforcement enforcement,
-                            bool noNestedConflict) {
+                            bool noNestedConflict,
+                            bool fromBuiltin) {
     return insert(new (getModule()) BeginUnpairedAccessInst(
         getSILDebugLocation(loc), address, buffer, accessKind, enforcement,
-        noNestedConflict));
+        noNestedConflict, fromBuiltin));
   }
 
-  EndUnpairedAccessInst *createEndUnpairedAccess(SILLocation loc,
-                                                 SILValue buffer,
-                                              SILAccessEnforcement enforcement,
-                                                 bool aborted) {
+  EndUnpairedAccessInst *
+  createEndUnpairedAccess(SILLocation loc, SILValue buffer,
+                          SILAccessEnforcement enforcement, bool aborted,
+                          bool fromBuiltin) {
     return insert(new (getModule()) EndUnpairedAccessInst(
-        getSILDebugLocation(loc), buffer, enforcement, aborted));
+        getSILDebugLocation(loc), buffer, enforcement, aborted, fromBuiltin));
   }
 
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
@@ -729,10 +730,10 @@ public:
   MarkUninitializedBehaviorInst *
   createMarkUninitializedBehavior(SILLocation Loc,
                                   SILValue initStorageFunc,
-                                  SubstitutionList initStorageSubs,
+                                  SubstitutionMap initStorageSubs,
                                   SILValue storage,
                                   SILValue setterFunc,
-                                  SubstitutionList setterSubs,
+                                  SubstitutionMap setterSubs,
                                   SILValue self,
                                   SILType ty) {
     return insert(MarkUninitializedBehaviorInst::create(getModule(),
@@ -1446,7 +1447,7 @@ public:
   InitBlockStorageHeaderInst *
   createInitBlockStorageHeader(SILLocation Loc, SILValue BlockStorage,
                                SILValue InvokeFunction, SILType BlockType,
-                               SubstitutionList Subs) {
+                               SubstitutionMap Subs) {
     return insert(InitBlockStorageHeaderInst::create(getFunction(),
       getSILDebugLocation(Loc), BlockStorage, InvokeFunction, BlockType, Subs));
   }
@@ -1482,6 +1483,14 @@ public:
     return insert(new (getModule())
                       CopyBlockInst(getSILDebugLocation(Loc), Operand));
   }
+
+  CopyBlockWithoutEscapingInst *
+  createCopyBlockWithoutEscaping(SILLocation Loc, SILValue Block,
+                                 SILValue Closure) {
+    return insert(new (getModule()) CopyBlockWithoutEscapingInst(
+        getSILDebugLocation(Loc), Block, Closure));
+  }
+
   StrongRetainInst *createStrongRetain(SILLocation Loc, SILValue Operand,
                                        Atomicity atomicity) {
     assert(isParsing || !getFunction().hasQualifiedOwnership());
@@ -1561,10 +1570,11 @@ public:
         getSILDebugLocation(Loc), value, Int1Ty));
   }
   IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
-                                                 SILValue operand) {
+                                                 SILValue operand,
+                                                 unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     return insert(new (getModule()) IsEscapingClosureInst(
-        getSILDebugLocation(Loc), operand, Int1Ty));
+        getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
   DeallocStackInst *createDeallocStack(SILLocation Loc, SILValue operand) {
@@ -2035,7 +2045,7 @@ private:
 
   void appendOperandTypeName(SILType OpdTy, llvm::SmallString<16> &Name) {
     if (auto BuiltinIntTy =
-            dyn_cast<BuiltinIntegerType>(OpdTy.getSwiftRValueType())) {
+            dyn_cast<BuiltinIntegerType>(OpdTy.getASTType())) {
       if (BuiltinIntTy == BuiltinIntegerType::getWordType(getASTContext())) {
         Name += "_Word";
       } else {
@@ -2043,7 +2053,7 @@ private:
         Name += "_Int" + llvm::utostr(NumBits);
       }
     } else {
-      assert(OpdTy.getSwiftRValueType() == getASTContext().TheRawPointerType);
+      assert(OpdTy.getASTType() == getASTContext().TheRawPointerType);
       Name += "_RawPointer";
     }
   }

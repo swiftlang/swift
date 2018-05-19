@@ -144,19 +144,7 @@ void Partition::assignStackLocation(
 
 /// Returns a single dealloc_stack user of the alloc_stack or nullptr otherwise.
 static SILInstruction *getSingleDeallocStack(AllocStackInst *ASI) {
-  SILInstruction *Dealloc = nullptr;
-  for (auto *U : ASI->getUses()) {
-    auto *Inst = U->getUser();
-    if (isa<DeallocStackInst>(Inst)) {
-      if (Dealloc == nullptr) {
-        Dealloc = Inst;
-        continue;
-      }
-      // Already saw a dealloc_stack.
-      return nullptr;
-    }
-  }
-  return Dealloc;
+  return ASI->getSingleDeallocStack();
 }
 
 namespace {

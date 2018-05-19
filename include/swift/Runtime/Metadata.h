@@ -819,22 +819,9 @@ public:
     case MetadataKind::ForeignClass:
       return true;
 
-    case MetadataKind::Function:
-    case MetadataKind::Struct:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Existential:
-    case MetadataKind::Metatype:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+    default:
       return false;
     }
-    
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this metadata for an existential type?
@@ -843,24 +830,10 @@ public:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Existential:
       return true;
-        
-    case MetadataKind::Metatype:
-    case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::ForeignClass:
-    case MetadataKind::Struct:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Function:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+
+    default:
       return false;
     }
-
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -944,20 +917,9 @@ public:
     case MetadataKind::ForeignClass:
       return static_cast<const TargetForeignClassMetadata<Runtime> *>(this)
           ->Description;
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Function:
-    case MetadataKind::Existential:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Metatype:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+    default:
       return nullptr;
     }
-
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
 
   /// Get the class object for this type if it has one, or return null if the
@@ -4164,6 +4126,13 @@ swift_getObjCClassFromObject(HeapObject *object);
 SWIFT_RUNTIME_EXPORT
 const ForeignTypeMetadata *
 swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique);
+
+/// \brief Fetch a unique witness table for a foreign witness table.
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_getForeignWitnessTable(const WitnessTable *nonUniqueWitnessCandidate,
+                             const TypeContextDescriptor *forForeignType,
+                             const ProtocolDescriptor *forProtocol);
 
 /// \brief Fetch a uniqued metadata for a tuple type.
 ///

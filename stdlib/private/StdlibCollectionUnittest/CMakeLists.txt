@@ -20,6 +20,10 @@ add_swift_library(swiftStdlibCollectionUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   ../../public/core/WriteBackMutableSlice.swift
 
   SWIFT_MODULE_DEPENDS StdlibUnittest
+  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+  SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_COMPILE_FLAGS ${swift_stdlib_unittest_compile_flags}
   TARGET_SDKS ALL_POSIX_PLATFORMS
   INSTALL_IN_COMPONENT stdlib-experimental)

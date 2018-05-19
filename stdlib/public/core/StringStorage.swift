@@ -64,8 +64,10 @@ where CodeUnit : UnsignedInteger & FixedWidthInteger {
 
 #if arch(i386) || arch(arm)
 #else
-    _sanityCheck((CodeUnit.self != UInt8.self || capacity > 15),
-      "Should prefer a small representation")
+    // TODO(SR-7594): Restore below invariant
+    // _sanityCheck(
+    //   CodeUnit.self != UInt8.self || capacity > _SmallUTF8String.capacity,
+    //   "Should prefer a small representation")
 #endif // 64-bit
 
     let storage = Builtin.allocWithTailElems_1(
@@ -180,7 +182,10 @@ extension _SwiftStringStorage {
   @inlinable
   @nonobjc
   var unusedBuffer: UnsafeMutableBufferPointer<CodeUnit> {
-    return UnsafeMutableBufferPointer(start: end, count: capacity - count)
+    @inline(__always)
+    get {
+      return UnsafeMutableBufferPointer(start: end, count: capacity - count)
+    }
   }
 
   @inlinable
@@ -193,7 +198,6 @@ extension _SwiftStringStorage {
 extension _SwiftStringStorage {
   // Append operations
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace<OtherCodeUnit>(
     _ other: _UnmanagedString<OtherCodeUnit>
@@ -205,7 +209,6 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace(_ other: _UnmanagedOpaqueString) {
     let otherCount = Int(other.count)
@@ -214,7 +217,6 @@ extension _SwiftStringStorage {
     self.count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
   @nonobjc
   internal final func _appendInPlace<C: Collection>(contentsOf other: C)
   where C.Element == CodeUnit {
@@ -227,7 +229,6 @@ extension _SwiftStringStorage {
     count += otherCount
   }
 
-  @inlinable // TODO(inlinability): @usableFromInline - P3
   @_specialize(where C == Character._SmallUTF16, CodeUnit == UInt8)
   @nonobjc
   internal final func _appendInPlaceUTF16<C: Collection>(contentsOf other: C)
@@ -245,7 +246,6 @@ extension _SwiftStringStorage {
 }
 
 extension _SwiftStringStorage {
-  @inlinable
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts, range: Range<Int>) {
     if _slowPath(other._isOpaque) {
@@ -276,7 +276,6 @@ extension _SwiftStringStorage {
     _appendInPlace(other._asOpaque()[range])
   }
 
-  @inlinable
   @nonobjc
   internal final func _appendInPlace(_ other: _StringGuts) {
     if _slowPath(other._isOpaque) {
@@ -305,13 +304,11 @@ extension _SwiftStringStorage {
     _appendInPlace(other._asOpaque())
   }
 
-  @inlinable
   @nonobjc
   internal final func _appendInPlace(_ other: String) {
     self._appendInPlace(other._guts)
   }
 
-  @inlinable
   @nonobjc
   internal final func _appendInPlace<S : StringProtocol>(_ other: S) {
     self._appendInPlace(

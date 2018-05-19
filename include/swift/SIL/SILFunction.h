@@ -121,8 +121,8 @@ private:
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The forwarding substitutions, lazily computed.
-  Optional<SubstitutionList> ForwardingSubs;
+  /// The forwarding substitution map, lazily computed.
+  SubstitutionMap ForwardingSubMap;
 
   /// The collection of all BasicBlocks in the SILFunction. Empty for external
   /// function references.
@@ -683,7 +683,7 @@ public:
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.
-  SubstitutionList getForwardingSubstitutions();
+  SubstitutionMap getForwardingSubstitutionMap();
 
   //===--------------------------------------------------------------------===//
   // Block List Access

@@ -489,9 +489,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   case SPECIALIZED_PROTOCOL_CONFORMANCE: {
     TypeID conformingTypeID;
-    unsigned numSubstitutions;
+    SubstitutionMapID substitutionMapID;
     SpecializedProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
-                                                     numSubstitutions);
+                                                     substitutionMapID);
 
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
@@ -503,13 +503,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
                                "reading specialized conformance for",
                                conformingType);
 
-    // Read the substitutions.
-    SmallVector<Substitution, 4> substitutions;
-    while (numSubstitutions--) {
-      auto sub = maybeReadSubstitution(Cursor, genericEnv);
-      assert(sub.hasValue() && "Missing substitution?");
-      substitutions.push_back(*sub);
-    }
+    auto subMap = getSubstitutionMap(substitutionMapID);
 
     ProtocolConformanceRef genericConformance =
       readConformance(Cursor, genericEnv);
@@ -519,7 +513,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         substitutions);
+                                         subMap);
     return ProtocolConformanceRef(conformance);
   }
 
@@ -654,42 +648,6 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   conformance->setState(ProtocolConformanceState::Complete);
   conformance->setLazyLoader(this, offset);
   return conformance;
-}
-
-Optional<Substitution>
-ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
-                                  GenericEnvironment *genericEnv) {
-  BCOffsetRAII lastRecordOffset(cursor);
-
-  auto entry = cursor.advance(AF_DontPopBlockAtEnd);
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    return None;
-
-  StringRef blobData;
-  SmallVector<uint64_t, 2> scratch;
-  unsigned recordID = cursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != decls_block::BOUND_GENERIC_SUBSTITUTION)
-    return None;
-
-  TypeID replacementID;
-  unsigned numConformances;
-  decls_block::BoundGenericSubstitutionLayout::readRecord(scratch,
-                                                          replacementID,
-                                                          numConformances);
-
-  auto replacementTy = getType(replacementID);
-  if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
-  }
-
-  SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
-  while (numConformances--) {
-    conformanceBuf.push_back(readConformance(cursor));
-  }
-
-  lastRecordOffset.reset();
-  return Substitution{replacementTy,
-                      getContext().AllocateCopy(conformanceBuf)};
 }
 
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
@@ -1729,8 +1687,11 @@ giveUpFastPath:
         }
       } else if (auto alias = dyn_cast<TypeAliasDecl>(base)) {
         paramList = alias->getGenericParams();
-      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
+      } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base)) {
         paramList = fn->getGenericParams();
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(base)) {
+        paramList = subscript->getGenericParams();
+      }
 
       if (!paramList) {
         return llvm::make_error<XRefError>(
@@ -4346,6 +4307,31 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     if (!nominalOrError)
       return nominalOrError.takeError();
 
+    // Look through compatibility aliases.
+    if (auto *alias = dyn_cast<TypeAliasDecl>(nominalOrError.get())) {
+      // Reminder: TypeBase::getAs will look through sugar. But we don't want to
+      // do that here, so we do isa<> checks on the TypeBase itself instead of
+      // using the Type wrapper.
+      const TypeBase *underlyingTy = nullptr;
+      while (alias->isCompatibilityAlias()) {
+        underlyingTy = alias->getUnderlyingTypeLoc().getType().getPointer();
+
+        // If the underlying type is itself a typealias, it might be another
+        // compatibility alias, meaning we need to go around the loop again.
+        auto aliasTy = dyn_cast<NameAliasType>(underlyingTy);
+        if (!aliasTy)
+          break;
+        alias = aliasTy->getDecl();
+      }
+
+      // We only want to use the type we found if it's a simple non-generic
+      // nominal type.
+      if (auto simpleNominalTy = dyn_cast_or_null<NominalType>(underlyingTy)) {
+        nominalOrError = simpleNominalTy->getDecl();
+        (void)!nominalOrError; // "Check" the llvm::Expected<> value.
+      }
+    }
+
     auto nominal = dyn_cast<NominalTypeDecl>(nominalOrError.get());
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
@@ -4740,8 +4726,8 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
   case decls_block::SIL_BOX_TYPE: {
     SILLayoutID layoutID;
-
-    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID);
+    SubstitutionMapID subMapID;
+    decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
     
     // Get the layout.
     auto getLayout = [&]() -> SILLayout * {
@@ -4767,24 +4753,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     auto layout = getLayout();
     if (!layout)
       return nullptr;
-    
-    SmallVector<Substitution, 4> genericArgs;
-    if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getSubstitutionListSize())) {
-        (void)i;
-        auto sub = maybeReadSubstitution(DeclTypeCursor);
-        if (!sub) {
-          error();
-          return nullptr;
-        }
 
-        genericArgs.push_back(
-          Substitution(sub->getReplacement()->getCanonicalType(),
-                       sub->getConformances()));
-      }
-    }
-
-    typeOrOffset = SILBoxType::get(getContext(), layout, genericArgs);
+    auto subMap = getSubstitutionMap(subMapID);
+    typeOrOffset = SILBoxType::get(getContext(), layout, subMap);
     break;
   }
       
@@ -5368,28 +5339,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     };
 
     // Requirement -> synthetic map.
-    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (auto syntheticSig = getGenericSignature(*rawIDIter++)) {
       // Create the synthetic environment.
       syntheticEnv = syntheticSig->createGenericEnvironment();
     }
 
     // Requirement -> synthetic substitutions.
-    if (unsigned numReqSubstitutions = *rawIDIter++) {
-      while (numReqSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
-        reqToSyntheticSubs.push_back(*sub);
-      }
-    }
+    SubstitutionMap reqToSyntheticSubs = getSubstitutionMap(*rawIDIter++);
 
     // Witness substitutions.
-    SmallVector<Substitution, 4> witnessSubstitutions;
-    if (unsigned numWitnessSubstitutions = *rawIDIter++) {
-      while (numWitnessSubstitutions--) {
-        auto sub = maybeReadSubstitution(DeclTypeCursor, syntheticEnv);
-        witnessSubstitutions.push_back(*sub);
-      }
-    }
+    SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
 
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {

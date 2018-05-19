@@ -514,8 +514,9 @@ struct VisibilityTesting {
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&yRef,
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+    // Allow WritableKeyPath for Swift 3/4 only.
     expect(&zRef,
-      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
   }
 
   func inPrivateContext() {
@@ -536,8 +537,9 @@ struct VisibilityTesting2 {
     var xRef = \VisibilityTesting.x
     var yRef = \VisibilityTesting.y
     var zRef = \VisibilityTesting.z
+    // Allow WritableKeyPath for Swift 3/4 only.
     expect(&xRef,
-      toHaveType: Exactly<KeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&yRef,
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&zRef,

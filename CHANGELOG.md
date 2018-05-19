@@ -57,6 +57,48 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0185][]
+
+  Protocol conformances are now able to be synthesized in extensions in the same
+  file as the type definition, allowing automatic synthesis of conditional
+  conformances to `Hashable`, `Equatable` and `Codable` (both `Encodable` and
+  `Decodable`). For instance, if there is a generic wrapper type that can only
+  be `Equatable` when its wrapped type is also `Equatable`, the `==` method can
+  be automatically constructed by the compiler:
+
+  ```swift
+  struct Generic<Param> {
+    var property: Param
+  }
+
+  extension Generic: Equatable where Param: Equatable {}
+  // Automatically synthesized inside the extension:
+  // static func ==(lhs: Generic, rhs: Generic) -> Bool {
+  //   return lhs.property == rhs.property
+  // }
+  ```
+
+  Code that wants to be as precise as possible should generally not
+  conditionally conform to `Codable` directly, but rather its two constituent
+  protocols `Encodable` and `Decodable`, or else one can only (for instance)
+  decode a `Generic<Param>` if `Param` is `Encodable` in addition to
+  `Decodable`, even though `Encodable` is likely not required:
+
+  ```swift
+  // Unnecessarily restrictive:
+  extension Generic: Codable where Param: Codable {}
+
+  // More precise:
+  extension Generic: Encodable where Param: Encodable {}
+  extension Generic: Decodable where Param: Decodable {}
+  ```
+
+  Finally, due to `Decodable` having an `init` requirement, it is not possible
+  to conform to `Decodable` in an extension of a non-final class: such a class
+  needs to have any `init`s from protocols be `required`, which means they need
+  to be in the class definition.
+
+
 * [SE-0054][]
 
   `ImplicitlyUnwrappedOptional<T>` is now an unavailable typealias of `Optional<T>`.
@@ -207,6 +249,8 @@ Swift 4.2
 
 Swift 4.1
 ---------
+
+### 2018-03-29 (Xcode 9.3)
 
 * [SE-0075][]
 
@@ -7063,7 +7107,19 @@ Swift 1.0
 [SE-0197]: <https://github.com/apple/swift-evolution/blob/master/proposals/0197-remove-where.md>
 [SE-0198]: <https://github.com/apple/swift-evolution/blob/master/proposals/0198-playground-quicklook-api-revamp.md>
 [SE-0199]: <https://github.com/apple/swift-evolution/blob/master/proposals/0199-bool-toggle.md>
+[SE-0200]: <https://github.com/apple/swift-evolution/blob/master/proposals/0200-raw-string-escaping.md>
+[SE-0201]: <https://github.com/apple/swift-evolution/blob/master/proposals/0201-package-manager-local-dependencies.md>
+[SE-0202]: <https://github.com/apple/swift-evolution/blob/master/proposals/0202-random-unification.md>
+[SE-0203]: <https://github.com/apple/swift-evolution/blob/master/proposals/0203-rename-sequence-elements-equal.md>
+[SE-0204]: <https://github.com/apple/swift-evolution/blob/master/proposals/0204-add-last-methods.md>
+[SE-0205]: <https://github.com/apple/swift-evolution/blob/master/proposals/0205-withUnsafePointer-for-lets.md>
 [SE-0206]: <https://github.com/apple/swift-evolution/blob/master/proposals/0206-hashable-enhancements.md>
+[SE-0207]: <https://github.com/apple/swift-evolution/blob/master/proposals/0207-containsOnly.md>
+[SE-0208]: <https://github.com/apple/swift-evolution/blob/master/proposals/0208-package-manager-system-library-targets.md>
+[SE-0209]: <https://github.com/apple/swift-evolution/blob/master/proposals/0209-package-manager-swift-lang-version-update.md>
+[SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
+[SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
+[SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>

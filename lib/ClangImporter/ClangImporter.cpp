@@ -464,6 +464,19 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
+
+    // Define macros that Swift bridging headers use.
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+          "-DSWIFT_CLASS_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_PROTOCOL_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_EXTENSION_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+          "-DSWIFT_ENUM_EXTRA=__attribute__((__annotate__("
+          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
+      });
+
   } else {
     invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
   }
@@ -471,16 +484,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
   // Set C language options.
   if (triple.isOSDarwin()) {
     invocationArgStrs.insert(invocationArgStrs.end(), {
-      // Define macros that Swift bridging headers use.
-      "-DSWIFT_CLASS_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_PROTOCOL_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_EXTENSION_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      "-DSWIFT_ENUM_EXTRA=__attribute__((annotate(\""
-        SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-
       // Avoid including the iso646.h header because some headers from OS X
       // frameworks are broken by it.
       "-D_ISO646_H_", "-D__ISO646_H",
@@ -609,12 +612,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
   // Enable API notes alongside headers/in frameworks.
   invocationArgStrs.push_back("-fapinotes-modules");
-
-  // Add API notes paths.
-  for (const auto &searchPath : searchPathOpts.ImportSearchPaths) {
-    invocationArgStrs.push_back("-iapinotes-modules");
-    invocationArgStrs.push_back(searchPath);
-  }
   invocationArgStrs.push_back("-iapinotes-modules");
   invocationArgStrs.push_back(searchPathOpts.RuntimeLibraryImportPath);
   invocationArgStrs.push_back("-fapinotes-swift-version=" +
@@ -1083,6 +1080,7 @@ ClangImporter::create(ASTContext &ctx,
   importer->Impl.ImportedHeaderUnit =
     new (ctx) ClangModuleUnit(*importedHeaderModule, importer->Impl, nullptr);
   importedHeaderModule->addFile(*importer->Impl.ImportedHeaderUnit);
+  importedHeaderModule->setHasResolvedImports();
 
   importer->Impl.IsReadingBridgingPCH = false;
 
@@ -1576,9 +1574,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {
-          return true;
-        });
+      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {});
     }
   } else {
     // Build the representation of the Clang module in Swift.
@@ -1588,6 +1584,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     result = ModuleDecl::create(name, SwiftContext);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
+    result->setHasResolvedImports();
 
     wrapperUnit =
       new (SwiftContext) ClangModuleUnit(*result, *this, clangModule);
@@ -1597,9 +1594,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // Force load adapter modules for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
-    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {
-        return true;
-      });
+    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
   }
 
   if (clangModule->isSubModule()) {
@@ -1732,6 +1727,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   auto wrapper = ModuleDecl::create(name, SwiftContext);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
+  wrapper->setHasResolvedImports();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,
                                                  underlying);

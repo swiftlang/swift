@@ -1567,47 +1567,6 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-
-bool ValueDecl::isDefinition() const {
-  switch (getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::MissingMember:
-    assert(!isa<ValueDecl>(this));
-    llvm_unreachable("non-value decls shouldn't get here");
-
-  case DeclKind::Func:
-  case DeclKind::Accessor:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
-    return cast<AbstractFunctionDecl>(this)->hasBody();
-
-  case DeclKind::Subscript:
-  case DeclKind::Var:
-  case DeclKind::Param:
-  case DeclKind::Enum:
-  case DeclKind::EnumElement:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::TypeAlias:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::AssociatedType:
-  case DeclKind::Protocol:
-  case DeclKind::Module:
-    return true;
-  }
-  llvm_unreachable("bad DeclKind");
-}
-
 bool ValueDecl::isInstanceMember() const {
   DeclContext *DC = getDeclContext();
   if (!DC->isTypeContext())
@@ -1672,12 +1631,14 @@ bool ValueDecl::isInstanceMember() const {
   llvm_unreachable("bad DeclKind");
 }
 
-bool ValueDecl::needsCapture() const {
-  // We don't need to capture anything from non-local contexts.
-  if (!getDeclContext()->isLocalContext())
-    return false;
-  // We don't need to capture types.
-  return !isa<TypeDecl>(this);
+unsigned ValueDecl::getLocalDiscriminator() const {
+  return LocalDiscriminator;
+}
+
+void ValueDecl::setLocalDiscriminator(unsigned index) {
+  assert(getDeclContext()->isLocalContext());
+  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  LocalDiscriminator = index;
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
@@ -2095,6 +2056,9 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 }
 
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+  if (isImplicit())
+    return SourceLoc();
+
   if (auto var = dyn_cast<VarDecl>(this)) {
     // [attrs] var ...
     // The attributes are part of the VarDecl, but the 'var' is part of the PBD.

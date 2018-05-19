@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/APFloat.h"
@@ -1906,7 +1907,7 @@ public:
       OS << '\n';
       printRec(E->getArgument());
     }
-    OS << "')";
+    OS << ")";
   }
   void visitDotSelfExpr(DotSelfExpr *E) {
     printCommon(E, "dot_self_expr");
@@ -1960,6 +1961,7 @@ public:
     if (auto semaE = E->getSemanticExpr()) {
       OS << '\n';
       printRec(semaE);
+      PrintWithColorRAII(OS, ParenthesisColor) << ')';
       return;
     }
     for (auto elt : E->getElements()) {
@@ -2051,7 +2053,6 @@ public:
     if (auto defaultArgsOwner = E->getDefaultArgsOwner()) {
       OS << " default_args_owner=";
       defaultArgsOwner.dump(OS);
-      dump(defaultArgsOwner.getSubstitutions());
     }
 
     OS << "\n";
@@ -2792,77 +2793,74 @@ void TypeRepr::dump() const {
   llvm::errs() << '\n';
 }
 
-void Substitution::dump() const {
-  dump(llvm::errs());
-}
+// Recursive helpers to avoid infinite recursion for recursive protocol
+// conformances.
+static void dumpProtocolConformanceRec(
+    const ProtocolConformance *conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
-void Substitution::dump(llvm::raw_ostream &out, unsigned indent) const {
-  out.indent(indent);
-  print(out);
-  out << '\n';
+static void dumpSubstitutionMapRec(
+    SubstitutionMap map, llvm::raw_ostream &out,
+    SubstitutionMap::DumpStyle style, unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited);
 
-  for (auto &c : Conformance) {
-    c.dump(out, indent + 2);
-  }
-}
-
-void ProtocolConformanceRef::dump() const {
-  dump(llvm::errs());
-}
-
-void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
-                                  unsigned indent) const {
-  if (isConcrete()) {
-    getConcrete()->dump(out, indent);
+static void dumpProtocolConformanceRefRec(
+    const ProtocolConformanceRef conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+  if (conformance.isConcrete()) {
+    dumpProtocolConformanceRec(conformance.getConcrete(), out, indent, visited);
   } else {
     out.indent(indent) << "(abstract_conformance protocol="
-                       << getAbstract()->getName();
+                       << conformance.getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
-    out << '\n';
   }
 }
 
-void swift::dump(SubstitutionList subs) {
-  unsigned i = 0;
-  for (const auto &s : subs) {
-    llvm::errs() << i++ << ": ";
-    s.dump();
-  }
-}
+static void dumpProtocolConformanceRec(
+    const ProtocolConformance *conformance, llvm::raw_ostream &out,
+    unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+  // A recursive conformance shouldn't have its contents printed, or there's
+  // infinite recursion. (This also avoids printing things that occur multiple
+  // times in a conformance hierarchy.)
+  auto shouldPrintDetails = visited.insert(conformance).second;
 
-void ProtocolConformance::dump() const {
-  auto &out = llvm::errs();
-  dump(out);
-  out << '\n';
-}
-
-void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   auto printCommon = [&](StringRef kind) {
     out.indent(indent);
     PrintWithColorRAII(out, ParenthesisColor) << '(';
-    out << kind << "_conformance type=" << getType()
-        << " protocol=" << getProtocol()->getName();
+    out << kind << "_conformance type=" << conformance->getType()
+        << " protocol=" << conformance->getProtocol()->getName();
+
+    if (!shouldPrintDetails)
+      out << " (details printed above)";
   };
 
-  switch (getKind()) {
+  switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
-    auto normal = cast<NormalProtocolConformance>(this);
+    auto normal = cast<NormalProtocolConformance>(conformance);
 
     printCommon("normal");
+    if (!shouldPrintDetails)
+      break;
+
     // Maybe print information about the conforming context?
     if (normal->isLazilyLoaded()) {
       out << " lazy";
     } else {
-      forEachTypeWitness(nullptr, [&](const AssociatedTypeDecl *req,
-                                      Type ty, const TypeDecl *) -> bool {
-        out << '\n';
-        out.indent(indent + 2);
-        PrintWithColorRAII(out, ParenthesisColor) << '(';
-        out << "assoc_type req=" << req->getName() << " type=";
-        PrintWithColorRAII(out, TypeColor) << ty;
-        PrintWithColorRAII(out, ParenthesisColor) << ')';
-        return false;
-      });
+      normal->forEachTypeWitness(
+          nullptr,
+          [&](const AssociatedTypeDecl *req, Type ty,
+              const TypeDecl *) -> bool {
+            out << '\n';
+            out.indent(indent + 2);
+            PrintWithColorRAII(out, ParenthesisColor) << '(';
+            out << "assoc_type req=" << req->getName() << " type=";
+            PrintWithColorRAII(out, TypeColor) << Type(ty->getDesugaredType());
+            PrintWithColorRAII(out, ParenthesisColor) << ')';
+            return false;
+          });
       normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
                                                Witness witness) {
         out << '\n';
@@ -2879,9 +2877,9 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
         PrintWithColorRAII(out, ParenthesisColor) << ')';
       });
 
-      for (auto conformance : normal->getSignatureConformances()) {
+      for (auto sigConf : normal->getSignatureConformances()) {
         out << '\n';
-        conformance.dump(out, indent + 2);
+        dumpProtocolConformanceRefRec(sigConf, out, indent + 2, visited);
       }
     }
 
@@ -2894,32 +2892,135 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
   }
 
   case ProtocolConformanceKind::Inherited: {
-    auto conf = cast<InheritedProtocolConformance>(this);
+    auto conf = cast<InheritedProtocolConformance>(conformance);
     printCommon("inherited");
+    if (!shouldPrintDetails)
+      break;
+
     out << '\n';
-    conf->getInheritedConformance()->dump(out, indent + 2);
+    dumpProtocolConformanceRec(conf->getInheritedConformance(), out, indent + 2,
+                               visited);
     break;
   }
 
   case ProtocolConformanceKind::Specialized: {
-    auto conf = cast<SpecializedProtocolConformance>(this);
+    auto conf = cast<SpecializedProtocolConformance>(conformance);
     printCommon("specialized");
+    if (!shouldPrintDetails)
+      break;
+
     out << '\n';
-    for (auto sub : conf->getGenericSubstitutions()) {
-      sub.dump(out, indent + 2);
-      out << '\n';
-    }
+    dumpSubstitutionMapRec(conf->getSubstitutionMap(), out,
+                           SubstitutionMap::DumpStyle::Full, indent + 2,
+                           visited);
+    out << '\n';
     for (auto subReq : conf->getConditionalRequirements()) {
       out.indent(indent + 2);
       subReq.dump(out);
       out << '\n';
     }
-    conf->getGenericConformance()->dump(out, indent + 2);
+    dumpProtocolConformanceRec(conf->getGenericConformance(), out, indent + 2,
+                               visited);
     break;
   }
   }
 
   PrintWithColorRAII(out, ParenthesisColor) << ')';
+}
+
+static void dumpSubstitutionMapRec(
+    SubstitutionMap map, llvm::raw_ostream &out,
+    SubstitutionMap::DumpStyle style, unsigned indent,
+    llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
+  auto *genericSig = map.getGenericSignature();
+  out.indent(indent);
+
+  auto printParen = [&](char p) {
+    PrintWithColorRAII(out, ParenthesisColor) << p;
+  };
+  printParen('(');
+  SWIFT_DEFER { printParen(')'); };
+  out << "substitution_map generic_signature=";
+  if (genericSig == nullptr) {
+    out << "<nullptr>";
+    return;
+  }
+
+  genericSig->print(out);
+  auto genericParams = genericSig->getGenericParams();
+  auto replacementTypes =
+      static_cast<const SubstitutionMap &>(map).getReplacementTypesBuffer();
+  for (unsigned i : indices(genericParams)) {
+    if (style == SubstitutionMap::DumpStyle::Minimal) {
+      out << " ";
+    } else {
+      out << "\n";
+      out.indent(indent + 2);
+    }
+    printParen('(');
+    out << "substitution ";
+    genericParams[i]->print(out);
+    out << " -> ";
+    if (replacementTypes[i])
+      replacementTypes[i]->print(out);
+    else
+      out << "<<unresolved concrete type>>";
+    printParen(')');
+  }
+  // A minimal dump doesn't need the details about the conformances, a lot of
+  // that info can be inferred from the signature.
+  if (style == SubstitutionMap::DumpStyle::Minimal)
+    return;
+
+  auto conformances = map.getConformances();
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    out << "\n";
+    out.indent(indent + 2);
+    printParen('(');
+    out << "conformance type=";
+    req.getFirstType()->print(out);
+    out << "\n";
+    dumpProtocolConformanceRefRec(conformances.front(), out, indent + 4,
+                                  visited);
+
+    printParen(')');
+    conformances = conformances.slice(1);
+  }
+}
+
+void ProtocolConformanceRef::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << '\n';
+}
+
+void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
+                                  unsigned indent) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpProtocolConformanceRefRec(*this, out, indent, visited);
+}
+void ProtocolConformance::dump() const {
+  auto &out = llvm::errs();
+  dump(out);
+  out << '\n';
+}
+
+void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpProtocolConformanceRec(this, out, indent, visited);
+}
+
+void SubstitutionMap::dump(llvm::raw_ostream &out, DumpStyle style,
+                           unsigned indent) const {
+  llvm::SmallPtrSet<const ProtocolConformance *, 8> visited;
+  dumpSubstitutionMapRec(*this, out, style, indent, visited);
+}
+
+void SubstitutionMap::dump() const {
+  dump(llvm::errs());
+  llvm::errs() << "\n";
 }
 
 //===----------------------------------------------------------------------===//

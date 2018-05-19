@@ -437,7 +437,7 @@ enum RawValueBTest: Double, RawValueB {
 }
 
 enum foo : String { // expected-error {{'foo' declares raw type 'String', but does not conform to RawRepresentable and conformance could not be synthesized}}
-  case bar = nil // expected-error {{cannot convert nil to raw type 'String'}}
+  case bar = nil // expected-error {{cannot convert 'nil' to raw type 'String'}}
 }
 
 // Static member lookup from instance methods

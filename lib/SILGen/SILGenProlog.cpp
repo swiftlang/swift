@@ -397,7 +397,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // the captured value.
     auto type = getVarTypeInCaptureContext();
     auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.getLoweredType(type).getSwiftRValueType(),
+                               SGF.getLoweredType(type).getASTType(),
                                SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);

@@ -1660,7 +1660,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto box = IGF.Builder.CreateExtractValue(result, 0);
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
-  auto archetype = ArchetypeType::getOpened(destType.getSwiftRValueType());
+  auto archetype = ArchetypeType::getOpened(destType.getASTType());
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
@@ -1695,8 +1695,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                ArrayRef<ProtocolConformanceRef> conformances) {
   // As a special case, an Error existential can be represented as a
   // reference to an already existing NSError or CFError instance.
-  if (outType.getSwiftRValueType().isExistentialType()) {
-    auto layout = outType.getSwiftRValueType().getExistentialLayout();
+  if (outType.isExistentialType()) {
+    auto layout = outType.getASTType().getExistentialLayout();
     if (layout.isErrorExistential()) {
       // Bitcast the incoming class reference to Error.
       out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
@@ -1717,7 +1717,7 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   // Emit the witness table pointers.
   llvm::Value *instanceMetadata = nullptr;
   forEachProtocolWitnessTable(IGF, instanceFormalType, &instanceMetadata,
-                              outType.getSwiftRValueType(),
+                              outType.getASTType(),
                               destTI.getStoredProtocols(),
                               conformances,
                               [&](unsigned i, llvm::Value *ptable) {
@@ -1747,7 +1747,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
 
   // Next, write the protocol witness tables.
   forEachProtocolWitnessTable(IGF, formalSrcType, &metadata,
-                              destType.getSwiftRValueType(),
+                              destType.getASTType(),
                               destTI.getStoredProtocols(), conformances,
                               [&](unsigned i, llvm::Value *ptable) {
     Address ptableSlot = destLayout.projectWitnessTable(IGF, dest, i);

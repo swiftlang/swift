@@ -1536,35 +1536,34 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-
-  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
-                              DeclAttrKind kind, bool warning) {
-    if (DK == DAK_Count && Tok.getText() == oldName) {
+  
+  auto checkInvalidAttrName = [&](StringRef invalidName, StringRef correctName,
+                              DeclAttrKind kind, Diag<StringRef, StringRef> diag) {
+    if (DK == DAK_Count && Tok.getText() == invalidName) {
       // We renamed @availability to @available, so if we see the former,
       // treat it as the latter and emit a Fix-It.
       DK = kind;
-      if (warning) {
-        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      } else {
-        diagnose(Tok, diag::attr_renamed, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      }
+      
+      diagnose(Tok, diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
     }
   };
 
   // FIXME: This renaming happened before Swift 3, we can probably remove
   // the specific fallback path at some point.
-  checkRenamedAttr("availability", "available", DAK_Available, false);
+  checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
+
+  // Check if attr is inlineable, and suggest inlinable instead
+  checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
 
   // In Swift 5 and above, these become hard errors. Otherwise, emit a
   // warning for compatibility.
   if (!Context.isSwiftVersionAtLeast(5)) {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
@@ -2407,6 +2406,14 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   Identifier name = D->getBaseName().getIdentifier();
   unsigned discriminator = CurLocalContext->claimNextNamedDiscriminator(name);
   D->setLocalDiscriminator(discriminator);
+}
+
+void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
+  for (auto P : *PL) {
+    if (!P->hasName() || P->isImplicit())
+      continue;
+    setLocalDiscriminator(P);
+  }
 }
 
 void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
@@ -3529,10 +3536,16 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   TmpCtxt.reset();
-  
+
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
+                                          /*genericParams*/nullptr,
+                                          CurDeclContext);
+
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    ContextChange CC(*this, TAD);
+
     SyntaxParsingContext InitCtx(SyntaxContext,
                                  SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
@@ -3540,20 +3553,15 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
           .fixItReplace(Tok.getLoc(), " = ");
-      consumeToken(tok::colon);
+      EqualLoc = consumeToken(tok::colon);
     } else {
       EqualLoc = consumeToken(tok::equal);
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
     Status |= UnderlyingTy;
-    if (UnderlyingTy.isNull())
-      return Status;
   }
 
-  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
   TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
@@ -3567,8 +3575,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
-    diagnose(Tok, diag::expected_equal_in_typealias);
-    Status.setIsParseError();
+    // If there is an attempt to do code completion
+    // inside of typealias type, let's just return
+    // because we've seen required '=' token.
+    if (EqualLoc.isInvalid()) {
+      diagnose(Tok, diag::expected_equal_in_typealias);
+      Status.setIsParseError();
+    }
     return Status;
   }
 
@@ -4276,6 +4289,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
 
       // Establish the new context.
       ParseFunctionBody CC(*this, TheDecl);
+      for (auto PL : TheDecl->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       // Parse the body.
       SmallVector<ASTNode, 16> Entries;
@@ -4367,6 +4382,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -4464,8 +4481,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   if (!PrimaryVar || !primaryVarIsWellFormed) {
     diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
-  } else {
-    setLocalDiscriminator(PrimaryVar);
   }
 
   TypeLoc TyLoc;
@@ -4875,6 +4890,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+      setLocalDiscriminator(VD);
       Decls.push_back(VD);
     });
 
@@ -5320,6 +5336,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
+    for (auto PL : FD->getParameterLists())
+      setLocalDiscriminatorToParamList(PL);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5390,6 +5408,8 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -5815,7 +5835,30 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
     CD->setInherited(Context.AllocateCopy(Inherited));
-  }
+  
+  // Parse python style inheritance clause and replace parentheses with a colon
+  } else if (Tok.is(tok::l_paren)) {
+    bool isParenStyleInheritance = false;
+    {
+      BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      isParenStyleInheritance = canParseType() &&
+        Tok.isAny(tok::r_paren, tok::kw_where, tok::l_brace, tok::eof);
+    }
+    if(isParenStyleInheritance) {
+      SourceLoc LParenLoc = consumeToken(tok::l_paren);
+      auto TypeResult = parseType();
+      if (TypeResult.isNull()) {
+        Status.setIsParseError();
+        return Status;
+      }
+      SourceLoc RParenLoc;
+      consumeIf(tok::r_paren, RParenLoc);
+      diagnose(LParenLoc, diag::expected_colon_class)
+        .fixItReplace(LParenLoc, ": ")
+        .fixItRemove(RParenLoc);
+    }
+  } 
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
@@ -6229,6 +6272,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
+      for (auto PL : CD->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)

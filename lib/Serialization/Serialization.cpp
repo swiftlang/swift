@@ -228,7 +228,7 @@ namespace {
   public:
     using key_type = std::string;
     using key_type_ref = StringRef;
-    using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+    using data_type = DeclID;
     using data_type_ref = const data_type &;
     using hash_value_type = uint32_t;
     using offset_type = unsigned;
@@ -242,7 +242,7 @@ namespace {
                                                     key_type_ref key,
                                                     data_type_ref data) {
       uint32_t keyLength = key.size();
-      uint32_t dataLength = sizeof(uint32_t) + sizeof(unsigned);
+      uint32_t dataLength = sizeof(uint32_t);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
       return { keyLength, dataLength };
@@ -256,8 +256,7 @@ namespace {
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
-      writer.write<uint32_t>(data.first);
-      writer.write<unsigned>(data.second);
+      writer.write<uint32_t>(data);
     }
   };
 
@@ -845,8 +844,6 @@ void Serializer::writeBlockInfoBlock() {
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(Out, X, #X, nameBuffer)
-  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
-                              decls_block::BOUND_GENERIC_SUBSTITUTION);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::ABSTRACT_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
@@ -1579,10 +1576,10 @@ void Serializer::writeNormalConformance(
         data.push_back(/*null generic signature*/0);
       }
 
-      auto reqToSyntheticSubs = witness.getRequirementToSyntheticSubs();
-
-      data.push_back(reqToSyntheticSubs.size());
-      data.push_back(witness.getSubstitutions().size());
+      data.push_back(
+        addSubstitutionMapRef(witness.getRequirementToSyntheticSubs()));
+      data.push_back(
+        addSubstitutionMapRef(witness.getSubstitutions()));
   });
 
   unsigned numSignatureConformances =
@@ -1601,21 +1598,6 @@ void Serializer::writeNormalConformance(
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
-  
-  conformance->forEachValueWitness(nullptr,
-                                   [&](ValueDecl *req, Witness witness) {
-   // Bail out early for simple witnesses.
-   if (!witness.getDecl()) return;
-
-   // Write requirement-to-synthetic substitutions.
-   writeSubstitutions(witness.getRequirementToSyntheticSubs(),
-                      DeclTypeAbbrCodes, nullptr);
-
-   // Write the witness substitutions.
-   writeSubstitutions(witness.getSubstitutions(),
-                      DeclTypeAbbrCodes,
-                      witness.getSyntheticEnvironment());
-  });
 }
 
 void
@@ -1665,16 +1647,15 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
 
   case ProtocolConformanceKind::Specialized: {
     auto conf = cast<SpecializedProtocolConformance>(conformance);
-    auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
     if (genericEnv && type->hasArchetype())
       type = type->mapTypeOutOfContext();
-    SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
-                                                     abbrCode,
-                                                     addTypeRef(type),
-                                                     substitutions.size());
-    writeSubstitutions(substitutions, abbrCodes, genericEnv);
+    SpecializedProtocolConformanceLayout::emitRecord(
+                           Out, ScratchRecord,
+                           abbrCode,
+                           addTypeRef(type),
+                           addSubstitutionMapRef(conf->getSubstitutionMap()));
 
     writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
@@ -1714,30 +1695,6 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 
   for (auto conformance : conformances)
     writeConformance(conformance, abbrCodes);
-}
-
-void
-Serializer::writeSubstitutions(SubstitutionList substitutions,
-                               const std::array<unsigned, 256> &abbrCodes,
-                               GenericEnvironment *genericEnv) {
-  using namespace decls_block;
-  auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
-
-  for (auto &sub : substitutions) {
-    auto replacementType = sub.getReplacement();
-    if (genericEnv && replacementType->hasArchetype()) {
-      replacementType = replacementType->mapTypeOutOfContext();
-    }
-
-    BoundGenericSubstitutionLayout::emitRecord(
-      Out, ScratchRecord, abbrCode,
-      addTypeRef(replacementType),
-      sub.getConformances().size());
-
-    for (auto conformance : sub.getConformances()) {
-      writeConformance(conformance, abbrCodes, genericEnv);
-    }
-  }
 }
 
 static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
@@ -3854,17 +3811,8 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
     SILLayoutID layoutRef = addSILLayoutRef(boxTy->getLayout());
 
-#ifndef NDEBUG
-    if (auto sig = boxTy->getLayout()->getGenericSignature()) {
-      assert(sig->getSubstitutionListSize()
-               == boxTy->getGenericArgs().size());
-    }
-#endif
-
-    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef);
-
-    // Write the set of substitutions.
-    writeSubstitutions(boxTy->getGenericArgs(), DeclTypeAbbrCodes);
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode, layoutRef,
+                          addSubstitutionMapRef(boxTy->getSubstitutions()));
     break;
   }
       
@@ -4042,7 +3990,6 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ArchetypeTypeLayout>();
   registerDeclTypeAbbr<ProtocolCompositionTypeLayout>();
   registerDeclTypeAbbr<BoundGenericTypeLayout>();
-  registerDeclTypeAbbr<BoundGenericSubstitutionLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
   registerDeclTypeAbbr<SILBoxTypeLayout>();
@@ -4961,9 +4908,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
       Mangle::ASTMangler Mangler;
       std::string MangledName = Mangler.mangleDeclAsUSR(TD, /*USRPrefix*/"");
       assert(!MangledName.empty() && "Mangled type came back empty!");
-      localTypeGenerator.insert(MangledName, {
-        addDeclRef(TD), TD->getLocalDiscriminator()
-      });
+      localTypeGenerator.insert(MangledName, addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
         collectInterestingNestedDeclarations(*this, IDC->getMembers(),

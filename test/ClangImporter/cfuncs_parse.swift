@@ -153,7 +153,7 @@ func test_decay() {
 func test_nested_pointers() {
   nested_pointer(nil)
   nested_pointer_audited(nil)
-  nested_pointer_audited2(nil) // expected-error {{nil is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+  nested_pointer_audited2(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 
   nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>?'}}
   nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>?'}}

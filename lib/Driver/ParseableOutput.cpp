@@ -155,9 +155,9 @@ public:
 };
 
 class TaskBasedMessage : public CommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
 public:
-  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
+  TaskBasedMessage(StringRef Kind, const Job &Cmd, int64_t Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
   void provideMapping(swift::json::Output &out) override {
@@ -167,9 +167,9 @@ public:
 };
 
 class BeganMessage : public DetailedCommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
 public:
-  BeganMessage(const Job &Cmd, ProcessId Pid) :
+  BeganMessage(const Job &Cmd, int64_t Pid) :
       DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
 
   void provideMapping(swift::json::Output &out) override {
@@ -181,7 +181,7 @@ public:
 class TaskOutputMessage : public TaskBasedMessage {
   std::string Output;
 public:
-  TaskOutputMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
+  TaskOutputMessage(StringRef Kind, const Job &Cmd, int64_t Pid,
                     StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
                                         Output(Output) {}
 
@@ -194,7 +194,7 @@ public:
 class FinishedMessage : public TaskOutputMessage {
   int ExitStatus;
 public:
-  FinishedMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
+  FinishedMessage(const Job &Cmd, int64_t Pid, StringRef Output,
                   int ExitStatus) : TaskOutputMessage("finished", Cmd, Pid,
                                                       Output),
                                     ExitStatus(ExitStatus) {}
@@ -209,7 +209,7 @@ class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
   Optional<int> Signal;
 public:
-  SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
+  SignalledMessage(const Job &Cmd, int64_t Pid, StringRef Output,
                    StringRef ErrorMsg, Optional<int> Signal) :
       TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
       Signal(Signal) {}
@@ -253,20 +253,20 @@ static void emitMessage(raw_ostream &os, Message &msg) {
 }
 
 void parseable_output::emitBeganMessage(raw_ostream &os,
-                                        const Job &Cmd, ProcessId Pid) {
+                                        const Job &Cmd, int64_t Pid) {
   BeganMessage msg(Cmd, Pid);
   emitMessage(os, msg);
 }
 
 void parseable_output::emitFinishedMessage(raw_ostream &os,
-                                           const Job &Cmd, ProcessId Pid,
+                                           const Job &Cmd, int64_t Pid,
                                            int ExitStatus, StringRef Output) {
   FinishedMessage msg(Cmd, Pid, Output, ExitStatus);
   emitMessage(os, msg);
 }
 
 void parseable_output::emitSignalledMessage(raw_ostream &os,
-                                            const Job &Cmd, ProcessId Pid,
+                                            const Job &Cmd, int64_t Pid,
                                             StringRef ErrorMsg,
                                             StringRef Output,
                                             Optional<int> Signal) {

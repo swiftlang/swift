@@ -26,7 +26,6 @@ import SwiftShims
 ///   or character combinations are preserved. The default is `true`.
 /// - Returns: The string of characters read from standard input. If EOF has
 ///   already been reached when `readLine()` is called, the result is `nil`.
-@inlinable // FIXME(sil-serialize-all)
 public func readLine(strippingNewline: Bool = true) -> String? {
   var linePtrVar: UnsafeMutablePointer<UInt8>?
   var readBytes = swift_stdlib_readLine_stdin(&linePtrVar)
@@ -66,7 +65,7 @@ public func readLine(strippingNewline: Bool = true) -> String? {
     }
   }
   let result = String._fromUTF8CodeUnitSequence(
-    UnsafeMutableBufferPointer(start: linePtr, count: readBytes),
+    UnsafeBufferPointer(start: linePtr, count: readBytes),
     repair: true)!
   _stdlib_free(linePtr)
   return result

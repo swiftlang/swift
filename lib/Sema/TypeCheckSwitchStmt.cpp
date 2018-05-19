@@ -231,11 +231,18 @@ namespace {
         return Space(C);
       }
       static Space forDisjunct(ArrayRef<Space> SP) {
-        if (SP.empty())
+        SmallVector<Space, 4> spaces(SP.begin(), SP.end());
+        spaces.erase(
+            std::remove_if(spaces.begin(), spaces.end(),
+                           [](const Space &space) { return space.isEmpty(); }),
+            spaces.end());
+
+        if (spaces.empty())
           return Space();
-        if (SP.size() == 1)
-          return SP.front();
-        return Space(SP);
+        if (spaces.size() == 1)
+          return spaces.front();
+
+        return Space(spaces);
       }
 
       bool operator==(const Space &other) const {
@@ -679,9 +686,19 @@ namespace {
       // Returns the result of subtracting the other space from this space.  The
       // result is empty if the other space completely covers this space, or
       // non-empty if there were any uncovered cases.  The difference of spaces
-      // is the smallest uncovered set of cases.
-      Space minus(const Space &other, TypeChecker &TC,
-                  const DeclContext *DC) const {
+      // is the smallest uncovered set of cases. The result is absent if the
+      // computation had to be abandoned.
+      //
+      // \p minusCount is an optional pointer counting the number of
+      // times minus has run.
+      // Returns None if the computation "timed out".
+      Optional<Space> minus(const Space &other, TypeChecker &TC,
+                            const DeclContext *DC, unsigned *minusCount) const {
+
+        if (minusCount && TC.getSwitchCheckingInvocationThreshold() &&
+            (*minusCount)++ >= TC.getSwitchCheckingInvocationThreshold())
+          return None;
+        
         if (this->isEmpty()) {
           return Space();
         }
@@ -712,7 +729,7 @@ namespace {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, this->getType(), spaces);
             auto decomp = Space::forDisjunct(spaces);
-            return decomp.minus(other, TC, DC);
+            return decomp.minus(other, TC, DC, minusCount);
           } else {
             return *this;
           }
@@ -731,12 +748,14 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Disjunct): {
-          return std::accumulate(other.getSpaces().begin(),
-                                 other.getSpaces().end(),
-                                 *this,
-                                 [&](const Space &left, const Space &right){
-            return left.minus(right, TC, DC);
-          });
+          Space tot = *this;
+          for (auto s : other.getSpaces()) {
+            if (auto diff = tot.minus(s, TC, DC, minusCount))
+              tot = *diff;
+            else
+              return None;
+          }
+          return tot;
         }
 
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
@@ -745,11 +764,12 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> smallSpaces;
-          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
-                         std::back_inserter(smallSpaces),
-                         [&](const Space &first){
-            return first.minus(other, TC, DC);
-          });
+          for (auto s : this->getSpaces()) {
+            if (auto diff = s.minus(other, TC, DC, minusCount))
+              smallSpaces.push_back(*diff);
+            else
+              return None;
+          }
           return Space::forDisjunct(smallSpaces);
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
@@ -757,7 +777,10 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> newSubSpaces;
           for (auto subSpace : this->getSpaces()) {
-            Space nextSpace = subSpace.minus(other, TC, DC).simplify(TC, DC);
+            auto diff = subSpace.minus(other, TC, DC, minusCount);
+            if (!diff)
+              return None;
+            auto nextSpace = diff->simplify(TC, DC);
             if (nextSpace.isEmpty())
               return Space();
             newSubSpaces.push_back(nextSpace);
@@ -805,7 +828,27 @@ namespace {
             // into each parameter.
             SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
                                              this->getSpaces().end());
-            copyParams[idx] = s1.minus(s2, TC, DC);
+
+            auto reducedSpaceOrNone = s1.minus(s2, TC, DC, minusCount);
+            if (!reducedSpaceOrNone)
+              return None;
+            auto reducedSpace = *reducedSpaceOrNone;
+            
+            // If one of the constructor parameters is empty it means
+            // the whole constructor space is empty as well, so we can
+            // safely skip it.
+            if (reducedSpace.isEmpty())
+              continue;
+
+            // If reduced produced the same space as original one, we
+            // should return it directly instead of trying to create
+            // a disjunction of its sub-spaces because nothing got reduced.
+            // This is especially helpful when dealing with `unknown` case
+            // in parameter positions.
+            if (s1 == reducedSpace)
+              return *this;
+
+            copyParams[idx] = reducedSpace;
             Space CS = Space::forConstructor(this->getType(), this->getHead(),
                                              this->canDowngradeToWarning(),
                                              copyParams);
@@ -834,7 +877,7 @@ namespace {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, other.getType(), spaces);
             auto disjunctSp = Space::forDisjunct(spaces);
-            return this->minus(disjunctSp, TC, DC);
+            return this->minus(disjunctSp, TC, DC, minusCount);
           }
           return *this;
         }
@@ -848,7 +891,7 @@ namespace {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, this->getType(), spaces);
             auto orSpace = Space::forDisjunct(spaces);
-            return orSpace.minus(other, TC, DC);
+            return orSpace.minus(other, TC, DC, minusCount);
           } else {
             return *this;
           }
@@ -1263,26 +1306,21 @@ namespace {
       Space totalSpace = Space::forType(subjectType, Identifier());
       Space coveredSpace = Space::forDisjunct(spaces);
 
-      size_t totalSpaceSize = totalSpace.getSize(TC, DC);
+      const size_t totalSpaceSize = totalSpace.getSize(TC, DC);
       if (totalSpaceSize > Space::getMaximumSize()) {
-        // Because the space is large, we have to extend the size
-        // heuristic to compensate for actually exhaustively pattern matching
-        // over enormous spaces.  In this case, if the covered space covers
-        // as much as the total space, and there were no duplicates, then we
-        // can assume the user did the right thing and that they don't need
-        // a 'default' to be inserted.
-        // FIXME: Do something sensible for non-frozen enums.
-        if (!sawRedundantPattern
-            && coveredSpace.getSize(TC, DC) >= totalSpaceSize) {
-          return;
-        }
-
-        diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
-                             unknownCase);
+        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+                            unknownCase);
         return;
       }
-
-      auto uncovered = totalSpace.minus(coveredSpace, TC, DC).simplify(TC, DC);
+      unsigned minusCount = 0;
+      auto diff = totalSpace.minus(coveredSpace, TC, DC, &minusCount);
+      if (!diff) {
+        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+                            unknownCase);
+        return;
+      }
+      
+      auto uncovered = diff->simplify(TC, DC);
       if (unknownCase && uncovered.isEmpty()) {
         TC.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
           .highlight(unknownCase->getSourceRange());
@@ -1291,8 +1329,8 @@ namespace {
       // Account for unknown cases. If the developer wrote `unknown`, they're
       // all handled; otherwise, we ignore the ones that were added for enums
       // that are implicitly frozen.
-      uncovered = uncovered.minus(Space::forUnknown(unknownCase == nullptr),
-                                  TC, DC);
+      uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
+                                   TC, DC, /*&minusCount*/ nullptr);
       uncovered = uncovered.simplify(TC, DC);
 
       if (uncovered.isEmpty())
@@ -1327,7 +1365,26 @@ namespace {
       UncoveredSwitch,
       SpaceTooLarge,
     };
-
+    
+    void diagnoseCannotCheck(const bool sawRedundantPattern,
+                             const size_t totalSpaceSize,
+                             const Space &coveredSpace,
+                             const CaseStmt *unknownCase) {
+      // Because the space is large or the check is too slow,
+      // we have to extend the size
+      // heuristic to compensate for actually exhaustively pattern matching
+      // over enormous spaces.  In this case, if the covered space covers
+      // as much as the total space, and there were no duplicates, then we
+      // can assume the user did the right thing and that they don't need
+      // a 'default' to be inserted.
+      // FIXME: Do something sensible for non-frozen enums.
+      if (!sawRedundantPattern &&
+          coveredSpace.getSize(TC, DC) >= totalSpaceSize)
+        return;
+      diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
+                           unknownCase);
+    }
+    
     void diagnoseMissingCases(RequiresDefault defaultReason, Space uncovered,
                               const CaseStmt *unknownCase = nullptr,
                               bool sawDowngradablePattern = false) {
@@ -1354,13 +1411,17 @@ namespace {
             mainDiagType = diag::non_exhaustive_switch_warn;
           break;
         case RequiresDefault::UncoveredSwitch:
-        case RequiresDefault::SpaceTooLarge:
-          TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        case RequiresDefault::SpaceTooLarge: {
+          auto diagnostic = defaultReason == RequiresDefault::UncoveredSwitch
+                                ? diag::non_exhaustive_switch
+                                : diag::possibly_non_exhaustive_switch;
+          TC.diagnose(startLoc, diagnostic);
           TC.diagnose(unknownCase->getLoc(),
                       diag::non_exhaustive_switch_drop_unknown)
             .fixItRemoveChars(unknownCase->getStartLoc(),
                               unknownCase->getLoc());
           return;
+        }
         }
       }
 
@@ -1404,7 +1465,7 @@ namespace {
         return;
       case RequiresDefault::SpaceTooLarge: {
         OS << tok::kw_default << ":\n" << "<#fatalError()#>" << "\n";
-        TC.diagnose(startLoc, diag::non_exhaustive_switch);
+        TC.diagnose(startLoc, diag::possibly_non_exhaustive_switch);
         TC.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1799,8 +1860,6 @@ void TypeChecker::checkSwitchExhaustiveness(const SwitchStmt *stmt,
 }
 
 void SpaceEngine::Space::dump() const {
-  SmallString<128> buf;
-  llvm::raw_svector_ostream os(buf);
-  this->show(os, /*normalize*/false);
-  llvm::errs() << buf.str();
+  this->show(llvm::errs(), /*normalize*/ false);
+  llvm::errs() << '\n';
 }

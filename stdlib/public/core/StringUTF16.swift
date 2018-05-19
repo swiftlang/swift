@@ -265,7 +265,6 @@ extension String {
       self._guts = _guts
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var description: String {
       return String(_guts._extractSlice(_encodedOffsetRange))
     }

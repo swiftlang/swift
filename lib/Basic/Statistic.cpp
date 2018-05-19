@@ -621,7 +621,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   raw_fd_ostream ostream(StatsFilename, EC, fs::F_Append | fs::F_Text);
   if (EC) {
     llvm::errs() << "Error opening -stats-output-dir file '"
-                 << TraceFilename << "' for writing\n";
+                 << StatsFilename << "' for writing\n";
     return;
   }
 

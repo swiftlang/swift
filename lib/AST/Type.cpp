@@ -102,12 +102,6 @@ void *TypeBase::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment, arena);
 }
 
-bool CanType::isActuallyCanonicalOrNull() const {
-  return getPointer() == nullptr ||
-         getPointer() == llvm::DenseMapInfo<TypeBase *>::getTombstoneKey() ||
-         getPointer()->isCanonical();
-}
-
 NominalTypeDecl *CanType::getAnyNominal() const {
   return dyn_cast_or_null<NominalTypeDecl>(getAnyGeneric());
 }
@@ -941,12 +935,11 @@ static void addProtocols(Type T,
 /// \brief Add the protocol (or protocols) in the type T to the stack of
 /// protocols, checking whether any of the protocols had already been seen and
 /// zapping those in the original list that we find again.
-static void addMinimumProtocols(Type T,
-                                SmallVectorImpl<ProtocolDecl *> &Protocols,
-                           llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
-                                llvm::SmallPtrSet<ProtocolDecl *, 16> &Visited,
-                                SmallVector<ProtocolDecl *, 16> &Stack,
-                                bool &ZappedAny) {
+static void
+addMinimumProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
+                    llvm::SmallDenseMap<ProtocolDecl *, unsigned> &Known,
+                    llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited,
+                    SmallVector<ProtocolDecl *, 16> &Stack, bool &ZappedAny) {
   if (auto Proto = T->getAs<ProtocolType>()) {
     auto KnownPos = Known.find(Proto->getDecl());
     if (KnownPos != Known.end()) {
@@ -1250,8 +1243,7 @@ CanType TypeBase::computeCanonicalType() {
 
   // Cache the canonical type for future queries.
   assert(Result && "Case not implemented!");
-  CanonicalType = Result;
-  return CanType(Result);
+  return CanonicalType = CanType(Result);
 }
 
 CanType TypeBase::getCanonicalType(GenericSignature *sig) {
@@ -1657,33 +1649,29 @@ bool TypeBase::isBindableTo(Type b) {
             moduleDecl, decl, decl->getGenericEnvironment());
 
         auto *genericSig = decl->getGenericSignature();
-        auto result = genericSig->enumeratePairedRequirements(
-          [&](Type t, ArrayRef<Requirement> reqts) -> bool {
-            auto orig = t.subst(origSubMap)->getCanonicalType();
-            auto subst = t.subst(substSubMap)->getCanonicalType();
-            if (!visit(orig, subst))
-              return true;
-
-            auto canTy = t->getCanonicalType();
-            for (auto reqt : reqts) {
-              auto *proto = reqt.getSecondType()->castTo<ProtocolType>()
-                ->getDecl();
-              auto origConf = *origSubMap.lookupConformance(canTy, proto);
-              auto substConf = *substSubMap.lookupConformance(canTy, proto);
-
-              if (origConf.isConcrete()) {
-                if (!substConf.isConcrete())
-                  return true;
-                if (origConf.getConcrete()->getRootNormalConformance()
-                    != substConf.getConcrete()->getRootNormalConformance())
-                  return true;
-              }
-            }
+        for (auto gp : genericSig->getGenericParams()) {
+          auto orig = Type(gp).subst(origSubMap)->getCanonicalType();
+          auto subst = Type(gp).subst(substSubMap)->getCanonicalType();
+          if (!visit(orig, subst))
             return false;
-          });
+        }
 
-        if (result)
-          return false;
+        for (const auto &req : genericSig->getRequirements()) {
+          if (req.getKind() != RequirementKind::Conformance) continue;
+
+          auto canTy = req.getFirstType()->getCanonicalType();
+          auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+          auto origConf = *origSubMap.lookupConformance(canTy, proto);
+          auto substConf = *substSubMap.lookupConformance(canTy, proto);
+
+          if (origConf.isConcrete()) {
+            if (!substConf.isConcrete())
+              return false;
+            if (origConf.getConcrete()->getRootNormalConformance()
+                  != substConf.getConcrete()->getRootNormalConformance())
+              return false;
+          }
+        }
 
         // Same decl should always either have or not have a parent.
         assert((bool)bgt->getParent() == (bool)substBGT->getParent());
@@ -2774,11 +2762,6 @@ bool AnyFunctionType::isCanonicalFunctionInputType(Type input) {
 }
 
 FunctionType *
-GenericFunctionType::substGenericArgs(SubstitutionList args) {
-  return substGenericArgs(getGenericSignature()->getSubstitutionMap(args));
-}
-
-FunctionType *
 GenericFunctionType::substGenericArgs(const SubstitutionMap &subs) {
   Type input = getInput().subst(subs);
   Type result = getResult().subst(subs);
@@ -3061,23 +3044,12 @@ static Type substType(Type derivedType,
     // Special-case handle SILBoxTypes; we want to structurally substitute the
     // substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
-      if (boxTy->getGenericArgs().empty())
-        return Type(boxTy);
-      
-      auto subMap = boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutionMap(boxTy->getGenericArgs());
-      subMap = subMap.subst(substitutions, lookupConformances);
+      auto subMap = boxTy->getSubstitutions();
+      auto newSubMap = subMap.subst(substitutions, lookupConformances);
 
-      SmallVector<Substitution, 4> newSubs;
-      boxTy->getLayout()->getGenericSignature()
-        ->getSubstitutions(subMap, newSubs);
-      for (auto &arg : newSubs) {
-        arg = Substitution(arg.getReplacement()->getCanonicalType(),
-                           arg.getConformances());
-      }
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
-                             newSubs);
+                             newSubMap);
     }
     
     // We only substitute for substitutable types and dependent member types.
@@ -3544,9 +3516,10 @@ case TypeKind::Id:
     // This interface isn't suitable for updating the substitution map in a
     // generic SILBox.
     auto boxTy = cast<SILBoxType>(base);
-    for (auto &arg : boxTy->getGenericArgs())
-      assert(arg.getReplacement()->isEqual(arg.getReplacement().transformRec(fn))
+    for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
+      assert(type->isEqual(type.transformRec(fn))
              && "SILBoxType can't be transformed");
+    }
 #endif
     return base;
   }
@@ -4132,35 +4105,25 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 //
 
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
-                         SubstitutionList Args) {
+                         SubstitutionMap Substitutions) {
   id.AddPointer(Layout);
-  profileSubstitutionList(id, Args);
+  Substitutions.profile(id);
+}
+
+static RecursiveTypeProperties getRecursivePropertiesOfMap(
+                                                      SubstitutionMap subMap) {
+  RecursiveTypeProperties props;
+  for (auto replacementType : subMap.getReplacementTypes()) {
+    if (replacementType) props |= replacementType->getRecursiveProperties();
+  }
+  return props;
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
-                       SILLayout *Layout, SubstitutionList Args)
-: TypeBase(TypeKind::SILBox, &C,
-           getRecursivePropertiesFromSubstitutions(Args)), Layout(Layout) {
-  Bits.SILBoxType.NumGenericArgs = Args.size();
-#ifndef NDEBUG
-  // Check that the generic args are reasonable for the box's signature.
-  if (Layout->getGenericSignature())
-    (void)Layout->getGenericSignature()->getSubstitutionMap(Args);
-  for (auto &arg : Args)
-    assert(arg.getReplacement()->isCanonical() &&
-           "box arguments must be canonical types!");
-#endif
-  std::uninitialized_copy(Args.begin(), Args.end(),
-                          getTrailingObjects<Substitution>());
-}
-
-RecursiveTypeProperties SILBoxType::
-getRecursivePropertiesFromSubstitutions(SubstitutionList Params) {
-  RecursiveTypeProperties props;
-  for (auto &param : Params) {
-    props |= param.getReplacement()->getRecursiveProperties();
-  }
-  return props;
+                       SILLayout *Layout, SubstitutionMap Substitutions)
+  : TypeBase(TypeKind::SILBox, &C, getRecursivePropertiesOfMap(Substitutions)),
+    Layout(Layout), Substitutions(Substitutions) {
+  assert(Substitutions.isCanonical());
 }
 
 Type TypeBase::openAnyExistentialType(ArchetypeType *&opened) {

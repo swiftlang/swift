@@ -7,6 +7,8 @@ Classes:
 Typedefs:
 - Name: RenamedTypedef
   SwiftName: RenamedTypedef
+- Name: RenamedWrappedTypedef
+  SwiftName: RenamedWrappedTypedef
 Tags:
 - Name: RenamedStruct
   SwiftName: RenamedStruct
@@ -27,6 +29,8 @@ SwiftVersions:
     SwiftName: Swift3RenamedTypedef
   - Name: NewlyWrappedTypedef
     SwiftWrapper: none
+  - Name: RenamedWrappedTypedef
+    SwiftName: Swift3RenamedWrappedTypedef
   Tags:
   - Name: RenamedStruct
     SwiftName: Swift3RenamedStruct

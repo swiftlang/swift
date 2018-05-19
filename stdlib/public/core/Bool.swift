@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,6 +86,53 @@ public struct Bool {
   public init(_ value: Bool) {
     self = value
   }
+
+  /// Returns a random Boolean value, using the given generator as a source for
+  /// randomness.
+  ///
+  /// This method returns `true` and `false` with equal probability. Use this
+  /// method to generate a random Boolean value when you are using a custom
+  /// random number generator.
+  ///
+  ///     let flippedHeads = Boolean.random(using: &myGenerator)
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// - Parameter generator: The random number generator to use when creating
+  ///   the new random value.
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bool {
+    return (generator.next() >> 17) & 1 == 0
+  }
+  
+  /// Returns a random Boolean value.
+  ///
+  /// This method returns `true` and `false` with equal probability.
+  ///
+  ///     let flippedHeads = Boolean.random()
+  ///     if flippedHeads {
+  ///         print("Heads, you win!")
+  ///     } else {
+  ///         print("Maybe another try?")
+  ///     }
+  ///
+  /// `Bool.random()` uses the default random generator, `Random.default`. The
+  /// call in the example above is equivalent to
+  /// `Bool.random(using: &Random.default)`.
+  ///
+  /// - Returns: Either `true` or `false`, randomly chosen with equal
+  ///   probability.
+  @inlinable
+  public static func random() -> Bool {
+    return Bool.random(using: &Random.default)
+  }
 }
 
 extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
@@ -153,6 +200,11 @@ extension Bool: Equatable {
 }
 
 extension Bool: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)

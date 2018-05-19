@@ -14,9 +14,9 @@ func variadicSecond(_ x: Int, _ y: Int...) {}
 
 var x = 0
 // CHECK: [[X_ADDR:%.*]] = global_addr @$S20scalar_to_tuple_args1xSivp : $*Int
+// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[DEFAULT_Y:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
 // CHECK: [[DEFAULT_Z:%.*]] = apply {{.*}} : $@convention(thin) () -> Int
-// CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[INOUT_WITH_DEFAULTS:%.*]] = function_ref @$S20scalar_to_tuple_args17inoutWithDefaults_1y1zySiz_S2itF
 // CHECK: apply [[INOUT_WITH_DEFAULTS]]([[WRITE]], [[DEFAULT_Y]], [[DEFAULT_Z]])
 inoutWithDefaults(&x)

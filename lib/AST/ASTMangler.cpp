@@ -739,15 +739,31 @@ void ASTMangler::appendType(Type type) {
       auto aliasTy = cast<NameAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
-      // FIXME: We also cannot yet mangle references to typealiases that
-      // involve generics.
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      // For the DWARF output we want to mangle the type alias + context,
-      // unless the type alias references a builtin type.
+      if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(tybase))
+          return;
+
+        appendAnyGenericType(decl);
+        bool isFirstArgList = true;
+        if (auto *nominalType = type->getAs<NominalType>()) {
+          if (nominalType->getParent())
+            type = nominalType->getParent();
+        }
+        appendBoundGenericArgs(type, isFirstArgList);
+        appendRetroactiveConformances(type);
+        appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
+      }
+
       return appendAnyGenericType(decl);
     }
 
@@ -986,8 +1002,8 @@ void ASTMangler::appendType(Type type) {
 
       if (auto sig = layout->getGenericSignature()) {
         fieldsList.clear();
-        for (auto &arg : box->getGenericArgs()) {
-          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        for (Type type : box->getSubstitutions().getReplacementTypes()) {
+          fieldsList.push_back(TupleTypeElt(type));
         }
         appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
                          ->getCanonicalType());

@@ -821,6 +821,9 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
 getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  if (DC->getASTContext().isSwiftVersion3())
+    return DC;
+
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;

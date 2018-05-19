@@ -1865,7 +1865,6 @@ bool DeclContext::lookupQualified(Type type,
     SmallVector<ValueDecl *, 4> allDecls;
     forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
       import.second->lookupClassMember(import.first, member, allDecls);
-      return true;
     });
 
     // For each declaration whose context is not something we've
@@ -1928,7 +1927,6 @@ void DeclContext::lookupAllObjCMethods(
   // Collect all of the methods with this selector.
   forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
     import.second->lookupObjCMethods(selector, results);
-    return true;
   });
 
   // Filter out duplicates.

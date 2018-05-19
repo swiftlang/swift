@@ -308,7 +308,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   auto Callee = PAI->getCallee();
-  SubstitutionList Subs = PAI->getSubstitutions();
+  SubstitutionMap Subs = PAI->getSubstitutionMap();
 
   // The partial_apply might be substituting in an open existential type.
   Builder.addOpenedArchetypeOperands(PAI);
@@ -489,7 +489,7 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
       assert(NewOpType.isAddress() && "Addresses should map to addresses.");
       auto UAC = Builder.createUncheckedAddrCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(UAC);
-    } else if (OldOpType.getSwiftRValueType() != NewOpType.getSwiftRValueType()) {
+    } else if (OldOpType.getASTType() != NewOpType.getASTType()) {
       auto URC = Builder.createUncheckedBitCast(AI.getLoc(), Op, NewOpType);
       Args.push_back(URC);
     } else {
@@ -501,10 +501,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI = Builder.createTryApply(AI.getLoc(), FRI, 
-                                 SubstitutionList(), Args,
+                                 SubstitutionMap(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else {
-    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
+    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
     assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
            AI.getSubstCalleeType()->getAllResultsType() &&
@@ -600,6 +600,51 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
+/// Determine the pattern for global_addr.
+/// %3 = global_addr @$P : $*SomeP
+/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
+/// %5 = alloc_ref $SomeC
+/// store %5 to %4 : $*SomeC
+/// %8 = alloc_stack $SomeP
+/// copy_addr %3 to [initialization] %8 : $*SomeP
+/// %9 = open_existential_addr immutable_access %8 : $*SomeP to $*@opened SomeP
+static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
+                                                  CopyAddrInst *CAI) {
+  assert(CAI->getSrc() == SILValue(GAI) &&
+         "Broken Assumption! Global Addr is not the source of the passed in "
+         "copy_addr?!");
+
+  /// Check for a single InitExistential usage for GAI and
+  /// a simple dominance check: both InitExistential and CAI are in
+  /// the same basic block and only one InitExistential
+  /// occurs between GAI and CAI.
+  llvm::SmallPtrSet<SILInstruction *, 8> IEUses;
+  for (auto *Use : GAI->getUses()) {
+    if (auto *InitExistential =
+            dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
+      IEUses.insert(InitExistential);
+    }
+  }
+
+  /// No InitExistential found in the basic block.
+  if (IEUses.empty())
+    return SILValue();
+
+  /// Walk backwards from CAI instruction till the begining of the basic block
+  /// looking for InitExistential.
+  SILValue SingleIE;
+  for (auto II = CAI->getIterator().getReverse(), IE = CAI->getParent()->rend();
+       II != IE; ++II) {
+    if (!IEUses.count(&*II))
+      continue;
+    if (SingleIE)
+      return SILValue();
+
+    SingleIE = cast<InitExistentialAddrInst>(&*II);
+  }
+  return SingleIE;
+}
+
 /// Returns the address of an object with which the stack location \p ASI is
 /// initialized. This is either a init_existential_addr or the destination of a
 /// copy_addr. Returns a null value if the address does not dominate the
@@ -666,6 +711,10 @@ static SILValue getAddressOfStackInit(AllocStackInst *ASI,
     SILValue CAISrc = CAI->getSrc();
     if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
       return getAddressOfStackInit(ASI, CAI, isCopied);
+    // Check if the CAISrc is a global_addr.
+    if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
+      return findInitExistentialFromGlobalAddr(GAI, CAI);
+    }
     return CAISrc;
   }
   return cast<InitExistentialAddrInst>(SingleWrite);
@@ -719,7 +768,7 @@ static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
     if (auto *IE =
           dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      auto Ty = Open->getType().getSwiftRValueType();
+      auto Ty = Open->getType().getASTType();
       while (auto Metatype = dyn_cast<MetatypeType>(Ty))
         Ty = Metatype.getInstanceType();
       OpenedArchetype = cast<ArchetypeType>(Ty);
@@ -754,11 +803,10 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
-  SmallVector<Substitution, 8> Substitutions;
+  SubstitutionMap Substitutions;
   if (FnTy->isPolymorphic()) {
-    auto FnSubsMap =
-        FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
-    auto FinalSubsMap = FnSubsMap.subst(
+    auto FnSubsMap = AI.getSubstitutionMap();
+    Substitutions = FnSubsMap.subst(
         [&](SubstitutableType *type) -> Type {
           if (type == OpenedArchetype)
             return ConcreteType;
@@ -772,7 +820,7 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
           }
           return ProtocolConformanceRef(proto->getDecl());
         });
-    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
+    
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -854,17 +902,17 @@ ConformanceAndConcreteType::ConformanceAndConcreteType(
     Conformances = IE->getConformances();
     ConcreteType = IE->getFormalConcreteType();
     NewSelf = IE;
-    ExistentialType = IE->getOperand()->getType().getSwiftRValueType();
+    ExistentialType = IE->getOperand()->getType().getASTType();
   } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
     Conformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
     NewSelf = IER->getOperand();
-    ExistentialType = IER->getType().getSwiftRValueType();
+    ExistentialType = IER->getType().getASTType();
   } else if (auto IEM = dyn_cast<InitExistentialMetatypeInst>(InitExistential)){
     Conformances = IEM->getConformances();
     NewSelf = IEM->getOperand();
-    ConcreteType = NewSelf->getType().getSwiftRValueType();
-    ExistentialType = IEM->getType().getSwiftRValueType();
+    ConcreteType = NewSelf->getType().getASTType();
+    ExistentialType = IEM->getType().getASTType();
     while (auto InstanceType = dyn_cast<ExistentialMetatypeType>(ExistentialType)) {
       ExistentialType = InstanceType.getInstanceType();
       ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
@@ -879,8 +927,8 @@ ConformanceAndConcreteType::ConformanceAndConcreteType(
   auto ExistentialSig = Ctx.getExistentialSignature(ExistentialType,
                                                     AI.getModule().getSwiftModule());
 
-  Substitution ConcreteSub(ConcreteType, Conformances);
-  auto SubMap = ExistentialSig->getSubstitutionMap({&ConcreteSub, 1});
+  auto SubMap = SubstitutionMap::get(ExistentialSig, { ConcreteType },
+                                     Conformances);
 
   // If the requirement is in a base protocol that is refined by the
   // conforming protocol, fish out the exact conformance for the base
@@ -1056,14 +1104,14 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI,
   // Notice that it is sufficient to compare the return type to the
   // substituted type because types that depend on the Self type are
   // not allowed (for example [Self] is not allowed).
-  if (AI.getType().getSwiftRValueType() == WMI->getLookupType())
+  if (AI.getType().getASTType() == WMI->getLookupType())
     return nullptr;
 
   // We need to handle the Self return type.
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftRValueType() == WMI->getLookupType())
+    if (Arg->getType().getASTType() == WMI->getLookupType())
       return nullptr;
   }
 
@@ -1138,8 +1186,8 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   // In we find arguments that are not the 'self' argument and if
   // they are of the Self type then we abort the optimization.
   for (auto Arg : AI.getArgumentsWithoutSelf()) {
-    if (Arg->getType().getSwiftRValueType() ==
-        AI.getArguments().back()->getType().getSwiftRValueType())
+    if (Arg->getType().getASTType() ==
+        AI.getArguments().back()->getType().getASTType())
       return nullptr;
   }
 
@@ -1317,11 +1365,11 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
   Builder.addOpenedArchetypeOperands(apply.getInstruction());
   if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
     return Builder.createTryApply(TAI->getLoc(), callee,
-                                  TAI->getSubstitutions(), arguments,
+                                  TAI->getSubstitutionMap(), arguments,
                                   TAI->getNormalBB(), TAI->getErrorBB());
   } else {
-    return Builder.createApply(apply.getLoc(), callee, apply.getSubstitutions(),
-                               arguments,
+    return Builder.createApply(apply.getLoc(), callee,
+                               apply.getSubstitutionMap(), arguments,
                                cast<ApplyInst>(apply)->isNonThrowing());
   }
 }

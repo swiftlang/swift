@@ -147,6 +147,15 @@ public:
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
   }
+
+  bool rightCommentUnderscored() const {
+    DeclNameViewer Viewer(RightComment);
+    auto HasUnderScore =
+      [](StringRef S) { return S.find('_') != StringRef::npos; };
+    auto Args = Viewer.args();
+    return HasUnderScore(Viewer.base()) ||
+        std::any_of(Args.begin(), Args.end(), HasUnderScore);
+  }
 };
 
 
@@ -238,6 +247,7 @@ enum class TypeMemberDiffItemSubKind {
   HoistSelfOnly,
   HoistSelfAndRemoveParam,
   HoistSelfAndUseProperty,
+  FuncRename,
 };
 
 struct TypeMemberDiffItem: public APIDiffItem {

@@ -18,7 +18,6 @@ extension String {
   ///   instance.
   ///
   /// - Complexity: O(*n*), where *n* is the length of `substring`.
-  @inlinable // FIXME(sil-serialize-all)
   public init(_ substring: Substring) {
     let wholeGuts = substring._wholeString._guts
     self.init(wholeGuts._extractSlice(substring._encodedOffsetRange))

@@ -876,6 +876,9 @@ public:
 
 class TupleCache : public MetadataCache<TupleCacheEntry, false, TupleCache> {
 public:
+// FIXME: https://bugs.swift.org/browse/SR-1155
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
   resolveExistingEntry(const TupleTypeMetadata *metadata) {
     // The correctness of this arithmetic is verified by an assertion in
@@ -885,6 +888,7 @@ public:
     auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
     return const_cast<TupleCacheEntry*>(entry);
   }
+#pragma clang diagnostic pop
 };
 
 } // end anonymous namespace
@@ -3096,6 +3100,58 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   return uniqueMetadata;
 }
 
+/// Unique-ing of foreign types' witness tables.
+namespace {
+  class ForeignWitnessTableCacheEntry {
+  public:
+    struct Key {
+      const TypeContextDescriptor *type;
+      const ProtocolDescriptor *protocol;
+    };
+
+    const Key key;
+    const WitnessTable *data;
+
+    ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
+                                  const WitnessTable *d)
+        : key(k), data(d) {}
+
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(key.type);
+    }
+
+    int compareWithKey(const Key other) const {
+      if (auto r = comparePointers(other.protocol, key.protocol))
+        return r;
+      return strcmp(other.type->Name.get(), key.type->Name.get());
+    }
+
+    static size_t getExtraAllocationSize(const Key,
+                                         const WitnessTable *) {
+      return 0;
+    }
+
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
+  };
+}
+
+static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
+
+const WitnessTable *swift::swift_getForeignWitnessTable(
+    const WitnessTable *witnessTableCandidate,
+    const TypeContextDescriptor *contextDescriptor,
+    const ProtocolDescriptor *protocol) {
+  auto result =
+      ForeignWitnessTables
+          .getOrInsert(
+              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
+              witnessTableCandidate)
+          .first->data;
+  return result;
+}
+
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
@@ -3113,23 +3169,9 @@ Metadata::getClassObject() const {
     return wrapper->Class;
   }
   // Other kinds of types don't have class objects.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
+  default:
     return nullptr;
   }
-
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
@@ -3203,9 +3245,10 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
     case MetadataKind::NAME: \
       return #NAME;
 #include "swift/ABI/MetadataKind.def"
+      
+  default:
+    return "<unknown>";
   }
-
-  swift_runtime_unreachable("Unhandled metadata kind?!");
 }
 
 #ifndef NDEBUG

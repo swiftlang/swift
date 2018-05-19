@@ -355,12 +355,13 @@ public protocol RangeReplaceableCollection : Collection
 
   /// Removes from the collection all elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeAll(where predicate: (Element) throws -> Bool) rethrows
+  mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
@@ -1086,45 +1087,61 @@ extension RangeReplaceableCollection {
 }
 
 extension RangeReplaceableCollection where Self: MutableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     // numbers == [6, 8, 10]
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    if var i = try firstIndex(where: predicate) {
-      var j = index(after: i)
-      while j != endIndex {
-        if try !predicate(self[j]) {
-          swapAt(i, j)
-          formIndex(after: &i)
-        }
-        formIndex(after: &j)
+    guard var i = try firstIndex(where: shouldBeRemoved) else { return }
+    var j = index(after: i)
+    while j != endIndex {
+      if try !shouldBeRemoved(self[j]) {
+        swapAt(i, j)
+        formIndex(after: &i)
       }
-      removeSubrange(i...)
+      formIndex(after: &j)
     }
+    removeSubrange(i...)
   }
 }
 
 extension RangeReplaceableCollection {
-  /// Removes from the collection all elements that satisfy the given predicate.
+  /// Removes all the elements that satisfy the given predicate.
   ///
-  /// - Parameter predicate: A closure that takes an element of the
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the vowels from a string:
+  ///
+  ///     var phrase = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     phrase.removeAll(where: { vowels.contains($0) })
+  ///     // phrase == "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
   ///   whether the element should be removed from the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public mutating func removeAll(
-    where predicate: (Element) throws -> Bool
+    where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
     // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
     // self = try filter { try !predicate($0) }
-    self = try Self(self.lazy.filter { try !predicate($0) })
+    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
   }
 }
