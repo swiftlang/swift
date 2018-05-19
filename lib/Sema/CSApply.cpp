@@ -81,16 +81,15 @@ SubstitutionMap Solution::computeSubstitutions(
   auto &tc = getConstraintSystem().getTypeChecker();
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolDecl *protoType)
           -> Optional<ProtocolConformanceRef> {
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
-      return ProtocolConformanceRef(protoType->getDecl());
+      return ProtocolConformanceRef(protoType);
     }
 
-    return tc.conformsToProtocol(replacement,
-                                 protoType->getDecl(),
+    return tc.conformsToProtocol(replacement, protoType,
                                  getConstraintSystem().DC,
                                  (ConformanceCheckFlags::InExpression|
                                   ConformanceCheckFlags::Used));
@@ -1836,7 +1835,7 @@ namespace {
           assert(type->isEqual(genericSig->getGenericParams()[0]));
           return valueType;
         },
-        [&](CanType origType, Type replacementType, ProtocolType *protoType)
+        [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
           -> ProtocolConformanceRef {
           assert(bridgedToObjectiveCConformance);
           return *bridgedToObjectiveCConformance;

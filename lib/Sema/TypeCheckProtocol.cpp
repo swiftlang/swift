@@ -3929,13 +3929,13 @@ Optional<ProtocolConformanceRef>
 TypeChecker::LookUpConformance::operator()(
                                        CanType dependentType,
                                        Type conformingReplacementType,
-                                       ProtocolType *conformedProtocol) const {
+                                       ProtocolDecl *conformedProtocol) const {
   if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
+    return ProtocolConformanceRef(conformedProtocol);
 
   return tc.conformsToProtocol(
                          conformingReplacementType,
-                         conformedProtocol->getDecl(),
+                         conformedProtocol,
                          dc,
                          (ConformanceCheckFlags::Used|
                           ConformanceCheckFlags::InExpression|

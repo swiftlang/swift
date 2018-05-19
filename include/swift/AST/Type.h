@@ -90,9 +90,9 @@ struct QueryTypeSubstitutionMapOrIdentity {
 
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
-  Type conformingReplacementType,
-  ProtocolType *conformedProtocol)
-  ->Optional<ProtocolConformanceRef>;
+                             Type conformingReplacementType,
+                             ProtocolDecl *conformedProtocol)
+  -> Optional<ProtocolConformanceRef>;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
@@ -106,7 +106,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -117,7 +117,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
@@ -131,7 +131,7 @@ public:
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
              Type conformingReplacementType,
-             ProtocolType *conformedProtocol) const;
+             ProtocolDecl *conformedProtocol) const;
 };
   
 /// Flags that can be passed when substituting into a type.

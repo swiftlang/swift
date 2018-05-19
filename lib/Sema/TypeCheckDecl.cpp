@@ -8297,8 +8297,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
                               },
                               [](CanType dependentType,
                                  Type replacementType,
-                                 ProtocolType *protoType) {
-                                auto proto = protoType->getDecl();
+                                 ProtocolDecl *proto) {
                                 return ProtocolConformanceRef(proto);
                               });
 

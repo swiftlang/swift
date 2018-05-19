@@ -3659,7 +3659,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
             genericSig->getSubstitutionMap(
               [&](SubstitutableType *type) -> Type { return formalTy; },
               [&](CanType dependentType, Type replacementType,
-                  ProtocolType *protoType)->Optional<ProtocolConformanceRef> {
+                  ProtocolDecl *proto)->Optional<ProtocolConformanceRef> {
                 return hashable;
               });
       }

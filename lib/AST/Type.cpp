@@ -2842,8 +2842,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     auto proto = assocType->getProtocol();
     Optional<ProtocolConformanceRef> conformance
       = lookupConformances(origBase->getCanonicalType(),
-                           substBase,
-                           proto->getDeclaredType());
+                           substBase, proto);
 
     if (!conformance) return failed();
     if (!conformance->isConcrete()) return failed();
@@ -2876,39 +2875,39 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 Optional<ProtocolConformanceRef>
 LookUpConformanceInModule::operator()(CanType dependentType,
                                       Type conformingReplacementType,
-                                      ProtocolType *conformedProtocol) const {
+                                      ProtocolDecl *conformedProtocol) const {
   if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
+    return ProtocolConformanceRef(conformedProtocol);
 
   return M->lookupConformance(conformingReplacementType,
-                              conformedProtocol->getDecl());
+                              conformedProtocol);
 }
 
 Optional<ProtocolConformanceRef>
 LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
                                        Type conformingReplacementType,
-                                       ProtocolType *conformedProtocol) const {
-  return Subs.lookupConformance(dependentType, conformedProtocol->getDecl());
+                                       ProtocolDecl *conformedProtocol) const {
+  return Subs.lookupConformance(dependentType, conformedProtocol);
 }
 
 Optional<ProtocolConformanceRef>
 MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
                                        Type conformingReplacementType,
-                                       ProtocolType *conformedProtocol) const {
+                                       ProtocolDecl *conformedProtocol) const {
   assert((conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
          && "replacement requires looking up a concrete conformance");
-  return ProtocolConformanceRef(conformedProtocol->getDecl());
+  return ProtocolConformanceRef(conformedProtocol);
 }
 
 Optional<ProtocolConformanceRef>
 LookUpConformanceInSignature::operator()(CanType dependentType,
                                          Type conformingReplacementType,
-                                         ProtocolType *conformedProtocol) const {
+                                         ProtocolDecl *conformedProtocol) const {
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
   return Sig.lookupConformance(conformingReplacementType->getCanonicalType(),
-                               conformedProtocol->getDecl());
+                               conformedProtocol);
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module,
