@@ -23,7 +23,6 @@
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
@@ -1736,12 +1735,23 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  StringRef firstWord = camel_case::getFirstWord(text);
+  // Does the given selector start with the given string as a prefix, in the
+  // sense of the selector naming conventions?
+  // This implementation matches the one used by
+  // clang::Selector::getMethodFamily, to make sure we behave the same as Clang
+  // ARC. We're not just calling that method here because it means allocating a
+  // clang::IdentifierInfo, which requires a Clang ASTContext.
+  auto hasPrefix = [](StringRef text, StringRef prefix) {
+    if (!text.startswith(prefix)) return false;
+    if (text.size() == prefix.size()) return true;
+    assert(text.size() > prefix.size());
+    return !clang::isLowercase(text[prefix.size()]);
+  };
 
   auto result = SelectorFamily::None;
   if (false) /*for #define purposes*/;
 #define CHECK_PREFIX(LABEL, PREFIX) \
-  else if (firstWord == PREFIX) result = SelectorFamily::LABEL;
+  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
   FOREACH_FAMILY(CHECK_PREFIX)
 #undef CHECK_PREFIX
 
