@@ -120,7 +120,7 @@ more environments.
 
 First, make sure that you're in the swift directory:
 
-    cd swift-source/swift
+    cd swift
 
 To build using Ninja, run:
 
