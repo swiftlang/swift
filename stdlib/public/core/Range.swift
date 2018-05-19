@@ -405,6 +405,11 @@ extension Range: Equatable {
 }
 
 extension Range: Hashable where Bound: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   public var hashValue: Int {
     return _hashValue(for: self)

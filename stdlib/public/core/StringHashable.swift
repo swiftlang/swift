@@ -131,6 +131,11 @@ extension String : Hashable {
     return _hashValue(for: self)
   }
 
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _guts.hash(into: &hasher)
@@ -138,6 +143,11 @@ extension String : Hashable {
 }
 
 extension StringProtocol {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable
   public var hashValue : Int {
     return _hashValue(for: self)

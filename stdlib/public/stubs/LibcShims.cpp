@@ -322,9 +322,9 @@ swift::_stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound) {
 // _stdlib_random
 //
 // Should the implementation of this function add a new platform/change for a
-// platform, make sure to also update the stdlib documentation regarding
-// platform implementation of this function.
-// This can be found at: stdlib/public/core/Random.swift
+// platform, make sure to also update the documentation regarding platform
+// implementation of this function.
+// This can be found at: /docs/Random.md
 
 #if defined(__APPLE__)
 
