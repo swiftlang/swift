@@ -22,6 +22,7 @@
 #include <cstdio>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
+#include "swift/Basic/Compiler.h"
 #include "swift/Runtime/Unreachable.h"
 
 #ifdef SWIFT_HAVE_CRASHREPORTERCLIENT
@@ -55,6 +56,8 @@ static inline const char *CRGetCrashLogMessage() {
   return reinterpret_cast<const char *>(gCRAnnotations.message);
 }
 
+
+
 #else
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
@@ -85,10 +88,12 @@ static inline void crash(const char *message) {
 // swift::fatalError() halts with a crash log message, 
 // but makes no attempt to preserve register state.
 LLVM_ATTRIBUTE_NORETURN
+SWIFT_ATTRIBUTE_PRINTF_LIKE(2, 3)
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
 /// swift::warning() emits a warning from the runtime.
+SWIFT_ATTRIBUTE_PRINTF_LIKE(2, 3)
 extern void
 warning(uint32_t flags, const char *format, ...);
 
@@ -109,7 +114,8 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
                          const char *message = nullptr);
 
 SWIFT_RUNTIME_EXPORT
-void swift_reportError(uint32_t flags, const char *message);
+SWIFT_ATTRIBUTE_PRINTF_LIKE(2, 3)
+void swift_reportError(uint32_t flags, const char *message, ...);
 
 // Halt due to an overflow in swift_retain().
 LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
@@ -210,9 +216,10 @@ enum: uintptr_t {
 
 /// Debugger hook. Calling this stops the debugger with a message and details
 /// about the issues. Called by overlays.
-SWIFT_RUNTIME_STDLIB_SPI
-void _swift_reportToDebugger(uintptr_t flags, const char *message,
-                             RuntimeErrorDetails *details = nullptr);
+SWIFT_RUNTIME_STDLIB_SPI SWIFT_ATTRIBUTE_PRINTF_LIKE(3, 4)
+void _swift_reportToDebugger(uintptr_t flags,
+                             RuntimeErrorDetails *details,
+                             const char *message, ...);
 
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_reportFatalErrorsToDebugger;

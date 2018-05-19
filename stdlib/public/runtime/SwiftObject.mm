@@ -1402,26 +1402,21 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
                                                   const unsigned char *filename,
                                                   int32_t filenameLength,
                                                   int32_t line, int32_t column,
-                                                  unsigned verifcationType) {
-  assert((verifcationType == 0 || verifcationType == 1) &&
-         "Unknown verifcation type");
+                                                  unsigned verificationType) {
+  assert((verificationType == 0 || verificationType == 1) &&
+         "Unknown verification type");
 
   bool isEscaping =
       object != nullptr && !object->refCounts.isUniquelyReferenced();
 
   // Print a message if the closure escaped.
+  #define SOURCE_LOC_FORMAT ": file %.*s, line %" PRIu32 ", column %" PRIu32 "\n"
   if (isEscaping) {
-    auto *message = (verifcationType == 0)
-                        ? "closure argument was escaped in "
-                          "withoutActuallyEscaping block"
-                        : "closure argument passed as @noescape "
-                          "to Objective-C has escaped";
-    auto messageLength = strlen(message);
-
-    char *log;
-    swift_asprintf(
-        &log, "%.*s: file %.*s, line %" PRIu32 ", column %" PRIu32 " \n",
-        messageLength, message, filenameLength, filename, line, column);
+    auto *message = verificationType == 0
+        ? "closure argument was escaped in withoutActuallyEscaping block"
+          SOURCE_LOC_FORMAT
+        : "closure argument passed as @noescape to Objective-C has escaped"
+          SOURCE_LOC_FORMAT;
 
     printCurrentBacktrace(2/*framesToSkip*/);
 
@@ -1432,11 +1427,13 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
           .currentStackDescription = "Closure has escaped",
           .framesToSkip = 1,
       };
-      _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
+      _swift_reportToDebugger(RuntimeErrorFlagFatal, &details,
+                              message, filenameLength, filename, line, column);
     }
 
-    swift_reportError(RuntimeErrorFlagFatal, log);
-    free(log);
+    swift_reportError(RuntimeErrorFlagFatal, message,
+                      filenameLength, filename,
+                      line, column);
   }
   return isEscaping;
 }
@@ -1530,13 +1527,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   if (filenameLength > INT_MAX)
     filenameLength = INT_MAX;
 
-  char *message, *nullTerminatedFilename;
-  asprintf(&message,
-           "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
-           "be removed in Swift 4",
-           isInstanceMethod ? '-' : '+',
-           class_getName([self class]),
-           sel_getName(selector));
+  char *nullTerminatedFilename;
   asprintf(&nullTerminatedFilename, "%*s", (int)filenameLength, filename);
 
   RuntimeErrorDetails::FixIt fixit = {
@@ -1562,14 +1553,23 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   uintptr_t runtime_error_flags = RuntimeErrorFlagNone;
   if (reporter == swift::fatalError)
     runtime_error_flags = RuntimeErrorFlagFatal;
-  _swift_reportToDebugger(runtime_error_flags, message, &details);
+  auto methodIntroducer = isInstanceMethod ? '-' : '+';
+  auto className = class_getName([self class]);
+  auto methodName = sel_getName(selector);
+  _swift_reportToDebugger(runtime_error_flags, &details,
+           "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
+           "be removed in Swift 4",
+           methodIntroducer, className, methodName);
 
   reporter(flags,
-           "*** %s:%zu:%zu: %s; add explicit '@objc' to the declaration to "
+           "*** %*s:%zu:%zu: "
+           "implicit Objective-C entrypoint %c[%s %s] is deprecated and will "
+           "be removed in Swift 4; ",
+           "add explicit '@objc' to the declaration to "
            "emit the Objective-C entrypoint in Swift 4 and suppress this "
            "message\n",
-           nullTerminatedFilename, line, column, message);
-  free(message);
+           nullTerminatedFilename, line, column,
+           methodIntroducer, className, methodName);
   free(nullTerminatedFilename);
 }
 

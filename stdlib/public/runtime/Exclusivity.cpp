@@ -87,30 +87,48 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     return;
   }
 
-  constexpr unsigned maxMessageLength = 100;
+  warning(0,
+          "Simultaneous accesses to 0x%tx, but modification requires "
+          "exclusive access",
+          reinterpret_cast<uintptr_t>(pointer));
+  
   constexpr unsigned maxAccessDescriptionLength = 50;
-  char message[maxMessageLength];
-  snprintf(message, sizeof(message),
-           "Simultaneous accesses to 0x%tx, but modification requires "
-           "exclusive access",
-           reinterpret_cast<uintptr_t>(pointer));
-  fprintf(stderr, "%s.\n", message);
-
   char oldAccess[maxAccessDescriptionLength];
-  snprintf(oldAccess, sizeof(oldAccess),
-           "Previous access (a %s) started at", getAccessName(oldAction));
-  fprintf(stderr, "%s ", oldAccess);
   if (oldPC) {
-    dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%tx).\n", reinterpret_cast<uintptr_t>(oldPC));
+    warning(0,
+            "Previous access (a %s) started at (0x%tx).",
+            getAccessName(oldAction), reinterpret_cast<uintptr_t>(oldPC));
+    snprintf(oldAccess, sizeof(oldAccess),
+            "Previous access (a %s) started at (0x%tx).",
+            getAccessName(oldAction), reinterpret_cast<uintptr_t>(oldPC));
   } else {
-    fprintf(stderr, "<unknown>.\n");
+    warning(0,
+            "Previous access (a %s) started at <unknown>.",
+            getAccessName(oldAction));
+    snprintf(oldAccess, sizeof(oldAccess),
+            "Previous access (a %s) started at <unknown>.",
+            getAccessName(oldAction));
   }
-
+  
   char newAccess[maxAccessDescriptionLength];
-  snprintf(newAccess, sizeof(newAccess), "Current access (a %s) started at",
-           getAccessName(getAccessAction(newFlags)));
-  fprintf(stderr, "%s:\n", newAccess);
+  if (newPC) {
+    warning(0,
+            "Current access (a %s) started at (0x%tx):",
+            getAccessName(getAccessAction(newFlags)),
+            reinterpret_cast<uintptr_t>(newPC));
+    snprintf(newAccess, sizeof(newAccess),
+            "Current access (a %s) started at (0x%tx):",
+            getAccessName(getAccessAction(newFlags)),
+            reinterpret_cast<uintptr_t>(newPC));
+  } else {
+    warning(0,
+            "Current access (a %s) started at <unknown>:",
+            getAccessName(getAccessAction(newFlags)));
+    snprintf(newAccess, sizeof(newAccess),
+             "Current access (a %s) started at <unknown>:",
+             getAccessName(getAccessAction(newFlags)));
+  }
+  
   // The top frame is in swift_beginAccess, don't print it.
   constexpr unsigned framesToSkip = 1;
   printCurrentBacktrace(framesToSkip);
@@ -134,7 +152,11 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   uintptr_t flags = RuntimeErrorFlagNone;
   if (!keepGoing)
     flags = RuntimeErrorFlagFatal;
-  _swift_reportToDebugger(flags, message, &details);
+  _swift_reportToDebugger(flags, &details,
+                          "Simultaneous accesses to 0x%tx, but "
+                          "modification requires "
+                          "exclusive access",
+                          reinterpret_cast<uintptr_t>(pointer));
 
   if (keepGoing) {
     return;

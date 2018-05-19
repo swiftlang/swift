@@ -49,4 +49,23 @@
 #define SWIFT_CONSTRUCTOR
 #endif
 
+#if __has_attribute(format)
+#define SWIFT_ATTRIBUTE_PRINTF_LIKE(index, firstToCheck) \
+  __attribute__((format(printf, index, firstToCheck)))
+#else
+#define SWIFT_ATTRIBUTE_PRINTF_LIKE(index, firstToCheck)
+#endif
+
+#if __has_attribute(optnone)
+
+/// Prevent the optimizer from doing any inlining or IPO on a function body.
+#define SWIFT_ATTRIBUTE_OPTNONE __attribute__((optnone))
+
+#else
+
+/// Prevent the optimizer from doing any inlining or IPO on a function body.
+#define SWIFT_ATTRIBUTE_OPTNONE
+
+#endif
+
 #endif // SWIFT_BASIC_COMPILER_H

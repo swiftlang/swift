@@ -3743,6 +3743,8 @@ static void diagnoseMetadataDependencyCycle(const Metadata *start,
                                             ArrayRef<MetadataDependency> links){
   assert(start == links.back().Value);
 
+  // TODO: Find some way to log this with format strings so that some part of
+  // the message can be preserved in redacted crash logs.
   std::string diagnostic =
     "runtime error: unresolvable type metadata dependency cycle detected\n  ";
   diagnostic += nameForMetadata(start);
@@ -3789,11 +3791,11 @@ static void diagnoseMetadataDependencyCycle(const Metadata *start,
     };
 #pragma GCC diagnostic pop
 
-    _swift_reportToDebugger(RuntimeErrorFlagFatal, diagnostic.c_str(),
-                            &details);
+    _swift_reportToDebugger(RuntimeErrorFlagFatal,
+                            &details, "%s", diagnostic.c_str());
   }
 
-  fatalError(0, diagnostic.c_str());
+  fatalError(0, "%s", diagnostic.c_str());
 }
 
 /// Check whether the given metadata dependency is satisfied, and if not,

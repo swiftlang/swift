@@ -16,5 +16,5 @@
 extern "C" void
 _swift_os_log_reportError(uint32_t flags, const char *message)
 {
-	swift::swift_reportError(flags, message);
+	swift::swift_reportError(flags, "%s", message);
 }

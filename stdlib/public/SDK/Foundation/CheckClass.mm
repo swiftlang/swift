@@ -208,8 +208,8 @@ static StringRefLite findBaseName(StringRefLite demangledName) {
       errorInfo.notes = notes;
       errorInfo.numNotes = arrayLength(notes);
 
-      _swift_reportToDebugger(RuntimeErrorFlagNone, [primaryMessage UTF8String],
-                              &errorInfo);
+      _swift_reportToDebugger(RuntimeErrorFlagNone,
+                              &errorInfo, "%s",  [primaryMessage UTF8String]);
 
       [primaryMessage release];
       [generatedNote release];
@@ -226,6 +226,9 @@ static StringRefLite findBaseName(StringRefLite demangledName) {
     NSString *demangledString = demangledName.newNSStringNoCopy();
     NSString *mangledString = NSStringFromClass(objcClass);
 
+    // TODO: Instead of pre-formatting the messages here, we should do the
+    // formatting inside NSLog/_swift_reportToDebugger so that the static
+    // strings in the message get preserved in production crash reports.
     NSString *primaryMessage;
     switch (operation) {
     case 1:
@@ -278,8 +281,8 @@ static StringRefLite findBaseName(StringRefLite demangledName) {
     errorInfo.notes = notes;
     errorInfo.numNotes = arrayLength(notes);
 
-    _swift_reportToDebugger(RuntimeErrorFlagNone, [primaryMessage UTF8String],
-                            &errorInfo);
+    _swift_reportToDebugger(RuntimeErrorFlagNone,
+                            &errorInfo, "%s",  [primaryMessage UTF8String]);
 
     [primaryMessage release];
     [firstNote release];
