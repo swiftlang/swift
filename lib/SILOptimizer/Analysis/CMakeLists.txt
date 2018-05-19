@@ -11,6 +11,7 @@ set(ANALYSIS_SOURCES
   Analysis/ClassHierarchyAnalysis.cpp
   Analysis/ClosureScope.cpp
   Analysis/ColdBlockInfo.cpp
+  Analysis/ConcreteTypeAnalysis.cpp
   Analysis/DestructorAnalysis.cpp
   Analysis/EscapeAnalysis.cpp
   Analysis/EpilogueARCAnalysis.cpp

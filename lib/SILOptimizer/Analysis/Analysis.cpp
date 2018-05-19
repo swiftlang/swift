@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ConcreteTypeAnalysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/SIL/SILModule.h"
@@ -54,4 +55,8 @@ SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createBasicCalleeAnalysis(SILModule *M) {
   return new BasicCalleeAnalysis(M);
+}
+
+SILAnalysis *swift::createConcreteTypeAnalysis(SILModule *M) {
+  return new ConcreteTypeAnalysis(M);
 }

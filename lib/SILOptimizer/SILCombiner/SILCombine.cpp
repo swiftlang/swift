@@ -25,6 +25,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ConcreteTypeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -345,11 +346,12 @@ class SILCombine : public SILFunctionTransform {
   void run() override {
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *CTA = PM->getAnalysis<ConcreteTypeAnalysis>();
 
     // Create a SILBuilder with a tracking list for newly added
     // instructions, which we will periodically move to our worklist.
     SILBuilder B(*getFunction(), &TrackingList);
-    SILCombiner Combiner(B, AA, DA, getOptions().RemoveRuntimeAsserts);
+    SILCombiner Combiner(B, AA, DA, CTA, getOptions().RemoveRuntimeAsserts);
     bool Changed = Combiner.runOnFunction(*getFunction());
     assert(TrackingList.empty() &&
            "TrackingList should be fully processed by SILCombiner");
