@@ -991,6 +991,10 @@ private:
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
+  /// Diagnose the usage of 'subscript' instead of the operator when calling
+  /// a subscript and offer a fixit if the inputs are compatible.
+  bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);
+
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -1421,16 +1425,6 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
         diagnose(loc, diag::any_as_anyobject_fixit)
           .fixItInsert(baseExpr->getStartLoc(), "(")
           .fixItInsertAfter(baseExpr->getEndLoc(), " as AnyObject)");
-        return;
-      } else if (memberName.getBaseName() == "subscript") {
-        auto res = CS.lookupMember(baseObjTy->getRValueType(),
-                                   DeclName(DeclBaseName::createSubscript()));
-        if (!res.empty()) {
-          diagnose(loc, diag::could_not_find_subscript_member, baseObjTy)
-          .highlight(baseRange).highlight(nameLoc.getSourceRange());
-          return;
-        }
-        emitBasicError();
         return;
       }
 
@@ -5382,134 +5376,138 @@ bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
   return false;
 }
 
-// Offer a fix-it for using `subscript` instead of the operator
-// if the inputs are compatible.
-static bool diagnoseSubscriptMisuse(ApplyExpr *callExpr,
-                                    ConstraintSystem &CS,
-                                    FailureDiagnosis &FD) {
+bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
   if (!UDE)
     return false;
 
   auto baseExpr = UDE->getBase();
-  if (baseExpr && UDE->getName().getBaseName() == "subscript") {
-    auto baseType = CS.getType(baseExpr);
-    // Look up subscript declarations and return if there are none.
-    auto lookup = CS.lookupMember(baseType->getRValueType(),
-                                  DeclName(DeclBaseName::createSubscript()));
-    if (lookup.empty())
+  if (!baseExpr || UDE->getName().getBaseName() != getTokenText(tok::kw_subscript))
+    return false;
+
+  auto baseType = CS.getType(baseExpr);
+  // Look up subscript declarations.
+  auto lookup = CS.lookupMember(baseType->getRValueType(),
+                                DeclName(DeclBaseName::createSubscript()));
+  auto nonSubscrLookup = CS.lookupMember(baseType->getRValueType(),
+                                         UDE->getName());
+  // Make sure we only found subscript declarations. If not, the problem
+  // is different - return.
+  if (lookup.empty() || !nonSubscrLookup.empty())
+    return false;
+  // Try to resolve a type of the argument expression.
+  auto argExpr = typeCheckChildIndependently(callExpr->getArg(),
+                                             Type(), CTP_CallArgument);
+  if (!argExpr)
+    return false;
+
+  SmallVector<Identifier, 2> scratch;
+  ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
+  SmallVector<OverloadChoice, 2> choices;
+
+  for (auto candidate : lookup)
+    choices.push_back(OverloadChoice(baseType, candidate.getValueDecl(),
+                                     UDE->getFunctionRefKind()));
+  CalleeCandidateInfo candidateInfo(baseType, choices,
+                                    callArgHasTrailingClosure(argExpr),
+                                    CS, true);
+  struct TypeConvertibleChecker {
+    ConstraintSystem &CS;
+
+    TypeConvertibleChecker(ConstraintSystem &CS) : CS(CS) {}
+
+    // Checks whether type1 is implicitly convertible to type2
+    bool isImplicitlyConvertible(Type type1, Type type2) {
+      if (!type1 || !type2)
+        return false;
+
+      if (auto tup1 = type1->getAs<TupleType>()) {
+        if (auto tup2 = type2->getAs<TupleType>())
+          return isImplicitlyConvertibleTuple(tup1, tup2);
+        else
+          return false;
+      }
+      if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
+          CS.TC.isSubtypeOf(type1, type2, CS.DC))
+        return true;
       return false;
+    }
 
-    auto argExpr = FD.typeCheckChildIndependently(callExpr->getArg(),
-                                                  Type(), CTP_CallArgument);
-    if (!argExpr)
-      return CS.TC.Diags.hadAnyError();
+    bool isImplicitlyConvertibleTuple(TupleType *tup1, TupleType *tup2) {
+      if (tup1->getNumElements() != tup2->getNumElements())
+        return false;
 
-    SmallVector<Identifier, 2> scratch;
-    ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
-    SmallVector<OverloadChoice, 2> choices;
-    auto hasTrailClosure = callArgHasTrailingClosure(argExpr);
-
-    for (auto candidate : lookup)
-      choices.push_back(OverloadChoice(baseType, candidate.getValueDecl(),
-                                       UDE->getFunctionRefKind()));
-
-    CalleeCandidateInfo candidates(baseType, choices,
-                                   hasTrailClosure, CS, true);
-    auto argType = CS.getType(argExpr);
-    auto params = swift::decomposeArgType(argType, argLabels);
-
-    using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
-    using Closeness = swift::CandidateCloseness;
-
-    struct TypeConvertibleChecker {
-      ConstraintSystem &CS;
-
-      TypeConvertibleChecker(ConstraintSystem &CS) : CS(CS) {}
-      // Checks whether type1 can is implicitly convertible to type2
-      // Returns 'Closeness' for further convenience.
-      Closeness checkType(Type type1, Type type2) {
-        if (!type1 || !type2)
-          return CC_GeneralMismatch;
-
-        if (auto tup1 = type1->getAs<TupleType>()) {
-          if (auto tup2 = type2->getAs<TupleType>())
-            return checkTuple(tup1, tup2);
-          else
-            return CC_GeneralMismatch;
+      for (unsigned i = 0, e = tup1->getNumElements(); i < e; i ++) {
+        auto element1 = tup1->getElement(i);
+        auto element2 = tup2->getElement(i);
+        if (element1.hasName()) {
+          if (!element2.hasName() || element1.getName() !=
+              element2.getName())
+            return false;
         }
-        if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
-            CS.TC.isSubtypeOf(type1, type2, CS.DC))
-          return CC_ExactMatch;
-        return CC_GeneralMismatch;
+        if (!isImplicitlyConvertible(element1.getType(),
+                                     element2.getType()))
+          return false;
       }
+      return true;
+    }
+  } checker(CS);
+  auto params = swift::decomposeArgType(CS.getType(argExpr), argLabels);
+  using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
-      Closeness checkTuple(TupleType *tup1, TupleType *tup2) {
-        if (tup1->getNumElements() != tup2->getNumElements())
-          return CC_GeneralMismatch;
+  candidateInfo.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
+    auto candFuncType = cand.getUncurriedFunctionType();
+    if (!candFuncType)
+      return {CC_GeneralMismatch, {}};
 
-        for (unsigned i = 0, e = tup1->getNumElements(); i < e; i ++) {
-          auto element1 = tup1->getElement(i);
-          auto element2 = tup2->getElement(i);
-          if (element1.hasName()) {
-            if (!element2.hasName() || element1.getName() !=
-                element2.getName())
-              return CC_GeneralMismatch;
-          }
-          if (checkType(element1.getType(),
-                        element2.getType()) != CC_ExactMatch)
-            return CC_GeneralMismatch;
-        }
-        return CC_ExactMatch;
-      }
-    };
+    auto candParams = candFuncType->getParams();
+    if (params.size() != candParams.size())
+      return {CC_GeneralMismatch, {}};
 
-    candidates.filterList([&](UncurriedCandidate cand) -> ClosenessPair {
-      auto candFuncType = cand.getUncurriedFunctionType();
-      if (!candFuncType)
-        return {CC_GeneralMismatch, {}};
+    for (unsigned i = 0, e = params.size(); i < e; i ++) {
+      if (checker.isImplicitlyConvertible(params[i].getType(),
+                                          candParams[i].getType()))
+        continue;
+      return {CC_GeneralMismatch, {}};
+    }
+    return {CC_ExactMatch, {}};
+  });
 
-      auto candParams = candFuncType->getParams();
-      if (params.size() != candParams.size())
-        return {CC_GeneralMismatch, {}};
+  auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
+  auto memberRange = baseExpr->getSourceRange();
+  if (locator)
+    locator = simplifyLocator(CS, locator, memberRange);
+  auto nameLoc = DeclNameLoc(memberRange.Start);
 
-      auto checker = TypeConvertibleChecker(CS);
-      for (unsigned i = 0, e = params.size(); i < e; i ++) {
-        if (checker.checkType(params[i].getType(),
-                              candParams[i].getType()) == CC_ExactMatch)
-          continue;
-        return {CC_GeneralMismatch, {}};
-      }
-      return {CC_ExactMatch, {}};
-    });
+  auto diag = diagnose(baseExpr->getLoc(),
+                       diag::could_not_find_subscript_member_did_you_mean,
+                       baseType);
+  diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
 
-    auto *locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-    auto memberRange = baseExpr->getSourceRange();
-    if (locator)
-      locator = simplifyLocator(CS, locator, memberRange);
+  if (candidateInfo.closeness != CC_ExactMatch)
+    return true;
 
-    auto baseLoc = baseExpr->getLoc();
-    auto nameLoc = DeclNameLoc(memberRange.Start);
+  auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
+  auto lastArgSymbol = toCharSourceRange(CS.TC.Context.SourceMgr,
+                                         argExpr->getEndLoc());
 
-    auto diag = CS.TC.diagnose(baseLoc, diag::did_you_mean_subscript_operator);
+  diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
+                    getTokenText(tok::l_square));
+  diag.fixItRemove(nameLoc.getSourceRange());
+  diag.fixItRemove(SourceRange(UDE->getDotLoc()));
+  if (CS.TC.Context.SourceMgr.extractText(lastArgSymbol) ==
+      getTokenText(tok::r_paren))
+    diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
+                      getTokenText(tok::r_square));
+  else
+    diag.fixItInsertAfter(argExpr->getEndLoc(),
+                          getTokenText(tok::r_square));
+  diag.flush();
 
-    if (candidates.closeness != CC_ExactMatch)
-      return false;
+  if (candidateInfo.size() == 1)
+    diagnose(candidateInfo.candidates.front().getDecl(),
+             diag::subscript_declared_here);
 
-    auto l_bracket = getTokenText(swift::tok::l_square);
-    auto r_bracket = getTokenText(swift::tok::r_square);
-    auto r_paren = getTokenText(swift::tok::r_paren);
-    auto lastArgSym =
-    Lexer::getCharSourceRangeFromSourceRange(CS.TC.Context.SourceMgr,
-                                             argExpr->getEndLoc());
-    diag.fixItReplace(SourceRange(argExpr->getStartLoc()), l_bracket);
-    diag.fixItRemove(nameLoc.getSourceRange());
-    diag.fixItRemove(SourceRange(UDE->getDotLoc()));
-    if (CS.TC.Context.SourceMgr.extractText(lastArgSym) == r_paren)
-      diag.fixItReplace(SourceRange(argExpr->getEndLoc()), r_bracket);
-    else
-      diag.fixItInsertAfter(argExpr->getEndLoc(), r_bracket);
-  }
   return true;
 }
 
@@ -5559,12 +5557,16 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   auto originalFnType = CS.getType(callExpr->getFn());
 
   if (shouldTypeCheckFunctionExpr(CS.TC, CS.DC, fnExpr)) {
+
+    // If we are misusing a subscript, diagnose that and provide a fixit.
+    // We diagnose this here to have enough context to offer an appropriate fixit.
+    if (diagnoseSubscriptMisuse(callExpr)) {
+      return CS.TC.Diags.hadAnyError();
+    }
     // Type check the function subexpression to resolve a type for it if
     // possible.
     fnExpr = typeCheckChildIndependently(callExpr->getFn());
-    // If we are misusing a subscript, provide a fixit.
     if (!fnExpr) {
-      diagnoseSubscriptMisuse(callExpr, CS, *this);
       return CS.TC.Diags.hadAnyError();
     }
   }
