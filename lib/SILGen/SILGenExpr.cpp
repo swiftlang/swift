@@ -1114,12 +1114,10 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SILValue branchArg;
   if (isByAddress) {
     assert(optInit);
-    SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
-    SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
+    SGF.emitExprInto(E->getSubExpr(), optInit);
   } else {
     ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    ManagedValue wrapped = SGF.getOptionalSomeValue(E, subExprValue, optTL);
-    branchArg = wrapped.forward(SGF);
+    branchArg = subExprValue.forward(SGF);
   }
 
   localCleanups.pop();
@@ -1133,8 +1131,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     if (!isByAddress)
       return RValue(SGF, E,
                     SGF.emitManagedRValueWithCleanup(branchArg, optTL));
-
-    optInit->finishInitialization(SGF);
 
     // If we emitted into the provided context, we're done.
     if (usingProvidedContext)
@@ -1180,8 +1176,6 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
                                          ValueOwnershipKind::Owned);
     return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(arg, optTL));
   }
-
-  optInit->finishInitialization(SGF);
 
   // If we emitted into the provided context, we're done.
   if (usingProvidedContext)

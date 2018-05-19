@@ -1709,8 +1709,8 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       optTy, CS.getType(expr->getSubExpr()),
+      CS.addConstraint(ConstraintKind::Conversion,
+                       CS.getType(expr->getSubExpr()), optTy,
                        CS.getConstraintLocator(expr));
       return optTy;
     }
