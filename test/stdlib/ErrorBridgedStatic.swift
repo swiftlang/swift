@@ -14,10 +14,6 @@ class Bar: Foo {
   override func foo(_ x: Int32) throws {
     try super.foo(5)
   }
-  
-  override func foothrows(_ x: Int32) throws {
-    try super.foothrows(5)
-  }
 }
 
 var ErrorBridgingStaticTests = TestSuite("ErrorBridging with static libs")
@@ -26,16 +22,6 @@ ErrorBridgingStaticTests.test("round-trip Swift override of ObjC method") {
   do {
     try (Bar() as Foo).foo(5)
   } catch { }
-}
-
-ErrorBridgingStaticTests.test("round-trip Swift override of throwing ObjC method") {
-  do {
-    try (Bar() as Foo).foothrows(5)
-  } catch {
-    print(error)
-    expectEqual(error._domain, "abcd")
-    expectEqual(error._code, 1234)
-  }
 }
 
 runAllTests()

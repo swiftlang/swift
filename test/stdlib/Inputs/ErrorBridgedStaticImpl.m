@@ -7,10 +7,5 @@
   return NO;
 }
 
-- (BOOL)foothrows:(int)x error:(NSError**)error {
-  *error = [NSError errorWithDomain: @"abcd" code: 1234 userInfo: nil];
-  return NO;
-}
-
 @end
 
