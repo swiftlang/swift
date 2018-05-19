@@ -1294,7 +1294,12 @@ class HeapObjectSideTableEntry {
 
   public:
   HeapObjectSideTableEntry(HeapObject *newObject)
-    : object(newObject), refCounts()
+    : object(newObject),
+#if __arm__ // https://bugs.swift.org/browse/SR-5846
+    refCounts(SideTableRefCounts::Initialized)
+#else
+    refCounts()
+#endif
   { }
 
 #pragma clang diagnostic push
