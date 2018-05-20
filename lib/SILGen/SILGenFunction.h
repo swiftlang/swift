@@ -1270,7 +1270,7 @@ public:
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       const SubstitutionMap &subMap);
+                       SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
@@ -1331,7 +1331,7 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     const SubstitutionMap &subMap,
+                                     SubstitutionMap subMap,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 

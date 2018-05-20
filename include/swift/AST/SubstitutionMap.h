@@ -164,7 +164,7 @@ public:
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
-  SubstitutionMap subst(const SubstitutionMap &subMap) const;
+  SubstitutionMap subst(SubstitutionMap subMap) const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
@@ -208,8 +208,8 @@ public:
   ///
   /// The 'how' parameter determines if we're looking at the depth or index.
   static SubstitutionMap
-  combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
-                          const SubstitutionMap &secondSubMap,
+  combineSubstitutionMaps(SubstitutionMap firstSubMap,
+                          SubstitutionMap secondSubMap,
                           CombineSubstitutionMaps how,
                           unsigned baseDepthOrIndex,
                           unsigned origDepthOrIndex,
@@ -268,6 +268,28 @@ private:
   /// stored inside the map. In most cases, you should call Type::subst()
   /// instead, since that will resolve member types also.
   Type lookupSubstitution(CanSubstitutableType type) const;
+};
+
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c SubstitutionMap.
+struct QuerySubstitutionMap {
+  SubstitutionMap subMap;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
+/// Functor class suitable for use as a \c LookupConformanceFn to look up a
+/// conformance in a \c SubstitutionMap.
+class LookUpConformanceInSubstitutionMap {
+  SubstitutionMap Subs;
+public:
+  explicit LookUpConformanceInSubstitutionMap(SubstitutionMap Subs)
+    : Subs(Subs) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

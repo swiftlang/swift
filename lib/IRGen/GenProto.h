@@ -139,7 +139,7 @@ namespace irgen {
   /// generics clause.
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
-                                const SubstitutionMap &subs,
+                                SubstitutionMap subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 
