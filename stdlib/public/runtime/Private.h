@@ -43,15 +43,10 @@ class TypeReferenceOwnership {
 public:
   constexpr TypeReferenceOwnership() : Data(0) {}
 
-  bool isWeak() const { return Data & Weak; }
-  bool isUnowned() const { return Data & Unowned; }
-  bool isUnmanaged() const { return Data & Unmanaged; }
-
-  void setWeak() { Data |= Weak; }
-
-  void setUnowned() { Data |= Unowned; }
-
-  void setUnmanaged() { Data |= Unmanaged; }
+#define REF_STORAGE(Name, ...) \
+  void set##Name() { Data |= Name; } \
+  bool is##Name() const { return Data & Name; }
+#include "swift/AST/ReferenceStorage.def"
 };
 
 /// Type information consists of metadata and its ownership info,

@@ -1007,20 +1007,12 @@ public:
     return BuiltType();
   }
 
-  BuiltType createUnownedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnowned();
-    return base;
+#define REF_STORAGE(Name, ...) \
+  BuiltType create##Name##StorageType(BuiltType base) { \
+    ReferenceOwnership.set##Name(); \
+    return base; \
   }
-
-  BuiltType createUnmanagedStorageType(BuiltType base) {
-    ReferenceOwnership.setUnmanaged();
-    return base;
-  }
-
-  BuiltType createWeakStorageType(BuiltType base) {
-    ReferenceOwnership.setWeak();
-    return base;
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   BuiltType createSILBoxType(BuiltType base) const {
     // FIXME: Implement.
