@@ -2390,9 +2390,9 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
     [&](SubstitutableType *type) -> Type {
       return signature->getCanonicalTypeInContext(type);
     },
-    [](Type depTy, Type replacementTy, ProtocolType *conformedTy)
+    [](Type depTy, Type replacementTy, ProtocolDecl *proto)
     -> ProtocolConformanceRef {
-      return ProtocolConformanceRef(conformedTy->getDecl());
+      return ProtocolConformanceRef(proto);
     });
 
   auto boxTy = SILBoxType::get(C, layout, subMap);

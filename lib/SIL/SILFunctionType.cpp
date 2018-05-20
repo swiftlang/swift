@@ -2460,7 +2460,7 @@ SILType SILType::subst(SILModule &silModule,
   return STST.subst(*this);
 }
 
-SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
+SILType SILType::subst(SILModule &silModule, SubstitutionMap subs) const{
   return subst(silModule,
                QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
@@ -2471,7 +2471,7 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  const SubstitutionMap &subs) {
+                                  SubstitutionMap subs) {
   if (!isPolymorphic()) {
     return CanSILFunctionType(this);
   }

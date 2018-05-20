@@ -2084,7 +2084,7 @@ public:
     Optional<ProtocolConformanceRef>
     operator()(CanType dependentType,
                Type conformingReplacementType,
-               ProtocolType *conformedProtocol) const;
+               ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.

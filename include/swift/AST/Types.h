@@ -1605,7 +1605,7 @@ class NameAliasType final
   friend TrailingObjects;
 
   NameAliasType(TypeAliasDecl *typealias, Type parent,
-                const SubstitutionMap &substitutions, Type underlying,
+                SubstitutionMap substitutions, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
@@ -1623,7 +1623,7 @@ class NameAliasType final
 
 public:
   static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
-                                 const SubstitutionMap &substitutions,
+                                 SubstitutionMap substitutions,
                                  Type underlying);
 
   /// \brief Returns the declaration that declares this type.
@@ -1660,7 +1660,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, const SubstitutionMap &substitutions,
+                      Type parent, SubstitutionMap substitutions,
                       Type underlying);
 
   // Implement isa/cast/dyncast/etc.
@@ -3057,7 +3057,7 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  FunctionType *substGenericArgs(const SubstitutionMap &subs);
+  FunctionType *substGenericArgs(SubstitutionMap subs);
 
   /// Substitute the given generic arguments into this generic
   /// function type using the given substitution and conformance lookup
@@ -4033,7 +4033,7 @@ public:
   isABICompatibleWith(CanSILFunctionType other) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      const SubstitutionMap &subs);
+                                      SubstitutionMap subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances);

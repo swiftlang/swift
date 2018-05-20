@@ -813,12 +813,12 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
           return type;
         },
         [&](CanType origTy, Type substTy,
-            ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
+            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
           if (substTy->isEqual(ConcreteType)) {
-            assert(proto->getDecl() == Conformance.getRequirement());
+            assert(proto == Conformance.getRequirement());
             return Conformance;
           }
-          return ProtocolConformanceRef(proto->getDecl());
+          return ProtocolConformanceRef(proto);
         });
     
     // Handle polymorphic functions by properly substituting

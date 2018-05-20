@@ -2310,14 +2310,14 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     bool ok = true;
     subMap = genericSig->getSubstitutionMap(
       QueryTypeSubstitutionMap{genericArgMap},
-      [&](CanType depTy, Type replacement, ProtocolType *proto)
+      [&](CanType depTy, Type replacement, ProtocolDecl *proto)
       -> ProtocolConformanceRef {
-        auto result = TC.conformsToProtocol(replacement, proto->getDecl(), DC,
+        auto result = TC.conformsToProtocol(replacement, proto, DC,
                                             ConformanceCheckOptions());
         // TODO: getSubstitutions callback ought to return Optional.
         if (!result) {
           ok = false;
-          return ProtocolConformanceRef(proto->getDecl());
+          return ProtocolConformanceRef(proto);
         }
         
         return *result;

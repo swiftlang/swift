@@ -1604,17 +1604,16 @@ SubstitutionMap getApplySubstitutionsFromParsed(
       return parses[index].replacement;
     },
     [&](CanType dependentType, Type replacementType,
-        ProtocolType *protoTy) ->Optional<ProtocolConformanceRef> {
+        ProtocolDecl *proto) ->Optional<ProtocolConformanceRef> {
       auto M = SP.P.SF.getParentModule();
-      auto conformance = M->lookupConformance(replacementType,
-                                              protoTy->getDecl());
+      auto conformance = M->lookupConformance(replacementType, proto);
       if (conformance) return conformance;
 
       SP.P.diagnose(loc, diag::sil_substitution_mismatch, replacementType,
-                    protoTy);
+                    proto->getDeclaredType());
       failed = true;
 
-      return ProtocolConformanceRef(protoTy->getDecl());
+      return ProtocolConformanceRef(proto);
     });
 
   return failed ? SubstitutionMap() : subMap;

@@ -118,8 +118,7 @@ ProtocolConformanceRef::subst(Type origType,
 
   // Check the conformance map.
   if (auto result = conformances(origType->getCanonicalType(),
-                                 substType,
-                                 proto->getDeclaredType())) {
+                                 substType, proto)) {
     return *result;
   }
 
