@@ -551,12 +551,9 @@ ERROR(sil_invalid_instr_operands,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,none,
       "%0 operand of '%1' must have address type", (StringRef, StringRef))
-ERROR(sil_operand_not_unowned_address,none,
-      "%0 operand of '%1' must have address of [unowned] type",
-      (StringRef, StringRef))
-ERROR(sil_operand_not_weak_address,none,
-      "%0 operand of '%1' must have address of [weak] type",
-      (StringRef, StringRef))
+ERROR(sil_operand_not_ref_storage_address,none,
+      "%0 operand of '%1' must have address of %2 type",
+      (StringRef, StringRef, ReferenceOwnership))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
 ERROR(sil_float_literal_not_float_type,none,
