@@ -1342,12 +1342,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
-  : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+  : LookupExpr(ExprKind::MemberRef, base, member, Implicit),
+    DotLoc(dotLoc), NameLoc(nameLoc) {
    
   Bits.MemberRefExpr.Semantics = (unsigned) semantics;
-  Bits.MemberRefExpr.IsSuper = false;
-  assert(Member);
 }
 
 Type OverloadSetRefExpr::getBaseType() const {
@@ -1588,10 +1586,9 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
                              bool hasTrailingClosure,
                              ConcreteDeclRef decl,
                              bool implicit, AccessSemantics semantics)
-    : Expr(ExprKind::Subscript, implicit, Type()),
-      TheDecl(decl), Base(base), Index(index) {
+    : LookupExpr(ExprKind::Subscript, base, decl, implicit),
+      Index(index) {
   Bits.SubscriptExpr.Semantics = (unsigned) semantics;
-  Bits.SubscriptExpr.IsSuper = false;
   Bits.SubscriptExpr.NumArgLabels = argLabels.size();
   Bits.SubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.SubscriptExpr.HasTrailingClosure = hasTrailingClosure;
