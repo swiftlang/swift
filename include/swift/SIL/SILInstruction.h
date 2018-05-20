@@ -3508,10 +3508,6 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  bool isUnownedAssign() const {
-    return getDest()->getType().getObjectType().is<UnownedStorageType>();
-  }
-
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
@@ -3794,59 +3790,38 @@ public:
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 };
 
-/// Represents a load from a @weak memory location.
-class LoadWeakInst
-  : public LoadReferenceInstBase<SILInstructionKind::LoadWeakInst>
-{
-  friend SILBuilder;
-
-  /// \param loc The location of the expression that caused the load.
-  /// \param lvalue The SILValue representing the address to
-  ///        use for the load.
-  LoadWeakInst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
-    : LoadReferenceInstBase(loc, lvalue, isTake) {}
-};
-
-/// Represents a store to a @weak memory location.
-class StoreWeakInst
-  : public StoreReferenceInstBase<SILInstructionKind::StoreWeakInst>
-{
-  friend SILBuilder;
-
-  StoreWeakInst(SILDebugLocation loc, SILValue src, SILValue dest,
-                IsInitialization_t isInit)
-    : StoreReferenceInstBase(loc, src, dest, isInit) {}
-};
-
-/// Represents a load from an @unowned memory location.
+/// Represents a load from a dynamic reference storage memory location.
+/// This is required for address-only scenarios; for loadable references,
+/// it's better to use a load and a strong_retain_#name.
 ///
-/// This is only required for address-only unowned references; for loadable
-/// unowned references, it's better to use a load and a strong_retain_unowned.
-class LoadUnownedInst
-  : public LoadReferenceInstBase<SILInstructionKind::LoadUnownedInst>
-{
-  friend SILBuilder;
-
-  /// \param loc The location of the expression that caused the load.
-  /// \param lvalue The SILValue representing the address to
-  ///        use for the load.
-  LoadUnownedInst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake)
-    : LoadReferenceInstBase(loc, lvalue, isTake) {}
+/// \param loc The location of the expression that caused the load.
+/// \param lvalue The SILValue representing the address to
+///        use for the load.
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Load##Name##Inst \
+    : public LoadReferenceInstBase<SILInstructionKind::Load##Name##Inst> { \
+  friend SILBuilder; \
+  Load##Name##Inst(SILDebugLocation loc, SILValue lvalue, IsTake_t isTake) \
+    : LoadReferenceInstBase(loc, lvalue, isTake) {} \
 };
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
-/// Represents a store to an @unowned memory location.
-///
-/// This is only required for address-only unowned references; for loadable
-/// unowned references, it's better to use a ref_to_unowned and a store.
-class StoreUnownedInst
-  : public StoreReferenceInstBase<SILInstructionKind::StoreUnownedInst>
-{
-  friend SILBuilder;
-
-  StoreUnownedInst(SILDebugLocation loc, SILValue src, SILValue dest,
-                   IsInitialization_t isInit)
-    : StoreReferenceInstBase(loc, src, dest, isInit) {}
+/// Represents a store to a dynamic reference storage memory location.
+/// This is only required for address-only scenarios; for loadable
+/// references, it's better to use a ref_to_##name and a store.
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Store##Name##Inst \
+    : public StoreReferenceInstBase<SILInstructionKind::Store##Name##Inst> { \
+  friend SILBuilder; \
+  Store##Name##Inst(SILDebugLocation loc, SILValue src, SILValue dest, \
+                IsInitialization_t isInit) \
+    : StoreReferenceInstBase(loc, src, dest, isInit) {} \
 };
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
 /// CopyAddrInst - Represents a copy from one memory location to another. This
 /// is similar to:
@@ -4318,62 +4293,25 @@ class RawPointerToRefInst
   RawPointerToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
 };
-  
-/// RefToUnownedInst - Given a value of a reference type,
-/// convert it to an unowned reference.
-///
+
+/// Transparent reference storage to underlying reference type conversion.
 /// This does nothing at runtime; it just changes the formal type.
-class RefToUnownedInst
-  : public UnaryInstructionBase<SILInstructionKind::RefToUnownedInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  RefToUnownedInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
+#define LOADABLE_REF_STORAGE(Name, ...) \
+class RefTo##Name##Inst \
+    : public UnaryInstructionBase<SILInstructionKind::RefTo##Name##Inst, \
+                                  ConversionInst> { \
+  friend SILBuilder; \
+  RefTo##Name##Inst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty) \
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {} \
+}; \
+class Name##ToRefInst \
+  : public UnaryInstructionBase<SILInstructionKind::Name##ToRefInst, \
+                                ConversionInst> { \
+  friend SILBuilder; \
+  Name##ToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty) \
+      : UnaryInstructionBase(DebugLoc, Operand, Ty) {} \
 };
-
-/// UnownedToRefInst - Given a value of an @unowned type,
-/// convert it to the underlying reference type.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class UnownedToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::UnownedToRefInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  UnownedToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
-
-/// RefToUnmanagedInst - Given a value of a reference type,
-/// convert it to an unmanaged reference.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class RefToUnmanagedInst
-  : public UnaryInstructionBase<SILInstructionKind::RefToUnmanagedInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  RefToUnmanagedInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
-
-/// UnmanagedToRefInst - Given a value of an unmanaged reference type,
-/// convert it to the underlying reference type.
-///
-/// This does nothing at runtime; it just changes the formal type.
-class UnmanagedToRefInst
-  : public UnaryInstructionBase<SILInstructionKind::UnmanagedToRefInst,
-                                ConversionInst>
-{
-  friend SILBuilder;
-
-  UnmanagedToRefInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty)
-      : UnaryInstructionBase(DebugLoc, Operand, Ty) {}
-};
+#include "swift/AST/ReferenceStorage.def"
 
 /// ThinToThickFunctionInst - Given a thin function reference, adds a null
 /// context to convert the value to a thick function type.
@@ -6083,50 +6021,47 @@ class StrongReleaseInst
   }
 };
 
-/// StrongRetainUnownedInst - Increase the strong reference count of an object
-/// and assert that it has not been deallocated.
+/// Simple reference storage logic.
 ///
-/// The operand must be an @unowned type.
-class StrongRetainUnownedInst :
-    public UnaryInstructionBase<SILInstructionKind::StrongRetainUnownedInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  StrongRetainUnownedInst(SILDebugLocation DebugLoc, SILValue operand,
-                          Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, operand) {
-    setAtomicity(atomicity);
-  }
+/// StrongRetain##Name##Inst - Increase the strong reference count of an object
+/// and assert that it has not been deallocated.
+/// The operand must be of type @name.
+///
+/// Name##RetainInst - Increase the 'name' reference count of an object.
+///
+/// Name##ReleaseInst - Decrease the 'name' reference count of an object.
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class StrongRetain##Name##Inst \
+    : public UnaryInstructionBase<SILInstructionKind::StrongRetain##Name##Inst,\
+                                  RefCountingInst> { \
+  friend SILBuilder; \
+  StrongRetain##Name##Inst(SILDebugLocation DebugLoc, SILValue operand, \
+                           Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, operand) { \
+    setAtomicity(atomicity); \
+  } \
+}; \
+class Name##RetainInst \
+    : public UnaryInstructionBase<SILInstructionKind::Name##RetainInst, \
+                                RefCountingInst> { \
+  friend SILBuilder; \
+  Name##RetainInst(SILDebugLocation DebugLoc, SILValue Operand, \
+                   Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, Operand) { \
+    setAtomicity(atomicity); \
+  } \
+}; \
+class Name##ReleaseInst \
+    : public UnaryInstructionBase<SILInstructionKind::Name##ReleaseInst, \
+                                  RefCountingInst> { \
+  friend SILBuilder; \
+  Name##ReleaseInst(SILDebugLocation DebugLoc, SILValue Operand, \
+                    Atomicity atomicity) \
+      : UnaryInstructionBase(DebugLoc, Operand) { \
+    setAtomicity(atomicity); \
+  } \
 };
-
-/// UnownedRetainInst - Increase the unowned reference count of an object.
-class UnownedRetainInst :
-    public UnaryInstructionBase<SILInstructionKind::UnownedRetainInst,
-                                RefCountingInst>
-{
-  friend SILBuilder;
-
-  UnownedRetainInst(SILDebugLocation DebugLoc, SILValue Operand,
-                    Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, Operand) {
-    setAtomicity(atomicity);
-  }
-};
-
-/// UnownedReleaseInst - Decrease the unowned reference count of an object.
-class UnownedReleaseInst :
-     public UnaryInstructionBase<SILInstructionKind::UnownedReleaseInst,
-                                 RefCountingInst>
-{
-  friend SILBuilder;
-
-  UnownedReleaseInst(SILDebugLocation DebugLoc, SILValue Operand,
-                     Atomicity atomicity)
-      : UnaryInstructionBase(DebugLoc, Operand) {
-    setAtomicity(atomicity);
-  }
-};
+#include "swift/AST/ReferenceStorage.def"
 
 /// FixLifetimeInst - An artificial use of a value for the purposes of ARC or
 /// RVO optimizations.
@@ -6264,16 +6199,17 @@ class CopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
-class CopyUnownedValueInst
-    : public UnaryInstructionBase<SILInstructionKind::CopyUnownedValueInst,
-                                  SingleValueInstruction> {
-  friend class SILBuilder;
-
-  CopyUnownedValueInst(SILDebugLocation DebugLoc, SILValue operand,
-                       SILModule &M)
-      : UnaryInstructionBase(DebugLoc, operand,
-                             operand->getType().getReferentType(M)) {}
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+class Copy##Name##ValueInst \
+    : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                  SingleValueInstruction> { \
+  friend class SILBuilder; \
+  Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
+                       SILModule &M) \
+      : UnaryInstructionBase(DebugLoc, operand, \
+                             operand->getType().getReferentType(M)) {} \
 };
+#include "swift/AST/ReferenceStorage.def"
 
 class DestroyValueInst
     : public UnaryInstructionBase<SILInstructionKind::DestroyValueInst,

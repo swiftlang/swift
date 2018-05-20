@@ -1734,59 +1734,105 @@ public:
             "Store operand type and dest type mismatch");
   }
 
-  void checkLoadUnownedInst(LoadUnownedInst *LUI) {
-    require(LUI->getType().isObject(), "Result of load must be an object");
-    auto PointerType = LUI->getOperand()->getType();
-    auto PointerRVType = PointerType.getASTType();
-    require(PointerType.isAddress() &&
-            PointerRVType->is<UnownedStorageType>(),
-            "load_unowned operand must be an unowned address");
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            LUI->getType().getASTType(),
-            "Load operand type and result type mismatch");
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  void checkLoad##Name##Inst(Load##Name##Inst *LWI) { \
+    require(LWI->getType().isObject(), "Result of load must be an object"); \
+    auto isOptional = bool(LWI->getType().getOptionalObjectType()); \
+    auto optionality = optionalityOf(ReferenceOwnership::Name); \
+    if (optionality == ReferenceOwnershipOptionality::Required) \
+      require(isOptional, "Optionality mismatch"); \
+    if (optionality == ReferenceOwnershipOptionality::Disallowed) \
+      require(!isOptional, "Optionality mismatch"); \
+    auto PointerType = LWI->getOperand()->getType(); \
+    auto PointerRVType = PointerType.getASTType(); \
+    require(PointerType.isAddress() && \
+            PointerRVType->is<Name##StorageType>(), \
+            "load_" #name " operand must be a " #name " address"); \
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==\
+            LWI->getType().getASTType(), \
+            "Load operand type and result type mismatch"); \
+  } \
+  void checkStore##Name##Inst(Store##Name##Inst *SWI) { \
+    auto SrcTy = SWI->getSrc()->getType(); \
+    require(SrcTy.isObject(), "Can't store from an address source"); \
+    auto isOptional = bool(SrcTy.getOptionalObjectType()); \
+    auto optionality = optionalityOf(ReferenceOwnership::Name); \
+    if (optionality == ReferenceOwnershipOptionality::Required) \
+      require(isOptional, "Optionality mismatch"); \
+    if (optionality == ReferenceOwnershipOptionality::Disallowed) \
+      require(!isOptional, "Optionality mismatch"); \
+    auto PointerType = SWI->getDest()->getType(); \
+    auto PointerRVType = PointerType.getASTType(); \
+    require(PointerType.isAddress() && \
+            PointerRVType->is<Name##StorageType>(), \
+            "store_" #name " address operand must be a " #name " address"); \
+    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==\
+            SrcTy.getASTType(), \
+            "Store operand type and dest type mismatch"); \
   }
-
-  void checkStoreUnownedInst(StoreUnownedInst *SUI) {
-    require(SUI->getSrc()->getType().isObject(),
-            "Can't store from an address source");
-    auto PointerType = SUI->getDest()->getType();
-    auto PointerRVType = PointerType.getASTType();
-    require(PointerType.isAddress() &&
-            PointerRVType->is<UnownedStorageType>(),
-            "store_unowned address operand must be an unowned address");
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SUI->getSrc()->getType().getASTType(),
-            "Store operand type and dest type mismatch");
+#define LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  void checkRefTo##Name##Inst(RefTo##Name##Inst *I) { \
+    requireReferenceStorageCapableValue(I->getOperand(), \
+                                        "Operand of ref_to_" #name); \
+    auto operandType = I->getOperand()->getType().getASTType(); \
+    auto resultType = requireObjectType(Name##StorageType, I, \
+                                        "Result of ref_to_" #name); \
+    require(resultType.getReferentType() == operandType, \
+            "Result of ref_to_" #name " does not have the " \
+            "operand's type as its referent type"); \
+  } \
+  void check##Name##ToRefInst(Name##ToRefInst *I) { \
+    auto operandType = requireObjectType(Name##StorageType, \
+                                         I->getOperand(), \
+                                         "Operand of " #name "_to_ref"); \
+    requireReferenceStorageCapableValue(I, "Result of " #name "_to_ref"); \
+    auto resultType = I->getType().getASTType(); \
+    require(operandType.getReferentType() == resultType, \
+            "Operand of " #name "_to_ref does not have the " \
+            "operand's type as its referent type"); \
   }
-
-  void checkLoadWeakInst(LoadWeakInst *LWI) {
-    require(LWI->getType().isObject(), "Result of load must be an object");
-    require(LWI->getType().getOptionalObjectType(),
-            "Result of weak load must be an optional");
-    auto PointerType = LWI->getOperand()->getType();
-    auto PointerRVType = PointerType.getASTType();
-    require(PointerType.isAddress() &&
-            PointerRVType->is<WeakStorageType>(),
-            "load_weak operand must be a weak address");
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            LWI->getType().getASTType(),
-            "Load operand type and result type mismatch");
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
+                                "Operand of strong_retain_" #name); \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+          "strong_retain_" #name " requires '" #name "' type to be loadable"); \
+    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+                                        "functions with unqualified " \
+                                        "ownership"); \
+  } \
+  void check##Name##RetainInst(Name##RetainInst *RI) { \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
+                                "Operand of " #name "_retain"); \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+            #name "_retain requires '" #name "' type to be loadable"); \
+    require(!F.hasQualifiedOwnership(), \
+            #name "_retain is only in functions with unqualified ownership"); \
+  } \
+  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
+                                "Operand of " #name "_release"); \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+            #name "_release requires '" #name "' type to be loadable"); \
+    require(!F.hasQualifiedOwnership(), \
+            #name "_release is only in functions with unqualified ownership"); \
+  } \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
+    auto ty = requireObjectType(Name##StorageType, I->getOperand(), \
+                                "Operand of " #name "_retain"); \
+    require(ty->isLoadable(ResilienceExpansion::Maximal), \
+            #name "_retain requires '" #name "' type to be loadable"); \
+    /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
+    /* pipeline even though it is a higher level instruction. */ \
   }
-
-  void checkStoreWeakInst(StoreWeakInst *SWI) {
-    require(SWI->getSrc()->getType().isObject(),
-            "Can't store from an address source");
-    require(SWI->getSrc()->getType().getOptionalObjectType(),
-            "store_weak must be of an optional value");
-    auto PointerType = SWI->getDest()->getType();
-    auto PointerRVType = PointerType.getASTType();
-    require(PointerType.isAddress() &&
-            PointerRVType->is<WeakStorageType>(),
-            "store_weak address operand must be a weak address");
-    require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SWI->getSrc()->getType().getASTType(),
-            "Store operand type and dest type mismatch");
-  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 
   void checkMarkUninitializedInst(MarkUninitializedInst *MU) {
     SILValue Src = MU->getOperand();
@@ -1903,15 +1949,6 @@ public:
     require(!fnConv.useLoweredAddresses() || F.hasQualifiedOwnership(),
             "copy_value is only valid in functions with qualified "
             "ownership");
-  }
-
-  void checkCopyUnownedValueInst(CopyUnownedValueInst *I) {
-    auto unownedType = requireObjectType(UnownedStorageType, I->getOperand(),
-                                         "Operand of unowned_retain");
-    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
-            "unowned_retain requires unowned type to be loadable");
-    // *NOTE* We allow copy_unowned_value to be used throughout the entire
-    // pipeline even though it is a higher level instruction.
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {
@@ -2227,31 +2264,7 @@ public:
     require(!F.hasQualifiedOwnership(),
             "strong_release is only in functions with unqualified ownership");
   }
-  void checkStrongRetainUnownedInst(StrongRetainUnownedInst *RI) {
-    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
-                                         "Operand of strong_retain_unowned");
-    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
-            "strong_retain_unowned requires unowned type to be loadable");
-    require(!F.hasQualifiedOwnership(), "strong_retain_unowned is only in "
-                                        "functions with unqualified "
-                                        "ownership");
-  }
-  void checkUnownedRetainInst(UnownedRetainInst *RI) {
-    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
-                                          "Operand of unowned_retain");
-    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
-            "unowned_retain requires unowned type to be loadable");
-    require(!F.hasQualifiedOwnership(),
-            "unowned_retain is only in functions with unqualified ownership");
-  }
-  void checkUnownedReleaseInst(UnownedReleaseInst *RI) {
-    auto unownedType = requireObjectType(UnownedStorageType, RI->getOperand(),
-                                         "Operand of unowned_release");
-    require(unownedType->isLoadable(ResilienceExpansion::Maximal),
-            "unowned_release requires unowned type to be loadable");
-    require(!F.hasQualifiedOwnership(),
-            "unowned_release is only in functions with unqualified ownership");
-  }
+
   void checkDeallocStackInst(DeallocStackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()),
@@ -3394,54 +3407,6 @@ public:
 
     require(opTy->getInstanceType()->isEqual(resTy->getInstanceType()),
             "objc_to_thick_metatype instance types do not match");
-  }
-
-  void checkRefToUnownedInst(RefToUnownedInst *I) {
-    requireReferenceStorageCapableValue(I->getOperand(),
-                                        "Operand of ref_to_unowned");
-    auto operandType = I->getOperand()->getType().getASTType();
-    auto resultType = requireObjectType(UnownedStorageType, I,
-                                        "Result of ref_to_unowned");
-    require(resultType->isLoadable(ResilienceExpansion::Maximal),
-            "ref_to_unowned requires unowned type to be loadable");
-    require(resultType.getReferentType() == operandType,
-            "Result of ref_to_unowned does not have the "
-            "operand's type as its referent type");
-  }
-
-  void checkUnownedToRefInst(UnownedToRefInst *I) {
-    auto operandType = requireObjectType(UnownedStorageType,
-                                         I->getOperand(),
-                                         "Operand of unowned_to_ref");
-    require(operandType->isLoadable(ResilienceExpansion::Maximal),
-            "unowned_to_ref requires unowned type to be loadable");
-    requireReferenceStorageCapableValue(I, "Result of unowned_to_ref");
-    auto resultType = I->getType().getASTType();
-    require(operandType.getReferentType() == resultType,
-            "Operand of unowned_to_ref does not have the "
-            "operand's type as its referent type");
-  }
-
-  void checkRefToUnmanagedInst(RefToUnmanagedInst *I) {
-    requireReferenceStorageCapableValue(I->getOperand(),
-                                        "Operand of ref_to_unmanaged");
-    auto operandType = I->getOperand()->getType().getASTType();
-    auto resultType = requireObjectType(UnmanagedStorageType, I,
-                                        "Result of ref_to_unmanaged");
-    require(resultType.getReferentType() == operandType,
-            "Result of ref_to_unmanaged does not have the "
-            "operand's type as its referent type");
-  }
-
-  void checkUnmanagedToRefInst(UnmanagedToRefInst *I) {
-    auto operandType = requireObjectType(UnmanagedStorageType,
-                                         I->getOperand(),
-                                         "Operand of unmanaged_to_ref");
-    requireReferenceStorageCapableValue(I, "Result of unmanaged_to_ref");
-    auto resultType = I->getType().getASTType();
-    require(operandType.getReferentType() == resultType,
-            "Operand of unmanaged_to_ref does not have the "
-            "operand's type as its referent type");
   }
 
   void checkUpcastInst(UpcastInst *UI) {

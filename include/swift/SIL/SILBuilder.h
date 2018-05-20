@@ -813,30 +813,62 @@ public:
   DebugValueAddrInst *createDebugValueAddr(SILLocation Loc, SILValue src,
                                            SILDebugVariable Var);
 
-  LoadWeakInst *createLoadWeak(SILLocation Loc, SILValue src, IsTake_t isTake) {
-    return insert(new (getModule())
-                      LoadWeakInst(getSILDebugLocation(Loc), src, isTake));
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  Load##Name##Inst *createLoad##Name(SILLocation Loc, \
+                                     SILValue src, \
+                                     IsTake_t isTake) { \
+    return insert(new (getModule()) \
+      Load##Name##Inst(getSILDebugLocation(Loc), src, isTake)); \
+  } \
+  Store##Name##Inst *createStore##Name(SILLocation Loc, \
+                                       SILValue value, \
+                                       SILValue dest, \
+                                       IsInitialization_t isInit) { \
+    return insert(new (getModule()) \
+      Store##Name##Inst(getSILDebugLocation(Loc), value, dest, isInit)); \
   }
-
-  StoreWeakInst *createStoreWeak(SILLocation Loc, SILValue value, SILValue dest,
-                                 IsInitialization_t isInit) {
-    return insert(new (getModule()) StoreWeakInst(getSILDebugLocation(Loc),
-                                                    value, dest, isInit));
+#define LOADABLE_REF_STORAGE_HELPER(Name) \
+  Name##ToRefInst *create##Name##ToRef(SILLocation Loc, SILValue op, \
+                                       SILType ty) { \
+    return insert(new (getModule()) \
+      Name##ToRefInst(getSILDebugLocation(Loc), op, ty)); \
+  } \
+  RefTo##Name##Inst *createRefTo##Name(SILLocation Loc, SILValue op, \
+                                       SILType ty) { \
+    return insert(new (getModule()) \
+      RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty)); \
   }
-
-  LoadUnownedInst *createLoadUnowned(SILLocation loc, SILValue src,
-                                     IsTake_t isTake) {
-    return insert(new (getModule())
-                    LoadUnownedInst(getSILDebugLocation(loc), src, isTake));
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name) \
+  StrongRetain##Name##Inst *createStrongRetain##Name(SILLocation Loc, \
+                                                     SILValue Operand, \
+                                                     Atomicity atomicity) { \
+    return insert(new (getModule()) \
+      StrongRetain##Name##Inst(getSILDebugLocation(Loc), Operand, atomicity)); \
+  } \
+  Name##RetainInst *create##Name##Retain(SILLocation Loc, SILValue Operand, \
+                                         Atomicity atomicity) { \
+    return insert(new (getModule()) \
+      Name##RetainInst(getSILDebugLocation(Loc), Operand, atomicity)); \
+  } \
+  Name##ReleaseInst *create##Name##Release(SILLocation Loc, \
+                                           SILValue Operand, \
+                                           Atomicity atomicity) { \
+    return insert(new (getModule()) \
+      Name##ReleaseInst(getSILDebugLocation(Loc), Operand, atomicity)); \
+  } \
+  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc, \
+                                                 SILValue operand) { \
+    return insert(new (getModule()) \
+      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, getModule())); \
   }
-
-  StoreUnownedInst *createStoreUnowned(SILLocation loc, SILValue value,
-                                       SILValue dest,
-                                       IsInitialization_t isInit) {
-    return insert(new (getModule())
-                    StoreUnownedInst(getSILDebugLocation(loc),
-                                     value, dest, isInit));
-  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 
   CopyAddrInst *createCopyAddr(SILLocation Loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
@@ -997,28 +1029,15 @@ public:
                       ObjCProtocolInst(getSILDebugLocation(Loc), P, Ty));
   }
 
-  UnownedToRefInst *createUnownedToRef(SILLocation Loc, SILValue op,
-                                       SILType ty) {
+  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
     return insert(new (getModule())
-                      UnownedToRefInst(getSILDebugLocation(Loc), op, ty));
+                      CopyValueInst(getSILDebugLocation(Loc), operand));
   }
 
-  RefToUnownedInst *createRefToUnowned(SILLocation Loc, SILValue op,
-                                       SILType ty) {
+  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
+    assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule())
-                      RefToUnownedInst(getSILDebugLocation(Loc), op, ty));
-  }
-
-  UnmanagedToRefInst *createUnmanagedToRef(SILLocation Loc, SILValue op,
-                                           SILType ty) {
-    return insert(new (getModule())
-                      UnmanagedToRefInst(getSILDebugLocation(Loc), op, ty));
-  }
-
-  RefToUnmanagedInst *createRefToUnmanaged(SILLocation Loc, SILValue op,
-                                           SILType ty) {
-    return insert(new (getModule())
-                      RefToUnmanagedInst(getSILDebugLocation(Loc), op, ty));
+                      DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
 
   UnconditionalCheckedCastInst *
@@ -1091,23 +1110,6 @@ public:
     assert(operand->getType().isLoadableOrOpaque(getModule()));
     return insert(new (getModule()) UnmanagedReleaseValueInst(
         getSILDebugLocation(Loc), operand, atomicity));
-  }
-
-  CopyValueInst *createCopyValue(SILLocation Loc, SILValue operand) {
-    return insert(new (getModule())
-                      CopyValueInst(getSILDebugLocation(Loc), operand));
-  }
-
-  CopyUnownedValueInst *createCopyUnownedValue(SILLocation Loc,
-                                               SILValue operand) {
-    return insert(new (getModule()) CopyUnownedValueInst(
-        getSILDebugLocation(Loc), operand, getModule()));
-  }
-
-  DestroyValueInst *createDestroyValue(SILLocation Loc, SILValue operand) {
-    assert(operand->getType().isLoadableOrOpaque(getModule()));
-    return insert(new (getModule())
-                      DestroyValueInst(getSILDebugLocation(Loc), operand));
   }
 
   AutoreleaseValueInst *createAutoreleaseValue(SILLocation Loc,
@@ -1575,22 +1577,6 @@ public:
                                      Atomicity atomicity) {
     return insert(new (getModule()) StrongUnpinInst(getSILDebugLocation(Loc),
                                                       Operand, atomicity));
-  }
-  StrongRetainUnownedInst *createStrongRetainUnowned(SILLocation Loc,
-                                                     SILValue Operand,
-                                                     Atomicity atomicity) {
-    return insert(new (getModule()) StrongRetainUnownedInst(
-        getSILDebugLocation(Loc), Operand, atomicity));
-  }
-  UnownedRetainInst *createUnownedRetain(SILLocation Loc, SILValue Operand,
-                                         Atomicity atomicity) {
-    return insert(new (getModule()) UnownedRetainInst(
-        getSILDebugLocation(Loc), Operand, atomicity));
-  }
-  UnownedReleaseInst *createUnownedRelease(SILLocation Loc, SILValue Operand,
-                                           Atomicity atomicity) {
-    return insert(new (getModule()) UnownedReleaseInst(
-        getSILDebugLocation(Loc), Operand, atomicity));
   }
 
   EndLifetimeInst *createEndLifetime(SILLocation Loc, SILValue Operand) {

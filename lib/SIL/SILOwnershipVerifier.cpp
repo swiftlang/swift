@@ -306,10 +306,12 @@ NO_OPERAND_INST(RetainValueAddr)
 NO_OPERAND_INST(StringLiteral)
 NO_OPERAND_INST(ConstStringLiteral)
 NO_OPERAND_INST(StrongRetain)
-NO_OPERAND_INST(StrongRetainUnowned)
-NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
 NO_OPERAND_INST(Unwind)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NO_OPERAND_INST(StrongRetain##Name) \
+  NO_OPERAND_INST(Name##Retain)
+#include "swift/AST/ReferenceStorage.def"
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -338,7 +340,6 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, ReleaseValueAddr)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, StrongUnpin)
-CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, UnownedRelease)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AbortApply)
@@ -367,8 +368,6 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUnique)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadUnowned)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkFunctionEscape)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, MarkUninitializedBehavior)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, ObjCExistentialMetatypeToObject)
@@ -395,9 +394,18 @@ CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedAddrCast)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedRefCastAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UncheckedTakeEnumDataAddr)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnconditionalCheckedCastAddr)
-CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, DeallocValueBuffer)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Load##Name)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, Name##Release)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  CONSTANT_OWNERSHIP_INST(Trivial, MustBeLive, Name##ToRef)
+#include "swift/AST/ReferenceStorage.def"
 #undef CONSTANT_OWNERSHIP_INST
 
 /// Instructions whose arguments are always compatible with one convention.
@@ -481,17 +489,20 @@ ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyBlock)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, OpenExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTailAddr)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToRawPointer)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToUnmanaged)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefToUnowned)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, SetDeallocating)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, StrongPin)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnownedToRef)
-ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, CopyUnownedValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ProjectExistentialBox)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedRetainValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedReleaseValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, UnmanagedAutoreleaseValue)
 ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, ConvertEscapeToNoEscape)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Name##ToRef) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, Copy##Name##Value)
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP(MustBeLive, RefTo##Name)
+#include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_NONTRIVIAL_OWNERSHIP
 
 OwnershipUseCheckerResult
@@ -814,24 +825,19 @@ OwnershipCompatibilityUseChecker::visitThrowInst(ThrowInst *I) {
           UseLifetimeConstraint::MustBeInvalidated};
 }
 
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreUnownedInst(StoreUnownedInst *I) {
-  if (getValue() == I->getSrc())
-    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
-            UseLifetimeConstraint::MustBeInvalidated};
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+OwnershipUseCheckerResult \
+OwnershipCompatibilityUseChecker::visitStore##Name##Inst(Store##Name##Inst *I){\
+  /* A store instruction implies that the value to be stored to be live, */ \
+  /* but it does not touch the strong reference count of the value. */ \
+  if (getValue() == I->getSrc()) \
+    return {true, UseLifetimeConstraint::MustBeLive}; \
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial), \
+          UseLifetimeConstraint::MustBeLive}; \
 }
-
-OwnershipUseCheckerResult
-OwnershipCompatibilityUseChecker::visitStoreWeakInst(StoreWeakInst *I) {
-  // A store_weak instruction implies that the value to be stored to be live,
-  // but it does not touch the strong reference count of the value.
-  if (getValue() == I->getSrc())
-    return {true, UseLifetimeConstraint::MustBeLive};
-  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
-          UseLifetimeConstraint::MustBeLive};
-}
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#include "swift/AST/ReferenceStorage.def"
 
 OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitStoreBorrowInst(StoreBorrowInst *I) {
