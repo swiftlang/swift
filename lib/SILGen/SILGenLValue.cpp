@@ -3005,13 +3005,15 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   case ReferenceOwnership::Name: \
     /* Address-only storage types are handled with their underlying type. */ \
     llvm_unreachable("address-only pointers are handled elsewhere");
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    return B.createCopy##Name##Value(loc, src);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \
     /* For loadable reference storage types, we need to generate a strong */ \
     /* retain and strip the box. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    assert(type->isLoadable(ResilienceExpansion::Maximal)); \
-    (void)type; \
+    assert(storageType.castTo<Name##StorageType>()->isLoadable( \
+                                               ResilienceExpansion::Maximal)); \
     return B.createCopy##Name##Value(loc, src); \
   }
 #define UNCHECKED_REF_STORAGE(Name, ...) \
@@ -3260,7 +3262,14 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: \
     llvm_unreachable("address-only types are never loadable");
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
+    value = B.createCopyValue(loc, value); \
+    B.emitDestroyValueOperation(loc, semanticValue); \
+    return value; \
+  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case ReferenceOwnership::Name: { \
     /* For loadable types, place into a box. */ \
     auto type = storageType.castTo<Name##StorageType>(); \

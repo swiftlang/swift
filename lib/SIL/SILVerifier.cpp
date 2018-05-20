@@ -1794,6 +1794,35 @@ public:
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name) \
   void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
+    requireObjectType(Name##StorageType, RI->getOperand(), \
+                      "Operand of strong_retain_" #name); \
+    require(!F.hasQualifiedOwnership(), "strong_retain_" #name " is only in " \
+                                        "functions with unqualified " \
+                                        "ownership"); \
+  } \
+  void check##Name##RetainInst(Name##RetainInst *RI) { \
+    requireObjectType(Name##StorageType, RI->getOperand(), \
+                      "Operand of " #name "_retain"); \
+    require(!F.hasQualifiedOwnership(), \
+            #name "_retain is only in functions with unqualified ownership"); \
+  } \
+  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
+    requireObjectType(Name##StorageType, RI->getOperand(), \
+                      "Operand of " #name "_release"); \
+    require(!F.hasQualifiedOwnership(), \
+            #name "_release is only in functions with unqualified ownership"); \
+  } \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
+    requireObjectType(Name##StorageType, I->getOperand(), \
+                      "Operand of " #name "_retain"); \
+    require(F.hasQualifiedOwnership(), \
+            "copy_" #name "_value is only valid in functions with qualified " \
+            "ownership"); \
+  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
     auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
                                 "Operand of strong_retain_" #name); \
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
@@ -1826,9 +1855,6 @@ public:
     /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
     /* pipeline even though it is a higher level instruction. */ \
   }
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
 #define UNCHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name)
 #include "swift/AST/ReferenceStorage.def"

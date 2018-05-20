@@ -290,13 +290,20 @@ ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
   return SGF.emitManagedRValueWithCleanup(result, lowering);
 }
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   ManagedValue \
   SILGenBuilder::createCopy##Name##Value(SILLocation loc, \
                                          ManagedValue originalValue) { \
     auto ty = originalValue.getType().castTo<Name##StorageType>(); \
     assert(ty->isLoadable(ResilienceExpansion::Maximal)); \
     (void)ty; \
+    SILValue result = createCopy##Name##Value(loc, originalValue.getValue()); \
+    return SGF.emitManagedRValueWithCleanup(result); \
+  }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  ManagedValue \
+  SILGenBuilder::createCopy##Name##Value(SILLocation loc, \
+                                         ManagedValue originalValue) { \
     SILValue result = createCopy##Name##Value(loc, originalValue.getValue()); \
     return SGF.emitManagedRValueWithCleanup(result); \
   }

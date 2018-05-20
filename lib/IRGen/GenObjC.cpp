@@ -307,11 +307,12 @@ const TypeInfo &IRGenModule::getObjCClassPtrTypeInfo() {
   return Types.getObjCClassPtrTypeInfo();
 }
 
-const LoadableTypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
+const TypeInfo &TypeConverter::getObjCClassPtrTypeInfo() {
   // ObjC class pointers look like unmanaged (untagged) object references.
   if (ObjCClassPtrTI) return *ObjCClassPtrTI;
   ObjCClassPtrTI =
-    createUnmanagedStorageType(IGM.ObjCClassPtrTy);
+    createUnmanagedStorageType(IGM.ObjCClassPtrTy, ReferenceCounting::ObjC,
+                               /*isOptional*/false);
   ObjCClassPtrTI->NextConverted = FirstType;
   FirstType = ObjCClassPtrTI;
   return *ObjCClassPtrTI;
