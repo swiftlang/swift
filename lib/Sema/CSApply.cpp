@@ -758,14 +758,8 @@ namespace {
         return ctorRef->getArg();
       } else if (auto apply = dyn_cast<ApplyExpr>(expr)) {
         return apply->getFn();
-      } else if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
-        return memberRef->getBase();
-      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(expr)) {
-        return dynMemberRef->getBase();
-      } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(expr)) {
-        return subscriptRef->getBase();
-      } else if (auto dynSubscriptRef = dyn_cast<DynamicSubscriptExpr>(expr)) {
-        return dynSubscriptRef->getBase();
+      } else if (auto lookupRef = dyn_cast<LookupExpr>(expr)) {
+        return lookupRef->getBase();
       } else if (auto load = dyn_cast<LoadExpr>(expr)) {
         return load->getSubExpr();
       } else if (auto inout = dyn_cast<InOutExpr>(expr)) {
