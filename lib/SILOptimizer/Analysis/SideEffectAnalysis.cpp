@@ -481,16 +481,20 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
   case SILInstructionKind::AllocStackInst:
   case SILInstructionKind::DeallocStackInst:
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
-  case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::RetainValueInst:
-  case SILInstructionKind::UnownedRetainInst:
     getEffectsOn(I->getOperand(0))->Retains = true;
     return;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::ReleaseValueInst:
-  case SILInstructionKind::UnownedReleaseInst:
     getEffectsOn(I->getOperand(0))->Releases = true;
     return;
   case SILInstructionKind::UnconditionalCheckedCastInst:
