@@ -2479,8 +2479,8 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
       if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
 
-      // If this is a compatibility typealias, the canonical extension may
-      // exists in another extension.
+      // If this is a compatibility typealias, the canonical type declaration
+      // may exist in another extension.
       auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
       if (!alias || !alias->isCompatibilityAlias()) continue;
 
