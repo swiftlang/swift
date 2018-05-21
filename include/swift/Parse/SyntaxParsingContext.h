@@ -75,9 +75,17 @@ public:
     // Storage for Collected parts.
     std::vector<RC<RawSyntax>> Storage;
 
+    SyntaxArena &Arena;
+
+    /// A cache of nodes that can be reused when creating the current syntax
+    /// tree
+    SyntaxParsingCache *SyntaxCache = nullptr;
+
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
-                    SourceManager &SourceMgr, unsigned BufferID)
-        : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID) {}
+                    SourceManager &SourceMgr, unsigned BufferID,
+                    SyntaxArena &Arena, SyntaxParsingCache *SyntaxCache)
+        : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
+          Arena(Arena), SyntaxCache(SyntaxCache) {}
   };
 
 private:
@@ -116,12 +124,7 @@ private:
   // Reference to the
   SyntaxParsingContext *&CtxtHolder;
 
-  /// A cache of nodes that can be reused when creating the current syntax tree
-  SyntaxParsingCache *SyntaxParsingCache = nullptr;
-
-  SyntaxArena &Arena;
-
-  std::vector<RC<RawSyntax>> &Storage;
+  RootContextData *RootData;
 
   // Offet for 'Storage' this context owns from.
   const size_t Offset;
@@ -145,7 +148,7 @@ private:
   void createNodeInPlace(SyntaxKind Kind, size_t N);
 
   ArrayRef<RC<RawSyntax>> getParts() const {
-    return makeArrayRef(Storage).drop_front(Offset);
+    return makeArrayRef(getStorage()).drop_front(Offset);
   }
 
   RC<RawSyntax> makeUnknownSyntax(SyntaxKind Kind,
@@ -161,9 +164,8 @@ public:
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
-        SyntaxParsingCache(CtxtHolder->SyntaxParsingCache),
-        Arena(CtxtHolder->Arena), Storage(CtxtHolder->Storage),
-        Offset(Storage.size()), Enabled(CtxtHolder->isEnabled()) {
+        RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
+        Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::LoadedFromCache &&
@@ -197,15 +199,27 @@ public:
   bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
 
-  SyntaxParsingContext *getParent() {
+  SyntaxParsingContext *getParent() const {
     return RootDataOrParent.get<SyntaxParsingContext*>();
   }
 
-  RootContextData &getRootData() {
-    return *getRoot()->RootDataOrParent.get<RootContextData*>();
+  RootContextData *getRootData() { return RootData; }
+
+  const RootContextData *getRootData() const { return RootData; }
+
+  std::vector<RC<RawSyntax>> &getStorage() { return getRootData()->Storage; }
+
+  const std::vector<RC<RawSyntax>> &getStorage() const {
+    return getRootData()->Storage;
   }
 
-  SyntaxParsingContext *getRoot();
+  SyntaxParsingCache *getSyntaxParsingCache() const {
+    return getRootData()->SyntaxCache;
+  }
+
+  SyntaxArena &getArena() const { return getRootData()->Arena; }
+
+  const SyntaxParsingContext *getRoot() const;
 
   /// Add RawSyntax to the parts.
   void addRawSyntax(RC<RawSyntax> Raw);
@@ -219,6 +233,7 @@ public:
 
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
+    auto &Storage = getStorage();
     assert(Storage.size() > Offset);
     if (auto Node = make<Syntax>(Storage.back()).getAs<SyntaxNode>()) {
       Storage.pop_back();
@@ -228,6 +243,7 @@ public:
   }
 
   TokenSyntax popToken() {
+    auto &Storage = getStorage();
     assert(Storage.size() > Offset);
     assert(Storage.back()->getKind() == SyntaxKind::Token);
     auto Node = make<TokenSyntax>(std::move(Storage.back()));
