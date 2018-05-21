@@ -300,6 +300,8 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 }
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  visitNominalTypeDecl(ED);
+
   if (!ED->isResilient())
     return;
 
