@@ -120,6 +120,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    // A @_cdecl("...") function has an extra symbol, with the name from the
+    // attribute.
+    addSymbol(SILDeclRef(AFD).asForeign());
+  }
+
   if (!SwiftModule->getASTContext().isSwiftVersion3())
     return;
 
