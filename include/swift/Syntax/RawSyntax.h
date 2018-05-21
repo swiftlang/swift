@@ -523,4 +523,8 @@ public:
 } // end namespace syntax
 } // end namespace swift
 
+namespace llvm {
+raw_ostream &operator<<(raw_ostream &OS, swift::syntax::AbsolutePosition Pos);
+} // end namespace llvm
+
 #endif // SWIFT_SYNTAX_RAWSYNTAX_H
