@@ -1,5 +1,6 @@
 set(TRANSFORMS_SOURCES
   Transforms/ARCCodeMotion.cpp
+  Transforms/AccessEnforcementOpts.cpp
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
   Transforms/ArrayElementValuePropagation.cpp
@@ -23,7 +24,6 @@ set(TRANSFORMS_SOURCES
   Transforms/RedundantOverflowCheckRemoval.cpp
   Transforms/ReleaseDevirtualizer.cpp
   Transforms/RemovePin.cpp
-  Transforms/SILCleanup.cpp
   Transforms/SILCodeMotion.cpp
   Transforms/SILLowerAggregateInstrs.cpp
   Transforms/SILMem2Reg.cpp

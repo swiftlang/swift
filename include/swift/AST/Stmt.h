@@ -20,13 +20,13 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/Support/TrailingObjects.h"
 
 namespace swift {
+  class AnyPattern;
   class ASTContext;
   class ASTWalker;
   class Decl;
@@ -814,17 +814,40 @@ public:
 
 /// A pattern and an optional guard expression used in a 'case' statement.
 class CaseLabelItem {
+  enum class Kind {
+    /// A normal pattern
+    Normal = 0,
+    /// `default`
+    Default,
+  };
+
   Pattern *CasePattern;
   SourceLoc WhereLoc;
-  llvm::PointerIntPair<Expr *, 1, bool> GuardExprAndIsDefault;
+  llvm::PointerIntPair<Expr *, 1, Kind> GuardExprAndKind;
+
+  CaseLabelItem(Kind kind, Pattern *casePattern, SourceLoc whereLoc,
+                Expr *guardExpr)
+    : CasePattern(casePattern), WhereLoc(whereLoc),
+      GuardExprAndKind(guardExpr, kind) {}
 
 public:
   CaseLabelItem(const CaseLabelItem &) = default;
 
-  CaseLabelItem(bool IsDefault, Pattern *CasePattern, SourceLoc WhereLoc,
-                Expr *GuardExpr)
-      : CasePattern(CasePattern), WhereLoc(WhereLoc),
-        GuardExprAndIsDefault(GuardExpr, IsDefault) {}
+  CaseLabelItem(Pattern *casePattern, SourceLoc whereLoc, Expr *guardExpr)
+    : CaseLabelItem(Kind::Normal, casePattern, whereLoc, guardExpr) {}
+  explicit CaseLabelItem(Pattern *casePattern)
+    : CaseLabelItem(casePattern, SourceLoc(), nullptr) {}
+
+  static CaseLabelItem getDefault(AnyPattern *pattern,
+                                  SourceLoc whereLoc,
+                                  Expr *guardExpr) {
+    assert(pattern);
+    return CaseLabelItem(Kind::Default, reinterpret_cast<Pattern *>(pattern),
+                         whereLoc, guardExpr);
+  }
+  static CaseLabelItem getDefault(AnyPattern *pattern) {
+    return getDefault(pattern, SourceLoc(), nullptr);
+  }
 
   SourceLoc getWhereLoc() const { return WhereLoc; }
 
@@ -838,14 +861,16 @@ public:
 
   /// Return the guard expression if present, or null if the case label has
   /// no guard.
-  Expr *getGuardExpr() { return GuardExprAndIsDefault.getPointer(); }
+  Expr *getGuardExpr() { return GuardExprAndKind.getPointer(); }
   const Expr *getGuardExpr() const {
-    return GuardExprAndIsDefault.getPointer();
+    return GuardExprAndKind.getPointer();
   }
-  void setGuardExpr(Expr *e) { GuardExprAndIsDefault.setPointer(e); }
+  void setGuardExpr(Expr *e) { GuardExprAndKind.setPointer(e); }
 
   /// Returns true if this is syntactically a 'default' label.
-  bool isDefault() const { return GuardExprAndIsDefault.getInt(); }
+  bool isDefault() const {
+    return GuardExprAndKind.getInt() == Kind::Default;
+  }
 };
 
 /// A 'case' or 'default' block of a switch statement.  Only valid as the
@@ -865,19 +890,21 @@ class CaseStmt final : public Stmt,
     private llvm::TrailingObjects<CaseStmt, CaseLabelItem> {
   friend TrailingObjects;
 
+  SourceLoc UnknownAttrLoc;
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasBoundDecls;
 
   CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
-           Optional<bool> Implicit);
+           bool HasBoundDecls, SourceLoc UnknownAttrLoc, SourceLoc ColonLoc,
+           Stmt *Body, Optional<bool> Implicit);
 
 public:
   static CaseStmt *create(ASTContext &C, SourceLoc CaseLoc,
                           ArrayRef<CaseLabelItem> CaseLabelItems,
-                          bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
+                          bool HasBoundDecls, SourceLoc UnknownAttrLoc,
+                          SourceLoc ColonLoc, Stmt *Body,
                           Optional<bool> Implicit = None);
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
@@ -896,13 +923,25 @@ public:
   /// Get the source location of the 'case' or 'default' of the first label.
   SourceLoc getLoc() const { return CaseLoc; }
 
-  SourceLoc getStartLoc() const { return getLoc(); }
+  SourceLoc getStartLoc() const {
+    if (UnknownAttrLoc.isValid())
+      return UnknownAttrLoc;
+    return getLoc();
+  }
   SourceLoc getEndLoc() const { return getBody()->getEndLoc(); }
   SourceRange getLabelItemsRange() const {
     return ColonLoc.isValid() ? SourceRange(getLoc(), ColonLoc) : getSourceRange();
   }
 
   bool isDefault() { return getCaseLabelItems()[0].isDefault(); }
+
+  bool hasUnknownAttr() const {
+    // Note: This representation doesn't allow for synthesized @unknown cases.
+    // However, that's probably sensible; the purpose of @unknown is for
+    // diagnosing otherwise-non-exhaustive switches, and the user can't edit
+    // a synthesized case.
+    return UnknownAttrLoc.isValid();
+  }
 
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Case; }
 };
@@ -983,7 +1022,7 @@ class BreakStmt : public Stmt {
   SourceLoc Loc;
   Identifier TargetName; // Named target statement, if specified in the source.
   SourceLoc TargetLoc;
-  LabeledStmt *Target;  // Target stmt, wired up by Sema.
+  LabeledStmt *Target = nullptr;  // Target stmt, wired up by Sema.
 public:
   BreakStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,
             Optional<bool> implicit = None)
@@ -1018,7 +1057,7 @@ class ContinueStmt : public Stmt {
   SourceLoc Loc;
   Identifier TargetName; // Named target statement, if specified in the source.
   SourceLoc TargetLoc;
-  LabeledStmt *Target;
+  LabeledStmt *Target = nullptr;
 
 public:
   ContinueStmt(SourceLoc Loc, Identifier TargetName, SourceLoc TargetLoc,

@@ -56,8 +56,9 @@ class SwiftTestCase(unittest.TestCase):
             benchmark_num_onone_iterations=3,
             benchmark_num_o_iterations=3,
             enable_sil_ownership=False,
-            enable_guaranteed_normal_arguments=False,
-            force_optimized_typechecker=False)
+            disable_guaranteed_normal_arguments=True,
+            force_optimized_typechecker=False,
+            enable_stdlibcore_exclusivity_checking=False)
 
         # Setup shell
         shell.dry_run = True
@@ -84,11 +85,14 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertEqual(set(swift.cmake_options), set([
-                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
-                         '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
-                         '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE']))
+        expected = [
+            '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+            '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+            '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+        ]
+        self.assertEqual(set(swift.cmake_options), set(expected))
 
     def test_swift_runtime_tsan(self):
         self.args.enable_tsan_runtime = True
@@ -97,12 +101,15 @@ class SwiftTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        flags_set = set(['-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
-                         '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
-                         '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
-                         '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
-                         '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE'])
-        self.assertEqual(set(swift.cmake_options), flags_set)
+        flags_set = [
+            '-DSWIFT_RUNTIME_USE_SANITIZERS=Thread',
+            '-DCMAKE_EXPORT_COMPILE_COMMANDS=TRUE',
+            '-DSWIFT_STDLIB_ENABLE_SIL_OWNERSHIP=FALSE',
+            '-DSWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS=FALSE',
+            '-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=FALSE',
+            '-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=FALSE'
+        ]
+        self.assertEqual(set(swift.cmake_options), set(flags_set))
 
     def test_swift_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"
@@ -289,7 +296,7 @@ class SwiftTestCase(unittest.TestCase):
              if 'SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP' in x])
 
     def test_swift_guaranteed_normal_arguments_flags(self):
-        self.args.enable_guaranteed_normal_arguments = True
+        self.args.disable_guaranteed_normal_arguments = False
         swift = Swift(
             args=self.args,
             toolchain=self.toolchain,
@@ -311,3 +318,15 @@ class SwiftTestCase(unittest.TestCase):
             ['-DSWIFT_FORCE_OPTIMIZED_TYPECHECKER=TRUE'],
             [x for x in swift.cmake_options
              if 'SWIFT_FORCE_OPTIMIZED_TYPECHECKER' in x])
+
+    def test_exclusivity_checking_flags(self):
+        self.args.enable_stdlibcore_exclusivity_checking = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING=TRUE'],
+            [x for x in swift.cmake_options
+             if 'SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING' in x])

@@ -223,6 +223,9 @@ namespace swift {
     /// Enables key path resilience.
     bool EnableKeyPathResilience = false;
 
+    /// Enables public emission of private metadata accessors.
+    bool EmitPublicTypeMetadataAccessors = false;
+
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
@@ -238,6 +241,10 @@ namespace swift {
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;
+
+    /// Diagnose switches over non-frozen enums that do not have catch-all
+    /// cases.
+    bool EnableNonFrozenEnumExhaustivityDiagnostics = false;
 
     /// Regex for the passes that should report passed and missed optimizations.
     ///

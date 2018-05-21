@@ -377,6 +377,53 @@ Then by running ``lldb test -s test.lldb``, lldb will:
 Using LLDB scripts can enable one to use complex debugger workflows without
 needing to retype the various commands perfectly every time.
 
+Custom LLDB Commands
+~~~~~~~~~~~~~~~~~~~~
+
+If you've ever found yourself repeatedly entering a complex sequence of
+commands within a debug session, consider using custom lldb commands. Custom
+commands are a handy way to automate debugging tasks.
+
+For example, say we need a command that prints the contents of the register
+``rax`` and then steps to the next instruction. Here's how to define that
+command within a debug session::
+
+    (lldb) script
+    Python Interactive Interpreter. To exit, type 'quit()', 'exit()' or Ctrl-D.
+    >>> def custom_step():
+    ...   print "rax =", lldb.frame.FindRegister("rax")
+    ...   lldb.thread.StepInstruction(True)
+    ...
+    >>> ^D
+
+You can call this function using the ``script`` command, or via an alias::
+
+    (lldb) script custom_step()
+    rax = ...
+    <debugger steps to the next instruction>
+
+    (lldb) command alias cs script custom_step()
+    (lldb) cs
+    rax = ...
+    <debugger steps to the next instruction>
+
+Printing registers and single-stepping are by no means the only things you can
+do with custom commands. The LLDB Python API surfaces a lot of useful
+functionality, such as arbitrary expression evaluation.
+
+There are some pre-defined custom commands which can be especially useful while
+debugging the swift compiler. These commands live in
+``swift/utils/lldb/lldbToolBox.py``. There is a wrapper script available in
+``SWIFT_BINARY_DIR/bin/lldb-with-tools`` which launches lldb with those
+commands loaded.
+
+A command named ``sequence`` is included in lldbToolBox. ``sequence`` runs
+multiple semicolon separated commands together as one command. This can be used
+to define custom commands using just other lldb commands. For example,
+``custom_step()`` function defined above could be defined as::
+
+    (lldb) command alias cs sequence p/x $rax; stepi
+
 Reducing SIL test cases using bug_reducer
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

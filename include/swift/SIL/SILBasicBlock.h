@@ -163,10 +163,10 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
   using PHIArgumentArrayRefTy =
-      TransformArrayRef<std::function<SILPHIArgument *(SILArgument *)>>;
+      TransformArrayRef<SILPHIArgument *(*)(SILArgument *)>;
   PHIArgumentArrayRefTy getPHIArguments() const;
   using FunctionArgumentArrayRefTy =
-      TransformArrayRef<std::function<SILFunctionArgument *(SILArgument *)>>;
+      TransformArrayRef<SILFunctionArgument *(*)(SILArgument *)>;
   FunctionArgumentArrayRefTy getFunctionArguments() const;
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
@@ -343,6 +343,11 @@ public:
   ///
   /// Used by llvm::LoopInfo.
   bool isLegalToHoistInto() const;
+
+  /// Returns the debug scope of the first non-meta instructions in the
+  /// basic block. SILBuilderWithScope uses this to correctly set up
+  /// the debug scope for newly created instructions.
+  const SILDebugScope *getScopeOfFirstNonMetaInstruction();
 
   //===--------------------------------------------------------------------===//
   // Debugging

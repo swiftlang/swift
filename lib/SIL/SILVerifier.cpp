@@ -22,6 +22,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PostOrder.h"
@@ -59,7 +60,10 @@ static llvm::cl::opt<bool> AbortOnFailure(
 
 static llvm::cl::opt<bool> VerifyDIHoles(
                               "verify-di-holes",
-                              llvm::cl::init(false));
+                              llvm::cl::init(true));
+
+static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
+    "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
 // The verifier is basically all assertions, so don't compile it with NDEBUG to
 // prevent release builds from triggering spurious unused variable warnings.
@@ -111,6 +115,317 @@ public:
 
 namespace {
 
+/// Verify invariants on a key path component.
+void verifyKeyPathComponent(SILModule &M,
+                            llvm::function_ref<void(bool, StringRef)> require,
+                            CanType &baseTy,
+                            CanType leafTy,
+                            const KeyPathPatternComponent &component,
+                            ArrayRef<Operand> operands,
+                            CanGenericSignature patternSig,
+                            SubstitutionMap patternSubs,
+                            bool forPropertyDescriptor,
+                            bool hasIndices) {
+  auto &C = M.getASTContext();
+  
+  auto loweredBaseTy =
+    M.Types.getLoweredType(AbstractionPattern::getOpaque(), baseTy);
+  auto componentTy = component.getComponentType().subst(patternSubs)
+    ->getCanonicalType();
+  auto loweredComponentTy =
+    M.Types.getLoweredType(AbstractionPattern::getOpaque(), componentTy);
+
+  auto checkIndexEqualsAndHash = [&]{
+    if (!component.getSubscriptIndices().empty()) {
+      // Equals should be
+      // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
+      {
+        auto equals = component.getSubscriptIndexEquals();
+        require(equals, "key path pattern with indexes must have equals "
+                        "operator");
+        
+        auto substEqualsType = equals->getLoweredFunctionType()
+          ->substGenericArgs(M, patternSubs);
+        
+        require(substEqualsType->getParameters().size() == 2,
+                "must have two arguments");
+        for (unsigned i = 0; i < 2; ++i) {
+          auto param = substEqualsType->getParameters()[i];
+          require(param.getConvention()
+                    == ParameterConvention::Direct_Unowned,
+                  "indices pointer should be trivial");
+          require(param.getType()->getAnyNominal()
+                    == C.getUnsafeRawPointerDecl(),
+                  "indices pointer should be an UnsafeRawPointer");
+        }
+        
+        require(substEqualsType->getResults().size() == 1,
+                "must have one result");
+        
+        require(substEqualsType->getResults()[0].getConvention()
+                  == ResultConvention::Unowned,
+                "result should be unowned");
+        require(substEqualsType->getResults()[0].getType()->getAnyNominal()
+                  == C.getBoolDecl(),
+                "result should be Bool");
+      }
+      {
+        // Hash should be
+        // <Sig...> @convention(thin) (RawPointer) -> Int
+        auto hash = component.getSubscriptIndexHash();
+        require(hash, "key path pattern with indexes must have hash "
+                      "operator");
+        
+        auto substHashType = hash->getLoweredFunctionType()
+          ->substGenericArgs(M, patternSubs);
+        
+        require(substHashType->getParameters().size() == 1,
+                "must have two arguments");
+        auto param = substHashType->getParameters()[0];
+        require(param.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(param.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+        
+        require(substHashType->getResults().size() == 1,
+                "must have one result");
+        
+        require(substHashType->getResults()[0].getConvention()
+                  == ResultConvention::Unowned,
+                "result should be unowned");
+        require(substHashType->getResults()[0].getType()->getAnyNominal()
+                  == C.getIntDecl(),
+                "result should be Int");
+      }
+    } else {
+      require(!component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "component without indexes must not have equals/hash");
+    }
+  };
+
+  switch (auto kind = component.getKind()) {
+  case KeyPathPatternComponent::Kind::StoredProperty: {
+    auto property = component.getStoredPropertyDecl();
+    auto fieldTy = baseTy->getTypeOfMember(M.getSwiftModule(), property)
+                         ->getReferenceStorageReferent()
+                         ->getCanonicalType();
+    require(fieldTy == componentTy,
+            "property decl should be a member of the base with the same type "
+            "as the component");
+    switch (property->getStorageKind()) {
+    case AbstractStorageDecl::Stored:
+    case AbstractStorageDecl::StoredWithObservers:
+    case AbstractStorageDecl::StoredWithTrivialAccessors:
+      break;
+    case AbstractStorageDecl::Addressed:
+    case AbstractStorageDecl::AddressedWithObservers:
+    case AbstractStorageDecl::AddressedWithTrivialAccessors:
+    case AbstractStorageDecl::Computed:
+    case AbstractStorageDecl::ComputedWithMutableAddress:
+    case AbstractStorageDecl::InheritedWithObservers:
+      require(false, "property must be stored");
+    }
+    auto propertyTy = loweredBaseTy.getFieldType(property, M);
+    require(propertyTy.getObjectType()
+              == loweredComponentTy.getObjectType(),
+            "component type should match the maximal abstraction of the "
+            "formal type");
+    break;
+  }
+    
+  case KeyPathPatternComponent::Kind::GettableProperty:
+  case KeyPathPatternComponent::Kind::SettableProperty: {
+    if (forPropertyDescriptor) {
+      require(component.getSubscriptIndices().empty()
+              && !component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "property descriptor should not have index information");
+    } else {
+      require(hasIndices == !component.getSubscriptIndices().empty(),
+              "component for subscript should have indices");
+    }
+  
+    ParameterConvention normalArgConvention;
+    if (M.getOptions().EnableGuaranteedNormalArguments)
+      normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
+    else
+      normalArgConvention = ParameterConvention::Indirect_In;
+  
+    // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
+    {
+      auto getter = component.getComputedPropertyGetter();
+      auto substGetterType = getter->getLoweredFunctionType()
+        ->substGenericArgs(M, patternSubs);
+      require(substGetterType->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thin,
+              "getter should be a thin function");
+      
+      require(substGetterType->getNumParameters() == 1 + hasIndices,
+              "getter should have one parameter");
+      auto baseParam = substGetterType->getParameters()[0];
+      require(baseParam.getConvention() == normalArgConvention,
+              "getter base parameter should have normal arg convention");
+      require(baseParam.getType() == loweredBaseTy.getASTType(),
+              "getter base parameter should match base of component");
+      
+      if (hasIndices) {
+        auto indicesParam = substGetterType->getParameters()[1];
+        require(indicesParam.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(indicesParam.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+      }
+
+      require(substGetterType->getNumResults() == 1,
+              "getter should have one result");
+      auto result = substGetterType->getResults()[0];
+      require(result.getConvention() == ResultConvention::Indirect,
+              "getter result should be @out");
+      require(result.getType() == loweredComponentTy.getASTType(),
+              "getter result should match the maximal abstraction of the "
+              "formal component type");
+    }
+    
+    if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+      // Setter should be
+      // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
+      
+      auto setter = component.getComputedPropertySetter();
+      auto substSetterType = setter->getLoweredFunctionType()
+        ->substGenericArgs(M, patternSubs);
+      
+      require(substSetterType->getRepresentation() ==
+                SILFunctionTypeRepresentation::Thin,
+              "setter should be a thin function");
+      
+      require(substSetterType->getNumParameters() == 2 + hasIndices,
+              "setter should have two parameters");
+
+      auto newValueParam = substSetterType->getParameters()[0];
+      // TODO: This should probably be unconditionally +1 when we
+      // can represent that.
+      require(newValueParam.getConvention() == normalArgConvention,
+              "setter value parameter should havee normal arg convention");
+
+      auto baseParam = substSetterType->getParameters()[1];
+      require(baseParam.getConvention() == normalArgConvention
+              || baseParam.getConvention() ==
+                  ParameterConvention::Indirect_Inout,
+              "setter base parameter should be normal arg convention "
+              "or @inout");
+      
+      if (hasIndices) {
+        auto indicesParam = substSetterType->getParameters()[2];
+        require(indicesParam.getConvention()
+                  == ParameterConvention::Direct_Unowned,
+                "indices pointer should be trivial");
+        require(indicesParam.getType()->getAnyNominal()
+                  == C.getUnsafeRawPointerDecl(),
+                "indices pointer should be an UnsafeRawPointer");
+      }
+
+      require(newValueParam.getType() ==
+                loweredComponentTy.getASTType(),
+              "setter value should match the maximal abstraction of the "
+              "formal component type");
+      
+      require(substSetterType->getNumResults() == 0,
+              "setter should have no results");
+    }
+    
+    if (!forPropertyDescriptor) {
+      for (auto &index : component.getSubscriptIndices()) {
+        auto opIndex = index.Operand;
+        auto contextType =
+          index.LoweredType.subst(M, patternSubs);
+        require(contextType == operands[opIndex].get()->getType(),
+                "operand must match type required by pattern");
+        SILType loweredType = index.LoweredType;
+        require(loweredType.isLoweringOf(M, index.FormalType),
+                "pattern index formal type doesn't match lowered type");
+      }
+
+      checkIndexEqualsAndHash();
+    }
+    
+    break;
+  }
+  case KeyPathPatternComponent::Kind::External: {
+    // The component type should match the substituted type of the
+    // referenced property.
+    auto decl = component.getExternalDecl();
+    auto sig = decl->getInnermostDeclContext()
+                   ->getGenericSignatureOfContext();
+    SubstitutionMap subs;
+    CanGenericSignature canSig = nullptr;
+    if (sig) {
+      canSig = sig->getCanonicalSignature();
+      subs = component.getExternalSubstitutions();
+    }
+    auto substType = component.getExternalDecl()->getStorageInterfaceType()
+      .subst(subs);
+    require(substType->isEqual(component.getComponentType()),
+            "component type should match storage type of referenced "
+            "declaration");
+
+    // Index types should match the lowered index types expected by the
+    // external declaration.
+    if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
+      auto indexParams = sub->getIndices();
+      require(indexParams->size() == component.getSubscriptIndices().size(),
+              "number of subscript indices should match referenced decl");
+      for (unsigned i : indices(*indexParams)) {
+        auto param = (*indexParams)[i];
+        auto &index = component.getSubscriptIndices()[i];
+        auto paramTy = param->getInterfaceType()->getCanonicalType();
+        auto substParamTy = paramTy.subst(subs);
+        auto loweredTy = M.Types.getLoweredType(
+          AbstractionPattern(canSig, paramTy), substParamTy);
+        require(index.LoweredType == loweredTy,
+                "index lowered types should match referenced decl");
+        require(index.FormalType == substParamTy->getCanonicalType(),
+                "index formal types should match referenced decl");
+      }
+      
+      checkIndexEqualsAndHash();
+    } else {
+      require(component.getSubscriptIndices().empty(),
+              "external var reference should not apply indices");
+      require(!component.getSubscriptIndexEquals()
+              && !component.getSubscriptIndexHash(),
+              "external var reference should not apply hash");
+    }
+    
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalChain: {
+    require(baseTy->getOptionalObjectType()->isEqual(componentTy),
+            "chaining component should unwrap optional");
+    require((bool)leafTy->getOptionalObjectType(),
+            "key path with chaining component should have optional "
+            "result");
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalForce: {
+    require(baseTy->getOptionalObjectType()->isEqual(componentTy),
+            "forcing component should unwrap optional");
+    break;
+  }
+  case KeyPathPatternComponent::Kind::OptionalWrap: {
+    require(componentTy->getOptionalObjectType()->isEqual(baseTy),
+            "wrapping component should wrap optional");
+    break;
+  }
+  }
+  
+  baseTy = componentTy;
+}
+
 /// The SIL verifier walks over a SIL function / basic block / instruction,
 /// checking and enforcing its invariants.
 class SILVerifier : public SILVerifierBase<SILVerifier> {
@@ -122,6 +437,10 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SmallVector<StringRef, 16> DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
+
+  // Used for dominance checking within a basic block.
+  llvm::DenseMap<const SILInstruction *, unsigned> InstNumbers;
+
   DeadEndBlocks DEBlocks;
   bool SingleFunction = true;
 
@@ -226,7 +545,7 @@ public:
                                                 const Twine &valueDescription) {
     require(value->getType().isObject(), valueDescription +" must be an object");
     
-    auto objectTy = value->getType().unwrapAnyOptionalType();
+    auto objectTy = value->getType().unwrapOptionalType();
     
     require(objectTy.isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
@@ -300,20 +619,32 @@ public:
     }
   }
 
+  static unsigned numInstsInFunction(const SILFunction &F) {
+    unsigned numInsts = 0;
+    for (auto &BB : F) {
+      numInsts += std::distance(BB.begin(), BB.end());
+    }
+    return numInsts;
+  }
+
   SILVerifier(const SILFunction &F, bool SingleFunction = true)
       : M(F.getModule().getSwiftModule()), F(F),
         fnConv(F.getLoweredFunctionType(), F.getModule()),
         TC(F.getModule().Types), OpenedArchetypes(&F), Dominance(nullptr),
+        InstNumbers(numInstsInFunction(F)),
         DEBlocks(&F), SingleFunction(SingleFunction) {
     if (F.isExternalDeclaration())
       return;
       
     // Check to make sure that all blocks are well formed.  If not, the
     // SILVerifier object will explode trying to compute dominance info.
+    unsigned InstIdx = 0;
     for (auto &BB : F) {
       require(!BB.empty(), "Basic blocks cannot be empty");
       require(isa<TermInst>(BB.back()),
               "Basic blocks must end with a terminator instruction");
+      for (auto &I : BB)
+        InstNumbers[&I] = InstIdx++;
     }
 
     Dominance = new DominanceInfo(const_cast<SILFunction *>(&F));
@@ -327,6 +658,20 @@ public:
   ~SILVerifier() {
     if (Dominance)
       delete Dominance;
+  }
+
+  // Checks dominance between two instructions.
+  // This does not use DominanceInfo.properlyDominates, because for large basic
+  // blocks it would result in quadratic behavior.
+  bool properlyDominates(SILInstruction *a, SILInstruction *b) {
+    auto aBlock = a->getParent(), bBlock = b->getParent();
+
+    // If the blocks are different, it's as easy as whether A's block
+    // dominates B's block.
+    if (aBlock != bBlock)
+      return Dominance->properlyDominates(aBlock, bBlock);
+
+    return InstNumbers[a] < InstNumbers[b];
   }
 
   // FIXME: For sanity, address-type block args should be prohibited at all SIL
@@ -460,7 +805,7 @@ public:
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
-          require(Dominance->properlyDominates(valueI, I),
+          require(properlyDominates(valueI, I),
                   "instruction isn't dominated by its operand");
         }
       }
@@ -582,7 +927,7 @@ public:
 
   /// Check that the given type is a legal SIL value type.
   void checkLegalType(SILFunction *F, SILType type, SILInstruction *I) {
-    checkLegalSILType(F, type.getSwiftRValueType(), I);
+    checkLegalSILType(F, type.getASTType(), I);
   }
 
   /// Check that the given type is a legal SIL value type.
@@ -624,7 +969,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), I),
+                properlyDominates(cast<SILInstruction>(Def), I),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -655,7 +1000,7 @@ public:
     require(AI->getType().isAddress(),
             "result of alloc_stack must be an address type");
 
-    verifyOpenedArchetype(AI, AI->getElementType().getSwiftRValueType());
+    verifyOpenedArchetype(AI, AI->getElementType().getASTType());
 
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
     // range. But apparently it can be the case that ASI has uses after the
@@ -666,7 +1011,7 @@ public:
 
   void checkAllocRefBase(AllocRefInstBase *ARI) {
     requireReferenceValue(ARI, "Result of alloc_ref");
-    verifyOpenedArchetype(ARI, ARI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(ARI, ARI->getType().getASTType());
     auto Types = ARI->getTailAllocatedTypes();
     auto Counts = ARI->getTailAllocatedCounts();
     unsigned NumTypes = Types.size();
@@ -674,7 +1019,7 @@ public:
     require(NumTypes == 0 || !ARI->isObjC(),
             "Can't tail allocate with ObjC class");
     for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
-      verifyOpenedArchetype(ARI, Types[Idx].getSwiftRValueType());
+      verifyOpenedArchetype(ARI, Types[Idx].getASTType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
@@ -704,12 +1049,12 @@ public:
   }
 
   /// Check the substitutions passed to an apply or partial_apply.
-  CanSILFunctionType checkApplySubstitutions(SubstitutionList subs,
+  CanSILFunctionType checkApplySubstitutions(SubstitutionMap subs,
                                              SILType calleeTy) {
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (subs.empty()) {
+    if (!subs.hasAnySubstitutableParams()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
@@ -719,8 +1064,8 @@ public:
 
     // Each archetype occurring in the substitutions list should belong to the
     // current function.
-    for (auto sub : subs) {
-      sub.getReplacement()->getCanonicalType().visit([&](CanType t) {
+    for (auto replacementType : subs.getReplacementTypes()) {
+      replacementType->getCanonicalType().visit([&](CanType t) {
         auto A = dyn_cast<ArchetypeType>(t);
         if (!A)
           return;
@@ -756,7 +1101,7 @@ public:
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
-                Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
+                properlyDominates(cast<SILInstruction>(Def), AI),
                 "Use of an opened archetype should be dominated by a "
                 "definition of this opened archetype");
       }
@@ -766,8 +1111,8 @@ public:
     };
 
     // Search for opened archetypes and dynamic self.
-    for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement()->getCanonicalType().visit(HandleType);
+    for (auto Replacement : AS.getSubstitutionMap().getReplacementTypes()) {
+      Replacement->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
@@ -803,7 +1148,7 @@ public:
 
     // Then make sure that we have a type that can be substituted for the
     // callee.
-    auto substTy = checkApplySubstitutions(site.getSubstitutions(),
+    auto substTy = checkApplySubstitutions(site.getSubstitutionMap(),
                                            site.getCallee()->getType());
     require(site.getOrigCalleeType()->getRepresentation() ==
             site.getSubstCalleeType()->getRepresentation(),
@@ -959,7 +1304,7 @@ public:
 
     checkApplyTypeDependentArguments(PAI);
 
-    auto substTy = checkApplySubstitutions(PAI->getSubstitutions(),
+    auto substTy = checkApplySubstitutions(PAI->getSubstitutionMap(),
                                         PAI->getCallee()->getType());
 
     require(!PAI->getSubstCalleeType()->isPolymorphic(),
@@ -1071,7 +1416,7 @@ public:
       auto isSwiftRefcounted = [](SILType t) -> bool {
         if (t.is<SILBoxType>())
           return true;
-        if (t.getSwiftRValueType() == t.getASTContext().TheNativeObjectType)
+        if (t.getASTType() == t.getASTContext().TheNativeObjectType)
           return true;
         if (auto clas = t.getClassOrBoundGenericClass())
           // Must be a class defined in Swift.
@@ -1102,14 +1447,17 @@ public:
 
     SILFunction *RefF = FRI->getReferencedFunction();
 
-    // A direct reference to a shared_external declaration is an error; we
-    // should have deserialized a body.
-    if (RefF->isExternalDeclaration()) {
-      require(SingleFunction ||
-              !hasSharedVisibility(RefF->getLinkage()) ||
-              RefF->hasForeignBody(),
-              "external declarations of SILFunctions with shared visibility is "
-              "not allowed");
+    // In canonical SIL, direct reference to a shared_external declaration
+    // is an error; we should have deserialized a body. In raw SIL, we may
+    // not have deserialized the body yet.
+    if (F.getModule().getStage() >= SILStage::Canonical) {
+      if (RefF->isExternalDeclaration()) {
+        require(SingleFunction ||
+                !hasSharedVisibility(RefF->getLinkage()) ||
+                RefF->hasForeignBody(),
+                "external declarations of SILFunctions with shared visibility is "
+                "not allowed");
+      }
     }
 
     // A direct reference to a non-public or shared but not fragile function
@@ -1341,12 +1689,12 @@ public:
   void checkLoadUnownedInst(LoadUnownedInst *LUI) {
     require(LUI->getType().isObject(), "Result of load must be an object");
     auto PointerType = LUI->getOperand()->getType();
-    auto PointerRVType = PointerType.getSwiftRValueType();
+    auto PointerRVType = PointerType.getASTType();
     require(PointerType.isAddress() &&
             PointerRVType->is<UnownedStorageType>(),
             "load_unowned operand must be an unowned address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            LUI->getType().getSwiftRValueType(),
+            LUI->getType().getASTType(),
             "Load operand type and result type mismatch");
   }
 
@@ -1354,12 +1702,12 @@ public:
     require(SUI->getSrc()->getType().isObject(),
             "Can't store from an address source");
     auto PointerType = SUI->getDest()->getType();
-    auto PointerRVType = PointerType.getSwiftRValueType();
+    auto PointerRVType = PointerType.getASTType();
     require(PointerType.isAddress() &&
             PointerRVType->is<UnownedStorageType>(),
             "store_unowned address operand must be an unowned address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SUI->getSrc()->getType().getSwiftRValueType(),
+            SUI->getSrc()->getType().getASTType(),
             "Store operand type and dest type mismatch");
   }
 
@@ -1368,12 +1716,12 @@ public:
     require(LWI->getType().getOptionalObjectType(),
             "Result of weak load must be an optional");
     auto PointerType = LWI->getOperand()->getType();
-    auto PointerRVType = PointerType.getSwiftRValueType();
+    auto PointerRVType = PointerType.getASTType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
             "load_weak operand must be a weak address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            LWI->getType().getSwiftRValueType(),
+            LWI->getType().getASTType(),
             "Load operand type and result type mismatch");
   }
 
@@ -1383,12 +1731,12 @@ public:
     require(SWI->getSrc()->getType().getOptionalObjectType(),
             "store_weak must be of an optional value");
     auto PointerType = SWI->getDest()->getType();
-    auto PointerRVType = PointerType.getSwiftRValueType();
+    auto PointerRVType = PointerType.getASTType();
     require(PointerType.isAddress() &&
             PointerRVType->is<WeakStorageType>(),
             "store_weak address operand must be a weak address");
     require(PointerRVType->getReferenceStorageReferent()->getCanonicalType() ==
-            SWI->getSrc()->getType().getSwiftRValueType(),
+            SWI->getSrc()->getType().getASTType(),
             "Store operand type and dest type mismatch");
   }
 
@@ -1397,9 +1745,7 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-                Src->getType()
-                    .getSwiftRValueType()
-                    ->getClassOrBoundGenericClass() ||
+                Src->getType().getClassOrBoundGenericClass() ||
                 Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
@@ -1467,6 +1813,8 @@ public:
             "Dest address should be lvalue");
     require(SI->getDest()->getType() == SI->getSrc()->getType(),
             "Store operand type and dest type mismatch");
+    require(F.getModule().isTypeABIAccessible(SI->getDest()->getType()),
+            "cannot directly copy type with inaccessible ABI");
   }
 
   void checkRetainValueInst(RetainValueInst *I) {
@@ -1544,13 +1892,23 @@ public:
     require(I->getOperand()->getType() == I->getType(),
             "result of copy_block should be same type as operand");
   }
+  void checkCopyBlockInst(CopyBlockWithoutEscapingInst *I) {
+    require(I->getBlock()->getType().isBlockPointerCompatible(),
+            "operand of copy_block should be a block");
+    require(I->getBlock()->getType() == I->getType(),
+            "result of copy_block should be same type as operand");
+    auto FnTy = requireObjectType(SILFunctionType, I->getClosure(),
+                                  "copy_block_without_escaping operand");
+    require(!FnTy->isNoEscape(),
+            "closure parameter must not be a @noescape closure");
+  }
 
   void checkAllocValueBufferInst(AllocValueBufferInst *I) {
     require(I->getOperand()->getType().isAddress(),
             "Operand value should be an address");
     require(I->getOperand()->getType().is<BuiltinUnsafeValueBufferType>(),
             "Operand value should be a Builtin.UnsafeValueBuffer");
-    verifyOpenedArchetype(I, I->getValueType().getSwiftRValueType());
+    verifyOpenedArchetype(I, I->getValueType().getASTType());
   }
 
   void checkProjectValueBufferInst(ProjectValueBufferInst *I) {
@@ -1596,7 +1954,7 @@ public:
     if (auto *AEBI = dyn_cast<AllocExistentialBoxInst>(PEBI->getOperand())) {
       // The lowered type must be the properly-abstracted form of the AST type.
       SILType exType = AEBI->getExistentialType();
-      auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+      auto archetype = ArchetypeType::getOpened(exType.getASTType());
 
       auto loweredTy = F.getModule().Types.getLoweredType(
                                       Lowering::AbstractionPattern(archetype),
@@ -1678,8 +2036,12 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    requireSameType(caseTy, UI->getType(),
-            "InitEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      requireSameType(
+          caseTy, UI->getType(),
+          "InitEnumDataAddrInst result does not match type of enum case");
+    }
   }
 
   void checkUncheckedEnumDataInst(UncheckedEnumDataInst *UI) {
@@ -1697,8 +2059,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedEnumData result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(),
+              "UncheckedEnumData result does not match type of enum case");
+    }
   }
 
   void checkUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UI) {
@@ -1716,8 +2081,11 @@ public:
     SILType caseTy =
       UI->getOperand()->getType().getEnumElementType(UI->getElement(),
                                                     F.getModule());
-    require(caseTy == UI->getType(),
-            "UncheckedTakeEnumDataAddrInst result does not match type of enum case");
+
+    if (UI->getModule().getStage() != SILStage::Lowered) {
+      require(caseTy == UI->getType(), "UncheckedTakeEnumDataAddrInst result "
+                                       "does not match type of enum case");
+    }
   }
 
   void checkInjectEnumAddrInst(InjectEnumAddrInst *IUAI) {
@@ -1739,7 +2107,7 @@ public:
 
     if (TI->getModule().getStage() != SILStage::Lowered) {
       for (size_t i = 0, size = TI->getElements().size(); i < size; ++i) {
-        require(TI->getElement(i)->getType().getSwiftRValueType() ==
+        require(TI->getElement(i)->getType().getASTType() ==
                     ResTy.getElementType(i),
                 "Tuple element arguments do not match tuple type!");
       }
@@ -1879,6 +2247,8 @@ public:
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand()->getType().isAddress(),
             "Operand of destroy_addr must be address");
+    require(F.getModule().isTypeABIAccessible(DI->getOperand()->getType()),
+            "cannot directly destroy type with inaccessible ABI");
   }
 
   void checkBindMemoryInst(BindMemoryInst *BI) {
@@ -1922,7 +2292,7 @@ public:
     require(EI->getFieldNo() < operandTy->getNumElements(),
             "invalid field index for tuple_extract instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      require(EI->getType().getSwiftRValueType() ==
+      require(EI->getType().getASTType() ==
                   operandTy.getElementType(EI->getFieldNo()),
               "type of tuple_extract does not match type of element");
     }
@@ -1965,7 +2335,7 @@ public:
     require(EI->getFieldNo() < fields.size(),
             "invalid field index for element_addr instruction");
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      require(EI->getType().getSwiftRValueType() ==
+      require(EI->getType().getASTType() ==
                   CanType(fields[EI->getFieldNo()].getType()),
               "type of tuple_element_addr does not match type of element");
     }
@@ -2080,10 +2450,7 @@ public:
       require(AMI->getTypeDependentOperands().empty(),
               "Should not have an operand for the opened existential");
     }
-    if (isa<ArchetypeType>(lookupType) || lookupType->isAnyExistentialType()) {
-      require(AMI->getConformance().isAbstract(),
-              "archetype or existential lookup should have abstract conformance");
-    } else {
+    if (!isa<ArchetypeType>(lookupType)) {
       require(AMI->getConformance().isConcrete(),
               "concrete type lookup requires concrete conformance");
       auto conformance = AMI->getConformance().getConcrete();
@@ -2107,7 +2474,7 @@ public:
 
     // Map interface types to archetypes.
     if (auto *env = constantInfo.GenericEnv) {
-      auto subs = env->getForwardingSubstitutions();
+      auto subs = env->getForwardingSubstitutionMap();
       methodTy = methodTy->substGenericArgs(F.getModule(), subs);
     }
     assert(!methodTy->isPolymorphic());
@@ -2116,7 +2483,7 @@ public:
     auto params = methodTy->getParameters();
     SmallVector<SILParameterInfo, 4>
       dynParams(params.begin(), params.end() - 1);
-    dynParams.push_back(SILParameterInfo(selfType.getSwiftRValueType(),
+    dynParams.push_back(SILParameterInfo(selfType.getASTType(),
                                          params.back().getConvention()));
 
     auto results = methodTy->getResults();
@@ -2215,7 +2582,7 @@ public:
             "wrong function type representation");
 
     auto operandType = OMI->getOperand()->getType();
-    auto operandInstanceType = operandType.getSwiftRValueType();
+    auto operandInstanceType = operandType.getASTType();
     if (auto metatypeType = dyn_cast<MetatypeType>(operandInstanceType))
       operandInstanceType = metatypeType.getInstanceType();
 
@@ -2228,7 +2595,7 @@ public:
       require(isa<ArchetypeType>(operandInstanceType) ||
               operandInstanceType->isObjCExistentialType(),
               "operand type must be an archetype or self-conforming existential");
-      verifyOpenedArchetype(OMI, OMI->getType().getSwiftRValueType());
+      verifyOpenedArchetype(OMI, OMI->getType().getASTType());
     }
 
     // TODO: We should enforce that ObjC methods are dispatched on ObjC
@@ -2282,7 +2649,7 @@ public:
     require(OEI->getType().isAddress(),
             "open_existential_addr result must be an address");
 
-    auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
+    auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype,
         "open_existential_addr result must be an opened existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2422,7 +2789,7 @@ public:
                                               ExistentialRepresentation::Class),
             "open_existential_ref operand must be class existential");
 
-    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+    CanType resultInstanceTy = OEI->getType().getASTType();
 
     require(OEI->getType().isObject(),
             "open_existential_ref result must be an address");
@@ -2444,7 +2811,7 @@ public:
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
-    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+    CanType resultInstanceTy = OEI->getType().getASTType();
 
     require(OEI->getType().isAddress(),
             "open_existential_box result must be an address");
@@ -2466,7 +2833,7 @@ public:
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
-    CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
+    CanType resultInstanceTy = OEI->getType().getASTType();
 
     require(!OEI->getType().isAddress(),
             "open_existential_box_value result must not be an address");
@@ -2536,7 +2903,7 @@ public:
     require(!OEI->getType().isAddress(),
             "open_existential_value result must not be an address");
 
-    auto archetype = getOpenedArchetypeOf(OEI->getType().getSwiftRValueType());
+    auto archetype = getOpenedArchetypeOf(OEI->getType().getASTType());
     require(archetype, "open_existential_value result must be an opened "
                        "existential archetype");
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
@@ -2571,7 +2938,7 @@ public:
             "existential type");
     
     // The lowered type must be the properly-abstracted form of the AST type.
-    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    auto archetype = ArchetypeType::getOpened(exType.getASTType());
     
     auto loweredTy = F.getModule().Types.getLoweredType(
                                 Lowering::AbstractionPattern(archetype),
@@ -2601,7 +2968,7 @@ public:
             "init_existential_value result must not be an address");
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    auto archetype = ArchetypeType::getOpened(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
         Lowering::AbstractionPattern(archetype), IEI->getFormalConcreteType());
     requireSameType(
@@ -2622,7 +2989,7 @@ public:
 
   void checkInitExistentialRefInst(InitExistentialRefInst *IEI) {
     SILType concreteType = IEI->getOperand()->getType();
-    require(concreteType.getSwiftRValueType()->isBridgeableObjectType(),
+    require(concreteType.getASTType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
     require(IEI->getType().canUseExistentialRepresentation(F.getModule(),
                                      ExistentialRepresentation::Class,
@@ -2633,7 +3000,7 @@ public:
     
     // The operand must be at the right abstraction level for the existential.
     SILType exType = IEI->getType();
-    auto archetype = ArchetypeType::getOpened(exType.getSwiftRValueType());
+    auto archetype = ArchetypeType::getOpened(exType.getASTType());
     auto loweredTy = F.getModule().Types.getLoweredType(
                                        Lowering::AbstractionPattern(archetype),
                                        IEI->getFormalConcreteType());
@@ -2709,7 +3076,7 @@ public:
     }
 
     checkExistentialProtocolConformances(resultType,
-                                         operandType.getSwiftRValueType(),
+                                         operandType.getASTType(),
                                          I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
@@ -2717,7 +3084,7 @@ public:
   void checkExistentialProtocolConformances(SILType resultType,
                                             CanType concreteType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
-    auto layout = resultType.getSwiftRValueType().getExistentialLayout();
+    auto layout = resultType.getASTType().getExistentialLayout();
     auto protocols = layout.getProtocols();
 
     require(conformances.size() == protocols.size(),
@@ -2756,8 +3123,8 @@ public:
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
 
-    auto fromCanTy = fromTy.getSwiftRValueType();
-    auto toCanTy = toTy.getSwiftRValueType();
+    auto fromCanTy = fromTy.getASTType();
+    auto toCanTy = toTy.getASTType();
 
     require(isOpaque || canUseScalarCheckedCastInstructions(F.getModule(),
                                                             fromCanTy, toCanTy),
@@ -2803,14 +3170,14 @@ public:
     verifyCheckedCast(/*exact*/ false,
                       CI->getOperand()->getType(),
                       CI->getType());
-    verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
   void checkUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
     verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
                       CI->getType(), true);
-    verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(CI, CI->getType().getASTType());
   }
 
   /// Verify if a given type is or contains an opened archetype or dynamic self.
@@ -2850,7 +3217,7 @@ public:
     verifyCheckedCast(CBI->isExact(),
                       CBI->getOperand()->getType(),
                       CBI->getCastType());
-    verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
+    verifyOpenedArchetype(CBI, CBI->getCastType().getASTType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
@@ -2877,7 +3244,7 @@ public:
   void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
     verifyCheckedCast(false, CBI->getOperand()->getType(), CBI->getCastType(),
                       true);
-    verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
+    verifyOpenedArchetype(CBI, CBI->getCastType().getASTType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_value_br must take one argument");
@@ -2967,7 +3334,7 @@ public:
   void checkRefToUnownedInst(RefToUnownedInst *I) {
     requireReferenceStorageCapableValue(I->getOperand(),
                                         "Operand of ref_to_unowned");
-    auto operandType = I->getOperand()->getType().getSwiftRValueType();
+    auto operandType = I->getOperand()->getType().getASTType();
     auto resultType = requireObjectType(UnownedStorageType, I,
                                         "Result of ref_to_unowned");
     require(resultType->isLoadable(ResilienceExpansion::Maximal),
@@ -2984,7 +3351,7 @@ public:
     require(operandType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_to_ref requires unowned type to be loadable");
     requireReferenceStorageCapableValue(I, "Result of unowned_to_ref");
-    auto resultType = I->getType().getSwiftRValueType();
+    auto resultType = I->getType().getASTType();
     require(operandType.getReferentType() == resultType,
             "Operand of unowned_to_ref does not have the "
             "operand's type as its referent type");
@@ -2993,7 +3360,7 @@ public:
   void checkRefToUnmanagedInst(RefToUnmanagedInst *I) {
     requireReferenceStorageCapableValue(I->getOperand(),
                                         "Operand of ref_to_unmanaged");
-    auto operandType = I->getOperand()->getType().getSwiftRValueType();
+    auto operandType = I->getOperand()->getType().getASTType();
     auto resultType = requireObjectType(UnmanagedStorageType, I,
                                         "Result of ref_to_unmanaged");
     require(resultType.getReferentType() == operandType,
@@ -3006,7 +3373,7 @@ public:
                                          I->getOperand(),
                                          "Operand of unmanaged_to_ref");
     requireReferenceStorageCapableValue(I, "Result of unmanaged_to_ref");
-    auto resultType = I->getType().getSwiftRValueType();
+    auto resultType = I->getType().getASTType();
     require(operandType.getReferentType() == resultType,
             "Operand of unmanaged_to_ref does not have the "
             "operand's type as its referent type");
@@ -3047,12 +3414,12 @@ public:
 
     // Upcast from Optional<B> to Optional<A> is legal as long as B is a
     // subclass of A.
-    if (ToTy.getSwiftRValueType().getOptionalObjectType() &&
-        FromTy.getSwiftRValueType().getOptionalObjectType()) {
+    if (ToTy.getASTType().getOptionalObjectType() &&
+        FromTy.getASTType().getOptionalObjectType()) {
       ToTy = SILType::getPrimitiveObjectType(
-          ToTy.getSwiftRValueType().getOptionalObjectType());
+          ToTy.getASTType().getOptionalObjectType());
       FromTy = SILType::getPrimitiveObjectType(
-          FromTy.getSwiftRValueType().getOptionalObjectType());
+          FromTy.getASTType().getOptionalObjectType());
     }
 
     auto ToClass = ToTy.getClassOrBoundGenericClass();
@@ -3060,7 +3427,7 @@ public:
             "upcast must convert a class instance to a class type");
       if (ToClass->usesObjCGenericsModel()) {
         require(ToClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType()),
+                  ->isBindableToSuperclassOf(FromTy.getASTType()),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
         require(ToTy.isExactSuperclassOf(FromTy),
@@ -3071,13 +3438,13 @@ public:
   void checkAddressToPointerInst(AddressToPointerInst *AI) {
     require(AI->getOperand()->getType().isAddress(),
             "address-to-pointer operand must be an address");
-    require(AI->getType().getSwiftRValueType()->isEqual(
+    require(AI->getType().getASTType()->isEqual(
                               AI->getType().getASTContext().TheRawPointerType),
             "address-to-pointer result type must be RawPointer");
   }
   
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(AI, AI->getType().getASTType());
     require(AI->getOperand()->getType().isObject(),
             "unchecked_ref_cast operand must be a value");
     require(AI->getType().isObject(),
@@ -3101,7 +3468,7 @@ public:
   }
   
   void checkUncheckedAddrCastInst(UncheckedAddrCastInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(AI, AI->getType().getASTType());
 
     require(AI->getOperand()->getType().isAddress(),
             "unchecked_addr_cast operand must be an address");
@@ -3110,7 +3477,7 @@ public:
   }
   
   void checkUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_trivial_bit_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -3120,7 +3487,7 @@ public:
   }
 
   void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
-    verifyOpenedArchetype(BI, BI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(BI, BI->getType().getASTType());
     require(BI->getOperand()->getType().isObject(),
             "unchecked_bitwise_cast must operate on a value");
     require(BI->getType().isObject(),
@@ -3128,23 +3495,22 @@ public:
   }
 
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
-    require(AI->getOperand()->getType().getSwiftRValueType()
-              ->isAnyClassReferenceType(),
+    require(AI->getOperand()->getType().isAnyClassReferenceType(),
             "ref-to-raw-pointer operand must be a class reference or"
             " NativeObject");
-    require(AI->getType().getSwiftRValueType()->isEqual(
+    require(AI->getType().getASTType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "ref-to-raw-pointer result must be RawPointer");
   }
 
   void checkRawPointerToRefInst(RawPointerToRefInst *AI) {
-    verifyOpenedArchetype(AI, AI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(AI, AI->getType().getASTType());
     require(AI->getType()
-              .getSwiftRValueType()->isBridgeableObjectType()
-            || AI->getType().getSwiftRValueType()->isEqual(
+              .getASTType()->isBridgeableObjectType()
+            || AI->getType().getASTType()->isEqual(
                              AI->getType().getASTContext().TheNativeObjectType),
         "raw-pointer-to-ref result must be a class reference or NativeObject");
-    require(AI->getOperand()->getType().getSwiftRValueType()->isEqual(
+    require(AI->getOperand()->getType().getASTType()->isEqual(
                             AI->getType().getASTContext().TheRawPointerType),
             "raw-pointer-to-ref operand must be NativeObject");
   }
@@ -3152,7 +3518,7 @@ public:
   void checkRefToBridgeObjectInst(RefToBridgeObjectInst *RI) {
     require(RI->getConverted()->getType().isObject(),
             "ref_to_bridge_object must convert from a value");
-    require(RI->getConverted()->getType().getSwiftRValueType()
+    require(RI->getConverted()->getType().getASTType()
               ->isBridgeableObjectType(),
             "ref_to_bridge_object must convert from a heap object ref");
     require(RI->getBitsOperand()->getType()
@@ -3163,13 +3529,13 @@ public:
   }
   
   void checkBridgeObjectToRefInst(BridgeObjectToRefInst *RI) {
-    verifyOpenedArchetype(RI, RI->getType().getSwiftRValueType());
+    verifyOpenedArchetype(RI, RI->getType().getASTType());
     require(RI->getConverted()->getType()
                == SILType::getBridgeObjectType(F.getASTContext()),
             "bridge_object_to_ref must take a BridgeObject");
     require(RI->getType().isObject(),
             "bridge_object_to_ref must produce a value");
-    require(RI->getType().getSwiftRValueType()->isBridgeableObjectType(),
+    require(RI->getType().getASTType()->isBridgeableObjectType(),
             "bridge_object_to_ref must produce a heap object reference");
   }
   void checkBridgeObjectToWordInst(BridgeObjectToWordInst *RI) {
@@ -3207,6 +3573,18 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI");
+
+    // After mandatory passes convert_escape_to_noescape should not have the
+    // '[not_guaranteed]' or '[escaped]' attributes.
+    if (!SkipConvertEscapeToNoescapeAttributes &&
+        F.getModule().getStage() != SILStage::Raw) {
+      require(!ICI->isEscapedByUser(),
+              "convert_escape_to_noescape [escaped] not "
+              "allowed after mandatory passes");
+      require(ICI->isLifetimeGuaranteed(),
+              "convert_escape_to_noescape [not_guaranteed] not "
+              "allowed after mandatory passes");
+    }
   }
 
   void checkThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -3625,9 +4003,9 @@ public:
 
     require(DMBI->getMember().getDecl()->isObjC(), "method must be @objc");
     if (!DMBI->getMember().getDecl()->isInstanceMember()) {
-      require(operandType.getSwiftRValueType()->is<MetatypeType>(),
+      require(operandType.is<MetatypeType>(),
               "operand must have metatype type");
-      require(operandType.getSwiftRValueType()->castTo<MetatypeType>()
+      require(operandType.castTo<MetatypeType>()
                 ->getInstanceType()->mayHaveSuperclass(),
               "operand must have metatype of class or class-bound type");
     }
@@ -3638,8 +4016,8 @@ public:
 
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
-              .getSwiftRValueType()
-              ->isBindableTo(bbArgTy.getSwiftRValueType()),
+              .getASTType()
+              ->isBindableTo(bbArgTy.getASTType()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 
@@ -3651,7 +4029,7 @@ public:
     
     require(PBSI->getType().isAddress(),
             "result must be an address");
-    auto captureTy = PBSI->getType().getSwiftRValueType();
+    auto captureTy = PBSI->getType().getASTType();
     require(storageTy->getCaptureType() == captureTy,
             "result must be the capture type of the @block_storage type");
   }
@@ -3751,7 +4129,7 @@ public:
             "objc_metatype_to_object must take an @objc metatype value");
     require(OMOI->getType().isObject(),
             "objc_metatype_to_object must produce a value");
-    require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
+    require(OMOI->getType().getASTType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
   }
 
@@ -3766,7 +4144,7 @@ public:
             "objc_metatype_to_object must take an @objc existential metatype value");
     require(OMOI->getType().isObject(),
             "objc_metatype_to_object must produce a value");
-    require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
+    require(OMOI->getType().getASTType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
   }
   
@@ -3785,10 +4163,7 @@ public:
     
     auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
     auto pattern = KPI->getPattern();
-    SubstitutionMap patternSubs;
-    if (pattern->getGenericSignature())
-      patternSubs = pattern->getGenericSignature()
-                           ->getSubstitutionMap(KPI->getSubstitutions());
+    SubstitutionMap patternSubs = KPI->getSubstitutions();
     require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
             "keypath root type should match root type of keypath pattern");
 
@@ -3801,279 +4176,39 @@ public:
                                           pattern->getGenericSignature());
       
       for (auto &component : pattern->getComponents()) {
-        auto loweredBaseTy =
-          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             baseTy);
-        auto componentTy = component.getComponentType().subst(patternSubs)
-          ->getCanonicalType();
-        auto loweredComponentTy =
-          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
-                                             componentTy);
-        
-        switch (auto kind = component.getKind()) {
-        case KeyPathPatternComponent::Kind::StoredProperty: {
-          auto property = component.getStoredPropertyDecl();
-          require(property->getDeclContext()
-                   == baseTy->getAnyNominal(),
-                  "property decl should be a member of the component base type");
-          switch (property->getStorageKind()) {
-          case AbstractStorageDecl::Stored:
-          case AbstractStorageDecl::StoredWithObservers:
-          case AbstractStorageDecl::StoredWithTrivialAccessors:
-            break;
-          case AbstractStorageDecl::Addressed:
-          case AbstractStorageDecl::AddressedWithObservers:
-          case AbstractStorageDecl::AddressedWithTrivialAccessors:
-          case AbstractStorageDecl::Computed:
-          case AbstractStorageDecl::ComputedWithMutableAddress:
-          case AbstractStorageDecl::InheritedWithObservers:
-            require(false, "property must be stored");
-          }
-          auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
-          require(propertyTy.getObjectType()
-                    == loweredComponentTy.getObjectType(),
-                  "component type should match the maximal abstraction of the "
-                  "formal type");
-          break;
-        }
-          
-        case KeyPathPatternComponent::Kind::GettableProperty:
-        case KeyPathPatternComponent::Kind::SettableProperty: {
-          bool hasIndices = !component.getSubscriptIndices().empty();
-        
-          ParameterConvention normalArgConvention;
-          if (F.getModule().getOptions().EnableGuaranteedNormalArguments)
-            normalArgConvention = ParameterConvention::Indirect_In_Guaranteed;
+        bool hasIndices;
+        switch (component.getKind()) {
+        case KeyPathPatternComponent::Kind::External:
+          if (auto subscript =
+                           dyn_cast<SubscriptDecl>(component.getExternalDecl()))
+            hasIndices = subscript->getIndices()->size() != 0;
           else
-            normalArgConvention = ParameterConvention::Indirect_In;
+            hasIndices = false;
+          break;
         
-          // Getter should be <Sig...> @convention(thin) (@in_guaranteed Base) -> @out Result
-          {
-            auto getter = component.getComputedPropertyGetter();
-            auto substGetterType = getter->getLoweredFunctionType()
-              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-            require(substGetterType->getRepresentation() ==
-                      SILFunctionTypeRepresentation::Thin,
-                    "getter should be a thin function");
-            
-            require(substGetterType->getNumParameters() == 1 + hasIndices,
-                    "getter should have one parameter");
-            auto baseParam = substGetterType->getParameters()[0];
-            require(baseParam.getConvention() == normalArgConvention,
-                    "getter base parameter should have normal arg convention");
-            require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
-                    "getter base parameter should match base of component");
-            
-            if (hasIndices) {
-              auto indicesParam = substGetterType->getParameters()[1];
-              require(indicesParam.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(indicesParam.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-            }
-
-            require(substGetterType->getNumResults() == 1,
-                    "getter should have one result");
-            auto result = substGetterType->getResults()[0];
-            require(result.getConvention() == ResultConvention::Indirect,
-                    "getter result should be @out");
-            require(result.getType() == loweredComponentTy.getSwiftRValueType(),
-                    "getter result should match the maximal abstraction of the "
-                    "formal component type");
-          }
-          
-          if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
-            // Setter should be
-            // <Sig...> @convention(thin) (@in_guaranteed Result, @in Base) -> ()
-            
-            auto setter = component.getComputedPropertySetter();
-            auto substSetterType = setter->getLoweredFunctionType()
-              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-            
-            require(substSetterType->getRepresentation() ==
-                      SILFunctionTypeRepresentation::Thin,
-                    "setter should be a thin function");
-            
-            require(substSetterType->getNumParameters() == 2 + hasIndices,
-                    "setter should have two parameters");
-
-            auto newValueParam = substSetterType->getParameters()[0];
-            // TODO: This should probably be unconditionally +1 when we
-            // can represent that.
-            require(newValueParam.getConvention() == normalArgConvention,
-                    "setter value parameter should havee normal arg convention");
-
-            auto baseParam = substSetterType->getParameters()[1];
-            require(baseParam.getConvention() == normalArgConvention
-                    || baseParam.getConvention() ==
-                        ParameterConvention::Indirect_Inout,
-                    "setter base parameter should be normal arg convention "
-                    "or @inout");
-            
-            if (hasIndices) {
-              auto indicesParam = substSetterType->getParameters()[2];
-              require(indicesParam.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(indicesParam.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-            }
-
-            require(newValueParam.getType() ==
-                      loweredComponentTy.getSwiftRValueType(),
-                    "setter value should match the maximal abstraction of the "
-                    "formal component type");
-            
-            require(substSetterType->getNumResults() == 0,
-                    "setter should have no results");
-          }
-          
-          for (auto &index : component.getSubscriptIndices()) {
-            auto opIndex = index.Operand;
-            auto contextType =
-              index.LoweredType.subst(F.getModule(), patternSubs);
-            requireSameType(contextType,
-                            KPI->getAllOperands()[opIndex].get()->getType(),
-                            "operand must match type required by pattern");
-            require(isLoweringOf(index.LoweredType, index.FormalType),
-                    "pattern index formal type doesn't match lowered type");
-          }
-          
-          if (!component.getSubscriptIndices().empty()) {
-            // Equals should be
-            // <Sig...> @convention(thin) (RawPointer, RawPointer) -> Bool
-            {
-              auto equals = component.getSubscriptIndexEquals();
-              require(equals, "key path pattern with indexes must have equals "
-                              "operator");
-              
-              auto substEqualsType = equals->getLoweredFunctionType()
-                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-              
-              require(substEqualsType->getParameters().size() == 2,
-                      "must have two arguments");
-              for (unsigned i = 0; i < 2; ++i) {
-                auto param = substEqualsType->getParameters()[i];
-                require(param.getConvention()
-                          == ParameterConvention::Direct_Unowned,
-                        "indices pointer should be trivial");
-                require(param.getType()->getAnyNominal()
-                          == C.getUnsafeRawPointerDecl(),
-                        "indices pointer should be an UnsafeRawPointer");
-              }
-              
-              require(substEqualsType->getResults().size() == 1,
-                      "must have one result");
-              
-              require(substEqualsType->getResults()[0].getConvention()
-                        == ResultConvention::Unowned,
-                      "result should be unowned");
-              require(substEqualsType->getResults()[0].getType()->getAnyNominal()
-                        == C.getBoolDecl(),
-                      "result should be Bool");
-            }
-            {
-              // Hash should be
-              // <Sig...> @convention(thin) (RawPointer) -> Int
-              auto hash = component.getSubscriptIndexHash();
-              require(hash, "key path pattern with indexes must have hash "
-                            "operator");
-              
-              auto substHashType = hash->getLoweredFunctionType()
-                ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
-              
-              require(substHashType->getParameters().size() == 1,
-                      "must have two arguments");
-              auto param = substHashType->getParameters()[0];
-              require(param.getConvention()
-                        == ParameterConvention::Direct_Unowned,
-                      "indices pointer should be trivial");
-              require(param.getType()->getAnyNominal()
-                        == C.getUnsafeRawPointerDecl(),
-                      "indices pointer should be an UnsafeRawPointer");
-              
-              require(substHashType->getResults().size() == 1,
-                      "must have one result");
-              
-              require(substHashType->getResults()[0].getConvention()
-                        == ResultConvention::Unowned,
-                      "result should be unowned");
-              require(substHashType->getResults()[0].getType()->getAnyNominal()
-                        == C.getIntDecl(),
-                      "result should be Int");
-            }
-          } else {
-            require(!component.getSubscriptIndexEquals()
-                    && !component.getSubscriptIndexHash(),
-                    "component without indexes must not have equals/hash");
-          }
-
+        case KeyPathPatternComponent::Kind::GettableProperty:
+        case KeyPathPatternComponent::Kind::SettableProperty:
+          hasIndices = !component.getSubscriptIndices().empty();
           break;
-        }
-        case KeyPathPatternComponent::Kind::External: {
-          // The component type should match the substituted type of the
-          // referenced property.
-          auto decl = component.getExternalDecl();
-          auto sig = decl->getInnermostDeclContext()
-                         ->getGenericSignatureOfContext()
-                         ->getCanonicalSignature();
-          auto subs =
-                sig->getSubstitutionMap(component.getExternalSubstitutions());
-          auto substType = component.getExternalDecl()->getStorageInterfaceType()
-            .subst(subs);
-          require(substType->isEqual(component.getComponentType()),
-                  "component type should match storage type of referenced "
-                  "declaration");
-
-          // Index types should match the lowered index types expected by the
-          // external declaration.
-          if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-            auto indexParams = sub->getIndices();
-            require(indexParams->size() == component.getSubscriptIndices().size(),
-                    "number of subscript indices should match referenced decl");
-            for (unsigned i : indices(*indexParams)) {
-              auto param = (*indexParams)[i];
-              auto &index = component.getSubscriptIndices()[i];
-              auto paramTy = param->getInterfaceType()->getCanonicalType();
-              auto substParamTy = paramTy.subst(subs);
-              auto loweredTy = F.getModule().Types.getLoweredType(
-                AbstractionPattern(sig, paramTy), substParamTy);
-              requireSameType(index.LoweredType, loweredTy,
-                            "index lowered types should match referenced decl");
-              require(index.FormalType == substParamTy->getCanonicalType(),
-                      "index formal types should match referenced decl");
-            }
-          } else {
-            require(component.getSubscriptIndices().empty(),
-                    "external var reference should not apply indices");
-          }
-          
-          break;
-        }
-        case KeyPathPatternComponent::Kind::OptionalChain: {
-          require(baseTy->getOptionalObjectType()->isEqual(componentTy),
-                  "chaining component should unwrap optional");
-          require(leafTy->getOptionalObjectType(),
-                  "key path with chaining component should have optional "
-                  "result");
-          break;
-        }
-        case KeyPathPatternComponent::Kind::OptionalForce: {
-          require(baseTy->getOptionalObjectType()->isEqual(componentTy),
-                  "forcing component should unwrap optional");
-          break;
-        }
-        case KeyPathPatternComponent::Kind::OptionalWrap: {
-          require(componentTy->getOptionalObjectType()->isEqual(baseTy),
-                  "wrapping component should wrap optional");
-          break;
-        }
-        }
         
-        baseTy = componentTy;
+        case KeyPathPatternComponent::Kind::StoredProperty:
+        case KeyPathPatternComponent::Kind::OptionalChain:
+        case KeyPathPatternComponent::Kind::OptionalWrap:
+        case KeyPathPatternComponent::Kind::OptionalForce:
+          hasIndices = false;
+          break;
+        }
+      
+        verifyKeyPathComponent(F.getModule(),
+          [&](bool reqt, StringRef message) { _require(reqt, message); },
+          baseTy,
+          leafTy,
+          component,
+          KPI->getAllOperands(),
+          KPI->getPattern()->getGenericSignature(),
+          KPI->getSubstitutions(),
+          /*property descriptor*/false,
+          hasIndices);
       }
     }
     require(CanType(baseTy) == CanType(leafTy),
@@ -4081,13 +4216,22 @@ public:
   }
 
   void checkIsEscapingClosureInst(IsEscapingClosureInst *IEC) {
-    auto fnType = IEC->getOperand()->getType().getAs<SILFunctionType>();
+    // The closure operand is allowed to be an optional closure.
+    auto operandType = IEC->getOperand()->getType();
+    if (operandType.getOptionalObjectType())
+      operandType = operandType.getOptionalObjectType();
+
+    auto fnType = operandType.getAs<SILFunctionType>();
     require(fnType && fnType->getExtInfo().hasContext() &&
                 !fnType->isNoEscape() &&
                 fnType->getExtInfo().getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
             "is_escaping_closure must have a thick "
             "function operand");
+    require(IEC->getVerificationType() == IsEscapingClosureInst::ObjCEscaping ||
+                IEC->getVerificationType() ==
+                    IsEscapingClosureInst::WithoutActuallyEscaping,
+            "unknown verfication type");
   }
 
   // This verifies that the entry block of a SIL function doesn't have
@@ -4190,9 +4334,8 @@ public:
     }
   }
 
-  bool
-  isUnreachableAlongAllPathsStartingAt(SILBasicBlock *StartBlock,
-                                       SmallPtrSet<SILBasicBlock *, 16> &Visited) {
+  bool isUnreachableAlongAllPathsStartingAt(
+      SILBasicBlock *StartBlock, SmallPtrSetImpl<SILBasicBlock *> &Visited) {
     if (isa<UnreachableInst>(StartBlock->getTerminator()))
       return true;
     else if (isa<ReturnInst>(StartBlock->getTerminator()))
@@ -4469,16 +4612,14 @@ public:
 
     const SILDebugScope *LastSeenScope = nullptr;
     for (SILInstruction &SI : *BB) {
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
       LastSeenScope = SI.getDebugScope();
       AlreadySeenScopes.insert(LastSeenScope);
       break;
     }
     for (SILInstruction &SI : *BB) {
-      // `alloc_stack` can create false positive, so we skip it
-      // for now.
-      if (isa<AllocStackInst>(SI))
+      if (SI.isMetaInstruction())
         continue;
 
       // If we haven't seen this debug scope yet, update the
@@ -4516,6 +4657,9 @@ public:
       }
       if (DS != LastSeenScope) {
         DEBUG(llvm::dbgs() << "Broken instruction!\n"; SI.dump());
+        DEBUG(llvm::dbgs() << "Please report a bug on bugs.swift.org\n");
+        DEBUG(llvm::dbgs() <<
+          "Pass -Xllvm -verify-di-holes=false to disable the verification\n");
         require(
             DS == LastSeenScope,
             "Basic block contains a non-contiguous lexical scope at -Onone");
@@ -4643,6 +4787,62 @@ void SILFunction::verify(bool SingleFunction) const {
   // ensures that the pretty stack trace in the verifier is included with the
   // back trace when the verifier crashes.
   SILVerifier(*this, SingleFunction).verify();
+}
+
+/// Verify that a property descriptor follows invariants.
+void SILProperty::verify(const SILModule &M) const {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+
+  auto *decl = getDecl();
+  auto *dc = decl->getInnermostDeclContext();
+  auto &component = getComponent();
+  
+  // TODO: base type for global/static descriptors
+  auto sig = dc->getGenericSignatureOfContext();
+  auto baseTy = dc->getInnermostTypeContext()->getSelfInterfaceType()
+                  ->getCanonicalType(sig);
+  auto leafTy = decl->getStorageInterfaceType()->getReferenceStorageReferent()
+                    ->getCanonicalType(sig);
+  SubstitutionMap subs;
+  if (sig) {
+    auto env = dc->getGenericEnvironmentOfContext();
+    subs = env->getForwardingSubstitutionMap();
+    baseTy = env->mapTypeIntoContext(baseTy)->getCanonicalType();
+    leafTy = env->mapTypeIntoContext(leafTy)->getCanonicalType();
+  }
+  bool hasIndices = false;
+  if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+    hasIndices = subscript->getIndices()->size() != 0;
+  }
+
+  auto canSig = sig ? sig->getCanonicalSignature() : nullptr;
+  Lowering::GenericContextScope scope(M.Types, canSig);
+
+  auto require = [&](bool reqt, StringRef message) {
+      if (!reqt) {
+        llvm::errs() << message << "\n";
+        assert(false && "invoking standard assertion failure");
+      }
+    };
+
+  verifyKeyPathComponent(const_cast<SILModule&>(M),
+    require,
+    baseTy,
+    leafTy,
+    component,
+    {},
+    canSig,
+    subs,
+    /*property descriptor*/true,
+    hasIndices);
+  
+  // verifyKeyPathComponent updates baseTy to be the projected type of the
+  // component, which should be the same as the type of the declared storage
+  require(baseTy == leafTy,
+          "component type of property descriptor should match type of storage");
 }
 
 /// Verify that a vtable follows invariants.
@@ -4878,6 +5078,12 @@ void SILModule::verify() const {
       assert(false && "triggering standard assertion failure routine");
     }
     wt.verify(*this);
+  }
+  
+  // Check property descriptors.
+  DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");
+  for (auto &prop : getPropertyList()) {
+    prop.verify(*this);
   }
 }
 

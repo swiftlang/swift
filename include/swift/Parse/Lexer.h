@@ -318,7 +318,11 @@ public:
 
   /// Retrieve the string used to indent the line that contains the given
   /// source location.
-  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc);
+  ///
+  /// If \c ExtraIndentation is not null, it will be set to an appropriate
+  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                         StringRef *ExtraIndentation = nullptr);
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.

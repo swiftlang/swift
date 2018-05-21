@@ -19,6 +19,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@SA@SomeItemSet@FI@theSimpleOldNameNotToRename",
+    "LeftComment": "theSimpleOldNameNotToRename",
+    "RightUsr": "",
+    "RightComment": "__theSimpleNewName",
+    "ModuleName": "SomeModule"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
@@ -487,5 +498,46 @@
     "NewTypeName": "example",
     "SelfIndex": 0,
     "RemovedIndex": 1
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)BarBaseNested",
+    "LeftComment": "BarBaseNested",
+    "RightUsr": "",
+    "RightComment": "BarBase.Nested",
+    "ModuleName": "bar"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@F@barGlobalHoistedFuncOldName",
+    "OldPrintedName": "barGlobalHoistedFuncOldName(_:_:_:)",
+    "OldTypeName": "",
+    "NewPrintedName": "newName(is:at:for:)",
+    "NewTypeName": "AwesomeWrapper"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:1:0:0:0",
+    "LeftUsr": "s:6Cities12ToplevelTypeC6memberyyySayypGSgcF",
+    "LeftComment": "Any",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities10FontWeightO",
+    "LeftComment": "FontWeight",
+    "RightUsr": "",
+    "RightComment": "FontWeighting",
+    "ModuleName": "Cities"
   }
 ]

@@ -206,7 +206,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILGLobalVariable
+// ilist_traits for SILGlobalVariable
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
@@ -214,7 +214,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILGlobalVariable> :
 public ilist_default_traits<::swift::SILGlobalVariable> {
-  typedef ::swift::SILGlobalVariable SILGlobalVariable;
+  using SILGlobalVariable = ::swift::SILGlobalVariable;
 
 public:
   static void deleteNode(SILGlobalVariable *V) {}

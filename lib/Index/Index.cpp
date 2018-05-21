@@ -245,7 +245,7 @@ public:
 
 private:
   bool visitImports(SourceFileOrModule Mod,
-                    llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
+                    llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
                                 bool &HashIsKnown);
@@ -464,8 +464,9 @@ private:
                                     SourceFileOrModule SFOrMod);
   void getRecursiveModuleImports(ModuleDecl &Mod,
                                  SmallVectorImpl<ModuleDecl *> &Imports);
-  void collectRecursiveModuleImports(ModuleDecl &Mod,
-                                     llvm::SmallPtrSet<ModuleDecl *, 16> &Visited);
+  void
+  collectRecursiveModuleImports(ModuleDecl &Mod,
+                                llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
   template <typename F>
   void warn(F log) {
@@ -540,7 +541,7 @@ bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod,
 }
 
 bool IndexSwiftASTWalker::visitImports(
-    SourceFileOrModule TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
+    SourceFileOrModule TopMod, llvm::SmallPtrSetImpl<ModuleDecl *> &Visited) {
   // Dependencies of the stdlib module (like SwiftShims module) are
   // implementation details.
   if (TopMod.getModule().isStdlibModule())
@@ -1329,7 +1330,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
 }
 
 void IndexSwiftASTWalker::collectRecursiveModuleImports(
-    ModuleDecl &TopMod, llvm::SmallPtrSet<ModuleDecl *, 16> &Visited) {
+    ModuleDecl &TopMod, llvm::SmallPtrSetImpl<ModuleDecl *> &Visited) {
 
   bool IsNew = Visited.insert(&TopMod).second;
   if (!IsNew)

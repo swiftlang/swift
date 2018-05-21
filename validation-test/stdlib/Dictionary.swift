@@ -274,13 +274,13 @@ DictionaryTestSuite.test("COW.Fast.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2[MinimalHashableValue(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -330,14 +330,14 @@ DictionaryTestSuite.test("COW.Slow.SubscriptWithKeyDoesNotReallocate")
   do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
 
     expectNil(d2[MinimalHashableClass(42)])
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -864,13 +864,13 @@ DictionaryTestSuite.test("COW.Fast.IndexForKeyDoesNotReallocate") {
   do {
     var d2: [MinimalHashableValue : OpaqueValue<Int>] = [:]
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableValue(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -901,13 +901,13 @@ DictionaryTestSuite.test("COW.Slow.IndexForKeyDoesNotReallocate") {
   do {
     var d2: [MinimalHashableClass : OpaqueValue<Int>] = [:]
     MinimalHashableClass.timesEqualEqualWasCalled = 0
-    MinimalHashableClass.timesHashValueWasCalled = 0
+    MinimalHashableClass.timesHashIntoWasCalled = 0
     expectNil(d2.index(forKey: MinimalHashableClass(42)))
 
     // If the dictionary is empty, we shouldn't be computing the hash value of
     // the provided key.
     expectEqual(0, MinimalHashableClass.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableClass.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableClass.timesHashIntoWasCalled)
   }
 }
 
@@ -1398,9 +1398,9 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     var lastKey: MinimalHashableValue = d2.first!.key
     for i in d2.indices { lastKey = d2[i].key }
 
-    // index(where:) - linear search
+    // firstIndex(where:) - linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let j = d2.index(where: { (k, _) in k == lastKey })!
+    let j = d2.firstIndex(where: { (k, _) in k == lastKey })!
     expectGE(MinimalHashableValue.timesEqualEqualWasCalled, 8)
 
     // index(forKey:) - O(1) bucket + linear search
@@ -1408,9 +1408,9 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     let k = d2.index(forKey: lastKey)!
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
     
-    // keys.index(of:) - O(1) bucket + linear search
+    // keys.firstIndex(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    let l = d2.keys.index(of: lastKey)!
+    let l = d2.keys.firstIndex(of: lastKey)!
 #if swift(>=4.0)
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
 #endif
@@ -1713,13 +1713,13 @@ DictionaryTestSuite.test("mapValues(_:)") {
       uniqueKeysWithValues: d1.lazy.map { (MinimalHashableValue($0), $1) })
     expectEqual(d3.count, 3)
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
 
     // Calling mapValues shouldn't ever recalculate any hashes.
     let d4 = d3.mapValues(String.init)
     expectEqual(d4.count, d3.count)
     expectEqual(0, MinimalHashableValue.timesEqualEqualWasCalled)
-    expectEqual(0, MinimalHashableValue.timesHashValueWasCalled)
+    expectEqual(0, MinimalHashableValue.timesHashIntoWasCalled)
   }
 }
 
@@ -4464,11 +4464,11 @@ DictionaryTestSuite.test("misc") {
     expectOptionalEqual(4, d3["four"])
     expectOptionalEqual(5, d3["five"])
 
-    expectEqual(3, d.values[d.keys.index(of: "three")!])
-    expectEqual(4, d.values[d.keys.index(of: "four")!])
+    expectEqual(3, d.values[d.keys.firstIndex(of: "three")!])
+    expectEqual(4, d.values[d.keys.firstIndex(of: "four")!])
 
-    expectEqual(3, d3.values[d3.keys.index(of: "three")!])
-    expectEqual(4, d3.values[d3.keys.index(of: "four")!])
+    expectEqual(3, d3.values[d3.keys.firstIndex(of: "three")!])
+    expectEqual(4, d3.values[d3.keys.firstIndex(of: "four")!])
   }
 }
 
@@ -4572,6 +4572,92 @@ DictionaryTestSuite.test("removeAt") {
     let origKeys: [Int] = [10, 20, 30]
     expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sorted())
   }
+}
+
+DictionaryTestSuite.test("localHashSeeds") {
+  // With global hashing, copying elements in hash order between hash tables
+  // can become quadratic. (See https://bugs.swift.org/browse/SR-3268)
+  //
+  // We defeat this by mixing the local storage capacity into the global hash
+  // seed, thereby breaking the correlation between bucket indices across
+  // hash tables with different sizes.
+  //
+  // Verify this works by copying a small sampling of elements near the
+  // beginning of a large Dictionary into a smaller one. If the elements end up
+  // in the same order in the smaller Dictionary, then that indicates we do not
+  // use size-dependent seeding.
+
+  let count = 100_000
+  // Set a large table size to reduce frequency/length of collision chains.
+  var large = [Int: Int](minimumCapacity: 4 * count)
+  for i in 1 ..< count {
+    large[i] = 2 * i
+  }
+
+  let bunch = count / 100 // 1 percent's worth of elements
+
+  // Copy two bunches of elements into another dictionary that's half the size
+  // of the first. We start after the initial bunch because the hash table may
+  // begin with collided elements wrapped over from the end, and these would be
+  // sorted into irregular slots in the smaller table.
+  let slice = large.prefix(3 * bunch).dropFirst(bunch)
+  var small = [Int: Int](minimumCapacity: large.capacity / 2)
+  expectLT(small.capacity, large.capacity)
+  for (key, value) in slice {
+    small[key] = value
+  }
+
+  // Compare the second halves of the new dictionary and the slice.  Ignore the
+  // first halves; the first few elements may not be in the correct order if we
+  // happened to start copying from the middle of a collision chain.
+  let smallKeys = small.dropFirst(bunch).map { $0.key }
+  let sliceKeys = slice.dropFirst(bunch).map { $0.key }
+  // If this test fails, there is a problem with local hash seeding.
+  expectFalse(smallKeys.elementsEqual(sliceKeys))
+}
+
+DictionaryTestSuite.test("Hashable") {
+  let d1: [Dictionary<Int, String>] = [
+    [1: "meow", 2: "meow", 3: "meow"],
+    [1: "meow", 2: "meow", 3: "mooo"],
+    [1: "meow", 2: "meow", 4: "meow"],
+    [1: "meow", 2: "meow", 4: "mooo"]]
+  checkHashable(d1, equalityOracle: { $0 == $1 })
+
+  let d2: [Dictionary<Int, Dictionary<Int, String>>] = [
+    [1: [2: "meow"]],
+    [2: [1: "meow"]],
+    [2: [2: "meow"]],
+    [1: [1: "meow"]],
+    [2: [2: "mooo"]],
+    [2: [:]],
+    [:]]
+  checkHashable(d2, equalityOracle: { $0 == $1 })
+
+  // Dictionary should hash itself in a way that ensures instances get correctly
+  // delineated even when they are nested in other commutative collections.
+  // These are different Sets, so they should produce different hashes:
+  let remix: [Set<Dictionary<String, Int>>] = [
+    [["Blanche": 1, "Rose": 2], ["Dorothy": 3, "Sophia": 4]],
+    [["Blanche": 1, "Dorothy": 3], ["Rose": 2, "Sophia": 4]],
+    [["Blanche": 1, "Sophia": 4], ["Rose": 2, "Dorothy": 3]]
+  ]
+  checkHashable(remix, equalityOracle: { $0 == $1 })
+
+  // Dictionary ordering is not guaranteed to be consistent across equal
+  // instances. In particular, ordering is highly sensitive to the size of the
+  // allocated storage buffer. Generate a few copies of the same dictionary with
+  // different capacities, and verify that they compare and hash the same.
+  var variants: [Dictionary<String, Int>] = []
+  for i in 4 ..< 12 {
+    var set: Dictionary<String, Int> = [
+      "one": 1,   "two": 2,
+      "three": 3, "four": 4,
+      "five": 5,  "six": 6]
+    set.reserveCapacity(1 << i)
+    variants.append(set)
+  }
+  checkHashable(variants, equalityOracle: { _, _ in true })
 }
 
 DictionaryTestSuite.setUp {

@@ -76,9 +76,7 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 
       auto subMap = t->getContextSubstitutionMap(getSILGenModule().SwiftModule,
                                                  decl);
-      SmallVector<Substitution, 4> subs;
-      genericSig->getSubstitutions(subMap, subs);
-      getSILGenModule().useConformancesFromSubstitutions(subs);
+      getSILGenModule().useConformancesFromSubstitutions(subMap);
       return false;
     });
 
@@ -91,7 +89,7 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
 
 ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
                                       SILType substFnTy, SILType result,
-                                      SubstitutionList subs,
+                                      SubstitutionMap subs,
                                       ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createApply(loc, fn, subs, args, false);
@@ -99,7 +97,7 @@ ApplyInst *SILGenBuilder::createApply(SILLocation loc, SILValue fn,
 
 TryApplyInst *
 SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
-                              SubstitutionList subs, ArrayRef<SILValue> args,
+                              SubstitutionMap subs, ArrayRef<SILValue> args,
                               SILBasicBlock *normalBB, SILBasicBlock *errorBB) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createTryApply(loc, fn, subs, args, normalBB, errorBB);
@@ -107,7 +105,7 @@ SILGenBuilder::createTryApply(SILLocation loc, SILValue fn, SILType substFnTy,
 
 PartialApplyInst *
 SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
-                                  SILType substFnTy, SubstitutionList subs,
+                                  SILType substFnTy, SubstitutionMap subs,
                                   ArrayRef<SILValue> args, SILType closureTy) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createPartialApply(
@@ -118,7 +116,7 @@ SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
 
 BuiltinInst *SILGenBuilder::createBuiltin(SILLocation loc, Identifier name,
                                           SILType resultTy,
-                                          SubstitutionList subs,
+                                          SubstitutionMap subs,
                                           ArrayRef<SILValue> args) {
   getSILGenModule().useConformancesFromSubstitutions(subs);
   return SILBuilder::createBuiltin(loc, name, resultTy, subs, args);
@@ -185,7 +183,7 @@ AllocExistentialBoxInst *SILGenBuilder::createAllocExistentialBox(
 
 ManagedValue SILGenBuilder::createPartialApply(SILLocation loc, SILValue fn,
                                                SILType substFnTy,
-                                               SubstitutionList subs,
+                                               SubstitutionMap subs,
                                                ArrayRef<ManagedValue> args,
                                                SILType closureTy) {
   llvm::SmallVector<SILValue, 8> values;
@@ -205,6 +203,26 @@ ManagedValue SILGenBuilder::createConvertFunction(SILLocation loc,
   SILValue result =
       createConvertFunction(loc, fn.forward(getSILGenFunction()), resultTy);
   return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
+    SILLocation loc, ManagedValue fn, SILType resultTy,
+    bool isEscapedByUser) {
+
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  auto resultFnType = resultTy.castTo<SILFunctionType>();
+
+  // Escaping to noescape conversion.
+  assert(resultFnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         fnType->getRepresentation() ==
+             SILFunctionTypeRepresentation::Thick &&
+         !fnType->isNoEscape() && resultFnType->isNoEscape() &&
+         "Expect a escaping to noescape conversion");
+  SILValue fnValue = fn.getValue();
+  SILValue result = createConvertEscapeToNoEscape(
+      loc, fnValue, resultTy, isEscapedByUser, false);
+  return ManagedValue::forTrivialObjectRValue(result);
 }
 
 ManagedValue SILGenBuilder::createInitExistentialValue(
@@ -411,9 +429,10 @@ ManagedValue SILGenBuilder::createFormalAccessCopyAddr(
   return SGF.emitFormalAccessManagedBufferWithCleanup(loc, newAddr);
 }
 
-ManagedValue SILGenBuilder::bufferForExpr(
-    SILLocation loc, SILType ty, const TypeLowering &lowering,
-    SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
+ManagedValue
+SILGenBuilder::bufferForExpr(SILLocation loc, SILType ty,
+                             const TypeLowering &lowering, SGFContext context,
+                             llvm::function_ref<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
   SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
@@ -439,10 +458,9 @@ ManagedValue SILGenBuilder::bufferForExpr(
   return SGF.emitManagedBufferWithCleanup(address);
 }
 
-
 ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SILLocation loc, SILType ty, const TypeLowering &lowering,
-    SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
+    SGFContext context, llvm::function_ref<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
   SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
@@ -640,7 +658,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
   auto &argTL = SGF.getTypeLowering(arg.getType());
-  SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
+  SILType optionalType = SILType::getOptionalType(arg.getType());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         createOptionalSome(loc, arg.forward(SGF), optionalType);
@@ -648,7 +666,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   }
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, optionalType);
-  RValue rvalue(SGF, loc, arg.getType().getSwiftRValueType(), arg);
+  RValue rvalue(SGF, loc, arg.getType().getASTType(), arg);
   ArgumentSource argValue(loc, std::move(rvalue));
   SGF.emitInjectOptionalValueInto(
       loc, std::move(argValue), tempResult,
@@ -900,4 +918,23 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   CleanupCloner cloner(*this, op);
   SILValue cast = createUncheckedAddrCast(loc, op.forward(SGF), resultTy);
   return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
+                                                      ManagedValue original,
+                                                      SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
+  if (!result)
+    return ManagedValue();
+  original.forward(SGF);
+  return cloner.clone(result);
+}
+
+ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
+                                                          ManagedValue original,
+                                                          SILType type) {
+  SILValue result =
+      SGF.B.createUncheckedTrivialBitCast(loc, original.getValue(), type);
+  return ManagedValue::forUnmanaged(result);
 }

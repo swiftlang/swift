@@ -63,6 +63,9 @@ public:
   const KeyPathPatternComponent &getComponent() const { return Component; }
   
   void print(SILPrintContext &Ctx) const;
+  void dump() const;
+  
+  void verify(const SILModule &M) const;
 };
   
 } // end namespace swift
@@ -76,7 +79,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILProperty>
     : public ilist_default_traits<::swift::SILProperty> {
-  typedef ::swift::SILProperty SILProperty;
+  using SILProperty = ::swift::SILProperty;
 
 public:
   static void deleteNode(SILProperty *VT) { VT->~SILProperty(); }

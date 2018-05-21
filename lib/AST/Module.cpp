@@ -190,6 +190,12 @@ void SourceLookupCache::doPopulateCache(Range decls,
       }
     if (auto *NTD = dyn_cast<NominalTypeDecl>(D))
       doPopulateCache(NTD->getMembers(), true);
+
+    // Avoid populating the cache with the members of invalid extension
+    // declarations.  These members can be used to point validation inside of
+    // a malformed context.
+    if (D->isInvalid()) continue;
+
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
       doPopulateCache(ED->getMembers(), true);
   }
@@ -348,7 +354,7 @@ void SourceLookupCache::invalidate() {
 ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   : DeclContext(DeclContextKind::Module, nullptr),
     TypeDecl(DeclKind::Module, &ctx, name, SourceLoc(), { }),
-    Flags({0, 0, 0}) {
+    Flags() {
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
@@ -1121,24 +1127,19 @@ bool ModuleDecl::isSystemModule() const {
   return false;
 }
 
-template<bool respectVisibility, typename Callback>
-static bool forAllImportedModules(ModuleDecl *topLevel,
-                                  ModuleDecl::AccessPathTy thisPath,
-                                  bool includePrivateTopLevelImports,
-                                  const Callback &fn) {
+template<bool respectVisibility>
+static bool
+forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
+                      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
   using ImportedModule = ModuleDecl::ImportedModule;
   using AccessPathTy = ModuleDecl::AccessPathTy;
   
   llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
   SmallVector<ImportedModule, 32> stack;
 
-  // Even if we're processing the top-level module like any other, we may
-  // still want to include non-exported modules.
-  ModuleDecl::ImportFilter filter = respectVisibility ? ModuleDecl::ImportFilter::Public
-                                                      : ModuleDecl::ImportFilter::All;
-  ModuleDecl::ImportFilter topLevelFilter =
-    includePrivateTopLevelImports ? ModuleDecl::ImportFilter::All : filter;
-  topLevel->getImportedModules(stack, topLevelFilter);
+  auto filter = respectVisibility ? ModuleDecl::ImportFilter::Public
+                                  : ModuleDecl::ImportFilter::All;
+  topLevel->getImportedModules(stack, filter);
 
   // Make sure the top-level module is first; we want pre-order-ish traversal.
   AccessPathTy overridingPath;
@@ -1176,11 +1177,10 @@ static bool forAllImportedModules(ModuleDecl *topLevel,
   return true;
 }
 
-bool ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                      bool includePrivateTopLevelImports,
-                                  llvm::function_ref<bool(ImportedModule)> fn) {
-  return forAllImportedModules<true>(this, thisPath,
-                                     includePrivateTopLevelImports, fn);
+bool
+ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
+                                 llvm::function_ref<bool(ImportedModule)> fn) {
+  return forAllImportedModules<true>(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
@@ -1208,8 +1208,15 @@ void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-  for (auto importPair : Imports)
-    importPair.first.second->collectLinkLibraries(callback);
+  forAllImportedModules<false>(getParentModule(), /*thisPath*/{},
+                               [=](ModuleDecl::ImportedModule import) -> bool {
+    swift::ModuleDecl *next = import.second;
+    if (next->getName() == getParentModule()->getName())
+      return true;
+
+    next->collectLinkLibraries(callback);
+    return true;
+  });
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {

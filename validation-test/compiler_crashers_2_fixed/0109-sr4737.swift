@@ -3,7 +3,7 @@
 //===----------------------------------------------------------------------===//
 extension UnicodeScalar {
   // Hack providing an efficient API that is available to the standard library
-  @_versioned
+  @usableFromInline
   @inline(__always)
   init(_unchecked x: UInt32) { self = unsafeBitCast(x, to: UnicodeScalar.self) }
 
@@ -17,13 +17,13 @@ public struct _UIntBuffer<
   Storage: UnsignedInteger & FixedWidthInteger, 
   Element: UnsignedInteger & FixedWidthInteger
 > {
-  @_versioned
+  @usableFromInline
   var _storage: Storage
-  @_versioned
+  @usableFromInline
   var _bitCount: UInt8
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal init(_storage: Storage, _bitCount: UInt8) {
     self._storage = _storage
     self._bitCount = _bitCount
@@ -51,7 +51,7 @@ extension _UIntBuffer : Sequence {
       }
       return Element(truncatingIfNeeded: _impl._storage)
     }
-    @_versioned
+    @usableFromInline
     var _impl: _UIntBuffer
   }
   
@@ -83,10 +83,10 @@ extension _UIntBuffer : Collection {
   public typealias _Element = Element
   
   public struct Index : Comparable {
-    @_versioned
+    @usableFromInline
     var bitOffset: UInt8
     
-    @_versioned
+    @usableFromInline
     init(bitOffset: UInt8) { self.bitOffset = bitOffset }
     
     public static func == (lhs: Index, rhs: Index) -> Bool {
@@ -112,7 +112,7 @@ extension _UIntBuffer : Collection {
     return Index(bitOffset: i.bitOffset &+ _elementWidth)
   }
 
-  @_versioned
+  @usableFromInline
   internal var _elementWidth : UInt8 {
     return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
@@ -149,17 +149,17 @@ extension _UIntBuffer : RandomAccessCollection {
 
 extension FixedWidthInteger {
   @inline(__always)
-  @_versioned
+  @usableFromInline
   func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
   }
   @inline(__always)
-  @_versioned
+  @usableFromInline
   func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
   }
   @inline(__always)
-  @_versioned
+  @usableFromInline
   static func _lowBits<N: FixedWidthInteger>(_ n: N) -> Self {
     return ~((~0 as Self)._fullShiftLeft(n))
   }
@@ -167,7 +167,7 @@ extension FixedWidthInteger {
 
 extension Range {
   @inline(__always)
-  @_versioned
+  @usableFromInline
   func _contains_(_ other: Range) -> Bool {
     return other.clamped(to: self) == other
   }
@@ -417,7 +417,7 @@ public struct ReverseIndexingIterator<
   Elements : BidirectionalCollection
 > : IteratorProtocol, Sequence {
 
-  @_inlineable
+  @inlinable
   @inline(__always)
   /// Creates an iterator over the given collection.
   public /// @testable
@@ -426,7 +426,7 @@ public struct ReverseIndexingIterator<
     self._position = _position
   }
   
-  @_inlineable
+  @inlinable
   @inline(__always)
   public mutating func next() -> Elements._Element? {
     guard _fastPath(_position != _elements.startIndex) else { return nil }
@@ -434,9 +434,9 @@ public struct ReverseIndexingIterator<
     return _elements[_position]
   }
   
-  @_versioned
+  @usableFromInline
   internal let _elements: Elements
-  @_versioned
+  @usableFromInline
   internal var _position: Elements.Index
 }
 
@@ -602,7 +602,7 @@ extension Unicode.UTF8.ReverseDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _consumeCodeUnits(_ n: UInt8) -> EncodedScalar {
     let s = buffer._storage
     let bitCount = n &* UInt8(CodeUnit.bitWidth)
@@ -614,7 +614,7 @@ extension Unicode.UTF8.ReverseDecoder : _UTF8Decoder {
   }
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _consumeValidCodeUnits(
     _ n: UInt8
   ) -> Unicode.ParseResult<EncodedScalar> {
@@ -623,7 +623,7 @@ extension Unicode.UTF8.ReverseDecoder : _UTF8Decoder {
   }
 
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _consumeInvalidCodeUnits(
     _ n: UInt8
   ) -> Unicode.ParseResult<EncodedScalar> {
@@ -707,7 +707,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   public typealias CodeUnit = UInt8
   
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _consumeCodeUnits(_ n: UInt8) -> EncodedScalar {
     let s = buffer._storage
     let bitCount = n &* UInt8(CodeUnit.bitWidth)
@@ -717,7 +717,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   }
   
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal mutating func _consumeValidCodeUnits(
     _ n: UInt8
   ) -> Unicode.ParseResult<EncodedScalar> {
@@ -726,7 +726,7 @@ extension Unicode.UTF8.ForwardDecoder : _UTF8Decoder {
   }
   
   @inline(__always)
-  @_versioned
+  @usableFromInline
   internal func _consumeInvalidCodeUnits(
     codeUnitCount n: UInt8
   ) -> Unicode.ParseResult<EncodedScalar> {

@@ -20,6 +20,30 @@ namespace Lowering {
 
 class SILGenFunction;
 
+/// TODO: std::variant.
+struct SwitchCaseBranchDest {
+  Optional<JumpDest> jumpDest;
+  NullablePtr<SILBasicBlock> block;
+
+  SwitchCaseBranchDest() : jumpDest(), block() {}
+
+  /// Implicit conversion.
+  SwitchCaseBranchDest(JumpDest jumpDest) : jumpDest(jumpDest), block() {}
+
+  /// Implicit conversion.
+  SwitchCaseBranchDest(SILBasicBlock *block) : jumpDest(), block(block) {}
+
+  explicit operator bool() const {
+    return jumpDest.hasValue() || block.isNonNull();
+  }
+
+  bool hasJumpDest() const { return jumpDest.hasValue(); }
+  bool hasBlock() const { return bool(block); }
+
+  SILBasicBlock *getBlock() { return block.getPtrOrNull(); }
+  JumpDest &getJumpDest() { return jumpDest.getValue(); }
+};
+
 /// A cleanup scope RAII object, like FullExpr, that comes with a JumpDest for a
 /// continuation block. It is intended to be used to handle switch cases.
 ///
@@ -30,23 +54,31 @@ class SwitchCaseFullExpr {
   SILGenFunction &SGF;
   Scope scope;
   CleanupLocation loc;
-  NullablePtr<SILBasicBlock> contBlock;
+  SwitchCaseBranchDest branchDest;
 
 public:
   SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc);
   SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
-                     SILBasicBlock *contBlock);
+                     SwitchCaseBranchDest branchDest);
 
-  ~SwitchCaseFullExpr() = default;
+  ~SwitchCaseFullExpr();
 
   SwitchCaseFullExpr(const SwitchCaseFullExpr &) = delete;
   SwitchCaseFullExpr &operator=(const SwitchCaseFullExpr &) = delete;
 
-  /// Pop the scope and branch to the cont block.
+  /// Pop the scope and branch to the branch destination. If this case has an
+  /// associated JumpDest as its branch destination, then this will cause
+  /// cleanups associated with the jump dest to be emitted.
   void exitAndBranch(SILLocation loc, ArrayRef<SILValue> result = {});
 
-  /// Pop the scope and do not branch to the cont block.
+  /// Pop the scope and do not branch to the branch destination. This is
+  /// intended to be used in situations where one wants to model a switch region
+  /// that ends midway through one of the case blocks.
   void exit();
+
+  /// Do not pop the scope and do not branch to the branch destination. But do
+  /// invalidate the scope. This can occur when emitting unreachables.
+  void unreachableExit();
 };
 
 /// A class for building switch enums that handles all of the ownership
@@ -55,12 +87,15 @@ public:
 /// It assumes that the user passes in a block that takes in a ManagedValue and
 /// returns a ManagedValue for the blocks exit argument. Should return an empty
 /// ManagedValue to signal no result.
+///
+/// TODO: Allow cases to take JumpDest as continuation blocks and then
+/// force exitBranchAndCleanup to be run.
 class SwitchEnumBuilder {
 public:
   using NormalCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+      std::function<void(ManagedValue, SwitchCaseFullExpr &&)>;
   using DefaultCaseHandler =
-      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+      std::function<void(ManagedValue, SwitchCaseFullExpr &&)>;
 
   enum class DefaultDispatchTime { BeforeNormalCases, AfterNormalCases };
 
@@ -68,29 +103,29 @@ private:
   struct NormalCaseData {
     EnumElementDecl *decl;
     SILBasicBlock *block;
-    NullablePtr<SILBasicBlock> contBlock;
+    SwitchCaseBranchDest branchDest;
     NormalCaseHandler handler;
     ProfileCounter count;
 
     NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
-                   NullablePtr<SILBasicBlock> contBlock,
-                   NormalCaseHandler handler, ProfileCounter count)
-        : decl(decl), block(block), contBlock(contBlock), handler(handler),
+                   SwitchCaseBranchDest branchDest, NormalCaseHandler handler,
+                   ProfileCounter count)
+        : decl(decl), block(block), branchDest(branchDest), handler(handler),
           count(count) {}
     ~NormalCaseData() = default;
   };
 
   struct DefaultCaseData {
     SILBasicBlock *block;
-    NullablePtr<SILBasicBlock> contBlock;
+    SwitchCaseBranchDest branchDest;
     DefaultCaseHandler handler;
     DefaultDispatchTime dispatchTime;
     ProfileCounter count;
 
-    DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
+    DefaultCaseData(SILBasicBlock *block, SwitchCaseBranchDest branchDest,
                     DefaultCaseHandler handler,
                     DefaultDispatchTime dispatchTime, ProfileCounter count)
-        : block(block), contBlock(contBlock), handler(handler),
+        : block(block), branchDest(branchDest), handler(handler),
           dispatchTime(dispatchTime), count(count) {}
     ~DefaultCaseData() = default;
   };
@@ -107,18 +142,50 @@ public:
       : builder(builder), loc(loc), optional(optional) {}
 
   void addDefaultCase(
-      SILBasicBlock *defaultBlock, NullablePtr<SILBasicBlock> contBlock,
+      SILBasicBlock *defaultBlock, SwitchCaseBranchDest branchDest,
       DefaultCaseHandler handle,
       DefaultDispatchTime dispatchTime = DefaultDispatchTime::AfterNormalCases,
       ProfileCounter count = ProfileCounter()) {
-    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime,
+    defaultBlockData.emplace(defaultBlock, branchDest, handle, dispatchTime,
                              count);
   }
 
   void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
-               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle,
+               SwitchCaseBranchDest branchDest, NormalCaseHandler handle,
                ProfileCounter count = ProfileCounter()) {
-    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle, count);
+    caseDataArray.emplace_back(decl, caseBlock, branchDest, handle, count);
+  }
+
+  void addOptionalSomeCase(SILBasicBlock *caseBlock) {
+    auto *decl = getSGF().getASTContext().getOptionalSomeDecl();
+    caseDataArray.emplace_back(
+        decl, caseBlock, nullptr,
+        [](ManagedValue mv, SwitchCaseFullExpr &&expr) { expr.exit(); },
+        ProfileCounter());
+  }
+
+  void addOptionalNoneCase(SILBasicBlock *caseBlock) {
+    auto *decl = getSGF().getASTContext().getOptionalNoneDecl();
+    caseDataArray.emplace_back(
+        decl, caseBlock, nullptr,
+        [](ManagedValue mv, SwitchCaseFullExpr &&expr) { expr.exit(); },
+        ProfileCounter());
+  }
+
+  void addOptionalSomeCase(SILBasicBlock *caseBlock,
+                           SwitchCaseBranchDest branchDest,
+                           NormalCaseHandler handle,
+                           ProfileCounter count = ProfileCounter()) {
+    auto *decl = getSGF().getASTContext().getOptionalSomeDecl();
+    caseDataArray.emplace_back(decl, caseBlock, branchDest, handle, count);
+  }
+
+  void addOptionalNoneCase(SILBasicBlock *caseBlock,
+                           SwitchCaseBranchDest branchDest,
+                           NormalCaseHandler handle,
+                           ProfileCounter count = ProfileCounter()) {
+    auto *decl = getSGF().getASTContext().getOptionalNoneDecl();
+    caseDataArray.emplace_back(decl, caseBlock, branchDest, handle, count);
   }
 
   void emit() &&;

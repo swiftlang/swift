@@ -18,6 +18,7 @@
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
@@ -206,7 +207,7 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   SILValue InOutOptionalParam;
   if (isConditional) {
     // Create a temporary
-    OptionalTy = OptionalType::get(Dest->getType().getSwiftRValueType())
+    OptionalTy = OptionalType::get(Dest->getType().getASTType())
                      ->getImplementationType()
                      ->getCanonicalType();
     Tmp = Builder.createAllocStack(Loc,
@@ -217,8 +218,14 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   }
 
   (void)ParamTypes;
-  assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
-         "Parameter should be @owned");
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    assert(ParamTypes[0].getConvention() ==
+               ParameterConvention::Direct_Guaranteed &&
+           "Parameter should be @owned");
+  } else {
+    assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
+           "Parameter should be @owned");
+  }
 
   // Emit a retain.
   Builder.createRetainValue(Loc, SrcOp, Builder.getDefaultAtomicity());
@@ -227,10 +234,14 @@ SILInstruction *CastOptimizer::optimizeBridgedObjCToSwiftCast(
   Args.push_back(SrcOp);
   Args.push_back(MetaTyVal);
 
-  SmallVector<Substitution, 4> Subs;
-  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
+  auto *AI = Builder.createApply(Loc, FuncRef, SubMap, Args, false);
 
-  auto *AI = Builder.createApply(Loc, FuncRef, Subs, Args, false);
+  // If we have guaranteed normal arguments, insert the destroy.
+  //
+  // TODO: Is it safe to just eliminate the initial retain?
+  if (M.getOptions().EnableGuaranteedNormalArguments) {
+    Builder.createReleaseValue(Loc, SrcOp, Builder.getDefaultAtomicity());
+  }
 
   // If the source of a cast should be destroyed, emit a release.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
@@ -300,14 +311,14 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
     return true;
   }
   // check if it is a bridgeable CF type
-  if (ConvTy.getSwiftRValueType() ==
+  if (ConvTy.getASTType() ==
       getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 DestTy.getSwiftRValueType())) {
+                                 DestTy.getASTType())) {
     return true;
   }
-  if (DestTy.getSwiftRValueType() ==
+  if (DestTy.getASTType() ==
       getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 ConvTy.getSwiftRValueType())) {
+                                 ConvTy.getASTType())) {
     return true;
   }
   // All else failed - can't optimize this case
@@ -502,12 +513,8 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
     }
   }
 
-  SmallVector<Substitution, 4> Subs;
-  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
-    Sig->getSubstitutions(SubMap, Subs);
-
   // Generate a code to invoke the bridging function.
-  auto *NewAI = Builder.createApply(Loc, FnRef, Subs, Src, false);
+  auto *NewAI = Builder.createApply(Loc, FnRef, SubMap, Src, false);
 
   auto releaseSrc = [&](SILBuilder &Builder) {
     if (AddressOnlyType) {
@@ -574,12 +581,12 @@ SILInstruction *CastOptimizer::optimizeBridgedSwiftToObjCCast(
         CastedValue = SILValue(
             Builder.createUnconditionalCheckedCast(Loc, NewAI, DestTy));
       }
-    } else if (ConvTy.getSwiftRValueType() ==
+    } else if (ConvTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              DestTy.getSwiftRValueType()) ||
-               DestTy.getSwiftRValueType() ==
+                                              DestTy.getASTType()) ||
+               DestTy.getASTType() ==
                    getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                              ConvTy.getSwiftRValueType())) {
+                                              ConvTy.getASTType())) {
       // Handle NS <-> CF toll-free bridging here.
       CastedValue =
           SILValue(Builder.createUncheckedRefCast(Loc, NewAI, DestTy));
@@ -1050,7 +1057,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
       if (MI) {
         if (SuccessBB->getSinglePredecessorBlock() &&
             canUseScalarCheckedCastInstructions(
-                Inst->getModule(), MI->getType().getSwiftRValueType(),
+                Inst->getModule(), MI->getType().getASTType(),
                 Inst->getTargetType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
@@ -1160,7 +1167,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the metatype of this type.
         auto EMT = EmiTy.castTo<AnyMetatypeType>();
-        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
+        auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getASTType(),
                                          EMT->getRepresentation());
         auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
@@ -1286,8 +1293,8 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
   SILBuilderWithScope Builder(Inst);
 
   // Try to apply the bridged casts optimizations
-  auto SourceType = LoweredSourceType.getSwiftRValueType();
-  auto TargetType = LoweredTargetType.getSwiftRValueType();
+  auto SourceType = LoweredSourceType.getASTType();
+  auto TargetType = LoweredTargetType.getASTType();
   auto Src = Inst->getOperand();
   auto NewI = optimizeBridgedCasts(Inst, CastConsumptionKind::CopyOnSuccess,
                                    false, Src, SILValue(), SourceType,
@@ -1314,8 +1321,8 @@ ValueBase *CastOptimizer::optimizeUnconditionalCheckedCastInst(
 
   auto Result = emitSuccessfulScalarUnconditionalCast(
       Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
-      LoweredSourceType.getSwiftRValueType(),
-      LoweredTargetType.getSwiftRValueType(), Inst);
+      LoweredSourceType.getASTType(),
+      LoweredTargetType.getASTType(), Inst);
 
   if (!Result) {
     // No optimization was possible.
@@ -1380,9 +1387,17 @@ static bool optimizeStaticallyKnownProtocolConformance(
     auto Proto = dyn_cast<ProtocolDecl>(TargetType->getAnyNominal());
     if (Proto) {
       auto Conformance = SM->lookupConformance(SourceType, Proto);
-      if (Conformance.hasValue()) {
-        // SourceType is a non-existential type conforming to a
-        // protocol represented by the TargetType.
+      if (Conformance.hasValue() &&
+          Conformance->getConditionalRequirements().empty()) {
+        // SourceType is a non-existential type with a non-conditional
+        // conformance to a protocol represented by the TargetType.
+        //
+        // Conditional conformances are complicated: they may depend on
+        // information not known until runtime. For instance, if `X: P` where `T
+        // == Int` in `func foo<T>(_: T) { ... X<T>() as? P ... }`, the cast
+        // will succeed for `foo(0)` but not for `foo("string")`. There are many
+        // cases where everything is completely static (`X<Int>() as? P`), but
+        // we don't try to handle that at the moment.
         SILBuilder B(Inst);
         SmallVector<ProtocolConformanceRef, 1> NewConformances;
         NewConformances.push_back(Conformance.getValue());

@@ -17,6 +17,8 @@ func foo(_ b: BarForwardDeclaredClass) {
   barGlobalFuncNewName(newlabel: 2)
   _ = NewEnum.enumElement
   _ = PropertyUserInterface.newMethodPlus()
+  let _: BarBase.Nested
+  _ = AwesomeWrapper.newName(is: 0, at: 1, for: 2)
 }
 
 func foo1(_ b: BarForwardDeclaredClass) {

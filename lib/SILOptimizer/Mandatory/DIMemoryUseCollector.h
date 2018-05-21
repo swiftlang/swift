@@ -21,12 +21,14 @@
 #define SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/APInt.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
+#include "llvm/ADT/APInt.h"
+#include "llvm/Support/Compiler.h"
 
 namespace swift {
-  class SILBuilder;
+
+class SILBuilder;
 
 /// DIMemoryObjectInfo - This struct holds information about the memory object
 /// being analyzed that is required to correctly break it down into elements.
@@ -73,7 +75,7 @@ public:
   SILInstruction *getFunctionEntryPoint() const;
 
   CanType getType() const {
-    return MemorySILType.getSwiftRValueType();
+    return MemorySILType.getASTType();
   }
 
   SingleValueInstruction *getAddress() const {
@@ -187,9 +189,10 @@ struct DIMemoryUse {
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
-                              SmallVectorImpl<DIMemoryUse> &Uses,
-                              SmallVectorImpl<SILInstruction *> &Releases);
+LLVM_NODISCARD bool
+collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
+                         SmallVectorImpl<DIMemoryUse> &Uses,
+                         SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 

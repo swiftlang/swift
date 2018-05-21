@@ -48,15 +48,15 @@ func testRenamedClassMembers(obj: ClassWithManyRenames) {
   _ = ClassWithManyRenames.classWithManyRenamesForInt(0)
   // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: 'classWithManyRenamesForInt' has been replaced by 'init(for:)'
 
-  // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: error: 'init(forInt:)' has been replaced by 'init(swift3Factory:)'
+  // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: error: 'init(forInt:)' has been renamed to 'init(swift3Factory:)'
   _ = ClassWithManyRenames(forInt: 0)
-  // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: 'init(forInt:)' has been replaced by 'init(for:)'
+  // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: 'init(forInt:)' has been renamed to 'init(for:)'
 
   // CHECK-DIAGS-3-NOT: :[[@LINE+1]]:{{[0-9]+}}:
   _ = ClassWithManyRenames(swift3Factory: 0)
-  // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: 'init(swift3Factory:)' has been replaced by 'init(for:)'
+  // CHECK-DIAGS-4: [[@LINE-1]]:{{[0-9]+}}: error: 'init(swift3Factory:)' has been renamed to 'init(for:)'
 
-  // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: error: 'init(for:)' has been replaced by 'init(swift3Factory:)'
+  // CHECK-DIAGS-3: [[@LINE+1]]:{{[0-9]+}}: error: 'init(for:)' has been renamed to 'init(swift3Factory:)'
   _ = ClassWithManyRenames(for: 0)
   // CHECK-DIAGS-4-NOT: :[[@LINE-1]]:{{[0-9]+}}:
 

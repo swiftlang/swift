@@ -22,6 +22,8 @@ using namespace swift;
 
 void *DeclBaseName::SubscriptIdentifierData =
     &DeclBaseName::SubscriptIdentifierData;
+void *DeclBaseName::ConstructorIdentifierData =
+    &DeclBaseName::ConstructorIdentifierData;
 void *DeclBaseName::DestructorIdentifierData =
     &DeclBaseName::DestructorIdentifierData;
 

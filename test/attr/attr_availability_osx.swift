@@ -1,4 +1,12 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target x86_64-apple-macosx10.10 %s
+// RUN: %swift -typecheck -verify -parse-stdlib -module-name Swift -target x86_64-apple-macosx10.10 %s
+
+// Fake declarations of some standard library features for -parse-stdlib.
+precedencegroup AssignmentPrecedence {}
+enum Optional<T> {
+  case none
+  case some(T)
+}
+
 
 @available(OSX, introduced: 10.5, deprecated: 10.8, obsoleted: 10.9,
               message: "you don't want to do that anyway")
@@ -71,3 +79,65 @@ doSomethingDeprecatedOnOSX() // expected-warning{{'doSomethingDeprecatedOnOSX()'
 func doSomethingDeprecatedOniOS() { }
 
 doSomethingDeprecatedOniOS() // okay
+
+
+struct TestStruct {}
+
+@available(macOS 10.10, *)
+extension TestStruct { // expected-note {{enclosing scope here}}
+  @available(swift 400)
+  func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
+
+  @available(macOS 10.9, *) // expected-error {{declaration cannot be more available than enclosing scope}}
+  @available(swift 400)
+  func doAnotherThing() {} // expected-note {{'doAnotherThing()' was introduced in Swift 400}}
+
+  @available(macOS 10.12, *)
+  @available(swift 400)
+  func doThirdThing() {} // expected-note {{'doThirdThing()' was introduced in Swift 400}}
+
+  @available(macOS 10.12, *)
+  @available(swift 1)
+  func doFourthThing() {}
+
+  @available(*, deprecated)
+  func doDeprecatedThing() {}
+}
+
+@available(macOS 10.11, *)
+func testMemberAvailability() {
+  TestStruct().doTheThing() // expected-error {{'doTheThing()' is unavailable}}
+  TestStruct().doAnotherThing() // expected-error {{'doAnotherThing()' is unavailable}}
+  TestStruct().doThirdThing() // expected-error {{'doThirdThing()' is unavailable}}
+  TestStruct().doFourthThing() // expected-error {{'doFourthThing()' is only available on OS X 10.12 or newer}} expected-note {{'if #available'}}
+  TestStruct().doDeprecatedThing() // expected-warning {{'doDeprecatedThing()' is deprecated}}
+}
+
+extension TestStruct {
+  struct Data {
+    mutating func mutate() {}
+  }
+
+  var unavailableGetter: Data {
+    @available(macOS, unavailable, message: "bad getter")
+    get { return Data() } // expected-note 2 {{here}}
+    set {}
+  }
+
+  var unavailableSetter: Data {
+    get { return Data() }
+    @available(macOS, obsoleted: 10.5, message: "bad setter")
+    set {} // expected-note 2 {{setter for 'unavailableSetter' was obsoleted in OS X 10.5}}
+  }
+}
+
+func testAccessors() {
+  var t = TestStruct()
+  _ = t.unavailableGetter // expected-error {{getter for 'unavailableGetter' is unavailable}}
+  t.unavailableGetter = .init()
+  t.unavailableGetter.mutate() // expected-error {{getter for 'unavailableGetter' is unavailable}}
+
+  _ = t.unavailableSetter
+  t.unavailableSetter = .init() // expected-error {{setter for 'unavailableSetter' is unavailable: bad setter}}
+  t.unavailableSetter.mutate() // expected-error {{setter for 'unavailableSetter' is unavailable: bad setter}}
+}

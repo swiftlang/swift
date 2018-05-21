@@ -103,7 +103,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
   // the type hasn't been mucked with by an optimization pass.
   DeclContext *DC = nullptr;
   GenericEnvironment *GE = nullptr;
-  auto LowTy = GV->getLoweredType().getSwiftRValueType();
+  auto LowTy = GV->getLoweredType().getASTType();
   auto *Type = LowTy.getPointer();
   if (auto *Decl = GV->getDecl()) {
     DC = Decl->getDeclContext();
@@ -145,8 +145,8 @@ bool DebugTypeInfo::operator!=(DebugTypeInfo T) const { return !operator==(T); }
 TypeDecl *DebugTypeInfo::getDecl() const {
   if (auto *N = dyn_cast<NominalType>(Type))
     return N->getDecl();
-  if (auto *TA = dyn_cast<NameAliasType>(Type))
-    return TA->getDecl();
+  if (auto *BTA = dyn_cast<NameAliasType>(Type))
+    return BTA->getDecl();
   if (auto *UBG = dyn_cast<UnboundGenericType>(Type))
     return UBG->getDecl();
   if (auto *BG = dyn_cast<BoundGenericType>(Type))

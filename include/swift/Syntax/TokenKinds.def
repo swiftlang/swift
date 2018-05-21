@@ -22,7 +22,6 @@
 ///     SIL_KEYWORD(kw)
 ///   POUND_KEYWORD(kw)
 ///     POUND_OBJECT_LITERAL(kw, desc, proto)
-///     POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
 ///     POUND_CONFIG(kw)
 ///     POUND_DIRECTIVE_KEYWORD(kw)
 ///       POUND_COND_DIRECTIVE_KEYWORD(kw)
@@ -94,13 +93,6 @@
 ///   Every keyword prefixed with a '#' representing an object literal.
 #ifndef POUND_OBJECT_LITERAL
 #define POUND_OBJECT_LITERAL(kw, desc, proto) POUND_KEYWORD(kw)
-#endif
-
-/// POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg)
-///   Every keyword prefixed with a '#' representing the obsoleted form of an
-///   object literal.
-#ifndef POUND_OLD_OBJECT_LITERAL
-#define POUND_OLD_OBJECT_LITERAL(kw, new_kw, old_arg, new_arg) POUND_KEYWORD(kw)
 #endif
 
 /// POUND_CONFIG(kw)
@@ -261,11 +253,6 @@ PUNCTUATOR(sil_exclamation, "!")    // Only in SIL mode.
 PUNCTUATOR(string_quote, "\"")
 PUNCTUATOR(multiline_string_quote, "\"\"\"")
 
-// Legacy punctuators used for migrating old object literal syntax.
-// NOTE: Remove in the future.
-PUNCTUATOR(l_square_lit,  "[#")
-PUNCTUATOR(r_square_lit,  "#]")
-
 // Keywords prefixed with a '#'.  "keyPath" becomes "tok::pound_keyPath".
 POUND_KEYWORD(keyPath)
 POUND_KEYWORD(line)
@@ -293,10 +280,6 @@ POUND_CONFIG(available)
 POUND_OBJECT_LITERAL(fileLiteral, "file reference", ExpressibleByFileReferenceLiteral)
 POUND_OBJECT_LITERAL(imageLiteral, "image", ExpressibleByImageLiteral)
 POUND_OBJECT_LITERAL(colorLiteral, "color", ExpressibleByColorLiteral)
-
-POUND_OLD_OBJECT_LITERAL(FileReference, fileLiteral, fileReferenceLiteral, resourceName)
-POUND_OLD_OBJECT_LITERAL(Image, imageLiteral, imageLiteral, resourceName)
-POUND_OLD_OBJECT_LITERAL(Color, colorLiteral, colorLiteralRed, red)
 
 // Single-token literals
 LITERAL(integer_literal)
@@ -330,7 +313,6 @@ MISC(string_interpolation_anchor)
 #undef SIL_KEYWORD
 #undef POUND_KEYWORD
 #undef POUND_OBJECT_LITERAL
-#undef POUND_OLD_OBJECT_LITERAL
 #undef POUND_CONFIG
 #undef POUND_DIRECTIVE_KEYWORD
 #undef POUND_COND_DIRECTIVE_KEYWORD

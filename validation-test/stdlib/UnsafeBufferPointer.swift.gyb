@@ -5,7 +5,7 @@
 // checking cannot be tested. The standard library always compiles with debug
 // checking enabled, so the behavior of the optimized test depends on whether
 // the inlining heuristics decide to inline these methods. To fix this, we need
-// a way to force @_inlineable UnsafeBufferPointer methods to be emitted inside
+// a way to force @inlinable UnsafeBufferPointer methods to be emitted inside
 // the client code, and thereby subject the stdlib implementation to the test
 // case's compile options.
 //
@@ -913,6 +913,49 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set
   expectEqual(0, buffer[2])
   expectEqual(1, buffer[3])
 }
+
+UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-swapAt") {
+% if IsRaw:
+  let allocated = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 8)
+  let buffer = UnsafeMutableRawBufferPointer(start: allocated, count: 3)
+  allocated.storeBytes(of: UInt8.max, toByteOffset: 3, as: UInt8.self)
+% else:
+  let allocated = UnsafeMutablePointer<Int>.allocate(capacity: 4)
+  let buffer = UnsafeMutableBufferPointer(start: allocated, count: 3)
+  allocated[3] = Int.max
+% end
+  defer { allocated.deallocate() }
+
+  buffer[0] = 0
+  buffer[1] = 1
+  buffer[2] = 2
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), [0, 1, 2])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), [2, 1, 0])
+
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+  buffer.swapAt(2, 3)
+}
+
+% if not IsRaw:
+UnsafeMutableBufferPointerTestSuite.test("nonmutating-swapAt-withARC") {
+  let buffer = UnsafeMutableBufferPointer<String>.allocate(capacity: 3)
+  defer { buffer.deallocate() }
+
+  _ = buffer.initialize(from: (0..<3).map(String.init(describing:)))
+
+  buffer.swapAt(0, 0)
+  expectEqual(Array(buffer), ["0", "1", "2"])
+
+  buffer.swapAt(0, 2)
+  expectEqual(Array(buffer), ["2", "1", "0"])
+}
+% end
 
 % end # SelfName
 

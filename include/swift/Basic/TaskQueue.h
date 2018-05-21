@@ -23,11 +23,12 @@
 #include <queue>
 
 namespace swift {
+class UnifiedStatsReporter;
 namespace sys {
 
 class Task; // forward declared to allow for platform-specific implementations
 
-typedef llvm::sys::ProcessInfo::ProcessId ProcessId;
+using ProcessId = llvm::sys::ProcessInfo::ProcessId;
 
 /// \brief Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
@@ -46,13 +47,18 @@ class TaskQueue {
   /// The number of tasks to execute in parallel.
   unsigned NumberOfParallelTasks;
 
+  /// Optional place to count I/O and subprocess events.
+  UnifiedStatsReporter *Stats;
+
 public:
   /// \brief Create a new TaskQueue instance.
   ///
   /// \param NumberOfParallelTasks indicates the number of tasks which should
   /// be run in parallel. If 0, the TaskQueue will choose the most appropriate
   /// number of parallel tasks for the current system.
-  TaskQueue(unsigned NumberOfParallelTasks = 0);
+  /// \param USR Optional stats reporter to count I/O and subprocess events.
+  TaskQueue(unsigned NumberOfParallelTasks = 0,
+            UnifiedStatsReporter *USR = nullptr);
   virtual ~TaskQueue();
 
   // TODO: remove once -Wdocumentation stops warning for \param, \returns on
@@ -63,7 +69,7 @@ public:
   ///
   /// \param Pid the ProcessId of the task which just began execution.
   /// \param Context the context which was passed when the task was added
-  typedef std::function<void(ProcessId Pid, void *Context)> TaskBeganCallback;
+  using TaskBeganCallback = std::function<void(ProcessId Pid, void *Context)>;
 
   /// \brief A callback which will be executed after each task finishes
   /// execution.
@@ -79,9 +85,9 @@ public:
   ///
   /// \returns true if further execution of tasks should stop,
   /// false if execution should continue
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
-                                             StringRef Output, StringRef Errors, void *Context)>
-    TaskFinishedCallback;
+  using TaskFinishedCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, int ReturnCode, StringRef Output, StringRef Errors,
+      void *Context)>;
 
   /// \brief A callback which will be executed if a task exited abnormally due
   /// to a signal.
@@ -101,10 +107,9 @@ public:
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
-  typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
-                                             StringRef Output, StringRef Errors,
-                                             void *Context, Optional<int> Signal)>
-    TaskSignalledCallback;
+  using TaskSignalledCallback = std::function<TaskFinishedResponse(
+      ProcessId Pid, StringRef ErrorMsg, StringRef Output, StringRef Errors,
+      void *Context, Optional<int> Signal)>;
 #pragma clang diagnostic pop
 
   /// \brief Indicates whether TaskQueue supports buffering output on the

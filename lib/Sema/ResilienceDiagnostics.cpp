@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements diagnostics for @inlineable.
+// This file implements diagnostics for @inlinable.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,13 +23,24 @@
 using namespace swift;
 using FragileFunctionKind = TypeChecker::FragileFunctionKind;
 
-FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
+std::pair<FragileFunctionKind, bool>
+TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
   for (; DC->isLocalContext(); DC = DC->getParent()) {
-    if (isa<DefaultArgumentInitializer>(DC))
-      return FragileFunctionKind::DefaultArgument;
+    if (isa<DefaultArgumentInitializer>(DC)) {
+      // Default argument generators of public functions cannot reference
+      // @usableFromInline declarations; all other fragile function kinds
+      // can.
+      auto *VD = cast<ValueDecl>(DC->getInnermostDeclarationDeclContext());
+      auto access =
+        VD->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/false);
+      return std::make_pair(FragileFunctionKind::DefaultArgument,
+                            !access.isPublic());
+    }
 
     if (isa<PatternBindingInitializer>(DC))
-      return FragileFunctionKind::PropertyInitializer;
+      return std::make_pair(FragileFunctionKind::PropertyInitializer,
+                            /*treatUsableFromInlineAsPublic=*/true);
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
       // If the function is a nested function, we will serialize its body if
@@ -40,45 +51,46 @@ FragileFunctionKind TypeChecker::getFragileFunctionKind(const DeclContext *DC) {
       // Bodies of public transparent and always-inline functions are
       // serialized, so use conservative access patterns.
       if (AFD->isTransparent())
-        return FragileFunctionKind::Transparent;
+        return std::make_pair(FragileFunctionKind::Transparent,
+                              /*treatUsableFromInlineAsPublic=*/true);
 
-      if (AFD->getAttrs().hasAttribute<InlineableAttr>())
-        return FragileFunctionKind::Inlineable;
+      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
+        return std::make_pair(FragileFunctionKind::Inlinable,
+                              /*treatUsableFromInlineAsPublic=*/true);
 
       if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
-          return FragileFunctionKind::InlineAlways;
+          return std::make_pair(FragileFunctionKind::InlineAlways,
+                                /*treatUsableFromInlineAsPublic=*/true);
 
-      // If a property or subscript is @_inlineable, the accessors are
-      // @_inlineable also.
+      // If a property or subscript is @inlinable, the accessors are
+      // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
-          return FragileFunctionKind::Inlineable;
+        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
+          return std::make_pair(FragileFunctionKind::Inlinable,
+                                /*treatUsableFromInlineAsPublic=*/true);
     }
   }
 
   llvm_unreachable("Context is not nested inside a fragile function");
 }
 
-void TypeChecker::diagnoseInlineableLocalType(const NominalTypeDecl *NTD) {
+void TypeChecker::diagnoseInlinableLocalType(const NominalTypeDecl *NTD) {
   auto *DC = NTD->getDeclContext();
   auto expansion = DC->getResilienceExpansion();
   if (expansion == ResilienceExpansion::Minimal) {
-    diagnose(NTD, diag::local_type_in_inlineable_function,
+    auto kind = getFragileFunctionKind(DC);
+    diagnose(NTD, diag::local_type_in_inlinable_function,
              NTD->getFullName(),
-             static_cast<unsigned>(getFragileFunctionKind(DC)));
+             static_cast<unsigned>(kind.first));
   }
 }
 
-bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
-                                            const ValueDecl *D,
-                                            const DeclContext *DC) {
-  auto expansion = DC->getResilienceExpansion();
-
-  // Internal declarations referenced from non-inlineable contexts are OK.
-  if (expansion == ResilienceExpansion::Maximal)
-    return false;
-
+bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
+                                           const ValueDecl *D,
+                                           const DeclContext *DC,
+                                           FragileFunctionKind Kind,
+                                           bool TreatUsableFromInlineAsPublic) {
   // Local declarations are OK.
   if (D->getDeclContext()->isLocalContext())
     return false;
@@ -89,7 +101,7 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
 
   // Public declarations are OK.
   if (D->getFormalAccessScope(/*useDC=*/nullptr,
-                              /*respectVersionedAttr=*/true).isPublic())
+                              TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
   // Enum cases are handled as part of their containing enum.
@@ -114,23 +126,13 @@ bool TypeChecker::diagnoseInlineableDeclRef(SourceLoc loc,
   diagnose(loc, diag::resilience_decl_unavailable,
            D->getDescriptiveKind(), D->getFullName(),
            D->getFormalAccessScope().accessLevelForDiagnostics(),
-           static_cast<unsigned>(getFragileFunctionKind(DC)));
+           static_cast<unsigned>(Kind));
 
-  bool isDefaultArgument = false;
-  while (DC->isLocalContext()) {
-    if (isa<DefaultArgumentInitializer>(DC)) {
-      isDefaultArgument = true;
-      break;
-    }
-
-    DC = DC->getParent();
-  }
-
-  if (isDefaultArgument) {
+  if (TreatUsableFromInlineAsPublic) {
     diagnose(D, diag::resilience_decl_declared_here,
              D->getDescriptiveKind(), D->getFullName());
   } else {
-    diagnose(D, diag::resilience_decl_declared_here_versioned,
+    diagnose(D, diag::resilience_decl_declared_here_public,
              D->getDescriptiveKind(), D->getFullName());
   }
 

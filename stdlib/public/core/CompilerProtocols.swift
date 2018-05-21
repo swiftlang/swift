@@ -148,7 +148,7 @@ public protocol RawRepresentable {
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -159,7 +159,7 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
@@ -172,43 +172,52 @@ public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
   where T : RawRepresentable, T.RawValue : Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
-/// A type that can produce a collection of all of its values.
+/// A type that provides a collection of all of its values.
 ///
-/// Simple Enumerations
-/// ===================
+/// Types that conform to the `CaseIterable` protocol are typically
+/// enumerations without associated values. When using a `CaseIterable` type,
+/// you can access a collection of all of the type's cases by using the type's
+/// `allCases` property.
 ///
-/// For any Swift enumeration where every case does not have an associated
-/// value, the Swift compiler can automatically fill out the `CaseIterable`
-/// conformance. When defining your own custom enumeration, specify a
-/// conformance to `CaseIterable` to take advantage of this automatic
-/// derivation.
+/// For example, the `CompassDirection` enumeration declared in this example
+/// conforms to `CaseIterable`. You access the number of cases and the cases
+/// themselves through `CompassDirection.allCases`.
 ///
-/// For example, every case of the `CardinalPoint` enumeration defined here
-/// does not have an associated value:
-///
-///     enum CardinalPoint: CaseIterable {
+///     enum CompassDirection: CaseIterable {
 ///         case north, south, east, west
 ///     }
 ///
-/// So the compiler automatically creates a conformance.
+///     print("There are \(CompassDirection.allCases.count) directions.")
+///     // Prints "There are 4 directions."
+///     let caseList = CompassDirection.allCases
+///                                    .map({ "\($0)" })
+///                                    .joined(separator: ", ")
+///     // caseList == "north, south, east, west"
 ///
-///     for cardinality in CardinalPoint.allCases {
-///         print(cardinality)
-///     }
-///     // Prints "north"
-///     // Prints "south"
-///     // Prints "east"
-///     // Prints "west"
+/// Conforming to the CaseIterable Protocol
+/// =======================================
+///
+/// The compiler can automatically provide an implementation of the
+/// `CaseIterable` requirements for any enumeration without associated values
+/// or `@available` attributes on its cases. The synthesized `allCases`
+/// collection provides the cases in order of their declaration.
+///
+/// You can take advantage of this compiler support when defining your own
+/// custom enumeration by declaring conformance to `CaseIterable` in the
+/// enumeration's original declaration. The `CompassDirection` example above
+/// demonstrates this automatic implementation.
 public protocol CaseIterable {
+  /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection
     where AllCases.Element == Self
-  /// Returns a collection of all values of this type.
+  
+  /// A collection of all values of this type.
   static var allCases: AllCases { get }
 }
 
@@ -439,7 +448,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
 extension ExpressibleByExtendedGraphemeClusterLiteral
   where ExtendedGraphemeClusterLiteralType == UnicodeScalarLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(unicodeScalarLiteral value: ExtendedGraphemeClusterLiteralType) {
     self.init(extendedGraphemeClusterLiteral: value)
@@ -505,7 +514,7 @@ public protocol ExpressibleByStringLiteral
 extension ExpressibleByStringLiteral
   where StringLiteralType == ExtendedGraphemeClusterLiteralType {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StringLiteralType) {
     self.init(stringLiteral: value)
@@ -765,7 +774,7 @@ public protocol _ExpressibleByColorLiteral {
 }
 
 extension _ExpressibleByColorLiteral {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, obsoleted: 4.0,
     message: "This initializer is only meant to be used by color literals")
   public init(

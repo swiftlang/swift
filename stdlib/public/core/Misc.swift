@@ -15,7 +15,7 @@
 // FIXME: Once we have an FFI interface, make these have proper function bodies
 
 /// Returns if `x` is a power of 2.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: UInt) -> Bool {
@@ -28,7 +28,7 @@ func _isPowerOf2(_ x: UInt) -> Bool {
 }
 
 /// Returns if `x` is a power of 2.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // @testable
 func _isPowerOf2(_ x: Int) -> Bool {
@@ -41,7 +41,7 @@ func _isPowerOf2(_ x: Int) -> Bool {
 }
 
 #if _runtime(_ObjC)
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _autorelease(_ x: AnyObject) {
   Builtin.retain(x)
@@ -54,8 +54,7 @@ public func _autorelease(_ x: AnyObject) {
 ///
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
-@_inlineable // FIXME(sil-serialize-all)
-@_versioned // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
@@ -71,18 +70,17 @@ internal func _withUninitializedString<R>(
 // with type names that we are nested in.
 // But we can place it behind #if _runtime(_Native) and remove it from ABI on
 // Apple platforms, deferring discussions mentioned above.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_silgen_name("swift_getTypeName")
 public func _getTypeName(_ type: Any.Type, qualified: Bool)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the demangled qualified name of a metatype.
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
   let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return ._fromWellFormedCodeUnitSequence(UTF8.self,
-    input: UnsafeBufferPointer(start: stringPtr, count: count))
+  return ._fromASCII(UnsafeBufferPointer(start: stringPtr, count: count))
 }
 
 /// Lookup a class given a name. Until the demangled encoding of type

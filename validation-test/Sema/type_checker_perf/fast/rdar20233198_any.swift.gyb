@@ -1,0 +1,9 @@
+// RUN: %scale-test --begin 2 --end 6 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+let _ = (UInt8(0)
+%for i in range(0, N):
+  , UInt8(0)
+%end
+)

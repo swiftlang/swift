@@ -102,9 +102,17 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   HelpText<"Show every step in the lifecycle of driver jobs">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
+def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
+  InternalDebugOpt, HelpText<"Pass input or output file names as filelists if there are more than <n>">,
+  MetaVarName<"<n>">;
+def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
+  Alias<driver_filelist_threshold>;
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
+def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
+  InternalDebugOpt,
+  HelpText<"Force one batch repartitioning for testing">;
 
 def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
@@ -346,6 +354,11 @@ def typo_correction_limit : Separate<["-"], "typo-correction-limit">,
 def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
+
+def emit_public_type_metadata_accessors :
+  Flag<["-"], "emit-public-type-metadata-accessors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit all type metadata accessors as public">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -741,6 +754,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+
+def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,

@@ -717,8 +717,7 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy =
-    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
   return ti.getSchema().empty() && !param.isFormalIndirect();
@@ -758,7 +757,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
@@ -933,7 +932,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
-      layout->getBindings().restore(subIGF, bindingsAddr);
+      layout->getBindings().restore(subIGF, bindingsAddr,
+                                    MetadataState::Complete);
     }
 
   // There's still a placeholder to claim if the target type is thick
@@ -947,8 +947,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.empty() != hasPolymorphicParameters(origType) ||
-         (subs.empty() && origType->getRepresentation() ==
+  assert((subs.hasAnySubstitutableParams()
+            == hasPolymorphicParameters(origType) ||
+         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
@@ -984,10 +985,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (void)param.claimAll();
     }
 
-    SubstitutionMap subMap;
-    if (auto genericSig = origType->getGenericSignature())
-      subMap = genericSig->getSubstitutionMap(subs);
-    emitPolymorphicArguments(subIGF, origType, subMap,
+    emitPolymorphicArguments(subIGF, origType, subs,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1062,6 +1060,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       if (RetainableValue->getType() != subIGF.IGM.RefCountedPtrTy)
         RetainableValue = subIGF.Builder.CreateBitCast(
             RetainableValue, subIGF.IGM.RefCountedPtrTy);
+      needsAllocas = true;
       auto temporary = subIGF.createAlloca(RetainableValue->getType(),
                                            subIGF.IGM.getPointerAlignment(),
                                            "partial-apply.context");
@@ -1091,7 +1090,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto &fieldTy = layout->getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      auto &fieldTI = fieldLayout.getType();
+      auto &fieldTI = fieldLayout.getTypeForAccess();
       auto fieldSchema = fieldTI.getSchema();
       
       Explosion param;
@@ -1183,10 +1182,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // Now that we have bound generic parameters from the captured arguments
     // emit the polymorphic arguments.
     if (hasPolymorphicParameters(origType)) {
-      SubstitutionMap subMap;
-      if (auto genericSig = origType->getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs);
-      emitPolymorphicArguments(subIGF, origType, subMap,
+      emitPolymorphicArguments(subIGF, origType, subs,
                                &witnessMetadata, polyArgs);
     }
   }
@@ -1332,7 +1328,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 void irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
-    SubstitutionList subs, CanSILFunctionType origType,
+    SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
     bool isOutlined) {
   // If we have a single Swift-refcounted context value, we can adopt it
@@ -1345,14 +1341,11 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
-  bool isNoEscapeFunction = outType->isNoEscape();
+  assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
-  SubstitutionMap subMap;
-  if (auto genericSig = origType->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subMap);
+                                                            origType, subs);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -1367,8 +1360,7 @@ void irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
-    auto argLoweringTy =
-        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
@@ -1475,10 +1467,7 @@ void irgen::emitFunctionPartialApplication(
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1519,10 +1508,7 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
-    if (isNoEscapeFunction)
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.OpaquePtrTy);
-    else
-      ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
     return;
   }
@@ -1579,9 +1565,9 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                 isOutlined);
+        auto addr = fieldLayout.getTypeForAccess().getAddressForPointer(args.claimNext());
+        fieldLayout.getTypeForAccess().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
+                                                          isOutlined);
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1590,7 +1576,7 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
-        cast<LoadableTypeInfo>(fieldLayout.getType())
+        cast<LoadableTypeInfo>(fieldLayout.getTypeForAccess())
             .initialize(IGF, args, fieldAddr, isOutlined);
         break;
       }
@@ -1613,8 +1599,6 @@ void irgen::emitFunctionPartialApplication(
                                                               argConventions);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
-  if (isNoEscapeFunction)
-    data = IGF.Builder.CreateBitCast(data, IGF.IGM.OpaquePtrTy);
   out.add(data);
 }
 

@@ -680,9 +680,6 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     llvm::SaveAndRestore<JumpDest> savedThrowDest(SGF.ThrowDest, throwDest);
 
     visit(S->getBody());
-    // We emit the counter for exiting the do-block here, as we may not have a
-    // valid insertion point when falling out.
-    SGF.emitProfilerIncrement(S);
   }
 
   // Emit the catch clauses, but only if the body of the function
@@ -816,10 +813,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   SILBasicBlock *failExitingBlock = createBasicBlock();
   SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
 
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
-      loopDest.getBlock(),
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalSomeCase(
+      createBasicBlock(), loopDest.getBlock(),
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         SGF.emitProfilerIncrement(S->getBody());
 
         // Emit the loop body.
@@ -868,8 +864,10 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
 
         // If we emitted an unreachable in the body, we will not have a valid
         // insertion point. Just return early.
-        if (!SGF.B.hasValidInsertionPoint())
+        if (!SGF.B.hasValidInsertionPoint()) {
+          scope.unreachableExit();
           return;
+        }
 
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
@@ -881,10 +879,9 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // We add loop fail block, just to be defensive about intermediate
   // transformations performing cleanups at scope.exit(). We still jump to the
   // contBlock.
-  switchEnumBuilder.addCase(
-      SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
-      failExitingBlock,
-      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+  switchEnumBuilder.addOptionalNoneCase(
+      createBasicBlock(), failExitingBlock,
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &&scope) {
         assert(!inputValue && "None should not be passed an argument!");
         scope.exitAndBranch(S);
       },

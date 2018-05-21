@@ -95,9 +95,9 @@ bool ARCPairingContext::performMatching(
       MatchedPair |= Builder.matchedPair();
       auto &Set = Builder.getResult();
       for (auto *I : Set.Increments)
-        IncToDecStateMap.blot(I);
+        IncToDecStateMap.erase(I);
       for (auto *I : Set.Decrements)
-        DecToIncStateMap.blot(I);
+        DecToIncStateMap.erase(I);
 
       // Add the Set to the callback. *NOTE* No instruction destruction can
       // happen here since we may remove instructions that are insertion points

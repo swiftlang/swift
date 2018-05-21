@@ -78,16 +78,14 @@ struct _SwiftEmptyDictionaryStorage _swiftEmptyDictionaryStorage;
 SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftEmptySetStorage _swiftEmptySetStorage;
 
-struct _SwiftHashingSeed {
+struct _SwiftHashingParameters {
   __swift_uint64_t seed0;
   __swift_uint64_t seed1;
+  __swift_bool deterministic;
 };
-
+  
 SWIFT_RUNTIME_STDLIB_INTERFACE
-struct _SwiftHashingSeed _swift_stdlib_Hashing_seed;
-
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_bool _swift_stdlib_Hashing_deterministicHashing;
+struct _SwiftHashingParameters _swift_stdlib_Hashing_parameters;
 
 #ifdef __cplusplus
 

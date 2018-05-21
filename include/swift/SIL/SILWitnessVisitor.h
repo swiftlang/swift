@@ -58,11 +58,20 @@ public:
       if (haveAddedAssociatedTypes) return;
       haveAddedAssociatedTypes = true;
 
+      SmallVector<AssociatedTypeDecl *, 2> associatedTypes;
       for (Decl *member : protocol->getMembers()) {
         if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
-          // TODO: only add associated types when they're new?
-          asDerived().addAssociatedType(AssociatedType(associatedType));
+          associatedTypes.push_back(associatedType);
         }
+      }
+
+      // Sort associated types by name, for resilience.
+      llvm::array_pod_sort(associatedTypes.begin(), associatedTypes.end(),
+                           TypeDecl::compare);
+
+      for (auto *associatedType : associatedTypes) {
+        // TODO: only add associated types when they're new?
+        asDerived().addAssociatedType(AssociatedType(associatedType));
       }
     };
 

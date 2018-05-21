@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Frontend/ArgsToFrontendOptionsConverter.h"
+#include "ArgsToFrontendOptionsConverter.h"
 
+#include "ArgsToFrontendInputsConverter.h"
+#include "ArgsToFrontendOutputsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Platform.h"
-#include "swift/Frontend/ArgsToFrontendInputsConverter.h"
-#include "swift/Frontend/ArgsToFrontendOutputsConverter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
@@ -78,6 +78,10 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
+                             Opts.SwitchCheckingInvocationThreshold);
+
+  Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
   computePlaygroundOptions();
 
@@ -210,10 +214,10 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
 }
 
 void ArgsToFrontendOptionsConverter::setUnsignedIntegerArgument(
-    options::ID optionID, unsigned max, unsigned &valueToSet) {
+    options::ID optionID, unsigned radix, unsigned &valueToSet) {
   if (const Arg *A = Args.getLastArg(optionID)) {
     unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(max, attempt)) {
+    if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     } else {

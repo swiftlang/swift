@@ -120,7 +120,7 @@ extension Syntax {
     return data.indexInParent
   }
 
-  /// The absolute position of the starting point this node. If the first token
+  /// The absolute position of the starting point of this node. If the first token
   /// is with leading trivia, the position points to the start of the leading
   /// trivia.
   public var position: AbsolutePosition {
@@ -136,6 +136,32 @@ extension Syntax {
   /// The textual byte length of this node including leading and trailing trivia.
   public var byteSize: Int {
     return data.byteSize
+  }
+
+  /// The leading trivia of this syntax node. Leading trivia is attached to
+  /// the first token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var leadingTrivia: Trivia? {
+    return raw.leadingTrivia
+  }
+
+  /// The trailing trivia of this syntax node. Trailing trivia is attached to
+  /// the last token syntax contained by this node. Without such token, this
+  /// property will return nil.
+  public var trailingTrivia: Trivia? {
+    return raw.trailingTrivia
+  }
+
+  /// When isImplicit is true, the syntax node doesn't include any
+  /// underlying tokens, e.g. an empty CodeBlockItemList.
+  public var isImplicit: Bool {
+    return leadingTrivia == nil
+  }
+
+  /// The textual byte length of this node exluding leading and trailing trivia.
+  public var byteSizeAfterTrimmingTrivia: Int {
+    return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
+      (trailingTrivia?.byteSize ?? 0)
   }
 
   /// The root of the tree in which this node resides.
@@ -175,6 +201,56 @@ extension Syntax {
   public func write<Target>(to target: inout Target)
     where Target: TextOutputStream {
     data.raw.write(to: &target)
+  }
+
+  /// The starting location, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterLeadingTrivia: Whether to skip leading trivia when getting
+  ///                         the node's location. Defaults to `true`.
+  public func startLocation(
+    in file: URL,
+    afterLeadingTrivia: Bool = true
+  ) -> SourceLocation {
+    let pos = afterLeadingTrivia ? 
+      data.position.copy() :
+      data.positionAfterSkippingLeadingTrivia.copy()
+    return SourceLocation(file: file.path, position: pos)
+  }
+
+
+  /// The ending location, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterTrailingTrivia: Whether to skip trailing trivia when getting
+  ///                          the node's location. Defaults to `false`.
+  public func endLocation(
+    in file: URL,
+    afterTrailingTrivia: Bool = false
+  ) -> SourceLocation {
+    let pos = data.position.copy()
+    raw.accumulateAbsolutePosition(pos)
+    if afterTrailingTrivia {
+      raw.accumulateTrailingTrivia(pos)
+    }
+    return SourceLocation(file: file.path, position: pos)
+  }
+
+  /// The source range, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterLeadingTrivia: Whether to skip leading trivia when getting
+  ///                          the node's start location. Defaults to `true`.
+  ///   - afterTrailingTrivia: Whether to skip trailing trivia when getting
+  ///                          the node's end location. Defaults to `false`.
+  public func sourceRange(
+    in file: URL,
+    afterLeadingTrivia: Bool = true,
+    afterTrailingTrivia: Bool = false
+  ) -> SourceRange {
+    let start = startLocation(in: file, afterLeadingTrivia: afterLeadingTrivia)
+    let end = endLocation(in: file, afterTrailingTrivia: afterTrailingTrivia)
+    return SourceRange(start: start, end: end)
   }
 }
 

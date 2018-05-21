@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -404,8 +404,8 @@ bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil @a2p_p2a_reinterpret_cast_word_raw_pointer
 // CHECK: bb0
+// CHECK-NEXT: unchecked_addr_cast
 // CHECK-NEXT: load
-// CHECK-NEXT: unchecked_trivial_bit_cast
 // CHECK-NEXT: return
 sil @a2p_p2a_reinterpret_cast_word_raw_pointer : $@convention(thin) (@inout Builtin.Word, Builtin.RawPointer) -> Int32 {
 bb0(%0 : $*Builtin.Word, %1 : $Builtin.RawPointer):
@@ -1133,9 +1133,9 @@ bb0:
 
 // CHECK-LABEL: sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
-// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
-// CHECK-NEXT: return
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
 sil @unchecked_addr_cast_formation : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
@@ -1146,9 +1146,10 @@ bb0(%0 : $*Builtin.NativeObject):
 
 // CHECK-LABEL: sil @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 // CHECK: bb0([[INPUT_PTR:%[0-9]+]] : $*Builtin.NativeObject):
-// CHECK-NEXT: [[INPUT_VALUE:%[0-9]+]] = load [[INPUT_PTR]] : $*Builtin.NativeObject
-// CHECK-NEXT: [[CAST_VALUE:%[0-9]+]] = unchecked_trivial_bit_cast [[INPUT_VALUE]] : $Builtin.NativeObject to $Builtin.Word
-// CHECK-NEXT: return
+// CHECK-NEXT: [[ADDR_CAST:%[0-9]+]] = unchecked_addr_cast [[INPUT_PTR]] : $*Builtin.NativeObject to $*Builtin.Word
+// CHECK-NEXT: debug_value [[ADDR_CAST]]
+// CHECK-NEXT: [[RETURN_VALUE:%[0-9]+]] = load [[ADDR_CAST]] : $*Builtin.Word
+// CHECK-NEXT: return [[RETURN_VALUE]]
 sil @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeObject) -> Builtin.Word {
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer

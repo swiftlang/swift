@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -47,7 +47,7 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
-  DoubleWidth.swift.gyb
+  Dictionary.swift
   DropWhile.swift
   Dump.swift
   EmptyCollection.swift
@@ -61,12 +61,12 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   Hashable.swift
-  HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
   # if we do so, the compiler crashes.
   AnyHashable.swift
   # END WORKAROUND
   HashedCollectionsAnyHashableExtensions.swift
+  Hasher.swift
   Hashing.swift
   HeapBuffer.swift
   ICU.swift
@@ -97,6 +97,7 @@ set(SWIFTLIB_ESSENTIAL
   Policy.swift
   PrefixWhile.swift
   Print.swift
+  Random.swift
   RandomAccessCollection.swift
   Range.swift
   RangeReplaceableCollection.swift
@@ -106,15 +107,17 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
-  SipHash.swift.gyb
+  SipHash.swift
   SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift
   SequenceWrapper.swift
+  Set.swift
   SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
+  SmallString.swift
   Sort.swift.gyb
   StaticString.swift
   Stride.swift.gyb
@@ -236,6 +239,9 @@ endif()
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-sil-ownership")
+if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
+  list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
+endif()
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE
@@ -246,7 +252,7 @@ endif()
 
 set(shared_only_libs)
 if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
-   list(APPEND shared_only_libs swiftImageInspectionShared)
+   list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
 endif()
 
 add_swift_library(swiftCore ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

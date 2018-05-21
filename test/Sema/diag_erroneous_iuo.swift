@@ -201,7 +201,7 @@ let x: Int? = 1
 let y0: Int = x as Int! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{23-24=?}}
 let y1: Int = (x as Int!)! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{24-25=?}}
 let z0: Int = x as! Int! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{24-25=?}}
-// expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
+// expected-warning@-1 {{forced cast from 'Int?' to 'Int' only unwraps optionals; did you mean to use '!'?}}
 let z1: Int = (x as! Int!)! // expected-error {{using '!' is not allowed here; perhaps '?' was intended?}}{{25-26=?}}
 // expected-warning@-1 {{forced cast of 'Int?' to same type has no effect}}
 let w0: Int = (x as? Int!)! // expected-warning {{conditional cast from 'Int?' to 'Int?' always succeeds}}

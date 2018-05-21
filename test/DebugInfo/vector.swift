@@ -14,7 +14,7 @@ public struct float2 {
     get {
       let elt = Builtin.extractelement_Vec2xFPIEEE32_Int32(_vector,
         Int32(index)._value)
-      return Float(_bits: elt)
+      return Float(elt)
     }
   }
 }

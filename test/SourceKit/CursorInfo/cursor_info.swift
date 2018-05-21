@@ -220,6 +220,8 @@ func funcWithNestedEscaping(a : (@escaping () -> ()) -> ()) {}
 /// doc
 typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 
+typealias GenericAlias<T, U> = MyAlias<T, U> where T: P1
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -488,7 +490,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK40-NEXT: s:11cursor_info2E2O2C2yACSi_SStcACmF
 // CHECK40-NEXT: (E2.Type) -> (Int, String) -> E2
 // CHECK40: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.argument_label>y</tuple.element.argument_label>: <tuple.element.type><ref.struct usr="s:SS">String</ref.struct></tuple.element.type></tuple.element>)</tuple></decl.enumelement>
+// CHECK40-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:SS">String</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=92:31 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK41
 // CHECK41: source.lang.swift.decl.enumelement (92:31-92:33)
@@ -496,8 +498,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK41-NEXT: s:11cursor_info2E2O2C3yACSicACmF
 // CHECK41-NEXT: (E2.Type) -> (Int) -> E2
 // CHECK41: <Declaration>case C3(<Type usr="s:Si">Int</Type>)</Declaration>
-// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<ref.struct usr="s:Si">Int</ref.struct>)</decl.enumelement>
-// FIXME: Wrap parameters in <decl.var.parameter>
+// CHECK41-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C3</decl.name>(<decl.var.parameter><decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=96:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK42
 // CHECK42: source.lang.swift.decl.enumelement (96:8-96:9)
@@ -517,13 +518,13 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // CHECK44: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK44-NEXT: C2
 // CHECK44: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x</tuple.element.argument_label>: <tuple.element.type><ref
+// CHECK44-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref
 
 // RUN: %sourcekitd-test -req=cursor -pos=102:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK45
 // CHECK45: source.lang.swift.ref.enumelement (92:8-92:10)
 // CHECK45-NEXT: C2
 // CHECK45: <Declaration>case C2(x: <Type usr="s:Si">Int</Type>, y: <Type usr="s:SS">String</Type>)</Declaration>
-// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name><tuple>(<tuple.element><tuple.element.argument_label>x
+// CHECK45-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>C2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x
 
 // RUN: %sourcekitd-test -req=cursor -pos=103:16 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK46
 // CHECK46: source.lang.swift.ref.enumelement (96:8-96:9)
@@ -747,3 +748,7 @@ typealias typeWithNestedAutoclosure = (@autoclosure () -> ()) -> ()
 // RUN: %sourcekitd-test -req=cursor -pos=221:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK90 %s
 // CHECK90: <Declaration>typealias typeWithNestedAutoclosure = (@autoclosure () -&gt; ()) -&gt; ()</Declaration>
 // CHECK90-NEXT: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
+
+// RUN: %sourcekitd-test -req=cursor -pos=223:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK91 %s
+// CHECK91: <Declaration>typealias GenericAlias&lt;T, U&gt; = <Type usr="s:11cursor_info7MyAliasa">MyAlias</Type>&lt;<Type usr="s:11cursor_info12GenericAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</Type>&gt; where T : <Type usr="s:11cursor_info2P1P">P1</Type></Declaration>
+// CHECK91-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>GenericAlias</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <ref.typealias usr="s:11cursor_info7MyAliasa">MyAlias</ref.typealias>&lt;<ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp">T</ref.generic_type_param>, <ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</ref.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T : <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.generic_type_requirement></decl.typealias>

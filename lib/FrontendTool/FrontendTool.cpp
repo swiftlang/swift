@@ -288,7 +288,7 @@ static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
   auto os = getFileOutputStream(OutputFilename, SF->getASTContext());
   if (!os) return true;
 
-  json::Output jsonOut(*os);
+  json::Output jsonOut(*os, /*PrettyPrint=*/false);
   auto Root = SF->getSyntaxRoot().getRaw();
   jsonOut << *Root;
   *os << "\n";
@@ -404,7 +404,7 @@ private:
     }
   }
 
-  bool finishProcessing() override {
+  bool finishProcessing(SourceManager &) override {
     std::error_code EC;
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
@@ -884,7 +884,8 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action))
-    Instance.performParseOnly();
+    Instance.performParseOnly(/*EvaluateConditionals*/
+                    Action == FrontendOptions::ActionType::EmitImportedModules);
   else
     Instance.performSema();
 
@@ -947,9 +948,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
@@ -979,13 +984,6 @@ static bool performCompile(CompilerInstance &Instance,
   return false;
 }
 
-/// If we are asked to link all, link all.
-static void linkAllIfNeeded(const CompilerInvocation &Invocation,
-                            SILModule *SM) {
-  if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
-    performSILLinking(SM, true);
-}
-
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM,
@@ -1006,8 +1004,6 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
     if (runSILOwnershipEliminatorPass(*SM))
       return true;
   }
-
-  linkAllIfNeeded(Invocation, SM);
 
   if (Invocation.getSILOptions().MergePartialModules)
     SM->linkAllFromCurrentModule();
@@ -1210,12 +1206,10 @@ static bool performCompileStepsPostSILGen(
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
-    linkAllIfNeeded(Invocation, SM.get());
     return writeSIL(*SM, PSPs, Instance, Invocation);
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
-    linkAllIfNeeded(Invocation, SM.get());
     serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
     return Context.hadError();
   }
@@ -1537,6 +1531,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
       subConsumers.emplace_back(input.file(), std::move(subConsumer));
     return false;
   });
+  // For batch mode, the compiler must swallow diagnostics pertaining to
+  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // multiple times. So, create a diagnostic "eater" for those non-primary
+  // files.
+  // To avoid introducing bugs into WMO or single-file modes, test for multiple
+  // primaries.
+  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+    inputsAndOutputs.forEachNonPrimaryInput(
+        [&](const InputFile &input) -> bool {
+          subConsumers.emplace_back(input.file(), nullptr);
+          return false;
+        });
+  }
 
   if (subConsumers.empty())
     return nullptr;
@@ -1644,7 +1651,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   auto finishDiagProcessing = [&](int retValue) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing();
+    bool err = Instance->getDiags().finishProcessing(Instance->getSourceMgr());
     return retValue ? retValue : err;
   };
 
@@ -1706,7 +1713,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     std::unique_ptr<llvm::opt::OptTable> Options(createSwiftOptTable());
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
-                       ExcludedFlagsBitmask);
+                       ExcludedFlagsBitmask, /*ShowAllAliases*/false);
     return finishDiagProcessing(0);
   }
 
@@ -1749,15 +1756,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
-  {
-    const FrontendInputsAndOutputs &io =
-        Invocation.getFrontendOptions().InputsAndOutputs;
-    if (io.hasDependencyTrackerPath() ||
-        !Invocation.getFrontendOptions().IndexStorePath.empty()) {
-      Instance->setDependencyTracker(&depTracker);
-    }
-  }
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasDependencyTrackerPath() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty())
+    Instance->createDependencyTracker();
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

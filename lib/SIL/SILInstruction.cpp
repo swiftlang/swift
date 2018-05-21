@@ -387,7 +387,9 @@ namespace {
     bool visitBeginAccessInst(const BeginAccessInst *right) {
       auto left = cast<BeginAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndAccessInst(const EndAccessInst *right) {
@@ -398,13 +400,16 @@ namespace {
     bool visitBeginUnpairedAccessInst(const BeginUnpairedAccessInst *right) {
       auto left = cast<BeginUnpairedAccessInst>(LHS);
       return left->getAccessKind() == right->getAccessKind()
-          && left->getEnforcement() == right->getEnforcement();
+          && left->getEnforcement() == right->getEnforcement()
+          && left->hasNoNestedConflict() == right->hasNoNestedConflict()
+          && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitEndUnpairedAccessInst(const EndUnpairedAccessInst *right) {
       auto left = cast<EndUnpairedAccessInst>(LHS);
       return left->getEnforcement() == right->getEnforcement()
-          && left->isAborting() == right->isAborting();
+             && left->isAborting() == right->isAborting()
+             && left->isFromBuiltin() == right->isFromBuiltin();
     }
 
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
@@ -604,7 +609,7 @@ namespace {
 
     bool visitApplyInst(ApplyInst *RHS) {
       auto *X = cast<ApplyInst>(LHS);
-      return X->getSubstitutions() == RHS->getSubstitutions();
+      return X->getSubstitutionMap() == RHS->getSubstitutionMap();
     }
 
     bool visitBuiltinInst(BuiltinInst *RHS) {
@@ -1188,6 +1193,20 @@ bool SILInstruction::mayTrap() const {
   }
 }
 
+bool SILInstruction::isMetaInstruction() const {
+  // Every instruction that implements getVarInfo() should be in this list.
+  switch (getKind()) {
+  case SILInstructionKind::AllocBoxInst:
+  case SILInstructionKind::AllocStackInst:
+  case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::DebugValueAddrInst:
+    return true;
+  default:
+    return false;
+  }
+  llvm_unreachable("Instruction not handled in isMetaInstruction()!");
+}
+
 //===----------------------------------------------------------------------===//
 //                                 Utilities
 //===----------------------------------------------------------------------===//
@@ -1288,7 +1307,7 @@ SILInstructionResultArray::SILInstructionResultArray(
   auto TRangeBegin = TypedRange.begin();
   auto TRangeIter = TRangeBegin;
   auto TRangeEnd = TypedRange.end();
-  assert(MVResults.size() == unsigned(std::distance(VRangeBegin, VRangeEnd)));
+  assert(MVResults.size() == unsigned(std::distance(TRangeBegin, TRangeEnd)));
   for (unsigned i : indices(MVResults)) {
     assert(SILValue(&MVResults[i]) == (*this)[i]);
     assert(SILValue(&MVResults[i])->getType() == (*this)[i]->getType());
@@ -1338,18 +1357,18 @@ operator==(const SILInstructionResultArray &other) {
 
 SILInstructionResultArray::type_range
 SILInstructionResultArray::getTypes() const {
-  std::function<SILType(SILValue)> F = [](SILValue V) -> SILType {
+  SILType (*F)(SILValue) = [](SILValue V) -> SILType {
     return V->getType();
   };
   return {llvm::map_iterator(begin(), F), llvm::map_iterator(end(), F)};
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::begin() const {
-  return iterator(*this, getStartOffset());
+  return iterator(*this, 0);
 }
 
 SILInstructionResultArray::iterator SILInstructionResultArray::end() const {
-  return iterator(*this, getEndOffset());
+  return iterator(*this, size());
 }
 
 SILInstructionResultArray::reverse_iterator

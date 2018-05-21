@@ -441,7 +441,8 @@ public:
     case MetadataKind::ErrorObject:
       // Treat these all as Builtin.NativeObject for type lowering purposes.
       return Builder.createBuiltinType("Bo");
-    case MetadataKind::Opaque: {
+    case MetadataKind::Opaque:
+    default: {
       auto BuiltOpaque = Builder.getOpaqueType();
       TypeCache[MetadataAddress] = BuiltOpaque;
       return BuiltOpaque;
@@ -924,8 +925,6 @@ protected:
         return _readMetadata<TargetMetatypeMetadata>(address);
       case MetadataKind::ObjCClassWrapper:
         return _readMetadata<TargetObjCClassWrapperMetadata>(address);
-      case MetadataKind::Opaque:
-        return _readMetadata<TargetOpaqueMetadata>(address);
       case MetadataKind::Optional:
         return _readMetadata<TargetEnumMetadata>(address);
       case MetadataKind::Struct:
@@ -946,6 +945,9 @@ protected:
 
         return _readMetadata(address, totalSize);
       }
+      case MetadataKind::Opaque:
+      default:
+        return _readMetadata<TargetOpaqueMetadata>(address);
     }
 
     // We can fall out here if the value wasn't actually a valid
@@ -1491,7 +1493,7 @@ private:
 namespace llvm {
   template<typename Runtime, typename T>
   struct simplify_type<swift::remote::RemoteRef<Runtime, T>> {
-    typedef const T *SimpleType;
+    using SimpleType = const T *;
     static SimpleType
     getSimplifiedValue(swift::remote::RemoteRef<Runtime, T> value) {
       return value.getLocalBuffer();

@@ -474,6 +474,8 @@ public:
   createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                      SILType BaseType,
                                      llvm::SmallVectorImpl<SILValue> &Values);
+
+  void print(raw_ostream &os, SILType baseType) const;
 private:
   /// Convenience method for getting the raw underlying index as a pointer.
   TypeBase *getPointer() const {
@@ -685,8 +687,8 @@ public:
 
   void verify(SILModule &M);
 
-  raw_ostream &print(raw_ostream &OS, SILModule &M);
-  void dump(SILModule &M);
+  raw_ostream &print(raw_ostream &OS, SILModule &M) const;
+  void dump(SILModule &M) const;
 };
 
 /// Returns the hashcode for the new projection path.

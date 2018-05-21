@@ -147,8 +147,8 @@ namespace swift {
     bool IsSynthesized;
   };
 
-  typedef llvm::function_ref<void(ArrayRef<ExtensionInfo>)>
-      ExtensionGroupOperation;
+  using ExtensionGroupOperation =
+      llvm::function_ref<void(ArrayRef<ExtensionInfo>)>;
 
   class SynthesizedExtensionAnalyzer {
     struct Implementation;

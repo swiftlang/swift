@@ -637,12 +637,6 @@ void Lexer::lexIdentifier() {
 void Lexer::lexHash() {
   const char *TokStart = CurPtr-1;
 
-  // NOTE: legacy punctuator.  Remove in the future.
-  if (*CurPtr == ']') { // #]
-     ++CurPtr;
-     return formToken(tok::r_square_lit, TokStart);
-  }
-
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
   if (clang::isIdentifierHead(*tmpPtr)) {
@@ -688,6 +682,12 @@ static bool isLeftBound(const char *tokBegin, const char *bufferBegin) {
     else
       return true;
 
+  case '\xA0':
+    if (tokBegin - 1 != bufferBegin && tokBegin[-2] == '\xC2')
+      return false; // Non-breaking whitespace (U+00A0)
+    else
+      return true;
+
   default:
     return true;
   }
@@ -719,6 +719,12 @@ static bool isRightBound(const char *tokEnd, bool isLeftBound,
     // A following comment counts as whitespace, so this token is not right bound.
     if (tokEnd[1] == '/' || tokEnd[1] == '*')
       return false;
+    else
+      return true;
+
+  case '\xC2':
+    if (tokEnd[1] == '\xA0')
+      return false; // Non-breaking whitespace (U+00A0)
     else
       return true;
 
@@ -1900,6 +1906,17 @@ bool Lexer::lexUnknown(bool EmitDiagnosticsIfToken) {
         .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp), " ");
     CurPtr = Tmp;
     return false; // Skip presumed whitespace.
+  } else if (Codepoint == 0x000000A0) {
+      // Non-breaking whitespace (U+00A0)
+      while (Tmp[0] == '\xC2' && Tmp[1] == '\xA0')
+        Tmp += 2;
+      SmallString<8> Spaces;
+      Spaces.assign((Tmp - CurPtr + 1) / 2, ' ');
+      diagnose(CurPtr - 1, diag::lex_nonbreaking_space)
+          .fixItReplaceChars(getSourceLoc(CurPtr - 1), getSourceLoc(Tmp),
+                             Spaces);
+      CurPtr = Tmp;
+      return false;
   } else if (Codepoint == 0x0000201D) {
     // If this is an end curly quote, just diagnose it with a fixit hint.
     if (EmitDiagnosticsIfToken) {
@@ -2224,29 +2241,16 @@ void Lexer::lexImpl() {
 
   case '@': return formToken(tok::at_sign, TokStart);
   case '{': return formToken(tok::l_brace, TokStart);
-  case '[': {
-     // NOTE: Legacy punctuator for old object literal syntax.
-     // Remove in the future.
-     if (*CurPtr == '#') { // [#
-       // NOTE: Do NOT include the '#' in the token, unlike in earlier
-       // versions of Swift that supported the old object literal syntax
-       // directly.  The '#' will be lexed as part of the object literal
-       // keyword token itself.
-       return formToken(tok::l_square_lit, TokStart);
-     }
-     return formToken(tok::l_square, TokStart);
-  }
+  case '[': return formToken(tok::l_square, TokStart);
   case '(': return formToken(tok::l_paren, TokStart);
   case '}': return formToken(tok::r_brace, TokStart);
   case ']': return formToken(tok::r_square, TokStart);
-  case ')':
-    return formToken(tok::r_paren, TokStart);
+  case ')': return formToken(tok::r_paren, TokStart);
 
   case ',': return formToken(tok::comma, TokStart);
   case ';': return formToken(tok::semi, TokStart);
   case ':': return formToken(tok::colon, TokStart);
-  case '\\':
-    return formToken(tok::backslash, TokStart);
+  case '\\': return formToken(tok::backslash, TokStart);
 
   case '#':
     return lexHash();
@@ -2640,7 +2644,17 @@ SourceLoc Lexer::getLocForEndOfLine(SourceManager &SM, SourceLoc Loc) {
   return getSourceLoc(L.CurPtr);
 }
 
-StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc) {
+StringRef Lexer::getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                       StringRef *ExtraIndentation) {
+  // FIXME: do something more intelligent here.
+  //
+  // Four spaces is the typical indentation in Swift code, so for now just use
+  // that directly here, but if someone was to do something better, updating
+  // here will update everyone.
+
+  if (ExtraIndentation)
+    *ExtraIndentation = "    ";
+
   // Don't try to do anything with an invalid location.
   if (Loc.isInvalid())
     return "";

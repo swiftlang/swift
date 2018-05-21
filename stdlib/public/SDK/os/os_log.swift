@@ -14,7 +14,7 @@
 @_exported import os.log
 import _SwiftOSOverlayShims
 
-@available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+@available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func os_log(
   _ message: StaticString, 
   dso: UnsafeRawPointer? = #dsohandle,
@@ -39,30 +39,30 @@ public func os_log(
 }
 
 extension OSLogType {
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let `default` = __OS_LOG_TYPE_DEFAULT
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let info = __OS_LOG_TYPE_INFO
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let debug = __OS_LOG_TYPE_DEBUG
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let error = __OS_LOG_TYPE_ERROR
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let fault = __OS_LOG_TYPE_FAULT
 }
 
 extension OSLog {
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let disabled = _swift_os_log_disabled()
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public static let `default` = _swift_os_log_default()
 
-  @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
+  @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
   public convenience init(subsystem: String, category: String) {
     self.init(__subsystem: subsystem, category: category)
   }

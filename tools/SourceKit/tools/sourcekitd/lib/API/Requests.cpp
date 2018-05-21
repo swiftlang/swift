@@ -22,6 +22,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Statistic.h"
+#include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
@@ -163,7 +164,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion);
+                          StringRef swiftVersion);
 
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
@@ -231,7 +232,9 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
 static bool isSemanticEditorDisabled();
 
 static void fillDictionaryForDiagnosticInfo(
-    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info);
+
+static void enableCompileNotifications(bool value);
 
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
@@ -356,6 +359,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     }
 
     return Rec(mangleSimpleClassNames(ModuleClassPairs));
+  }
+
+  if (ReqUID == RequestEnableCompileNotifications) {
+    int64_t value = true;
+    if (Req.getInt64(KeyValue, value, /*isOptional=*/false)) {
+      return Rec(createErrorRequestInvalid("missing 'key.value'"));
+    }
+    enableCompileNotifications(value);
+    return Rec(ResponseBuilder().createResponse());
   }
 
   // Just accept 'source.request.buildsettings.register' for now, don't do
@@ -498,10 +510,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
     Optional<int64_t> UsingSwiftArgs = Req.getOptionalInt64(KeyUsingSwiftArgs);
-    Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
-    Optional<unsigned> swiftVer;
-    if (swiftVerVal.hasValue())
-      swiftVer = *swiftVerVal;
+    std::string swiftVer;
+    Optional<StringRef> swiftVerValStr = Req.getString(KeySwiftVersion);
+    if (swiftVerValStr.hasValue()) {
+      swiftVer = swiftVerValStr.getValue();
+    } else {
+      Optional<int64_t> swiftVerVal = Req.getOptionalInt64(KeySwiftVersion);
+      if (swiftVerVal.hasValue())
+        swiftVer = std::to_string(*swiftVerVal);
+    }
     return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
                                          UsingSwiftArgs.getValueOr(false),
                                          SynthesizedExtension, swiftVer));
@@ -1213,13 +1230,6 @@ public:
 };
 } // end anonymous namespace
 
-static bool isSwiftPrefixed(StringRef MangledName) {
-  if (MangledName.size() < 2)
-    return false;
-  return MangledName[0] == '_' &&
-         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
-}
-
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified) {
   swift::Demangle::DemangleOptions DemangleOptions;
@@ -1229,7 +1239,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   }
 
   auto getDemangledName = [&](StringRef MangledName) -> std::string {
-    if (!isSwiftPrefixed(MangledName))
+    if (!swift::Demangle::isSwiftSymbol(MangledName))
       return std::string(); // Not a mangled name
 
     std::string Result = swift::Demangle::demangleSymbolAsString(
@@ -1449,30 +1459,7 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
     Arr = TopDict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -2151,7 +2138,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
                           ArrayRef<const char *> Args,
                           bool UsingSwiftArgs,
                           bool SynthesizedExtensions,
-                          Optional<unsigned> swiftVersion) {
+                          StringRef swiftVersion) {
   SKEditorConsumer EditC(/*EnableSyntaxMap=*/true,
                          /*EnableStructure=*/true,
                          /*EnableDiagnostics=*/false,
@@ -2318,7 +2305,38 @@ bool SKEditorConsumer::recordFormattedText(StringRef Text) {
   return true;
 }
 
+static void fillDictionaryForDiagnosticInfoBase(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info);
+
 static void fillDictionaryForDiagnosticInfo(
+    ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfo &Info) {
+
+  UIdent SeverityUID;
+  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
+  static UIdent UIDKindDiagError(KindDiagError.str());
+  switch (Info.Severity) {
+  case DiagnosticSeverityKind::Warning:
+    SeverityUID = UIDKindDiagWarning;
+    break;
+  case DiagnosticSeverityKind::Error:
+    SeverityUID = UIDKindDiagError;
+    break;
+  }
+
+  Elem.set(KeySeverity, SeverityUID);
+  fillDictionaryForDiagnosticInfoBase(Elem, Info);
+
+  if (!Info.Notes.empty()) {
+    auto NotesArr = Elem.setArray(KeyDiagnostics);
+    for (auto &NoteDiag : Info.Notes) {
+      auto NoteElem = NotesArr.appendDictionary();
+      NoteElem.set(KeySeverity, KindDiagNote);
+      fillDictionaryForDiagnosticInfoBase(NoteElem, NoteDiag);
+    }
+  }
+}
+
+static void fillDictionaryForDiagnosticInfoBase(
     ResponseBuilder::Dictionary Elem, const DiagnosticEntryInfoBase &Info) {
 
   Elem.set(KeyDescription, Info.Description);
@@ -2366,31 +2384,8 @@ bool SKEditorConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info,
     Arr = Dict.setArray(KeyDiagnostics);
 
   auto Elem = Arr.appendDictionary();
-  UIdent SeverityUID;
-  static UIdent UIDKindDiagWarning(KindDiagWarning.str());
-  static UIdent UIDKindDiagError(KindDiagError.str());
-  switch (Info.Severity) {
-  case DiagnosticSeverityKind::Warning:
-    SeverityUID = UIDKindDiagWarning;
-    break;
-  case DiagnosticSeverityKind::Error:
-    SeverityUID = UIDKindDiagError;
-    break;
-  }
-
-  Elem.set(KeySeverity, SeverityUID);
   Elem.set(KeyDiagnosticStage, DiagStage);
   fillDictionaryForDiagnosticInfo(Elem, Info);
-
-  if (!Info.Notes.empty()) {
-    auto NotesArr = Elem.setArray(KeyDiagnostics);
-    for (auto &NoteDiag : Info.Notes) {
-      auto NoteElem = NotesArr.appendDictionary();
-      NoteElem.set(KeySeverity, KindDiagNote);
-      fillDictionaryForDiagnosticInfo(NoteElem, NoteDiag);
-    }
-  }
-
   return true;
 }
 
@@ -2685,4 +2680,70 @@ static bool isSemanticEditorDisabled() {
 
   assert(Toggle != SemaInfoToggle::None);
   return Toggle == SemaInfoToggle::Disable;
+}
+
+namespace {
+class CompileTrackingConsumer final : public trace::TraceConsumer {
+public:
+  void operationStarted(uint64_t OpId, trace::OperationKind OpKind,
+                        const trace::SwiftInvocation &Inv,
+                        const trace::StringPairs &OpArgs) override;
+  void operationFinished(uint64_t OpId, trace::OperationKind OpKind,
+                         ArrayRef<DiagnosticEntryInfo> Diagnostics) override;
+  swift::OptionSet<trace::OperationKind> desiredOperations() override {
+    return swift::OptionSet<trace::OperationKind>() |
+           trace::OperationKind::PerformSema |
+           trace::OperationKind::CodeCompletion;
+  }
+};
+} // end anonymous namespace
+
+void CompileTrackingConsumer::operationStarted(
+    uint64_t OpId, trace::OperationKind OpKind,
+    const trace::SwiftInvocation &Inv, const trace::StringPairs &OpArgs) {
+  if (!desiredOperations().contains(OpKind))
+    return;
+
+  static UIdent CompileWillStartUID("source.notification.compile-will-start");
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  Dict.set(KeyNotification, CompileWillStartUID);
+  Dict.set(KeyCompileID, std::to_string(OpId));
+  Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
+  // FIXME: OperationKind
+  Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
+  sourcekitd::postNotification(RespBuilder.createResponse());
+}
+
+void CompileTrackingConsumer::operationFinished(
+    uint64_t OpId, trace::OperationKind OpKind,
+    ArrayRef<DiagnosticEntryInfo> Diagnostics) {
+  if (!desiredOperations().contains(OpKind))
+    return;
+
+  static UIdent CompileDidFinishUID("source.notification.compile-did-finish");
+  ResponseBuilder RespBuilder;
+  auto Dict = RespBuilder.getDictionary();
+  Dict.set(KeyNotification, CompileDidFinishUID);
+  Dict.set(KeyCompileID, std::to_string(OpId));
+  auto DiagArray = Dict.setArray(KeyDiagnostics);
+  for (const auto &DiagInfo : Diagnostics) {
+    fillDictionaryForDiagnosticInfo(DiagArray.appendDictionary(), DiagInfo);
+  }
+
+  sourcekitd::postNotification(RespBuilder.createResponse());
+}
+
+static void enableCompileNotifications(bool value) {
+  static std::atomic<bool> status{false};
+  if (status.exchange(value) == value) {
+    return; // Unchanged.
+  }
+
+  static CompileTrackingConsumer compileConsumer;
+  if (value) {
+    trace::registerConsumer(&compileConsumer);
+  } else {
+    trace::unregisterConsumer(&compileConsumer);
+  }
 }

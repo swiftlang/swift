@@ -29,6 +29,11 @@ public struct SourceLocation: Codable {
   /// The file in which this location resides.
   public let file: String
 
+  public init(file: String, position: AbsolutePosition) {
+    self.init(line: position.line, column: position.column,
+              offset: position.utf8Offset, file: file)
+  }
+
   public init(line: Int, column: Int, offset: Int, file: String) {
     self.line = line
     self.column = column
@@ -82,7 +87,7 @@ public enum FixIt: Codable {
       let string = try container.decode(String.self, forKey: .string)
       let loc = try container.decode(SourceLocation.self, forKey: .location)
       self = .insert(loc, string)
-    case "replace": 
+    case "replace":
       let string = try container.decode(String.self, forKey: .string)
       let range = try container.decode(SourceRange.self, forKey: .range)
       self = .replace(range, string)
@@ -196,7 +201,11 @@ public struct Diagnostic: Codable {
   /// An array of possible FixIts to apply to this diagnostic.
   public let fixIts: [FixIt]
 
-  /// A diagnostic builder that 
+  /// A diagnostic builder that exposes mutating operations for notes,
+  /// highlights, and FixIts. When a Diagnostic is created, a builder
+  /// will be provided in a closure where the user can conditionally
+  /// add notes, highlights, and FixIts, that will then be wrapped
+  /// into the immutable Diagnostic object.
   public struct Builder {
     /// An in-flight array of notes.
     internal var notes = [Note]()
@@ -219,7 +228,7 @@ public struct Diagnostic: Codable {
     ///   - fixIts: Any FixIts that should be attached to this note.
     public mutating func note(_ message: Message,
                               location: SourceLocation? = nil,
-                              highlights: [SourceRange] = [], 
+                              highlights: [SourceRange] = [],
                               fixIts: [FixIt] = []) {
       self.notes.append(Note(message: message, location: location,
                              highlights: highlights, fixIts: fixIts))
@@ -246,7 +255,7 @@ public struct Diagnostic: Codable {
 
     /// Adds a FixIt to replace the contents of the source file corresponding
     /// to the provided SourceRange with the provided text.
-    public mutating 
+    public mutating
     func fixItReplace(_ sourceRange: SourceRange, with text: String) {
       fixIts.append(.replace(sourceRange, text))
     }

@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -39,7 +38,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(StringRef)> fn) const;
+                         llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -90,6 +89,11 @@ public:
   /// the expression type checker run before we consider an expression
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
+  
+  /// If non-zero, overrides the default threshold for how many times
+  /// the Space::minus function is called before we consider switch statement
+  /// exhaustiveness checking to be too complex.
+  unsigned SwitchCheckingInvocationThreshold = 0;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -142,6 +146,9 @@ public:
   /// If set, emitted module files will always contain options for the
   /// debugger to use.
   bool AlwaysSerializeDebuggingOptions = false;
+
+  /// If set, inserts instrumentation useful for testing the debugger.
+  bool DebuggerTestingTransform = false;
 
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
@@ -293,7 +300,7 @@ public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
 };
 
 }

@@ -69,6 +69,19 @@ OptionalTests.test("Equatable") {
   expectEqual([false, true, true, true, true, false], testRelation(!=))
 }
 
+OptionalTests.test("Hashable") {
+    let o1: Optional<Int> = .some(1010)
+    let o2: Optional<Int> = .some(2020)
+    let o3: Optional<Int> = .none
+    checkHashable([o1, o2, o3], equalityOracle: { $0 == $1 })
+
+    let oo1: Optional<Optional<Int>> = .some(.some(1010))
+    let oo2: Optional<Optional<Int>> = .some(.some(2010))
+    let oo3: Optional<Optional<Int>> = .some(.none)
+    let oo4: Optional<Optional<Int>> = .none
+    checkHashable([oo1, oo2, oo3, oo4], equalityOracle: { $0 == $1 })
+}
+
 OptionalTests.test("CustomReflectable") {
   // Test with a non-refcountable type.
   do {

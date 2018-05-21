@@ -118,3 +118,12 @@ class C {
 var // comment
   `$` = 1
 func /* comment */`foo`(x: Int) {}
+
+// rdar://40085232
+enum MyEnum {
+  case Bar(arg: Int)
+}
+
+enum MySecondEnum {
+  case One = 1
+}

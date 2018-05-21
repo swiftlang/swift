@@ -17,6 +17,7 @@ extension ARCamera {
     /**
      A value describing the camera's tracking state.
      */
+    @_frozen
     public enum TrackingState {
         public enum Reason {
             /** Tracking is limited due to initialization in progress. */

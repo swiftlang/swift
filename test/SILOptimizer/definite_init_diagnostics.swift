@@ -111,16 +111,22 @@ func test2() {
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'w2' declared here}}
   weak var w2 = SomeClass()
   _ = w2                // ok
   
   
-  // Unowned.  This is immediately crashing code (it causes a retain of a
-  // released object) so it should be diagnosed with a warning someday.
+  // Unowned. This is immediately crashing code (it causes a retain of a
+  // released object).
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
+  // expected-warning@+3 {{instance will be immediately deallocated because variable 'u2' is 'unowned'}}
+  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
 }
@@ -1309,3 +1315,48 @@ class ProtocolCastTestChild : ProtocolCastTestParent, ProtocolCastTestProtocol {
   }
 }
 
+// Make sure we don't diagnose immediate deallocation of instances if we first
+// assign them through strong variables.
+func testDontDiagnoseUnownedImmediateDeallocationThroughStrong() {
+  weak var c1: SomeClass?
+  do {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  unowned let c2: SomeClass
+  do {
+    let tmp = SomeClass()
+    c2 = tmp
+  }
+
+  weak var c3: SomeClass?
+  let c3Tmp = SomeClass()
+  c3 = c3Tmp
+
+  unowned let c4: SomeClass
+  let c4Tmp = SomeClass()
+  c4 = c4Tmp
+
+  _ = c1; _ = c2; _ = c3; _ = c4
+}
+
+class ClassWithUnownedProperties {
+
+  weak var c1: SomeClass?
+  unowned var c2: SomeClass
+
+  init(c2: SomeClass) {
+    self.c2 = c2
+  }
+
+  func assignToC1() {
+    let tmp = SomeClass()
+    c1 = tmp
+  }
+
+  func assignToC2() {
+    let tmp = SomeClass()
+    c2 = tmp
+  }
+}

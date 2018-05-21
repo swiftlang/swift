@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Parser.h"
@@ -286,7 +287,8 @@ void NameBinder::addImport(
         emittedDiag.emplace(diagnose(ID,
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
-            typealias->getDeclaredInterfaceType(),
+            NameAliasType::get(typealias, Type(), SubstitutionMap(),
+                                typealias->getUnderlyingTypeLoc().getType()),
             getImportKindString(ID->getImportKind())));
       } else {
         emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,

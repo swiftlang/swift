@@ -267,6 +267,7 @@ private:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -333,6 +334,7 @@ private:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
+    case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
@@ -398,9 +400,11 @@ private:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolRequirementArray:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::RelatedEntityDeclName:
@@ -440,6 +444,7 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -809,8 +814,11 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer Node,
 
   assert(
       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
        (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::Dead))) &&
+       (V & unsigned(FunctionSigSpecializationParamKind::Dead))||
+       (V & unsigned(
+                FunctionSigSpecializationParamKind::ExistentialToGeneric))) &&
       "Invalid OptionSet");
   print(Node->getChild(Idx++));
   return Idx;
@@ -1209,16 +1217,30 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     uint64_t raw = Node->getIndex();
 
     bool printedOptionSet = false;
+    if (raw &
+        uint64_t(FunctionSigSpecializationParamKind::ExistentialToGeneric)) {
+      printedOptionSet = true;
+      Printer << "Existential To Protocol Constrained Generic";
+    }
+
     if (raw & uint64_t(FunctionSigSpecializationParamKind::Dead)) {
+      if (printedOptionSet)
+        Printer << " and ";
       printedOptionSet = true;
       Printer << "Dead";
     }
-
     if (raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
       if (printedOptionSet)
         Printer << " and ";
       printedOptionSet = true;
       Printer << "Owned To Guaranteed";
+    }
+
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+      if (printedOptionSet)
+        Printer << " and ";
+      printedOptionSet = true;
+      Printer << "Guaranteed To Owned";
     }
 
     if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
@@ -1256,8 +1278,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamKind::GuaranteedToOwned:
     case FunctionSigSpecializationParamKind::SROA:
       printer_unreachable("option sets should have been handled earlier");
     }
@@ -1301,12 +1325,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
+  case Node::Kind::ProtocolWitnessTablePattern:
+    Printer << "protocol witness table pattern for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::GenericProtocolWitnessTable:
     Printer << "generic protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     Printer << "instantiation function for generic protocol witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ResilientProtocolWitnessTable:
+    Printer << "resilient protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::VTableThunk: {
@@ -1397,6 +1429,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(entity, /*asContext*/ false);
     return nullptr;
   }
+  case Node::Kind::EnumCase: {
+    Printer << "enum case for ";
+    auto entity = Node->getChild(0);
+    print(entity, /*asContext*/ false);
+    return nullptr;
+  }
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
@@ -1444,6 +1482,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ProtocolDescriptor:
     Printer << "protocol descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::ProtocolRequirementArray:
+    Printer << "protocol requirement array for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::FullTypeMetadata:
@@ -1518,6 +1560,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);
     return nullptr;
   case Node::Kind::DynamicSelf:

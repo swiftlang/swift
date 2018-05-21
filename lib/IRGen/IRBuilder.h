@@ -29,13 +29,13 @@ namespace irgen {
 class FunctionPointer;
 class IRGenModule;
 
-typedef llvm::IRBuilder<> IRBuilderBase;
+using IRBuilderBase = llvm::IRBuilder<>;
 
 class IRBuilder : public IRBuilderBase {
 public:
   // Without this, it keeps resolving to llvm::IRBuilderBase because
   // of the injected class name.
-  typedef irgen::IRBuilderBase IRBuilderBase;
+  using IRBuilderBase = irgen::IRBuilderBase;
 
 private:
   /// The block containing the insertion point when the insertion
@@ -115,7 +115,7 @@ public:
   class StableIP {
     /// Either an instruction that we're inserting after or the basic
     /// block that we're inserting at the beginning of.
-    typedef llvm::PointerUnion<llvm::Instruction*, llvm::BasicBlock*> UnionTy;
+    using UnionTy = llvm::PointerUnion<llvm::Instruction *, llvm::BasicBlock *>;
     UnionTy After;
   public:
     StableIP() = default;
@@ -370,6 +370,29 @@ public:
   /// gadget is emitted before the trap. The gadget inhibits transforms which
   /// merge trap calls together, which makes debugging crashes easier.
   llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM);
+
+  /// Split a first-class aggregate value into its component pieces.
+  template <unsigned N>
+  std::array<llvm::Value *, N> CreateSplit(llvm::Value *aggregate) {
+    assert(isa<llvm::StructType>(aggregate->getType()));
+    assert(cast<llvm::StructType>(aggregate->getType())->getNumElements() == N);
+    std::array<llvm::Value *, N> results;
+    for (unsigned i = 0; i != N; ++i) {
+      results[i] = CreateExtractValue(aggregate, i);
+    }
+    return results;
+  }
+
+  /// Combine the given values into a first-class aggregate.
+  llvm::Value *CreateCombine(llvm::StructType *aggregateType,
+                             ArrayRef<llvm::Value*> values) {
+    assert(aggregateType->getNumElements() == values.size());
+    llvm::Value *result = llvm::UndefValue::get(aggregateType);
+    for (unsigned i = 0, e = values.size(); i != e; ++i) {
+      result = CreateInsertValue(result, values[i], i);
+    }
+    return result;
+  }
 };
 
 } // end namespace irgen
@@ -377,7 +400,8 @@ public:
 
 namespace llvm {
   template <> struct PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
-    typedef swift::irgen::IRBuilder::StableIP type;
+    using type = swift::irgen::IRBuilder::StableIP;
+
   public:
     static void *getAsVoidPointer(type IP) {
       return IP.getOpaqueValue();

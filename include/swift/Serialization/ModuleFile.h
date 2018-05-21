@@ -156,8 +156,6 @@ public:
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
-    void forceExported() { IsExported = true; }
-
     std::string getPrettyPrintedPath() const;
   };
 
@@ -310,6 +308,9 @@ private:
   /// Generic environments referenced by this module.
   std::vector<Serialized<GenericEnvironment *>> GenericEnvironments;
 
+  /// Substitution maps referenced by this module.
+  std::vector<Serialized<SubstitutionMap>> SubstitutionMaps;
+
   /// Represents an identifier that may or may not have been deserialized yet.
   ///
   /// If \c Offset is non-zero, the identifier has not been loaded yet.
@@ -398,12 +399,6 @@ private:
 
     /// Whether this module file comes from a framework.
     unsigned IsFramework : 1;
-
-    /// THIS SETTING IS OBSOLETE BUT IS STILL USED BY OLDER MODULES.
-    ///
-    /// Whether this module has a shadowed module that's part of its public
-    /// interface.
-    unsigned HasUnderlyingModule : 1;
 
     /// Whether or not ImportDecls is valid.
     unsigned ComputedImportDecls : 1;
@@ -844,12 +839,9 @@ public:
   GenericEnvironment *getGenericEnvironment(
                                         serialization::GenericEnvironmentID ID);
 
-  /// Reads a substitution record from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a substitution, returns None.
-  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor,
-                                               GenericEnvironment *genericEnv =
-                                                nullptr);
+  /// Returns the substitution map for the given ID, deserializing it if
+  /// needed.
+  SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
 
   /// Recursively reads a protocol conformance from the given cursor.
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,

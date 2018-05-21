@@ -249,7 +249,7 @@ bb6:
 }
 
 // Check that the compiler does not unroll loops containing calls
-// of big inlineable functions.
+// of big inlinable functions.
 //
 // CHECK-LABEL: sil @unroll_with_apply
 // CHECK: apply

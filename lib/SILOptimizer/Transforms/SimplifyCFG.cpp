@@ -266,7 +266,7 @@ static SILValue getTerminatorCondition(TermInst *Term) {
 
 /// Is this basic block jump threadable.
 static bool isThreadableBlock(SILBasicBlock *BB,
-                              SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders) {
+                              SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders) {
   if (isa<ReturnInst>(BB->getTerminator()))
     return false;
 
@@ -444,7 +444,7 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 /// of the operand of 'DominatingBB's terminator.
 static bool tryDominatorBasedSimplifications(
     SILBasicBlock *DominatingBB, DominanceInfo *DT,
-    SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders,
+    SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders,
     SmallVectorImpl<ThreadInfo> &JumpThreadableEdges,
     llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>>
         &ThreadedEdgeSet,
@@ -767,7 +767,7 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
 
 static NullablePtr<EnumElementDecl>
 getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
-                     llvm::SmallPtrSet<SILArgument *, 8> HandledArgs) {
+                     llvm::SmallPtrSetImpl<SILArgument *> &HandledArgs) {
   // Limit the number of recursions. This is an easy way to cope with cycles
   // in the SSA graph.
   if (RecursionDepth > 3)
@@ -1127,7 +1127,7 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   TermInst *Terminator = BB->getTerminator();
   SILBasicBlock::iterator Iter = BB->begin();
   while (&*Iter != Terminator) {
-    if (!isDebugInst(&*Iter))
+    if (!(&*Iter)->isDebugInstruction())
       return false;
     Iter++;
   }
@@ -2085,14 +2085,14 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
       TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-                                                TAI->getSubstitutions());
+                                                TAI->getSubstitutionMap());
     }
     SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutions());
+                                            TAI->getSubstitutionMap());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
@@ -2112,7 +2112,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
-                                           TAI->getSubstitutions(),
+                                           TAI->getSubstitutionMap(),
                                            Args, CalleeFnTy->hasErrorResult());
 
     auto Loc = TAI->getLoc();

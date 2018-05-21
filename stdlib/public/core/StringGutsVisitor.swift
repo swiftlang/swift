@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 // TODO: describe
-
 //
 // HACK HACK HACK: For whatever reason, having this directly on String instead
 // of _StringGuts avoids a cascade of ARC. Also note, we can have a global
@@ -19,8 +18,7 @@
 // else ARC.
 //
 extension String {
-  @_versioned
-  @_inlineable
+  @inlinable
   @inline(__always)
   func _visit<Result>(
     range: (Range<Int>, performBoundsCheck: Bool)? = nil,
@@ -55,9 +53,9 @@ extension String {
     }
   }
 
-  @_versioned
+  @usableFromInline
   @effects(readonly)
-  @inline(never)
+  @inline(never) // @_outlined
   func _visitOpaque<Result>(
     range: (Range<Int>, performBoundsCheck: Bool)? = nil,
     ascii: /*@convention(thin)*/ (_UnmanagedString<UInt8>) -> Result,
@@ -65,6 +63,33 @@ extension String {
     opaque: /*@convention(thin)*/ (_UnmanagedOpaqueString) -> Result
   ) -> Result {
     _sanityCheck(_guts._isOpaque)
+
+    if _guts._isSmall {
+      _sanityCheck(_guts._object._isSmallUTF8, "no other small forms yet")
+      let small = _guts._smallUTF8String
+      if small.isASCII {
+        return small.withUnmanagedASCII { view in
+          var view = view
+          if let (range, boundsCheck) = range {
+            if boundsCheck {
+              view._boundsCheck(offsetRange: range)
+            }
+            view = view[range]
+          }
+          return ascii(view)
+        }
+      }
+      return small.withUnmanagedUTF16 { view in
+        var view = view
+        if let (range, boundsCheck) = range {
+          if boundsCheck {
+            view._boundsCheck(offsetRange: range)
+          }
+          view = view[range]
+        }
+        return utf16(view)
+      }
+    }
 
     // TODO: But can it provide a pointer+length representation?
     defer { _fixLifetime(self) }
@@ -79,8 +104,7 @@ extension String {
     return opaque(view)
   }
 
-  @_versioned
-  @_inlineable
+  @inlinable
   @inline(__always)
   func _visit<T, Result>(
     range: (Range<Int>, performBoundsCheck: Bool)?,
@@ -116,7 +140,7 @@ extension String {
     }
   }
 
-  @_versioned
+  @usableFromInline // @opaque
   @effects(readonly)
   @inline(never)
   func _visitOpaque<T, Result>(
@@ -127,6 +151,33 @@ extension String {
     opaque: /*@convention(thin)*/ (_UnmanagedOpaqueString, T) -> Result
   ) -> Result {
     _sanityCheck(_guts._isOpaque)
+
+    if _fastPath(_guts._isSmall) {
+      _sanityCheck(_guts._object._isSmallUTF8, "no other small forms yet")
+      let small = _guts._smallUTF8String
+      if small.isASCII {
+        return small.withUnmanagedASCII { view in
+          var view = view
+          if let (range, boundsCheck) = range {
+            if boundsCheck {
+              view._boundsCheck(offsetRange: range)
+            }
+            view = view[range]
+          }
+          return ascii(view, x)
+        }
+      }
+      return small.withUnmanagedUTF16 { view in
+        var view = view
+        if let (range, boundsCheck) = range {
+          if boundsCheck {
+            view._boundsCheck(offsetRange: range)
+          }
+          view = view[range]
+        }
+        return utf16(view, x)
+      }
+    }
 
     // TODO: But can it provide a pointer+length representation?
     defer { _fixLifetime(self) }
@@ -142,8 +193,7 @@ extension String {
   }
 }
 
-@_versioned
-@_inlineable
+@inlinable
 @inline(__always)
 internal
 func _visitGuts<Result>(
@@ -157,8 +207,7 @@ func _visitGuts<Result>(
     range: range, ascii: ascii, utf16: utf16, opaque: opaque)
 }
 
-@_versioned
-@_inlineable
+@inlinable
 @inline(__always)
 internal
 func _visitGuts<T, Result>(

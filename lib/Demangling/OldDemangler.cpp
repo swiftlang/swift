@@ -100,13 +100,21 @@ public:
 
   /// Return the next character without claiming it.  Asserts that
   /// there is at least one remaining character.
-  char peek() { return Text.front(); }
+  char peek() {
+    if (isEmpty()) {
+      // Return an otherwise unused character to prevent crashes for malformed
+      // symbols.
+      return '.';
+    }
+    return Text.front();
+  }
 
   /// Claim and return the next character.  Asserts that there is at
   /// least one remaining character.
   char next() {
     char c = peek();
-    advanceOffset(1);
+    if (!isEmpty())
+      advanceOffset(1);
     return c;
   }
 
@@ -641,6 +649,11 @@ private:
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
         }
 
+        if (Mangled.nextIf('o')) {
+          Value |=
+              unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+        }
+
         if (Mangled.nextIf('s')) {
           Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
         }
@@ -675,7 +688,7 @@ private:
                               Node::Kind::GenericSpecializationNotReAbstracted :
                               Node::Kind::GenericSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);
@@ -692,7 +705,7 @@ private:
       auto spec =
           Factory.createNode(Node::Kind::FunctionSignatureSpecialization);
 
-      // Create a node if the specialization is externally inlineable.
+      // Create a node if the specialization is externally inlinable.
       if (Mangled.nextIf("q")) {
         auto kind = Node::Kind::SpecializationIsFragile;
         spec->addChild(Factory.createNode(kind), Factory);

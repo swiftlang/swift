@@ -1,0 +1,12 @@
+// RUN: %scale-test --begin 2 --end 6 --step 1 --select incrementScopeCounter %s
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+
+func overload(_ x: Int) -> Int { return x }
+func overload(_ x: Float) -> Float { return x }
+
+let _ = (overload(0)
+%for i in range(0, N):
+  , overload(0)
+%end
+)

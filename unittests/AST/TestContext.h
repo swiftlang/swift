@@ -46,7 +46,7 @@ class TestContext : public TestContextBase {
   SourceFile *FileForLookups;
 
 public:
-  ASTContext Ctx;
+  ASTContext &Ctx;
 
   TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes);
 

@@ -34,6 +34,11 @@ TYPE_NODES = [
                    is_optional=True),
          ]),
 
+    # class-restriction-type -> 'class'
+    Node('ClassRestrictionType', kind='Type',
+         children=[
+             Child('ClassKeyword', kind='ClassToken'),
+         ]),
     # array-type -> '[' type ']'
     Node('ArrayType', kind='Type',
          children=[

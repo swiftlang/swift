@@ -149,9 +149,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(), SourceMgr,
-                               Diagnostics));
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
 
   if (setUpModuleLoaders())
     return true;
@@ -197,10 +197,10 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
-                                                  DepTracker));
+                                                  getDependencyTracker()));
   }
   {
-    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    auto SML = SerializedModuleLoader::create(*Context, getDependencyTracker());
     this->SML = SML.get();
     Context->addModuleLoader(std::move(SML));
   }
@@ -210,7 +210,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     // knowledge.
     auto clangImporter =
         ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              Invocation.getPCHHash(), DepTracker);
+                              Invocation.getPCHHash(), getDependencyTracker());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
@@ -614,13 +614,22 @@ void CompilerInstance::parseAndCheckTypes(
                               TypeCheckOptions);
   }
 
+  assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
+    auto *SF = dyn_cast<SourceFile>(File);
+    if (!SF)
+      return true;
+    return SF->ASTStage >= SourceFile::NameBound;
+  }) && "some files have not yet had their imports resolved");
+  MainModule->setHasResolvedImports();
+
   const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF, PersistentState.getTopLevelContext(),
                         TypeCheckOptions, /*curElem*/ 0,
                         options.WarnLongFunctionBodies,
                         options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold);
+                        options.SolverExpressionTimeThreshold,
+                        options.SwitchCheckingInvocationThreshold);
   });
 
   // Even if there were no source files, we should still record known
@@ -743,12 +752,18 @@ void CompilerInstance::parseAndTypeCheckMainFile(
                           TypeCheckOptions, CurTUElem,
                           options.WarnLongFunctionBodies,
                           options.WarnLongExpressionTypeChecking,
-                          options.SolverExpressionTimeThreshold);
+                          options.SolverExpressionTimeThreshold,
+                          options.SwitchCheckingInvocationThreshold);
     }
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
+
+  if (mainIsPrimary && !Context->hadError() &&
+      Invocation.getFrontendOptions().DebuggerTestingTransform) {
+    performDebuggerTestingTransform(MainFile);
+  }
 
   if (mainIsPrimary && !Context->hadError() &&
       Invocation.getFrontendOptions().PCMacro) {

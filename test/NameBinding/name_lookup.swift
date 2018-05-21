@@ -200,8 +200,8 @@ class ThisDerived1 : ThisBase1 {
 
     super.derivedExtProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtProp'}}
     super.derivedExtFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedExtFunc0'}}
-    super.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticVar'}}
-    super.derivedExtStaticProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticProp'}}
+    super.derivedExtStaticVar = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticVar'; did you mean 'baseExtStaticVar'?}}
+    super.derivedExtStaticProp = 42 // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticProp'; did you mean 'baseExtStaticProp'?}}
     super.derivedExtStaticFunc0() // expected-error {{value of type 'ThisBase1' has no member 'derivedExtStaticFunc0'}}
 
     var ds2 = super.DerivedNestedStruct() // expected-error {{value of type 'ThisBase1' has no member 'DerivedNestedStruct'}}
@@ -321,9 +321,9 @@ class ThisDerived1 : ThisBase1 {
 
     super.derivedExtProp = 42 // expected-error {{type 'ThisBase1' has no member 'derivedExtProp'}}
     super.derivedExtFunc0() // expected-error {{type 'ThisBase1' has no member 'derivedExtFunc0'}}
-    super.derivedExtStaticVar = 42 // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticVar'}}
-    super.derivedExtStaticProp = 42 // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticProp'}}
-    super.derivedExtStaticFunc0() // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticFunc0'}}
+    super.derivedExtStaticVar = 42 // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticVar'; did you mean 'baseExtStaticVar'?}}
+    super.derivedExtStaticProp = 42 // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticProp'; did you mean 'baseExtStaticProp'?}}
+    super.derivedExtStaticFunc0() // expected-error {{type 'ThisBase1' has no member 'derivedExtStaticFunc0'; did you mean 'baseExtStaticFunc0'?}}
 
     var ds2 = super.DerivedNestedStruct() // expected-error {{type 'ThisBase1' has no member 'DerivedNestedStruct'}}
     var dc2 = super.DerivedNestedClass() // expected-error {{type 'ThisBase1' has no member 'DerivedNestedClass'}}
@@ -331,11 +331,11 @@ class ThisDerived1 : ThisBase1 {
     var do3 = super.DerivedNestedUnion.DerivedUnionX(24) // expected-error {{type 'ThisBase1' has no member 'DerivedNestedUnion'}}
     var dt2 = super.DerivedNestedTypealias(42) // expected-error {{type 'ThisBase1' has no member 'DerivedNestedTypealias'}}
 
-    var des2 = super.DerivedExtNestedStruct() // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedStruct'}}
-    var dec2 = super.DerivedExtNestedClass() // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedClass'}}
+    var des2 = super.DerivedExtNestedStruct() // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedStruct'; did you mean 'BaseExtNestedStruct'?}}
+    var dec2 = super.DerivedExtNestedClass() // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedClass'; did you mean 'BaseExtNestedClass'?}}
     var deo2 = super.DerivedExtUnionX(24) // expected-error {{type 'ThisBase1' has no member 'DerivedExtUnionX'}}
-    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedUnion'}}
-    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedTypealias'}}
+    var deo3 = super.DerivedExtNestedUnion.DerivedExtUnionX(24) // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedUnion'; did you mean 'BaseExtNestedUnion'?}}
+    var det2 = super.DerivedExtNestedTypealias(42) // expected-error {{type 'ThisBase1' has no member 'DerivedExtNestedTypealias'; did you mean 'BaseExtNestedTypealias'?}}
 
     super.Type // expected-error {{type 'ThisBase1' has no member 'Type'}}
   }
@@ -351,26 +351,26 @@ extension ThisBase1 {
 
   func baseExtFunc0() {}
 
-  var baseExtStaticVar: Int // expected-error {{extensions must not contain stored properties}} // expected-note 2 {{did you mean 'baseExtStaticVar'?}}
+  var baseExtStaticVar: Int // expected-error {{extensions must not contain stored properties}} // expected-note 2 {{'baseExtStaticVar' declared here}}
 
-  var baseExtStaticProp: Int { // expected-note 2 {{did you mean 'baseExtStaticProp'?}}
+  var baseExtStaticProp: Int { // expected-note 2 {{'baseExtStaticProp' declared here}}
     get {
       return 42
     }
     set {}
   }
 
-  class func baseExtStaticFunc0() {} // expected-note {{did you mean 'baseExtStaticFunc0'?}}
+  class func baseExtStaticFunc0() {} // expected-note {{'baseExtStaticFunc0' declared here}}
 
-  struct BaseExtNestedStruct {} // expected-note 2 {{did you mean 'BaseExtNestedStruct'?}}
-  class BaseExtNestedClass { // expected-note {{did you mean 'BaseExtNestedClass'?}}
+  struct BaseExtNestedStruct {} // expected-note {{did you mean 'BaseExtNestedStruct'?}} // expected-note {{'BaseExtNestedStruct' declared here}}
+  class BaseExtNestedClass { // expected-note {{'BaseExtNestedClass' declared here}}
     init() { }
   }
-  enum BaseExtNestedUnion { // expected-note {{did you mean 'BaseExtNestedUnion'?}}
+  enum BaseExtNestedUnion { // expected-note {{'BaseExtNestedUnion' declared here}}
     case BaseExtUnionX(Int)
   }
 
-  typealias BaseExtNestedTypealias = Int // expected-note 2 {{did you mean 'BaseExtNestedTypealias'?}}
+  typealias BaseExtNestedTypealias = Int // expected-note {{did you mean 'BaseExtNestedTypealias'?}} // expected-note {{'BaseExtNestedTypealias' declared here}}
 }
 
 extension ThisDerived1 {
@@ -577,13 +577,13 @@ struct Person {
   let name: String?
 }
 
-struct Company { // expected-note 2{{did you mean 'Company'?}}
+struct Company { // expected-note 2{{'Company' declared here}}
   let owner: Person?
 }
 
 func test1() {
   let example: Company? = Company(owner: Person(name: "Owner"))
-  if let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+  if let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'; did you mean 'Company'?}}
      let aCompany = example {
     _ = person
   }
@@ -591,13 +591,13 @@ func test1() {
 
 func test2() {
   let example: Company? = Company(owner: Person(name: "Owner"))
-  guard let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'}}
+  guard let person = aCompany.owner, // expected-error {{use of unresolved identifier 'aCompany'; did you mean 'Company'?}}
         let aCompany = example else { return }
 }
 
 func test3() {
-  var c: String? = "c" // expected-note {{did you mean 'c'?}}
-  if let a = b = c, let b = c { // expected-error {{use of unresolved identifier 'b'}}
+  var c: String? = "c" // expected-note {{'c' declared here}}
+  if let a = b = c, let b = c { // expected-error {{use of unresolved identifier 'b'; did you mean 'c'?}}
     _ = b
   }
 }

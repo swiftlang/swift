@@ -106,6 +106,14 @@ extension Array : _ObjectiveCBridgeable {
   }
 }
 
+extension NSArray : _HasCustomAnyHashableRepresentation {
+  // Must be @nonobjc to avoid infinite recursion during bridging
+  @nonobjc
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(self as! Array<AnyHashable>)
+  }
+}
+
 extension NSArray : Sequence {
   /// Return an *iterator* over the elements of this *sequence*.
   ///

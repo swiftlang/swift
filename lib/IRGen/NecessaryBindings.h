@@ -27,6 +27,7 @@
 
 namespace swift {
   class CanType;
+  enum class MetadataState : size_t;
   class ProtocolDecl;
   class ProtocolConformanceRef;
 
@@ -48,7 +49,7 @@ public:
   /// signature.
   static NecessaryBindings forFunctionInvocations(IRGenModule &IGM,
                                                   CanSILFunctionType origType,
-                                                  const SubstitutionMap &subs);
+                                                  SubstitutionMap subs);
   
   /// Add whatever information is necessary to reconstruct type metadata
   /// for the given type.
@@ -78,7 +79,7 @@ public:
   void save(IRGenFunction &IGF, Address buffer) const;
 
   /// Restore the necessary bindings from the given buffer.
-  void restore(IRGenFunction &IGF, Address buffer) const;
+  void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
 
   const llvm::SetVector<GenericRequirement> &getRequirements() const {
     return Requirements;

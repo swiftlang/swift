@@ -20,7 +20,7 @@ struct _UnsafeBitMap {
   public // @testable
   let bitCount: Int
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   static func wordIndex(_ i: Int) -> Int {
     // Note: We perform the operation on UInts to get faster unsigned math
@@ -28,7 +28,7 @@ struct _UnsafeBitMap {
     return Int(bitPattern: UInt(bitPattern: i) / UInt(UInt.bitWidth))
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   static func bitIndex(_ i: Int) -> UInt {
     // Note: We perform the operation on UInts to get faster unsigned math
@@ -36,32 +36,32 @@ struct _UnsafeBitMap {
     return UInt(bitPattern: i) % UInt(UInt.bitWidth)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   static func sizeInWords(forSizeInBits bitCount: Int) -> Int {
     return (bitCount + Int.bitWidth - 1) / Int.bitWidth
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   init(storage: UnsafeMutablePointer<UInt>, bitCount: Int) {
     self.bitCount = bitCount
     self.values = storage
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   var numberOfWords: Int {
     return _UnsafeBitMap.sizeInWords(forSizeInBits: bitCount)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   func initializeToZero() {
     values.initialize(repeating: 0, count: numberOfWords)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public // @testable
   subscript(i: Int) -> Bool {
     get {

@@ -35,3 +35,5 @@ public func foo2(_ a: Int = #line, b: S1) {}
 public enum Number: Int {
   case one
 }
+
+public func foo3(_ a: [Int: String]) {}

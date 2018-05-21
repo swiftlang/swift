@@ -641,6 +641,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+      Out << 'o';
     if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
@@ -756,6 +759,14 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   mangleProtocolWithoutPrefix(node->begin()[0]);
 }
 
+void Remangler::mangleProtocolRequirementArray(Node *node) {
+  unreachable("todo");
+}
+
+void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
+  unreachable("todo");
+}
+
 void Remangler::mangleProtocolConformanceDescriptor(Node *node) {
   Out << "Mc";
   mangleProtocolConformance(node->begin()[0]);
@@ -811,6 +822,11 @@ void Remangler::mangleFieldOffset(Node *node) {
   mangleChildNodes(node); // directness, entity
 }
 
+void Remangler::mangleEnumCase(Node *node) {
+  Out << "WC";
+  mangleSingleChildNode(node); // enum case
+}
+
 void Remangler::mangleProtocolWitnessTable(Node *node) {
   Out << "WP";
   mangleSingleChildNode(node); // protocol conformance
@@ -819,6 +835,10 @@ void Remangler::mangleProtocolWitnessTable(Node *node) {
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   Out << "WG";
   mangleSingleChildNode(node); // protocol conformance
+}
+
+void Remangler::mangleResilientProtocolWitnessTable(Node *node) {
+  unreachable("todo");
 }
 
 void Remangler::mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -1851,6 +1871,11 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
 }

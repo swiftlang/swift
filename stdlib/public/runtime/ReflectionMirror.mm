@@ -312,16 +312,8 @@ struct EnumImpl : ReflectionMirrorImpl {
   const char *getInfo(unsigned *tagPtr = nullptr,
                       const Metadata **payloadTypePtr = nullptr,
                       bool *indirectPtr = nullptr) {
-    const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->getDescription();;
-
-    unsigned payloadCases = Description->getNumPayloadCases();
-
-    // 'tag' is in the range [-ElementsWithPayload..ElementsWithNoPayload-1].
-    int tag = type->vw_getEnumTag(value);
-
-    // Convert resilient tag index to fragile tag index.
-    tag += payloadCases;
+    // 'tag' is in the range [0..NumElements-1].
+    unsigned tag = type->vw_getEnumTag(value);
 
     const Metadata *payloadType = nullptr;
     bool indirect = false;
@@ -359,9 +351,6 @@ struct EnumImpl : ReflectionMirrorImpl {
 
   AnyReturn subscript(intptr_t i, const char **outName,
                       void (**outFreeFunc)(const char *)) {
-    const auto *Enum = static_cast<const EnumMetadata *>(type);
-    const auto &Description = Enum->getDescription();
-
     unsigned tag;
     const Metadata *payloadType;
     bool indirect;
@@ -374,8 +363,7 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     type->vw_destructiveProjectEnumData(const_cast<OpaqueValue *>(value));
     boxType->vw_initializeWithCopy(pair.buffer, const_cast<OpaqueValue *>(value));
-    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value),
-                                      (int) (tag - Description->getNumPayloadCases()));
+    type->vw_destructiveInjectEnumTag(const_cast<OpaqueValue *>(value), tag);
 
     value = pair.buffer;
 
@@ -634,8 +622,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
-    case MetadataKind::Function:
-    case MetadataKind::Existential:
+    default:
       break;
 
     // Types can't have these kinds.
@@ -737,9 +724,9 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
+    default:
+      return "(Unknown)";
   }
-
-  return "(Unknown)";
 }
 
 #if SWIFT_OBJC_INTEROP

@@ -35,7 +35,7 @@ entry(%0 : $*T):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_allocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_allocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[METATYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[METATYPE_ADDR]]
 // CHECK:  [[CAST:%.*]] = bitcast %swift.type* [[METATYPE]]
@@ -109,7 +109,7 @@ entry:
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_deallocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_deallocate_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[META_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[META:%.*]] = load %swift.type*, %swift.type** [[META_ADDR]]
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[META]] to i8***
@@ -160,7 +160,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -188,7 +188,7 @@ bb0(%0 : $*Existential):
 // CHECK:   ret %swift.opaque* [[VALUEADDRBOXED]]
 
 
-// CHECK-LABEL: define{{( protected)?}} {{.*}} @test_open_existential_addr_mutable
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}} @test_open_existential_addr_mutable
 // CHECK:  [[META_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METATYPE:%.*]] = load %swift.type*, %swift.type** [[META_ADDR]]
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 2
@@ -203,7 +203,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_mutable_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
+// CHECK: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden %swift.opaque* @__swift_mutable_project_boxed_opaque_existential_1([{{(24|12)}} x i8]*, %swift.type*)
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
@@ -227,7 +227,7 @@ bb0(%0 : $*Existential):
 // CHECK:  ret %swift.opaque* [[ADDR]]
 
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_destroy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_destroy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* %0)
 // CHECK:   ret void
 sil @test_destroy_existential_addr :$@convention(thin) (@in Existential) -> () {
@@ -237,7 +237,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:  [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 // CHECK:  [[BUFFER_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 0
@@ -268,7 +268,7 @@ bb0(%0 : $*Existential):
 // CHECK:   call void @swift_release(%swift.refcounted* [[REFERENCE]])
 // CHECK:   ret void
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_assignWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_assignWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:  [[ALLOCA:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:  call void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]], %T25existentials_opaque_boxed11ExistentialP* %0)
 // CHECK:  ret void
@@ -282,7 +282,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} linkonce_odr hidden void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} linkonce_odr hidden void @__swift_assign_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:  [[TMPBUFFER:%.*]] = alloca [{{(24|12)}} x i8]
 // CHECK:  [[SELFASSIGN:%.*]] = icmp eq %T25existentials_opaque_boxed11ExistentialP* %0, %1
 // CHECK:  br i1 [[SELFASSIGN]], label %done, label %cont
@@ -429,10 +429,10 @@ bb0(%0 : $*Existential):
 // CHECK: done:
 // CHECK:   ret void
 
-// CHECK: define{{( protected)?}} swiftcc void @test_assignWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_assignWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[ALLOCA:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
 // CHECK:   call void @__swift_destroy_boxed_opaque_existential_1(%T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[ALLOCA]])
 // CHECK:   ret void
 sil @test_assignWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -443,7 +443,7 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
 // CHECK:   [[LOCAL_METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
@@ -463,9 +463,9 @@ bb0(%0 : $*Existential):
 // CHECK:     call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[BUFFER_LOCAL_ADDR]], {{.*}} [[BUFFER_ARG_ADDR]], %swift.type* [[METADATA]])
 // CHECK:   ret %T25existentials_opaque_boxed11ExistentialP* %1
 
-// CHECK: define{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWb0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:    call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
 sil @test_initWithTake_existential_addr : $@convention(thin) (@in Existential) -> () {
 bb0(%0 : $*Existential):
@@ -476,11 +476,11 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_initWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithCopy_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP
-// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWc0_"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
+// CHECK:   call %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP* %0, %T25existentials_opaque_boxed11ExistentialP* [[LOCAL]])
 // CHECK:   ret void
-// CHECK-LABEL: define{{( protected)?}} internal %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWc0_"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOc"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
 // CHECK:   [[TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
 // CHECK:   [[ARG_TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:   [[LOCAL_TYPE_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1

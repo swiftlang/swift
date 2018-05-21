@@ -3,8 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// XFAIL: plus_zero_runtime
-
 import Foundation
 
 public class MyGizmo {
@@ -62,16 +60,17 @@ public func testOutlining() {
 // CHECK:   %3 = apply %2(%1) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
 // CHECK:   switch_enum %3 : $Optional<NSString>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK: bb1(%5 : $NSString):
-// CHECK:   %6 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   %6 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
 // CHECK:   %7 = metatype $@thin String.Type
-// CHECK:   %8 = apply %6(%3, %7) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
-// CHECK:   %9 = enum $Optional<String>, #Optional.some!enumelt.1, %8 : $String
-// CHECK:   br bb3(%9 : $Optional<String>)
+// CHECK:   %8 = apply %6(%3, %7) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   release_value %3 : $Optional<NSString>
+// CHECK:   %10 = enum $Optional<String>, #Optional.some!enumelt.1, %8 : $String
+// CHECK:   br bb3(%10 : $Optional<String>)
 // CHECK: bb2:
-// CHECK:   %11 = enum $Optional<String>, #Optional.none!enumelt
-// CHECK:   br bb3(%11 : $Optional<String>)
-// CHECK: bb3(%13 : $Optional<String>):
-// CHECK:   return %13 : $Optional<String>
+// CHECK:   %12 = enum $Optional<String>, #Optional.none!enumelt
+// CHECK:   br bb3(%12 : $Optional<String>)
+// CHECK: bb3(%14 : $Optional<String>):
+// CHECK:   return %14 : $Optional<String>
 
 // CHECK-LABEL: sil shared [noinline] @$SSo5GizmoC14stringPropertySSSgvgToTepb_ : $@convention(thin) (Gizmo) -> @owned Optional<String>
 // CHECK: bb0(%0 : $Gizmo):
@@ -79,16 +78,17 @@ public func testOutlining() {
 // CHECK:  %2 = apply %1(%0) : $@convention(objc_method) (Gizmo) -> @autoreleased Optional<NSString>
 // CHECK:  switch_enum %2 : $Optional<NSString>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK:bb1(%4 : $NSString):
-// CHECK:  %5 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:  %5 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
 // CHECK:  %6 = metatype $@thin String.Type
-// CHECK:  %7 = apply %5(%2, %6) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
-// CHECK:  %8 = enum $Optional<String>, #Optional.some!enumelt.1, %7 : $String
-// CHECK:  br bb3(%8 : $Optional<String>)
+// CHECK:  %7 = apply %5(%2, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:  release_value %2 : $Optional<NSString>
+// CHECK:  %9 = enum $Optional<String>, #Optional.some!enumelt.1, %7 : $String
+// CHECK:  br bb3(%9 : $Optional<String>)
 // CHECK:bb2:
-// CHECK:  %10 = enum $Optional<String>, #Optional.none!enumelt
-// CHECK:  br bb3(%10 : $Optional<String>)
-// CHECK:bb3(%12 : $Optional<String>):
-// CHECK:  return %12 : $Optional<String>
+// CHECK:  %11 = enum $Optional<String>, #Optional.none!enumelt
+// CHECK:  br bb3(%11 : $Optional<String>)
+// CHECK:bb3(%13 : $Optional<String>):
+// CHECK:  return %13 : $Optional<String>
 
 // CHECK-LABEL: sil shared [noinline] @$SSo5GizmoC14stringPropertySSSgvsToTembnn_ : $@convention(thin) (@owned String, Gizmo) -> () {
 // CHECK: bb0(%0 : $String, %1 : $Gizmo):
@@ -117,14 +117,15 @@ public func testOutlining() {
 // CHECK:   br bb3(%12 : $Optional<String>)
 //
 // CHECK: bb2(%14 : $NSString):
-// CHECK:   %15 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   %15 = function_ref @$SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
 // CHECK:   %16 = metatype $@thin String.Type
-// CHECK:   %17 = apply %15(%9, %16) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
-// CHECK:   %18 = enum $Optional<String>, #Optional.some!enumelt.1, %17 : $String
-// CHECK:   br bb3(%18 : $Optional<String>)
+// CHECK:   %17 = apply %15(%9, %16) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+// CHECK:   release_value %9 : $Optional<NSString>          // id: %18
+// CHECK:   %19 = enum $Optional<String>, #Optional.some!enumelt.1, %17 : $String
+// CHECK:   br bb3(%19 : $Optional<String>)
 //
-// CHECK: bb3(%20 : $Optional<String>):
-// CHECK:   return %20 : $Optional<String>
+// CHECK: bb3(%21 : $Optional<String>):
+// CHECK:   return %21 : $Optional<String>
 
 // CHECK-LABEL: sil shared [noinline] @$SSo5GizmoC11doSomethingyypSgSaySSGSgFToTembnn_ : $@convention(thin) (@owned Array<String>, Gizmo) -> @owned Optional<AnyObject> {
 // CHECK: bb0(%0 : $Array<String>, %1 : $Gizmo):
@@ -155,4 +156,12 @@ public func dontCrash2(_ c: SomeGenericClass) -> Bool {
   c.doSomething2(arr)
 
   return true
+}
+
+func dontCrash3() -> String? {
+  let bundle = Bundle.main
+  let resource = "common parameter"
+
+  return bundle.path(forResource: resource, ofType: "png")
+      ?? bundle.path(forResource: resource, ofType: "apng")
 }

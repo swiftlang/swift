@@ -140,6 +140,11 @@ namespace swift {
   ///                  source file.
   void performNameBinding(SourceFile &SF, unsigned StartElem = 0);
 
+  /// Once type-checking is complete, this instruments code with calls to an
+  /// intrinsic that record the expected values of local variables so they can
+  /// be compared against the results from the debugger.
+  void performDebuggerTestingTransform(SourceFile &SF);
+
   /// Once parsing and name-binding are complete, this optionally transforms the
   /// ASTs to add calls to external logging functions.
   ///
@@ -184,7 +189,8 @@ namespace swift {
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
                            unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0);
+                           unsigned ExpressionTimeoutThreshold = 0,
+                           unsigned SwitchCheckingInvocationThreshold = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method

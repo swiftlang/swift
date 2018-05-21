@@ -37,6 +37,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/StringSaver.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -120,6 +121,18 @@ int main(int argc_, const char **argv_) {
     llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
     return 1;
   }
+
+  // Expand any response files in the command line argument vector - arguments
+  // may be passed through response files in the event of command line length
+  // restrictions.
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver(Allocator);
+  llvm::cl::ExpandResponseFiles(
+      Saver,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
+      llvm::cl::TokenizeWindowsCommandLine :
+      llvm::cl::TokenizeGNUCommandLine,
+      argv);
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

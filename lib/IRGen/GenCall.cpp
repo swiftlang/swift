@@ -1637,10 +1637,8 @@ void CallEmission::emitToMemory(Address addr,
   // result that's actually being passed indirectly.
   //
   // TODO: SIL address lowering should be able to handle such cases earlier.
-  CanType origResultType =
-      origFnType->getDirectFormalResultsType().getSwiftRValueType();
-  CanType substResultType =
-      substFnType->getDirectFormalResultsType().getSwiftRValueType();
+  auto origResultType = origFnType->getDirectFormalResultsType().getASTType();
+  auto substResultType = substFnType->getDirectFormalResultsType().getASTType();
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()

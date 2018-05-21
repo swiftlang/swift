@@ -285,19 +285,29 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
 
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
-    // If the type is public, the property initializer is referenced from
-    // inlinable initializers, and has PublicNonABI linkage.
+    // Three cases:
     //
-    // Note that we don't serialize the presence of an initializer, so there's
-    // no way to reference one from another module except for this case.
+    // 1) Type is formally @_fixed_layout. Root initializers can be declared
+    //    @inlinable. The property initializer must only reference
+    //    public symbols, and is serialized, so we give it PublicNonABI linkage.
+    //
+    // 2) Type is not formally @_fixed_layout and the module is not resilient.
+    //    Root initializers can be declared @inlinable. This is the annoying
+    //    case. We give the initializer public linkage if the type is public.
+    //
+    // 3) Type is resilient. The property initializer is never public because
+    //    root initializers cannot be @inlinable.
+    //
+    // FIXME: Get rid of case 2 somehow.
     if (isSerialized())
       return maybeAddExternal(SILLinkage::PublicNonABI);
 
-    // Otherwise, use the visibility of the type itself, because even if the
-    // property is private, we might reference the initializer from another
-    // file.
     d = cast<NominalTypeDecl>(d->getDeclContext());
-    neverPublic = true;
+
+    // FIXME: This should always be true.
+    if (d->getDeclContext()->getParentModule()->getResilienceStrategy() ==
+        ResilienceStrategy::Resilient)
+      neverPublic = true;
   }
 
   // The global addressor is never public for resilient globals.
@@ -414,7 +424,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     dc = getDecl()->getInnermostDeclContext();
 
     // Enum element constructors are serialized if the enum is
-    // @_versioned or public.
+    // @usableFromInline or public.
     if (isEnumElement())
       if (d->getEffectiveAccess() >= AccessLevel::Public)
         return IsSerialized;
@@ -431,7 +441,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
       return IsSerializable;
 
     // The allocating entry point for designated initializers are serialized
-    // if the class is @_versioned or public.
+    // if the class is @usableFromInline or public.
     if (kind == SILDeclRef::Kind::Allocator) {
       auto *ctor = cast<ConstructorDecl>(d);
       if (ctor->isDesignatedInit() &&
@@ -446,8 +456,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // marked as @_fixed_layout.
     if (isStoredPropertyInitializer()) {
       auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
-      auto scope = nominal->getFormalAccessScope(/*useDC=*/nullptr,
-                                                 /*respectVersionedAttr=*/true);
+      auto scope =
+        nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
       if (!scope.isPublic())
         return IsNotSerialized;
       if (nominal->isFormallyResilient())
@@ -457,11 +468,11 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Declarations imported from Clang modules are serialized if
-  // referenced from an inlineable context.
+  // referenced from an inlinable context.
   if (isClangImported())
     return IsSerializable;
 
-  // Otherwise, ask the AST if we're inside an @_inlineable context.
+  // Otherwise, ask the AST if we're inside an @inlinable context.
   if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
     return IsSerialized;
 

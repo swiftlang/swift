@@ -37,10 +37,6 @@ enum class FormalLinkage {
   /// unique file that is known to define it.
   HiddenUnique,
 
-  /// This entity is visible in only a single Swift module but does not
-  /// have a unique file that is known to define it.
-  HiddenNonUnique,
-
   /// This entity is visible in only a single Swift file. These are by
   /// definition unique.
   Private,

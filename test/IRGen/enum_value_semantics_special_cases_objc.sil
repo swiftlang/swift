@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -enable-objc-interop -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 import Builtin
 
@@ -52,4 +51,4 @@ enum AllMixedRefcountedTwoSimple {
 }
 
 // CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
-// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWy"
+// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"

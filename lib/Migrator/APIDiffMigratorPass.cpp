@@ -28,6 +28,7 @@
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
 #include "swift/IDE/APIDigesterData.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace swift::migrator;
@@ -47,13 +48,14 @@ struct FoundResult {
 class ChildIndexFinder : public TypeReprVisitor<ChildIndexFinder, FoundResult> {
   ArrayRef<uint8_t> ChildIndices;
   bool ParentIsOptional;
+  bool IsFunctionTypeArgument;
 
 public:
-  ChildIndexFinder(ArrayRef<uint8_t> ChildIndices) :
-    ChildIndices(ChildIndices) {}
+  ChildIndexFinder(ArrayRef<uint8_t> ChildIndices)
+      : ChildIndices(ChildIndices), ParentIsOptional(false),
+        IsFunctionTypeArgument(false) {}
 
   FoundResult findChild(AbstractFunctionDecl *Parent) {
-    ParentIsOptional = false;
     auto NextIndex = consumeNext();
     if (!NextIndex) {
       if (auto Func = dyn_cast<FuncDecl>(Parent))
@@ -118,12 +120,16 @@ public:
         Parent->getSourceRange(),
         Optional, Suffixable, /*Suffixed=*/ParentIsOptional
       };
+
     auto NextIndex = consumeNext();
     if (isUserTypeAlias(Parent))
       return {SourceRange(), false, false, false};
+
     assert(NextIndex < Children.size());
     TypeRepr *Child = Children[NextIndex];
     ParentIsOptional = Optional;
+    IsFunctionTypeArgument = NextIndex == 1 && isa<FunctionTypeRepr>(Parent);
+
     return visit(Child);
   }
 
@@ -173,12 +179,14 @@ public:
   }
 
   FoundResult visitTupleTypeRepr(TupleTypeRepr *T) {
-    // Single element TupleTypeReprs may be arbitrarily nested so don't count
-    // as their own index level
-    if (T->getNumElements() == 1) {
+    // Paren TupleTypeReprs may be arbitrarily nested so don't count as their
+    // own index level except in the case of function type argument parens
+    if (T->isParenType() && !IsFunctionTypeArgument) {
       ParentIsOptional = false;
       return visit(T->getElementType(0));
     }
+
+    IsFunctionTypeArgument = false;
     llvm::SmallVector<TypeRepr *, 8> Children;
     T->getElementTypes(Children);
     return handleParent(T, ArrayRef<TypeRepr *>(Children));
@@ -227,9 +235,45 @@ public:
   }
 };
 
+static ValueDecl* getReferencedDecl(Expr *E) {
+  // Get the syntactic expression out of an implicit expression.
+  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
+    E = ICE->getSyntacticSubExpr();
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    return DRE->getDecl();
+  } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    return MRE->getMember().getDecl();
+  } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
+    return OtherCtorE->getDecl();
+  } else {
+    return nullptr;
+  }
+}
+
 struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   APIDiffItemStore DiffStore;
+
+  bool isNilExpr(Expr *E) {
+    auto Range = E->getSourceRange();
+    return Range.isValid() && Lexer::getCharSourceRangeFromSourceRange(
+      SF->getASTContext().SourceMgr, Range).str() == "nil";
+  }
+
+  bool isDotMember(CharSourceRange Range) {
+    auto S = Range.str();
+    return S.startswith(".") && S.substr(1).find(".") == StringRef::npos;
+  }
+
+  bool isDotMember(SourceRange Range) {
+    return isDotMember(Lexer::getCharSourceRangeFromSourceRange(
+      SF->getASTContext().SourceMgr, Range));
+  }
+
+  bool isDotMember(Expr *E) {
+    auto Range = E->getSourceRange();
+    return Range.isValid() && isDotMember(Range);
+  }
 
   std::vector<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
     std::vector<APIDiffItem*> results;
@@ -250,20 +294,28 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return results;
   }
 
-  DeclNameViewer getFuncRename(ValueDecl *VD, bool &IgnoreBase) {
+  DeclNameViewer getFuncRename(ValueDecl *VD, llvm::SmallString<32> &Buffer,
+                               bool &IgnoreBase) {
     for (auto *Item: getRelatedDiffItems(VD)) {
       if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isRename()) {
           IgnoreBase = true;
           switch(CI->NodeKind) {
-          case SDKNodeKind::Function:
+          case SDKNodeKind::DeclFunction:
             IgnoreBase = false;
             LLVM_FALLTHROUGH;
-          case SDKNodeKind::Constructor:
+          case SDKNodeKind::DeclConstructor:
             return DeclNameViewer(CI->getNewName());
           default:
             return DeclNameViewer();
           }
+        }
+      }
+      if (auto *MI = dyn_cast<TypeMemberDiffItem>(Item)) {
+        if (MI->Subkind == TypeMemberDiffItemSubKind::FuncRename) {
+          llvm::raw_svector_ostream OS(Buffer);
+          OS << MI->newTypeName << "." << MI->newPrintedName;
+          return DeclNameViewer(OS.str());
         }
       }
     }
@@ -271,18 +323,19 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
 
-  bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
+  bool isSimpleReplacement(APIDiffItem *Item, bool isDotMember, std::string &Text) {
     if (auto *MD = dyn_cast<TypeMemberDiffItem>(Item)) {
       if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
-        Text = (llvm::Twine(MD->newTypeName) + "." + MD->getNewName().base()).
-          str();
+        Text = (llvm::Twine(isDotMember ? "" : MD->newTypeName) + "." +
+          MD->getNewName().base()).str();
         return true;
       }
     }
 
     // Simple rename.
     if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
-      if (CI->NodeKind == SDKNodeKind::Var && CI->isRename()) {
+      if (CI->isRename() && (CI->NodeKind == SDKNodeKind::DeclVar ||
+                             CI->NodeKind == SDKNodeKind::DeclType)) {
         Text = CI->getNewName();
         return true;
       }
@@ -290,9 +343,20 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
+  std::set<std::string> InsertedFunctions;
+  SourceLoc FileEndLoc;
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
-                      const MigratorOptions &Opts)
-    : ASTMigratorPass(Editor, SF, Opts) {}
+                      const MigratorOptions &Opts):
+    ASTMigratorPass(Editor, SF, Opts),
+    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {
+      SmallVector<Decl*, 16> TopDecls;
+      SF->getTopLevelDecls(TopDecls);
+      for (auto *D: TopDecls) {
+        if (auto *FD = dyn_cast<FuncDecl>(D)) {
+          InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
+        }
+      }
+    }
 
   void run() {
     if (Opts.APIDigesterDataStorePaths.empty())
@@ -303,12 +367,30 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     walk(SF);
   }
 
+  bool updateStringRepresentableDeclRef(APIDiffItem *Diff,
+      CharSourceRange Range) {
+    auto *CD = dyn_cast<CommonDiffItem>(Diff);
+    if (!CD)
+      return false;
+    if (CD->NodeKind != SDKNodeKind::DeclVar)
+      return false;
+    if (!CD->isStringRepresentableChange())
+      return false;
+    switch(CD->DiffKind) {
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+      Editor.insert(Range.getEnd(), ".rawValue");
+      return true;
+    default:
+      return false;
+    }
+  }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
                           Type T, ReferenceMetaData Data) override {
-    for (auto *Item: getRelatedDiffItems(D)) {
+    for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
-      if (isSimpleReplacement(Item, RepText)) {
+      if (isSimpleReplacement(Item, isDotMember(Range), RepText)) {
         Editor.replace(Range, RepText);
         return true;
       }
@@ -367,7 +449,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   void handleFuncRename(ValueDecl *FD, Expr* FuncRefContainer, Expr *Arg) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(FD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(FD, Buffer, IgnoreBase)) {
       if (!IgnoreBase) {
         ReferenceCollector Walker(FD);
         Walker.walk(FuncRefContainer);
@@ -382,8 +465,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       for (auto *I: getRelatedDiffItems(VD)) {
         if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
           if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
-            Editor.replace(ToReplace, (llvm::Twine(Item->newTypeName) + "." +
-              Item->getNewName().base()).str());
+            Editor.replace(ToReplace,
+              (llvm::Twine(isDotMember(ToReplace) ? "" : Item->newTypeName) + "." +
+               Item->getNewName().base()).str());
             return true;
           }
         }
@@ -529,7 +613,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (!Item)
       return false;
     if (Item->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement ||
-        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement)
+        Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement ||
+        Item->Subkind == TypeMemberDiffItemSubKind::FuncRename)
       return false;
 
     if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
@@ -578,6 +663,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
 
     switch (Item->Subkind) {
+    case TypeMemberDiffItemSubKind::FuncRename:
     case TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty:
     case TypeMemberDiffItemSubKind::SimpleReplacement:
     case TypeMemberDiffItemSubKind::QualifiedReplacement:
@@ -640,8 +726,194 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  void replaceExpr(Expr* E, StringRef Text) {
+    Editor.replace(CharSourceRange(SM, E->getStartLoc(),
+      Lexer::getLocForEndOfToken(SM, E->getEndLoc())), Text);
+  }
+
+  bool wrapAttributeReference(Expr* Reference, Expr* WrapperTarget,
+                              bool FromString) {
+    auto *RD = getReferencedDecl(Reference);
+    if (!RD)
+      return false;
+    std::string Rename;
+    Optional<NodeAnnotation> Kind;
+    StringRef LeftComment;
+    StringRef RightComment;
+    for (auto *Item: getRelatedDiffItems(RD)) {
+      if (isSimpleReplacement(Item, isDotMember(Reference), Rename)) {
+      } else if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->isStringRepresentableChange() &&
+            CI->NodeKind == SDKNodeKind::DeclVar) {
+          Kind = CI->DiffKind;
+          LeftComment = CI->LeftComment;
+          RightComment = CI->RightComment;
+        }
+      }
+    }
+    if (!Kind.hasValue())
+      return false;
+    if (Kind && !isNilExpr(WrapperTarget)) {
+      SmallString<256> Buffer;
+      auto Func = insertHelperFunction(*Kind, LeftComment, RightComment, Buffer,
+        FromString);
+      Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
+      Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    }
+    if (!Rename.empty()) {
+      replaceExpr(Reference, Rename);
+    }
+    return true;
+  }
+
+  bool handleAssignDestMigration(Expr *E) {
+    Editor.disableCache();
+    SWIFT_DEFER { Editor.enableCache(); };
+    auto *ASE = dyn_cast<AssignExpr>(E);
+    if (!ASE || !ASE->getDest() || !ASE->getSrc())
+      return false;
+    auto *Dest = ASE->getDest();
+    auto Src = ASE->getSrc();
+    if (wrapAttributeReference(Dest, Src, true)) {
+      // We should handle the assignment source here since we won't visit
+      // the children with present changes.
+      handleAttributeReference(Src);
+      return true;
+    }
+    return false;
+  }
+
+  bool handleAttributeReference(Expr *E) {
+    return wrapAttributeReference(E, E, false);
+  }
+
+  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
+                                 StringRef NewType,
+                                 SmallString<256> &Buffer, bool FromString) {
+    llvm::raw_svector_ostream OS(Buffer);
+    OS << "\n";
+    OS << "// Helper function inserted by Swift 4.2 migrator.\n";
+    OS << "fileprivate func ";
+    unsigned FuncNameStart = Buffer.size();
+    OS << (FromString ? "convertTo" : "convertFrom");
+    SmallVector<std::string, 8> Segs;
+    StringRef guard = "\tguard let input = input else { return nil }\n";
+    switch(Anno) {
+    case NodeAnnotation::OptionalArrayMemberUpdate:
+      Segs = {"Optional", "Array", (Twine("[") + RawType + "]?").str()};
+      Segs.push_back((Twine("[") + NewType +"]?").str());
+      Segs.push_back((Twine(guard) + "\treturn input.map { key in " + NewType +"(key) }").str());
+      Segs.push_back((Twine(guard) + "\treturn input.map { key in key.rawValue }").str());
+      break;
+    case NodeAnnotation::OptionalDictionaryKeyUpdate:
+      Segs = {"Optional", "Dictionary", (Twine("[") + RawType + ": Any]?").str()};
+      Segs.push_back((Twine("[") + NewType +": Any]?").str());
+      Segs.push_back((Twine(guard) +
+                      "\treturn Dictionary(uniqueKeysWithValues: input.map"
+                      " { key, value in (" + NewType + "(rawValue: key), value)})").str());
+      Segs.push_back((Twine(guard) +
+                      "\treturn Dictionary(uniqueKeysWithValues: input.map"
+                      " {key, value in (key.rawValue, value)})").str());
+      break;
+    case NodeAnnotation::ArrayMemberUpdate:
+      Segs = {"", "Array", (Twine("[") + RawType + "]").str()};
+      Segs.push_back((Twine("[") + NewType +"]").str());
+      Segs.push_back((Twine("\treturn input.map { key in ") + NewType +"(key) }").str());
+      Segs.push_back("\treturn input.map { key in key.rawValue }");
+      break;
+    case NodeAnnotation::DictionaryKeyUpdate:
+      Segs = {"", "Dictionary", (Twine("[") + RawType + ": Any]").str()};
+      Segs.push_back((Twine("[") + NewType +": Any]").str());
+      Segs.push_back((Twine("\treturn Dictionary(uniqueKeysWithValues: input.map"
+        " { key, value in (") + NewType + "(rawValue: key), value)})").str());
+      Segs.push_back("\treturn Dictionary(uniqueKeysWithValues: input.map"
+                     " {key, value in (key.rawValue, value)})");
+      break;
+    case NodeAnnotation::SimpleStringRepresentableUpdate:
+      Segs = {"", "", RawType};
+      Segs.push_back(NewType);
+      Segs.push_back((Twine("\treturn ") + NewType + "(rawValue: input)").str());
+      Segs.push_back("\treturn input.rawValue");
+      break;
+    case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      Segs = {"Optional", "", (Twine(RawType) +"?").str()};
+      Segs.push_back((Twine(NewType) +"?").str());
+      Segs.push_back((Twine(guard) + "\treturn " + NewType + "(rawValue: input)").str());
+      Segs.push_back((Twine(guard) + "\treturn input.rawValue").str());
+      break;
+    default:
+      llvm_unreachable("shouldn't handle this key.");
+    }
+    assert(Segs.size() == 6);
+    OS << Segs[0];
+    SmallVector<StringRef, 4> Parts;
+    NewType.split(Parts, '.');
+    for (auto P: Parts)
+      OS << P;
+    OS << Segs[1];
+    auto FuncName = Buffer.str().substr(FuncNameStart);
+    if (!InsertedFunctions.count(FuncName)) {
+      if (FromString) {
+        OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
+        OS << Segs[4] << "\n}\n";
+      } else {
+        OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
+        OS << Segs[5] << "\n}\n";
+      }
+      Editor.insert(FileEndLoc, OS.str());
+      InsertedFunctions.insert(FuncName);
+    }
+    return FuncName;
+  }
+
+  void handleStringRepresentableArg(ValueDecl *FD, Expr *Arg, Expr *Call) {
+    Editor.disableCache();
+    SWIFT_DEFER { Editor.enableCache(); };
+    NodeAnnotation Kind;
+    StringRef RawType;
+    StringRef NewAttributeType;
+    uint8_t ArgIdx;
+    for (auto Item: getRelatedDiffItems(FD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->isStringRepresentableChange()) {
+          Kind = CI->DiffKind;
+          RawType = CI->LeftComment;
+          NewAttributeType = CI->RightComment;
+          assert(CI->getChildIndices().size() == 1);
+          ArgIdx = CI->getChildIndices().front();
+          break;
+        }
+      }
+    }
+    if (NewAttributeType.empty())
+      return;
+    Expr *WrapTarget = Call;
+    bool FromString = false;
+    if (ArgIdx) {
+      ArgIdx --;
+      FromString = true;
+      auto AllArgs = getCallArgInfo(SM, Arg, LabelRangeEndAt::LabelNameOnly);
+      if (AllArgs.size() <= ArgIdx)
+        return;
+      WrapTarget = AllArgs[ArgIdx].ArgExp;
+      // Avoid wrapping nil literal.
+      if (isNilExpr(WrapTarget))
+        return;
+    }
+    assert(WrapTarget);
+    SmallString<256> Buffer;
+    auto FuncName = insertHelperFunction(Kind, RawType, NewAttributeType, Buffer,
+                                         FromString);
+    Editor.insert(WrapTarget->getStartLoc(), (Twine(FuncName) + "(").str());
+    Editor.insertAfterToken(WrapTarget->getEndLoc(), ")");
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (handleQualifiedReplacement(E))
+      return false;
+    if (handleAssignDestMigration(E))
+      return false;
+    if (handleAttributeReference(E))
       return false;
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
@@ -652,6 +924,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFuncRename(FD, Fn, Args);
           handleTypeHoist(FD, CE, Args);
           handleSpecialCases(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args, CE);
         }
         break;
       }
@@ -661,13 +934,17 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           handleFuncRename(FD, DSC->getFn(), Args);
           handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
           handleSpecialCases(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args, CE);
         }
         break;
       }
       case ExprKind::ConstructorRefCall: {
         auto CCE = cast<ConstructorRefCallExpr>(Fn);
-        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl())
-          handleFuncRename(FD, CCE->getFn(), Args);
+        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl()) {
+          auto *CE = CCE->getFn();
+          handleFuncRename(FD, CE, Args);
+          handleStringRepresentableArg(FD, Args, CE);
+        }
         break;
       }
       default:
@@ -680,7 +957,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   void handleFuncDeclRename(AbstractFunctionDecl *AFD,
                             CharSourceRange NameRange) {
     bool IgnoreBase = false;
-    if (auto View = getFuncRename(AFD, IgnoreBase)) {
+    llvm::SmallString<32> Buffer;
+    if (auto View = getFuncRename(AFD, Buffer, IgnoreBase)) {
       if (!IgnoreBase)
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;

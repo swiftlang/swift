@@ -23,11 +23,9 @@ function usage() {
   echo "-n --dry-run"
   echo "Do a dry run."
   echo ""
-  if [[ "$(uname -s)" == "Linux" ]] ; then
-    echo "-t --test"
-    echo "Run tests."
-    echo ""
-  fi
+  echo "-t --test"
+  echo "Run tests."
+  echo ""
 }
 
 cd "$(dirname $0)/.." || exit
@@ -38,7 +36,7 @@ DRY_RUN=
 BUNDLE_PREFIX=
 case $(uname -s) in
   Darwin)
-    SWIFT_PACKAGE=buildbot_osx_package
+    SWIFT_PACKAGE=buildbot_osx_package,no_test
   ;;
   Linux)
     SWIFT_PACKAGE=buildbot_linux,no_test
@@ -60,8 +58,7 @@ while [ $# -ne 0 ]; do
       if [ "$(uname -s)" == "Linux" ]; then
         SWIFT_PACKAGE=buildbot_linux
       else
-        echo "--test is not supported on \"$(uname -s)\". See --help"
-        exit 1
+        SWIFT_PACKAGE=buildbot_osx_package
       fi
   ;;
   -h|--help)

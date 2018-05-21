@@ -200,8 +200,6 @@ enum class ConversionRestrictionKind {
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
   OptionalToOptional,
-  /// Implicit forces of implicitly unwrapped optionals to their presumed values
-  ForceUnchecked,
   /// Implicit upcast conversion of array types.
   ArrayUpcast,
   /// Implicit upcast conversion of dictionary types, which includes
@@ -251,6 +249,11 @@ enum class FixKind : uint8_t {
 
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
+
+  /// Mark function type as explicitly '@escaping'.
+  ExplicitlyEscaping,
+  /// Mark function type as explicitly '@escaping' to be convertable to 'Any'.
+  ExplicitlyEscapingToAny,
 };
 
 /// Describes a fix that can be applied to a constraint before visiting it.
@@ -293,6 +296,8 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump(ConstraintSystem *cs) const 
                               LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
+
+  bool operator==(Fix const &b) { return Kind == b.Kind && Data == b.Data; }
 };
 
 
@@ -441,6 +446,13 @@ public:
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second, Type Third,
                             ConstraintLocator *locator);
+
+  /// Create a new member constraint, or a disjunction of that with the outer
+  /// alternatives.
+  static Constraint *createMemberOrOuterDisjunction(
+      ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
+      DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
@@ -711,7 +723,7 @@ namespace llvm {
 template<>
 struct ilist_traits<swift::constraints::Constraint>
          : public ilist_default_traits<swift::constraints::Constraint> {
-  typedef swift::constraints::Constraint Element;
+  using Element = swift::constraints::Constraint;
 
   static Element *createNode(const Element &V) = delete;
   static void deleteNode(Element *V) { /* never deleted */ }

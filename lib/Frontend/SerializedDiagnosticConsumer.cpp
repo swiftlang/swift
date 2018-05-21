@@ -83,8 +83,8 @@ public:
   }
 };
 
-typedef SmallVector<uint64_t, 64> RecordData;
-typedef SmallVectorImpl<uint64_t> RecordDataImpl;
+using RecordData = SmallVector<uint64_t, 64>;
+using RecordDataImpl = SmallVectorImpl<uint64_t>;
 
 struct SharedState : llvm::RefCountedBase<SharedState> {
   SharedState(StringRef serializedDiagnosticsPath)
@@ -113,8 +113,8 @@ struct SharedState : llvm::RefCountedBase<SharedState> {
   /// \brief The collection of files used.
   llvm::DenseMap<const char *, unsigned> Files;
 
-  typedef llvm::DenseMap<const void *, std::pair<unsigned, StringRef> >
-  DiagFlagsTy;
+  using DiagFlagsTy =
+      llvm::DenseMap<const void *, std::pair<unsigned, StringRef>>;
 
   /// \brief Map for uniquing strings.
   DiagFlagsTy DiagFlags;
@@ -140,7 +140,7 @@ public:
     assert(CalledFinishProcessing && "did not call finishProcessing()");
   }
 
-  bool finishProcessing() override {
+  bool finishProcessing(SourceManager &SM) override {
     assert(!CalledFinishProcessing &&
            "called finishProcessing() multiple times");
     CalledFinishProcessing = true;
@@ -160,8 +160,7 @@ public:
                                       llvm::sys::fs::F_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
-      SourceManager dummyMgr;
-      DiagnosticEngine DE(dummyMgr);
+      DiagnosticEngine DE(SM);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
@@ -560,4 +559,3 @@ void SerializedDiagnosticConsumer::handleDiagnostic(
   if (bracketDiagnostic)
     exitDiagBlock();
 }
-

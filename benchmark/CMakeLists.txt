@@ -49,21 +49,25 @@ set(SWIFT_BENCH_MODULES
     single-source/CSVParsing
     single-source/Calculator
     single-source/CaptureProp
+    single-source/ChainedFilterMap
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
     single-source/CharacterProperties
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/Combos
+    single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
     single-source/DictTest3
     single-source/DictTest4
+    single-source/DictTest4Legacy
     single-source/DictionaryBridge
     single-source/DictionaryCopy
     single-source/DictionaryGroup
+    single-source/DictionaryKeysContains
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
@@ -76,6 +80,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Exclusivity
     single-source/ExistentialPerformance
     single-source/Fibonacci
+    single-source/FloatingPointPrinting
     single-source/Hanoi
     single-source/Hash
     single-source/HashQuadratic
@@ -119,6 +124,8 @@ set(SWIFT_BENCH_MODULES
     single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
+    single-source/RandomShuffle
+    single-source/RandomValues
     single-source/RangeAssignment
     single-source/RangeIteration
     single-source/RangeReplaceableCollectionPlusDefault

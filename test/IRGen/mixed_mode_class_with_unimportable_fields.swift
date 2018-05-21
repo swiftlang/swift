@@ -67,8 +67,8 @@ public func invokeMethod(on holder: SubButtHolder) {
 }
 
 // CHECK-V3-LABEL: define private void @initialize_metadata_SubButtHolder
-// CHECK-V3:   call void @swift_initClassMetadata_UniversalStrategy
+// CHECK-V3:   call void @swift_initClassMetadata(
 
 // CHECK-V3-LABEL: define private void @initialize_metadata_SubSubButtHolder
-// CHECK-V3:   call void @swift_initClassMetadata_UniversalStrategy
+// CHECK-V3:   call void @swift_initClassMetadata(
 
