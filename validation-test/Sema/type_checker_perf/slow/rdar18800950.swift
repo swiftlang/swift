@@ -7,5 +7,5 @@ func rdar18800950(v: Float) -> Double {
   let c2 = 2.0
   let r = v / c1
   let _ = (c2 * 2 * (3 * (1 - c1 / v) - 4) * r + 5) * (c2 * 2 * (3 * (1 - c1 / v) - 4) * r + 5)
-  // expected-error@-1 {{reasonable time}}
+  // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
 }

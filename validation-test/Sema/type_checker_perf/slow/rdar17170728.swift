@@ -6,6 +6,6 @@ let j: Int?
 let k: Int? = 2
 
 let _ = [i, j, k].reduce(0 as Int?) {
-  // expected-error@-1 {{reasonable time}}
+  // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
   $0 != nil && $1 != nil ? $0! + $1! : ($0 != nil ? $0! : ($1 != nil ? $1! : nil))
 }

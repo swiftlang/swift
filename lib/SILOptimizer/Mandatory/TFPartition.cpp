@@ -3007,8 +3007,13 @@ public:
       auto len = B.createIntegerLiteral(fn->getLocation(),
                               tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
-      auto name = B.createStringLiteral(fn->getLocation(),
-                                        tensorProgram.fn->getName(),
+      // Strip off the $ from the start of a function name if present.
+      // FIXME: Factor this out somewhere common.
+      auto fnName = tensorProgram.fn->getName();
+      if (fnName.startswith("$"))
+        fnName = fnName.substr(1);
+
+      auto name = B.createStringLiteral(fn->getLocation(), fnName,
                                         StringLiteralInst::Encoding::UTF8);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();

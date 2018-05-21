@@ -4,4 +4,4 @@
 let j = 1
 
 _ = "a" + j + "b" + j + "c" + j
-// expected-error@-1 {{reasonable time}}
+// expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
