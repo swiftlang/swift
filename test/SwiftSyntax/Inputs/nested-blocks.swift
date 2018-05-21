@@ -1,4 +1,4 @@
-struct {
+struct Foo {
   func foo() {
     print("hello")
     func bar() {
