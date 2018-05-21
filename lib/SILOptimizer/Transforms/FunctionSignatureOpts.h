@@ -149,7 +149,7 @@ struct ArgumentDescriptor {
         ERM.hasSomeReleasesForArgument(Arg))
       return true;
 
-    size_t explosionSize = ProjTree.liveLeafCount();
+    unsigned explosionSize = ProjTree.getLiveLeafCount();
     return explosionSize >= 1 && explosionSize <= 3;
   }
 
