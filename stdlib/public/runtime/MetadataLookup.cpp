@@ -23,7 +23,6 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -106,11 +105,9 @@ namespace {
 
 struct TypeMetadataPrivateState {
   ConcurrentMap<NominalTypeDescriptorCacheEntry> NominalCache;
-  std::vector<TypeMetadataSection> SectionsToScan;
-  Mutex SectionsToScanLock;
+  ConcurrentReadableArray<TypeMetadataSection> SectionsToScan;
 
   TypeMetadataPrivateState() {
-    SectionsToScan.reserve(16);
     initializeTypeMetadataRecordLookup();
   }
 
@@ -122,7 +119,6 @@ static void
 _registerTypeMetadataRecords(TypeMetadataPrivateState &T,
                              const TypeMetadataRecord *begin,
                              const TypeMetadataRecord *end) {
-  ScopedLock guard(T.SectionsToScanLock);
   T.SectionsToScan.push_back(TypeMetadataSection{begin, end});
 }
 
@@ -296,12 +292,9 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
 
 // returns the nominal type descriptor for the type named by typeName
 static const TypeContextDescriptor *
-_searchTypeMetadataRecords(const TypeMetadataPrivateState &T,
+_searchTypeMetadataRecords(TypeMetadataPrivateState &T,
                            Demangle::NodePointer node) {
-  unsigned sectionIdx = 0;
-  unsigned endSectionIdx = T.SectionsToScan.size();
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
-    auto &section = T.SectionsToScan[sectionIdx];
+  for (auto &section : T.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto ntd = record.getTypeContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node)) {
@@ -342,9 +335,7 @@ _findNominalTypeDescriptor(Demangle::NodePointer node,
     return Value->getDescription();
 
   // Check type metadata records
-  T.SectionsToScanLock.withLock([&] {
-    foundNominal = _searchTypeMetadataRecords(T, node);
-  });
+  foundNominal = _searchTypeMetadataRecords(T, node);
 
   // Check protocol conformances table. Note that this has no support for
   // resolving generic types yet.
@@ -395,11 +386,9 @@ namespace {
 
   struct ProtocolMetadataPrivateState {
     ConcurrentMap<ProtocolDescriptorCacheEntry> ProtocolCache;
-    std::vector<ProtocolSection> SectionsToScan;
-    Mutex SectionsToScanLock;
+    ConcurrentReadableArray<ProtocolSection> SectionsToScan;
 
     ProtocolMetadataPrivateState() {
-      SectionsToScan.reserve(16);
       initializeProtocolLookup();
     }
   };
@@ -411,7 +400,6 @@ static void
 _registerProtocols(ProtocolMetadataPrivateState &C,
                    const ProtocolRecord *begin,
                    const ProtocolRecord *end) {
-  ScopedLock guard(C.SectionsToScanLock);
   C.SectionsToScan.push_back(ProtocolSection{begin, end});
 }
 
@@ -439,12 +427,9 @@ void swift::swift_registerProtocols(const ProtocolRecord *begin,
 }
 
 static const ProtocolDescriptor *
-_searchProtocolRecords(const ProtocolMetadataPrivateState &C,
+_searchProtocolRecords(ProtocolMetadataPrivateState &C,
                        const llvm::StringRef protocolName){
-  unsigned sectionIdx = 0;
-  unsigned endSectionIdx = C.SectionsToScan.size();
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
-    auto &section = C.SectionsToScan[sectionIdx];
+  for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto protocol = record.Protocol.getPointer()) {
         // Drop the "S$" prefix from the protocol record. It's not used in
@@ -472,9 +457,7 @@ _findProtocolDescriptor(llvm::StringRef mangledName) {
     return Value->getDescription();
 
   // Check type metadata records
-  T.SectionsToScanLock.withLock([&] {
-    foundProtocol = _searchProtocolRecords(T, mangledName);
-  });
+  foundProtocol = _searchProtocolRecords(T, mangledName);
 
   if (foundProtocol) {
     T.ProtocolCache.getOrInsert(mangledName, foundProtocol);
@@ -534,7 +517,7 @@ public:
   DynamicFieldSection(const FieldDescriptor **fields, size_t size)
       : Begin(fields), End(fields + size) {}
 
-  const FieldDescriptor **begin() { return Begin; }
+  const FieldDescriptor **begin() const { return Begin; }
 
   const FieldDescriptor **end() const { return End; }
 };
@@ -542,13 +525,10 @@ public:
 struct FieldCacheState {
   ConcurrentMap<FieldDescriptorCacheEntry> FieldCache;
 
-  Mutex SectionsLock;
-  std::vector<StaticFieldSection> StaticSections;
-  std::vector<DynamicFieldSection> DynamicSections;
+  ConcurrentReadableArray<StaticFieldSection> StaticSections;
+  ConcurrentReadableArray<DynamicFieldSection> DynamicSections;
 
   FieldCacheState() {
-    StaticSections.reserve(16);
-    DynamicSections.reserve(8);
     initializeTypeFieldLookup();
   }
 };
@@ -559,7 +539,6 @@ static Lazy<FieldCacheState> FieldCache;
 void swift::swift_registerFieldDescriptors(const FieldDescriptor **records,
                                            size_t size) {
   auto &cache = FieldCache.get();
-  ScopedLock guard(cache.SectionsLock);
   cache.DynamicSections.push_back({records, size});
 }
 
@@ -570,7 +549,6 @@ void swift::addImageTypeFieldDescriptorBlockCallback(const void *recordsBegin,
 
   // Field cache should always be sufficiently initialized by this point.
   auto &cache = FieldCache.unsafeGetAlreadyInitialized();
-  ScopedLock guard(cache.SectionsLock);
   cache.StaticSections.push_back({recordsBegin, recordsEnd});
 }
 
@@ -1204,16 +1182,15 @@ void swift::swift_getFieldAt(
     return;
   }
 
-  ScopedLock guard(cache.SectionsLock);
   // Otherwise let's try to find it in one of the sections.
-  for (auto &section : cache.DynamicSections) {
+  for (auto &section : cache.DynamicSections.snapshot()) {
     for (const auto *descriptor : section) {
       if (isRequestedDescriptor(*descriptor))
         return;
     }
   }
 
-  for (const auto &section : cache.StaticSections) {
+  for (const auto &section : cache.StaticSections.snapshot()) {
     for (auto &descriptor : section) {
       if (isRequestedDescriptor(descriptor))
         return;
