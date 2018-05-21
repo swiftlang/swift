@@ -1291,7 +1291,7 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   if (!fixedTI)
     return FixedPacking::Dynamic;
 
-  // By convention we don't store bitwise takable values inline.
+  // By convention we only store bitwise takable values inline.
   if (!fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal))
     return FixedPacking::Allocate;
 
