@@ -450,7 +450,37 @@ private:
   Mutex WriterLock;
   std::vector<Storage *> FreeList;
   
+  void incrementReaders() {
+    ReaderCount.fetch_add(1, std::memory_order_acquire);
+  }
+  
+  void decrementReaders() {
+    ReaderCount.fetch_sub(1, std::memory_order_release);
+  }
+  
 public:
+  struct Snapshot {
+    ConcurrentReadableArray *Array;
+    const ElemTy *Start;
+    size_t Count;
+    
+    Snapshot(ConcurrentReadableArray *array, const ElemTy *start, size_t count)
+      : Array(array), Start(start), Count(count) {}
+    
+    Snapshot(const Snapshot &other)
+      : Array(other.Array), Start(other.Start), Count(other.Count) {
+      Array->incrementReaders();
+    }
+    
+    ~Snapshot() {
+      Array->decrementReaders();
+    }
+    
+    const ElemTy *begin() { return Start; }
+    const ElemTy *end() { return Start + Count; }
+    size_t count() { return Count; }
+  };
+  
   // This type cannot be safely copied, moved, or deleted.
   ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
   ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
@@ -485,28 +515,16 @@ public:
         storage->deallocate();
   }
   
-  /// Read the contents of the array. The parameter `f` is called with
-  /// two parameters: a pointer to the elements in the array, and the
-  /// count. This represents a snapshot of the contents at the time
-  /// `read` was called. The pointer becomes invalid after `f` returns.
-  template <class F> auto read(F f) -> decltype(f(nullptr, 0)) {
-    ReaderCount.fetch_add(1, std::memory_order_acquire);
+  Snapshot snapshot() {
+    incrementReaders();
     auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
+    if (storage == nullptr) {
+      return Snapshot(this, nullptr, 0);
+    }
+    
     auto count = storage->Count.load(std::memory_order_acquire);
     const auto *ptr = storage->data();
-    
-    decltype(f(nullptr, 0)) result = f(ptr, count);
-    
-    ReaderCount.fetch_sub(1, std::memory_order_release);
-    
-    return result;
-  }
-  
-  /// Get the current count. It's just a snapshot and may be obsolete immediately.
-  size_t count() {
-    return read([](const ElemTy *ptr, size_t count) -> size_t {
-      return count;
-    });
+    return Snapshot(this, ptr, count);
   }
 };
 
