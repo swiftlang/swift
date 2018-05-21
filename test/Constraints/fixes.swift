@@ -166,13 +166,64 @@ func moreComplexUnwrapFixes() {
   takeNon(os.value) // expected-error{{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}} {{13-13=!}}
 
   takeOpt(t.s.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  // expected-error@-1 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}} {{14-14=?}}
   takeNon(t.s.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=!}}
   takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  // expected-error@-1 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}} {{17-17=?}}
   takeNon(t.optS.value) // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
   // expected-error@-1 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}}{{17-17=!}}
 
   takeOpt(u.t.s.value) // expected-error{{value of optional type 'U?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=?}}
+  // expected-error@-1 {{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=?}}
+  // expected-error@-2 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}}{{16-16=?}}
+
   takeNon(u.t.s.value) // expected-error{{value of optional type 'U?' not unwrapped; did you mean to use '!' or '?'?}} {{12-12=!}}
 
   t.s.value = 2 // expected-error{{value of optional type 'T?' not unwrapped; did you mean to use '!' or '?'?}} {{4-4=?}}
+  // expected-error@-1 {{value of optional type 'S?' not unwrapped; did you mean to use '!' or '?'?}}{{6-6=?}}
+
+  struct A {
+    var n: Int = 0
+    var ns: [Int] = []
+  }
+  struct B {
+    var a: A? = nil
+    var r: [A] = []
+    var n: Int? = nil
+  }
+  struct C {
+    var b: B
+    func thing() -> A? { return nil } // expected-note{{found this candidate}}
+    func thing() -> B? { return nil } // expected-note{{found this candidate}}
+  }
+
+  func moreTest(c: C?) {
+    takeOpt(c.thing().n) // expected-error{{ambiguous reference to member 'thing()'}}
+    // Not ambigious because we can prefer A.n over B.n
+    takeNon(c.thing().n) // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=?}}
+    // expected-error@-1 {{value of optional type 'A?' not unwrapped; did you mean to use '!' or '?'?}}{{22-22=!}}
+
+    takeOpt(c.b.r[0].n) // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=!}}
+    takeNon(c.b.r[0].n) // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=!}}
+    takeOpt(c?.b.a.ns.first) // expected-error{{value of optional type 'A?' not unwrapped; did you mean to use '!' or '?'?}}{{19-19=?}}
+    // expected-error@-1 {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}}{{22-22=?}}
+    takeNon(c!.b.a.ns.first) // expected-error{{value of optional type 'A?' not unwrapped; did you mean to use '!' or '?'?}}{{19-19=?}}
+    // expected-error@-1 {{value of optional type '[Int]?' not unwrapped; did you mean to use '!' or '?'?}}{{22-22=?}}
+    // expected-error@-2 {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}{{28-28=!}}
+  }
+}
+
+func moreComplexUnwrapFixes2() {
+  class C {
+    var i: Int = 0
+  }
+
+  class D {
+    var c: C? = nil
+  }
+
+  func test(d: D?) -> Int? {
+    return d.c.i // expected-error{{value of optional type 'D?' not unwrapped; did you mean to use '!' or '?'?}}{{13-13=?}}
+    // expected-error@-1 {{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}{{15-15=?}}
+  }
 }

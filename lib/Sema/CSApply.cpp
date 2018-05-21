@@ -7783,27 +7783,16 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
     if (auto subscript = dyn_cast<SubscriptExpr>(affected))
       affected = subscript->getBase();
   }
-    
-  switch (fix.first.getKind()) {
-  case FixKind::OptionalChaining: {
-    auto type = solution.simplifyType(getType(affected))
-                  ->getRValueObjectType();
-    auto diag = TC.diagnose(affected->getLoc(),
-                            diag::missing_unwrap_optional, type);
-    diag.fixItInsertAfter(affected->getEndLoc(), "?");
-    return true;
-  }
 
+  switch (fix.first.getKind()) {
   case FixKind::ForceOptional: {
     const Expr *unwrapped = affected->getValueProvidingExpr();
-    auto type = solution.simplifyType(getType(affected))
-                  ->getRValueObjectType();
+    auto type = solution.simplifyType(getType(affected))->getRValueObjectType();
 
     if (auto tryExpr = dyn_cast<OptionalTryExpr>(unwrapped)) {
-      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try,
-                  type)
-        .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
-                      "try!");
+      TC.diagnose(tryExpr->getTryLoc(), diag::missing_unwrap_optional_try, type)
+          .fixItReplace({tryExpr->getTryLoc(), tryExpr->getQuestionLoc()},
+                        "try!");
 
     } else {
       auto diag = TC.diagnose(affected->getLoc(),
@@ -7815,6 +7804,16 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
             .fixItInsertAfter(affected->getEndLoc(), ")!");
       }
     }
+    return true;
+  }
+
+  case FixKind::OptionalChaining:
+    LLVM_FALLTHROUGH;
+  case FixKind::OptionalMember: {
+    auto type = solution.simplifyType(getType(affected))->getRValueObjectType();
+    auto diag =
+        TC.diagnose(affected->getLoc(), diag::missing_unwrap_optional, type);
+    diag.fixItInsertAfter(affected->getEndLoc(), "?");
     return true;
   }
 

@@ -234,16 +234,21 @@ enum RememberChoice_t : bool {
 enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
   ForceOptional,
-    
+
   /// Introduce a '?.' to begin optional chaining.
   OptionalChaining,
+
+  /// Implicitly part of an optional chain where the member returns
+  /// an optional, so we don't want to wrap it in an additional level
+  /// of optionality.
+  OptionalMember,
 
   /// Append 'as! T' to force a downcast to the specified type.
   ForceDowncast,
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
-  
+
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
 };
@@ -272,6 +277,13 @@ public:
 
   /// If this fix has a type argument, retrieve it.
   Type getTypeArgument(ConstraintSystem &cs) const;
+
+  /// Weight to put on scoring this fix in a potential solution.
+  unsigned scoreWeight() const {
+    // Prefer lots of other (optional chain) fixes to a single
+    // force optional, if solutions for both exist.
+    return getKind() == FixKind::ForceOptional ? 10 : 1;
+  }
 
   /// Return a string representation of a fix.
   static llvm::StringRef getName(FixKind kind);

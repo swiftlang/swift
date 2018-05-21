@@ -3388,6 +3388,72 @@ retry_after_fail:
   return result;
 }
 
+static bool fixOptionalBaseMemberConstraint(ConstraintSystem &cs,
+                                            Type unwrappedBaseObjTy,
+                                            DeclName member, Type memberTy,
+                                            DeclContext *useDC,
+                                            FunctionRefKind functionRefKind,
+                                            ConstraintLocator *locator) {
+  // Don't try to fixup multiple levels of optionality, if we unwrapped and
+  // the result is still optional, fail.
+  if (unwrappedBaseObjTy->getOptionalObjectType())
+    return false;
+
+  if (!(cs.Options & ConstraintSystemFlags::AllowFixes))
+    return false;
+
+  auto contextTy = cs.getContextualType();
+  bool forceUnwrap;
+  if (contextTy)
+    forceUnwrap = contextTy->getOptionalObjectType().isNull();
+  else
+    forceUnwrap =
+        cs.Options.contains(ConstraintSystemFlags::PreferForceUnwrapToOptional);
+
+  if (forceUnwrap || functionRefKind != FunctionRefKind::Unapplied) {
+    // Note the fix.
+    auto fixKind =
+        forceUnwrap ? FixKind::ForceOptional : FixKind::OptionalChaining;
+    if (cs.recordFix(fixKind, locator))
+      return false;
+
+    // The simple case - just look through one level of optional.
+    cs.addValueMemberConstraint(unwrappedBaseObjTy, member, memberTy, useDC,
+                                functionRefKind, locator);
+    return true;
+  }
+
+  auto innerTV =
+      cs.createTypeVariable(locator, TVO_CanBindToLValue | TVO_CanBindToInOut);
+  Type optTy = cs.getTypeChecker().getOptionalType(SourceLoc(), innerTV);
+  if (!optTy)
+    return false;
+
+  // Add a disjunction with the three possibilities:
+  // 1) member is non-optional, result of expression adds optional to it ("?")
+  // 2) member is non-optional, result of expression is non-optional ("!")
+  // 3) member is optional, result of expression matches it ("?")
+  SmallVector<Constraint *, 3> optionalities;
+  auto optionalResult = Constraint::createFixed(cs, ConstraintKind::Conversion,
+                                                FixKind::OptionalChaining,
+                                                optTy, memberTy, locator);
+  auto nonoptionalResult =
+      Constraint::createFixed(cs, ConstraintKind::Conversion,
+                              FixKind::ForceOptional, optTy, memberTy, locator);
+  auto optionalMember = Constraint::createFixed(cs, ConstraintKind::Conversion,
+                                                FixKind::OptionalMember,
+                                                innerTV, memberTy, locator);
+  optionalMember->setFavored();
+  optionalities.push_back(optionalResult);
+  optionalities.push_back(nonoptionalResult);
+  optionalities.push_back(optionalMember);
+  cs.addDisjunctionConstraint(optionalities, locator);
+
+  cs.addValueMemberConstraint(unwrappedBaseObjTy, member, innerTV, useDC,
+                              functionRefKind, locator);
+  return true;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
                                            Type baseTy, DeclName member,
@@ -3446,108 +3512,16 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   auto instanceTy = baseObjTy;
   if (auto MTT = instanceTy->getAs<MetatypeType>())
     instanceTy = MTT->getInstanceType();
-  
-  // Value member lookup has some hacks too.
+
+  // If the base type was an optional, look through it and try to generate
+  // fixes to make it valid.
   auto unwrappedBaseObjTy = baseObjTy->getOptionalObjectType();
-  if (unwrappedBaseObjTy) {
-    // If the base type was an optional, look through it.
-
-    // Figure out if we have an existing optional chaining fix done earlier in
-    // this dotted expression chain.
-    bool continuingChain = false;
-    if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
-      for (auto pair : Fixes) {
-        if (pair.first.getKind() == FixKind::OptionalChaining) {
-          auto innerExpr = dotExpr->getBase();
-          while (innerExpr) {
-            if (pair.second->getAnchor() == innerExpr) {
-              continuingChain = true;
-              break;
-            }
-            auto innerDot = dyn_cast<UnresolvedDotExpr>(innerExpr);
-            innerExpr = innerDot ? innerDot->getBase() : nullptr;
-          }
-        }
-      }
-    }
-
-    // If we aren't continuing an existing chain, do we want to add a new fixit?
-    if (!continuingChain) {
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
-
-      auto contextTy = getContextualType();
-      bool forceUnwrap;
-      if (contextTy)
-        forceUnwrap = contextTy->getOptionalObjectType().isNull();
-      else
-        forceUnwrap = Options.contains(ConstraintSystemFlags::PreferForceUnwrapToOptional);
-
-      if (forceUnwrap || functionRefKind != FunctionRefKind::Unapplied) {
-        // Note the fix.
-        auto fixKind = forceUnwrap ? FixKind::ForceOptional : FixKind::OptionalChaining;
-        if (recordFix(fixKind, locator))
-          return SolutionKind::Error;
-
-        // The simple case - just look through one level of optional.
-        addValueMemberConstraint(unwrappedBaseObjTy,
-                                 member, memberTy, useDC, functionRefKind, locator);
-        return SolutionKind::Solved;
-      }
-    }
-
-    // See if there is a matching member with an optional type.
-    // If so, then inserting an optional chaining fix won't produce a MORE optional result,
-    // and it is safe to just fix with chaining.
-    MemberLookupResult result =
-      performMemberLookup(kind, member, unwrappedBaseObjTy, functionRefKind, locator,
-                          /*includeInaccessibleMembers*/false);
-    bool memberIsOptional = false;
-    for (auto candidate : result.ViableCandidates) {
-      if (candidate.isDecl())
-        memberIsOptional |= !candidate.getDecl()->getInterfaceType()->
-                              getOptionalObjectType().isNull();
-    }
-
-    if (memberIsOptional) {
-      if (!continuingChain) {
-        // Note the fix.
-        if (recordFix(FixKind::OptionalChaining, locator))
-          return SolutionKind::Error;
-      }
-    } else {
-      // If the member isn't already optional, we need to make the result optional.
-
-      auto innerTV = createTypeVariable(locator, TVO_CanBindToLValue | TVO_CanBindToInOut);
-      Type optTy = getTypeChecker().getOptionalType(SourceLoc(), innerTV);
-      if (!optTy)
-        return SolutionKind::Error;
-
-      if (continuingChain) {
-        addConstraint(ConstraintKind::Conversion, optTy, memberTy, locator);
-      } else {
-        // If we are starting a new chain, it may or may not be valid. Add a disjunction
-        // with the optional and non-optional result.
-        SmallVector<Constraint *, 4> optionalities;
-        auto optionalResult = Constraint::createFixed(*this, ConstraintKind::Conversion,
-                                                      FixKind::OptionalChaining,
-                                                      optTy, memberTy, locator);
-        auto nonoptionalResult = Constraint::createFixed(*this, ConstraintKind::Conversion,
-                                                         FixKind::ForceOptional,
-                                                         optTy, memberTy, locator);
-        optionalities.push_back(optionalResult);
-        optionalities.push_back(nonoptionalResult);
-        addDisjunctionConstraint(optionalities, locator);
-      }
-      memberTy = innerTV;
-    }
-
-    // Look through one level of optional.
-    addValueMemberConstraint(unwrappedBaseObjTy,
-                             member, memberTy, useDC, functionRefKind, locator);
+  if (unwrappedBaseObjTy && fixOptionalBaseMemberConstraint(
+                                *this, unwrappedBaseObjTy, member, memberTy,
+                                useDC, functionRefKind, locator))
     return SolutionKind::Solved;
-  }
-  return SolutionKind::Error;
+  else
+    return SolutionKind::Error;
 }
 
 ConstraintSystem::SolutionKind
@@ -4830,7 +4804,7 @@ bool ConstraintSystem::recordFix(Fix fix, ConstraintLocatorBuilder locator) {
 
   // Increase the score. If this would make the current solution worse than
   // the best solution we've seen already, stop now.
-  increaseScore(SK_Fix);
+  increaseScore(SK_Fix, fix.scoreWeight());
   if (worseThanBestSolution())
     return true;
 
@@ -4871,6 +4845,26 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
 
     return result;
   }
+
+  case FixKind::OptionalMember: {
+    // The second type must result in an optional, and then can be matched
+    // to the first.
+    auto fixedType =
+        getFixedTypeRecursive(type2, flags, /* wantRValue= */ false,
+                              /* retainParens= */ false);
+    if (fixedType->hasTypeVariable())
+      return SolutionKind::Unsolved;
+    if (!fixedType->getOptionalObjectType())
+      return SolutionKind::Error;
+
+    auto result = matchTypes(type1, type2, matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix, locator))
+        return SolutionKind::Error;
+
+    return result;
+  }
+
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
     if (recordFix(fix, locator))

@@ -500,6 +500,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: force optional";
   case FixKind::OptionalChaining:
     return "fix: optional chaining";
+  case FixKind::OptionalMember:
+    return "fix: optional member";
   case FixKind::ForceDowncast:
     return "fix: force downcast";
   case FixKind::AddressOf:
