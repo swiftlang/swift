@@ -524,14 +524,7 @@ namespace {
                          [&](const Space &s) {
             return this->intersect(s, TC, DC);
           });
-          // Optimization: Remove all empty spaces.
-          SmallVector<Space, 4> filteredCases;
-          std::copy_if(intersectedCases.begin(), intersectedCases.end(),
-                       std::back_inserter(filteredCases),
-                       [&](const Space &s) {
-            return !s.isEmpty();
-          });
-          return Space::forDisjunct(filteredCases);
+          return Space::forDisjunct(intersectedCases);
         }
 
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
@@ -546,14 +539,7 @@ namespace {
                          [&](const Space &s) {
             return s.intersect(other, TC, DC);
           });
-          // Optimization: Remove all empty spaces.
-          SmallVector<Space, 4> filteredCases;
-          std::copy_if(intersectedCases.begin(), intersectedCases.end(),
-                       std::back_inserter(filteredCases),
-                       [&](const Space &s) {
-            return !s.isEmpty();
-          });
-          return Space::forDisjunct(filteredCases);
+          return Space::forDisjunct(intersectedCases);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
           // Optimization: The intersection of equal types is that type.
@@ -623,8 +609,10 @@ namespace {
           auto j = other.getSpaces().begin();
           for (; i != this->getSpaces().end() && j != other.getSpaces().end();
                ++i, ++j) {
-            auto intersection = (*i).intersect(*j, TC, DC);
-            if (intersection.simplify(TC, DC).isEmpty()) {
+            auto intersection = (*i).intersect(*j, TC, DC).simplify(TC, DC);
+            // If at least one of the constructor sub-spaces is empty,
+            // it makes the whole space empty as well.
+            if (intersection.isEmpty()) {
               return Space();
             }
             paramSpace.push_back(intersection);
@@ -1006,16 +994,14 @@ namespace {
           // Simplify each component subspace.  If, after simplification, any
           // subspace contains an empty, then the whole space is empty.
           SmallVector<Space, 4> simplifiedSpaces;
-          std::transform(getSpaces().begin(), getSpaces().end(),
-                         std::back_inserter(simplifiedSpaces),
-                         [&](const Space &el) {
-            return el.simplify(TC, DC);
-          });
-          for (auto &el : simplifiedSpaces) {
-            if (el.isEmpty()) {
+          for (const auto &space : Spaces) {
+            auto simplified = space.simplify(TC, DC);
+            if (simplified.isEmpty())
               return Space();
-            }
+
+            simplifiedSpaces.push_back(simplified);
           }
+
           return Space::forConstructor(getType(), Head, canDowngradeToWarning(),
                                        simplifiedSpaces);
         }
@@ -1040,19 +1026,7 @@ namespace {
                          [&](const Space &el){
             return el.simplify(TC, DC);
           });
-          // If the disjunct is singular, unpack it into its component.
-          if (simplifiedSpaces.size() == 1) {
-            return simplifiedSpaces.front();
-          }
-
-          // Otherwise, remove any empties.
-          SmallVector<Space, 4> compatifiedSpaces;
-          std::copy_if(simplifiedSpaces.begin(), simplifiedSpaces.end(),
-                       std::back_inserter(compatifiedSpaces),
-                       [&](const Space &el) {
-            return !el.isEmpty();
-          });
-          return Space::forDisjunct(compatifiedSpaces);
+          return Space::forDisjunct(simplifiedSpaces);
         }
         default:
           return *this;
