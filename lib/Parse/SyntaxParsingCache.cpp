@@ -17,7 +17,7 @@ using namespace swift::syntax;
 
 bool SyntaxParsingCache::nodeCanBeReused(const Syntax &Node, size_t Position,
                                          SyntaxKind Kind) const {
-  auto NodeStart = Node.getAbsolutePositionWithLeadingTrivia().getOffset();
+  auto NodeStart = Node.getAbsolutePositionBeforeLeadingTrivia().getOffset();
   if (NodeStart != Position)
     return false;
   if (Node.getKind() != Kind)
@@ -60,7 +60,8 @@ llvm::Optional<Syntax> SyntaxParsingCache::lookUpFrom(const Syntax &Node,
     if (!Child.hasValue()) {
       continue;
     }
-    auto ChildStart = Child->getAbsolutePositionWithLeadingTrivia().getOffset();
+    auto ChildStart =
+        Child->getAbsolutePositionBeforeLeadingTrivia().getOffset();
     auto ChildEnd = ChildStart + Child->getTextLength();
     if (ChildStart <= Position && Position < ChildEnd) {
       return lookUpFrom(Child.getValue(), Position, Kind);

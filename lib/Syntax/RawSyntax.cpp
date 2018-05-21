@@ -225,7 +225,7 @@ bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
     }
   } else {
     for (auto &Child: getLayout()) {
-      if (!Child)
+      if (!Child || Child->isMissing())
         continue;
       if (Child->accumulateLeadingTrivia(Pos))
         return true;
