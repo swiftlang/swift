@@ -326,14 +326,11 @@ void ConformanceState::verify() const {
   // Iterate over all of the sections and verify all of the protocol
   // descriptors.
   auto &Self = const_cast<ConformanceState &>(*this);
-  Self.SectionsToScan.read([](const ConformanceSection *ptr, size_t count) -> char {
-    for (size_t i = 0; i < count; i++) {
-      for (const auto &Record : ptr[i]) {
-        Record.get()->verify();
-      }
+  for (const auto &Section : Self.SectionsToScan.snapshot()) {
+    for (const auto &Record : Section) {
+      Record.get()->verify();
     }
-    return 0;
-  });
+  }
 }
 #endif
 
@@ -445,7 +442,7 @@ recur:
       }
 
       // Check if the negative cache entry is up-to-date.
-      if (Value->getFailureGeneration() == C.SectionsToScan.count()) {
+      if (Value->getFailureGeneration() == C.SectionsToScan.snapshot().count()) {
         // Negative cache entry is up-to-date. Return failure along with
         // the original query type's own cache entry, if we found one.
         // (That entry may be out of date but the caller still has use for it.)
@@ -546,100 +543,94 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   auto failureEntry = FoundConformance.failureEntry;
 
   // Prepare to scan conformance records.
-  size_t scannedCount;
-  auto returnNull = C.SectionsToScan
-    .read([&](const ConformanceSection *ptr, size_t count) -> bool {
-    scannedCount = count;
-    // Scan only sections that were not scanned yet.
-    // If we found an out-of-date negative cache entry,
-    // we need not to re-scan the sections that it covers.
-    auto startIndex = failureEntry ? failureEntry->getFailureGeneration() : 0;
-    auto endIndex = count;
+  auto snapshot = C.SectionsToScan.snapshot();
   
-    // If there are no unscanned sections outstanding
-    // then we can cache failure and give up now.
-    if (startIndex == endIndex) {
-      C.cacheFailure(type, protocol, count);
-      return true;
+  // Scan only sections that were not scanned yet.
+  // If we found an out-of-date negative cache entry,
+  // we need not to re-scan the sections that it covers.
+  auto startIndex = failureEntry ? failureEntry->getFailureGeneration() : 0;
+  auto endIndex = snapshot.count();
+
+  // If there are no unscanned sections outstanding
+  // then we can cache failure and give up now.
+  if (startIndex == endIndex) {
+    C.cacheFailure(type, protocol, snapshot.count());
+    return nullptr;
+  }
+
+  /// Local function to retrieve the witness table and record the result.
+  auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
+                                const Metadata *type) {
+    switch (descriptor.getConformanceKind()) {
+    case ConformanceFlags::ConformanceKind::WitnessTable:
+      // If the record provides a nondependent witness table for all
+      // instances of a generic type, cache it for the generic pattern.
+      C.cacheSuccess(type, protocol, descriptor.getStaticWitnessTable());
+      return;
+
+    case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
+      // If the record provides a dependent witness table accessor,
+      // cache the result for the instantiated type metadata.
+      C.cacheSuccess(type, protocol, descriptor.getWitnessTable(type));
+      return;
+
+    case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
+      auto witnessTable = descriptor.getWitnessTable(type);
+      if (witnessTable)
+        C.cacheSuccess(type, protocol, witnessTable);
+      else
+        C.cacheFailure(type, protocol, snapshot.count());
+      return;
+    }
     }
 
-    /// Local function to retrieve the witness table and record the result.
-    auto recordWitnessTable = [&](const ProtocolConformanceDescriptor &descriptor,
-                                  const Metadata *type) {
-      switch (descriptor.getConformanceKind()) {
-      case ConformanceFlags::ConformanceKind::WitnessTable:
-        // If the record provides a nondependent witness table for all
-        // instances of a generic type, cache it for the generic pattern.
-        C.cacheSuccess(type, protocol, descriptor.getStaticWitnessTable());
-        return;
+    // Always fail, because we cannot interpret a future conformance
+    // kind.
+    C.cacheFailure(type, protocol, snapshot.count());
+  };
 
-      case ConformanceFlags::ConformanceKind::WitnessTableAccessor:
-        // If the record provides a dependent witness table accessor,
-        // cache the result for the instantiated type metadata.
-        C.cacheSuccess(type, protocol, descriptor.getWitnessTable(type));
-        return;
+  // Really scan conformance records.
+  for (size_t i = startIndex; i < endIndex; i++) {
+    auto &section = snapshot.Start[i];
+    // Eagerly pull records for nondependent witnesses into our cache.
+    for (const auto &record : section) {
+      auto &descriptor = *record.get();
 
-      case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
-        auto witnessTable = descriptor.getWitnessTable(type);
-        if (witnessTable)
-          C.cacheSuccess(type, protocol, witnessTable);
-        else
-          C.cacheFailure(type, protocol, count);
-        return;
-      }
-      }
+      // If the record applies to a specific type, cache it.
+      if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
+        auto P = descriptor.getProtocol();
 
-      // Always fail, because we cannot interpret a future conformance
-      // kind.
-      C.cacheFailure(type, protocol, count);
-    };
+        // Look for an exact match.
+        if (protocol != P)
+          continue;
 
-    // Really scan conformance records.
-    for (size_t i = startIndex; i < endIndex; i++) {
-      auto &section = ptr[i];
-      // Eagerly pull records for nondependent witnesses into our cache.
-      for (const auto &record : section) {
-        auto &descriptor = *record.get();
+        if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
+          continue;
 
-        // If the record applies to a specific type, cache it.
-        if (auto metadata = descriptor.getCanonicalTypeMetadata()) {
-          auto P = descriptor.getProtocol();
+        // Record the witness table.
+        recordWitnessTable(descriptor, metadata);
 
-          // Look for an exact match.
-          if (protocol != P)
-            continue;
+      // TODO: "Nondependent witness table" probably deserves its own flag.
+      // An accessor function might still be necessary even if the witness table
+      // can be shared.
+      } else if (descriptor.getTypeKind()
+                   == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
+                 descriptor.getTypeKind()
+                  == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
+        auto R = descriptor.getTypeContextDescriptor();
+        auto P = descriptor.getProtocol();
 
-          if (!isRelatedType(type, metadata, /*candidateIsMetadata=*/true))
-            continue;
+        // Look for an exact match.
+        if (protocol != P)
+          continue;
 
-          // Record the witness table.
-          recordWitnessTable(descriptor, metadata);
+        if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
+          continue;
 
-        // TODO: "Nondependent witness table" probably deserves its own flag.
-        // An accessor function might still be necessary even if the witness table
-        // can be shared.
-        } else if (descriptor.getTypeKind()
-                     == TypeMetadataRecordKind::DirectNominalTypeDescriptor ||
-                   descriptor.getTypeKind()
-                    == TypeMetadataRecordKind::IndirectNominalTypeDescriptor) {
-          auto R = descriptor.getTypeContextDescriptor();
-          auto P = descriptor.getProtocol();
-
-          // Look for an exact match.
-          if (protocol != P)
-            continue;
-
-          if (!isRelatedType(type, R, /*candidateIsMetadata=*/false))
-            continue;
-
-          recordWitnessTable(descriptor, type);
-        }
+        recordWitnessTable(descriptor, type);
       }
     }
-    return false;
-  });
-  
-  if (returnNull) return nullptr;
+  }
   
   // Conformance scan is complete.
   // Search the cache once more, and this time update the cache if necessary.
@@ -648,7 +639,7 @@ swift_conformsToProtocolImpl(const Metadata * const type,
   if (FoundConformance.isAuthoritative) {
     return FoundConformance.witnessTable;
   } else {
-    C.cacheFailure(type, protocol, scannedCount);
+    C.cacheFailure(type, protocol, snapshot.count());
     return nullptr;
   }
 }
@@ -657,19 +648,15 @@ const TypeContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
-  return C.SectionsToScan
-    .read([&](const ConformanceSection *ptr, size_t count) -> const TypeContextDescriptor * {
-    for (size_t i = 0; i < count; i++) {
-      auto &section = ptr[i];
-      for (const auto &record : section) {
-        if (auto ntd = record->getTypeContextDescriptor()) {
-          if (_contextDescriptorMatchesMangling(ntd, node))
-            return ntd;
-        }
+  for (auto &section : C.SectionsToScan.snapshot()) {
+    for (const auto &record : section) {
+      if (auto ntd = record->getTypeContextDescriptor()) {
+        if (_contextDescriptorMatchesMangling(ntd, node))
+          return ntd;
       }
     }
-    return nullptr;
-  });
+  }
+  return nullptr;
 }
 
 /// Resolve a reference to a generic parameter to type metadata.
