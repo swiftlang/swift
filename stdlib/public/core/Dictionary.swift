@@ -4074,7 +4074,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   @inlinable // FIXME(sil-serialize-all)
   internal mutating func _nativeLargeRemoveObject(forKey key: Key) -> Value? {
     var idealBucket = asNative._bucket(key)
-    var (index, found) = asNative._find(key)
+    var (index, found) = asNative._find(key, startBucket: idealBucket)
 
     // Fast path: if the key is not present, we will not mutate the set,
     // so don't force unique buffer.
