@@ -2603,7 +2603,7 @@ bool RefactoringActionLocalizeString::performChange() {
 }
 
 void processParameters(ArrayRef<const ParameterList *> allParamsList, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
-    //-----[Start] This section processes parameters -----
+    
     SmallVector<ParamDecl *, 5> allParamDecls;
     for (auto paramLists : allParamsList) {
         auto paramDecls = paramLists->getArray();
@@ -2632,9 +2632,22 @@ void processParameters(ArrayRef<const ParameterList *> allParamsList, swift::Sou
         EditConsumer.accept(SM, startLocation, parameterName);
         EditConsumer.accept(SM, startLocation, "#>\n");
     }
-    //-----[End] This section processes parameters -----
+    
+}
+
+void processReturn(Type returnType, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
+    if (returnType.isNull()) return;
+    
+    EditConsumer.accept(SM, startLocation, "///\n///  - Returns: <#");
+    EditConsumer.accept(SM, startLocation, returnType.getString());
+    EditConsumer.accept(SM, startLocation, "#>\n");
+
 }
     
+void processThrows(swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
+    EditConsumer.accept(SM, startLocation, "///\n///  - Throws: <#Throws#>\n");
+}
+
 void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
     
     if (funcDecl == nullptr) return;
@@ -2643,21 +2656,12 @@ void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLoc
     
     processParameters(funcDecl->getParameterLists(), startLocation, EditConsumer, SM);
     
-    //-----[Start] This section processes throws -----
     if (funcDecl->hasThrows()) {
-        EditConsumer.accept(SM, startLocation, "///\n///  - Throws: <#Throws#>\n");
+        processThrows(startLocation, EditConsumer, SM);
     }
-    //-----[End] This section processes throws -----
     
-    //-----[Start] This section processes return type -----
     Type returnType = funcDecl->getReturnTypeLoc().getType();
-    if (!returnType.isNull()) {
-        EditConsumer.accept(SM, startLocation, "///\n///  - Returns: <#");
-        EditConsumer.accept(SM, startLocation, returnType.getString());
-        EditConsumer.accept(SM, startLocation, "#>\n");
-    }
-    
-    //-----[End] This section processes return type -----
+    processReturn(returnType, startLocation, EditConsumer, SM);
     
     EditConsumer.accept(SM, startLocation,"///\n");
 }
@@ -2674,6 +2678,12 @@ void generateDocCommentForConstructor(ConstructorDecl *constructorDecl, swift::S
     ArrayRef<const ParameterList *> allParamsList(allParams);
     
     processParameters(allParamsList, startLocation, EditConsumer, SM);
+    
+    if(constructorDecl->hasThrows()) {
+        processThrows(startLocation, EditConsumer, SM);
+    }
+    
+    EditConsumer.accept(SM, startLocation,"///\n");
 
 }
     
