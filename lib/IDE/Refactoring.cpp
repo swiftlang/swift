@@ -2602,15 +2602,10 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
-void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
-    
-    if (funcDecl == nullptr) return;
-    
-    EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
-    
+void processParameters(ArrayRef<const ParameterList *> allParamsList, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
     //-----[Start] This section processes parameters -----
     SmallVector<ParamDecl *, 5> allParamDecls;
-    for (auto paramLists : funcDecl->getParameterLists()) {
+    for (auto paramLists : allParamsList) {
         auto paramDecls = paramLists->getArray();
         for(auto paramDecl : paramDecls) {
             allParamDecls.push_back(paramDecl);
@@ -2638,6 +2633,15 @@ void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLoc
         EditConsumer.accept(SM, startLocation, "#>\n");
     }
     //-----[End] This section processes parameters -----
+}
+    
+void generateDocCommentForFunction(FuncDecl *funcDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
+    
+    if (funcDecl == nullptr) return;
+    
+    EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
+    
+    processParameters(funcDecl->getParameterLists(), startLocation, EditConsumer, SM);
     
     //-----[Start] This section processes throws -----
     if (funcDecl->hasThrows()) {
@@ -2662,7 +2666,15 @@ void generateDocCommentForConstructor(ConstructorDecl *constructorDecl, swift::S
     
     if(constructorDecl == nullptr) return;
     
-    assert(false);
+    EditConsumer.accept(SM, startLocation, "/// <#Initializer Summary#>\n");
+    
+    //This extra step is needed for initializers to ensure the param
+    //self is not added to the documentation
+    ParameterList * allParams = constructorDecl->getParameters();
+    ArrayRef<const ParameterList *> allParamsList(allParams);
+    
+    processParameters(allParamsList, startLocation, EditConsumer, SM);
+
 }
     
 bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
