@@ -1801,6 +1801,7 @@ internal class _RawNativeDictionaryStorage
   internal final var values: UnsafeMutableRawPointer
 
   @usableFromInline // FIXME(sil-serialize-all)
+  @nonobjc
   internal final var seed: (UInt64, UInt64)
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
