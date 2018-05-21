@@ -927,12 +927,13 @@ static void addValueWitness(IRGenModule &IGM,
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
       assert(packing == FixedPacking::OffsetZero ||
              packing == FixedPacking::Allocate);
-      bool fitsInlineBuffer = packing == FixedPacking::OffsetZero;
+      bool isInline = packing == FixedPacking::OffsetZero;
       bool isBitwiseTakable =
           fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+      assert(isBitwiseTakable || !isInline);
       flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                   .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
-                  .withInlineStorage(fitsInlineBuffer && isBitwiseTakable)
+                  .withInlineStorage(isInline)
                   .withExtraInhabitants(
                       fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
                   .withBitwiseTakable(isBitwiseTakable);
