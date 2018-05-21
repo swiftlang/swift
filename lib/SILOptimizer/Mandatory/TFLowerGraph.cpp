@@ -1348,8 +1348,8 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
     return true;
 
   if (isTopLevelFunction) {
-    const std::string funcName = name.str();
-    const std::string funcNodeName = "tfc_func_" + funcName;
+    std::string funcName = name.str();
+    std::string funcNodeName = "tfc_func_" + funcName;
     TF_OperationDescription *funcDesc =
         TF_NewOperation(resultGraph, /*op_type*/ funcName.c_str(),
                         /*op_name*/ funcNodeName.c_str());
@@ -1435,6 +1435,8 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
 
   // Create the graph function for the top level code.
   auto fnName = graphGen.SILFn->getName();
+  if (fnName.startswith("$"))
+    fnName = fnName.substr(1);
   if (graphGen.buildGraphFunction(graphFnBody, fnName, /*isTopLevelFunction*/true))
     return {};
 
