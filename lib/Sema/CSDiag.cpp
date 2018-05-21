@@ -5399,7 +5399,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   auto argExpr = typeCheckChildIndependently(callExpr->getArg(),
                                              Type(), CTP_CallArgument);
   if (!argExpr)
-    return false;
+    return CS.TC.Diags.hadAnyError();
 
   SmallVector<Identifier, 2> scratch;
   ArrayRef<Identifier> argLabels = callExpr->getArgumentLabels(scratch);
