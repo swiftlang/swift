@@ -553,7 +553,7 @@ int parseFile(const char *MainExecutablePath, const StringRef InputFileName,
     }
     SyntaxCache = new SyntaxParsingCache(OldSyntaxTree.getValue());
 
-    SyntaxCache->recordReuseInformation();
+    SyntaxCache->setRecordReuseInformation();
 
     if (options::OldSourceFilename.empty()) {
       llvm::errs() << "The old syntax file must be provided to translate "

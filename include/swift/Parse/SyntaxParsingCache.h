@@ -80,7 +80,7 @@ public:
   llvm::Optional<Syntax> lookUp(size_t NewPosition, SyntaxKind Kind);
 
   /// Turn recording of reused ranges on
-  void recordReuseInformation() { RecordReuseInformation = true; }
+  void setRecordReuseInformation() { RecordReuseInformation = true; }
 
   /// Return the ranges of the new source file that have been successfully
   /// looked up in this cache as a (start, end) pair of byte offsets in the
