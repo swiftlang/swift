@@ -186,7 +186,7 @@ EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
 // SWIFT_ENABLE_TENSORFLOW
 EXPR(Gradient, Expr)
-LAST_EXPR(Gradient)
+LAST_EXPR(KeyPathDot)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR

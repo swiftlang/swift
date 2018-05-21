@@ -5,4 +5,4 @@ let a = "a"
 let b = "b"
 let c = 42
 _ = "a=" + a + ";b=" + b + ";c=" + c
-// expected-error@-1 {{reasonable time}}
+// expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
