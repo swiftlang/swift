@@ -774,6 +774,9 @@ class SwiftDocumentSyntaxInfo {
   unsigned BufferID;
   std::vector<std::string> Args;
   std::string PrimaryFile;
+  /// Whether or not the AST stored in the source file is up-to-date or just an
+  /// artifact of incremental syntax parsing
+  bool HasUpToDateAST;
 
 public:
   SwiftDocumentSyntaxInfo(const CompilerInvocation &CompInv,
@@ -798,6 +801,10 @@ public:
     );
 
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
+
+    // If there is a syntax parsing cache, incremental syntax parsing is
+    // performed and thus the generated AST may not be up-to-date.
+    HasUpToDateAST = CompInv.getMainFileSyntaxParsingCache() == nullptr;
   }
 
   void parse() {
@@ -825,6 +832,8 @@ public:
   SourceManager &getSourceManager() {
     return SM;
   }
+
+  bool hasUpToDateAST() { return HasUpToDateAST; }
 
   ArrayRef<DiagnosticEntryInfo> getDiagnostics() {
     return DiagConsumer.getDiagnosticsForBuffer(BufferID);
@@ -2018,6 +2027,10 @@ unsigned SwiftEditorDocument::getBufferID() const {
 
 std::string SwiftEditorDocument::getFilePath() const { return Impl.FilePath; }
 
+bool SwiftEditorDocument::hasUpToDateAST() const {
+  return Impl.SyntaxInfo->hasUpToDateAST();
+}
+
 void SwiftEditorDocument::formatText(unsigned Line, unsigned Length,
                                      EditorConsumer &Consumer) {
   auto SyntaxInfo = Impl.getSyntaxInfo();
@@ -2440,6 +2453,13 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
   if (!EditorDoc) {
     Consumer.handleRequestError("No associated Editor Document");
     return;
+  }
+
+  if (!EditorDoc->hasUpToDateAST()) {
+    // An up-to-date AST is needed for formatting. If it does not exist, fall
+    // back to a full reparse of the file
+    EditorDoc->parse(EditorDoc->getLatestSnapshot(), *this,
+                     /*BuildSyntaxTree=*/true);
   }
 
   EditorDoc->formatText(Line, Length, Consumer);

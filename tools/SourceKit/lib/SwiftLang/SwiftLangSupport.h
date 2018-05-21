@@ -117,6 +117,10 @@ public:
   unsigned getBufferID() const;
 
   std::string getFilePath() const;
+
+  /// Whether or not the AST stored for this document is up-to-date or just an
+  /// artifact of incremental syntax parsing
+  bool hasUpToDateAST() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
