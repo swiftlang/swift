@@ -386,35 +386,6 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
-void ClangImporter::Implementation::forEachDistinctName(
-    const clang::NamedDecl *decl,
-    llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
-  using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
-  SmallVector<ImportNameKey, 8> seenNames;
-
-  ImportedName newName = importFullName(decl, CurrentVersion);
-  ImportNameKey key(newName, newName.getEffectiveContext());
-  if (action(newName, CurrentVersion))
-    seenNames.push_back(key);
-
-  CurrentVersion.forEachOtherImportNameVersion(
-      [&](ImportNameVersion nameVersion) {
-    // Check to see if the name is different.
-    ImportedName newName = importFullName(decl, nameVersion);
-    ImportNameKey key(newName, newName.getEffectiveContext());
-    bool seen = llvm::any_of(seenNames,
-                             [&key](const ImportNameKey &existing) -> bool {
-      if (key.first != existing.first)
-        return false;
-      return key.second.equalsWithoutResolving(existing.second);
-    });
-    if (seen)
-      return;
-    if (action(newName, nameVersion))
-      seenNames.push_back(key);
-  });
-}
-
 // Build the init(rawValue:) initializer for an imported NS_ENUM.
 //   enum NSSomeEnum: RawType {
 //     init?(rawValue: RawType) {
@@ -2167,7 +2138,9 @@ namespace {
         if (canonicalVersion != getActiveSwiftVersion()) {
           auto activeName = Impl.importFullName(D, getActiveSwiftVersion());
           if (activeName &&
-              activeName.getDeclName() == canonicalName.getDeclName()) {
+              activeName.getDeclName() == canonicalName.getDeclName() &&
+              activeName.getEffectiveContext().equalsWithoutResolving(
+                  canonicalName.getEffectiveContext())) {
             return ImportedName();
           }
         }
@@ -2184,7 +2157,9 @@ namespace {
       if (!alternateName)
         return ImportedName();
 
-      if (alternateName.getDeclName() == canonicalName.getDeclName()) {
+      if (alternateName.getDeclName() == canonicalName.getDeclName() &&
+          alternateName.getEffectiveContext().equalsWithoutResolving(
+              canonicalName.getEffectiveContext())) {
         if (getVersion() == getActiveSwiftVersion()) {
           assert(canonicalVersion != getActiveSwiftVersion());
           return alternateName;
