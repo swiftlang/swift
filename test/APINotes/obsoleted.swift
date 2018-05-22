@@ -6,3 +6,6 @@ import ObsoletedAPINotesTest
 
 let _: FooID // expected-error{{'FooID' has been renamed to 'Foo_ID'}}
 let _: Foo_ID
+
+let _: BarContainerOld.Sub // expected-error{{'Sub' has been renamed to 'BarContainerCanonical.Sub'}}
+let _: BarContainerCanonical.Sub

@@ -1636,37 +1636,30 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
-  if (auto importedName = nameImporter.importName(named, currentVersion)) {
-    SmallPtrSet<DeclName, 8> distinctNames;
-    distinctNames.insert(importedName.getDeclName());
-    table.addEntry(importedName.getDeclName(), named,
-                   importedName.getEffectiveContext());
+  auto failed = nameImporter.forEachDistinctImportName(
+      named, currentVersion,
+      [&](ImportedName importedName, ImportNameVersion version) {
+        table.addEntry(importedName.getDeclName(), named,
+                       importedName.getEffectiveContext());
 
-    // Also add the subscript entry, if needed.
-    if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(nameImporter.getContext(),
-                              DeclBaseName::createSubscript(),
-                              ArrayRef<Identifier>()),
-                     named, importedName.getEffectiveContext());
+        // Also add the subscript entry, if needed.
+        if (version == currentVersion && importedName.isSubscriptAccessor()) {
+          table.addEntry(DeclName(nameImporter.getContext(),
+                                  DeclBaseName::createSubscript(),
+                                  {Identifier()}),
+                         named, importedName.getEffectiveContext());
+        }
 
-    currentVersion.forEachOtherImportNameVersion(
-        [&](ImportNameVersion alternateVersion) {
-      auto alternateName = nameImporter.importName(named, alternateVersion);
-      if (!alternateName)
+        return true;
+      });
+  if (failed) {
+    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+      // If the category is invalid, don't add it.
+      if (category->isInvalidDecl())
         return;
-      // FIXME: What if the DeclNames are the same but the contexts are
-      // different?
-      if (distinctNames.insert(alternateName.getDeclName()).second) {
-        table.addEntry(alternateName.getDeclName(), named,
-                       alternateName.getEffectiveContext());
-      }
-    });
-  } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
-    // If the category is invalid, don't add it.
-    if (category->isInvalidDecl())
-      return;
 
-    table.addCategory(category);
+      table.addCategory(category);
+    }
   }
 
   // Walk the members of any context that can have nested members.
@@ -1867,4 +1860,3 @@ SwiftNameLookupExtension::createExtensionReader(
   // Return the new reader.
   return std::move(tableReader);
 }
-
