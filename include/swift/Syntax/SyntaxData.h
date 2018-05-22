@@ -132,6 +132,7 @@ class SyntaxData final
     return {getTrailingObjects<AtomicCache<SyntaxData>>(), getNumChildren()};
   }
 
+public:
   /// Get the node immediately before this current node. Return 0 if we cannot
   /// find such node.
   RC<SyntaxData> getPreviousNode() const;
@@ -140,10 +141,9 @@ class SyntaxData final
   /// find such node.
   RC<SyntaxData> getNextNode() const;
 
-  /// Get the absolute position without skipping the leading trivia of this node.
-  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
+  /// Get the first token node in this tree
+  RC<SyntaxData> getFirstToken() const;
 
-public:
   ~SyntaxData() {
     for (auto &I : getChildren())
       I.~AtomicCache<SyntaxData>();
@@ -257,6 +257,10 @@ public:
   /// next node if populated.
   AbsolutePosition getAbsoluteEndPosition() const;
 
+  /// Get the absolute position without skipping the leading trivia of this
+  /// node.
+  AbsolutePosition getAbsolutePositionWithLeadingTrivia() const;
+
   /// Returns true if the data node represents type syntax.
   bool isType() const;
 
@@ -278,6 +282,9 @@ public:
   /// Dump a debug description of the syntax data for debugging to
   /// standard error.
   void dump(llvm::raw_ostream &OS) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only meant for use in the debugger");
 };
 
 } // end namespace syntax

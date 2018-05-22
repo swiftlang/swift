@@ -871,6 +871,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+    MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     bool Done;
     do {

@@ -49,7 +49,10 @@ bool SyntaxData::isUnknown() const {
 
 void SyntaxData::dump(llvm::raw_ostream &OS) const {
   Raw->dump(OS, 0);
+  OS << '\n';
 }
+
+void SyntaxData::dump() const { dump(llvm::errs()); }
 
 RC<SyntaxData> SyntaxData::getPreviousNode() const {
   if (size_t N = getIndexInParent()) {
@@ -76,6 +79,21 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
     return Parent->getNextNode();
   }
   return nullptr;
+}
+
+RC<SyntaxData> SyntaxData::getFirstToken() const {
+  for (size_t I = 0, E = getNumChildren(); I < E; ++I) {
+    if (auto Child = getChild(I)) {
+      if (!Child->getRaw()->isMissing()) {
+        return Child->getFirstToken();
+      }
+    }
+  }
+
+  // Get a reference counted version of this
+  assert(getRaw()->isToken() && "Leaf node that is no token?");
+  assert(hasParent() && "The syntax tree should not conisist only of the root");
+  return getParent()->getChild(getIndexInParent());
 }
 
 AbsolutePosition SyntaxData::getAbsolutePositionWithLeadingTrivia() const {
