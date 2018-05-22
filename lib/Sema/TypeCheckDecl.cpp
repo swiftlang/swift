@@ -3000,7 +3000,11 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
       return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
                                                  /*Implicit=*/true);
     }
-    
+    // If the prevValue is not a well-typed integer, then break.
+    // This could happen if the literal value overflows _MaxBuiltinIntegerType.
+    if (!prevValue->getType())
+      return nullptr;
+
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
       APInt nextVal = intLit->getValue() + 1;
       bool negative = nextVal.slt(0);
