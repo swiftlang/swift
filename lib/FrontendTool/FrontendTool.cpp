@@ -61,6 +61,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "swift/TBDGen/TBDGen.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -775,9 +776,11 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
                          : Invocation.getFrontendOptions().TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
-                  installName);
+  TBDGenOptions opts;
+  opts.InstallName = installName;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+
+  return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -1147,12 +1150,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  const auto hasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  TBDGenOptions opts;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
-  return MSF.is<SourceFile *>() ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols)
-                                : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols);
+  return MSF.is<SourceFile *>()
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,

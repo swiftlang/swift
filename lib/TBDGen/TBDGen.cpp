@@ -334,14 +334,13 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
-                                           bool hasMultipleIGMs,
                                            llvm::raw_ostream *os,
-                                           StringRef installName) {
+                                           TBDGenOptions &opts) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, hasMultipleIGMs, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
 
-  TBDGenVisitor visitor(symbols, target, linkInfo, M, installName);
+  TBDGenVisitor visitor(symbols, target, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     SmallVector<Decl *, 16> decls;
@@ -376,18 +375,16 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
+                                   TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
-                                 hasMultipleIGMs, nullptr, StringRef());
+                                 nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, nullptr,
-                                 StringRef());
+                                   TBDGenOptions &opts) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         bool hasMultipleIGMs, StringRef installName) {
+                         TBDGenOptions &opts) {
   StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, &os,
-                                 installName);
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, &os, opts);
 }
