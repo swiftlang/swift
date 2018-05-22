@@ -2455,6 +2455,15 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
         results.push_back(extension);
     }
 
+    auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
+      for (auto importedDC = importedDecl->getDeclContext();
+           !importedDC->isModuleContext();
+           importedDC = importedDC->getParent()) {
+        if (auto ext = dyn_cast<ExtensionDecl>(importedDC))
+          return ext;
+      }
+      return nullptr;
+    };
     // Retrieve all of the globals that will be mapped to members.
 
     // FIXME: Since we don't represent Clang submodules as Swift
@@ -2462,21 +2471,33 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl =
-          owner.importDecl(decl, owner.CurrentVersion);
+      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
-      ExtensionDecl *ext = nullptr;
-      for (auto importedDC = importedDecl->getDeclContext();
-           !importedDC->isModuleContext();
-           importedDC = importedDC->getParent()) {
-        ext = dyn_cast<ExtensionDecl>(importedDC);
-        if (ext) break;
-      }
-      if (!ext) continue;
+      ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
+        results.push_back(ext);
 
-      if (knownExtensions.insert(ext).second)
+      // If this is a compatibility typealias, the canonical type declaration
+      // may exist in another extension.
+      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+      if (!alias || !alias->isCompatibilityAlias()) continue;
+
+      auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
+      ext = nullptr;
+      importedDecl = nullptr;
+
+      // Note: We can't use getAnyGeneric() here because `aliasedTy`
+      // might be typealias.
+      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      if (!importedDecl) continue;
+
+      ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
     }
   }
