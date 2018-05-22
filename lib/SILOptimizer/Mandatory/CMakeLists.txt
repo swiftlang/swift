@@ -16,4 +16,6 @@ set(MANDATORY_SOURCES
   Mandatory/PredictableMemOpt.cpp
   Mandatory/SemanticARCOpts.cpp
   Mandatory/ClosureLifetimeFixup.cpp
+  Mandatory/RawSILInstLowering.cpp
+  Mandatory/MandatoryOptUtils.cpp
   PARENT_SCOPE)
