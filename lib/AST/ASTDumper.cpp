@@ -1662,6 +1662,7 @@ public:
     Indent += 2;
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
+    PrintWithColorRAII(OS, ExprColor) << label;
     OS << '\n';
     printRec(E);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
@@ -1719,6 +1720,15 @@ public:
       OS << " trailing_semi";
 
     return OS;
+  }
+  
+  void printSemanticExpr(Expr * semanticExpr) {
+    if (semanticExpr == nullptr) {
+      return;
+    }
+    
+    OS << '\n';
+    printRecLabeled(semanticExpr, "semantic_expr");
   }
 
   void visitErrorExpr(ErrorExpr *E) {
@@ -1780,6 +1790,7 @@ public:
       OS << '\n';
       printRec(Segment);
     }
+    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1803,6 +1814,7 @@ public:
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
+    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -1955,20 +1967,16 @@ public:
       OS << '\n';
       printRec(elt);
     }
+    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
-    if (auto semaE = E->getSemanticExpr()) {
-      OS << '\n';
-      printRec(semaE);
-      PrintWithColorRAII(OS, ParenthesisColor) << ')';
-      return;
-    }
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
     }
+    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
@@ -2468,6 +2476,7 @@ public:
       OS << '\n';
       printRec(ExpTyR);
     }
+    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {
