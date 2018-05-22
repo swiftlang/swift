@@ -2837,8 +2837,8 @@ bool ASTContext::diagnoseObjCUnsatisfiedOptReqConflicts(SourceFile &sf) {
                    true,
                    classDecl->getFullName(),
                    protocolName);
-    Diags.diagnose(req, diag::protocol_requirement_here,
-                   reqDiagInfo.second);
+    Diags.diagnose(req, diag::kind_declname_declared_here,
+                   DescriptiveDeclKind::Requirement, reqDiagInfo.second);
 
     anyDiagnosed = true;
   }

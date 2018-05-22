@@ -1738,11 +1738,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
             TC.diagnose(behavior->getLoc(),
                         diag::property_behavior_protocol_reqt_ambiguous,
                         TC.Context.Id_value);
-            TC.diagnose(valueProp->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(valueProp->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
-            TC.diagnose(foundVar->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(foundVar->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
             break;
           }
