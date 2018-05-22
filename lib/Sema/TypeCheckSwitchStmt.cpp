@@ -377,18 +377,14 @@ namespace {
 
           // (_ : Ty1) <= (_ : Ty2) iff D(Ty1) == D(Ty2)
           if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> disjuncts;
-            decompose(TC, DC, this->getType(), disjuncts);
-            Space or1Space = Space::forDisjunct(disjuncts);
+            Space or1Space = decompose(TC, DC, this->getType());
             if (or1Space.isSubspace(other, TC, DC)) {
               return true;
             }
           }
 
           if (canDecompose(other.getType(), DC)) {
-            SmallVector<Space, 4> disjuncts;
-            decompose(TC, DC, other.getType(), disjuncts);
-            Space or2Space = Space::forDisjunct(disjuncts);
+            Space or2Space = decompose(TC, DC, other.getType());
             return this->isSubspace(or2Space, TC, DC);
           }
 
@@ -406,17 +402,13 @@ namespace {
           if (!canDecompose(this->getType(), DC)) {
             return false;
           }
-          SmallVector<Space, 4> disjuncts;
-          decompose(TC, DC, this->getType(), disjuncts);
-          Space or1Space = Space::forDisjunct(disjuncts);
+          Space or1Space = decompose(TC, DC, this->getType());
           return or1Space.isSubspace(other, TC, DC);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           // (_ : Ty1) <= H(p1 | ... | pn) iff D(Ty1) <= H(p1 | ... | pn)
           if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> disjuncts;
-            decompose(TC, DC, this->getType(), disjuncts);
-            Space or1Space = Space::forDisjunct(disjuncts);
+            Space or1Space = decompose(TC, DC, this->getType());
             return or1Space.isSubspace(other, TC, DC);
           }
           // An undecomposable type is always larger than its constructor space.
@@ -544,24 +536,18 @@ namespace {
           if (this->getType()->isEqual(other.getType())) {
             return other;
           } else if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            decompose(TC, DC, this->getType(), spaces);
-            auto decomposition = Space::forDisjunct(spaces);
+            auto decomposition = decompose(TC, DC, this->getType());
             return intersect(decomposition, other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            decompose(TC, DC, other.getType(), spaces);
-            auto disjunctSp = Space::forDisjunct(spaces);
-            return intersect(*this, disjunctSp, TC, DC);
+            auto decomposition = decompose(TC, DC, other.getType());
+            return intersect(*this, decomposition, TC, DC);
           } else {
             return other;
           }
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            decompose(TC, DC, this->getType(), spaces);
-            auto decomposition = Space::forDisjunct(spaces);
+            auto decomposition = decompose(TC, DC, this->getType());
             return intersect(decomposition, other, TC, DC);
           } else {
             return other;
@@ -620,8 +606,8 @@ namespace {
           return Space::forDisjunct(paramSpace);
         }
 
-        PAIRCASE(SpaceKind::UnknownCase, SpaceKind::Type):
-        PAIRCASE(SpaceKind::UnknownCase, SpaceKind::Constructor):
+        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
+        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
           return intersect(other, *this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
           if (other.isAllowedButNotRequired())
@@ -637,10 +623,8 @@ namespace {
           }
 
           if (canDecompose(other.getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            decompose(TC, DC, other.getType(), spaces);
-            auto disjunctSp = Space::forDisjunct(spaces);
-            return intersect(*this, disjunctSp, TC, DC);
+            auto decomposition = decompose(TC, DC, other.getType());
+            return intersect(*this, decomposition, TC, DC);
           }
           return Space();
         }
@@ -693,23 +677,18 @@ namespace {
           if (this->getType()->isEqual(other.getType())) {
             return Space();
           } else if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            this->decompose(TC, DC, this->getType(), spaces);
-            return intersect(Space::forDisjunct(spaces), other, TC, DC);
+            auto decomposition = decompose(TC, DC, this->getType());
+            return intersect(decomposition, other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            this->decompose(TC, DC, other.getType(), spaces);
-            auto decomp = Space::forDisjunct(spaces);
-            return intersect(*this, decomp, TC, DC);
+            auto decomposition = decompose(TC, DC, other.getType());
+            return intersect(*this, decomposition, TC, DC);
           }
           return Space();
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            this->decompose(TC, DC, this->getType(), spaces);
-            auto decomp = Space::forDisjunct(spaces);
-            return decomp.minus(other, TC, DC, minusCount);
+            auto decomposition = decompose(TC, DC, this->getType());
+            return decomposition.minus(other, TC, DC, minusCount);
           } else {
             return *this;
           }
@@ -854,10 +833,8 @@ namespace {
           }
 
           if (canDecompose(other.getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            this->decompose(TC, DC, other.getType(), spaces);
-            auto disjunctSp = Space::forDisjunct(spaces);
-            return this->minus(disjunctSp, TC, DC, minusCount);
+            auto decomposition = decompose(TC, DC, other.getType());
+            return this->minus(decomposition, TC, DC, minusCount);
           }
           return *this;
         }
@@ -868,9 +845,7 @@ namespace {
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
           if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            this->decompose(TC, DC, this->getType(), spaces);
-            auto orSpace = Space::forDisjunct(spaces);
+            auto orSpace = decompose(TC, DC, this->getType());
             return orSpace.minus(other, TC, DC, minusCount);
           } else {
             return *this;
@@ -1107,6 +1082,13 @@ namespace {
         } else {
           llvm_unreachable("Can't decompose type?");
         }
+      }
+
+      static Space decompose(TypeChecker &TC, const DeclContext *DC,
+                             Type type) {
+        SmallVector<Space, 4> spaces;
+        decompose(TC, DC, type, spaces);
+        return Space::forDisjunct(spaces);
       }
 
       static bool canDecompose(Type tp, const DeclContext *DC) {
