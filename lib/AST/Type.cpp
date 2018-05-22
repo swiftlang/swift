@@ -2768,14 +2768,6 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
   return FunctionType::get(input, result, getExtInfo());
 }
 
-FunctionType *
-GenericFunctionType::substGenericArgs(TypeSubstitutionFn subs,
-                                      LookupConformanceFn conformances) {
-  Type input = getInput().subst(subs, conformances);
-  Type result = getResult().subst(subs, conformances);
-  return FunctionType::get(input, result, getExtInfo());
-}
-
 static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
                                  Type origBase,
                                  Type substBase,
