@@ -501,6 +501,11 @@ namespace {
         }
       }
 
+      static Space intersect(const Space &a, const Space &b, TypeChecker &TC,
+                             const DeclContext *DC) {
+        return a.intersect(b, TC, DC).simplify(TC, DC);
+      }
+
       // Returns the intersection of this space with another.  The intersection
       // is the largest shared subspace occupied by both arguments.
       Space intersect(const Space &other, TypeChecker &TC,
@@ -519,11 +524,10 @@ namespace {
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Disjunct): {
           // S & (S1 || ... || Sn) iff (S & S1) && ... && (S & Sn)
           SmallVector<Space, 4> intersectedCases;
-          std::transform(other.getSpaces().begin(), other.getSpaces().end(),
-                         std::back_inserter(intersectedCases),
-                         [&](const Space &s) {
-            return this->intersect(s, TC, DC);
-          });
+          std::transform(
+              other.getSpaces().begin(), other.getSpaces().end(),
+              std::back_inserter(intersectedCases),
+              [&](const Space &s) { return intersect(*this, s, TC, DC); });
           return Space::forDisjunct(intersectedCases);
         }
 
@@ -533,13 +537,7 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-          SmallVector<Space, 4> intersectedCases;
-          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
-                         std::back_inserter(intersectedCases),
-                         [&](const Space &s) {
-            return s.intersect(other, TC, DC);
-          });
-          return Space::forDisjunct(intersectedCases);
+          return intersect(other, *this, TC, DC);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
           // Optimization: The intersection of equal types is that type.
@@ -549,12 +547,12 @@ namespace {
             SmallVector<Space, 4> spaces;
             decompose(TC, DC, this->getType(), spaces);
             auto decomposition = Space::forDisjunct(spaces);
-            return decomposition.intersect(other, TC, DC);
+            return intersect(decomposition, other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             SmallVector<Space, 4> spaces;
             decompose(TC, DC, other.getType(), spaces);
             auto disjunctSp = Space::forDisjunct(spaces);
-            return this->intersect(disjunctSp, TC, DC);
+            return intersect(*this, disjunctSp, TC, DC);
           } else {
             return other;
           }
@@ -564,7 +562,7 @@ namespace {
             SmallVector<Space, 4> spaces;
             decompose(TC, DC, this->getType(), spaces);
             auto decomposition = Space::forDisjunct(spaces);
-            return decomposition.intersect(other, TC, DC);
+            return intersect(decomposition, other, TC, DC);
           } else {
             return other;
           }
@@ -582,10 +580,11 @@ namespace {
 
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> newSubSpaces;
-          for (auto subSpace : this->getSpaces()) {
-            Space nextSpace = subSpace.intersect(other, TC, DC);
-            newSubSpaces.push_back(nextSpace.simplify(TC, DC));
-          }
+          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
+                         std::back_inserter(newSubSpaces),
+                         [&](const Space &subSpace) {
+                           return intersect(subSpace, other, TC, DC);
+                         });
           return Space::forConstructor(this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
                                        newSubSpaces);
@@ -609,21 +608,21 @@ namespace {
           auto j = other.getSpaces().begin();
           for (; i != this->getSpaces().end() && j != other.getSpaces().end();
                ++i, ++j) {
-            auto intersection = (*i).intersect(*j, TC, DC).simplify(TC, DC);
+            auto result = intersect(*i, *j, TC, DC);
             // If at least one of the constructor sub-spaces is empty,
             // it makes the whole space empty as well.
-            if (intersection.isEmpty()) {
+            if (result.isEmpty()) {
               return Space();
             }
-            paramSpace.push_back(intersection);
+            paramSpace.push_back(result);
           }
 
           return Space::forDisjunct(paramSpace);
         }
 
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return other.intersect(*this, TC, DC);
+        PAIRCASE(SpaceKind::UnknownCase, SpaceKind::Type):
+        PAIRCASE(SpaceKind::UnknownCase, SpaceKind::Constructor):
+          return intersect(other, *this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
           if (other.isAllowedButNotRequired())
             return other;
@@ -641,7 +640,7 @@ namespace {
             SmallVector<Space, 4> spaces;
             decompose(TC, DC, other.getType(), spaces);
             auto disjunctSp = Space::forDisjunct(spaces);
-            return this->intersect(disjunctSp, TC, DC);
+            return intersect(*this, disjunctSp, TC, DC);
           }
           return Space();
         }
@@ -651,14 +650,7 @@ namespace {
           return Space();
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> spaces;
-            decompose(TC, DC, this->getType(), spaces);
-            auto disjunctSp = Space::forDisjunct(spaces);
-            return disjunctSp.intersect(other, TC, DC);
-          } else {
-            return Space();
-          }
+          return intersect(other, *this, TC, DC);
         }
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
@@ -703,12 +695,12 @@ namespace {
           } else if (canDecompose(this->getType(), DC)) {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, this->getType(), spaces);
-            return Space::forDisjunct(spaces).intersect(other, TC, DC);
+            return intersect(Space::forDisjunct(spaces), other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             SmallVector<Space, 4> spaces;
             this->decompose(TC, DC, other.getType(), spaces);
             auto decomp = Space::forDisjunct(spaces);
-            return this->intersect(decomp, TC, DC);
+            return intersect(*this, decomp, TC, DC);
           }
           return Space();
         }
@@ -802,7 +794,7 @@ namespace {
             auto &s2 = *j;
             // If the intersection of each subspace is ever empty then the
             // two spaces are disjoint and their difference is the first space.
-            if (s1.intersect(s2, TC, DC).simplify(TC, DC).isEmpty()) {
+            if (intersect(s1, s2, TC, DC).isEmpty()) {
               return *this;
             }
 
