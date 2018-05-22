@@ -32,6 +32,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
@@ -2587,11 +2588,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     Printer.printStructurePost(PrintStructureKind::NumberLiteral);
     break;
   }
-  case ExprKind::StringLiteral:
+  case ExprKind::StringLiteral: {
     Printer.callPrintStructurePre(PrintStructureKind::StringLiteral);
-    Printer << "\"" << cast<StringLiteralExpr>(raw)->getValue() << "\"";
+    llvm::SmallString<32> str;
+    llvm::raw_svector_ostream os(str);
+    os << QuotedString(cast<StringLiteralExpr>(raw)->getValue());
+    Printer << str;
     Printer.printStructurePost(PrintStructureKind::StringLiteral);
     break;
+  }
   default:
     break; // Incorrect raw value; skip it for error recovery.
   }
