@@ -120,6 +120,12 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
 
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    // A @_cdecl("...") function has an extra symbol, with the name from the
+    // attribute.
+    addSymbol(SILDeclRef(AFD).asForeign());
+  }
+
   if (!SwiftModule->getASTContext().isSwiftVersion3())
     return;
 
@@ -216,11 +222,25 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  // The below symbols are only emitted if the class is resilient.
-  if (!CD->isResilient())
+  auto hasResilientAncestor =
+      CD->isResilient(SwiftModule, ResilienceExpansion::Minimal);
+  auto ancestor = CD->getSuperclassDecl();
+  while (ancestor && !hasResilientAncestor) {
+    hasResilientAncestor |=
+        ancestor->isResilient(SwiftModule, ResilienceExpansion::Maximal);
+    ancestor = ancestor->getSuperclassDecl();
+  }
+
+  // Types with resilient superclasses have some extra symbols.
+  if (!hasResilientAncestor)
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
+  // And classes that are themselves resilient (not just a superclass) have even
+  // more.
+  if (!CD->isResilient())
+    return;
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -300,6 +320,8 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 }
 
 void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  visitNominalTypeDecl(ED);
+
   if (!ED->isResilient())
     return;
 
