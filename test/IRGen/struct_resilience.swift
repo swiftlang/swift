@@ -170,6 +170,24 @@ public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }
 
+public func wantsAny(_ any: Any) {}
+
+public func resilientAny(s : ResilientWeakRef) {
+  wantsAny(s)
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$S17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(%swift.opaque* noalias nocapture)
+// CHECK: entry:
+// CHECK: [[ANY:%.*]] = alloca %Any
+// CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct16ResilientWeakRefVMa"(i64 0)
+// CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response %3, 0
+// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 1
+// CHECK:  store %swift.type* [[META2]], %swift.type** [[TYADDR]]
+// CHECK:  call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%Any* [[ANY]])
+// CHECK:  call swiftcc void @"$S17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable(32) [[ANY]])
+// CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
+// CHECK:  ret void
+
 // Public metadata accessor for our resilient struct
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.metadata_response @"$S17struct_resilience6MySizeVMa"
