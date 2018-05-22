@@ -182,7 +182,9 @@ private:
   PostOrderFunctionInfo *PO;
   AccessedStorageAnalysis *ASA;
 
-  /// Tracks the in-progress accesses at the end of each block.
+  /// Tracks the in-scope accesses at the end of each block, for the purpose of
+  /// finding nested conflicts.  (Out-of-scope accesses are currently only
+  /// tracked locally for the purpose of merging access scopes.)
   llvm::SmallDenseMap<SILBasicBlock *, DenseAccessSet, 32> blockOutAccess;
 
   Result result;
@@ -220,18 +222,21 @@ protected:
 class SparseAccessSet {
   AccessConflictAnalysis::Result &result;
 
-  llvm::SmallBitVector bitmask; // Most functions have < 64 accesses.
-  DenseAccessSet denseVec;
+  // Mark the in-scope accesses.
+  // (Most functions have < 64 accesses.)
+  llvm::SmallBitVector inScopeBitmask;
+  // Mark a potential conflicts on each access since the last begin/end marker.
+  llvm::SmallBitVector conflictBitmask;
+  DenseAccessSet denseVec; // Hold all local accesses seen thus far.
 
 public:
-  /// Internally, the denseVec may contain entries that have been removed from
-  /// the bitmask. Iteration checks for membership in the bitmask.
-  class Iterator {
+  /// Iterate over in-scope, conflict free access.
+  class NoNestedConflictIterator {
     const SparseAccessSet &sparseSet;
     DenseAccessSet::const_iterator denseIter;
 
   public:
-    Iterator(const SparseAccessSet &set)
+    NoNestedConflictIterator(const SparseAccessSet &set)
         : sparseSet(set), denseIter(set.denseVec.begin()) {}
 
     BeginAccessInst *next() {
@@ -240,67 +245,88 @@ public:
         BeginAccessInst *beginAccess = *denseIter;
         ++denseIter;
         unsigned sparseIndex = sparseSet.result.getAccessIndex(beginAccess);
-        if (sparseSet.bitmask[sparseIndex])
+        if (sparseSet.inScopeBitmask[sparseIndex]
+            && !sparseSet.conflictBitmask[sparseIndex]) {
           return beginAccess;
+        }
       }
       return nullptr;
     }
   };
 
   SparseAccessSet(AccessConflictAnalysis::Result &result)
-      : result(result), bitmask(result.accessMap.size()) {}
+      : result(result), inScopeBitmask(result.accessMap.size()),
+        conflictBitmask(result.accessMap.size()) {}
 
+  // All accessed in the given denseVec are presumed to be in-scope and conflict
+  // free.
   SparseAccessSet(const DenseAccessSet &denseVec,
                   AccessConflictAnalysis::Result &result)
-      : result(result), bitmask(result.accessMap.size()), denseVec(denseVec) {
+      : result(result), inScopeBitmask(result.accessMap.size()),
+        conflictBitmask(result.accessMap.size()), denseVec(denseVec) {
     for (BeginAccessInst *beginAccess : denseVec)
-      bitmask.set(result.getAccessIndex(beginAccess));
+      inScopeBitmask.set(result.getAccessIndex(beginAccess));
   }
-
-  bool isEmpty() const {
-    Iterator iterator(*this);
+  bool hasConflictFreeAccess() const {
+    NoNestedConflictIterator iterator(*this);
     return iterator.next() == nullptr;
   }
 
-  bool contains(unsigned index) const { return bitmask[index]; }
+  bool hasInScopeAccess() const {
+    return llvm::any_of(denseVec, [this](BeginAccessInst *beginAccess) {
+      unsigned sparseIndex = result.getAccessIndex(beginAccess);
+      return inScopeBitmask[sparseIndex];
+    });
+  }
+
+  bool isInScope(unsigned index) const { return inScopeBitmask[index]; }
 
   // Insert the given BeginAccessInst with its corresponding reachability index.
-  // Return true if the set was expanded.
-  bool insert(BeginAccessInst *beginAccess, unsigned index) {
-    if (bitmask[index])
-      return false;
-
-    bitmask.set(index);
+  // Set the in-scope bit and reset the conflict bit.
+  bool enterScope(BeginAccessInst *beginAccess, unsigned index) {
+    assert(!inScopeBitmask[index]
+           && "nested access should not be dynamically enforced.");
+    inScopeBitmask.set(index);
+    conflictBitmask.reset(index);
     denseVec.push_back(beginAccess);
     return true;
   }
 
-  /// Erase an access from this set based on the index provided by its mapped
-  /// AccessInfo.
-  ///
-  /// Does not invalidate Iterator.
-  void erase(unsigned index) { bitmask.reset(index); }
+  /// End the scope of the given access by marking it in-scope and clearing the
+  /// conflict bit. (The conflict bit only marks conflicts since the last begin
+  /// *or* end access).
+  void exitScope(unsigned index) { inScopeBitmask.reset(index); }
 
-  bool isEquivalent(const SparseAccessSet &other) const {
-    return bitmask == other.bitmask;
-  }
+  bool seenConflict(unsigned index) const { return conflictBitmask[index]; }
+
+  void setConflict(unsigned index) { conflictBitmask.set(index); }
 
   // Only merge accesses that are present on the `other` map. i.e. erase
   // all accesses in this map that are not present in `other`.
-  void merge(const SparseAccessSet &other) { bitmask &= other.bitmask; }
-
-  void copyInto(DenseAccessSet &other) {
-    other.clear();
-    Iterator iterator(*this);
-    while (BeginAccessInst *beginAccess = iterator.next()) {
-      other.push_back(beginAccess);
-    }
+  void merge(const SparseAccessSet &other) {
+    inScopeBitmask &= other.inScopeBitmask;
+    // Currently only conflict free accesses are preserved across blocks by this
+    // analysis. Otherwise, taking the union of conflict bits would be valid.
+    assert(other.conflictBitmask.none());
   }
 
+  void copyNoNestedConflictInto(DenseAccessSet &other) {
+    other.clear();
+    NoNestedConflictIterator iterator(*this);
+    while (BeginAccessInst *beginAccess = iterator.next())
+      other.push_back(beginAccess);
+  }
+
+  // Dump only the accesses with no conflict up to this point.
   void dump() const {
-    Iterator iterator(*this);
-    while (BeginAccessInst *beginAccess = iterator.next()) {
+    for (BeginAccessInst *beginAccess : denseVec) {
+      unsigned sparseIndex = result.getAccessIndex(beginAccess);
+      if (conflictBitmask[sparseIndex])
+        continue;
+
       llvm::dbgs() << *beginAccess << "  ";
+      if (!inScopeBitmask[sparseIndex])
+        llvm::dbgs() << " [noscope]";
       result.getAccessInfo(beginAccess).dump();
     }
   }
@@ -361,7 +387,7 @@ void AccessConflictAnalysis::identifyBeginAccesses() {
 /// conflicts. Erasing from SparseAccessSet does not invalidate any iterators.
 static void recordConflict(AccessInfo &info, SparseAccessSet &accessSet) {
   info.setSeenNestedConflict();
-  accessSet.erase(info.getAccessIndex());
+  accessSet.setConflict(info.getAccessIndex());
 }
 
 // Given an "inner" access, check for potential conflicts with any outer access.
@@ -382,7 +408,7 @@ void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *innerBeginAccess,
   const AccessInfo &innerAccess = result.getAccessInfo(innerBeginAccess);
   SILAccessKind innerAccessKind = innerBeginAccess->getAccessKind();
 
-  SparseAccessSet::Iterator accessIter(accessSet);
+  SparseAccessSet::NoNestedConflictIterator accessIter(accessSet);
   while (BeginAccessInst *outerBeginAccess = accessIter.next()) {
     // If both are reads, keep the mapped access.
     if (!accessKindMayConflict(innerAccessKind,
@@ -406,7 +432,7 @@ void AccessConflictAnalysis::visitBeginAccess(BeginAccessInst *innerBeginAccess,
   // Record the current access in the map. It can potentially be folded
   // regardless of whether it may conflict with an outer access.
   bool inserted =
-      accessSet.insert(innerBeginAccess, innerAccess.getAccessIndex());
+      accessSet.enterScope(innerBeginAccess, innerAccess.getAccessIndex());
   (void)inserted;
   assert(inserted && "the same begin_access cannot be seen twice.");
 }
@@ -418,13 +444,13 @@ void AccessConflictAnalysis::visitEndAccess(EndAccessInst *endAccess,
     return;
 
   unsigned index = result.getAccessIndex(beginAccess);
-  DEBUG(if (accessSet.contains(index)) llvm::dbgs()
+  DEBUG(if (accessSet.seenConflict(index)) llvm::dbgs()
         << "No conflict on one path from " << *beginAccess << " to "
         << *endAccess);
 
   // Erase this access from the sparse set. We only want to detect conflicts
   // within the access scope.
-  accessSet.erase(index);
+  accessSet.exitScope(index);
 }
 
 void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply,
@@ -432,7 +458,7 @@ void AccessConflictAnalysis::visitFullApply(FullApplySite fullApply,
   FunctionAccessedStorage callSiteAccesses;
   ASA->getCallSiteEffects(callSiteAccesses, fullApply);
 
-  SparseAccessSet::Iterator accessIter(accessSet);
+  SparseAccessSet::NoNestedConflictIterator accessIter(accessSet);
   while (BeginAccessInst *outerBeginAccess = accessIter.next()) {
 
     // If there is no potential conflict, leave the outer access mapped.
@@ -484,16 +510,16 @@ void AccessConflictAnalysis::visitBlock(SILBasicBlock *BB) {
       visitFullApply(fullApply, accessSet);
     }
   }
-  DEBUG(if (!accessSet.isEmpty()) {
-    llvm::dbgs() << "Initializing accesses out of bb" << BB->getDebugID()
-                 << "\n";
+  DEBUG(if (accessSet.hasConflictFreeAccess()) {
+    llvm::dbgs() << "Initializing no-conflict access out of bb"
+                 << BB->getDebugID() << "\n";
     accessSet.dump();
   });
   if (BB->getTerminator()->isFunctionExiting())
-    assert(accessSet.isEmpty() && "no postdominating end_access");
+    assert(!accessSet.hasInScopeAccess() && "no postdominating end_access");
 
   // Initialize blockOutAccess for this block with the current access set.
-  accessSet.copyInto(blockOutAccess[BB]);
+  accessSet.copyNoNestedConflictInto(blockOutAccess[BB]);
 }
 
 // -----------------------------------------------------------------------------
