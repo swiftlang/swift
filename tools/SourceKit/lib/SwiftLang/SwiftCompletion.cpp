@@ -136,6 +136,10 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
     CI.addDiagnosticConsumer(&TraceDiags);
     trace::SwiftInvocation SwiftArgs;
     trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
+    TracedOp.setDiagnosticProvider(
+        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          TraceDiags.getAllDiagnostics(diags);
+        });
     TracedOp.start(SwiftArgs,
                    {std::make_pair("OriginalOffset", std::to_string(Offset)),
                     std::make_pair("Offset",
@@ -190,12 +194,6 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                            &CompletionContext);
   CI.performSema();
   SwiftConsumer.clearContext();
-
-  if (TracedOp.enabled()) {
-    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
-    TraceDiags.getAllDiagnostics(Diagnostics);
-    TracedOp.finish(Diagnostics);
-  }
 
   return true;
 }
