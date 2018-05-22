@@ -2023,12 +2023,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
           .fixItRemoveChars(end.getAdvancedLoc(-1), end);
     }
 
-    auto unescapedUnderscore = underscore && !escaped;
-    if (!unescapedUnderscore)
-      name = Context.getIdentifier(text);
-    if (!underscore)
-      Tok.setKind(tok::identifier);
-    loc = consumeToken();
+    loc = consumeArgumentLabel(name);
     consumeToken(tok::colon);
   }
 }

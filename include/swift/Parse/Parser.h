@@ -466,6 +466,16 @@ public:
     return consumeToken();
   }
 
+  SourceLoc consumeArgumentLabel(Identifier &Result) {
+    assert(Tok.canBeArgumentLabel());
+    assert(Result.empty());
+    if (!Tok.is(tok::kw__)) {
+      Tok.setKind(tok::identifier);
+      Result = Context.getIdentifier(Tok.getText());
+    }
+    return consumeToken();
+  }
+
   /// \brief Retrieve the location just past the end of the previous
   /// source location.
   SourceLoc getEndOfPreviousLoc();

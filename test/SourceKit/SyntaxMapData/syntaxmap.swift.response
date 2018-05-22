@@ -474,7 +474,7 @@
       key.length: 1
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 910,
       key.length: 7
     },
@@ -489,7 +489,7 @@
       key.length: 4
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 937,
       key.length: 2
     },
@@ -514,7 +514,7 @@
       key.length: 6
     },
     {
-      key.kind: source.lang.swift.syntaxtype.keyword,
+      key.kind: source.lang.swift.syntaxtype.identifier,
       key.offset: 971,
       key.length: 2
     },
