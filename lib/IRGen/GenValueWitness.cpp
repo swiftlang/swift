@@ -927,13 +927,16 @@ static void addValueWitness(IRGenModule &IGM,
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
       assert(packing == FixedPacking::OffsetZero ||
              packing == FixedPacking::Allocate);
+      bool isInline = packing == FixedPacking::OffsetZero;
+      bool isBitwiseTakable =
+          fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal);
+      assert(isBitwiseTakable || !isInline);
       flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
-                   .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
-                   .withInlineStorage(packing == FixedPacking::OffsetZero)
-                   .withExtraInhabitants(
+                  .withPOD(fixedTI->isPOD(ResilienceExpansion::Maximal))
+                  .withInlineStorage(isInline)
+                  .withExtraInhabitants(
                       fixedTI->getFixedExtraInhabitantCount(IGM) > 0)
-                   .withBitwiseTakable(
-                      fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal));
+                  .withBitwiseTakable(isBitwiseTakable);
     } else {
       flags = flags.withIncomplete(true);
     }
@@ -1287,6 +1290,10 @@ FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {
   // allocated inline.
   if (!fixedTI)
     return FixedPacking::Dynamic;
+
+  // By convention we only store bitwise takable values inline.
+  if (!fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal))
+    return FixedPacking::Allocate;
 
   Size bufferSize = getFixedBufferSize(IGM);
   Size requiredSize = fixedTI->getFixedSize();

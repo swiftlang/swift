@@ -278,13 +278,15 @@ struct TargetValueBuffer {
 using ValueBuffer = TargetValueBuffer<InProcess>;
 
 /// Can a value with the given size and alignment be allocated inline?
-constexpr inline bool canBeInline(size_t size, size_t alignment) {
-  return size <= sizeof(ValueBuffer) && alignment <= alignof(ValueBuffer);
+constexpr inline bool canBeInline(bool isBitwiseTakable, size_t size,
+                                  size_t alignment) {
+  return isBitwiseTakable && size <= sizeof(ValueBuffer) &&
+         alignment <= alignof(ValueBuffer);
 }
 
 template <class T>
-constexpr inline bool canBeInline() {
-  return canBeInline(sizeof(T), alignof(T));
+constexpr inline bool canBeInline(bool isBitwiseTakable) {
+  return canBeInline(isBitwiseTakable, sizeof(T), alignof(T));
 }
 
 struct ValueWitnessTable;
@@ -345,8 +347,8 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  static bool isValueInline(size_t size, size_t alignment) {
-    return (size <= sizeof(ValueBuffer) &&
+  static bool isValueInline(bool isBitwiseTakable, size_t size, size_t alignment) {
+    return (isBitwiseTakable && size <= sizeof(ValueBuffer) &&
             alignment <= alignof(ValueBuffer));
   }
 
