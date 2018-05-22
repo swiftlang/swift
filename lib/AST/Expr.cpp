@@ -996,15 +996,19 @@ LiteralExpr *LiteralExpr::shallowClone(
   return Result;
 }
 
-
-
+/// A wrapper around LLVM::getAsInteger that can be used on Swift interger
+/// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
+/// octal numbers.
+static bool getAsInteger(StringRef Text, llvm::APInt &Value) {
+  // swift encodes octal differently from C
+  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
+  return Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+}
 
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
-  // swift encodes octal differently from C
-  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
-  bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+  bool Error = getAsInteger(Text, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   if (IsNegative)
     Value = -Value;
@@ -1015,6 +1019,15 @@ static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
 
 APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth, bool Negative) {
   return getIntegerLiteralValue(Negative, Text, BitWidth);
+}
+
+/// Returns the raw magnitude of the literal text without any truncation.
+APInt IntegerLiteralExpr::getRawMagnitude() const {
+  llvm::APInt Value(64, 0);
+  bool Error = getAsInteger(getDigitsText(), Value);
+  assert(!Error && "Invalid IntegerLiteral formed");
+  (void)Error;
+  return Value;
 }
 
 APInt IntegerLiteralExpr::getValue() const {

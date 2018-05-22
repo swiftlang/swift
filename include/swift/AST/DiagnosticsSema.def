@@ -2446,6 +2446,9 @@ ERROR(no_MaxBuiltinIntegerType_found,none,
    "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
+ERROR(integer_literal_overflows_maxwidth, none,
+   "integer literal needs %1 bits, exceeding limit of %0 bits",
+   (unsigned, unsigned))
 
 ERROR(no_member_of_module,none,
       "module %0 has no member named %1", (Identifier, DeclName))

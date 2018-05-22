@@ -870,6 +870,7 @@ public:
 
 private:
   Type IntLiteralType;
+  Type MaxIntegerType;
   Type FloatLiteralType;
   Type BooleanLiteralType;
   Type UnicodeScalarType;
@@ -1048,6 +1049,7 @@ public:
   Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
+  Type getMaxIntegerType(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);

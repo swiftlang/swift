@@ -833,6 +833,8 @@ public:
   APInt getValue() const;
   static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
+  APInt getRawMagnitude() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::IntegerLiteral;
   }
