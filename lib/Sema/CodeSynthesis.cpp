@@ -2026,6 +2026,12 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     }
   }
 
+  // Inherit the @discardableResult attribute.
+  if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+    auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
   // Make sure the constructor is only as available as its superclass's
   // constructor.
   AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
