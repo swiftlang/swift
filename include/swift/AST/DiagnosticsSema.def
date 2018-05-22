@@ -48,7 +48,7 @@ NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
 //------------------------------------------------------------------------------
-// Constraint solver diagnostics
+// MARK: Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(ambiguous_member_overload_set,none,
@@ -547,7 +547,7 @@ ERROR(cannot_return_value_from_void_func,none,
       "unexpected non-void return value in void function", ())
 
 //------------------------------------------------------------------------------
-// Name Binding
+// MARK: Name Binding
 //------------------------------------------------------------------------------
 
 ERROR(sema_no_import,Fatal,
@@ -767,14 +767,14 @@ NOTE(previous_precedence_group_decl,none,
      "previous precedence group declaration here", ())
 
 //------------------------------------------------------------------------------
-// Type Check Coercions
+// MARK: Type Check Coercions
 //------------------------------------------------------------------------------
 
 ERROR(tuple_conversion_not_expressible,none,
       "cannot express tuple conversion %0 to %1", (Type, Type))
 
 //------------------------------------------------------------------------------
-// Expression Type Checking Errors
+// MARK: Expression Type Checking Errors
 //------------------------------------------------------------------------------
 ERROR(types_not_convertible,none,
       "%1 is not %select{convertible to|a subtype of}0 %2",
@@ -1009,7 +1009,7 @@ ERROR(c_function_pointer_from_function_with_context,none,
       (bool, unsigned))
 
 //------------------------------------------------------------------------------
-// Type Check Declarations
+// MARK: Type Check Declarations
 //------------------------------------------------------------------------------
 
 ERROR(var_type_not_materializable,none,
@@ -2295,7 +2295,7 @@ ERROR(property_behavior_conformance_broken,none,
       "property behavior for %0 in type %1 is broken", (DeclName, Type))
 
 //------------------------------------------------------------------------------
-// Type Check Attributes
+// MARK: Type Check Attributes
 //------------------------------------------------------------------------------
 
 ERROR(attr_only_one_decl_kind,none,
@@ -2437,7 +2437,7 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
-// Type Check Expressions
+// MARK: Type Check Expressions
 //------------------------------------------------------------------------------
 
 NOTE(found_candidate,none,
@@ -2903,7 +2903,7 @@ ERROR(capture_across_type_decl,none,
       (DescriptiveDeclKind, Identifier))
 
 //------------------------------------------------------------------------------
-// Type Check Statements
+// MARK: Type Check Statements
 //------------------------------------------------------------------------------
 
 ERROR(jump_out_of_defer,none,
@@ -3042,7 +3042,7 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 //------------------------------------------------------------------------------
-// Type Check Patterns
+// MARK: Type Check Patterns
 //------------------------------------------------------------------------------
 
 ERROR(cannot_infer_type_for_pattern,none,
@@ -3129,7 +3129,7 @@ WARNING(swift3_ignore_specialized_enum_element_call,none,
         "which will be rejected in future version of Swift", ())
 
 //------------------------------------------------------------------------------
-// Error-handling diagnostics
+// MARK: Error-handling diagnostics
 //------------------------------------------------------------------------------
 
 
@@ -3205,7 +3205,7 @@ WARNING(no_throw_in_do_with_catch,none,
         "'catch' block is unreachable because no errors are thrown in 'do' block", ())
 
 //------------------------------------------------------------------------------
-// Type Check Types
+// MARK: Type Check Types
 //------------------------------------------------------------------------------
 
 ERROR(unsupported_recursive_struct,none,
@@ -3363,7 +3363,7 @@ ERROR(sil_metatype_multiple_reprs,none,
       ())
 
 //------------------------------------------------------------------------------
-// @objc and @nonobjc
+// MARK: @objc and @nonobjc
 //------------------------------------------------------------------------------
 
 ERROR(objc_interop_disabled,none,
@@ -3665,7 +3665,7 @@ ERROR(nonobjc_not_allowed,none,
 #undef OBJC_ATTR_SELECT
 
 //------------------------------------------------------------------------------
-// dynamic
+// MARK: dynamic
 //------------------------------------------------------------------------------
 
 ERROR(dynamic_not_in_class,none,
@@ -3681,7 +3681,7 @@ ERROR(dynamic_requires_objc,none,
       (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
-// @available
+// MARK: @available
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
@@ -3806,7 +3806,7 @@ ERROR(availabilty_string_subscript_migration, none,
       "subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result", ())
 
 //------------------------------------------------------------------------------
-// @discardableResult
+// MARK: @discardableResult
 //------------------------------------------------------------------------------
 
 WARNING(discardable_result_on_void_never_function, none,
@@ -3814,7 +3814,7 @@ WARNING(discardable_result_on_void_never_function, none,
         (bool))
 
 //------------------------------------------------------------------------------
-// Resilience diagnostics
+// MARK: Resilience diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(fixed_layout_attr_on_internal_type,
@@ -3878,7 +3878,7 @@ ERROR(inlinable_decl_not_public,
       (DeclBaseName, AccessLevel))
 
 //------------------------------------------------------------------------------
-// @_specialize diagnostics
+// MARK: @_specialize diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(specialize_attr_nongeneric_trailing_where,none,
@@ -3907,7 +3907,7 @@ ERROR(specialize_attr_unsupported_kind_of_req,none,
       "Only same-type and layout requirements are supported by '_specialize' attribute", ())
 
 //------------------------------------------------------------------------------
-// Variable usage diagnostics
+// MARK: Variable usage diagnostics
 //------------------------------------------------------------------------------
 
 WARNING(pbd_never_used_stmtcond, none,
@@ -3947,7 +3947,7 @@ WARNING(variable_never_read, none,
         (Identifier, unsigned))
 
 //------------------------------------------------------------------------------
-// Circular reference diagnostics
+// MARK: Circular reference diagnostics
 //------------------------------------------------------------------------------
 ERROR(circular_reference, none,
       "circular reference", ())
@@ -3959,7 +3959,7 @@ NOTE(circular_reference_through, none,
      "through reference here", ())
 
 //------------------------------------------------------------------------------
-// Debug diagnostics
+// MARK: Debug diagnostics
 //------------------------------------------------------------------------------
 
 WARNING(debug_long_function_body, none,
@@ -3973,7 +3973,7 @@ WARNING(debug_long_expression, none,
         (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
-// Pattern match diagnostics
+// MARK: Pattern match diagnostics
 //------------------------------------------------------------------------------
 
 
