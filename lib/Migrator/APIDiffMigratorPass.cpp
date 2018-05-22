@@ -260,21 +260,6 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       SF->getASTContext().SourceMgr, Range).str() == "nil";
   }
 
-  bool isDotMember(CharSourceRange Range) {
-    auto S = Range.str();
-    return S.startswith(".") && S.substr(1).find(".") == StringRef::npos;
-  }
-
-  bool isDotMember(SourceRange Range) {
-    return isDotMember(Lexer::getCharSourceRangeFromSourceRange(
-      SF->getASTContext().SourceMgr, Range));
-  }
-
-  bool isDotMember(Expr *E) {
-    auto Range = E->getSourceRange();
-    return Range.isValid() && isDotMember(Range);
-  }
-
   std::vector<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
     std::vector<APIDiffItem*> results;
     auto addDiffItems = [&](ValueDecl *VD) {
@@ -323,11 +308,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
 
-  bool isSimpleReplacement(APIDiffItem *Item, bool isDotMember, std::string &Text) {
+  bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
     if (auto *MD = dyn_cast<TypeMemberDiffItem>(Item)) {
       if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
-        Text = (llvm::Twine(isDotMember ? "" : MD->newTypeName) + "." +
-          MD->getNewName().base()).str();
+        Text = (llvm::Twine(MD->newTypeName) + "." + MD->getNewName().base()).
+          str();
         return true;
       }
     }
@@ -390,7 +375,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                           Type T, ReferenceMetaData Data) override {
     for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
-      if (isSimpleReplacement(Item, isDotMember(Range), RepText)) {
+      if (isSimpleReplacement(Item, RepText)) {
         Editor.replace(Range, RepText);
         return true;
       }
@@ -465,9 +450,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       for (auto *I: getRelatedDiffItems(VD)) {
         if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
           if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
-            Editor.replace(ToReplace,
-              (llvm::Twine(isDotMember(ToReplace) ? "" : Item->newTypeName) + "." +
-               Item->getNewName().base()).str());
+            Editor.replace(ToReplace, (llvm::Twine(Item->newTypeName) + "." +
+              Item->getNewName().base()).str());
             return true;
           }
         }
@@ -741,7 +725,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     StringRef LeftComment;
     StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
-      if (isSimpleReplacement(Item, isDotMember(Reference), Rename)) {
+      if (isSimpleReplacement(Item, Rename)) {
       } else if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange() &&
             CI->NodeKind == SDKNodeKind::DeclVar) {
