@@ -838,6 +838,9 @@ class ProjectionTree {
   SILModule &Mod;
 
   /// The allocator we use to allocate ProjectionTreeNodes in the tree.
+  ///
+  /// FIXME: This should be a reference to an outside allocator. We shouldn't
+  /// have each ProjectionTree have its own allocator.
   llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
 
   // A common pattern is a 3 field struct.
