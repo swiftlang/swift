@@ -1643,7 +1643,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
         if (version == currentVersion && importedName.isSubscriptAccessor()) {
           table.addEntry(DeclName(nameImporter.getContext(),
                                   DeclBaseName::createSubscript(),
-                                  ArrayRef<Identifier>()),
+                                  {Identifier()}),
                          named, importedName.getEffectiveContext());
         }
 
