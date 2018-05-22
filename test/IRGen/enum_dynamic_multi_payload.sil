@@ -433,7 +433,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF0]]
 
 // CHECK:      [[BUF1:%.*]] = getelementptr {{.*}} [[BUF]], i32 0, i32 1
@@ -445,7 +445,7 @@ entry(%a : $*EitherOr<T, C>, %b : $*EitherOr<T, C>):
 // CHECK:      [[T0:%.*]] = bitcast %swift.type* [[U_CHECKED]] to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]]
 // CHECK-NEXT: [[VALUE_WITNESSES:%.*]] = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 9
+// CHECK-NEXT: [[LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[VALUE_WITNESSES]], i32 8
 // CHECK-NEXT: store i8** [[LAYOUT]], {{.*}} [[BUF1]]
 
 // CHECK:   call void @swift_initEnumMetadataMultiPayload(%swift.type* [[METADATA]], {{i(32|64)}} 0, {{i(32|64)}} 2, i8*** [[BUF0]])

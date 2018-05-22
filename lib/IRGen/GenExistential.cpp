@@ -343,16 +343,11 @@ public:
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     if (isOutlined) {
-      llvm::Value *metadata = copyType(IGF, dest, src);
-
-      auto layout = getLayout();
-
-      // Project down to the buffers and ask the witnesses to do a
-      // take-initialize.
-      Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
-      Address destBuffer = layout.projectExistentialBuffer(IGF, dest);
-      emitInitializeBufferWithTakeOfBufferCall(IGF, metadata, destBuffer,
-                                               srcBuffer);
+      // memcpy the existential container. This is safe because: either the
+      // value is stored inline and is therefore by convention bitwise takable
+      // or the value is stored in a reference counted heap buffer, in which
+      // case a memcpy of the reference is also correct.
+      IGF.emitMemCpy(dest, src, getLayout().getSize(IGF.IGM));
     } else {
       // Create an outlined function to avoid explosion
       OutliningMetadataCollector collector(IGF);

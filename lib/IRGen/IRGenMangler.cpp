@@ -45,7 +45,6 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithCopy) \
     GET_MANGLING(InitializeWithTake) \
     GET_MANGLING(AssignWithTake) \
-    GET_MANGLING(InitializeBufferWithTakeOfBuffer) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
     GET_MANGLING(StoreExtraInhabitant) \
