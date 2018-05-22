@@ -3059,12 +3059,6 @@ public:
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs);
 
-  /// Substitute the given generic arguments into this generic
-  /// function type using the given substitution and conformance lookup
-  /// callbacks.
-  FunctionType *substGenericArgs(TypeSubstitutionFn subs,
-                                 LookupConformanceFn conformances);
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getInput(), getResult(),
             getExtInfo());
