@@ -1654,14 +1654,10 @@ namespace {
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding);
 
-      Type optTy = getOptionalType(expr->getSubExpr()->getLoc(), valueTy);
-      if (!optTy)
-        return Type();
-
-      CS.addConstraint(ConstraintKind::OptionalObject,
-                       optTy, CS.getType(expr->getSubExpr()),
+      CS.addConstraint(ConstraintKind::Bind,
+                       CS.getType(expr->getSubExpr()), valueTy,
                        CS.getConstraintLocator(expr));
-      return optTy;
+      return valueTy;
     }
 
     virtual Type visitParenExpr(ParenExpr *expr) {

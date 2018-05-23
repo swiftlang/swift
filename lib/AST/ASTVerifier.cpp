@@ -1775,13 +1775,7 @@ public:
     void verifyChecked(OptionalTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OptionalTryExpr", E);
 
-      Type unwrappedType = E->getType()->getOptionalObjectType();
-      if (!unwrappedType) {
-        Out << "OptionalTryExpr result type is not optional\n";
-        abort();
-      }
-
-      checkSameType(unwrappedType, E->getSubExpr()->getType(),
+      checkSameType(E->getType(), E->getSubExpr()->getType(),
                     "OptionalTryExpr and sub-expression");
 
       verifyCheckedBase(E);
