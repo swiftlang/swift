@@ -218,8 +218,6 @@ public:
 
   /// If the specified value is a 'let' property in an initializer, return true.
   bool isElementLetProperty(unsigned Element) const;
-
-  void collectRetainCountInfo(DIElementUseInfo &OutVar) const;
 };
 
 enum DIUseKind {
