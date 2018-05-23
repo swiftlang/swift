@@ -389,23 +389,6 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   return false;
 }
 
-void DIMemoryObjectInfo::collectRetainCountInfo(
-    DIElementUseInfo &OutVar) const {
-  if (isa<MarkUninitializedInst>(MemoryInst))
-    return;
-
-  // Collect information about the retain count result as well.
-  for (auto *Op : MemoryInst->getUses()) {
-    auto *User = Op->getUser();
-
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
-      OutVar.trackDestroy(User);
-    }
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                        DIMemoryUse Implementation
 //===----------------------------------------------------------------------===//
@@ -535,7 +518,6 @@ public:
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
       collectClassSelfUses();
-      TheMemory.collectRetainCountInfo(UseInfo);
       return;
     }
 
@@ -544,8 +526,6 @@ public:
     } else {
       collectUses(TheMemory.getAddress(), 0);
     }
-
-    TheMemory.collectRetainCountInfo(UseInfo);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -1794,14 +1774,12 @@ void swift::ownership::collectDIElementUsesFrom(
     assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
     auto *MUI = cast<MarkUninitializedInst>(MemoryInfo.MemoryInst);
     collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo, MUI);
-    MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
   }
 
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
-    MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
   }
 
