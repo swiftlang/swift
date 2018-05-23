@@ -4166,6 +4166,126 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Returns the function declaration corresponding to a @dynamicCallable
+/// attribute required method (if it exists) implemented by a type. Otherwise,
+/// return nullptr.
+static FuncDecl *
+lookupDynamicCallableMethod(Type type, ConstraintSystem &CS,
+                            const ConstraintLocatorBuilder &locator,
+                            StringRef methodName, StringRef argumentName,
+                            bool hasKeywordArgs, bool &error) {
+  auto &ctx = CS.getASTContext();
+  auto decl = type->getAnyNominal();
+  auto option = DeclName(ctx, DeclBaseName(ctx.getIdentifier(methodName)),
+                         { ctx.getIdentifier(argumentName) });
+  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
+                                        option, type,
+                                        FunctionRefKind::SingleApply,
+                                        CS.getConstraintLocator(locator),
+                                        /*includeInaccessibleMembers*/ false);
+  // Filter valid candidates.
+  auto candidates = matches.ViableCandidates;
+  auto filter = [&](OverloadChoice choice) {
+    auto candidate = cast<FuncDecl>(choice.getDecl());
+    return !isValidDynamicCallableMethod(candidate, decl, CS.TC, hasKeywordArgs)
+      // TODO: Add support for generic @dynamicCallable methods.
+      || candidate->isGeneric();
+  };
+  candidates.erase(std::remove_if(candidates.begin(), candidates.end(), filter),
+                   candidates.end());
+
+  // If there is one candidate, return it. Otherwise, return nullptr.
+  auto size = candidates.size();
+  if (size == 1) return cast<FuncDecl>(candidates.front().getDecl());
+  // If there are >1 candidates, it is an overload error.
+  else if (size > 1) error = true;
+  return nullptr;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Looks up and returns the @dynamicCallable required methods (if they exist)
+/// implemented by a type. This function should not be called directly: instead,
+/// call `getDynamicCallableMethods` which performs caching.
+static DynamicCallableMethods
+lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
+                             const ConstraintLocatorBuilder &locator,
+                             bool &error) {
+  DynamicCallableMethods methods;
+  methods.argumentsMethod =
+    lookupDynamicCallableMethod(type, CS, locator, "dynamicallyCall",
+                                "withArguments", /*hasKeywordArgs*/ false,
+                                error);
+  methods.keywordArgumentsMethod =
+    lookupDynamicCallableMethod(type, CS, locator, "dynamicallyCall",
+                                "withKeywordArguments", /*hasKeywordArgs*/ true,
+                                error);
+  return methods;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Returns the @dynamicCallable required methods (if they exist) implemented by
+/// a type.
+/// This function may be slow for deep class hierarchies and multiple protocol
+/// conformances, but it is invoked only after other constraint simplification
+/// rules fail.
+static DynamicCallableMethods
+getDynamicCallableMethods(Type type, ConstraintSystem &CS,
+                          const ConstraintLocatorBuilder &locator,
+                          bool &error) {
+  auto canType = type->getCanonicalType();
+  auto it = CS.DynamicCallableCache.find(canType);
+  if (it != CS.DynamicCallableCache.end()) return it->second;
+
+  auto calculate = [&]() -> DynamicCallableMethods {
+    // If this is a protocol composition, check if any of the protocols have the
+    // attribute.
+    if (auto protocolComp = canType->getAs<ProtocolCompositionType>()) {
+      for (auto protocolType : protocolComp->getMembers()) {
+        auto methods = getDynamicCallableMethods(protocolType, CS, locator,
+                                                 error);
+        if (methods.isValid()) return methods;
+      }
+      return DynamicCallableMethods();
+    }
+
+    // Otherwise, this must be a nominal type.
+    // Dynamic calling doesn't work for tuples, etc.
+    auto nominal = canType->getAnyNominal();
+    if (!nominal) return DynamicCallableMethods();
+
+    // If this type conforms to a protocol which has the attribute, then
+    // look up the methods.
+    for (auto p : nominal->getAllProtocols())
+      if (p->getAttrs().hasAttribute<DynamicCallableAttr>())
+        return lookupDynamicCallableMethods(type, CS, locator, error);
+
+    // Walk superclasses, if present.
+    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
+    while (1) {
+      // If we found a circular parent class chain, reject this.
+      if (!visitedDecls.insert(nominal).second)
+        return DynamicCallableMethods();
+
+      // If this type has the attribute on it, then look up the methods.
+      if (nominal->getAttrs().hasAttribute<DynamicCallableAttr>())
+        return lookupDynamicCallableMethods(type, CS, locator, error);
+
+      // If this type is a class with a superclass, check superclasses.
+      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
+        if (auto superClass = cd->getSuperclassDecl()) {
+          nominal = superClass;
+          continue;
+        }
+      }
+
+      return DynamicCallableMethods();
+    }
+  };
+
+  return CS.DynamicCallableCache[canType] = calculate();
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
@@ -4283,6 +4403,112 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
     return simplified;
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Handle @dynamicCallable applications.
+  bool error = false;
+  auto methods = getDynamicCallableMethods(desugar2, *this, locator, error);
+  if (error) return SolutionKind::Error;
+
+  if (methods.isValid()) {
+    auto &ctx = getASTContext();
+    auto decl = desugar2->getAnyNominal();
+    auto func1 = type1->castTo<FunctionType>();
+
+    // Determine whether to call the positional arguments method or the
+    // keyword arguments method.
+    bool useKwargsMethod = methods.argumentsMethod == nullptr;
+    if (!useKwargsMethod) {
+      for (auto param : func1->getParams()) {
+        if (param.hasLabel()) {
+          useKwargsMethod = true;
+          break;
+        }
+      }
+    }
+
+    auto method = useKwargsMethod
+      ? methods.keywordArgumentsMethod
+      : methods.argumentsMethod;
+
+    if (!method) {
+      assert(useKwargsMethod &&
+             "Undefined method implies kwargs method is missing");
+      TC.diagnose(decl->getLoc(), diag::missing_dynamic_callable_kwargs_method,
+                  desugar2);
+      return SolutionKind::Error;
+    }
+
+    auto memberType = desugar2->getTypeOfMember(DC->getParentModule(), method);
+    auto methodType = memberType->castTo<AnyFunctionType>()->getResult()
+      ->getAs<AnyFunctionType>();
+    auto argType = methodType->getParams()[0].getType();
+
+    // Attempts to solve an argument conversion constraint from each dynamic
+    // call parameter to the specified type. Returns true if the constraint can
+    // be solved.
+    auto argTypesMatch = [&](Type argElementType) {
+      if (auto archetype = argElementType->getAs<ArchetypeType>())
+        argElementType = archetype->getInterfaceType();
+      // TODO: Handle generics.
+      if (argElementType->hasTypeParameter()) return true;
+      for (auto param : func1->getParams()) {
+        auto paramType = param.getType();
+        if (auto archetype = paramType->getAs<ArchetypeType>())
+          paramType = archetype->getInterfaceType();
+
+        auto locatorBuilder =
+          outerLocator.withPathElement(ConstraintLocator::ApplyArgument);
+        if (matchTypes(paramType, argElementType,
+                       ConstraintKind::ArgumentConversion, subflags,
+                       locatorBuilder).isFailure()) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    // Add constraints on argument type.
+    if (!useKwargsMethod) {
+      auto arrayLitProto =
+        ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+      auto conformance =
+        TC.conformsToProtocol(argType, arrayLitProto, DC,
+                              ConformanceCheckFlags::InExpression);
+      Type arrayElementType =
+        ProtocolConformanceRef::getTypeWitnessByName(
+          argType, *conformance, ctx.Id_ArrayLiteralElement, &TC)
+        ->getDesugaredType();
+
+      if (!argTypesMatch(arrayElementType))
+        return SolutionKind::Error;
+    } else {
+      auto dictLitProto =
+        ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+      auto conformance =
+        TC.conformsToProtocol(argType, dictLitProto, DC,
+                              ConformanceCheckFlags::InExpression);
+      Type dictValueType =
+        ProtocolConformanceRef::getTypeWitnessByName(
+          argType, *conformance, ctx.Id_Value, &TC)
+        ->getDesugaredType();
+
+      if (!argTypesMatch(dictValueType))
+        return SolutionKind::Error;
+    }
+
+    // Add constraints on result type.
+    if (!methodType->getResult()->hasTypeParameter()) {
+      auto locatorBuilder =
+        locator.withPathElement(ConstraintLocator::FunctionResult);
+      if (matchTypes(func1->getResult(), methodType->getResult(),
+                     ConstraintKind::Bind, subflags,
+                     locatorBuilder).isFailure())
+        return SolutionKind::Error;
+    }
+
+    return SolutionKind::Solved;
+  } // end @dynamicCallable handling
 
   return SolutionKind::Error;
 }

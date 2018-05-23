@@ -889,9 +889,16 @@ struct MemberLookupResult {
   
 // SWIFT_ENABLE_TENSORFLOW
 /// \brief Stores the required methods for @dynamicCallable types.
-struct DynamicCallableEntry {
-  FuncDecl *argumentsMethod;
-  FuncDecl *keywordArgumentsMethod;
+struct DynamicCallableMethods {
+  FuncDecl *argumentsMethod = nullptr;
+  FuncDecl *keywordArgumentsMethod = nullptr;
+
+  /// \brief Returns true if type defines either of the @dynamicCallable
+  /// required methods. Returns false iff type does not satisfy @dynamicCallable
+  /// requirements.
+  bool isValid() const {
+    return argumentsMethod || keywordArgumentsMethod;
+  }
 };
 
 /// \brief Describes a system of constraints on type variables, the
@@ -1042,8 +1049,8 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// A cache that stores the @dynamicCallable required methods implemented by
-  /// various types.
-  llvm::DenseMap<CanType, DynamicCallableLookupResult> DynamicCallableCache;
+  /// types.
+  llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
   /// This is a cache that keeps track of whether a given type is known (or not)
   /// to be a @dynamicMemberLookup type.
