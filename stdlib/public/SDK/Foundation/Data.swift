@@ -11,19 +11,19 @@
 //===----------------------------------------------------------------------===//
 
 #if DEPLOYMENT_RUNTIME_SWIFT
-    
+
 #if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux)
 import Glibc
 #endif
-    
+
 import CoreFoundation
-    
+
 internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     munmap(mem, length)
 }
-    
+
 internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int) {
     free(mem)
 }
@@ -31,13 +31,13 @@ internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ le
 internal func __NSDataIsCompact(_ data: NSData) -> Bool {
     return data._isCompact()
 }
-    
+
 #else
-    
+
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
-    
+
 internal func __NSDataIsCompact(_ data: NSData) -> Bool {
     if #available(OSX 10.10, iOS 8.0, tvOS 9.0, watchOS 2.0, *) {
         return data._isCompact()
@@ -56,8 +56,10 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 
 #endif
 
-public final class _DataStorage {
-    public enum Backing {
+@usableFromInline
+internal final class _DataStorage {
+    @usableFromInline
+    enum Backing {
         // A mirror of the Objective-C implementation that is suitable to inline in Swift
         case swift
         
@@ -77,10 +79,10 @@ public final class _DataStorage {
         case customMutableReference(NSMutableData) // tracks data references that are known to be mutable
     }
     
-    public static let maxSize = Int.max >> 1
-    public static let vmOpsThreshold = NSPageSize() * 4
+    static let maxSize = Int.max >> 1
+    static let vmOpsThreshold = NSPageSize() * 4
     
-    public static func allocate(_ size: Int, _ clear: Bool) -> UnsafeMutableRawPointer? {
+    static func allocate(_ size: Int, _ clear: Bool) -> UnsafeMutableRawPointer? {
         if clear {
             return calloc(1, size)
         } else {
@@ -88,8 +90,8 @@ public final class _DataStorage {
         }
     }
     
-    
-    public static func move(_ dest_: UnsafeMutableRawPointer, _ source_: UnsafeRawPointer?, _ num_: Int) {
+    @usableFromInline
+    static func move(_ dest_: UnsafeMutableRawPointer, _ source_: UnsafeRawPointer?, _ num_: Int) {
         var dest = dest_
         var source = source_
         var num = num_
@@ -105,20 +107,28 @@ public final class _DataStorage {
         }
     }
     
-    public static func shouldAllocateCleared(_ size: Int) -> Bool {
+    static func shouldAllocateCleared(_ size: Int) -> Bool {
         return (size > (128 * 1024))
     }
     
-    public var _bytes: UnsafeMutableRawPointer?
-    public var _length: Int
-    public var _capacity: Int
-    public var _needToZero: Bool
-    public var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
-    public var _backing: Backing = .swift
-    public var _offset: Int
+    @usableFromInline
+    var _bytes: UnsafeMutableRawPointer?
+    @usableFromInline
+    var _length: Int
+    @usableFromInline
+    var _capacity: Int
+    @usableFromInline
+    var _needToZero: Bool
+    @usableFromInline
+    var _deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?
+    @usableFromInline
+    var _backing: Backing = .swift
+    @usableFromInline
+    var _offset: Int
     
-    public var bytes: UnsafeRawPointer? {
-        @inline(__always)
+    @usableFromInline
+    var bytes: UnsafeRawPointer? {
+        @inlinable
         get {
             switch _backing {
             case .swift:
@@ -135,8 +145,9 @@ public final class _DataStorage {
         }
     }
 
+    @usableFromInline
     @discardableResult
-    public func withUnsafeBytes<Result>(in range: Range<Int>, apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
+    func withUnsafeBytes<Result>(in range: Range<Int>, apply: (UnsafeRawBufferPointer) throws -> Result) rethrows -> Result {
         switch _backing {
         case .swift: fallthrough
         case .immutable: fallthrough
@@ -213,8 +224,9 @@ public final class _DataStorage {
         }
     }
     
+    @usableFromInline
     @discardableResult
-    public func withUnsafeMutableBytes<Result>(in range: Range<Int>, apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
+    func withUnsafeMutableBytes<Result>(in range: Range<Int>, apply: (UnsafeMutableRawBufferPointer) throws -> Result) rethrows -> Result {
         switch _backing {
         case .swift: fallthrough
         case .mutable:
@@ -235,8 +247,8 @@ public final class _DataStorage {
         }
     }
 
-    public var mutableBytes: UnsafeMutableRawPointer? {
-        @inline(__always)
+    var mutableBytes: UnsafeMutableRawPointer? {
+        @inlinable
         get {
             switch _backing {
             case .swift:
@@ -260,8 +272,10 @@ public final class _DataStorage {
         }
     }
     
-    public var length: Int {
-        @inline(__always)
+    
+    @usableFromInline
+    var length: Int {
+        @inlinable
         get {
             switch _backing {
             case .swift:
@@ -276,14 +290,14 @@ public final class _DataStorage {
                 return d.length
             }
         }
-        @inline(__always)
+        @inlinable
         set {
             setLength(newValue)
         }
     }
     
     
-    public func _freeBytes() {
+    func _freeBytes() {
         if let bytes = _bytes {
             if let dealloc = _deallocator {
                 dealloc(bytes, length)
@@ -293,13 +307,13 @@ public final class _DataStorage {
         }
     }
     
-    public func enumerateBytes(in range: Range<Int>, _ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Data.Index, _ stop: inout Bool) -> Void) {
+    func enumerateBytes(in range: Range<Int>, _ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Data.Index, _ stop: inout Bool) -> Void) {
         var stopv: Bool = false
         var data: NSData
         switch _backing {
         case .swift: fallthrough
         case .immutable: fallthrough
-        case .mutable: 
+        case .mutable:
             block(UnsafeBufferPointer<UInt8>(start: _bytes?.advanced(by: range.lowerBound - _offset).assumingMemoryBound(to: UInt8.self), count: Swift.min(range.count, _length)), 0, &stopv)
             return
         case .customReference(let d):
@@ -325,8 +339,9 @@ public final class _DataStorage {
         }
     }
     
+    @usableFromInline
     @inline(never)
-    public func _grow(_ newLength: Int, _ clear: Bool) {
+    func _grow(_ newLength: Int, _ clear: Bool) {
         let cap = _capacity
         var additionalCapacity = (newLength >> (_DataStorage.vmOpsThreshold <= newLength ? 2 : 1))
         if Int.max - additionalCapacity < newLength {
@@ -403,8 +418,8 @@ public final class _DataStorage {
         _needToZero = !allocateCleared
     }
     
-    @inline(__always)
-    public func setLength(_ length: Int) {
+    @inlinable
+    func setLength(_ length: Int) {
         switch _backing {
         case .swift:
             let origLength = _length
@@ -436,8 +451,8 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func append(_ bytes: UnsafeRawPointer, length: Int) {
+    @inlinable
+    func append(_ bytes: UnsafeRawPointer, length: Int) {
         precondition(length >= 0, "Length of appending bytes must not be negative")
         switch _backing {
         case .swift:
@@ -469,8 +484,8 @@ public final class _DataStorage {
     }
     
     // fast-path for appending directly from another data storage
-    @inline(__always)
-    public func append(_ otherData: _DataStorage, startingAt start: Int, endingAt end: Int) {
+    @inlinable
+    func append(_ otherData: _DataStorage, startingAt start: Int, endingAt end: Int) {
         let otherLength = otherData.length
         if otherLength == 0 { return }
         if let bytes = otherData.bytes {
@@ -478,15 +493,15 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func append(_ otherData: Data) {
+    @inlinable
+    func append(_ otherData: Data) {
         otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, _, _) in
             append(buffer.baseAddress!, length: buffer.count)
         }
     }
     
-    @inline(__always)
-    public func increaseLength(by extraLength: Int) {
+    @inlinable
+    func increaseLength(by extraLength: Int) {
         if extraLength == 0 { return }
         switch _backing {
         case .swift:
@@ -518,7 +533,8 @@ public final class _DataStorage {
         
     }
 
-    public func get(_ index: Int) -> UInt8 {
+    @usableFromInline
+    func get(_ index: Int) -> UInt8 {
         switch _backing {
         case .swift: fallthrough
         case .immutable: fallthrough
@@ -555,8 +571,8 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func set(_ index: Int, to value: UInt8) {
+    @inlinable
+    func set(_ index: Int, to value: UInt8) {
         switch _backing {
         case .swift:
             fallthrough
@@ -570,15 +586,14 @@ public final class _DataStorage {
         
     }
     
-    @inline(__always)
-    public func replaceBytes(in range: NSRange, with bytes: UnsafeRawPointer?) {
+    @inlinable
+    func replaceBytes(in range: NSRange, with bytes: UnsafeRawPointer?) {
         if range.length == 0 { return }
         switch _backing {
         case .swift:
             if _length < range.location + range.length {
                 let newLength = range.location + range.length
                 if _capacity < newLength {
-                    
                     _grow(newLength, false)
                 }
                 _length = newLength
@@ -603,8 +618,8 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func replaceBytes(in range_: NSRange, with replacementBytes: UnsafeRawPointer?, length replacementLength: Int) {
+    @inlinable
+    func replaceBytes(in range_: NSRange, with replacementBytes: UnsafeRawPointer?, length replacementLength: Int) {
         let range = NSRange(location: range_.location - _offset, length: range_.length)
         let currentLength = _length
         let resultingLength = currentLength - range.length + replacementLength
@@ -653,8 +668,8 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func resetBytes(in range_: NSRange) {
+    @inlinable
+    func resetBytes(in range_: NSRange) {
         let range = NSRange(location: range_.location - _offset, length: range_.length)
         if range.length == 0 { return }
         switch _backing {
@@ -687,12 +702,13 @@ public final class _DataStorage {
         
     }
     
-    
-    public convenience init() {
+    @usableFromInline
+    convenience init() {
         self.init(capacity: 0)
     }
     
-    public init(length: Int) {
+    @usableFromInline
+    init(length: Int) {
         precondition(length < _DataStorage.maxSize)
         var capacity = (length < 1024 * 1024 * 1024) ? length + (length >> 2) : length
         if _DataStorage.vmOpsThreshold <= capacity {
@@ -708,8 +724,8 @@ public final class _DataStorage {
         setLength(length)
     }
     
-    
-    public init(capacity capacity_: Int) {
+    @usableFromInline
+    init(capacity capacity_: Int) {
         var capacity = capacity_
         precondition(capacity < _DataStorage.maxSize)
         if _DataStorage.vmOpsThreshold <= capacity {
@@ -722,7 +738,8 @@ public final class _DataStorage {
         _offset = 0
     }
     
-    public init(bytes: UnsafeRawPointer?, length: Int) {
+    @usableFromInline
+    init(bytes: UnsafeRawPointer?, length: Int) {
         precondition(length < _DataStorage.maxSize)
         _offset = 0
         if length == 0 {
@@ -749,7 +766,8 @@ public final class _DataStorage {
         }
     }
     
-    public init(bytes: UnsafeMutableRawPointer?, length: Int, copy: Bool, deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?, offset: Int) {
+    @usableFromInline
+    init(bytes: UnsafeMutableRawPointer?, length: Int, copy: Bool, deallocator: ((UnsafeMutableRawPointer, Int) -> Void)?, offset: Int) {
         precondition(length < _DataStorage.maxSize)
         _offset = offset
         if length == 0 {
@@ -792,7 +810,8 @@ public final class _DataStorage {
         }
     }
     
-    public init(immutableReference: NSData, offset: Int) {
+    @usableFromInline
+    init(immutableReference: NSData, offset: Int) {
         _offset = offset
         _bytes = UnsafeMutableRawPointer(mutating: immutableReference.bytes)
         _capacity = 0
@@ -801,7 +820,8 @@ public final class _DataStorage {
         _backing = .immutable(immutableReference)
     }
     
-    public init(mutableReference: NSMutableData, offset: Int) {
+    @usableFromInline
+    init(mutableReference: NSMutableData, offset: Int) {
         _offset = offset
         _bytes = mutableReference.mutableBytes
         _capacity = 0
@@ -810,7 +830,8 @@ public final class _DataStorage {
         _backing = .mutable(mutableReference)
     }
     
-    public init(customReference: NSData, offset: Int) {
+    @usableFromInline
+    init(customReference: NSData, offset: Int) {
         _offset = offset
         _bytes = nil
         _capacity = 0
@@ -819,7 +840,8 @@ public final class _DataStorage {
         _backing = .customReference(customReference)
     }
     
-    public init(customMutableReference: NSMutableData, offset: Int) {
+    @usableFromInline
+    init(customMutableReference: NSMutableData, offset: Int) {
         _offset = offset
         _bytes = nil
         _capacity = 0
@@ -837,8 +859,8 @@ public final class _DataStorage {
         }
     }
     
-    @inline(__always)
-    public func mutableCopy(_ range: Range<Int>) -> _DataStorage {
+    @inlinable
+    func mutableCopy(_ range: Range<Int>) -> _DataStorage {
         switch _backing {
         case .swift:
             return _DataStorage(bytes: _bytes?.advanced(by: range.lowerBound - _offset), length: range.count, copy: true, deallocator: nil, offset: range.lowerBound)
@@ -869,7 +891,7 @@ public final class _DataStorage {
         }
     }
     
-    public func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
+    func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
         if range.isEmpty {
             return try work(NSData()) // zero length data can be optimized as a singleton
         }
@@ -901,7 +923,7 @@ public final class _DataStorage {
         }
     }
     
-    public func bridgedReference(_ range: Range<Int>) -> NSData {
+    func bridgedReference(_ range: Range<Int>) -> NSData {
         if range.isEmpty {
             return NSData() // zero length data can be optimized as a singleton
         }
@@ -932,7 +954,8 @@ public final class _DataStorage {
         }
     }
     
-    public func subdata(in range: Range<Data.Index>) -> Data {
+    @usableFromInline
+    func subdata(in range: Range<Data.Index>) -> Data {
         switch _backing {
         case .customReference(let d):
             return d.subdata(with: NSRange(location: range.lowerBound - _offset, length: range.count))
@@ -1289,11 +1312,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// The number of bytes in the data.
     
     public var count: Int {
-        @inline(__always)
         get {
             return _sliceRange.count
         }
-        @inline(__always)
         set {
             precondition(count >= 0, "count must not be negative")
             if !isKnownUniquelyReferenced(&_backing) {
@@ -1307,7 +1328,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Access the bytes in the data.
     ///
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    @inline(__always)
     public func withUnsafeBytes<ResultType, ContentType>(_ body: (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         return try _backing.withUnsafeBytes(in: _sliceRange) {
             return try body($0.baseAddress?.assumingMemoryBound(to: ContentType.self) ?? UnsafePointer<ContentType>(bitPattern: 0xBAD0)!)
@@ -1319,7 +1339,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// This function assumes that you are mutating the contents.
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
-    @inline(__always)
     public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
@@ -1337,7 +1356,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
     /// - parameter count: The number of bytes to copy.
     /// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
-    @inline(__always)
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
         precondition(count >= 0, "count of bytes to copy must not be negative")
         if count == 0 { return }
@@ -1346,7 +1364,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inline(__always)
     private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: NSRange) {
         if range.length == 0 { return }
         _backing.withUnsafeBytes(in: range.lowerBound..<range.upperBound) {
@@ -1392,7 +1409,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     // MARK: -
 #if !DEPLOYMENT_RUNTIME_SWIFT
-    @inline(__always)
     private func _shouldUseNonAtomicWriteReimplementation(options: Data.WritingOptions = []) -> Bool {
     
         // Avoid a crash that happens on OS X 10.11.x and iOS 9.x or before when writing a bridged Data non-atomically with Foundation's standard write() implementation.
@@ -1461,25 +1477,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public func enumerateBytes(_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Index, _ stop: inout Bool) -> Void) {
         _backing.enumerateBytes(in: _sliceRange, block)
     }
-    
-    @inline(__always)
-    public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
-        if count == 0 { return }
-        append(UnsafeBufferPointer(start: bytes, count: count))
-    }
-    
-    @inline(__always)
-    public mutating func append(_ other: Data) {
-        other.enumerateBytes { (buffer, _, _) in
-            append(buffer)
-        }
-    }
-    
-    /// Append a buffer of bytes to the data.
-    ///
-    /// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
-    @inline(__always)
-    public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
+
+    @inlinable
+    internal mutating func _append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
         if buffer.isEmpty { return }
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
@@ -1488,29 +1488,33 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + buffer.count * MemoryLayout<SourceType>.stride)
     }
     
-    @inline(__always)
-    public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
-        let estimatedCount = newElements.underestimatedCount
-        guard estimatedCount > 0 else {
-            for byte in newElements {
-                append(byte)
-            }
-            return
-        }
-        _withStackOrHeapBuffer(estimatedCount) { allocation in
-            let buffer = UnsafeMutableBufferPointer(start: allocation.pointee.memory.assumingMemoryBound(to: UInt8.self), count: estimatedCount)
-            var (iterator, endPoint) = newElements._copyContents(initializing: buffer)
-            append(buffer.baseAddress!, count: endPoint - buffer.startIndex)
-            while let byte = iterator.next() {
-                append(byte)
-            }
+    public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
+        if count == 0 { return }
+        _append(UnsafeBufferPointer(start: bytes, count: count))
+    }
+    
+    public mutating func append(_ other: Data) {
+        other.enumerateBytes { (buffer, _, _) in
+            _append(buffer)
         }
     }
     
-    @inline(__always)
+    /// Append a buffer of bytes to the data.
+    ///
+    /// - parameter buffer: The buffer of bytes to append. The size is calculated from `SourceType` and `buffer.count`.
+    public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
+        _append(buffer)
+    }
+
+    public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
+        for byte in newElements {
+            append(byte)
+        }
+    }
+    
     public mutating func append(contentsOf bytes: [UInt8]) {
         bytes.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) -> Void in
-            append(buffer)
+            _append(buffer)
         }
     }
     
@@ -1520,7 +1524,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// If `range` exceeds the bounds of the data, then the data is resized to fit.
     /// - parameter range: The range in the data to set to `0`.
-    @inline(__always)
     public mutating func resetBytes(in range: Range<Index>) {
         // it is worth noting that the range here may be out of bounds of the Data itself (which triggers a growth)
         precondition(range.lowerBound >= 0, "Ranges must not be negative bounds")
@@ -1542,7 +1545,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace. If `subrange.lowerBound == data.count && subrange.count == 0` then this operation is an append.
     /// - parameter data: The replacement data.
-    @inline(__always)
     public mutating func replaceSubrange(_ subrange: Range<Index>, with data: Data) {
         let cnt = data.count
         data.withUnsafeBytes {
@@ -1557,7 +1559,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter buffer: The replacement bytes.
-    @inline(__always)
     public mutating func replaceSubrange<SourceType>(_ subrange: Range<Index>, with buffer: UnsafeBufferPointer<SourceType>) {
         guard !buffer.isEmpty  else { return }
         replaceSubrange(subrange, with: buffer.baseAddress!, count: buffer.count * MemoryLayout<SourceType>.stride)
@@ -1570,7 +1571,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - precondition: The bounds of `subrange` must be valid indices of the collection.
     /// - parameter subrange: The range in the data to replace.
     /// - parameter newElements: The replacement bytes.
-    @inline(__always)
     public mutating func replaceSubrange<ByteCollection : Collection>(_ subrange: Range<Index>, with newElements: ByteCollection) where ByteCollection.Iterator.Element == Data.Iterator.Element {
         _validateRange(subrange)
         let totalCount: Int = numericCast(newElements.count)
@@ -1585,7 +1585,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inline(__always)
+    @inlinable
     public mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer, count cnt: Int) {
         _validateRange(subrange)
         let nsRange = NSRange(location: subrange.lowerBound, length: subrange.upperBound - subrange.lowerBound)
@@ -1601,7 +1601,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Return a new copy of the data in a specified range.
     ///
     /// - parameter range: The range to copy.
-    @inline(__always)
+    @inlinable
     public func subdata(in range: Range<Index>) -> Data {
         _validateRange(range)
         if isEmpty {
@@ -1651,7 +1651,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         return hashValue
     }
     
-    @inline(__always)
+    @inlinable
     public func advanced(by amount: Int) -> Data {
         _validateIndex(startIndex + amount)
         let length = count - amount
@@ -1668,12 +1668,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     /// Sets or returns the byte at the specified index.
     public subscript(index: Index) -> UInt8 {
-        @inline(__always)
+        @inlinable
         get {
             _validateIndex(index)
             return _backing.get(index)
         }
-        @inline(__always)
+        @inlinable
         set {
             _validateIndex(index)
             if !isKnownUniquelyReferenced(&_backing) {
@@ -1684,12 +1684,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public subscript(bounds: Range<Index>) -> Data {
-        @inline(__always)
+        @inlinable
         get {
             _validateRange(bounds)
             return Data(backing: _backing, range: bounds)
         }
-        @inline(__always)
+        @inlinable
         set {
             replaceSubrange(bounds, with: newValue)
         }
@@ -1697,7 +1697,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
         where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
-        @inline(__always)
+        @inlinable
         get {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)
@@ -1708,7 +1708,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _validateRange(r)
             return Data(backing: _backing, range: r)
         }
-        @inline(__always)
+        @inlinable
         set {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)
@@ -1724,7 +1724,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     /// The start `Index` in the data.
     public var startIndex: Index {
-        @inline(__always)
+        @inlinable
         get {
             return _sliceRange.lowerBound
         }
@@ -1734,24 +1734,24 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// This is the "one-past-the-end" position, and will always be equal to the `count`.
     public var endIndex: Index {
-        @inline(__always)
+        @inlinable
         get {
             return _sliceRange.upperBound
         }
     }
     
-    @inline(__always)
+    @inlinable
     public func index(before i: Index) -> Index {
         return i - 1
     }
     
-    @inline(__always)
+    @inlinable
     public func index(after i: Index) -> Index {
         return i + 1
     }
     
     public var indices: Range<Int> {
-        @inline(__always)
+        @inlinable
         get {
             return startIndex..<endIndex
         }
