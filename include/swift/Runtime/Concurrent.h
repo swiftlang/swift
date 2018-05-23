@@ -459,6 +459,13 @@ private:
     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
   
+  void deallocateFreeList() {
+    for (Storage *storage : FreeList)
+      storage->deallocate();
+    FreeList.clear();
+    FreeList.shrink_to_fit();
+  }
+  
 public:
   struct Snapshot {
     ConcurrentReadableArray *Array;
@@ -489,6 +496,12 @@ public:
   
   ConcurrentReadableArray() : Capacity(0), ReaderCount(0), Elements(nullptr) {}
   
+  ~ConcurrentReadableArray() {
+    assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
+           "deallocating ConcurrentReadableArray with outstanding snapshots");
+    deallocateFreeList();
+  }
+  
   void push_back(const ElemTy &elem) {
     ScopedLock guard(WriterLock);
     
@@ -512,8 +525,7 @@ public:
     storage->Count.store(count + 1, std::memory_order_release);
     
     if (ReaderCount.load(std::memory_order_acquire) == 0)
-      for (Storage *storage : FreeList)
-        storage->deallocate();
+      deallocateFreeList();
   }
   
   Snapshot snapshot() {
