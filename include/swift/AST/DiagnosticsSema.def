@@ -1027,11 +1027,19 @@ NOTE(unbound_generic_parameter_explicit_fix,none,
 
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(invalid_dynamic_callable_type,none,
-      "@dynamicCallable attribute requires %0 to have either a valid "
-      "'dynamicallyCall(withArguments:)' method or a valid "
+      "@dynamicCallable attribute requires %0 to have either a valid, "
+      "non-generic 'dynamicallyCall(withArguments:)' method or "
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
+ERROR(missing_dynamic_callable_kwargs_method,none,
+      "@dynamicCallable type %0 cannot be applied with keyword arguments; "
+      "missing `dynamicCall(withKeywordArguments:)` method",
+      (Type))
 ERROR(ambiguous_dynamic_callable_method,none,
       "@dynamicCallable attribute does not support ambiguous method %0",
+      (DeclName))
+// TODO: Add support for generic @dynamicCallable methods.
+ERROR(generic_dynamic_callable_method,none,
+      "@dynamicCallable attribute does not support generic method %0",
       (DeclName))
 
 ERROR(type_invalid_dml,none,
