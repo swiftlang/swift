@@ -975,64 +975,63 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-
-  auto boundArgType = argType->getAs<BoundGenericType>();
-  if (!boundArgType ||
-      !TC.conformsToProtocol(boundArgType, dictLitProto, DC,
-                             ConformanceCheckOptions()))
-    return false;
-  auto genericTypes = boundArgType->getGenericArgs();
-  return TC.conformsToProtocol(genericTypes[0], stringLitProtocol, DC,
+  auto dictConf = TC.conformsToProtocol(argType, dictLitProto, DC,
+                                        ConformanceCheckOptions());
+  if (!dictConf) return false;
+  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
+  auto keyAssocType =
+    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
+  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
                                ConformanceCheckOptions()).hasValue();
+
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Returns the function declaration corresponding to a @dynamicCallable
-/// attribute required method, if it exists. Otherwise, return nullptr.
-static FuncDecl *getDynamicCallableMethod(TypeChecker &TC,
+/// Returns true if a declaration has a valid implementation of a
+/// @dynamicCallable attribute requirement.
+static bool hasValidDynamicCallableMethod(TypeChecker &TC,
                                           NominalTypeDecl *decl,
                                           StringRef methodName,
                                           StringRef argumentName,
-                                          bool hasKeywordArgs) {
+                                          bool hasKeywordArgs,
+                                          bool &error) {
   auto declType = decl->getDeclaredType();
   auto option = DeclName(TC.Context,
                          DeclBaseName(TC.Context.getIdentifier(methodName)),
                          { TC.Context.getIdentifier(argumentName) });
   auto candidates = TC.lookupMember(decl, declType, option);
-  if (candidates.empty()) return nullptr;
+  if (candidates.empty()) return false;
 
-  FuncDecl *method = nullptr;
-  for (auto entry : candidates) {
+  // Filter valid candidates.
+  candidates.filter([&](LookupResultEntry entry) {
     auto candidate = cast<FuncDecl>(entry.getValueDecl());
-    if (isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs)) {
-      // If a valid method has already been found, emit diagnostic and return.
-      if (method) {
-        TC.diagnose(method->getLoc(), diag::ambiguous_dynamic_callable_method,
-                    method->getFullName());
-        return nullptr;
-      }
-      // Otherwise, set valid method.
-      method = candidate;
-    }
-  }
-  return method;
-}
+    return isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs);
+  });
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns a DynamicCallableLookupResult with the @dynamicCallable required
-/// methods defined by a nominal type declaration.
-DynamicCallableLookupResult
-swift::findDynamicCallableMethods(TypeChecker &TC,
-                                  NominalTypeDecl *decl) {
-  DynamicCallableLookupResult result;
-  result.setArgumentsMethod(
-    getDynamicCallableMethod(TC, decl, "dynamicallyCall", "withArguments",
-                             /*hasKeywordArgs*/ false));
-  result.setKeywordArgumentsMethod(
-    getDynamicCallableMethod(TC, decl, "dynamicallyCall",
-                             "withKeywordArguments",
-                             /*hasKeywordArgs*/ true));
-  return result;
+  // If there are no valid candidates, return false.
+  if (candidates.size() == 0) return false;
+
+  auto candidate = cast<FuncDecl>(candidates.front().getValueDecl());
+  // If there are multiple valid candidates, emit overload error.
+  if (candidates.size() > 1) {
+    TC.diagnose(candidate->getLoc(),
+                diag::ambiguous_dynamic_callable_method,
+                candidate->getFullName());
+    error = true;
+    return false;
+  }
+  // If candidate is generic, emit error.
+  // TODO: Add support for generic @dynamicCallable methods.
+  if (candidate->isGeneric()) {
+    TC.diagnose(candidate->getLoc(),
+                diag::generic_dynamic_callable_method,
+                candidate->getFullName());
+    error = true;
+    return false;
+  }
+  // Otherwise, there is a single valid method.
+  return true;
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -1042,8 +1041,16 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
 
-  auto result = findDynamicCallableMethods(TC, decl);
-  if (!result.isValid()) {
+  bool hasValidMethod = false;
+  bool error = false;
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, "dynamicallyCall", "withArguments",
+                                  /*hasKeywordArgs*/ false, error);
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, "dynamicallyCall",
+                                  "withKeywordArguments",
+                                  /*hasKeywordArgs*/ true, error);
+  if (!hasValidMethod || error) {
     TC.diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
     attr->setInvalid();
   }

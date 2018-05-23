@@ -2577,52 +2577,12 @@ public:
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-/// \brief Stores the required methods for a @dynamicCallable type.
-struct DynamicCallableLookupResult {
-  FuncDecl *ArgumentsMethod;
-  FuncDecl *KeywordArgumentsMethod;
-
-  public:
-  DynamicCallableLookupResult(FuncDecl *argsMethod,
-                              FuncDecl *kwargsMethod)
-    : ArgumentsMethod(argsMethod),
-      KeywordArgumentsMethod(kwargsMethod) {}
-
-  DynamicCallableLookupResult()
-    : DynamicCallableLookupResult(nullptr, nullptr) {}
-
-  /// \brief Returns the method for dynamically calling with positional
-  /// (non-keyword) arguments, if it exists.
-  FuncDecl *getArgumentsMethod() const { return ArgumentsMethod; }
-
-  /// \brief Returns the method for dynamically calling with keyword arguments,
-  /// if it exists.
-  FuncDecl *getKeywordArgumentsMethod() const { return KeywordArgumentsMethod; }
-
-  /// \brief Returns true if type defines either of the @dynamicCallable
-  /// required methods. Returns false iff type does not satisfy @dynamicCallable
-  /// requirements.
-  bool isValid() const {
-    return ArgumentsMethod || KeywordArgumentsMethod;
-  }
-
-  void setArgumentsMethod(FuncDecl *d) { ArgumentsMethod = d; }
-  void setKeywordArgumentsMethod(FuncDecl *d) { KeywordArgumentsMethod = d; }
-};
-
-// SWIFT_ENABLE_TENSORFLOW
 /// Returns true if a method is an valid implementation of a @dynamicCallable
 /// attribute requirement. The method is given to be defined as one of the
 /// following: `dynamicallyCall(withArguments:)` or
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
                                   TypeChecker &TC, bool hasKeywordArguments);
-
-// SWIFT_ENABLE_TENSORFLOW
-/// Returns an DynamicCallableLookupResult showing which @dynamicCallable
-/// required methods are defined by a nominal type decl.
-DynamicCallableLookupResult findDynamicCallableMethods(TypeChecker &TC,
-                                                       NominalTypeDecl *decl);
 
 /// Given a subscript defined as "subscript(dynamicMember:)->T", return true if
 /// it is an acceptable implementation of the @dynamicMemberLookup attribute's
