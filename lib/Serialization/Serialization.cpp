@@ -3943,7 +3943,9 @@ void Serializer::writeType(Type ty) {
 
     unsigned abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
     UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                         addDeclRef(generic->getDecl()),
+                                         addDeclRef(generic->getDecl(),
+                                                    /*forceSerialization*/false,
+                                                    /*allowTypeAliasXRef*/true),
                                          addTypeRef(generic->getParent()));
     break;
   }

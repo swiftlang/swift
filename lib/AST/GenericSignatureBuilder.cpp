@@ -2639,9 +2639,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
   // Lookup the conformance of the concrete type to this protocol.
   auto conformance =
       lookupConformance(type.getDependentType(*this)->getCanonicalType(),
-                        concrete,
-                        proto->getDeclaredInterfaceType()
-                          ->castTo<ProtocolType>());
+                        concrete, proto);
   if (!conformance) {
     if (!concrete->hasError() && concreteSource->getLoc().isValid()) {
       Impl->HadAnyError = true;
@@ -2672,9 +2670,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   // Lookup the conformance of the superclass to this protocol.
   auto conformance =
     lookupConformance(type.getDependentType(*this)->getCanonicalType(),
-                      superclass,
-                      proto->getDeclaredInterfaceType()
-                        ->castTo<ProtocolType>());
+                      superclass, proto);
   if (!conformance) return nullptr;
 
   // Conformance to this protocol is redundant; update the requirement source
@@ -3825,16 +3821,16 @@ GenericSignatureBuilder::getLookupConformanceFn()
 Optional<ProtocolConformanceRef>
 GenericSignatureBuilder::lookupConformance(CanType dependentType,
                                            Type conformingReplacementType,
-                                           ProtocolType *conformedProtocol) {
+                                           ProtocolDecl *conformedProtocol) {
   if (conformingReplacementType->isTypeParameter())
-    return ProtocolConformanceRef(conformedProtocol->getDecl());
+    return ProtocolConformanceRef(conformedProtocol);
 
   // Figure out which module to look into.
   // FIXME: When lookupConformance() starts respecting modules, we'll need
   // to do some filtering here.
-  ModuleDecl *searchModule = conformedProtocol->getDecl()->getParentModule();
+  ModuleDecl *searchModule = conformedProtocol->getParentModule();
   auto result = searchModule->lookupConformance(conformingReplacementType,
-                                                conformedProtocol->getDecl());
+                                                conformedProtocol);
   if (result && getLazyResolver())
     getLazyResolver()->markConformanceUsed(*result, searchModule);
 
@@ -4726,7 +4722,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         // getLookupConformanceFns used in here don't use that parameter anyway.
         auto dependentType = CanType();
         auto conformance =
-            getLookupConformanceFn()(dependentType, subjectType, proto);
+            getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {

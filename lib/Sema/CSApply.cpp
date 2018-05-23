@@ -81,16 +81,15 @@ SubstitutionMap Solution::computeSubstitutions(
   auto &tc = getConstraintSystem().getTypeChecker();
 
   auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
+      [&](CanType original, Type replacement, ProtocolDecl *protoType)
           -> Optional<ProtocolConformanceRef> {
     if (replacement->hasError() ||
         isOpenedAnyObject(replacement) ||
         replacement->is<GenericTypeParamType>()) {
-      return ProtocolConformanceRef(protoType->getDecl());
+      return ProtocolConformanceRef(protoType);
     }
 
-    return tc.conformsToProtocol(replacement,
-                                 protoType->getDecl(),
+    return tc.conformsToProtocol(replacement, protoType,
                                  getConstraintSystem().DC,
                                  (ConformanceCheckFlags::InExpression|
                                   ConformanceCheckFlags::Used));
@@ -759,14 +758,8 @@ namespace {
         return ctorRef->getArg();
       } else if (auto apply = dyn_cast<ApplyExpr>(expr)) {
         return apply->getFn();
-      } else if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
-        return memberRef->getBase();
-      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(expr)) {
-        return dynMemberRef->getBase();
-      } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(expr)) {
-        return subscriptRef->getBase();
-      } else if (auto dynSubscriptRef = dyn_cast<DynamicSubscriptExpr>(expr)) {
-        return dynSubscriptRef->getBase();
+      } else if (auto lookupRef = dyn_cast<LookupExpr>(expr)) {
+        return lookupRef->getBase();
       } else if (auto load = dyn_cast<LoadExpr>(expr)) {
         return load->getSubExpr();
       } else if (auto inout = dyn_cast<InOutExpr>(expr)) {
@@ -1836,7 +1829,7 @@ namespace {
           assert(type->isEqual(genericSig->getGenericParams()[0]));
           return valueType;
         },
-        [&](CanType origType, Type replacementType, ProtocolType *protoType)
+        [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
           -> ProtocolConformanceRef {
           assert(bridgedToObjectiveCConformance);
           return *bridgedToObjectiveCConformance;
@@ -1865,7 +1858,6 @@ namespace {
       return bridgeFromObjectiveC(object, valueType, false);
     }
 
-    TypeAliasDecl *MaxIntegerTypeDecl = nullptr;
     TypeAliasDecl *MaxFloatTypeDecl = nullptr;
     
   public:
@@ -1928,28 +1920,6 @@ namespace {
         }
       }
 
-      // Find the maximum-sized builtin integer type.
-      
-      if (!MaxIntegerTypeDecl) {
-        SmallVector<ValueDecl *, 1> lookupResults;
-        tc.getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
-                                            tc.Context.Id_MaxBuiltinIntegerType,
-                                            NLKind::QualifiedLookup,
-                                            lookupResults);
-        if (lookupResults.size() == 1) {
-          MaxIntegerTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
-          tc.validateDecl(MaxIntegerTypeDecl);
-        }
-      }
-      if (!MaxIntegerTypeDecl ||
-          !MaxIntegerTypeDecl->hasInterfaceType() ||
-          !MaxIntegerTypeDecl->getDeclaredInterfaceType()->is<BuiltinIntegerType>()) {
-        tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
-        return nullptr;
-      }
-      tc.validateDecl(MaxIntegerTypeDecl);
-      auto maxType = MaxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
-
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_integerLiteral });
       DeclName builtinInitName(tc.Context, DeclBaseName::createConstructor(),
@@ -1963,7 +1933,9 @@ namespace {
                tc.Context.Id_IntegerLiteralType,
                initName,
                builtinProtocol,
-               maxType,
+               // Note that 'MaxIntegerType' is guaranteed to be available.
+               // Otherwise it would be caught by CSGen::visitLiteralExpr
+               tc.getMaxIntegerType(dc),
                builtinInitName,
                nullptr,
                diag::integer_literal_broken_proto,

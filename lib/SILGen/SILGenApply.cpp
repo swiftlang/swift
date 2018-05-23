@@ -4523,7 +4523,7 @@ RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
 RValue
 SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             FuncDecl *fn,
-                                            const SubstitutionMap &subMap,
+                                            SubstitutionMap subMap,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), subMap, loc);

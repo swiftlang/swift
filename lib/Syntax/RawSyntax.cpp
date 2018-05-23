@@ -76,6 +76,14 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   Bits.ManualMemory = unsigned(ManualMemory);
   Bits.NumChildren = Layout.size();
 
+  // Compute the text length
+  Bits.TextLength = 0;
+  for (const auto ChildNode : Layout) {
+    if (ChildNode && !ChildNode->isMissing()) {
+      Bits.TextLength += ChildNode->getTextLength();
+    }
+  }
+
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
                           getTrailingObjects<RC<RawSyntax>>());
@@ -237,6 +245,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
 
 void RawSyntax::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
+  llvm::errs() << '\n';
 }
 
 void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {

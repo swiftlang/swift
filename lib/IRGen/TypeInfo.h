@@ -452,6 +452,9 @@ public:
                                          SILType T) const = 0;
   
   /// Compute the packing of values of this type into a fixed-size buffer.
+  /// A value might not be stored in the fixed-size buffer because it does not
+  /// fit or because it is not bit-wise takable. Non bit-wise takable values are
+  /// not stored inline by convention.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
   
   /// Index into an array of objects of this type.

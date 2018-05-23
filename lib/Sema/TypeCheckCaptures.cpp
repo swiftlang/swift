@@ -271,7 +271,8 @@ public:
                         NTD->getDescriptiveKind(),
                         D->getBaseName().getIdentifier());
 
-            TC.diagnose(NTD->getLoc(), diag::type_declared_here);
+            TC.diagnose(NTD->getLoc(), diag::kind_declared_here,
+                        DescriptiveDeclKind::Type);
 
             TC.diagnose(D, diag::decl_declared_here, D->getFullName());
             return { false, DRE };

@@ -83,6 +83,7 @@ VisitorTests.test("SyntaxRewriter.visitCollection") {
 
     override func visit(_ items: CodeBlockItemListSyntax) {
       numberOfCodeBlockItems += items.count
+      super.visit(items)
     }
   }
 
@@ -92,7 +93,7 @@ VisitorTests.test("SyntaxRewriter.visitCollection") {
     )
     let visitor = VisitCollections()
     visitor.visit(parsed)
-    expectEqual(3, visitor.numberOfCodeBlockItems)
+    expectEqual(4, visitor.numberOfCodeBlockItems)
   })
 }
 

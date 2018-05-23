@@ -3659,7 +3659,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
             genericSig->getSubstitutionMap(
               [&](SubstitutableType *type) -> Type { return formalTy; },
               [&](CanType dependentType, Type replacementType,
-                  ProtocolType *protoType)->Optional<ProtocolConformanceRef> {
+                  ProtocolDecl *proto)->Optional<ProtocolConformanceRef> {
                 return hashable;
               });
       }
@@ -4567,28 +4567,10 @@ static bool mayLieAboutNonOptionalReturn(SILModule &M, Expr *expr) {
     return mayLieAboutNonOptionalReturn(M, load->getSubExpr());
   }
 
-  // A reference to a member property.
-  if (auto member = dyn_cast<MemberRefExpr>(expr)) {
+  // A reference to a potentially dynamic member/subscript property.
+  if (auto member = dyn_cast<LookupExpr>(expr)) {
     return isVerbatimNullableTypeInC(M, member->getType()) &&
       mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
-  }
-
-  // A reference to a subscript.
-  if (auto subscript = dyn_cast<SubscriptExpr>(expr)) {
-    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
-      mayLieAboutNonOptionalReturn(M, subscript->getDecl().getDecl());
-  }
-
-  // A reference to a member property found via dynamic lookup.
-  if (auto member = dyn_cast<DynamicMemberRefExpr>(expr)) {
-    return isVerbatimNullableTypeInC(M, member->getType()) &&
-      mayLieAboutNonOptionalReturn(M, member->getMember().getDecl());
-  }
-
-  // A reference to a subscript found via dynamic lookup.
-  if (auto subscript = dyn_cast<DynamicSubscriptExpr>(expr)) {
-    return isVerbatimNullableTypeInC(M, subscript->getType()) &&
-      mayLieAboutNonOptionalReturn(M, subscript->getMember().getDecl());
   }
 
   return false;

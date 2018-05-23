@@ -114,7 +114,7 @@ class ReabstractionInfo {
 
   // Create a new substituted type with the updated signature.
   CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
-                                           const SubstitutionMap &SubstMap,
+                                           SubstitutionMap SubstMap,
                                            bool HasUnboundGenericParams);
 
   void createSubstitutedAndSpecializedTypes();

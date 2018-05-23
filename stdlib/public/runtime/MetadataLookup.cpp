@@ -1128,8 +1128,10 @@ void swift::swift_getFieldAt(
       }
     }
 
+    auto typeName = field.getMangledTypeName(0);
+
     auto typeInfo = _getTypeByMangledName(
-        field.getMangledTypeName(0),
+        typeName,
         [&](unsigned depth, unsigned index) -> const Metadata * {
           if (depth >= descriptorPath.size())
             return nullptr;
@@ -1152,6 +1154,16 @@ void swift::swift_getFieldAt(
 
           return base->getGenericArgs()[flatIndex];
         });
+
+    // If demangling the type failed, pretend it's an empty type instead with
+    // a log message.
+    if (typeInfo == nullptr) {
+      typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
+      warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
+                 "mangled type name is '%*s'",
+                 (int)name.size(), name.data(),
+                 (int)typeName.size(), typeName.data());
+    }
 
     callback(name, FieldType()
                        .withType(typeInfo)

@@ -283,7 +283,7 @@ void SILLinkerVisitor::visitProtocolConformance(
   }
 }
 
-void SILLinkerVisitor::visitApplySubstitutions(const SubstitutionMap &subs) {
+void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
   for (auto &reqt : subs.getGenericSignature()->getRequirements()) {
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {

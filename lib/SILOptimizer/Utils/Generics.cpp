@@ -690,7 +690,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
 /// Create a new substituted type with the updated signature.
 CanSILFunctionType
 ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
-                                         const SubstitutionMap &SubstMap,
+                                         SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
   auto &M = OrigF->getModule();
   if ((SpecializedGenericSig &&

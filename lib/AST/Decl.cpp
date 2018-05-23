@@ -252,6 +252,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(TypeAlias, "type alias");
   ENTRY(GenericTypeParam, "generic parameter");
   ENTRY(AssociatedType, "associated type");
+  ENTRY(Type, "type");
   ENTRY(Enum, "enum");
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
@@ -259,6 +260,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
+  ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(Constructor, "initializer");
   ENTRY(Destructor, "deinitializer");
@@ -278,6 +280,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumElement, "enum element");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
+  ENTRY(Requirement, "requirement");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");

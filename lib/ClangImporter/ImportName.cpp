@@ -1779,6 +1779,40 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   return res;
 }
 
+bool NameImporter::forEachDistinctImportName(
+    const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+    llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
+  using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
+  SmallVector<ImportNameKey, 8> seenNames;
+
+  ImportedName newName = importName(decl, activeVersion);
+  if (!newName)
+    return true;
+  ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+  if (action(newName, activeVersion))
+    seenNames.push_back(key);
+
+  activeVersion.forEachOtherImportNameVersion(
+      [&](ImportNameVersion nameVersion) {
+        // Check to see if the name is different.
+        ImportedName newName = importName(decl, nameVersion);
+        if (!newName)
+          return;
+        ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+
+        bool seen = llvm::any_of(
+            seenNames, [&key](const ImportNameKey &existing) -> bool {
+              return key.first == existing.first &&
+                     key.second.equalsWithoutResolving(existing.second);
+            });
+        if (seen)
+          return;
+        if (action(newName, nameVersion))
+          seenNames.push_back(key);
+      });
+  return false;
+}
+
 const InheritedNameSet *NameImporter::getAllPropertyNames(
                           clang::ObjCInterfaceDecl *classDecl,
                           bool forInstance) {
@@ -1846,4 +1880,3 @@ const InheritedNameSet *NameImporter::getAllPropertyNames(
 
   return known->second.get();
 }
-

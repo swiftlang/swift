@@ -466,6 +466,16 @@ public:
     return consumeToken();
   }
 
+  SourceLoc consumeArgumentLabel(Identifier &Result) {
+    assert(Tok.canBeArgumentLabel());
+    assert(Result.empty());
+    if (!Tok.is(tok::kw__)) {
+      Tok.setKind(tok::identifier);
+      Result = Context.getIdentifier(Tok.getText());
+    }
+    return consumeToken();
+  }
+
   /// \brief Retrieve the location just past the end of the previous
   /// source location.
   SourceLoc getEndOfPreviousLoc();
@@ -520,6 +530,13 @@ public:
 
   /// \brief Skip until the next '#else', '#endif' or until eof.
   void skipUntilConditionalBlockClose();
+
+  /// If the parser is generating only a syntax tree, try loading the current
+  /// node from a previously generated syntax tree.
+  /// Returns \c true if the node has been loaded and inserted into the current
+  /// syntax tree. In this case the parser should behave as if the node has
+  /// successfully been created.
+  bool loadCurrentSyntaxNodeFromCache();
 
   /// Parse an #endif.
   bool parseEndIfDirective(SourceLoc &Loc);
