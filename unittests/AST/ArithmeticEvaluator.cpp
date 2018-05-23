@@ -246,8 +246,8 @@ TEST(ArithmeticEvaluator, Simple) {
   }
 
   EXPECT_EQ(productDependencies,
-    " `--InternallyCachedEvaluationRule(Binary: product)\n"
-    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
+    " `--InternallyCachedEvaluationRule(Binary: product) -> 2.461145e+02\n"
+    "     `--InternallyCachedEvaluationRule(Binary: sum) -> 5.859870e+00\n"
     "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
     "     |   `--InternallyCachedEvaluationRule(Literal: 2.718280e+00)\n"
     "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");

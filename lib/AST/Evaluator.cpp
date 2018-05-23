@@ -69,6 +69,13 @@ void Evaluator::printDependencies(const AnyRequest &request,
   // Print this node.
   simple_display(out, request);
 
+  // Print the cached value, if known.
+  auto cachedValue = cache.find(request);
+  if (cachedValue != cache.end()) {
+    out << " -> ";
+    PrintEscapedString(cachedValue->second.getAsString(), out);
+  }
+
   if (!visited.insert(request).second) {
     // We've already seed this node, so we have a cyclic dependency.
     out.changeColor(llvm::raw_ostream::RED);
