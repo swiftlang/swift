@@ -38,19 +38,19 @@
 #endif
 
 NOTE(kind_declname_declared_here,none,
-      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(kind_identifier_declared_here,none,
-      "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
+     "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
 NOTE(decl_declared_here,none,
-      "%0 declared here", (DeclName))
+     "%0 declared here", (DeclName))
 NOTE(identifier_declared_here,none,
-      "%0 declared here", (Identifier))
+     "%0 declared here", (Identifier))
 NOTE(kind_declared_here,none,
-      "%0 declared here", (DescriptiveDeclKind))
+     "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
-      "%1 '%0' is implicitly declared", (StringRef, StringRef))
+     "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
-      "extended type declared here", ())
+     "extended type declared here", ())
 
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
