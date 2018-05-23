@@ -24,9 +24,14 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
+#include <string>
 #include <tuple>
 #include <type_traits>
 #include <vector>
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace swift {
 
@@ -109,6 +114,17 @@ class Evaluator {
   /// A cache that stores the results of requests.
   llvm::DenseMap<AnyRequest, AnyValue> cache;
 
+  /// Track the dependencies of each request.
+  ///
+  /// This is an adjacency-list representation expressing, for each known
+  /// request, the requests that it directly depends on. It is populated
+  /// lazily while the request is being evaluated.
+  ///
+  /// In a well-formed program, the graph should be a directed acycle graph
+  /// (DAG). However, cyclic dependencies will be recorded within this graph,
+  /// so all clients must cope with cycles.
+  llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
+
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
@@ -187,6 +203,10 @@ private:
   /// Produce the result of the request without caching.
   template<typename Request>
   typename Request::OutputType getResultUncached(const Request &request) {
+    // Clear out the dependencies on this request; we're going to recompute
+    // them now anyway.
+    dependencies[request].clear();
+
     return request(*this);
   }
 
@@ -199,6 +219,10 @@ private:
     // If there is a cached result, return it.
     if (auto cached = request.getCachedResult())
       return *cached;
+
+    // Clear out the dependencies on this request; we're going to recompute
+    // them now anyway.
+    dependencies[request].clear();
 
     // Service the request.
     auto result = request(*this);
@@ -224,6 +248,10 @@ private:
       return known->second.castTo<typename Request::OutputType>();
     }
 
+    // Clear out the dependencies on this request; we're going to recompute
+    // them now anyway.
+    dependencies[request].clear();
+
     // Evaluate the request.
     auto result = request(*this);
 
@@ -231,6 +259,27 @@ private:
     cache.insert({anyRequest, result});
     return result;
   }
+
+public:
+  /// Print the dependencies of the given request as a tree.
+  ///
+  /// This is the core printing operation; most callers will want to use
+  /// the other overload.
+  void printDependencies(const AnyRequest &request,
+                         llvm::raw_ostream &out,
+                         llvm::DenseSet<AnyRequest> &visited,
+                         std::string &prefixStr,
+                         bool lastChild) const;
+
+  /// Print the dependencies of the given request as a tree.
+  void printDependencies(const AnyRequest &request,
+                         llvm::raw_ostream &out) const;
+
+  /// Dump the dependencies of the given request to the debugging stream
+  /// as a tree.
+  LLVM_ATTRIBUTE_DEPRECATED(
+    void dumpDependencies(const AnyRequest &request) const LLVM_ATTRIBUTE_USED,
+    "Only meant for use in the debugger");
 };
 
 } // end namespace evaluator

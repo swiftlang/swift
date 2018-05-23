@@ -60,6 +60,27 @@ class Binary : public ArithmeticExpr {
       lhs(lhs), rhs(rhs) { }
 };
 
+void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
+  switch (expr->kind) {
+  case ArithmeticExpr::Kind::Literal:
+    out << "Literal: " << static_cast<Literal *>(expr)->value;
+    break;
+
+  case ArithmeticExpr::Kind::Binary:
+    out << "Binary: ";
+    switch (static_cast<Binary *>(expr)->operatorKind) {
+    case Binary::OperatorKind::Sum:
+      out << "sum";
+      break;
+
+    case Binary::OperatorKind::Product:
+      out << "product";
+      break;
+    }
+    break;
+  }
+}
+
 /// Rule to evaluate the value of the expression.
 template<typename Derived>
 struct EvaluationRule
@@ -213,6 +234,33 @@ TEST(ArithmeticEvaluator, Simple) {
   EXPECT_EQ(*sum->cachedValue, 3.14159 + 2.71828);
   EXPECT_EQ(*product->cachedValue, expectedResult);
 
+  // Dependency printing.
+  std::string productDependencies;
+  {
+    llvm::raw_string_ostream out(productDependencies);
+    evaluator.printDependencies(InternallyCachedEvaluationRule(product), out);
+  }
+
+  EXPECT_EQ(productDependencies,
+    " `--InternallyCachedEvaluationRule(Binary: product)\n"
+    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
+    "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
+    "     |   `--InternallyCachedEvaluationRule(Literal: 2.718280e+00)\n"
+    "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
+
+  std::string sumDependencies;
+  {
+    llvm::raw_string_ostream out(sumDependencies);
+    evaluator.printDependencies(ExternallyCachedEvaluationRule(product), out);
+  }
+
+  EXPECT_EQ(sumDependencies,
+    " `--ExternallyCachedEvaluationRule(Binary: product)\n"
+    "     `--ExternallyCachedEvaluationRule(Binary: sum)\n"
+    "     |   `--ExternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
+    "     |   `--ExternallyCachedEvaluationRule(Literal: 2.718280e+00)\n"
+    "     `--ExternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
+
   // Cleanup
   delete pi;
   delete e;
@@ -268,6 +316,21 @@ TEST(ArithmeticEvaluator, Cycle) {
   ExternallyCachedEvaluationRule::brokeCycle = false;
   EXPECT_TRUE(isnan(evaluator(ExternallyCachedEvaluationRule(product))));
   EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
+
+  // Dependency printing.
+  std::string productDependencies;
+  {
+    llvm::raw_string_ostream out(productDependencies);
+    evaluator.printDependencies(InternallyCachedEvaluationRule(product), out);
+  }
+
+  EXPECT_EQ(productDependencies,
+    " `--InternallyCachedEvaluationRule(Binary: product)\n"
+    "     `--InternallyCachedEvaluationRule(Binary: sum)\n"
+    "     |   `--InternallyCachedEvaluationRule(Literal: 3.141590e+00)\n"
+    "     |   `--InternallyCachedEvaluationRule(Binary: product) "
+      "(cyclic dependency)\n"
+    "     `--InternallyCachedEvaluationRule(Literal: 4.200000e+01)\n");
 
   // Cleanup
   delete pi;
