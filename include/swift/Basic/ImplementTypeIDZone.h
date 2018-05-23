@@ -15,9 +15,9 @@
 //  Two macros should be #define'd before inclusion, and will be #undef'd at
 //  the end of this file:
 //
-//    SWIFT_TYPEID_ZONE: The name of the Zone being defined, e.g.,
-//    SwiftAST for the Swift AST library's zone. All zones need to be defined
-//    a priori as 
+//    SWIFT_TYPEID_ZONE: The ID number of the Zone being defined, which must
+//    be unique. 0 is reserved for basic C and LLVM types; 255 is reserved
+//    for test cases.
 //
 //    SWIFT_TYPEID_HEADER: A (quoted) name of the header to be
 //    included to define the types in the zone.
