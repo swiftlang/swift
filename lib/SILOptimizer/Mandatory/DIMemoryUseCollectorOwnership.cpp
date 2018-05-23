@@ -1769,22 +1769,25 @@ collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
+  if (MemoryInfo.isDelegatingInit()) {
+    assert(MemoryInfo.isClassInitSelf());
+    return true;
+  }
+
+  return MemoryInfo.isNonDelegatingInit() &&
+         MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.isDerivedClassSelfOnly();
+}
+
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
 void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
     bool isDIFinished, bool TreatAddressToPointerAsInout) {
-  // If we have a delegating init, use the delegating init element use
-  // collector.
-  if (MemoryInfo.isDelegatingInit()) {
-    if (MemoryInfo.isClassInitSelf()) {
-      DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
-      UseCollector.collectClassInitSelfUses();
-      MemoryInfo.collectRetainCountInfo(UseInfo);
-      return;
-    }
 
+  if (MemoryInfo.isDelegatingInit() && !MemoryInfo.isClassInitSelf()) {
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
@@ -1795,11 +1798,9 @@ void swift::ownership::collectDIElementUsesFrom(
     return;
   }
 
-  if (MemoryInfo.isNonDelegatingInit() &&
-      MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
-      MemoryInfo.isDerivedClassSelfOnly()) {
-    DelegatingClassInitElementUseCollector(MemoryInfo, UseInfo)
-        .collectClassInitSelfUses();
+  if (shouldPerformClassInitSelf(MemoryInfo)) {
+    DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
+    UseCollector.collectClassInitSelfUses();
     MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
   }
