@@ -642,13 +642,6 @@ struct BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = true;
 
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
-                                    reinterpret_cast<OpaqueValue*>(src),
-                                    self);
-  }
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
@@ -664,21 +657,6 @@ struct BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
                             FixedPacking::Allocate>
     : BufferValueWitnessesBase<Impl> {
   static constexpr bool isInline = false;
-
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    auto wtable = self->getValueWitnesses();
-    auto *srcReference = *reinterpret_cast<HeapObject **>(src);
-    *reinterpret_cast<HeapObject **>(dest) = srcReference;
-
-    // Project the address of the value in the buffer.
-    unsigned alignMask = wtable->getAlignmentMask();
-    // Compute the byte offset of the object in the box.
-    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-    auto *bytePtr = reinterpret_cast<char *>(srcReference);
-    return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-  }
 
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,
@@ -700,26 +678,6 @@ struct BufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
 /// fixed in size.
 template <class Impl, bool IsKnownAllocated>
 struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
-  static OpaqueValue *initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                       ValueBuffer *src,
-                                                       const Metadata *self) {
-    auto vwtable = self->getValueWitnesses();
-    (void)vwtable;
-    if (!IsKnownAllocated && vwtable->isValueInline()) {
-      return Impl::initializeWithTake(reinterpret_cast<OpaqueValue *>(dest),
-                                      reinterpret_cast<OpaqueValue *>(src),
-                                      self);
-    } else {
-      auto reference = src->PrivateData[0];
-      dest->PrivateData[0] = reference;
-      // Project the address of the value in the buffer.
-      unsigned alignMask = vwtable->getAlignmentMask();
-      // Compute the byte offset of the object in the box.
-      unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-      auto *bytePtr = reinterpret_cast<char *>(reference);
-      return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-    }
-  }
 
   static OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                        ValueBuffer *src,

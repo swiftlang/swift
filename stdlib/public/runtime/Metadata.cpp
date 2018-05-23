@@ -1057,23 +1057,6 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
-/// Generic tuple value witness for 'initializeBufferWithTakeOfBuffer'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                           ValueBuffer *src,
-                                                     const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-  if (IsInline) {
-    return tuple_initializeWithTake<IsPOD, IsInline>(
-        tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
-        tuple_projectBuffer<IsPOD, IsInline>(src, metatype), metatype);
-  }
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-  return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
-}
-
 template <bool IsPOD, bool IsInline>
 static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
@@ -1560,20 +1543,6 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  auto wtable = self->getValueWitnesses();
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-
-  // Project the address of the value in the buffer.
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr = reinterpret_cast<char *>(srcReference);
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-}
-
 static void pod_noop(void *object, const Metadata *self) {
 }
 #define pod_direct_destroy \
@@ -1589,9 +1558,6 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_indirect_initializeWithCopy pod_direct_initializeWithCopy
 #define pod_direct_initializeBufferWithCopyOfBuffer \
   pointer_function_cast<value_witness_types::initializeBufferWithCopyOfBuffer> \
-    (pod_direct_initializeWithCopy)
-#define pod_direct_initializeBufferWithTakeOfBuffer \
-  pointer_function_cast<value_witness_types::initializeBufferWithTakeOfBuffer> \
     (pod_direct_initializeWithCopy)
 #define pod_direct_assignWithCopy pod_direct_initializeWithCopy
 #define pod_indirect_assignWithCopy pod_direct_initializeWithCopy
@@ -1705,23 +1671,12 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
     // Use POD value witnesses for operations that do an initializeWithTake.
     if (flags.isInlineStorage()) {
       vwtable->initializeWithTake = pod_direct_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_direct_initializeBufferWithTakeOfBuffer;
     } else {
       vwtable->initializeWithTake = pod_indirect_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_indirect_initializeBufferWithTakeOfBuffer;
     }
     return;
   }
 
-  if (!flags.isInlineStorage()) {
-    // For values stored out-of-line, initializeBufferWithTakeOfBuffer is
-    // always a memcpy.
-    vwtable->initializeBufferWithTakeOfBuffer
-      = pod_indirect_initializeBufferWithTakeOfBuffer;
-    return;
-  }
 }
 
 /***************************************************************************/

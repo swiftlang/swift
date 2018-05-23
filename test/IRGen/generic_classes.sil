@@ -389,7 +389,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[B_CHECKED]] to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK:   store i8** [[T0]], i8*** [[T1]], align 8
 // CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[FIELDS_ADDR]], i64* [[OFFSETS]])

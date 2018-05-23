@@ -107,20 +107,9 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBoxBase
   static Container *initializeWithTake(Container *dest, Container *src,
                                        A... args) {
     src->copyTypeInto(dest, args...);
-    auto *type = src->getType();
-    auto *vwt = type->getValueWitnesses();
-
-    if (vwt->isValueInline()) {
-      auto *destValue =
-          reinterpret_cast<OpaqueValue *>(dest->getBuffer(args...));
-      auto *srcValue =
-          reinterpret_cast<OpaqueValue *>(src->getBuffer(args...));
-
-      type->vw_initializeWithTake(destValue, srcValue);
-    } else {
-      // initWithTake of the reference to the cow box.
-      copyReference(dest, src, Dest::Init, Source::Take, args...);
-    }
+    auto from = src->getBuffer(args...);
+    auto to = dest->getBuffer(args...);
+    memcpy(to, from, sizeof(ValueBuffer));
     return dest;
   }
 

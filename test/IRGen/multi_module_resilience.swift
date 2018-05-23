@@ -20,7 +20,7 @@ import OtherModule
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
 //   Allocate 'copy'.
-// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK: [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to [[INT]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, [[INT]] [[SIZE]],
@@ -49,7 +49,7 @@ public func copyFoo(foo: Foo) -> Foo {
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
 //   Allocate 'copy'.
-// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK: [[T1:%.*]] = load i8*, i8** [[T0]],
 // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to [[INT]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, [[INT]] [[SIZE]],

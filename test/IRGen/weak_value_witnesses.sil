@@ -24,7 +24,6 @@ struct Gen<T> {
   var x: C
   var y: T
 }
-// CHECK: @"$S20weak_value_witnesses8JustWeakVWV" = internal constant [12 x i8*] {{.*}}@__swift_copy_outline_existential_box_pointer
 
 // CHECK-NOT: define linkonce_odr hidden %swift.opaque* @"$S20weak_value_witnesses8JustWeakVwTK"(
 
