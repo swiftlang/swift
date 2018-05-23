@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering -verify | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -verify | %FileCheck %s
 
 // This file contains tests that test diagnostics emitted for var initialization
 // by DI.
@@ -362,7 +362,7 @@ bb0(%0 : @trivial $*ContainsNativeObject):
 
 // CHECK-LABEL: sil @non_box_assign_trivial
 // CHECK-NOT: load
-// CHECK: store
+// CHECK: assign
 // CHECK: return
 sil @non_box_assign_trivial : $@convention(thin) (@inout Bool, Bool) -> () {
 bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
@@ -372,8 +372,8 @@ bb0(%0 : @trivial $*Bool, %1 : @trivial $Bool):
 }
 
 // CHECK-LABEL: sil @non_box_assign
-// CHECK: load
-// CHECK: store
+// CHECK-NOT: load
+// CHECK: assign
 // CHECK: return
 sil @non_box_assign : $@convention(thin) (@inout SomeClass, @owned SomeClass) -> () {
 bb0(%0 : @trivial $*SomeClass, %1 : @owned $SomeClass):
@@ -390,7 +390,6 @@ sil_global @int_global : $Int
 sil @test_tlc : $() -> () {
   %0 = global_addr @int_global : $*Int
   %1 = mark_uninitialized [var] %0 : $*Int
-
   %9 = tuple ()
   return %9 : $()
 }
