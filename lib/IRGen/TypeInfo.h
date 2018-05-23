@@ -370,23 +370,6 @@ public:
                                                    Address srcBuffer,
                                                    SILType T) const;
 
-  /// Perform a take-initialization from the given fixed-size buffer
-  /// into an uninitialized fixed-size buffer, allocating the buffer if
-  /// necessary and deallocating the destination buffer.  Returns the
-  /// address of the value inside the destination buffer.
-  ///
-  /// This is equivalent to:
-  ///   auto srcAddress = projectBuffer(IGF, srcBuffer, T);
-  ///   initializeBufferWithTake(IGF, destBuffer, srcAddress, T);
-  ///   deallocateBuffer(IGF, srcBuffer, T);
-  /// but may be able to re-use the buffer from the source buffer, and may
-  /// be more efficient for dynamic types, since it uses a single
-  /// value witness call.
-  virtual Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                                   Address destBuffer,
-                                                   Address srcBuffer,
-                                                   SILType T) const;
-
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address src, SILType T,

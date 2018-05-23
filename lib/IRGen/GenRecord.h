@@ -323,22 +323,6 @@ protected:
 public:
   using super::getStorageType;
 
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcBuffer,
-                                           SILType type) const override {
-    if (auto field = getUniqueNonEmptyField()) {
-      auto &fieldTI = field->getTypeInfo();
-      Address fieldResult =
-        fieldTI.initializeBufferWithTakeOfBuffer(IGF, destBuffer, srcBuffer,
-                                                 field->getType(IGF.IGM, type));
-      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
-    } else {
-      return super::initializeBufferWithTakeOfBuffer(IGF, destBuffer,
-                                                     srcBuffer, type);
-    }
-  }
-
   Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
                                            Address destBuffer,
                                            Address srcBuffer,
