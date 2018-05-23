@@ -878,16 +878,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         Backtracking->cancelBacktrack();
 
       // Consume a name.
-      if (!Tok.is(tok::kw__))
-        element.Name = Context.getIdentifier(Tok.getText());
-      element.NameLoc = consumeToken();
+      element.NameLoc = consumeArgumentLabel(element.Name);
 
       // If there is a second name, consume it as well.
-      if (Tok.canBeArgumentLabel()) {
-        if (!Tok.is(tok::kw__))
-          element.SecondName = Context.getIdentifier(Tok.getText());
-        element.SecondNameLoc = consumeToken();
-      }
+      if (Tok.canBeArgumentLabel())
+        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
 
       // Consume the ':'.
       if (!consumeIf(tok::colon, element.ColonLoc))
