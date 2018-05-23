@@ -2732,9 +2732,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::protocol_requirement_here,
+          diags.diagnose(requirement, diag::kind_declname_declared_here,
+                         DescriptiveDeclKind::Requirement,
                          requirement->getFullName());
-
         });
     }
 
@@ -2835,7 +2835,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             }
           }
 
-          diags.diagnose(requirement, diag::protocol_requirement_here,
+          diags.diagnose(requirement, diag::kind_declname_declared_here,
+                         DescriptiveDeclKind::Requirement,
                          requirement->getFullName());
       });
       break;
@@ -2873,7 +2874,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          witness->getFullName(),
                          conformance->getProtocol()->getFullName());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
-          diags.diagnose(requirement, diag::protocol_requirement_here,
+          diags.diagnose(requirement, diag::kind_declname_declared_here,
+                         DescriptiveDeclKind::Requirement,
                          requirement->getFullName());
         });
       break;
@@ -3516,7 +3518,8 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
                            "@nonobjc ");
           }
 
-          TC.diagnose(requirement, diag::protocol_requirement_here,
+          TC.diagnose(requirement, diag::kind_declname_declared_here,
+                      DescriptiveDeclKind::Requirement,
                       requirement->getFullName());
 
           Conformance->setInvalid();
@@ -4484,7 +4487,8 @@ static void diagnosePotentialWitness(TypeChecker &tc,
       .fixItInsert(witness->getAttributeInsertionLoc(false), "@nonobjc ");
   }
 
-  tc.diagnose(req, diag::protocol_requirement_here, req->getFullName());
+  tc.diagnose(req, diag::kind_declname_declared_here,
+              DescriptiveDeclKind::Requirement, req->getFullName());
 }
 
 /// Whether the given protocol is "NSCoding".
