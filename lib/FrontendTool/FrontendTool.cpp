@@ -765,20 +765,22 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
   assert(!TBDPath.empty() &&
          "If not WMO, getTBDPathForWholeModule should have failed");
 
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
+  auto installName = frontendOpts.TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+                         : frontendOpts.TBDInstallName;
 
   TBDGenOptions opts;
   opts.InstallName = installName;
   opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
 
   return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
@@ -1141,7 +1143,8 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
 
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto mode = frontendOpts.ValidateTBDAgainstIR;
   // Ensure all cases are covered by using a switch here.
   switch (mode) {
   case FrontendOptions::TBDValidationMode::None:
@@ -1152,6 +1155,7 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   }
   TBDGenOptions opts;
   opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
 
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
   return MSF.is<SourceFile *>()

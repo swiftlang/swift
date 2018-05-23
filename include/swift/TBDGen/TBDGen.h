@@ -30,6 +30,8 @@ struct TBDGenOptions {
   bool HasMultipleIGMs;
   /// \brief The install-name used for the compilation.
   llvm::StringRef InstallName;
+  /// \brief The module link name (for force loading).
+  llvm::StringRef ModuleLinkName;
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,

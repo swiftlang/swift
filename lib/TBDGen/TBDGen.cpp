@@ -332,6 +332,13 @@ void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
   }
 }
 
+void TBDGenVisitor::addFirstFileSymbols() {
+  if (!Opts.ModuleLinkName.empty()) {
+    SmallString<32> buf;
+    addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName));
+  }
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
                                            llvm::raw_ostream *os,
@@ -343,6 +350,10 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   TBDGenVisitor visitor(symbols, target, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
+    if (file == M->getFiles()[0]) {
+      visitor.addFirstFileSymbols();
+    }
+
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
