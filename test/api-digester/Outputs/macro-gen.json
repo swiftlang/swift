@@ -1,13 +1,35 @@
 [
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Constructor",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
-    "LeftUsr": "s:12macrogenleft2S1VyACSicfc",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
     "LeftComment": "Int",
     "RightUsr": "",
-    "RightComment": "Double",
+    "RightComment": "() -> ()",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "String",
     "ModuleName": "macrogenleft"
   },
   {
@@ -90,8 +112,8 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "UnwrapOptional",
-    "ChildIndex": "1:0:1",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "2:0",
     "LeftUsr": "s:12macrogenleft2S1V4foo91x1yySays10DictionaryVySiSSSgGG_SaySiGtF",
     "LeftComment": "",
     "RightUsr": "",
@@ -101,8 +123,8 @@
   {
     "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
-    "NodeAnnotation": "WrapOptional",
-    "ChildIndex": "2:0",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1:0:1",
     "LeftUsr": "s:12macrogenleft2S1V4foo91x1yySays10DictionaryVySiSSSgGG_SaySiGtF",
     "LeftComment": "",
     "RightUsr": "",
@@ -144,35 +166,13 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "0",
-    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
-    "LeftComment": "String",
-    "RightUsr": "",
-    "RightComment": "Int",
-    "ModuleName": "macrogenleft"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
-    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
+    "LeftUsr": "s:12macrogenleft2S1VyACSicfc",
     "LeftComment": "Int",
     "RightUsr": "",
-    "RightComment": "() -> ()",
-    "ModuleName": "macrogenleft"
-  },
-  {
-    "DiffItemKind": "CommonDiffItem",
-    "NodeKind": "Function",
-    "NodeAnnotation": "TypeRewritten",
-    "ChildIndex": "2",
-    "LeftUsr": "s:12macrogenleft2C1C4foo2ySSSi_SitF",
-    "LeftComment": "Int",
-    "RightUsr": "",
-    "RightComment": "String",
+    "RightComment": "Double",
     "ModuleName": "macrogenleft"
   }
 ]

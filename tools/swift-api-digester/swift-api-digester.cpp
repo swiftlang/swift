@@ -2988,8 +2988,8 @@ void TypeMemberDiffFinder::dump(llvm::raw_ostream &os) const {
 }
 
 namespace {
-template<typename T>
 
+template<typename T>
 void removeRedundantAndSort(std::vector<T> &Diffs) {
   std::set<T> DiffSet(Diffs.begin(), Diffs.end());
   Diffs.assign(DiffSet.begin(), DiffSet.end());
@@ -2998,7 +2998,6 @@ void removeRedundantAndSort(std::vector<T> &Diffs) {
 
 template<typename T>
 void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
-  removeRedundantAndSort(Diffs);
   if (Diffs.empty())
     return;
   Fs << "\n";
@@ -3824,6 +3823,10 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   auto &typeMemberDiffs = Ctx.getTypeMemberDiffs();
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
+  removeRedundantAndSort(AllItems);
+  removeRedundantAndSort(typeMemberDiffs);
+  removeRedundantAndSort(AllNoEscapingFuncs);
+  removeRedundantAndSort(Overloads);
   if (options::OutputInJson) {
     std::vector<APIDiffItem*> TotalItems;
     std::transform(AllItems.begin(), AllItems.end(),
