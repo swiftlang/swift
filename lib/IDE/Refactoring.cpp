@@ -908,6 +908,15 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
     return ExtractCheckResult();
   }
 
+  // Disallow extracting certain kinds of statements.
+  if (RangeInfo.Kind == RangeKind::SingleStatement) {
+    Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
+
+    // These aren't independent statement.
+    if (isa<BraceStmt>(S) || isa<CatchStmt>(S) || isa<CaseStmt>(S))
+      return ExtractCheckResult();
+  }
+
   // Disallow extracting literals.
   if (RangeInfo.Kind == RangeKind::SingleExpression) {
     Expr *E = RangeInfo.ContainedNodes[0].get<Expr*>();
