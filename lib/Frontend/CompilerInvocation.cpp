@@ -304,9 +304,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.EmitPublicTypeMetadataAccessors =
-    Args.hasArg(OPT_emit_public_type_metadata_accessors);
-
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
