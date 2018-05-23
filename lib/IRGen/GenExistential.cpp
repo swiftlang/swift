@@ -280,7 +280,7 @@ class OpaqueExistentialTypeInfo final :
                             llvm::Type *ty, Size size, Alignment align)
     : super(protocols, ty, size,
             SpareBitVector::getConstant(size.getValueInBits(), false), align,
-            IsNotPOD, IsNotBitwiseTakable, IsFixedSize) {}
+            IsNotPOD, IsBitwiseTakable, IsFixedSize) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {

@@ -327,7 +327,7 @@ struct LLVM_LIBRARY_VISIBILITY OpaqueExistentialBox
   static constexpr size_t alignment = alignof(Container);
   static constexpr size_t stride = sizeof(Container);
   static constexpr size_t isPOD = false;
-  static constexpr bool isBitwiseTakable = false;
+  static constexpr bool isBitwiseTakable = true;
   static constexpr unsigned numExtraInhabitants = 0;
 };
 
