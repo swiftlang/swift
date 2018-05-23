@@ -37,11 +37,16 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-
-NOTE(type_declared_here,none,
-     "type declared here", ())
+NOTE(kind_declname_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
+NOTE(kind_identifier_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, Identifier))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
+NOTE(identifier_declared_here,none,
+     "%0 declared here", (Identifier))
+NOTE(kind_declared_here,none,
+     "%0 declared here", (DescriptiveDeclKind))
 NOTE(implicit_member_declared_here,none,
      "%1 '%0' is implicitly declared", (StringRef, StringRef))
 NOTE(extended_type_declared_here,none,
@@ -765,8 +770,6 @@ ERROR(precedence_group_cycle,none,
 ERROR(precedence_group_lower_within_module,none,
       "precedence group cannot be given lower precedence than group in same"
       " module; make the other precedence group higher than this one instead",
-      ())
-NOTE(precedence_group_declared_here,none,"precedence group declared here",
       ())
 ERROR(precedence_group_redeclared,none,
       "precedence group redeclared", ())
@@ -1689,8 +1692,6 @@ NOTE(protocol_witness_nonconform_type,none,
      "possibly intended match %0 does not "
      "%select{inherit from|conform to}2 %1", (Type, Type, bool))
 
-NOTE(protocol_requirement_here,none,
-     "requirement %0 declared here", (DeclName))
 NOTE(protocol_conformance_here,none,
      "%select{|class }0%1 declares conformance to protocol %2 here",
      (bool, DeclName, DeclName))
@@ -1753,8 +1754,6 @@ ERROR(typealias_outside_of_protocol,none,
 
 ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
-NOTE(protocol_here,none,
-     "protocol %0 declared here", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
@@ -2072,8 +2071,6 @@ ERROR(superclass_of_open_not_open,none,
   "superclass %0 of open class must be open", (Type))
 ERROR(circular_class_inheritance,none,
       "circular class inheritance %0", (StringRef))
-NOTE(class_here,none,
-     "class %0 declared here", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
@@ -2141,8 +2138,6 @@ WARNING(enum_raw_type_access_warn,none,
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
         (bool, AccessLevel, AccessLevel, bool))
 
-NOTE(enum_here,none,
-     "enum %0 declared here", (Identifier))
 ERROR(empty_enum_raw_type,none,
       "an enum with no cases cannot declare a raw type", ())
 ERROR(enum_raw_value_without_raw_type,none,
@@ -2247,8 +2242,6 @@ ERROR(property_behavior_not_protocol,none,
       "property behavior name must refer to a protocol", ())
 ERROR(property_behavior_protocol_reqt_ambiguous,none,
       "property behavior protocol has ambiguous %0 member", (Identifier))
-NOTE(property_behavior_protocol_reqt_here,none,
-     "%0 declared here", (Identifier))
 ERROR(property_behavior_protocol_no_value,none,
       "property behavior protocol does not have a 'value' property", ())
 ERROR(property_behavior_protocol_no_initStorage,none,
@@ -2685,8 +2678,6 @@ ERROR(type_parameter_count_mismatch,none,
       (Identifier, unsigned, unsigned, bool))
 ERROR(generic_type_requires_arguments,none,
       "reference to generic type %0 requires arguments in <...>", (Type))
-NOTE(generic_type_declared_here,none,
-     "generic type %0 declared here", (Identifier))
 NOTE(descriptive_generic_type_declared_here,none,
      "%0 declared here", (StringRef))
 

@@ -709,7 +709,7 @@ static void breakInheritanceCycle(EnumDecl *enumDecl) {
 template<typename T>
 static void checkCircularity(TypeChecker &tc, T *decl,
                              Diag<StringRef> circularDiag,
-                             Diag<Identifier> declHereDiag,
+                             DescriptiveDeclKind declKind,
                              SmallVectorImpl<T *> &path) {
   switch (decl->getCircularityCheck()) {
   case CircularityCheck::Checked:
@@ -752,7 +752,8 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     // Diagnose the cycle.
     tc.diagnose(decl->getLoc(), circularDiag, pathStr);
     for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      tc.diagnose(*i, declHereDiag, (*i)->getName());
+      tc.diagnose(*i, diag::kind_identifier_declared_here,
+                  declKind, (*i)->getName());
     }
 
     // Set this declaration as invalid, then break the cycle somehow.
@@ -768,7 +769,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     decl->setCircularityCheck(CircularityCheck::Checking);
     T *scratch = nullptr;
     for (auto inherited : getInheritedForCycleCheck(tc, decl, &scratch)) {
-      checkCircularity(tc, inherited, circularDiag, declHereDiag, path);
+      checkCircularity(tc, inherited, circularDiag, declKind, path);
     }
     decl->setCircularityCheck(CircularityCheck::Checked);
     path.pop_back();
@@ -1837,7 +1838,7 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 
   if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
     const ValueDecl *VD = CITR->getBoundDecl();
-    TC.diagnose(VD, diag::type_declared_here);
+    TC.diagnose(VD, diag::kind_declared_here, DescriptiveDeclKind::Type);
   }
 }
 
@@ -3430,11 +3431,9 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
                       diag::property_behavior_protocol_reqt_ambiguous,
                       TC.Context.Id_initStorage);
           TC.diagnose(defaultInitStorageDecl->getLoc(),
-                      diag::property_behavior_protocol_reqt_here,
-                      TC.Context.Id_initStorage);
+                      diag::identifier_declared_here, TC.Context.Id_initStorage);
           TC.diagnose(parameterizedInitStorageDecl->getLoc(),
-                      diag::property_behavior_protocol_reqt_here,
-                      TC.Context.Id_initStorage);
+                      diag::identifier_declared_here, TC.Context.Id_initStorage);
           conformance->setInvalid();
           continue;
         }
@@ -3503,8 +3502,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
           TC.diagnose(behavior->getLoc(),
                       diag::property_behavior_invalid_parameter_reqt,
                       behaviorProto->getName());
-          TC.diagnose(varReqt->getLoc(),
-                      diag::property_behavior_protocol_reqt_here,
+          TC.diagnose(varReqt->getLoc(), diag::identifier_declared_here,
                       TC.Context.Id_parameter);
           conformance->setInvalid();
           continue;
@@ -3774,7 +3772,8 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
             == dc->getParentModule()) {
         if (!PGD->isInvalid()) {
           diagnose(rel.NameLoc, diag::precedence_group_lower_within_module);
-          diagnose(group->getNameLoc(), diag::precedence_group_declared_here);
+          diagnose(group->getNameLoc(), diag::kind_declared_here,
+                   DescriptiveDeclKind::PrecedenceGroup);
           isInvalid = true;
         }
       } else {
@@ -4478,7 +4477,7 @@ public:
       SmallVector<EnumDecl *, 8> path;
       path.push_back(ED);
       checkCircularity(TC, ED, diag::circular_enum_inheritance,
-                       diag::enum_here, path);
+                       DescriptiveDeclKind::Enum, path);
     }
 
     for (Decl *member : ED->getMembers())
@@ -4638,7 +4637,7 @@ public:
       SmallVector<ClassDecl *, 8> path;
       path.push_back(CD);
       checkCircularity(TC, CD, diag::circular_class_inheritance,
-                       diag::class_here, path);
+                       DescriptiveDeclKind::Class, path);
     }
 
     for (Decl *Member : CD->getMembers())
@@ -4762,7 +4761,7 @@ public:
       SmallVector<ProtocolDecl *, 8> path;
       path.push_back(PD);
       checkCircularity(TC, PD, diag::circular_protocol_def,
-                       diag::protocol_here, path);
+                       DescriptiveDeclKind::Protocol, path);
 
       // Make sure the parent protocols have been fully validated.
       for (auto inherited : PD->getLocalProtocols()) {
@@ -6879,7 +6878,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         if (mentionsItself) {
           diagnose(defaultDefinition.getLoc(), diag::recursive_type_reference,
                    assocType->getDescriptiveKind(), assocType->getName());
-          diagnose(assocType, diag::type_declared_here);
+          diagnose(assocType, diag::kind_declared_here, DescriptiveDeclKind::Type);
         }
       }
     }
@@ -7009,8 +7008,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           diagnose(proto->getLoc(),
                    diag::objc_protocol_inherits_non_objc_protocol,
                    proto->getDeclaredType(), inherited->getDeclaredType());
-          diagnose(inherited->getLoc(), diag::protocol_here,
-                   inherited->getName());
+          diagnose(inherited->getLoc(), diag::kind_identifier_declared_here,
+                   DescriptiveDeclKind::Protocol, inherited->getName());
           isObjC = None;
         }
       }

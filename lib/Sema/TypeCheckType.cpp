@@ -460,8 +460,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
              genericParams->size(), genericArgs.size(),
              genericArgs.size() < genericParams->size())
         .highlight(generic->getAngleBrackets());
-    diagnose(decl, diag::generic_type_declared_here,
-             decl->getName());
+    diagnose(decl, diag::kind_identifier_declared_here,
+             DescriptiveDeclKind::GenericType, decl->getName());
     return ErrorType::get(Context);
   }
 
@@ -495,7 +495,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
              genericDecl->getDescriptiveKind(), genericDecl->getName());
-    diagnose(genericDecl, diag::type_declared_here);
+    diagnose(genericDecl, diag::kind_declared_here,
+             DescriptiveDeclKind::Type);
     return ErrorType::get(Context);
   }
 
@@ -671,8 +672,8 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  tc.diagnose(unbound->getDecl(), diag::generic_type_declared_here,
-              unbound->getDecl()->getName());
+  tc.diagnose(unbound->getDecl(), diag::kind_identifier_declared_here,
+              DescriptiveDeclKind::GenericType, unbound->getDecl()->getName());
 }
 
 // Produce a diagnostic if the type we referenced was an
@@ -730,7 +731,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     if (!typeDecl->hasInterfaceType()) {
       TC.diagnose(loc, diag::recursive_type_reference,
                   typeDecl->getDescriptiveKind(), typeDecl->getName());
-      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+      TC.diagnose(typeDecl->getLoc(), diag::kind_declared_here,
+                  DescriptiveDeclKind::Type);
       return ErrorType::get(TC.Context);
     }
   }
@@ -871,7 +873,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults)
-        tc.diagnose(lookupResult.getValueDecl(), diag::type_declared_here);
+        tc.diagnose(lookupResult.getValueDecl(), diag::kind_declared_here,
+                    DescriptiveDeclKind::Type);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -937,7 +940,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
     for (auto lookupResult : inaccessibleMembers)
-      tc.diagnose(lookupResult.first, diag::type_declared_here);
+      tc.diagnose(lookupResult.first, diag::kind_declared_here,
+                  DescriptiveDeclKind::Type);
 
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.

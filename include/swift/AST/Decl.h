@@ -122,7 +122,8 @@ enum class DescriptiveDeclKind : uint8_t {
   PrecedenceGroup,
   TypeAlias,
   GenericTypeParam,
-  AssociatedType,  
+  AssociatedType,
+  Type,
   Enum,
   Struct,
   Class,
@@ -130,6 +131,7 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericEnum,
   GenericStruct,
   GenericClass,
+  GenericType,
   Subscript,
   Constructor,
   Destructor,
@@ -149,6 +151,7 @@ enum class DescriptiveDeclKind : uint8_t {
   EnumElement,
   Module,
   MissingMember,
+  Requirement,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
