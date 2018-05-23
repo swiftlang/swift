@@ -2526,7 +2526,7 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   Data.flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
     .withPOD(false)
-    .withBitwiseTakable(false)
+    .withBitwiseTakable(true)
     .withInlineStorage(false)
     .withExtraInhabitants(false);
   Data.stride = Box::Container::getStride(numWitnessTables);
