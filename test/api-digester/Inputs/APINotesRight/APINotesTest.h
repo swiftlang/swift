@@ -28,3 +28,5 @@ typedef NSString * AnimalAttributeName NS_STRING_ENUM;
 @end
 
 extern AnimalAttributeName globalAttributeName;
+
+typedef NSString * CatAttributeName NS_STRING_ENUM;

@@ -28,3 +28,5 @@ extern int ANTGlobalValue;
 @end
 
 extern NSString *globalAttributeName;
+
+typedef NSString * CatAttributeName;

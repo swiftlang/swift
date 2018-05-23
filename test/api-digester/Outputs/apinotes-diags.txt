@@ -1,5 +1,6 @@
 
 /* RawRepresentable Changes */
+APINotesTest(APINotesTest.h): TypeAlias CatAttributeName(NSString) is now String representable
 
 /* Removed Decls */
 APINotesTest(APINotesTest.h): Func ObjcProt.protMemberFunc2() has been removed
