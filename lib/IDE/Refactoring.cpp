@@ -1688,12 +1688,12 @@ findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
   return {OuterIf, InnerIf};
 }
 
-bool RefactoringActionCollapseNestedIfExpr::
+bool RefactoringActionCollapseNestedIfStmt::
 isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
   return findCollapseNestedIfTarget(CursorInfo).first;
 }
 
-bool RefactoringActionCollapseNestedIfExpr::performChange() {
+bool RefactoringActionCollapseNestedIfStmt::performChange() {
   auto Target = findCollapseNestedIfTarget(CursorInfo);
   if (!Target.first)
     return true;

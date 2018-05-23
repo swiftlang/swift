@@ -390,7 +390,7 @@ func testConvertToTernaryExpr() {
 
 // CHECK-LOCALIZE-STRING: Localize String
 
-// CHECK-COLLAPSE-NESTED-IF: Collapse Nested If Expression
+// CHECK-COLLAPSE-NESTED-IF: Collapse Nested If Statements
 
 // CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
 
