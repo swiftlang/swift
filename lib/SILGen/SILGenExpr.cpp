@@ -1520,15 +1520,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     SGF.ThrowDest,
     JumpDest(catchBB, SGF.Cleanups.getCleanupsDepth(), E)};
 
-  SILValue branchArg;
-  if (isByAddress) {
-    assert(optInit);
-    SILValue optAddr = optInit->getAddressForInPlaceInitialization(SGF, E);
-    SGF.emitInjectOptionalValueInto(E, E->getSubExpr(), optAddr, optTL);
-  } else {
-    ManagedValue subExprValue = SGF.emitRValueAsSingleValue(E->getSubExpr());
-    branchArg = subExprValue.forward(SGF);
-  }
+  RValue subExprResult = visit(E->getSubExpr());
 
   localCleanups.pop();
 
@@ -1538,9 +1530,12 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
     SGF.eraseBasicBlock(catchBB);
 
     // The value we provide is the one we've already got.
-    if (!isByAddress)
+    if (!isByAddress) {
+      // What should I do with 'branchArg' here, though?
       return RValue(SGF, E,
+                    SGF.emit
                     SGF.emitManagedRValueWithCleanup(branchArg, optTL));
+    }
 
     optInit->finishInitialization(SGF);
 
@@ -1554,10 +1549,7 @@ RValue RValueEmitter::visitOptionalTryExpr(OptionalTryExpr *E, SGFContext C) {
   SILBasicBlock *contBB = SGF.createBasicBlock();
 
   // Branch to the continuation block.
-  if (isByAddress)
-    SGF.B.createBranch(E, contBB);
-  else
-    SGF.B.createBranch(E, contBB, branchArg);
+  SGF.B.createBranch(E, contBB);
 
   // If control branched to the failure block, inject .None into the
   // result type.
