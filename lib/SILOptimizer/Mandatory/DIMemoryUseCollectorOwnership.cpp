@@ -1459,24 +1459,79 @@ void ElementUseCollector::collectClassSelfUses(
 }
 
 //===----------------------------------------------------------------------===//
-//                     DelegatingInitElementUseCollector
+//                    DelegatingValueTypeInitUseCollector
+//===----------------------------------------------------------------------===//
+
+static void
+collectValueTypeDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
+                                   DIElementUseInfo &UseInfo,
+                                   SingleValueInstruction *I) {
+  for (auto *Op : I->getUses()) {
+    auto *User = Op->getUser();
+
+    // destroy_addr is a release of the entire value. This can result from an
+    // early release due to a conditional initializer.
+    if (isa<DestroyAddrInst>(User)) {
+      UseInfo.trackDestroy(User);
+      continue;
+    }
+
+    // For delegating initializers, we only track calls to self.init with
+    // specialized code. All other uses are modeled as escapes.
+    //
+    // *NOTE* This intentionally ignores all stores, which (if they got emitted
+    // as copyaddr or assigns) will eventually get rewritten as assignments (not
+    // initializations), which is the right thing to do.
+    DIUseKind Kind = DIUseKind::Escape;
+
+    // Stores *to* the allocation are writes.  If the value being stored is a
+    // call to self.init()... then we have a self.init call.
+    if (auto *AI = dyn_cast<AssignInst>(User)) {
+      if (AI->getDest() == I) {
+        UseInfo.trackStoreToSelf(AI);
+        Kind = DIUseKind::InitOrAssign;
+      }
+    }
+
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (CAI->getDest() == I) {
+        UseInfo.trackStoreToSelf(CAI);
+        Kind = DIUseKind::InitOrAssign;
+      }
+    }
+
+    // Look through begin_access
+    if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
+      collectValueTypeDelegatingInitUses(TheMemory, UseInfo, BAI);
+      continue;
+    }
+
+    // Ignore end_access
+    if (isa<EndAccessInst>(User))
+      continue;
+
+    // We can safely handle anything else as an escape.  They should all happen
+    // after self.init is invoked.
+    UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                   DelegatingClassInitElementUseCollector
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-class DelegatingInitElementUseCollector {
+class DelegatingClassInitElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
-  void collectValueTypeInitSelfUses(SingleValueInstruction *I);
-
 public:
-  DelegatingInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                                    DIElementUseInfo &UseInfo)
+  DelegatingClassInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
+                                         DIElementUseInfo &UseInfo)
       : TheMemory(TheMemory), UseInfo(UseInfo) {}
 
   void collectClassInitSelfUses();
-  void collectValueTypeInitSelfUses();
 
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
@@ -1488,7 +1543,7 @@ public:
 
 /// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
 /// delegating-constructor-for-a-class case.
-void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
+void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
@@ -1631,70 +1686,9 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   }
 }
 
-void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
-    SingleValueInstruction *I) {
-  for (auto Op : I->getUses()) {
-    auto *User = Op->getUser();
-
-    // destroy_addr is a release of the entire value. This can result from an
-    // early release due to a conditional initializer.
-    if (isa<DestroyAddrInst>(User)) {
-      UseInfo.trackDestroy(User);
-      continue;
-    }
-
-    // For delegating initializers, we only track calls to self.init with
-    // specialized code. All other uses are modeled as escapes.
-    //
-    // *NOTE* This intentionally ignores all stores, which (if they got emitted
-    // as copyaddr or assigns) will eventually get rewritten as assignments (not
-    // initializations), which is the right thing to do.
-    DIUseKind Kind = DIUseKind::Escape;
-
-    // Stores *to* the allocation are writes.  If the value being stored is a
-    // call to self.init()... then we have a self.init call.
-    if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (AI->getDest() == I) {
-        UseInfo.trackStoreToSelf(AI);
-        Kind = DIUseKind::InitOrAssign;
-      }
-    }
-
-    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == I) {
-        UseInfo.trackStoreToSelf(CAI);
-        Kind = DIUseKind::InitOrAssign;
-      }
-    }
-
-    // Look through begin_access
-    if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
-      collectValueTypeInitSelfUses(BAI);
-      continue;
-    }
-
-    // Ignore end_access
-    if (isa<EndAccessInst>(User))
-      continue;
-
-    // We can safely handle anything else as an escape.  They should all happen
-    // after self.init is invoked.
-    UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
-  }
-}
-
-void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
-  // When we're analyzing a delegating constructor, we aren't field sensitive at
-  // all.  Just treat all members of self as uses of the single
-  // non-field-sensitive value.
-  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-  collectValueTypeInitSelfUses(MUI);
-}
-
-void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
-    MarkUninitializedInst *MUI, SingleValueInstruction *LI) {
+void DelegatingClassInitElementUseCollector::
+collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+                                       SingleValueInstruction *LI) {
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
   // If we have a load, then this is a use of the box.  Look at the uses of
@@ -1784,13 +1778,19 @@ void swift::ownership::collectDIElementUsesFrom(
   // If we have a delegating init, use the delegating init element use
   // collector.
   if (MemoryInfo.isDelegatingInit()) {
-    DelegatingInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     if (MemoryInfo.isClassInitSelf()) {
+      DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
       UseCollector.collectClassInitSelfUses();
-    } else {
-      UseCollector.collectValueTypeInitSelfUses();
+      MemoryInfo.collectRetainCountInfo(UseInfo);
+      return;
     }
 
+    // When we're analyzing a delegating constructor, we aren't field sensitive
+    // at all. Just treat all members of self as uses of the single
+    // non-field-sensitive value.
+    assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
+    auto *MUI = cast<MarkUninitializedInst>(MemoryInfo.MemoryInst);
+    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo, MUI);
     MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
   }
@@ -1798,7 +1798,7 @@ void swift::ownership::collectDIElementUsesFrom(
   if (MemoryInfo.isNonDelegatingInit() &&
       MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
       MemoryInfo.isDerivedClassSelfOnly()) {
-    DelegatingInitElementUseCollector(MemoryInfo, UseInfo)
+    DelegatingClassInitElementUseCollector(MemoryInfo, UseInfo)
         .collectClassInitSelfUses();
     MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
