@@ -92,28 +92,32 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
         normalConformance);
-    auto addSymbolIfNecessary = [&](SILDeclRef declRef) {
-      auto witnessLinkage = declRef.getLinkage(ForDefinition);
+    auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
+                                    ValueDecl *witnessDecl) {
+      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
-        addSymbol(Mangler.mangleWitnessThunk(normalConformance,
-                                             declRef.getDecl()));
+        addSymbol(
+            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
-                                                        Witness witness) {
-      if (isa<AbstractFunctionDecl>(valueReq)) {
-        addSymbolIfNecessary(SILDeclRef(valueReq));
-      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        if (auto *getter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(getter));
-        if (auto *setter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(setter));
-        if (auto *materializeForSet = storage->getMaterializeForSetFunc())
-          addSymbolIfNecessary(SILDeclRef(materializeForSet));
-      }
-    });
+    normalConformance->forEachValueWitness(
+        nullptr, [&](ValueDecl *valueReq, Witness witness) {
+          auto witnessDecl = witness.getDecl();
+          if (isa<AbstractFunctionDecl>(valueReq)) {
+            addSymbolIfNecessary(valueReq, witnessDecl);
+          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
+            if (auto *getter = storage->getGetter())
+              addSymbolIfNecessary(getter, witnessStorage->getGetter());
+            if (auto *setter = storage->getSetter())
+              addSymbolIfNecessary(setter, witnessStorage->getSetter());
+            if (auto *materializeForSet = storage->getMaterializeForSetFunc())
+              addSymbolIfNecessary(materializeForSet,
+                                   witnessStorage->getMaterializeForSetFunc());
+          }
+        });
   }
 }
 
