@@ -2967,14 +2967,23 @@ namespace {
     }
 
     Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
-      Type optType = simplifyType(cs.getType(expr));
+      Type subExprType = expr->getSubExpr()->getType();
+      Type targetType = simplifyType(subExprType);
       
-      Expr *subExpr = coerceToType(expr->getSubExpr(), optType,
-                                   cs.getConstraintLocator(expr));
-      if (!subExpr) return nullptr;
+      // If the subexpression is not optional, wrap it in
+      // an InjectIntoOptionalExpr. Then use the type of the
+      // subexpression as the type of the 'try?' expr
+      bool subExprIsOptional = (bool) subExprType->getOptionalObjectType();
       
-      expr->setSubExpr(subExpr);
-      cs.setType(expr, optType);
+      if (!subExprIsOptional) {
+        targetType = OptionalType::get(targetType);
+        auto subExpr = coerceToType(expr->getSubExpr(), targetType,
+                                    cs.getConstraintLocator(expr));
+        if (!subExpr) return nullptr;
+        expr->setSubExpr(subExpr);
+      }
+      
+      cs.setType(expr, targetType);
       return expr;
     }
 
