@@ -111,8 +111,6 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 int main(int argc_, const char **argv_) {
-  PROGRAM_START(argc_, argv_);
-
   SmallVector<const char *, 256> argv;
   llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
   std::error_code EC = llvm::sys::Process::GetArgumentVector(
@@ -133,6 +131,10 @@ int main(int argc_, const char **argv_) {
       llvm::cl::TokenizeWindowsCommandLine :
       llvm::cl::TokenizeGNUCommandLine,
       argv);
+
+  // Initialize the stack trace using the parsed argument vector with expanded
+  // response files.
+  PROGRAM_START(argv.size(), argv.data());
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);

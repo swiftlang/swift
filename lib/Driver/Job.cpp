@@ -355,9 +355,10 @@ void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   os << ' ';
   if (hasResponseFile()) {
     printArguments(os, {ResponseFileArg});
-  } else {
-    printArguments(os, Arguments);
+    os << " # ";
   }
+  printArguments(os, Arguments);
+
   os << Terminator;
 }
 
