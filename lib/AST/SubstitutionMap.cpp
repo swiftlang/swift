@@ -275,6 +275,11 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
     // Substitute into the replacement type.
     replacementType = concreteType.subst(*this);
+
+    // If the generic signature is canonical, canonicalize the replacement type.
+    if (getGenericSignature()->isCanonical())
+      replacementType = replacementType->getCanonicalType();
+
     return replacementType;
   }
 
@@ -290,6 +295,11 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   replacementType = ErrorType::get(type);
 
   replacementType = lookupSubstitution(cast<SubstitutableType>(canonicalType));
+
+  // If the generic signature is canonical, canonicalize the replacement type.
+  if (getGenericSignature()->isCanonical())
+    replacementType = replacementType->getCanonicalType();
+
   return replacementType;
 }
 
