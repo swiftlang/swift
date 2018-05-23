@@ -3807,6 +3807,22 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   RefinementPass.pass(LeftModule, RightModule);
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
+
+  auto &AliasMap = Ctx.getTypeAliasUpdateMap();
+  // Find type alias change first.
+  TypeAliasDiffFinder(LeftModule, RightModule, AliasMap).search();
+
+  for (auto Pair: AliasMap) {
+    auto Left = Pair.first->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->
+      getPrintedName();
+    auto Right = AliasMap[(SDKNode*)Pair.first]->getAs<SDKNodeDeclType>()->
+      getRawValueType()->getPrintedName();
+    auto *D = Pair.first->getAs<SDKNodeDecl>();
+    AllItems.emplace_back(SDKNodeKind::DeclTypeAlias,
+      NodeAnnotation::TypeAliasDeclToRawRepresentable, "0",
+      D->getUsr(), "", Left, Right, D->getModuleName());
+  }
+
   AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
                                 [&](CommonDiffItem &Item) {
     return Item.DiffKind == NodeAnnotation::RemovedDecl &&

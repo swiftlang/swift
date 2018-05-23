@@ -12,6 +12,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeAlias",
+    "NodeAnnotation": "TypeAliasDeclToRawRepresentable",
+    "ChildIndex": "0",
+    "LeftUsr": "c:APINotesTest.h@T@CatAttributeName",
+    "LeftComment": "NSString",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "Function",
     "NodeAnnotation": "SimpleStringRepresentableUpdate",
     "ChildIndex": "1",
