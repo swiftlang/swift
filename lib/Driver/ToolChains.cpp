@@ -183,8 +183,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_emit_public_type_metadata_accessors);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
