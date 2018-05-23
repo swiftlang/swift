@@ -507,7 +507,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(5 * sizeof(void*), ex1->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex1->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex1->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex1->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex1->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex1->getSuperclassConstraint());
       return ex1;
@@ -525,7 +525,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(6 * sizeof(void*), ex2->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex2->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex2->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex2->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex2->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex2->getSuperclassConstraint());
       return ex2;
@@ -543,7 +543,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(7 * sizeof(void*), ex3->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex3->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex3->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex3->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex3->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex3->getSuperclassConstraint());
       return ex3;
