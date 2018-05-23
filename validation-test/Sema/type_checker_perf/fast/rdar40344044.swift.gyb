@@ -1,4 +1,4 @@
-// RUN: %scale-test --invert-result --begin 3 --end 8  --step 1 --select incrementScopeCounter %s
+// RUN: %scale-test --begin 3 --end 20  --step 1 --select incrementScopeCounter %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
