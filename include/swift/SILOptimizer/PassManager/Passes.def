@@ -236,6 +236,8 @@ PASS(MandatorySILLinker, "mandatory-linker",
      "Deserialize all referenced SIL functions that are shared or transparent")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
+PASS(RawSILInstLowering, "raw-sil-inst-lowering",
+     "Lower all raw SIL instructions to canonical equivalents.")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
 PASS(TempRValueOpt, "temp-rvalue-opt",

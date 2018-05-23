@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -Onone -Xllvm -sil-print-debuginfo \
-// RUN:   -o /dev/null -Xllvm -sil-print-after=definite-init \
+// RUN:   -o /dev/null -Xllvm -sil-print-after=raw-sil-inst-lowering \
 // RUN:   -Xllvm -sil-print-only-functions=$S8patatino4BearC6before7before26during5afterACSb_S3btKcfc \
 // RUN:   2>&1 | %FileCheck %s
 // REQUIRES: executable_test
