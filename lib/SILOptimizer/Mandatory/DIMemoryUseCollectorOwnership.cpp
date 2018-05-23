@@ -62,19 +62,9 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(SILInstruction *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MemoryInst) {
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
-           "analyzing multi-field boxes not implemented");
-    return {ABI->getBoxType()->getFieldType(MemoryInst->getModule(), 0), false};
-  }
-
-  if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    return {ASI->getElementType(), false};
-  }
-
-  auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+  auto *MUI = MemoryInst;
   SILType MemorySILType = MUI->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -89,7 +79,7 @@ computeMemorySILType(SILInstruction *MemoryInst) {
   return {MemorySILType, VDecl->isLet()};
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
+DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
@@ -352,9 +342,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
-  if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-    if (MUI->isVar())
-      return MUI->getLoc().getAsASTNode<VarDecl>();
+  if (MemoryInst->isVar())
+    return MemoryInst->getLoc().getAsASTNode<VarDecl>();
 
   // Otherwise, we can't.
   return nullptr;
@@ -521,11 +510,7 @@ public:
       return;
     }
 
-    if (auto *ABI = TheMemory.getContainer()) {
-      collectContainerUses(ABI);
-    } else {
-      collectUses(TheMemory.getAddress(), 0);
-    }
+    collectUses(TheMemory.MemoryInst, 0);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -538,7 +523,6 @@ public:
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
-  void collectContainerUses(AllocBoxInst *ABI);
   void collectClassSelfUses();
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
@@ -648,29 +632,6 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   }
 
   collectUses(SEAI, BaseEltNo);
-}
-
-void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (auto *Op : ABI->getUses()) {
-    auto *User = Op->getUser();
-
-    // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
-        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
-      continue;
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(PBI, PBI->getFieldIndex());
-      continue;
-    }
-
-    // Other uses of the container are considered escapes of the values.
-    for (unsigned Field : indices(ABI->getBoxType()->getLayout()->getFields())) {
-      addElementUses(Field,
-                     ABI->getBoxType()->getFieldType(ABI->getModule(), Field),
-                     User, DIUseKind::Escape);
-    }
-  }
 }
 
 /// Return the underlying accessed pointer value. This peeks through
@@ -1072,10 +1033,9 @@ void ElementUseCollector::collectClassSelfUses() {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-  if (MUI->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(TheMemory.getAddress(), TheMemory.MemorySILType,
-                         EltNumbering);
+  auto *MemoryInst = TheMemory.MemoryInst;
+  if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
+    collectClassSelfUses(MemoryInst, TheMemory.MemorySILType, EltNumbering);
     return;
   }
 
@@ -1092,7 +1052,7 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  SmallVector<Operand *, 8> Uses(MemoryInst->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1103,7 +1063,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MUI->getParent()) {
+          if (Arg->getParent() == MemoryInst->getParent()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1118,7 +1078,7 @@ void ElementUseCollector::collectClassSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MUI)
+          if (LI->getOperand() == MemoryInst)
             continue;
 
         // Any other store needs to be recorded.
@@ -1528,7 +1488,7 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
   assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
+  auto *MUI = TheMemory.MemoryInst;
 
   // The number of stores of the initial 'self' argument into the self box
   // that we saw.
@@ -1772,8 +1732,8 @@ void swift::ownership::collectDIElementUsesFrom(
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
     assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
-    auto *MUI = cast<MarkUninitializedInst>(MemoryInfo.MemoryInst);
-    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo, MUI);
+    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo,
+                                       MemoryInfo.MemoryInst);
     return;
   }
 
