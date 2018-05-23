@@ -280,6 +280,14 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(
     void dumpDependencies(const AnyRequest &request) const LLVM_ATTRIBUTE_USED,
     "Only meant for use in the debugger");
+
+  /// Print all dependencies known to the evaluator as a single Graphviz
+  /// directed graph.
+  void printDependenciesGraphviz(llvm::raw_ostream &out) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(
+    void dumpDependenciesGraphviz() const LLVM_ATTRIBUTE_USED,
+    "Only meant for use in the debugger");
 };
 
 } // end namespace evaluator

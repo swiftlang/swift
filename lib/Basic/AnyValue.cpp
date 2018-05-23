@@ -18,3 +18,12 @@
 using namespace swift;
 
 AnyValue::HolderBase::~HolderBase() { }
+
+std::string AnyValue::getAsString() const {
+  std::string result;
+  {
+    llvm::raw_string_ostream out(result);
+    simple_display(out, *this);
+  }
+  return result;
+}

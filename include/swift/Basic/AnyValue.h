@@ -139,6 +139,9 @@ public:
   friend void simple_display(llvm::raw_ostream &out, const AnyValue &value) {
     value.stored->display(out);
   }
+
+  /// Return the result of calling simple_display as a string.
+  std::string getAsString() const;
 };
 
 } // end namespace swift

@@ -20,6 +20,7 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
+#include <string>
 
 namespace llvm {
 class raw_ostream;
@@ -209,6 +210,9 @@ public:
   friend void simple_display(llvm::raw_ostream &out, const AnyRequest &any) {
     any.stored->display(out);
   }
+
+  /// Return the result of calling simple_display as a string.
+  std::string getAsString() const;
 
   static AnyRequest getEmptyKey() {
     return AnyRequest(StorageKind::Empty);

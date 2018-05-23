@@ -16,11 +16,21 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/Evaluator.h"
 #include "swift/Basic/Range.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
 AnyRequest::HolderBase::~HolderBase() { }
+
+std::string AnyRequest::getAsString() const {
+  std::string result;
+  {
+    llvm::raw_string_ostream out(result);
+    simple_display(out, *this);
+  }
+  return result;
+}
 
 Evaluator::Evaluator(DiagnosticEngine &diags) : diags(diags) { }
 
@@ -107,4 +117,91 @@ void Evaluator::dumpDependencies(const AnyRequest &request) const {
   printDependencies(request, llvm::dbgs());
 }
 
+void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
+  // Form a list of all of the requests we know about.
+  std::vector<AnyRequest> allRequests;
+  for (const auto &knownRequest : dependencies) {
+    allRequests.push_back(knownRequest.first);
+  }
 
+  // Sort the list of requests based on the display strings, so we get
+  // deterministic output.
+  auto getDisplayString = [&](const AnyRequest &request) {
+    std::string result;
+    {
+      llvm::raw_string_ostream out(result);
+      simple_display(out, request);
+    }
+    return result;
+  };
+  std::sort(allRequests.begin(), allRequests.end(),
+            [&](const AnyRequest &lhs, const AnyRequest &rhs) {
+              return getDisplayString(lhs) < getDisplayString(rhs);
+            });
+
+  // Manage request IDs to use in the resulting output graph.
+  llvm::DenseMap<AnyRequest, unsigned> requestIDs;
+  unsigned nextID = 0;
+
+  // Prepopulate the known requests.
+  for (const auto &request : allRequests) {
+    requestIDs[request] = nextID++;
+  }
+
+  auto getRequestID = [&](const AnyRequest &request) {
+    auto known = requestIDs.find(request);
+    if (known != requestIDs.end()) return known->second;
+
+    // We discovered a new request; record it's ID and add it to the list of
+    // all requests.
+    allRequests.push_back(request);
+    requestIDs[request] = nextID;
+    return nextID++;
+  };
+
+  auto getNodeName = [&](const AnyRequest &request) {
+    std::string result;
+    {
+      llvm::raw_string_ostream out(result);
+      out << "request_" << getRequestID(request);
+    }
+    return result;
+  };
+
+  // Emit the graph header.
+  out << "digraph Dependencies {\n";
+
+  // Emit the edges.
+  for (const auto &source : allRequests) {
+    auto known = dependencies.find(source);
+    assert(known != dependencies.end());
+    for (const auto &target : known->second) {
+      out << "  " << getNodeName(source) << " -> " << getNodeName(target)
+          << ";\n";
+    }
+  }
+
+  out << "\n";
+
+  // Emit the nodes.
+  for (unsigned i : indices(allRequests)) {
+    const auto &request = allRequests[i];
+    out << "  " << getNodeName(request);
+    out << " [label=\"";
+    PrintEscapedString(request.getAsString(), out);
+
+    auto cachedValue = cache.find(request);
+    if (cachedValue != cache.end()) {
+      out << " -> ";
+      PrintEscapedString(cachedValue->second.getAsString(), out);
+    }
+    out << "\"];\n";
+  }
+
+  // Done!
+  out << "}\n";
+}
+
+void Evaluator::dumpDependenciesGraphviz() const {
+  printDependenciesGraphviz(llvm::dbgs());
+}
