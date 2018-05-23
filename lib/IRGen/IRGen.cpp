@@ -489,7 +489,7 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
     EmitPasses.add(createTargetTransformInfoWrapperPass(
         TargetMachine->getTargetIRAnalysis()));
 
-    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS,
+    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS, nullptr,
                                                    FileType, !Opts.Verify);
     if (fail) {
       if (Diags) {
