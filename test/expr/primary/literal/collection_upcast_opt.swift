@@ -11,7 +11,7 @@ struct TakesArray<T> {
   init(_: [(T) -> Void]) { }
 }
 
-// CHECK-LABEL: func_decl "arrayUpcast(_:_:)"
+// CHECK-LABEL: func_decl{{.*}}"arrayUpcast(_:_:)"
 // CHECK: assign_expr
 // CHECK-NOT: collection_upcast_expr
 // CHECK: array_expr type='[(X) -> Void]'
@@ -27,7 +27,7 @@ struct TakesDictionary<T> {
   init(_: [Int : (T) -> Void]) { }
 }
 
-// CHECK-LABEL: func_decl "dictionaryUpcast(_:_:)"
+// CHECK-LABEL: func_decl{{.*}}"dictionaryUpcast(_:_:)"
 // CHECK: assign_expr
 // CHECK-NOT: collection_upcast_expr
 // CHECK: paren_expr type='([Int : (X) -> Void])'
