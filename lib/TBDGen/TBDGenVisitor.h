@@ -94,6 +94,8 @@ public:
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);
 
+  void visitAccessorDecl(AccessorDecl *AD);
+
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
@@ -103,6 +105,8 @@ public:
   void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD);
+
+  void visitAbstractStorageDecl(AbstractStorageDecl *ASD);
 
   void visitVarDecl(VarDecl *VD);
 

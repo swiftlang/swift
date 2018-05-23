@@ -150,6 +150,22 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
+  // Do nothing: accessors are always nested within the storage decl, but
+  // sometimes appear outside it too. To avoid double-walking them, we
+  // explicitly visit them as members of the storage and ignore them when we
+  // visit them as part of the main walk, here.
+}
+
+void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  // Explicitly look at each accessor here: see visitAccessorDecl.
+  SmallVector<Decl *, 8> accessors;
+  ASD->getAllAccessorFunctions(accessors);
+  for (auto accessor : accessors) {
+    visitAbstractFunctionDecl(cast<AbstractFunctionDecl>(accessor));
+  }
+}
+
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
@@ -162,6 +178,8 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
+
+  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
