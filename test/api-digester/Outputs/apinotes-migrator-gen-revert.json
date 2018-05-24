@@ -5,9 +5,9 @@
     "NodeAnnotation": "RevertSimpleStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleAttribute:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
@@ -27,9 +27,9 @@
     "NodeAnnotation": "RevertSimpleOptionalStringRepresentableUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(cm)animalStatusSingleOptionalAttribute:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
@@ -49,9 +49,9 @@
     "NodeAnnotation": "RevertDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributes:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
@@ -71,9 +71,9 @@
     "NodeAnnotation": "RevertArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
@@ -93,9 +93,9 @@
     "NodeAnnotation": "RevertOptionalDictionaryKeyUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributes:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
@@ -115,9 +115,9 @@
     "NodeAnnotation": "RevertOptionalArrayMemberUpdate",
     "ChildIndex": "1",
     "LeftUsr": "c:objc(cs)AnimalStatusDescriptor(im)animalStatusDescriptorByAddingOptionalAttributesArray:",
-    "LeftComment": "",
+    "LeftComment": "AnimalAttributeName",
     "RightUsr": "",
-    "RightComment": "",
+    "RightComment": "String",
     "ModuleName": "APINotesTest"
   },
   {
