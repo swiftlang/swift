@@ -295,6 +295,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
 
     SyntaxParsingContext NodeContext(SyntaxContext, SyntaxKind::CodeBlockItem);
+    if (loadCurrentSyntaxNodeFromCache()) {
+      continue;
+    }
 
     if (Tok.is(tok::r_brace)) {
       SyntaxParsingContext ErrContext(SyntaxContext, SyntaxContextKind::Stmt);
@@ -445,11 +448,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     }
 
     if (NeedParseErrorRecovery) {
-      SyntaxContext->createNodeInPlace(SyntaxKind::CodeBlockItem);
-      SyntaxContext->setTransparent();
-
-      SyntaxParsingContext ItemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
-      SyntaxParsingContext StmtCtxt(SyntaxContext, SyntaxContextKind::Stmt);
+      SyntaxParsingContext TokenListCtxt(SyntaxContext,
+                                         SyntaxKind::NonEmptyTokenList);
       // If we had a parse error, skip to the start of the next stmt, decl or
       // '{'.
       //

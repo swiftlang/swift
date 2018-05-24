@@ -508,7 +508,7 @@ public:
     Optional<ProtocolConformanceRef>
     operator()(CanType dependentType,
                Type conformingReplacementType,
-               ProtocolType *conformedProtocol) const {
+               ProtocolDecl *conformedProtocol) const {
       return builder->lookupConformance(dependentType,
                                         conformingReplacementType,
                                         conformedProtocol);
@@ -522,7 +522,7 @@ public:
   /// Lookup a protocol conformance in a module-agnostic manner.
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType dependentType, Type conformingReplacementType,
-                    ProtocolType *conformedProtocol);
+                    ProtocolDecl *conformedProtocol);
 
 
   /// Retrieve the lazy resolver, if there is one.

@@ -27,6 +27,8 @@
 
 #include <forward_list>
 
+#define DEBUG_TYPE "SILProfiler"
+
 using namespace swift;
 
 /// Check if a closure has a body.
@@ -198,15 +200,30 @@ struct MapRegionCounters : public ASTWalker {
   MapRegionCounters(llvm::DenseMap<ASTNode, unsigned> &CounterMap)
       : CounterMap(CounterMap) {}
 
+  void mapRegion(ASTNode N) {
+    CounterMap[N] = NextCounter;
+
+    DEBUG({
+      llvm::dbgs() << "Assigned counter #" << NextCounter << " to: ";
+      auto *E = N.dyn_cast<Expr *>();
+      if (E)
+        llvm::dbgs() << Expr::getKindName(E->getKind()) << "\n";
+      auto *S = N.dyn_cast<Stmt *>();
+      if (S)
+        llvm::dbgs() << Stmt::getKindName(S->getKind()) << "\n";
+    });
+
+    ++NextCounter;
+  }
+
   bool walkToDeclPre(Decl *D) override {
     if (isUnmapped(D))
       return false;
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      return visitFunctionDecl(
-          *this, AFD, [&] { CounterMap[AFD->getBody()] = NextCounter++; });
+      return visitFunctionDecl(*this, AFD, [&] { mapRegion(AFD->getBody()); });
     } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      CounterMap[TLCD->getBody()] = NextCounter++;
+      mapRegion(TLCD->getBody());
     } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       return visitNominalTypeDecl(*this, NTD,
                                   [&] { WithinNominalType = true; });
@@ -216,34 +233,31 @@ struct MapRegionCounters : public ASTWalker {
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
     if (auto *IS = dyn_cast<IfStmt>(S)) {
-      CounterMap[IS->getThenStmt()] = NextCounter++;
+      mapRegion(IS->getThenStmt());
     } else if (auto *US = dyn_cast<GuardStmt>(S)) {
-      CounterMap[US->getBody()] = NextCounter++;
+      mapRegion(US->getBody());
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
-      CounterMap[WS->getBody()] = NextCounter++;
+      mapRegion(WS->getBody());
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
-      CounterMap[RWS->getBody()] = NextCounter++;
+      mapRegion(RWS->getBody());
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
-      CounterMap[FES->getBody()] = NextCounter++;
+      mapRegion(FES->getBody());
       walkPatternForProfiling(FES->getIterator(), *this);
     } else if (auto *SS = dyn_cast<SwitchStmt>(S)) {
-      CounterMap[SS] = NextCounter++;
+      mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
-      CounterMap[CS] = NextCounter++;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
+      mapRegion(CS);
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      CounterMap[CS->getBody()] = NextCounter++;
+      mapRegion(CS->getBody());
     }
     return {true, S};
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (auto *IE = dyn_cast<IfExpr>(E)) {
-      CounterMap[IE->getThenExpr()] = NextCounter++;
+      mapRegion(IE->getThenExpr());
     } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(E)) {
-      return visitClosureExpr(*this, ACE,
-                              [&] { CounterMap[ACE] = NextCounter++; });
+      return visitClosureExpr(*this, ACE, [&] { mapRegion(ACE); });
     }
     return {true, E};
   }
@@ -327,6 +341,33 @@ public:
 
     llvm_unreachable("Unhandled Kind in switch.");
   }
+
+  void print(raw_ostream &OS) const {
+    switch (K) {
+    case Kind::Zero:
+      OS << "zero";
+      return;
+    case Kind::Node:
+      OS << "node(" << Node.getOpaqueValue() << ")";
+      return;
+    case Kind::Add:
+    case Kind::Sub:
+      LHS->print(OS);
+      OS << ' ' << ((K == Kind::Add) ? '+' : '-') << ' ';
+      RHS->print(OS);
+      return;
+    case Kind::Ref:
+      OS << "ref(";
+      LHS->print(OS);
+      OS << ")";
+      return;
+    }
+    llvm_unreachable("Unhandled Kind in switch.");
+  }
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::errs()); }
+#endif
 };
 
 /// \brief A region of source code that can be mapped to a counter.
@@ -522,10 +563,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[CS] = NextCounter++;
       auto csCount = loadExecutionCount(CS);
       LoadedCounterMap[CS] = csCount;
-    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
-      CounterMap[DCS] = NextCounter++;
-      auto dcsCount = loadExecutionCount(DCS);
-      LoadedCounterMap[DCS] = dcsCount;
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
       auto csBody = CS->getBody();
       CounterMap[csBody] = NextCounter++;
@@ -586,6 +623,9 @@ private:
 
   /// \brief A stack of active repeat-while loops.
   std::vector<RepeatWhileStmt *> RepeatWhileStack;
+
+  /// \brief A stack of active do-catch statements.
+  std::vector<DoCatchStmt *> DoCatchStack;
 
   CounterExpr *ExitCounter = nullptr;
 
@@ -872,10 +912,16 @@ public:
       assignCounter(DS);
 
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      // The do-catch body is visited the same number of times as its parent.
       assignCounter(DCS->getBody(), CounterExpr::Ref(getCurrentCounter()));
-      assignCounter(DCS);
+
+      // Initialize the exit count of the do-catch to the entry count, then
+      // subtract off non-local exits as they are visited.
+      assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
+      DoCatchStack.push_back(DCS);
 
     } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
       assignCounter(CS->getBody());
     }
     return {true, S};
@@ -914,11 +960,17 @@ public:
 
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
       // When we break from a loop, we need to adjust the exit count.
-      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BS->getTarget())) {
+      Stmt *BreakTarget = BS->getTarget();
+      if (auto *RWS = dyn_cast<RepeatWhileStmt>(BreakTarget)) {
         subtractFromCounter(RWS->getCond(), getCurrentCounter());
-      } else if (!isa<SwitchStmt>(BS->getTarget())) {
+      } else if (!isa<SwitchStmt>(BreakTarget)) {
         addToCounter(BS->getTarget(), getCurrentCounter());
       }
+
+      // The break also affects the exit counts of active do-catch statements.
+      for (auto *DCS : DoCatchStack)
+        subtractFromCounter(DCS, getCurrentCounter());
+
       terminateRegion(S);
 
     } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
@@ -931,13 +983,23 @@ public:
     } else if (isa<CaseStmt>(S)) {
       popRegions(S);
 
-    } else if (isa<DoCatchStmt>(S)) {
+    } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
+      assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
+      DoCatchStack.pop_back();
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
+    } else if (isa<CatchStmt>(S)) {
+      assert(DoCatchStack.size() && "catch stmt with no parent");
+
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
-      // When we return, we may need to adjust some loop condition counts.
-      for (auto *RWS : RepeatWhileStack)
-        subtractFromCounter(RWS->getCond(), getCurrentCounter());
+      // When we return, adjust loop condition counts and do-catch exit counts
+      // to reflect the early exit.
+      if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
+        for (auto *RWS : RepeatWhileStack)
+          subtractFromCounter(RWS->getCond(), getCurrentCounter());
+        for (auto *DCS : DoCatchStack)
+          subtractFromCounter(DCS, getCurrentCounter());
+      }
 
       terminateRegion(S);
     }
@@ -1030,6 +1092,7 @@ void SILProfiler::assignRegionCounters() {
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
 
+  DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName << "\n");
   Root.walk(Mapper);
 
   NumRegionCounters = Mapper.NextCounter;

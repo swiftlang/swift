@@ -402,7 +402,8 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     TC.diagnose(ConformanceDecl->getLoc(),
                 diag::cannot_synthesize_in_crossfile_extension,
                 getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::type_declared_here);
+    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
+                DescriptiveDeclKind::Type);
     return true;
   }
 

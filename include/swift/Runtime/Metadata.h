@@ -278,13 +278,15 @@ struct TargetValueBuffer {
 using ValueBuffer = TargetValueBuffer<InProcess>;
 
 /// Can a value with the given size and alignment be allocated inline?
-constexpr inline bool canBeInline(size_t size, size_t alignment) {
-  return size <= sizeof(ValueBuffer) && alignment <= alignof(ValueBuffer);
+constexpr inline bool canBeInline(bool isBitwiseTakable, size_t size,
+                                  size_t alignment) {
+  return isBitwiseTakable && size <= sizeof(ValueBuffer) &&
+         alignment <= alignof(ValueBuffer);
 }
 
 template <class T>
-constexpr inline bool canBeInline() {
-  return canBeInline(sizeof(T), alignof(T));
+constexpr inline bool canBeInline(bool isBitwiseTakable) {
+  return canBeInline(isBitwiseTakable, sizeof(T), alignof(T));
 }
 
 struct ValueWitnessTable;
@@ -345,8 +347,8 @@ struct ValueWitnessTable {
 
   /// Would values of a type with the given layout requirements be
   /// allocated inline?
-  static bool isValueInline(size_t size, size_t alignment) {
-    return (size <= sizeof(ValueBuffer) &&
+  static bool isValueInline(bool isBitwiseTakable, size_t size, size_t alignment) {
+    return (isBitwiseTakable && size <= sizeof(ValueBuffer) &&
             alignment <= alignof(ValueBuffer));
   }
 
@@ -819,22 +821,9 @@ public:
     case MetadataKind::ForeignClass:
       return true;
 
-    case MetadataKind::Function:
-    case MetadataKind::Struct:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Existential:
-    case MetadataKind::Metatype:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+    default:
       return false;
     }
-    
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this metadata for an existential type?
@@ -843,24 +832,10 @@ public:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::Existential:
       return true;
-        
-    case MetadataKind::Metatype:
-    case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::ForeignClass:
-    case MetadataKind::Struct:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Function:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+
+    default:
       return false;
     }
-
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
   
   /// Is this either type metadata or a class object for any kind of class?
@@ -944,20 +919,9 @@ public:
     case MetadataKind::ForeignClass:
       return static_cast<const TargetForeignClassMetadata<Runtime> *>(this)
           ->Description;
-    case MetadataKind::Opaque:
-    case MetadataKind::Tuple:
-    case MetadataKind::Function:
-    case MetadataKind::Existential:
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Metatype:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
+    default:
       return nullptr;
     }
-
-    swift_runtime_unreachable("Unhandled MetadataKind in switch.");
   }
 
   /// Get the class object for this type if it has one, or return null if the

@@ -970,12 +970,12 @@ struct StructWithLayout {
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var StructWithLayout }, 0
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
 // CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
-// call default argument
-// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
 // call StaticString.init
 // CHECK: apply
 // call UInt.init(_builtinIntegerLiteral:)
 // CHECK: apply
+// call default argument
+// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
 // call _sanityCheck(_:_:file:line:)
 // CHECK: apply %{{.*}}([[CLOSURE]], {{.*}})
 // CHECK: load [trivial] [[PROJ]] : $*StructWithLayout

@@ -15,7 +15,7 @@ guard let x = Optional(0) else { fatalError() }
 // CHECK: (top_level_code_decl
 _ = 0 // intervening code
 
-// CHECK-LABEL: (func_decl "function()" interface type='() -> ()' access=internal captures=(x<direct>)
+// CHECK-LABEL: (func_decl{{.*}}"function()" interface type='() -> ()' access=internal captures=(x<direct>)
 func function() {
   _ = x
 }
@@ -23,7 +23,7 @@ func function() {
 // CHECK-LABEL: (closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]
 // CHECK: captures=(x<direct>)
-// CHECK: (var_decl "closure"
+// CHECK: (var_decl{{.*}}"closure"
 let closure: () -> Void = {
   _ = x
 }
@@ -33,13 +33,13 @@ let closure: () -> Void = {
 // CHECK: (closure_expr
 // CHECK: location={{.*}}top-level-guard.swift:[[@LINE+3]]
 // CHECK: captures=(x)
-// CHECK: (var_decl "closureCapture"
+// CHECK: (var_decl{{.*}}"closureCapture"
 let closureCapture: () -> Void = { [x] in
   _ = x
 }
 
 // CHECK-LABEL: (defer_stmt
-// CHECK-NEXT: (func_decl implicit "$defer()" interface type='() -> ()' access=fileprivate captures=(x<direct><noescape>)
+// CHECK-NEXT: (func_decl{{.*}}implicit "$defer()" interface type='() -> ()' access=fileprivate captures=(x<direct><noescape>)
 defer {
   _ = x
 }

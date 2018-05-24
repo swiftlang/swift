@@ -2805,9 +2805,9 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       types[origType] = replacement;
       return replacement;
     },
-    [&](CanType origType, Type substType, ProtocolType *conformedProtocol)
+    [&](CanType origType, Type substType, ProtocolDecl *conformedProtocol)
       -> Optional<ProtocolConformanceRef> {
-      return ProtocolConformanceRef(conformedProtocol->getDecl());
+      return ProtocolConformanceRef(conformedProtocol);
     });
 }
 

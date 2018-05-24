@@ -334,6 +334,28 @@ public:
                           clang::DeclarationName preferredName =
                             clang::DeclarationName());
 
+  /// Attempts to import the name of \p decl with each possible
+  /// ImportNameVersion. \p action will be called with each unique name.
+  ///
+  /// In this case, "unique" means either the full name is distinct or the
+  /// effective context is distinct. This method does not attempt to handle
+  /// "unresolved" contexts in any special way---if one name references a
+  /// particular Clang declaration and the other has an unresolved context that
+  /// will eventually reference that declaration, the contexts will still be
+  /// considered distinct.
+  ///
+  /// If \p action returns false, the current name will \e not be added to the
+  /// set of seen names.
+  ///
+  /// The active name for \p activeVerion is always first, followed by the
+  /// other names in the order of
+  /// ImportNameVersion::forEachOtherImportNameVersion.
+  ///
+  /// Returns \c true if it fails to import name for the active version.
+  bool forEachDistinctImportName(
+      const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+      llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
+
   /// Imports the name of the given Clang macro into Swift.
   Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
                              const clang::MacroInfo *macro);

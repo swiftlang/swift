@@ -631,18 +631,19 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     }
     return tupleNode;
   }
-  case MetadataKind::Opaque: {
-    if (auto builtinType = _buildDemanglerForBuiltinType(type, Dem))
-      return builtinType;
-
-    // FIXME: Some opaque types do have manglings, but we don't have enough info
-    // to figure them out.
-    break;
-  }
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     break;
+  case MetadataKind::Opaque:
+  default: {
+    if (auto builtinType = _buildDemanglerForBuiltinType(type, Dem))
+      return builtinType;
+    
+    // FIXME: Some opaque types do have manglings, but we don't have enough info
+    // to figure them out.
+    break;
+  }
   }
   // Not a type.
   return nullptr;

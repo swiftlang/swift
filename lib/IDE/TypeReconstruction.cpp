@@ -668,9 +668,10 @@ static DeclKind GetKindAsDeclKind(Demangle::Node::Kind node_kind) {
     return DeclKind::Enum;
   case Demangle::Node::Kind::Protocol:
     return DeclKind::Protocol;
+  case Demangle::Node::Kind::Variable:
+    return DeclKind::Var;
   default:
     llvm_unreachable("Missing alias");
-    // FIXME: can we 'log' getNodeKindString(node_kind))
   }
 }
 

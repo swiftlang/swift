@@ -88,13 +88,6 @@ public:
     return this->getAddressForPointer(addr);
   }
 
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                   Address dest, Address src,
-                                   SILType T) const override {
-    auto addr = emitInitializeBufferWithTakeOfBufferCall(IGF, T, dest, src);
-    return this->getAddressForPointer(addr);
-  }
-
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     emitInitializeWithCopyCall(IGF, T, dest, src);

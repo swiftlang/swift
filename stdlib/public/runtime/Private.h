@@ -60,7 +60,7 @@ public:
 /// itself related info has to be bundled with it.
 class TypeInfo {
   const Metadata *Type;
-  const TypeReferenceOwnership ReferenceOwnership;
+  TypeReferenceOwnership ReferenceOwnership;
 
 public:
   TypeInfo() : Type(nullptr), ReferenceOwnership() {}
