@@ -31,13 +31,6 @@ extension _SequenceWrapper  {
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _base._preprocessingPass(preprocess)
-  }
 }
 
 extension _SequenceWrapper where Iterator == Base.Iterator {
@@ -56,25 +49,6 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 }
 
 extension _SequenceWrapper {
-  @inlinable // FIXME(sil-serialize-all)
-  public func map<T>(
-    _ transform: (Element) throws -> T
-) rethrows -> [T] {
-    return try _base.map(transform)
-  }
-  
-  @inlinable // FIXME(sil-serialize-all)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
-    return try _base.filter(isIncluded)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func forEach(_ body: (Element) throws -> Void) rethrows {
-    return try _base.forEach(body)
-  }
-  
   @inlinable // FIXME(sil-serialize-all)
   public func _customContainsEquatableElement(
     _ element: Element

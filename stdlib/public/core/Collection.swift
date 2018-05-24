@@ -632,22 +632,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Complexity: Hopefully less than O(`count`).
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
 
-  // FIXME(move-only types): `first` might not be implementable by collections
-  // with move-only elements, since they would need to be able to somehow form
-  // a temporary `Optional<Element>` value from a non-optional Element without
-  // modifying the collection.
-
-  /// The first element of the collection.
-  ///
-  /// If the collection is empty, the value of this property is `nil`.
-  /// 
-  ///     let numbers = [10, 20, 30, 40, 50]
-  ///     if let firstNumber = numbers.first {
-  ///         print(firstNumber)
-  ///     }
-  ///     // Prints "10"
-  var first: Element? { get }
-
   /// Returns an index that is the specified distance from the given index.
   ///
   /// The following example obtains an index advanced four positions from a

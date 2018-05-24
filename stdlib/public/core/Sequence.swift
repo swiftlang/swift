@@ -388,37 +388,6 @@ public protocol Sequence {
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> [Element]
 
-  /// Calls the given closure on each element in the sequence in the same order
-  /// as a `for`-`in` loop.
-  ///
-  /// The two loops in the following example produce the same output:
-  ///
-  ///     let numberWords = ["one", "two", "three"]
-  ///     for word in numberWords {
-  ///         print(word)
-  ///     }
-  ///     // Prints "one"
-  ///     // Prints "two"
-  ///     // Prints "three"
-  ///
-  ///     numberWords.forEach { word in
-  ///         print(word)
-  ///     }
-  ///     // Same as above
-  ///
-  /// Using the `forEach` method is distinct from a `for`-`in` loop in two
-  /// important ways:
-  ///
-  /// 1. You cannot use a `break` or `continue` statement to exit the current
-  ///    call of the `body` closure or skip subsequent calls.
-  /// 2. Using the `return` statement in the `body` closure will exit only from
-  ///    the current call to `body`, not from any outer scope, and won't skip
-  ///    subsequent calls.
-  ///
-  /// - Parameter body: A closure that takes an element of the sequence as a
-  ///   parameter.
-  func forEach(_ body: (Element) throws -> Void) rethrows
-
   // Note: The complexity of Sequence.dropFirst(_:) requirement
   // is documented as O(n) because Collection.dropFirst(_:) is
   // implemented in O(n), even though the default
@@ -598,12 +567,6 @@ public protocol Sequence {
   func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool?
-
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke `preprocess` and
-  /// return its result.  Otherwise, return `nil`.
-  func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R?
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
@@ -889,13 +852,6 @@ extension Sequence {
   @inlinable
   public var underestimatedCount: Int {
     return 0
-  }
-
-  @inlinable
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return nil
   }
 
   @inlinable
