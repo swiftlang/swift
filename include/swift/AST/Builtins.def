@@ -556,9 +556,9 @@ BUILTIN_MISC_OPERATION(TensorFlowReceive, "tensorflowReceive", "", Special)
 // Automatic differentiation builtins.
 /// autodiffCreateTape has type <T> () -> Builtin.AutoDiffTape<T>.
 BUILTIN_MISC_OPERATION(AutoDiffCreateTape, "autodiffCreateTape", "", Special)
-/// autodiffPushToTape has type <T> (Builtin.AutoDiffTape<T>, T, Builtin.Int) -> ().
+/// autodiffPushToTape has type <T> (Builtin.AutoDiffTape<T>, T, Builtin.Word) -> ().
 BUILTIN_MISC_OPERATION(AutoDiffPushToTape, "autodiffPushToTape", "", Special)
-/// autodiffPopFromTape has type <T> (Builtin.AutoDiffTape<T>, Builtin.Int) -> T.
+/// autodiffPopFromTape has type <T> (Builtin.AutoDiffTape<T>, Builtin.Word) -> T.
 BUILTIN_MISC_OPERATION(AutoDiffPopFromTape, "autodiffPopFromTape", "", Special)
 /// autodiffDestroyTape has type <T> (Builtin.AutoDiffTape<T>) -> ().
 BUILTIN_MISC_OPERATION(AutoDiffDestroyTape, "autodiffDestroyTape", "", Special)
