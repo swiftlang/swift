@@ -96,6 +96,7 @@ import ObserverClosure
 import ObserverForwarderStruct
 import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
+import OpaqueConsumingUsers
 import OpenClose
 import PartialApplyDynamicType
 import Phonebook
@@ -253,6 +254,7 @@ registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)
 registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
+registerBenchmark(OpaqueConsumingUsers)
 registerBenchmark(OpenClose)
 registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
