@@ -84,8 +84,6 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       "value of type %0 has no property or method named 'subscript'; "
       "did you mean to use the subscript operator?",
       (Type))
-NOTE(subscript_declared_here,none,
-      "declared here", ())
 
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2", (Type, DeclName, DeclName))
