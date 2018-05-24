@@ -550,6 +550,7 @@ foldNonNestedAccesses(AccessConflictAnalysis::AccessMap &accessMap) {
     // Optimize this begin_access by setting [no_nested_conflict].
     beginAccess->setNoNestedConflict(true);
     changed = true;
+    DEBUG(llvm::dbgs() << "Folding " << *beginAccess);
   }
   return changed;
 }
@@ -585,6 +586,7 @@ removeLocalNonNestedAccess(AccessConflictAnalysis::Result &&result,
               return result.getAccessIndex(a) < result.getAccessIndex(b);
             });
   for (BeginAccessInst *beginAccess : deadAccesses) {
+    DEBUG(llvm::dbgs() << "Removing dead access " << *beginAccess);
     changed = true;
     removeBeginAccess(beginAccess);
   }
@@ -612,8 +614,12 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 
     // Use the updated AccessedStorageAnalysis to find any uniquely identified
-    // local storage that has no nested conflict on any of its accesses. These
-    // can be removed entirely.
+    // local storage that has no nested conflict on any of its accesses within
+    // this function. These can be removed entirely.
+    //
+    // Note that the storage address may be passed as an argument and there may
+    // be nested conflicts within that call, but none of the accesses within
+    // this function will overlap.
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
     if (removeLocalNonNestedAccess(std::move(result), functionAccess))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
