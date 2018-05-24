@@ -358,7 +358,7 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
 def emit_public_type_metadata_accessors :
   Flag<["-"], "emit-public-type-metadata-accessors">,
   Flags<[FrontendOption]>,
-  HelpText<"Emit all type metadata accessors as public">;
+  HelpText<"Emit all type metadata accessors as public (deprecated: now does nothing)">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,

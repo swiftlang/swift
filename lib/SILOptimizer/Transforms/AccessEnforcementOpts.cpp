@@ -360,6 +360,9 @@ void AccessConflictAnalysis::identifyBeginAccesses() {
       if (!beginAccess)
         continue;
 
+      if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
+        continue;
+
       // The accessed base is expected to be valid for begin_access, but for
       // now, since this optimization runs at the end of the pipeline, we
       // gracefully ignore unrecognized source address patterns, which show up
