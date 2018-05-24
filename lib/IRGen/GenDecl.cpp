@@ -2755,10 +2755,10 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_protos, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_protocols";
+    sectionName = "swift5_protocols";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
@@ -2945,10 +2945,10 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_protocol_conformances";
+    sectionName = "swift5_protocol_conformances";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
@@ -2972,10 +2972,10 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_type_metadata";
+    sectionName = "swift5_type_metadata";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
@@ -3039,13 +3039,13 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_fieldmd, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_fieldmd";
+    sectionName = "swift5_fieldmd";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".swift4_fieldmd";
+    sectionName = ".swift5_fieldmd";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
