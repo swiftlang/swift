@@ -113,7 +113,7 @@ public:
     return Result;
   }
 };
-} // unnamed namespace
+} // end anonymous namespace
 
 static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
   // Nested type declarations can be accessed only with unqualified lookup or
@@ -473,19 +473,70 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
                              GenericSignatureBuilder *GSB,
                              VisitedSet &Visited);
 
-static void lookupVisibleProtocolMemberDecls(
-    Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
-    const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
-                                             LazyResolver *TypeResolver, GenericSignatureBuilder *GSB,
-    VisitedSet &Visited) {
+class RestateFilteringConsumer : public VisibleDeclConsumer {
+  VisibleDeclConsumer &parentConsumer;
+  const Type baseTy;
+  const DeclContext *DC;
+  LazyResolver *resolver;
+  llvm::DenseSet<DeclName> foundVars;
+  llvm::DenseMap<std::tuple<DeclName, Type>, std::set<ValueDecl *>> foundFuncs;
+
+  void validate() {
+    assert(DC && baseTy && !baseTy->hasLValueType());
+  }
+public:
+  RestateFilteringConsumer(VisibleDeclConsumer &parentConsumer,
+                           Type baseTy, const DeclContext *DC,
+                           LazyResolver *resolver)
+  : parentConsumer(parentConsumer), baseTy(baseTy), DC(DC), resolver(resolver) {
+    validate();
+  }
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    assert(VD);
+    if (!VD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      parentConsumer.foundDecl(VD, Reason);
+      return;
+    }
+    if (resolver)
+      resolver->resolveDeclSignature(VD);
+
+    if (!VD->hasInterfaceType()) {
+      parentConsumer.foundDecl(VD, Reason);
+      return;
+    }
+    if (!VD->getInterfaceType()->is<AnyFunctionType>()) {
+      if (foundVars.insert(VD->getFullName()).second) {
+        parentConsumer.foundDecl(VD, Reason);
+      }
+      return;
+    }
+    auto type =
+      VD->getOverloadSignatureType()->getAs<AnyFunctionType>()->getResult();
+
+    if (foundFuncs[{VD->getFullName(), type}].empty()) {
+      parentConsumer.foundDecl(VD, Reason);
+    }
+    foundFuncs[{VD->getFullName(), type}].insert(VD);
+  }
+};
+
+static void
+  lookupVisibleProtocolMemberDecls(Type BaseTy, ProtocolType *PT,
+                                   VisibleDeclConsumer &Consumer,
+                                   const DeclContext *CurrDC, LookupState LS,
+                                   DeclVisibilityKind Reason,
+                                   LazyResolver *TypeResolver,
+                                   GenericSignatureBuilder *GSB,
+                                   VisitedSet &Visited) {
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols())
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
-                                 LS, getReasonForSuper(Reason), TypeResolver,
-                                 GSB, Visited);
-
+  for (auto Proto : PT->getDecl()->getInheritedProtocols()){
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(),
+                                     Consumer, CurrDC, LS,
+                                     getReasonForSuper(Reason), TypeResolver,
+                                     GSB, Visited);}
   lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason, TypeResolver);
 }
 
@@ -536,7 +587,7 @@ static void lookupVisibleMemberDeclsImpl(
   }
 
   // If the base is a protocol, enumerate its members.
-  if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
+  if (auto PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
                                      TypeResolver, GSB, Visited);
     return;
@@ -551,13 +602,13 @@ static void lookupVisibleMemberDeclsImpl(
   }
 
   // Enumerate members of archetype's requirements.
-  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
-    for (auto Proto : Archetype->getConformsTo())
-      lookupVisibleProtocolMemberDecls(
-          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
-          getReasonForSuper(Reason), TypeResolver, GSB, Visited);
-
-    if (auto superclass = Archetype->getSuperclass())
+  if (ArchetypeType *AT = BaseTy->getAs<ArchetypeType>()) {
+    for (auto Proto : AT->getConformsTo())
+      lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(),
+                                       Consumer, CurrDC, LS,
+                                       getReasonForSuper(Reason),
+                                       TypeResolver, GSB, Visited);
+    if (auto superclass = AT->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
                                    getReasonForSuper(Reason), TypeResolver,
                                    GSB, Visited);
@@ -832,7 +883,7 @@ public:
     DeclsToReport.insert(FoundDeclTy(VD, Reason));
   }
 };
-} // unnamed namespace
+} // end anonymous namespace
 
 /// \brief Enumerate all members in \c BaseTy (including members of extensions,
 /// superclasses and implemented protocols), as seen from the context \c CurrDC.
@@ -844,13 +895,15 @@ static void lookupVisibleMemberDecls(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
     GenericSignatureBuilder *GSB) {
-  OverrideFilteringConsumer ConsumerWrapper(BaseTy, CurrDC, TypeResolver);
+  OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC, TypeResolver);
+  RestateFilteringConsumer restateConsumer(overrideConsumer, BaseTy, CurrDC,
+                                           TypeResolver);
   VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, ConsumerWrapper, CurrDC, LS, Reason,
+  lookupVisibleMemberDeclsImpl(BaseTy, restateConsumer, CurrDC, LS, Reason,
                                TypeResolver, GSB, Visited);
 
   // Report the declarations we found to the real consumer.
-  for (const auto &DeclAndReason : ConsumerWrapper.DeclsToReport)
+  for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
     Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }
 

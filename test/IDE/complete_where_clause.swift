@@ -4,6 +4,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP6 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_1 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_2 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_1 | %FileCheck %s -check-prefix=GEN_T
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2_ASSOC | %FileCheck %s -check-prefix=GEN_T_ASSOC_DOT
@@ -62,6 +64,23 @@ extension A1 where T1.#^GP6^# {}
 // TYPE1-NOT: T3
 // TYPE1-NOT: T4
 // TYPE1-NOT: T5
+
+protocol A {associatedtype E}
+protocol B {associatedtype E}
+
+protocol C {associatedtype E}
+protocol D: C {associatedtype E}
+
+func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
+
+func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
+
+// GEN_T_ASSOC_E: Begin completions, 3 items
+// GEN_T_ASSOC_E: Decl[AssociatedType]/Super:     E; name=E
+// GEN_T_ASSOC_E-NOT: Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-DAG: Keyword/None:               Type[#T.Type#];
+// GEN_T_ASSOC_E-DAG: Keyword/CurrNominal:        self[#T#];
+// GEN_T_ASSOC_E: End completions
 
 protocol Assoc {
   associatedtype Q
