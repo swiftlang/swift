@@ -992,24 +992,24 @@ static ValueDecl *getAutoDiffCreateTape(ASTContext &Context, Identifier Id) {
 }
 
 static ValueDecl *getAutoDiffPushToTape(ASTContext &Context, Identifier Id) {
-  // <T> (Swift._AutoDiffTape<T>, T, Builtin.Int64) -> ()
+  // <T> (Swift._AutoDiffTape<T>, T, Builtin.Word) -> ()
   BuiltinGenericSignatureBuilder builder(Context, 1);
   auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   auto T = makeGenericParam();
   builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
   builder.addParameter(T);
-  builder.addParameter(makeConcrete(BuiltinIntegerType::get(64, Context)));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
   builder.setResult(makeConcrete(Context.TheEmptyTupleType));
   return builder.build(Id);
 }
 
 static ValueDecl *getAutoDiffPopFromTape(ASTContext &Context, Identifier Id) {
-  // <T> (Swift._AutoDiffTape<T>, Builtin.Int64) -> (T)
+  // <T> (Swift._AutoDiffTape<T>, Builtin.Word) -> (T)
   BuiltinGenericSignatureBuilder builder(Context, 1);
   auto *tapeDecl = Context.get_AutoDiffTapeDecl();
   auto T = makeGenericParam();
   builder.addParameter(makeBoundGeneric(tapeDecl, makeConcrete(Type()), T));
-  builder.addParameter(makeConcrete(BuiltinIntegerType::get(64, Context)));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(Context)));
   builder.setResult(T);
   return builder.build(Id);
 }
