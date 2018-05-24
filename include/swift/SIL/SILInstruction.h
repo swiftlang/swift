@@ -3184,8 +3184,10 @@ enum class SILAccessKind : uint8_t {
   Deinit,
 
   // This enum is encoded.
-  Last = Deinit
+  Last = Deinit,
 };
+enum { NumSILAccessKindBits = 2 };
+
 StringRef getSILAccessKindName(SILAccessKind kind);
 
 /// Different kinds of exclusivity enforcement for accesses.
