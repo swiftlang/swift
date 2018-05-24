@@ -2704,7 +2704,8 @@ class InterfaceTypeChangeDetector {
 
   bool detectTypeRewritten(SDKNodeType *Node, SDKNodeType *Counter) {
     if (IsVisitingLeft &&
-        (Node->getName() != Counter->getName()||
+        Node->getPrintedName() != Counter->getPrintedName() &&
+        (Node->getName() != Counter->getName() ||
         Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
       Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
@@ -2794,6 +2795,8 @@ class InterfaceTypeChangeDetector {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
                     NodeAnnotation::RevertDictionaryKeyUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
       }
       return true;
     }
@@ -2843,6 +2846,8 @@ class InterfaceTypeChangeDetector {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalArrayMemberUpdate :
                     NodeAnnotation::RevertArrayMemberUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
       }
       return true;
     }
@@ -2874,6 +2879,8 @@ class InterfaceTypeChangeDetector {
                     NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
                     NodeAnnotation::SimpleStringRepresentableUpdate);
       } else {
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
                     NodeAnnotation::RevertSimpleStringRepresentableUpdate);
@@ -3051,6 +3058,12 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::SimpleStringRepresentableUpdate:
       case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
         return Node->getAnnotateComment(NodeAnnotation::RawTypeLeft);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
@@ -3069,6 +3082,12 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::SimpleStringRepresentableUpdate:
       case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
         return Node->getAnnotateComment(NodeAnnotation::RawTypeRight);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
