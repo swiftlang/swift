@@ -199,7 +199,7 @@ func moreComplexUnwrapFixes() {
 
   func moreTest(c: C?) {
     takeOpt(c.thing().n) // expected-error{{ambiguous reference to member 'thing()'}}
-    // Not ambigious because we can prefer A.n over B.n
+    // Not ambiguous because we can prefer A.n over B.n
     takeNon(c.thing().n) // expected-error{{value of optional type 'C?' not unwrapped; did you mean to use '!' or '?'?}}{{14-14=?}}
     // expected-error@-1 {{value of optional type 'A?' not unwrapped; did you mean to use '!' or '?'?}}{{22-22=!}}
 
