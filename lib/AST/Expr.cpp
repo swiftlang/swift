@@ -2174,6 +2174,23 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   return Res;
 }
 
+bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
+  auto *E = getSemanticsProvidingExpr();
+
+  if (auto IOE = dyn_cast<InOutExpr>(E))
+    E = IOE->getSubExpr();
+
+  while (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+    if (sameBase && isa<DerivedToBaseExpr>(ICE))
+      return false;
+    E = ICE->getSubExpr();
+  }
+
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl() == AFD->getImplicitSelfDecl();
+
+  return false;
+}
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();

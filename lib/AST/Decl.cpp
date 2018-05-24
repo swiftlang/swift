@@ -5468,21 +5468,6 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                DiagnosticEngine *diags)
         : Decl(decl), Diags(diags) { }
 
-    bool isSelfExpr(Expr *E) {
-      E = E->getSemanticsProvidingExpr();
-
-      if (auto ATSE = dyn_cast<ArchetypeToSuperExpr>(E))
-        E = ATSE->getSubExpr();
-      if (auto IOE = dyn_cast<InOutExpr>(E))
-        E = IOE->getSubExpr();
-      if (auto LE = dyn_cast<LoadExpr>(E))
-        E = LE->getSubExpr();
-      if (auto DRE = dyn_cast<DeclRefExpr>(E))
-        return DRE->getDecl() == Decl->getImplicitSelfDecl();
-
-      return false;
-    }
-
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
       return !isa<NominalTypeDecl>(D);
@@ -5520,7 +5505,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       BodyInitKind myKind;
       if (arg->isSuperExpr())
         myKind = BodyInitKind::Chained;
-      else if (isSelfExpr(arg))
+      else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
         myKind = BodyInitKind::Delegating;
       else {
         // We're constructing something else.
