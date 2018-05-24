@@ -74,7 +74,7 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 void SILLinkerVisitor::addFunctionToWorklist(SILFunction *F) {
   assert(F->isExternalDeclaration());
 
-  DEBUG(llvm::dbgs() << "Imported function: "
+  LLVM_DEBUG(llvm::dbgs() << "Imported function: "
                      << F->getName() << "\n");
   if (Mod.loadFunction(F)) {
     if (F->isExternalDeclaration())
@@ -383,7 +383,7 @@ void SILLinkerVisitor::process() {
       Fn->setSerialized(IsSerialized_t::IsNotSerialized);
     }
 
-    DEBUG(llvm::dbgs() << "Process imports in function: "
+    LLVM_DEBUG(llvm::dbgs() << "Process imports in function: "
                        << Fn->getName() << "\n");
 
     for (auto &BB : *Fn) {

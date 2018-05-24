@@ -223,7 +223,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
   for (auto witness : checker.lookupValueWitnesses(req,
                                                    /*ignoringNames=*/nullptr)) {
-    DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
+    LLVM_DEBUG(llvm::dbgs() << "Inferring associated types from decl:\n";
           witness->dump(llvm::dbgs()));
 
     // If the potential witness came from an extension, and our `Self`
@@ -246,20 +246,20 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 }
       auto &result = witnessResult.Inferred[i];
 
-      DEBUG(llvm::dbgs() << "Considering whether " << result.first->getName()
+      LLVM_DEBUG(llvm::dbgs() << "Considering whether " << result.first->getName()
                          << " can infer to:\n";
             result.second->dump(llvm::dbgs()));
 
       // Filter out errors.
       if (result.second->hasError()) {
-        DEBUG(llvm::dbgs() << "-- has error type\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- has error type\n");
         REJECT;
       }
 
       // Filter out duplicates.
       if (!known.insert({result.first, result.second->getCanonicalType()})
                 .second) {
-        DEBUG(llvm::dbgs() << "-- duplicate\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- duplicate\n");
         REJECT;
       }
 
@@ -318,7 +318,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                       return t;
                     });
                     canInferFromOtherAssociatedType = true;
-                    DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
+                    LLVM_DEBUG(llvm::dbgs() << "++ we can same-type to:\n";
                           result.second->dump(llvm::dbgs()));
                     return false;
                   }
@@ -332,7 +332,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         });
 
       if (containsTautologicalType) {
-        DEBUG(llvm::dbgs() << "-- tautological\n");
+        LLVM_DEBUG(llvm::dbgs() << "-- tautological\n");
         REJECT;
       }
 
@@ -353,7 +353,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
         if (!newWitness->hasTypeParameter() &&
             !newWitness->hasDependentMember() &&
             !existingWitness->isEqual(newWitness)) {
-          DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
+          LLVM_DEBUG(llvm::dbgs() << "** contradicts explicit type witness, "
                                 "rejecting inference from this decl\n");
           goto next_witness;
         }
@@ -368,12 +368,12 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
                                            result.second)) {
           witnessResult.NonViable.push_back(
                           std::make_tuple(result.first,result.second,failed));
-          DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
+          LLVM_DEBUG(llvm::dbgs() << "-- doesn't fulfill requirements\n");
           REJECT;
         }
       }
 
-      DEBUG(llvm::dbgs() << "++ seems legit\n");
+      LLVM_DEBUG(llvm::dbgs() << "++ seems legit\n");
       ++i;
     }
 #undef REJECT
@@ -1897,7 +1897,7 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
   // Infer potential type witnesses from value witnesses.
   inferred = inferTypeWitnessesViaValueWitnesses(checker,
                                                  unresolvedAssocTypes);
-  DEBUG(llvm::dbgs() << "Candidates for inference:\n";
+  LLVM_DEBUG(llvm::dbgs() << "Candidates for inference:\n";
         dumpInferredAssociatedTypes(inferred));
 
   // Compute the set of solutions.

@@ -50,7 +50,7 @@ public:
     // serialized functions or anything referenced from them. Therefore,
     // to avoid linker errors, the object file of the current module should
     // contain all the symbols which were alive at the time of serialization.
-    DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
+    LLVM_DEBUG(llvm::dbgs() << "Serializing SILModule in SerializeSILPass\n");
     getModule()->serialize();
     removeSerializedFlagFromAllFunctions(M);
   }

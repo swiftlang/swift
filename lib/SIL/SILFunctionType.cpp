@@ -162,7 +162,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
   // It is possible that we won't find a bridging type (e.g. String) when we're
   // parsing the stdlib itself.
   if (t) {
-    DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
+    LLVM_DEBUG(llvm::dbgs() << "Bridging type " << moduleName << '.' << typeName
             << " mapped to ";
           if (t)
             t->print(llvm::dbgs());
@@ -2093,7 +2093,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     ::getUncachedSILFunctionTypeForConstant(M, constant,
                                             loweredInterfaceType);
 
-  DEBUG(llvm::dbgs() << "lowering type for constant ";
+  LLVM_DEBUG(llvm::dbgs() << "lowering type for constant ";
         constant.print(llvm::dbgs());
         llvm::dbgs() << "\n  formal type: ";
         formalInterfaceType.print(llvm::dbgs());

@@ -663,7 +663,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
 
   // If no witness table was found, bail.
   if (!Ret) {
-    DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
+    LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of witness for: ";
           C.dump(); Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
@@ -701,7 +701,7 @@ SILModule::lookUpFunctionInDefaultWitnessTable(const ProtocolDecl *Protocol,
   // FIXME: Could be an assert if we fix non-single-frontend mode to link
   // together serialized SIL emitted by each translation unit.
   if (!Ret) {
-    DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
+    LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of default "
           "witness for " << Protocol->getName() << " ";
           Requirement.dump());
     return std::make_pair(nullptr, nullptr);

@@ -261,7 +261,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
     for (auto *VDecl : S->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Struct, Count++);
-      DEBUG(ProjectionPath X(Ty);
+      LLVM_DEBUG(ProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
             X.append(P);
             assert(X.getMostDerivedType(Mod) == Ty.getFieldType(VDecl, Mod));
@@ -274,7 +274,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
   if (auto TT = Ty.getAs<TupleType>()) {
     for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
       Projection P(ProjectionKind::Tuple, i);
-      DEBUG(ProjectionPath X(Ty);
+      LLVM_DEBUG(ProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
             X.append(P);
             assert(X.getMostDerivedType(Mod) == Ty.getTupleElementType(i));
@@ -289,7 +289,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
     for (auto *VDecl : C->getStoredProperties()) {
       (void) VDecl;
       Projection P(ProjectionKind::Class, Count++);
-      DEBUG(ProjectionPath X(Ty);
+      LLVM_DEBUG(ProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
             X.append(P);
             assert(X.getMostDerivedType(Mod) == Ty.getFieldType(VDecl, Mod));
@@ -302,7 +302,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
   if (auto Box = Ty.getAs<SILBoxType>()) {
     for (unsigned field : indices(Box->getLayout()->getFields())) {
       Projection P(ProjectionKind::Box, field);
-      DEBUG(ProjectionPath X(Ty);
+      LLVM_DEBUG(ProjectionPath X(Ty);
             assert(X.getMostDerivedType(Mod) == Ty);
             X.append(P);
             assert(X.getMostDerivedType(Mod) == Box->getFieldType(Mod, field));
@@ -382,7 +382,7 @@ ProjectionPath::hasNonEmptySymmetricDifference(const ProjectionPath &RHS) const{
     // If we are accessing different fields of a common object, the two
     // projection paths may have a non-empty symmetric difference. We check if
     if (LHSProj != RHSProj) {
-      DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
+      LLVM_DEBUG(llvm::dbgs() << "        Path different at index: " << i << '\n');
       FoundDifferingProjections = true;
       break;
     }
@@ -595,7 +595,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     // Get the current type to process.
     SILType Ty = PP.getMostDerivedType(*Mod);
 
-    DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
 
     // Get the first level projection of the current type.
     Projections.clear();
@@ -604,7 +604,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.
     if (Projections.empty()) {
-      DEBUG(llvm::dbgs() << "    No projections. Finished projection list\n");
+      LLVM_DEBUG(llvm::dbgs() << "    No projections. Finished projection list\n");
       Paths.push_back(PP);
       continue;
     }
@@ -627,7 +627,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
     // The worklist would never be empty in this case !.
     //
     if (Ty.getClassOrBoundGenericClass()) {
-      DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Found class. Finished projection list\n");
       Paths.push_back(PP);
       continue;
     }
@@ -848,19 +848,19 @@ ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
                     llvm::SmallVectorImpl<ValueNodePair> &Worklist,
                     SILValue Value) {
-  DEBUG(llvm::dbgs() << "    Looking at Users:\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Looking at Users:\n");
 
   // For all uses of V...
   for (Operand *Op : getNonDebugUses(Value)) {
     // Grab the User of V.
     SILInstruction *User = Op->getUser();
 
-    DEBUG(llvm::dbgs() << "        " << *User);
+    LLVM_DEBUG(llvm::dbgs() << "        " << *User);
 
     // The projections we can handle are always single-value instructions.
     auto projectionInst = dyn_cast<SingleValueInstruction>(User);
     if (!projectionInst) {
-      DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
+      LLVM_DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
       addNonProjectionUser(Op);
       continue;
@@ -872,13 +872,13 @@ processUsersOfValue(ProjectionTree &Tree,
     // If we fail to create a projection, add User as a user to this node and
     // continue.
     if (!P.isValid()) {
-      DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
+      LLVM_DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
       addNonProjectionUser(Op);
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "            Created projection.\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Created projection.\n");
 
     // we have a projection to the next level children, create the next
     // level children nodes lazily.
@@ -891,13 +891,13 @@ processUsersOfValue(ProjectionTree &Tree,
     // *NOTE* This means that we will process ChildNode multiple times
     // potentially with different projection users.
     if (auto *ChildNode = getChildForProjection(Tree, P)) {
-      DEBUG(llvm::dbgs() << "            Found child for projection: "
+      LLVM_DEBUG(llvm::dbgs() << "            Found child for projection: "
             << ChildNode->getType() << "\n");
 
       SILValue V = SILValue(projectionInst);
       Worklist.push_back({V, ChildNode});
     } else {
-      DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
+      LLVM_DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
             "Adding to non projection user!\b");
 
       // The only projection which we do not currently handle are enums since we
@@ -918,8 +918,8 @@ createNextLevelChildrenForStruct(ProjectionTree &Tree, StructDecl *SD) {
     assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
     SILType NodeTy = Ty.getFieldType(VD, Mod);
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
-    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
-    DEBUG(llvm::dbgs() << "            Projection: " 
+    LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Projection: " 
           << Node->getProjection().getValue().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
     assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
@@ -936,8 +936,8 @@ createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
     assert(Tree.getNode(Index) == this && "Node is not mapped to itself?");
     SILType NodeTy = Ty.getTupleElementType(i);
     auto *Node = Tree.createChildForTuple(this, NodeTy, i);
-    DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
-    DEBUG(llvm::dbgs() << "            Projection: "
+    LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "            Projection: "
           << Node->getProjection().getValue().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
     assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
@@ -949,9 +949,9 @@ createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
 void
 ProjectionTreeNode::
 createNextLevelChildren(ProjectionTree &Tree) {
-  DEBUG(llvm::dbgs() << "    Creating children for: " << getType() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "    Creating children for: " << getType() << "\n");
   if (Initialized) {
-    DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Already initialized! bailing!\n");
     return;
   }
 
@@ -960,24 +960,24 @@ createNextLevelChildren(ProjectionTree &Tree) {
   SILType Ty = getType();
 
   if (Ty.aggregateHasUnreferenceableStorage()) {
-    DEBUG(llvm::dbgs() << "        Has unreferenced storage bailing!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Has unreferenced storage bailing!\n");
     return;
   }
 
   if (auto *SD = Ty.getStructOrBoundGenericStruct()) {
-    DEBUG(llvm::dbgs() << "        Found a struct!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Found a struct!\n");
     createNextLevelChildrenForStruct(Tree, SD);
     return;
   }
 
   auto TT = Ty.getAs<TupleType>();
   if (!TT) {
-    DEBUG(llvm::dbgs() << "        Did not find a tuple or struct, "
+    LLVM_DEBUG(llvm::dbgs() << "        Did not find a tuple or struct, "
           "bailing!\n");
     return;
   }
 
-  DEBUG(llvm::dbgs() << "        Found a tuple.");
+  LLVM_DEBUG(llvm::dbgs() << "        Found a tuple.");
   createNextLevelChildrenForTuple(Tree, TT);
 }
 
@@ -1105,7 +1105,7 @@ public:
 
 ProjectionTree::
 ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
+  LLVM_DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
                      << "\n");
 
   // Create the root node of the tree with our base type.
@@ -1179,8 +1179,8 @@ computeUsesAndLiveness(SILValue Base) {
 
   // Then until the worklist is empty...
   while (!UseWorklist.empty()) {
-    DEBUG(llvm::dbgs() << "Current Worklist:\n");
-    DEBUG(for (auto &T : UseWorklist) {
+    LLVM_DEBUG(llvm::dbgs() << "Current Worklist:\n");
+    LLVM_DEBUG(for (auto &T : UseWorklist) {
         llvm::dbgs() << "    Type: " << T.second->getType() << "; Value: ";
         if (T.first) {
           llvm::dbgs() << T.first;
@@ -1195,7 +1195,7 @@ computeUsesAndLiveness(SILValue Base) {
     // Pop off the top type, value, and node.
     std::tie(Value, Node) = UseWorklist.pop_back_val();
 
-    DEBUG(llvm::dbgs() << "Visiting: " << Node->getType() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << Node->getType() << "\n");
 
     // If Value is not null, collate all users of Value the appropriate child
     // nodes and add such items to the worklist.
@@ -1207,11 +1207,11 @@ computeUsesAndLiveness(SILValue Base) {
     // liveness to its children and its children with an empty value to the
     // worklist so we propagate liveness down to any further descendants.
     if (Node->IsLive) {
-      DEBUG(llvm::dbgs() << "Node Is Live. Marking Children Live!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Node Is Live. Marking Children Live!\n");
       for (unsigned ChildIdx : Node->ChildProjections) {
         ProjectionTreeNode *Child = getNode(ChildIdx);
         Child->IsLive = true;
-        DEBUG(llvm::dbgs() << "    Marking child live: " << Child->getType() << "\n");
+        LLVM_DEBUG(llvm::dbgs() << "    Marking child live: " << Child->getType() << "\n");
         UseWorklist.push_back({SILValue(), Child});
       }
     }
@@ -1242,11 +1242,11 @@ computeUsesAndLiveness(SILValue Base) {
   }
 
 #ifndef NDEBUG
-  DEBUG(llvm::dbgs() << "Final Leafs: \n");
+  LLVM_DEBUG(llvm::dbgs() << "Final Leafs: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
   getLiveLeafTypes(LeafTypes);
   for (SILType Leafs : LeafTypes) {
-    DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
   }
 #endif
 }
@@ -1255,7 +1255,7 @@ void
 ProjectionTree::
 createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
                     llvm::SmallVectorImpl<SILValue> &Leafs) const {
-  DEBUG(llvm::dbgs() << "Recreating tree from value: " << NewBase);
+  LLVM_DEBUG(llvm::dbgs() << "Recreating tree from value: " << NewBase);
 
   using WorklistEntry =
     std::tuple<const ProjectionTreeNode *, SILValue>;
@@ -1271,19 +1271,19 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
     SILValue V = std::get<1>(Worklist.back());
     Worklist.pop_back();
 
-    DEBUG(llvm::dbgs() << "Visiting: " << V->getType() << ": " << V);
+    LLVM_DEBUG(llvm::dbgs() << "Visiting: " << V->getType() << ": " << V);
 
     // If we have any children...
     unsigned NumChildren = Node->ChildProjections.size();
     if (NumChildren) {
-      DEBUG(llvm::dbgs() << "    Not Leaf! Adding children to list.\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Not Leaf! Adding children to list.\n");
 
       // Create projections for each one of them and the child node and
       // projection to the worklist for processing.
       for (unsigned ChildIdx : reversed(Node->ChildProjections)) {
         const ProjectionTreeNode *ChildNode = getNode(ChildIdx);
         auto I = ChildNode->createProjection(B, Loc, V).get();
-        DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": "
+        LLVM_DEBUG(llvm::dbgs() << "    Adding Child: " << I->getType() << ": "
                            << *I);
         Worklist.push_back(std::make_tuple(ChildNode, SILValue(I)));
       }
@@ -1294,7 +1294,7 @@ createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
         continue;
 
       // Otherwise add it to our leaf list.
-      DEBUG(llvm::dbgs() << "    Is a Leaf! Adding to leaf list\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Is a Leaf! Adding to leaf list\n");
       Leafs.push_back(V);
     }
   }
@@ -1344,22 +1344,22 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
   NewAggregateBuilderMap AggBuilderMap(Builder, Loc);
   llvm::SmallVector<ProjectionTreeNode *, 8> Worklist;
 
-  DEBUG(llvm::dbgs() << "Replacing all uses in callee with leafs!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Replacing all uses in callee with leafs!\n");
 
   // For each Leaf we have as input...
   for (unsigned i = 0, e = Leafs.size(); i != e; ++i) {
     SILValue Leaf = Leafs[i];
     ProjectionTreeNode *Node = getNode(LiveLeafIndices[i]);
 
-    DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
+    LLVM_DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
 
     assert(Node->IsLive && "Unexpected dead node in LiveLeafIndices!");
 
     // Otherwise replace all uses at this level of the tree with uses of the
     // Leaf value.
-    DEBUG(llvm::dbgs() << "        Replacing operands with leaf!\n");
+    LLVM_DEBUG(llvm::dbgs() << "        Replacing operands with leaf!\n");
     for (auto *Op : Node->NonProjUsers) {
-      DEBUG(llvm::dbgs() << "            User: " << *Op->getUser());
+      LLVM_DEBUG(llvm::dbgs() << "            User: " << *Op->getUser());
       Op->set(Leaf);
     }
 
@@ -1368,18 +1368,18 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
 
     // If the parent is dead, continue.
     if (!Parent || !Parent->IsLive) {
-      DEBUG(llvm::dbgs() << "        Parent is dead... continuing.\n");
+      LLVM_DEBUG(llvm::dbgs() << "        Parent is dead... continuing.\n");
       continue;
     }
 
-    DEBUG(llvm::dbgs() << "        Parent is alive! Adding to parent "
+    LLVM_DEBUG(llvm::dbgs() << "        Parent is alive! Adding to parent "
           "builder\n");
 
     // Otherwise either create an aggregate builder for the parent or reuse one
     // that has already been created for it.
     AggBuilderMap.getBuilder(Parent).setValueForChild(Node, Leaf);
 
-    DEBUG(llvm::dbgs() << "            Is parent complete: "
+    LLVM_DEBUG(llvm::dbgs() << "            Is parent complete: "
           << (AggBuilderMap.isComplete(Parent)? "yes" : "no") << "\n");
 
     // Finally add the parent to the worklist.
@@ -1391,7 +1391,7 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
   // of the list.
   llvm::SmallVector<ProjectionTreeNode *, 8> NewNodes;
 
-  DEBUG(llvm::dbgs() << "Processing worklist!\n");
+  LLVM_DEBUG(llvm::dbgs() << "Processing worklist!\n");
 
   // Then until we have no work left...
   while (!Worklist.empty()) {
@@ -1410,10 +1410,10 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
                 return unsigned(IsComplete1) < unsigned(IsComplete2);
               });
 
-    DEBUG(llvm::dbgs() << "    Current Worklist:\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Current Worklist:\n");
 #ifndef NDEBUG
     for (auto *_work : Worklist) {
-      DEBUG(llvm::dbgs() << "        Type: " << _work->getType()
+      LLVM_DEBUG(llvm::dbgs() << "        Type: " << _work->getType()
                    << "; Complete: "
                    << (AggBuilderMap.isComplete(_work)? "yes" : "no")
                    << "; Invalidated: "

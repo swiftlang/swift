@@ -100,7 +100,7 @@ private:
 
   /// The entry point to the transformation.
   void run() override {
-    DEBUG(llvm::dbgs() << "** StackPromotion **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** StackPromotion **\n");
 
     bool Changed = false;
 

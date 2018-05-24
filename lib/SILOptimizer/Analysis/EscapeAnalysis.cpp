@@ -1080,7 +1080,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
   if (BottomUpOrder.prepareForVisiting(FInfo))
     return;
 
-  DEBUG(llvm::dbgs() << "  >> build graph for " <<
+  LLVM_DEBUG(llvm::dbgs() << "  >> build graph for " <<
         FInfo->Graph.F->getName() << '\n');
 
   FInfo->NeedUpdateSummaryGraph = true;
@@ -1138,7 +1138,7 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
       }
     }
   }
-  DEBUG(llvm::dbgs() << "  << finished graph for " <<
+  LLVM_DEBUG(llvm::dbgs() << "  << finished graph for " <<
         FInfo->Graph.F->getName() << '\n');
 }
 
@@ -1648,7 +1648,7 @@ void EscapeAnalysis::setAllEscaping(SILInstruction *I,
 void EscapeAnalysis::recompute(FunctionInfo *Initial) {
   allocNewUpdateID();
 
-  DEBUG(llvm::dbgs() << "recompute escape analysis with UpdateID " <<
+  LLVM_DEBUG(llvm::dbgs() << "recompute escape analysis with UpdateID " <<
         getCurrentUpdateID() << '\n');
 
   // Collect and analyze all functions to recompute, starting at Initial.
@@ -1664,13 +1664,13 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
   int Iteration = 0;
   bool NeedAnotherIteration;
   do {
-    DEBUG(llvm::dbgs() << "iteration " << Iteration << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "iteration " << Iteration << '\n');
     NeedAnotherIteration = false;
 
     for (FunctionInfo *FInfo : BottomUpOrder) {
       bool SummaryGraphChanged = false;
       if (FInfo->NeedUpdateSummaryGraph) {
-        DEBUG(llvm::dbgs() << "  create summary graph for " <<
+        LLVM_DEBUG(llvm::dbgs() << "  create summary graph for " <<
               FInfo->Graph.F->getName() << '\n');
 
         FInfo->Graph.propagateEscapeStates();
@@ -1693,7 +1693,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 
             // Only include callers which we are actually recomputing.
             if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-              DEBUG(llvm::dbgs() << "  merge  " << FInfo->Graph.F->getName() <<
+              LLVM_DEBUG(llvm::dbgs() << "  merge  " << FInfo->Graph.F->getName() <<
                     " into " << E.Caller->Graph.F->getName() << '\n');
 
               if (mergeCalleeGraph(E.FAS, &E.Caller->Graph,
@@ -1711,7 +1711,7 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         // Limit the total number of iterations. First to limit compile time,
         // second to make sure that the loop terminates. Theoretically this
         // should always be the case, but who knows?
-        DEBUG(llvm::dbgs() << "  finalize conservatively " <<
+        LLVM_DEBUG(llvm::dbgs() << "  finalize conservatively " <<
               FInfo->Graph.F->getName() << '\n');
         for (const auto &E : FInfo->getCallers()) {
           assert(E.isValid());
@@ -1987,12 +1987,12 @@ bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
 void EscapeAnalysis::invalidate() {
   Function2Info.clear();
   Allocator.DestroyAll();
-  DEBUG(llvm::dbgs() << "invalidate all\n");
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
 }
 
 void EscapeAnalysis::invalidate(SILFunction *F, InvalidationKind K) {
   if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
-    DEBUG(llvm::dbgs() << "  invalidate " << FInfo->Graph.F->getName() << '\n');
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->Graph.F->getName() << '\n');
     invalidateIncludingAllCallers(FInfo);
   }
 }

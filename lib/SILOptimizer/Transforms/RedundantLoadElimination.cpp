@@ -725,7 +725,7 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   //
   RedundantLoads[cast<SingleValueInstruction>(I)] = TheForwardingValue;
 
-  DEBUG(llvm::dbgs() << "FORWARD " << TheForwardingValue << "  to" << *I);
+  LLVM_DEBUG(llvm::dbgs() << "FORWARD " << TheForwardingValue << "  to" << *I);
   return true;
 }
 
@@ -1077,11 +1077,11 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   // that it and its operands cannot alias a load we have visited,
   // invalidate that load.
   if (Inst->mayWriteToMemory()) {
-    DEBUG(llvm::dbgs() << "WRITE " << *Inst);
+    LLVM_DEBUG(llvm::dbgs() << "WRITE " << *Inst);
     processUnknownWriteInst(Ctx, Inst, Kind);
     return;
   }
-  DEBUG(llvm::dbgs() << "READ " << *Inst);
+  LLVM_DEBUG(llvm::dbgs() << "READ " << *Inst);
 }
 
 RLEContext::ProcessKind
@@ -1358,7 +1358,7 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
 
 void RLEContext::processBasicBlocksForGenKillSet() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
-    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+    LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
                        << " for Gen/Kill:\n";
           BB->print(llvm::dbgs(), printCtx));
 
@@ -1383,7 +1383,7 @@ void RLEContext::processBasicBlocksForGenKillSet() {
 
       S.processInstructionWithKind(*this, &*I, RLEKind::ComputeAvailGenKillSet);
     }
-    DEBUG(S.dump(*this));
+    LLVM_DEBUG(S.dump(*this));
   }
 }
 
@@ -1402,7 +1402,7 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
   }
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
-    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+    LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
                        << " with Gen/Kill.\n");
     HandledBBs.erase(BB);
 
@@ -1420,13 +1420,13 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
         WorkList.push_back(X);
       }
     }
-    DEBUG(Forwarder.dump(*this));
+    LLVM_DEBUG(Forwarder.dump(*this));
   }
 }
 
 void RLEContext::processBasicBlocksForAvailValue() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
-    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+    LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
                        << " for available.\n");
 
     BlockState &Forwarder = getBlockState(BB);
@@ -1446,13 +1446,13 @@ void RLEContext::processBasicBlocksForAvailValue() {
     // stabilized in the processBasicBlocksWithGenKillSet.
     Forwarder.updateForwardValOut();
 
-    DEBUG(Forwarder.dump(*this));
+    LLVM_DEBUG(Forwarder.dump(*this));
   }
 }
 
 void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
-    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB) << " for RLE.\n");
+    LLVM_DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB) << " for RLE.\n");
 
     // If we know this is not a one iteration function which means its
     // forward sets have been computed and converged, 
@@ -1469,7 +1469,7 @@ void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
     // beginning of the basic block along all paths.
     Forwarder.mergePredecessorAvailSetAndValue(*this);
 
-    DEBUG(Forwarder.dump(*this));
+    LLVM_DEBUG(Forwarder.dump(*this));
 
     // Perform the actual redundant load elimination.
     Forwarder.processBasicBlockWithKind(*this, RLEKind::PerformRLE);
@@ -1547,7 +1547,7 @@ bool RLEContext::run() {
                           BBToProcess.find(&B) != BBToProcess.end());
   }
 
-  DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
+  LLVM_DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
     llvm::dbgs() << "LSLocation #" << i;
     getLocation(i).print(llvm::dbgs(), &Fn->getModule());
   });
@@ -1580,7 +1580,7 @@ bool RLEContext::run() {
       auto Iter = Loads.find(V);
       if (Iter == Loads.end())
         continue;
-      DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first) << "With "
+      LLVM_DEBUG(llvm::dbgs() << "Replacing  " << SILValue(Iter->first) << "With "
             << Iter->second);
       SILChanged = true;
       Iter->first->replaceAllUsesWith(Iter->second);
@@ -1614,7 +1614,7 @@ class RedundantLoadElimination : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "*** RLE on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** RLE on function: " << F->getName() << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();

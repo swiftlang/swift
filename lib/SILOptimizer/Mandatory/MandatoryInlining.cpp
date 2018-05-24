@@ -565,7 +565,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
       // process the inlined body after inlining, because the inlining may
       // have exposed new inlining opportunities beyond those present in
       // the inlined function when processed independently.
-      DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
+      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
                          << " into @" << InnerAI.getFunction()->getName()
                          << "\n");
 

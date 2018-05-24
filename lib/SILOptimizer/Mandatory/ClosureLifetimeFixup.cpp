@@ -528,7 +528,7 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     // copy_block_without_escaping instructions.
     if (fixupClosureLifetimes(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-    DEBUG(getFunction()->verify());
+    LLVM_DEBUG(getFunction()->verify());
 
   }
 

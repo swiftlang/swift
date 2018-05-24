@@ -354,10 +354,10 @@ void HoistAllocStack::collectHoistableInstructions() {
         continue;
       }
       if (isHoistable(ASI, IRGenMod)) {
-        DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
+        LLVM_DEBUG(llvm::dbgs() << "Hoisting     " << Inst);
         AllocStackToHoist.push_back(ASI);
       } else {
-        DEBUG(llvm::dbgs() << "Not hoisting " << Inst);
+        LLVM_DEBUG(llvm::dbgs() << "Not hoisting " << Inst);
       }
     }
   }

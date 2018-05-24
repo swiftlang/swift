@@ -418,7 +418,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
     MF->error();
     return nullptr;
   }
@@ -443,20 +443,20 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                 genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
-    DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
+    LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
     MF->error();
     return nullptr;
   }
   auto ty = getSILType(MF->getType(funcTyID), SILValueCategory::Object);
   if (!ty.is<SILFunctionType>()) {
-    DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
+    LLVM_DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     MF->error();
     return nullptr;
   }
 
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
-    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                        << " for SILFunction\n");
     MF->error();
     return nullptr;
@@ -466,7 +466,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   if (clangNodeOwnerID != 0) {
     clangNodeOwner = dyn_cast_or_null<ValueDecl>(MF->getDecl(clangNodeOwnerID));
     if (!clangNodeOwner) {
-      DEBUG(llvm::dbgs() << "invalid clang node owner for SILFunction\n");
+      LLVM_DEBUG(llvm::dbgs() << "invalid clang node owner for SILFunction\n");
       MF->error();
       return nullptr;
     }
@@ -489,7 +489,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   // If we have an existing function, verify that the types match up.
   if (fn) {
     if (fn->getLoweredType() != ty) {
-      DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
       MF->error();
       return nullptr;
     }
@@ -655,7 +655,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 
       // Handle a SILInstruction record.
       if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
-        DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
+        LLVM_DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
         MF->error();
         return fn;
       }
@@ -2393,7 +2393,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
 
   auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
   if (Func) {
-    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
     assert(InFunc->getName() == Func->getName());
   }
@@ -2425,7 +2425,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
     MF->error();
     return false;
   }
@@ -2453,7 +2453,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
                                 genericEnvID, clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
-    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                        << " for SIL function " << Name << "\n");
     return false;
   }
@@ -2462,7 +2462,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   if (Linkage && linkage.getValue() != *Linkage)
     return false;
 
-  DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Found SIL Function: " << Name << "\n");
   return true;
 }
 
@@ -2477,7 +2477,7 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
 
   auto Func = readSILFunction(*iter, nullptr, name, declarationOnly);
   if (Func)
-    DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
           Func->dump());
   return Func;
 }
@@ -2509,7 +2509,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   SILCursor.JumpToBit(globalVarOrOffset);
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar.\n");
     return nullptr;
   }
 
@@ -2525,13 +2525,13 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, isSerialized,
                                  IsDeclaration, IsLet, TyID, dID);
   if (TyID == 0) {
-    DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
+    LLVM_DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
     return nullptr;
   }
 
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
-    DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                        << " for SILGlobalVariable\n");
     return nullptr;
   }
@@ -2593,7 +2593,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   SILCursor.JumpToBit(vTableOrOffset);
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in readVTable.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable.\n");
     return nullptr;
   }
 
@@ -2607,7 +2607,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   unsigned Serialized;
   VTableLayout::readRecord(scratch, ClassID, Serialized);
   if (ClassID == 0) {
-    DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
+    LLVM_DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
     return nullptr;
   }
 
@@ -2639,7 +2639,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
     auto Linkage = fromStableSILLinkage(RawLinkage);
     if (!Linkage) {
-      DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+      LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
             << " for VTable Entry\n");
       MF->error();
       return nullptr;
@@ -2709,7 +2709,7 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
   SILCursor.JumpToBit(propOrOffset.getOffset());
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in readProperty.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty.\n");
     return nullptr;
   }
 
@@ -2754,7 +2754,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   SILCursor.JumpToBit(wTableOrOffset.getOffset());
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable.\n");
     return nullptr;
   }
 
@@ -2772,7 +2772,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
-    DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
                        << " for SILFunction\n");
     MF->error();
     return nullptr;
@@ -2795,7 +2795,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   // up.
   if (wT) {
     if (wT->getConformance() != theConformance) {
-      DEBUG(llvm::dbgs() << "Conformance mismatch.\n");
+      LLVM_DEBUG(llvm::dbgs() << "Conformance mismatch.\n");
       MF->error();
       return nullptr;
     }
@@ -2944,7 +2944,7 @@ SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
   // Attempt to read the witness table.
   auto Wt = readWitnessTable(*iter, existingWt);
   if (Wt)
-    DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
 
   return Wt;
 }
@@ -2965,7 +2965,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   SILCursor.JumpToBit(wTableOrOffset.getOffset());
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    DEBUG(llvm::dbgs() << "Cursor advance error in "
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
           "readDefaultWitnessTable.\n");
     return nullptr;
   }
@@ -2982,7 +2982,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
-    DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
+    LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
                        << " for SILFunction\n");
     MF->error();
     return nullptr;
@@ -2990,7 +2990,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
   if (proto == nullptr) {
-    DEBUG(llvm::dbgs() << "invalid protocol code " << protoId << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "invalid protocol code " << protoId << "\n");
     MF->error();
     return nullptr;
   }
@@ -3005,7 +3005,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   // matches up.
   if (wT) {
     if (wT->getProtocol() != proto) {
-      DEBUG(llvm::dbgs() << "Protocol mismatch.\n");
+      LLVM_DEBUG(llvm::dbgs() << "Protocol mismatch.\n");
       MF->error();
       return nullptr;
     }
@@ -3093,7 +3093,7 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
   // Attempt to read the default witness table.
   auto Wt = readDefaultWitnessTable(*iter, existingWt);
   if (Wt)
-    DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
 
   return Wt;
 }

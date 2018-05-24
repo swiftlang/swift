@@ -493,13 +493,13 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
                                        OptRemark::Emitter *ORE,
                                        bool isEffectivelyFinalMethod) {
 
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
 
   // First attempt to lookup the origin for our class method. The origin should
   // either be a metatype or an alloc_ref.
-  DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
+  LLVM_DEBUG(llvm::dbgs() << "        Origin Type: " << ClassOrMetatypeType);
 
   auto *MI = cast<MethodInst>(AI.getCallee());
 
@@ -509,7 +509,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
   if (!F) {
-    DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
     return false;
   }
@@ -517,7 +517,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // We need to disable the  “effectively final” opt if a function is inlinable
   if (isEffectivelyFinalMethod &&
       F->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
                           "it is an effectively-final inlinable: "
                        << F->getName() << "\n");
     return false;
@@ -528,7 +528,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   // So even for Onone functions we have to do it if the SILStage is raw.
   if (F->getModule().getStage() != SILStage::Raw && !F->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
-    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
+    LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function "
                        << " because it is marked no-opt: " << F->getName()
                        << "\n");
     return false;
@@ -553,7 +553,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
 DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
                                                       SILValue ClassOrMetatype,
                                                       OptRemark::Emitter *ORE) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
   SILModule &Mod = AI.getModule();
   auto *MI = cast<MethodInst>(AI.getCallee());
@@ -675,7 +675,7 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   ResultValue = castValueToABICompatibleType(&B, NewAI.getLoc(), ResultValue,
                                              ResultTy, AI.getType());
 
-  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
   if (ORE)
     ORE->emit([&]() {
         using namespace OptRemark;
@@ -982,7 +982,7 @@ swift::tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE) {
 DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
                                                    ClassHierarchyAnalysis *CHA,
                                                    OptRemark::Emitter *ORE) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
   //
@@ -1054,7 +1054,7 @@ DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
 }
 
 bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) {
-  DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
+  LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize: " << *AI.getInstruction());
 
   // Devirtualize apply instructions that call witness_method instructions:
   //

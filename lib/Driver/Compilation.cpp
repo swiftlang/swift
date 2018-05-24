@@ -863,7 +863,7 @@ namespace driver {
           // To avoid redoing the batch loop too many times, repartition pretty
           // aggressively by doubling partition count / halving size.
           NumPartitions *= 2;
-          DEBUG(llvm::dbgs()
+          LLVM_DEBUG(llvm::dbgs()
                 << "Should have used a supplementary output file map.\n");
           return true;
         }

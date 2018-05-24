@@ -25,7 +25,7 @@ namespace {
 class EscapeAnalysisDumper : public SILModuleTransform {
 
   void run() override {
-    DEBUG(llvm::dbgs() << "** EscapeAnalysisDumper **\n");
+    LLVM_DEBUG(llvm::dbgs() << "** EscapeAnalysisDumper **\n");
 
 #ifndef NDEBUG
     auto *EA = PM->getAnalysis<EscapeAnalysis>();

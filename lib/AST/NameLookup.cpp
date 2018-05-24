@@ -1381,7 +1381,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   if (name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
-  DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
+  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect(" << name << ")"
         << ", lookupTable.getInt()=" << LookupTable.getInt()
         << ", hasLazyMembers()=" << hasLazyMembers()
         << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading

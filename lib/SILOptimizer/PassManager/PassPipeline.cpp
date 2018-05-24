@@ -652,7 +652,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
 SILPassPipelinePlan
 SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
   namespace yaml = llvm::yaml;
-  DEBUG(llvm::dbgs() << "Parsing Pass Pipeline from " << Filename << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Parsing Pass Pipeline from " << Filename << "\n");
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -676,12 +676,12 @@ SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
   for (yaml::Node &PipelineNode :
        make_range(RootList->begin(), RootList->end())) {
     Passes.clear();
-    DEBUG(llvm::dbgs() << "New Pipeline:\n");
+    LLVM_DEBUG(llvm::dbgs() << "New Pipeline:\n");
 
     auto *Desc = cast<yaml::SequenceNode>(&PipelineNode);
     yaml::SequenceNode::iterator DescIter = Desc->begin();
     StringRef Name = cast<yaml::ScalarNode>(&*DescIter)->getRawValue();
-    DEBUG(llvm::dbgs() << "    Name: \"" << Name << "\"\n");
+    LLVM_DEBUG(llvm::dbgs() << "    Name: \"" << Name << "\"\n");
     ++DescIter;
 
     for (auto DescEnd = Desc->end(); DescIter != DescEnd; ++DescIter) {
@@ -690,7 +690,7 @@ SILPassPipelinePlan::getPassPipelineFromFile(StringRef Filename) {
       StringRef PassName = cast<yaml::ScalarNode>(FirstNode)->getRawValue();
       unsigned Size = PassName.size() - 2;
       PassName = PassName.substr(1, Size);
-      DEBUG(llvm::dbgs() << "    Pass: \"" << PassName << "\"\n");
+      LLVM_DEBUG(llvm::dbgs() << "    Pass: \"" << PassName << "\"\n");
       auto Kind = PassKindFromString(PassName);
       assert(Kind != PassKind::invalidPassKind && "Found invalid pass kind?!");
       Passes.push_back(Kind);

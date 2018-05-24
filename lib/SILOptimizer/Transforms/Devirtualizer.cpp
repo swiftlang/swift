@@ -38,7 +38,7 @@ class Devirtualizer : public SILFunctionTransform {
   void run() override {
     SILFunction &F = *getFunction();
     ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
-    DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
+    LLVM_DEBUG(llvm::dbgs() << "***** Devirtualizer on function:" << F.getName()
                        << " *****\n");
 
     if (devirtualizeAppliesInFunction(F, CHA))

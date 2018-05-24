@@ -942,7 +942,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // Fully dead store - stores to all the components are dead, therefore this
   // instruction is dead.
   if (Dead) {
-    DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Instruction Dead: " << *I << "\n");
     S->DeadStores.insert(I);
     ++NumDeadStores;
     return;
@@ -990,7 +990,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     }
 
     // Lastly, mark the old store as dead.
-    DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Instruction Partially Dead: " << *I << "\n");
     S->DeadStores.insert(I);
     ++NumPartialDeadStores;
   }
@@ -1224,7 +1224,7 @@ bool DSEContext::run() {
     // Delete the dead stores.
     for (auto &I : getBlockState(&BB)->DeadStores) {
       Changed = true;
-      DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
+      LLVM_DEBUG(llvm::dbgs() << "*** Removing: " << *I << " ***\n");
       // This way, we get rid of pass dependence on DCE.
       recursivelyDeleteTriviallyDeadInstructions(I, true);
     }
@@ -1244,7 +1244,7 @@ public:
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
-    DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
+    LLVM_DEBUG(llvm::dbgs() << "*** DSE on function: " << F->getName() << " ***\n");
 
     auto *AA = PM->getAnalysis<AliasAnalysis>();
     auto *TE = PM->getAnalysis<TypeExpansionAnalysis>();

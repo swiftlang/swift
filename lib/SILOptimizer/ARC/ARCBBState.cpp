@@ -123,7 +123,7 @@ void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
     // Attempt to merge Other into this ref count state. If we fail, blot this
     // ref counted value and continue.
     if (!RefCountState.merge(OtherRefCountState)) {
-      DEBUG(llvm::dbgs() << "Failed to merge!\n");
+      LLVM_DEBUG(llvm::dbgs() << "Failed to merge!\n");
       PtrToTopDownState.erase(RefCountedValue);
       continue;
     }

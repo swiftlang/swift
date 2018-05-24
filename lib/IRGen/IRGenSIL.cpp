@@ -1249,7 +1249,7 @@ IRGenSILFunction::~IRGenSILFunction() {
   // Emit the fail BB if we have one.
   if (!FailBBs.empty())
     emitFailBB();
-  DEBUG(CurFn->print(llvm::dbgs()));
+  LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
 template<typename ValueVector>
@@ -1615,7 +1615,7 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
 }
 
 void IRGenSILFunction::emitSILFunction() {
-  DEBUG(llvm::dbgs() << "emitting SIL function: ";
+  LLVM_DEBUG(llvm::dbgs() << "emitting SIL function: ";
         CurSILFn->printName(llvm::dbgs());
         llvm::dbgs() << '\n';
         CurSILFn->print(llvm::dbgs()));
