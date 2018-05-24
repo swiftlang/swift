@@ -16,6 +16,7 @@
 #include <atomic>
 #include <functional>
 #include <stdint.h>
+#include <vector>
 #include "llvm/Support/Allocator.h"
 #include "Atomic.h"
 #include "Debug.h"
