@@ -126,6 +126,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES1 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES2 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
@@ -1515,6 +1517,17 @@ protocol NoDupReq6: NoDupReq5 {
 
 typealias NoDupReq23 = NoDupReq2 & NoDupReq3
 
+protocol Override {
+  func foo<T: NoDupReq1>(_ arg: T)
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+protocol Override2 {
+  func foo<T: NoDupReq1>(_ arg: T)
+}
+protocol Override3: Override2 {
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+
 func checkRestatementNoDup1(_ arg: NoDupReq1 & NoDupReq2 & NoDupReq3) {
   arg.#^NODUP_RESTATED_REQ1^#
   arg#^NODUP_RESTATED_REQ_NODOT1^#
@@ -1538,6 +1551,12 @@ func checkRestatementNoDup5<T: NoDupReq1 & NoDupReq23>(_ arg: T) {
 func checkRestatementNoDup6(_ arg: NoDupReq1 & NoDupReq23) {
   arg.#^NODUP_RESTATED_REQ6^#
   arg#^NODUP_RESTATED_REQ_NODOT3^#
+}
+func checkOverrideInclusion1(_ arg: Override) {
+  arg.#^CHECK_PROT_OVERRIDES1^#
+}
+func checkOverrideInclusion2(_ arg: Override3) {
+  arg.#^CHECK_PROT_OVERRIDES2^#
 }
 
 // CHECK_NODUP_RESTATED_REQ: Begin completions
@@ -1568,6 +1587,9 @@ func checkRestatementNoDup6(_ arg: NoDupReq1 & NoDupReq23) {
 // CHECK_NODUP_RESTATED_REQ_TYPE-NOT: Decl[InstanceMethod]/Super: foo({#self: [[ARG:.+]]#})[#() -> Void#]; name=foo([[ARG]])
 // CHECK_NODUP_RESTATED_REQ_TYPE-NOT: Decl[AssociatedType]/Super: E; name=E
 // CHECK_NODUP_RESTATED_REQ_TYPE: End completions
+
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq1#})[#Void#]; name=foo(arg: NoDupReq1)
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq2#})[#Void#]; name=foo(arg: NoDupReq2)
 
 struct OnlyMe {}
 protocol P4 {

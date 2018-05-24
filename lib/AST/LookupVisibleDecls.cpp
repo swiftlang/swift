@@ -17,12 +17,12 @@
 
 #include "NameLookupImpl.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -479,8 +479,7 @@ class RestateFilteringConsumer : public VisibleDeclConsumer {
   const DeclContext *DC;
   LazyResolver *resolver;
   llvm::DenseSet<DeclName> foundVars;
-  llvm::DenseMap<std::tuple<DeclName, Type>, std::set<ValueDecl *>> foundFuncs;
-
+  llvm::DenseSet<std::pair<DeclName, CanType>> foundFuncs;
   void validate() {
     assert(DC && baseTy && !baseTy->hasLValueType());
   }
@@ -494,7 +493,9 @@ public:
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
     assert(VD);
-    if (!VD->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+    // If this isn't a protocol context, hand over the decl
+    // to the parent consumer.
+    if (!isa<ProtocolDecl>(VD->getDeclContext())) {
       parentConsumer.foundDecl(VD, Reason);
       return;
     }
@@ -505,19 +506,35 @@ public:
       parentConsumer.foundDecl(VD, Reason);
       return;
     }
-    if (!VD->getInterfaceType()->is<AnyFunctionType>()) {
-      if (foundVars.insert(VD->getFullName()).second) {
+    auto AFT = VD->getInterfaceType()->getAs<AnyFunctionType>();
+    if (!AFT) {
+      if (foundVars.insert(VD->getFullName()).second)
         parentConsumer.foundDecl(VD, Reason);
-      }
       return;
     }
-    auto type =
-      VD->getOverloadSignatureType()->getAs<AnyFunctionType>()->getResult();
+    // Preserve the generic signature if this is a subscript, which are uncurried,
+    // or if we have genenic params other than Self. Otherwise, strip if off
+    // and use the resultType of the curried function type.
+    // When preserving the generic signature, we remove the requirement
+    // from Self to make sure it doesn't prevent us from recognizing restatements.
+    CanType type;
+    // This can't be null since we are dealing with method or
+    // subscript requirements, where Self is an implicit generic param.
+    auto sig = AFT->getOptGenericSignature();
+    auto params = sig->getGenericParams();
+    if (params.size() == 1 && !isa<SubscriptDecl>(VD)) {
+      type = AFT->getResult()->getCanonicalType();
+    } else {
+      auto newReqs = sig->getRequirements().drop_front();
+      auto newSig = GenericSignature::get(params, newReqs, false);
 
-    if (foundFuncs[{VD->getFullName(), type}].empty()) {
+      type = GenericFunctionType::get(newSig, AFT->getInput(),
+                                      AFT->getResult(), AFT->getExtInfo())
+        ->getCanonicalType(newSig);
+    }
+    if (foundFuncs.insert({VD->getFullName(), type}).second) {
       parentConsumer.foundDecl(VD, Reason);
     }
-    foundFuncs[{VD->getFullName(), type}].insert(VD);
   }
 };
 
@@ -532,11 +549,10 @@ static void
   if (!Visited.insert(PT->getDecl()).second)
     return;
 
-  for (auto Proto : PT->getDecl()->getInheritedProtocols()){
-    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(),
-                                     Consumer, CurrDC, LS,
-                                     getReasonForSuper(Reason), TypeResolver,
-                                     GSB, Visited);}
+  for (auto Proto : PT->getDecl()->getInheritedProtocols())
+    lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(), Consumer, CurrDC,
+                                     LS, getReasonForSuper(Reason), TypeResolver,
+                                     GSB, Visited);
   lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason, TypeResolver);
 }
 
@@ -587,7 +603,7 @@ static void lookupVisibleMemberDeclsImpl(
   }
 
   // If the base is a protocol, enumerate its members.
-  if (auto PT = BaseTy->getAs<ProtocolType>()) {
+  if (ProtocolType *PT = BaseTy->getAs<ProtocolType>()) {
     lookupVisibleProtocolMemberDecls(BaseTy, PT, Consumer, CurrDC, LS, Reason,
                                      TypeResolver, GSB, Visited);
     return;
@@ -602,13 +618,13 @@ static void lookupVisibleMemberDeclsImpl(
   }
 
   // Enumerate members of archetype's requirements.
-  if (ArchetypeType *AT = BaseTy->getAs<ArchetypeType>()) {
-    for (auto Proto : AT->getConformsTo())
-      lookupVisibleProtocolMemberDecls(BaseTy, Proto->getDeclaredType(),
-                                       Consumer, CurrDC, LS,
-                                       getReasonForSuper(Reason),
-                                       TypeResolver, GSB, Visited);
-    if (auto superclass = AT->getSuperclass())
+  if (ArchetypeType *Archetype = BaseTy->getAs<ArchetypeType>()) {
+    for (auto Proto : Archetype->getConformsTo())
+      lookupVisibleProtocolMemberDecls(
+          BaseTy, Proto->getDeclaredType(), Consumer, CurrDC, LS,
+          getReasonForSuper(Reason), TypeResolver, GSB, Visited);
+
+    if (auto superclass = Archetype->getSuperclass())
       lookupVisibleMemberDeclsImpl(superclass, Consumer, CurrDC, LS,
                                    getReasonForSuper(Reason), TypeResolver,
                                    GSB, Visited);
