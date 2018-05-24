@@ -1803,13 +1803,13 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
 }
 
 // Attempt to find a disjunction of bind constraints where all options
-// in the disjunction are binding the same type variable, and where
-// that type variable appears as the right hand side of a conversion
-// constraint.
+// in the disjunction are binding the same type variable.
 //
-// Trying these bindings early can make it possible to split the
+// Prefer disjunctions where the bound type variable is also the
+// right-hand side of a conversion constraint, since having a concrete
+// type that we're converting to can make it possible to split the
 // constraint system into multiple ones.
-static Constraint *selectDisjunctionBindingConversionResultType(
+static Constraint *selectBestBindingDisjunction(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
 
   // Collect any disjunctions that simply attempt bindings for a
@@ -1868,6 +1868,13 @@ static Constraint *selectDisjunctionBindingConversionResultType(
     }
   }
 
+  // If we had any binding disjunctions, return the first of
+  // those. These ensure that we attempt to bind types earlier than
+  // trying the elements of other disjunctions, which can often mean
+  // we fail faster.
+  if (!bindingDisjunctions.empty())
+    return bindingDisjunctions[0];
+
   return nullptr;
 }
 
@@ -1877,7 +1884,7 @@ Constraint *ConstraintSystem::selectDisjunction(
     return nullptr;
 
   auto *disjunction =
-      selectDisjunctionBindingConversionResultType(*this, disjunctions);
+      selectBestBindingDisjunction(*this, disjunctions);
   if (disjunction)
     return disjunction;
 
