@@ -5546,9 +5546,16 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
                        baseType);
   diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
 
-  if (candidateInfo.closeness != CC_ExactMatch)
+  auto showNote = [&]() {
+    diag.flush();
+    if (candidateInfo.size() == 1)
+      diagnose(candidateInfo.candidates.front().getDecl(),
+               diag::kind_declared_here, DescriptiveDeclKind::Subscript);
+  };
+  if (candidateInfo.closeness != CC_ExactMatch) {
+    showNote();
     return true;
-
+  }
   auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
   auto lastArgSymbol = toCharSourceRange(CS.TC.Context.SourceMgr,
                                          argExpr->getEndLoc());
@@ -5564,11 +5571,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   else
     diag.fixItInsertAfter(argExpr->getEndLoc(),
                           getTokenText(tok::r_square));
-  diag.flush();
-
-  if (candidateInfo.size() == 1)
-    diagnose(candidateInfo.candidates.front().getDecl(),
-             diag::subscript_declared_here);
+  showNote();
 
   return true;
 }
