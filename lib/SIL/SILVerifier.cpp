@@ -25,6 +25,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1581,8 +1582,8 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    auto op = BAI->getOperand();
-    requireSameType(BAI->getType(), op->getType(),
+    auto sourceOper = BAI->getOperand();
+    requireSameType(BAI->getType(), sourceOper->getType(),
                     "result must be same type as operand");
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
@@ -1603,6 +1604,11 @@ public:
     case SILAccessKind::Modify:
       break;
     }
+
+    // For dynamic Read/Modify access, AccessEnforcementWMO assumes a valid
+    // AccessedStorage and runs very late in the optimizer pipeline.
+    // TODO: eventually, make this true for any kind of access.
+    findAccessedStorage(sourceOper);
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
