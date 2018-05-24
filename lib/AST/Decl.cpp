@@ -4554,7 +4554,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+    DeclContext *parent, ArrayRef<ParameterList *> paramLists) {
   if (parent->isLocalContext()) {
     setParent(parent);
   }
