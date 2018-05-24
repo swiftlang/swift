@@ -41,26 +41,54 @@ public enum ParserError: Error, CustomStringConvertible {
   }
 }
 
-extension Syntax {
-  fileprivate static func encodeSourceFileSyntaxInternal(_ url: URL) throws -> Data {
-    let swiftcRunner = try SwiftcRunner(sourceFile: url)
-    let result = try swiftcRunner.invoke()
-    guard result.wasSuccessful else {
-      throw ParserError.swiftcFailed(result.exitCode, result.stderr)
+/// Deserializes the syntax tree from its serialized form to an object tree in
+/// Swift. To deserialize incrementally transferred syntax trees, the same
+/// instance of the deserializer must be used for all subsequent
+/// deserializations.
+public final class SyntaxTreeDeserializer {
+  // FIXME: This lookup table just accumulates nodes, we should invalidate nodes
+  // that are no longer used at some point and remove them from the table
+
+  /// Syntax nodes that have already been parsed and are able to be reused if
+  /// they were omitted in an incremental syntax tree transfer
+  private var nodeLookupTable: [SyntaxNodeId: RawSyntax] = [:]
+
+  public init() {
+  }
+
+  /// Decode a serialized form of SourceFileSyntax to a syntax tree.
+  /// - Parameter data: The UTF-8 represenation of the serialized syntax tree
+  /// - Returns: A top-level Syntax node representing the contents of the tree,
+  ///            if the parse was successful.
+  public func deserialize(_ data: Data) throws -> SourceFileSyntax {
+    let decoder = JSONDecoder()
+    decoder.userInfo[.rawSyntaxDecodedCallback] = self.addToLookupTable
+    decoder.userInfo[.omittedNodeLookupFunction] = self.lookupNode
+    let raw = try decoder.decode(RawSyntax.self, from: data)
+    guard let file = makeSyntax(raw) as? SourceFileSyntax else {
+      throw ParserError.invalidFile
     }
-    return result.stdoutData
+    return file
   }
 
-  /// Parses the Swift file at the provided URL into a `Syntax` tree in Json
-  /// serialization format.
-  /// - Parameter url: The URL you wish to parse.
-  /// - Returns: The syntax tree in Json format string.
-  public static func encodeSourceFileSyntax(_ url: URL) throws -> String {
-    return String(data: try encodeSourceFileSyntaxInternal(url), encoding: .utf8)!
+  // MARK: Incremental deserialization helper functions
+
+  private func lookupNode(id: SyntaxNodeId) -> RawSyntax? {
+    return nodeLookupTable[id]
   }
 
-  /// Parses the Swift file at the provided URL into a full-fidelity `Syntax`
-  /// tree.
+  private func addToLookupTable(_ node: RawSyntax) {
+    guard let id = node.id else {
+      return
+    }
+    nodeLookupTable[id] = node
+  }
+}
+
+/// Namespace for functions to retrieve a syntax tree from the swift compiler
+/// and deserializing it.
+public enum SyntaxTreeParser {
+  /// Parses the Swift file at the provided URL into a full-fidelity Syntax tree
   /// - Parameter url: The URL you wish to parse.
   /// - Returns: A top-level Syntax node representing the contents of the tree,
   ///            if the parse was successful.
@@ -68,27 +96,14 @@ extension Syntax {
   ///           located, `ParseError.invalidFile` if the file is invalid.
   ///           FIXME: Fill this out with all error cases.
   public static func parse(_ url: URL) throws -> SourceFileSyntax {
-    return try decodeSourceFileSyntax(encodeSourceFileSyntaxInternal(url))
-  }
-
-  /// Decode a serialized form of SourceFileSyntax to a syntax node.
-  /// - Parameter content: The data of the serialized SourceFileSyntax.
-  /// - Returns: A top-level Syntax node representing the contents of the tree,
-  ///            if the parse was successful.
-  fileprivate static func decodeSourceFileSyntax(_ content: Data) throws -> SourceFileSyntax {
-    let decoder = JSONDecoder()
-    let raw = try decoder.decode(RawSyntax.self, from: content)
-    guard let file = makeSyntax(raw) as? SourceFileSyntax else {
-      throw ParserError.invalidFile
+    let swiftcRunner = try SwiftcRunner(sourceFile: url)
+    let result = try swiftcRunner.invoke()
+    guard result.wasSuccessful else {
+      throw ParserError.swiftcFailed(result.exitCode, result.stderr)
     }
-    return file
-  }
-
-  /// Decode a serialized form of SourceFileSyntax to a syntax node.
-  /// - Parameter content: The string content of the serialized SourceFileSyntax.
-  /// - Returns: A top-level Syntax node representing the contents of the tree,
-  ///            if the parse was successful.
-  public static func decodeSourceFileSyntax(_ content: String) throws -> SourceFileSyntax {
-    return try decodeSourceFileSyntax(content.data(using: .utf8)!)
+    let syntaxTreeData = result.stdoutData
+    let deserializer = SyntaxTreeDeserializer()
+    return try deserializer.deserialize(syntaxTreeData)
   }
 }
+
