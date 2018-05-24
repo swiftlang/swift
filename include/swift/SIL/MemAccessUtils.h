@@ -53,17 +53,17 @@ public:
   }
 };
 
-/// Represents the identity of a storage object being accessed.
+/// Represents the identity of a storage location being accessed.
 ///
 /// AccessedStorage may be one of several kinds of "identified" storage
-/// objects, or may be valid, but Unidentified storage. An identified object
+/// locations, or may be valid, but Unidentified storage. An identified location
 /// is known to identify the base of the accessed storage, whether that is a
 /// SILValue that produces the base address, or a variable
 /// declaration. "Uniquely identified" storage refers to identified storage that
 /// cannot be aliased. For example, local allocations are uniquely identified,
 /// while global variables and class properties are not. Unidentified storage is
 /// associated with a SILValue that produces the accessed address but has not
-/// been determined to be the base of a storage object. It may, for example,
+/// been determined to be the base of a storage location. It may, for example,
 /// be a SILPHIArgument.
 ///
 /// An invalid AccessedStorage object is marked Unidentified and contains an
@@ -72,19 +72,19 @@ public:
 /// SILVerification could allow the optimizer to aggressively assert that
 /// AccessedStorage is always valid.
 ///
-/// Note that the SILValue that represents a storage object is not
+/// Note that the SILValue that represents a storage location is not
 /// necessarilly an address type. It may instead be a SILBoxType.
 ///
-/// AccessedStorage hashing and comparison (via DenseMapInfo) is used to
-/// determine when two 'begin_access' instructions access the same or disjoint
-/// underlying objects.
+/// AccessedStorage hashing and comparison is used to determine when two
+/// 'begin_access' instructions access the same or disjoint underlying
+/// locations.
 ///
-/// `DenseMapInfo::isEqual()` guarantees that two AccessStorage values refer to
-/// the same memory if both values are valid.
+/// Equality guarantees that two AccessStorage values refer to the same
+/// memory if both values are valid.
 ///
-/// `!DenseMapInfo::isEqual()` does not guarantee that two identified
-/// AccessStorage values are distinct. Inequality does, however, guarantee that
-/// two *uniquely* identified AccessStorage values are distinct.
+/// Inequality does not guarantee that two identified AccessStorage values
+/// distinct. Inequality does guarantee that two *uniquely* identified
+/// AccessStorage values are distinct.
 class AccessedStorage {
 public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
@@ -111,42 +111,26 @@ protected:
   // with the fields used within this class as a common prefix.
   //
   // This allows passes to embed analysis flags, and reserves enough space to
-  // embed a unique index.
-  //
-  // AccessedStorageAnalysis defines an StorageAccessInfo object that maps each
-  // storage object within a function to its unique storage index and summary
-  // information of that storage object.
-  //
-  // AccessEnforcementOpts defines an AccessEnforcementOptsInfo object that maps
-  // each begin_access to its storage object, unique access index, and summary
-  // info for that access.
+  // embed a unique access index.
   union {
     uint64_t OpaqueBits;
-    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, bitmax(NumKindBits, 8),
-                               Kind : bitmax(NumKindBits, 8));
+    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, bitmax(NumKindBits, 8), Kind
+                               : bitmax(NumKindBits, 8));
 
-    // Define bits for use in AccessedStorageAnalysis. Each identified storage
-    // object is mapped to one instance of this subclass.
-    SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessedStorage,
-                               64 - NumAccessedStorageBits,
-                               accessKind : NumSILAccessKindBits,
-                               noNestedConflict : 1,
-                               storageIndex : 64 - (NumAccessedStorageBits
-                                                    + NumSILAccessKindBits
-                                                    + 1));
-
-    // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
-    // in the function is mapped to one instance of this subclass.  Reserve a
-    // bit for a seenNestedConflict flag, which is the per-begin-access result
-    // of pass-specific analysis. The remaning bits are sufficient to index all
+    // Define bits for use in the AccessEnforcementOpts pass. Reserve the high
+    // bit for a seenNestedConflict flag, which is the result of pass-specific
+    // analysis. The remaning bits are sufficient to index all
     // begin_[unpaired_]access instructions.
     //
-    // `AccessedStorage` refers to the AccessedStorageBitfield defined above,
+    // `AccessEnforcementOpts` does not need to be a defined class. This macro
+    // simply defines the pass-specific name "AccessEnforcementOptsBitfield".
+    //
+    // `AccessedStorage` identifies the AccessedStoredBitfield defined above,
     // setting aside enough bits for common data.
     SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessedStorage,
                                64 - NumAccessedStorageBits,
-                               seenNestedConflict : 1,
-                               beginAccessIndex : 63 - NumAccessedStorageBits);
+                               beginAccessIndex : 63 - NumAccessedStorageBits,
+                               seenNestedConflict : 1);
   } Bits;
 
 private:
@@ -172,7 +156,7 @@ public:
     initKind(Class);
   }
 
-  // Return true if this is a valid storage object.
+  // Return true if this is a valid storage location.
   operator bool() const { return getKind() != Unidentified || value; }
 
   Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.Kind); }
@@ -221,20 +205,6 @@ public:
     }
   }
 
-  bool isLocal() const {
-    switch (getKind()) {
-    case Box:
-    case Stack:
-      return true;
-    case Global:
-    case Class:
-    case Argument:
-    case Nested:
-    case Unidentified:
-      return false;
-    }
-  }
-
   bool isUniquelyIdentified() const {
     switch (getKind()) {
     case Box:
@@ -261,13 +231,6 @@ public:
 
   void print(raw_ostream &os) const;
   void dump() const;
-
-private:
-  // Disable direct comparison because we allow subclassing with bitfields.
-  // Currently, we use DenseMapInfo to unique storage, which defines key
-  // equalilty only in terms of the base AccessedStorage class bits.
-  bool operator==(const AccessedStorage &) const = delete;
-  bool operator!=(const AccessedStorage &) const = delete;
 };
 } // end namespace swift
 
@@ -337,9 +300,9 @@ namespace swift {
 /// memory, return an AccessedStorage object that identifies the formal access.
 ///
 /// The returned AccessedStorage represents the best attempt to find the base of
-/// the storage object being accessed at `sourceAddr`. This may be a fully
+/// the storage location being accessed at `sourceAddr`. This may be a fully
 /// identified storage base of known kind, or a valid but Unidentified storage
-/// object, such as a SILPHIArgument.
+/// location, such as a SILPHIArgument.
 ///
 /// This may return an invalid storage object if the address producer is not
 /// recognized by a whitelist of recognizable access patterns. The result must
@@ -383,14 +346,6 @@ bool isPossibleFormalAccessBase(const AccessedStorage &storage, SILFunction *F);
 /// which could be considered part of a formal access.
 void visitAccessedAddress(SILInstruction *I,
                           llvm::function_ref<void(Operand *)> visitor);
-
-/// Perform a RAUW operation on begin_access with it's own source operand.
-/// Then erase the begin_access and all associated end_access instructions.
-/// Return an iterator to the following instruction.
-///
-/// The caller should use this iterator rather than assuming that the
-/// instruction following this begin_access was not also erased.
-SILBasicBlock::iterator removeBeginAccess(BeginAccessInst *beginAccess);
 
 } // end namespace swift
 

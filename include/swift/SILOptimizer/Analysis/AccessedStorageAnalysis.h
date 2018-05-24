@@ -15,10 +15,10 @@
 // used by AccessEnforcementOpts to locally fold access scopes and remove
 // dynamic checks based on whole module analysis.
 //
-// Note: This interprocedural analysis can be easily augmented to simultaneously
-// compute FunctionSideEffects, without using a separate analysis, by adding
-// FunctionSideEffects as a member of FunctionAccessedStorage. However, passes
-// that use AccessedStorageAnalysis do not currently need SideEffectAnalysis.
+// Note: This can be easily augmented to simultaneously compute
+// FunctionSideEffects by adding FunctionSideEffects as a member of
+// FunctionAccessedStorage. However, currently, the only use of
+// FunctionAccessedStorage is local to summarizeFunction().
 //
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
@@ -33,139 +33,48 @@ namespace swift {
 
 /// Information about a formal access within a function pertaining to a
 /// particular AccessedStorage location.
-class StorageAccessInfo : public AccessedStorage {
-public:
-  StorageAccessInfo(AccessedStorage storage, SILAccessKind accessKind,
-                    bool noNestedConflict)
-    : AccessedStorage(storage) {
-    Bits.StorageAccessInfo.accessKind = unsigned(accessKind);
-    Bits.StorageAccessInfo.noNestedConflict = noNestedConflict;
-    Bits.StorageAccessInfo.storageIndex = 0;
-  }
+struct StorageAccessInfo {
+  SILAccessKind accessKind;
+  bool noNestedConflict = false;
 
-  // Initialize AccessedStorage from the given storage argument and fill in
-  // subclass fields from otherStorageInfo.
-  StorageAccessInfo(AccessedStorage storage, StorageAccessInfo otherStorageInfo)
-      : StorageAccessInfo(storage, otherStorageInfo.getAccessKind(),
-                          otherStorageInfo.hasNoNestedConflict()) {}
+  StorageAccessInfo() {}
 
   template <typename B>
-  StorageAccessInfo(AccessedStorage storage, B *beginAccess)
-      : StorageAccessInfo(storage, beginAccess->getAccessKind(),
-                          beginAccess->hasNoNestedConflict()) {
+  explicit StorageAccessInfo(B *beginAccess)
+      : accessKind(beginAccess->getAccessKind()),
+        noNestedConflict(beginAccess->hasNoNestedConflict()) {
     // Currently limited to dynamic Read/Modify access.
     assert(beginAccess->getEnforcement() == SILAccessEnforcement::Dynamic);
   }
 
-  /// Get the merged access kind of all accesses on this storage. If any access
-  /// is a Modify, the return Modify, otherwise return Read.
-  SILAccessKind getAccessKind() const {
-    return SILAccessKind(Bits.StorageAccessInfo.accessKind);
-  }
-
-  void setAccessKind(SILAccessKind accessKind) {
-    Bits.StorageAccessInfo.accessKind = unsigned(accessKind);
-  }
-
-  /// Get a unique index for this accessed storage within a function.
-  unsigned getStorageIndex() const {
-    return Bits.StorageAccessInfo.storageIndex;
-  }
-
-  void setStorageIndex(unsigned index) {
-    Bits.StorageAccessInfo.storageIndex = index;
-    assert(unsigned(Bits.StorageAccessInfo.storageIndex) == index);
-  }
-
-  /// Return true if all accesses of this storage within a function have the
-  /// [no_nested_conflict] flag set.
-  bool hasNoNestedConflict() const {
-    return Bits.StorageAccessInfo.noNestedConflict;
-  }
-
-  void setNoNestedConflict(bool val) {
-    Bits.StorageAccessInfo.noNestedConflict = val;
-  }
-
   bool mergeFrom(const StorageAccessInfo &RHS);
-
-  void print(raw_ostream &os) const;
-  void dump() const;
-};
-} // namespace swift
-
-// Use the same DenseMapInfo for StorageAccessInfo as for AccessedStorage. None
-// of the subclass bitfields participate in the Key.
-template <> struct llvm::DenseMapInfo<swift::StorageAccessInfo> {
-  static swift::StorageAccessInfo getEmptyKey() {
-    auto key = DenseMapInfo<swift::AccessedStorage>::getEmptyKey();
-    return static_cast<swift::StorageAccessInfo &>(key);
-  }
-
-  static swift::StorageAccessInfo getTombstoneKey() {
-    auto key = DenseMapInfo<swift::AccessedStorage>::getTombstoneKey();
-    return static_cast<swift::StorageAccessInfo &>(key);
-  }
-  static unsigned getHashValue(swift::StorageAccessInfo storage) {
-    return DenseMapInfo<swift::AccessedStorage>::getHashValue(storage);
-  }
-  static bool isEqual(swift::StorageAccessInfo LHS,
-                      swift::StorageAccessInfo RHS) {
-    return DenseMapInfo<swift::AccessedStorage>::isEqual(LHS, RHS);
-  }
 };
 
-namespace swift {
 /// The per-function result of AccessedStorageAnalysis.
 ///
-/// Records each unique AccessedStorage in a set of StorageAccessInfo
-/// objects. Hashing and equality only sees the AccesedStorage data. The
-/// additional StorageAccessInfo bits are recorded as results of this analysis.
+/// Maps each unique AccessedStorage location to StorageAccessInfo.
 ///
 /// Any unidentified accesses are summarized as a single unidentifiedAccess
 /// property.
 class FunctionAccessedStorage {
-  using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
+  using AccessedStorageMap =
+      llvm::SmallDenseMap<AccessedStorage, StorageAccessInfo, 8>;
 
-  AccessedStorageSet storageAccessSet;
+  AccessedStorageMap storageAccessMap;
   Optional<SILAccessKind> unidentifiedAccess;
 
 public:
   FunctionAccessedStorage() {}
 
-  // ---------------------------------------------------------------------------
-  // Accessing the results.
-
-  bool hasUnidentifiedAccess() const { return unidentifiedAccess != None; }
-
-  /// Return true if the analysis has determined all accesses of otherStorage
-  /// have the [no_nested_conflict] flag set.
-  ///
-  /// Only call this if there is no unidentifiedAccess in the function and the
-  /// given storage is uniquely identified.
-  bool hasNoNestedConflict(const AccessedStorage &otherStorage) const;
-
-  /// Does any of the accesses represented by this FunctionAccessedStorage
-  /// object conflict with the given access kind and storage.
-  bool mayConflictWith(SILAccessKind otherAccessKind,
-                       const AccessedStorage &otherStorage) const;
-
-  /// Raw access to the result for a given AccessedStorage location.
-  StorageAccessInfo
-  getStorageAccessInfo(const AccessedStorage &otherStorage) const;
-
-  // ---------------------------------------------------------------------------
-  // Constructing the results.
-
   void clear() {
-    storageAccessSet.clear();
+    storageAccessMap.clear();
     unidentifiedAccess = None;
   }
 
   /// Sets the most conservative effects, if we don't know anything about the
   /// function.
   void setWorstEffects() {
-    storageAccessSet.clear();
+    storageAccessMap.clear();
     unidentifiedAccess = SILAccessKind::Modify;
   }
 
@@ -189,7 +98,7 @@ public:
   ///
   /// TODO: Summarize ArraySemanticsCall accesses.
   bool summarizeCall(FullApplySite fullApply) {
-    assert(storageAccessSet.empty() && "expected uninitialized results.");
+    assert(storageAccessMap.empty() && "expected uninitialized results.");
     return false;
   }
 
@@ -212,22 +121,20 @@ public:
   /// reaches MaxRecursionDepth.
   void analyzeInstruction(SILInstruction *I);
 
+  /// Does any of the accesses represented by this FunctionAccessedStorage
+  /// object conflict with the given access kind and storage.
+  bool mayConflictWith(SILAccessKind otherAccessKind,
+                       const AccessedStorage &otherStorage);
+
   void print(raw_ostream &os) const;
   void dump() const;
 
 protected:
-  std::pair<AccessedStorageSet::iterator, bool>
-  insertStorageAccess(StorageAccessInfo storageAccess) {
-    storageAccess.setStorageIndex(storageAccessSet.size());
-    return storageAccessSet.insert(storageAccess);
-  }
-
   bool updateUnidentifiedAccess(SILAccessKind accessKind);
 
   bool mergeAccesses(
-      const FunctionAccessedStorage &other,
-      std::function<StorageAccessInfo(const StorageAccessInfo &)>
-          transformStorage);
+      const FunctionAccessedStorage &RHS,
+      std::function<AccessedStorage(const AccessedStorage &)> transformStorage);
 
   template <typename B> void visitBeginAccess(B *beginAccess);
 };
@@ -242,10 +149,6 @@ protected:
 /// marked as potentially executing unidentified reads or writes. An incomplete
 /// function, without a known callee set, is considered to have unidentified
 /// writes.
-///
-/// Use the GenericFunctionEffectAnalysis API to get the results of the analysis:
-/// - geEffects(SILFunction*)
-/// - getCallSiteEffects(FunctionEffects &callEffects, FullApplySite fullApply)
 class AccessedStorageAnalysis
     : public GenericFunctionEffectAnalysis<FunctionAccessedStorage> {
 public:
