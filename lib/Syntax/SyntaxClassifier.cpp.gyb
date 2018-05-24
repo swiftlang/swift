@@ -31,7 +31,7 @@ using namespace swift::syntax;
 % for node in SYNTAX_NODES:
 %   if is_visitable(node):
 void SyntaxClassifier::visit(${node.name} Node) {
-%     if node.is_unknown():
+%     if node.is_unknown() or node.is_syntax_collection():
   SyntaxVisitor::visit(Node);
 %     else:
 %       for child in node.children:
