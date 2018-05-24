@@ -8014,7 +8014,6 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::OptionalChaining:
-    LLVM_FALLTHROUGH;
   case FixKind::OptionalMember: {
     auto type = solution.simplifyType(getType(affected))->getRValueObjectType();
     auto diag =

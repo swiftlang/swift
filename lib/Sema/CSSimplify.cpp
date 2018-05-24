@@ -3467,6 +3467,13 @@ static bool fixOptionalBaseMemberConstraint(ConstraintSystem &cs,
   if (unwrappedBaseObjTy->getOptionalObjectType())
     return false;
 
+  // FIXME: This should be checking cs.shouldAttemptFixes() but its logic is
+  // wrong for here. It returns false any time there is solverState, but
+  // exploring a disjunction uses solverState and these fixes depend on
+  // exploring disjunctions. I.e. in the case of a dotted series that is missing
+  // optional chaining a.b.c, refusing to allow fixes in disjunctions means the
+  // preferred a?.b?.c will never be found and all chains will be fixited as
+  // single a!.b.c instead.
   if (!(cs.Options & ConstraintSystemFlags::AllowFixes))
     return false;
 
@@ -3493,7 +3500,8 @@ static bool fixOptionalBaseMemberConstraint(ConstraintSystem &cs,
 
   auto innerTV =
       cs.createTypeVariable(locator, TVO_CanBindToLValue | TVO_CanBindToInOut);
-  Type optTy = cs.getTypeChecker().getOptionalType(SourceLoc(), innerTV);
+  Type optTy = cs.getTypeChecker().getOptionalType(
+      locator->getAnchor()->getSourceRange().Start, innerTV);
   if (!optTy)
     return false;
 
@@ -3502,13 +3510,13 @@ static bool fixOptionalBaseMemberConstraint(ConstraintSystem &cs,
   // 2) member is non-optional, result of expression is non-optional ("!")
   // 3) member is optional, result of expression matches it ("?")
   SmallVector<Constraint *, 3> optionalities;
-  auto optionalResult = Constraint::createFixed(cs, ConstraintKind::Conversion,
+  auto optionalResult = Constraint::createFixed(cs, ConstraintKind::Equal,
                                                 FixKind::OptionalChaining,
                                                 optTy, memberTy, locator);
   auto nonoptionalResult =
-      Constraint::createFixed(cs, ConstraintKind::Conversion,
-                              FixKind::ForceOptional, optTy, memberTy, locator);
-  auto optionalMember = Constraint::createFixed(cs, ConstraintKind::Conversion,
+      Constraint::createFixed(cs, ConstraintKind::Equal, FixKind::ForceOptional,
+                              optTy, memberTy, locator);
+  auto optionalMember = Constraint::createFixed(cs, ConstraintKind::Equal,
                                                 FixKind::OptionalMember,
                                                 innerTV, memberTy, locator);
   optionalMember->setFavored();
