@@ -2049,7 +2049,7 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
   // .Some
   // Single payload enums are guaranteed layout compatible with their
   // payload. Only the source's payload needs to be taken or destroyed.
-  return {false, payloadType};
+  return checkDynamicCastFromOptional(dest, src, payloadType, targetType, flags);
 }
 
 /******************************************************************************/
