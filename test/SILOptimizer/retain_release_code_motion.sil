@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 import Builtin
@@ -58,6 +59,10 @@ struct foo {
 enum Optional<T> {
   case none
   case some(T)
+}
+
+struct Unowned {
+  @sil_stored unowned let x: @sil_unowned Builtin.NativeObject
 }
 
 sil @createS : $@convention(thin) () -> @owned S
@@ -620,3 +625,44 @@ bb3(%p1: $C2, %p2: $C2):
   return %10 : $()
 }
 
+// CHECK-LABEL: sil @test_unowned
+// CHECK:      bb0(%0 : $Builtin.NativeObject):
+// CHECK-NEXT:   br bb1    
+// CHECK:      bb1:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @test_unowned : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  %5 = tuple()
+  return %5 : $()
+}
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @dont_eliminate_strong_retain_and_unowned_release_pair
+// CHECK-RELEASE-HOISTING:       = function_ref @blocker
+// CHECK-RELEASE-HOISTING-NEXT:  apply
+// CHECK-RELEASE-HOISTING-NEXT:  strong_retain %0 : $Builtin.NativeObject
+// CHECK-RELEASE-HOISTING-NEXT:  unowned_release %1 : $@sil_unowned Builtin.NativeObject
+sil @dont_eliminate_strong_retain_and_unowned_release_pair : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = ref_to_unowned %0 : $Builtin.NativeObject to $@sil_unowned Builtin.NativeObject
+  %2 = struct $Unowned (%1 : $@sil_unowned Builtin.NativeObject)
+  retain_value %2: $Unowned
+  %b = function_ref @blocker : $@convention(thin) () -> ()
+  apply %b() : $@convention(thin) () -> ()
+  strong_retain %0: $Builtin.NativeObject
+  br bb1
+
+bb1:
+  release_value %2: $Unowned
+  apply %b() : $@convention(thin) () -> ()
+  strong_release %0: $Builtin.NativeObject
+  %5 = tuple()
+  return %5 : $()
+}

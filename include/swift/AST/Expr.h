@@ -549,6 +549,10 @@ public:
   /// a builtin operator.
   bool isInfixOperator() const;
 
+  /// Returns true if this is a reference to the implicit self of function.
+  bool isSelfExprOf(const AbstractFunctionDecl *AFD,
+                    bool sameBase = false) const;
+
   /// Produce a mapping from each subexpression to its parent
   /// expression, with the provided expression serving as the root of
   /// the parent map.

@@ -61,6 +61,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "swift/TBDGen/TBDGen.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -764,20 +765,24 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
   assert(!TBDPath.empty() &&
          "If not WMO, getTBDPathForWholeModule should have failed");
 
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
+  auto installName = frontendOpts.TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+                         : frontendOpts.TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
-                  installName);
+  TBDGenOptions opts;
+  opts.InstallName = installName;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
+  return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -1138,7 +1143,8 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
 
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto mode = frontendOpts.ValidateTBDAgainstIR;
   // Ensure all cases are covered by using a switch here.
   switch (mode) {
   case FrontendOptions::TBDValidationMode::None:
@@ -1147,12 +1153,14 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  const auto hasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  TBDGenOptions opts;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
-  return MSF.is<SourceFile *>() ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols)
-                                : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols);
+  return MSF.is<SourceFile *>()
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,

@@ -13,6 +13,7 @@ func testObjectExpr() {
   fooObject.#^T1^#
 }
 // T1: Begin completions
+// T1-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
 // T1-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // T1-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 //
@@ -24,6 +25,7 @@ func testGenericObjectExpr() {
   genericFooObject.#^T2^#
 }
 // T2: Begin completions
+// T2-NEXT: Keyword[self]/CurrNominal: self[#GenericFooStruct<Void>#]; name=self
 // T2-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]{{; name=.+$}}
 // T2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc0()[#Void#]{{; name=.+$}}
 //
