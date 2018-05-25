@@ -26,7 +26,6 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 
