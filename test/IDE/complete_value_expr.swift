@@ -7,6 +7,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_DOT_1 | %FileCheck %s -check-prefix=FOO_STRUCT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_NO_DOT_1 | %FileCheck %s -check-prefix=FOO_STRUCT_NO_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_META_1 | %FileCheck %s -check-prefix=FOO_STRUCT_META
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_META_2 | %FileCheck %s -check-prefix=FOO_STRUCT_META
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_0 | %FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_1 | %FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_1
@@ -496,6 +498,26 @@ func testMetatypeExpr() {
 func testMetatypeExprWithoutDot() {
   FooStruct#^FOO_STRUCT_NO_DOT_1^#
 }
+
+struct NoMetaCompletions {
+  static var foo: Int = 0
+  class func bar() {}
+  typealias Foo = Int
+}
+func testMetatypeCompletions() {
+  NoMetaCompletions.Type#^FOO_STRUCT_META_1^#
+}
+func testMetatypeCompletionsWithoutDot() {
+  NoMetaCompletions.Type.#^FOO_STRUCT_META_2^#
+}
+// FOO_STRUCT_META-NOT: Decl[StaticVar]/CurrNominal:    .foo[#Int#]; name=foo
+// FOO_STRUCT_META-NOT: Decl[StaticMethod]/CurrNominal: .bar()[#Void#]; name=bar()
+// FOO_STRUCT_META-NOT: Decl[TypeAlias]/CurrNominal:    .Foo[#Int#]; name=Foo
+// FOO_STRUCT_META-NOT: Decl[Constructor]/CurrNominal:  ()[#NoMetaCompletions#]; name=()
+// FOO_STRUCT_META-NOT: Decl[StaticVar]/CurrNominal:    foo[#Int#]; name=foo
+// FOO_STRUCT_META-NOT: Decl[StaticMethod]/CurrNominal: bar()[#Void#]; name=bar()
+// FOO_STRUCT_META-NOT: Decl[TypeAlias]/CurrNominal:    Foo[#Int#]; name=Foo
+// FOO_STRUCT_META-NOT: Decl[Constructor]/CurrNominal:  init()[#NoMetaCompletions#]; name=init()
 
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
