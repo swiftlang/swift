@@ -131,7 +131,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
                                             ModuleName)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
-      DataLayout(target->createDataLayout()),
+      DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
       silConv(irgen.SIL), OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
@@ -1154,3 +1154,10 @@ llvm::Triple IRGenerator::getEffectiveClangTriple() {
   assert(CI && "no clang module loader");
   return llvm::Triple(CI->getTargetInfo().getTargetOpts().Triple);
 }
+
+const llvm::DataLayout &IRGenerator::getClangDataLayout() {
+  return static_cast<ClangImporter *>(
+             SIL.getASTContext().getClangModuleLoader())
+      ->getTargetInfo()
+      .getDataLayout();
+  }
