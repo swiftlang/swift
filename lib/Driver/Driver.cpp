@@ -244,6 +244,10 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateAutolinkingArgs(diags, args);
+
+  if (args.hasArg(options::OPT_emit_public_type_metadata_accessors))
+    diags.diagnose(SourceLoc(),
+                   diag::warn_emit_public_type_metadata_accessors_deprecated);
 }
 
 std::unique_ptr<ToolChain>
