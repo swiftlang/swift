@@ -110,6 +110,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ObserverForwarderStruct
     single-source/ObserverPartiallyAppliedMethod
     single-source/ObserverUnappliedMethod
+    single-source/OpaqueConsumingUsers
     single-source/OpenClose
     single-source/PartialApplyDynamicType
     single-source/Phonebook
