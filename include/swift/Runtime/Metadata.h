@@ -4266,9 +4266,10 @@ inline int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
 #if SWIFT_OBJC_INTEROP
   if (value & ((uintptr_t(1) << ObjCReservedLowBits) - 1))
     return -1;
+  return int(value >> ObjCReservedLowBits);
+#else
+  return int(value);
 #endif
-
-  return (int) (value >> ObjCReservedLowBits);
 }
   
 /// Store an extra inhabitant of a heap object pointer to memory,
@@ -4277,7 +4278,11 @@ inline void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index) {
   // This must be consistent with the storeHeapObjectExtraInhabitant
   // implementation in IRGen's ExtraInhabitants.cpp.
 
+#if SWIFT_OBJC_INTEROP
   auto value = uintptr_t(index) << heap_object_abi::ObjCReservedLowBits;
+#else
+  auto value = uintptr_t(index);
+#endif
   *dest = reinterpret_cast<HeapObject*>(value);
 }
 
@@ -4289,9 +4294,15 @@ inline constexpr unsigned swift_getHeapObjectExtraInhabitantCount() {
   using namespace heap_object_abi;
 
   // The runtime needs no more than INT_MAX inhabitants.
+#if SWIFT_OBJC_INTEROP
   return (LeastValidPointerValue >> ObjCReservedLowBits) > INT_MAX
     ? (unsigned)INT_MAX
     : (unsigned)(LeastValidPointerValue >> ObjCReservedLowBits);
+#else
+  return (LeastValidPointerValue) > INT_MAX
+    ? unsigned(INT_MAX)
+    : unsigned(LeastValidPointerValue);
+#endif
 }  
 
 /// Calculate the numeric index of an extra inhabitant of a function
