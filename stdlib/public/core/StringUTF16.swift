@@ -392,7 +392,7 @@ extension String.UTF16View.Index {
   public init?(
     _ sourcePosition: String.Index, within target: String.UTF16View
   ) {
-    guard sourcePosition._transcodedOffset == 0 else { return nil }
+    guard sourcePosition.transcodedOffset == 0 else { return nil }
     self.init(encodedOffset: sourcePosition.encodedOffset)
   }
 

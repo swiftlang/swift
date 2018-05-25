@@ -221,18 +221,14 @@ extension String._CharacterView : BidirectionalCollection {
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
   internal func _toBaseIndex(_ index: Index) -> Index {
-    var ret = index
-    ret._codeUnitOffset -= _baseOffset
-    return ret
+    return String.Index(from: index, adjustingEncodedOffsetBy: -_baseOffset)
   }
 
   /// Translates an index in the underlying base string into a view index using
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
   internal func _toViewIndex(_ index: Index) -> Index {
-    var ret = index
-    ret._codeUnitOffset += _baseOffset
-    return ret
+    return String.Index(from: index, adjustingEncodedOffsetBy: _baseOffset)
   }
 
   /// The position of the first character in a nonempty character view.

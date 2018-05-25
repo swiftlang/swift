@@ -527,7 +527,7 @@ extension String.UnicodeScalarView {
     if i == startIndex || i == endIndex {
       return true
     }
-    if i._transcodedOffset != 0 { return false }
+    if i.transcodedOffset != 0 { return false }
     let i2 = _toCoreIndex(i)
     if _fastPath(!UTF16.isTrailSurrogate(_guts[i2])) { return true }
     return i2 == 0 || !UTF16.isLeadSurrogate(_guts[i2 &- 1])
