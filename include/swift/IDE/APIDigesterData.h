@@ -22,6 +22,8 @@
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace ide {
 namespace api {
 
@@ -370,7 +372,7 @@ struct APIDiffItemStore {
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
   static void serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items);
   APIDiffItemStore(const APIDiffItemStore& that) = delete;
-  APIDiffItemStore();
+  APIDiffItemStore(DiagnosticEngine &Diags);
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
   ArrayRef<APIDiffItem*> getAllDiffItems() const;
