@@ -1521,37 +1521,36 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
                                           EditConsumer).performChange();
 }
 
-// Compute a decl context that is the parent context for all decls in
-// \c DeclaredDecls. Return \c nullptr if no such context exists.
-DeclContext *getCommonDeclContext(ArrayRef<DeclaredDecl> DeclaredDecls) {
-  if (DeclaredDecls.empty())
-    return nullptr;
-
-  DeclContext *CommonDC = DeclaredDecls.front().VD->getDeclContext();
-  for (auto DD : DeclaredDecls) {
-    auto OtherDC = DD.VD->getDeclContext();
-    CommonDC = DeclContext::getCommonParentContext(CommonDC, OtherDC);
-  }
-  return CommonDC;
-}
 
 bool RefactoringActionMoveMembersToExtension::isApplicable(
     ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::SingleDecl:
   case RangeKind::MultiTypeMemberDecl: {
-    DeclContext *CommonDC = getCommonDeclContext(Info.DeclaredDecls);
+    DeclContext *DC = Info.RangeContext;
 
     // The the common decl context is not a nomial type, we cannot create an
     // extension for it
-    if (!CommonDC || !CommonDC->getInnermostDeclarationDeclContext() ||
-        !isa<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext()))
+    if (!DC || !DC->getInnermostDeclarationDeclContext() ||
+        !isa<NominalTypeDecl>(DC->getInnermostDeclarationDeclContext()))
       return false;
+
 
     // Members of types not declared at top file level cannot be extracted
     // to an extension at top file level
-    if (CommonDC->getParent()->getContextKind() != DeclContextKind::FileUnit)
+    if (DC->getParent()->getContextKind() != DeclContextKind::FileUnit)
       return false;
+
+    // Check if contained nodes are all allowed decls.
+    for (auto Node : Info.ContainedNodes) {
+      Decl *D = Node.dyn_cast<Decl*>();
+      if (!D)
+        return false;
+
+      if (isa<AccessorDecl>(D) || isa<DestructorDecl>(D) ||
+          isa<EnumCaseDecl>(D) || isa<EnumElementDecl>(D))
+        return false;
+    }
 
     // We should not move instance variables with storage into the extension
     // because they are not allowed to be declared there
@@ -1559,7 +1558,7 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
       if (auto ASD = dyn_cast<AbstractStorageDecl>(DD.VD)) {
         // Only disallow storages in the common decl context, allow them in
         // any subtypes
-        if (ASD->hasStorage() && ASD->getDeclContext() == CommonDC) {
+        if (ASD->hasStorage() && ASD->getDeclContext() == DC) {
           return false;
         }
       }
@@ -1577,10 +1576,10 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
 }
 
 bool RefactoringActionMoveMembersToExtension::performChange() {
-  DeclContext *CommonDC = getCommonDeclContext(RangeInfo.DeclaredDecls);
+  DeclContext *DC = RangeInfo.RangeContext;
 
   auto CommonTypeDecl =
-      dyn_cast<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext());
+      dyn_cast<NominalTypeDecl>(DC->getInnermostDeclarationDeclContext());
   assert(CommonTypeDecl && "Not applicable if common parent is no nomial type");
 
   SmallString<64> Buffer;
