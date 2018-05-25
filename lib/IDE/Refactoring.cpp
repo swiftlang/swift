@@ -1553,6 +1553,17 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
     if (CommonDC->getParent()->getContextKind() != DeclContextKind::FileUnit)
       return false;
 
+    // Check if contained nodes are all allowed decls.
+    for (auto Node : Info.ContainedNodes) {
+      Decl *D = Node.dyn_cast<Decl*>();
+      if (!D)
+        return false;
+
+      if (isa<AccessorDecl>(D) || isa<DestructorDecl>(D) ||
+          isa<EnumCaseDecl>(D) || isa<EnumElementDecl>(D))
+        return false;
+    }
+
     // We should not move instance variables with storage into the extension
     // because they are not allowed to be declared there
     for (auto DD : Info.DeclaredDecls) {
