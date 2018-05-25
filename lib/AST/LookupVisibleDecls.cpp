@@ -503,6 +503,8 @@ static void lookupVisibleMemberDeclsImpl(
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
+    if (Ty->is<AnyMetatypeType>())
+      return;
 
     LookupState subLS = LookupState::makeQualified().withOnMetatype();
     if (LS.isIncludingInstanceMembers()) {
