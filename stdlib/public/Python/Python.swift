@@ -81,6 +81,7 @@ final class PyReference {
 ///
 /// Internally, `PythonObject` is implemented as a reference-counted pointer to
 /// a Python C API `PyObject`.
+@dynamicCallable
 @dynamicMemberLookup
 @_fixed_layout
 public struct PythonObject {
@@ -92,7 +93,8 @@ public struct PythonObject {
     reference = pointer
   }
 
-  /// Creates a new instance, taking ownership of the specified `PyObject` pointer.
+  /// Creates a new instance, taking ownership of the specified `PyObject`
+  /// pointer.
   public init(owning pointer: OwnedPyObjectPointer) {
     reference = PyReference(owning: pointer)
   }
@@ -120,7 +122,7 @@ extension PythonObject : CustomStringConvertible {
     // it for printing descriptions.
     // `repr` is not used because it is not designed to be readable and takes
     // too long for large objects.
-    return String(Python.str.call(with: self))!
+    return String(Python.str(self))!
   }
 }
 
@@ -208,9 +210,6 @@ public enum PythonError : Error, Equatable {
   /// - An invalid keyword argument was specified.
   case invalidCall(PythonObject)
 
-  /// A member lookup error.
-  case invalidMember(String)
-
   /// A module import error.
   case invalidModule(String)
 }
@@ -220,7 +219,6 @@ extension PythonError : CustomStringConvertible {
     switch self {
     case .exception(let p): return "exception: \(p)"
     case .invalidCall(let p): return "invalidCall: \(p)"
-    case .invalidMember(let m): return "invalidMember: \(m)"
     case .invalidModule(let m): return "invalidModule: \(m)"
     }
   }
@@ -246,6 +244,10 @@ private func throwPythonErrorIfPresent() throws {
 /// A `PythonObject` wrapper that enables throwing method calls.
 /// Exceptions produced by Python functions are reflected as Swift errors and
 /// thrown.
+/// - Note: It is intentional that `ThrowingPythonObject` does not have the
+///   `@dynamicCallable` attribute because the call syntax is unintuitive:
+///   `x.throwing(arg1, arg2, ...)`. The methods will still be named
+///   `dynamicallyCall` until further discussion/design.
 @_fixed_layout
 public struct ThrowingPythonObject {
   private var base: PythonObject
@@ -254,17 +256,24 @@ public struct ThrowingPythonObject {
     self.base = base
   }
 
-  /// Call `self` with the specified arguments.
+  /// Call `self` with the specified positional arguments.
   /// If the call fails for some reason, `PythonError.invalidCall` is thrown.
   /// - Precondition: `self` must be a Python callable.
-  /// - Parameters:
-  ///   - argArray: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
+  /// - Parameter args: Positional arguments for the Python callable.
   @discardableResult
-  public func call<T : PythonConvertible>(
-    argArray args: [T],
-    kwargs: [(String, PythonConvertible)] = []
+  public func dynamicallyCall(
+    withArguments args: PythonConvertible...
+  ) throws -> PythonObject {
+    return try dynamicallyCall(withArguments: args)
+  }
+
+  /// Call `self` with the specified positional arguments.
+  /// If the call fails for some reason, `PythonError.invalidCall` is thrown.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameter args: Positional arguments for the Python callable.
+  @discardableResult
+  public func dynamicallyCall(
+    withArguments args: [PythonConvertible] = []
   ) throws -> PythonObject {
     // Make sure there are no state errors.
     if PyErr_Occurred() != nil {
@@ -273,23 +282,67 @@ public struct ThrowingPythonObject {
       fatalError("Python error state must be clear")
     }
 
-    // Produce a dictionary for keyword arguments if any are present.
-    var kwdictObject: OwnedPyObjectPointer? = nil
-    if !kwargs.isEmpty {
-      kwdictObject = PyDict_New()!
-      for (key, value) in kwargs {
-        // FIXME: What if two identical keywords are provided?
-        let k = PythonObject(key).ownedPyObject
-        let v = value.ownedPyObject
-        PyDict_SetItem(kwdictObject, k, v)
-        Py_DecRef(k)
-        Py_DecRef(v)
-      }
+    // Positional arguments are passed as a tuple of objects.
+    let argTuple = pyTuple(args.map { $0.pythonObject })
+    defer { Py_DecRef(argTuple) }
+
+    // Python calls always return a non-null object when successful. If the
+    // Python function produces the equivalent of C `void`, it returns the
+    // `None` object. A `null` result of `PyObjectCall` happens when there is an
+    // error, like `self` not being a Python callable.
+    let selfObject = base.ownedPyObject
+    defer { Py_DecRef(selfObject) }
+
+    guard let result = PyObject_CallObject(selfObject, argTuple) else {
+      // If a Python exception was thrown, throw a corresponding Swift error.
+      try throwPythonErrorIfPresent()
+      throw PythonError.invalidCall(base)
     }
+    return PythonObject(owning: result)
+  }
+
+  /// Call `self` with the specified arguments.
+  /// If the call fails for some reason, `PythonError.invalidCall` is thrown.
+  /// - Precondition: `self` must be a Python callable.
+  /// - Parameter args: Positional or keyword arguments for the Python callable.
+  @discardableResult
+  public func dynamicallyCall(
+    withKeywordArguments args:
+      DictionaryLiteral<String, PythonConvertible> = [:]
+  ) throws -> PythonObject {
+    // Make sure there are no state errors.
+    if PyErr_Occurred() != nil {
+      // FIXME: This should be an assert, but the failure mode in Playgrounds
+      // is just awful.
+      fatalError("Python error state must be clear")
+    }
+
+    // An array containing positional arguments.
+    var positionalArgs: [PythonObject] = []
+    // A dictionary object for storing keyword arguments, if any exist.
+    var kwdictObject: OwnedPyObjectPointer? = nil
+
+    for (key, value) in args {
+      if key.isEmpty {
+        positionalArgs.append(value.pythonObject)
+        continue
+      }
+      // Initialize dictionary object if necessary.
+      if kwdictObject == nil { kwdictObject = PyDict_New()! }
+      // Add key-value pair to the dictionary object.
+      // TODO: Handle duplicate keys.
+      // In Python, `SyntaxError: keyword argument repeated` is thrown.
+      let k = PythonObject(key).ownedPyObject
+      let v = value.ownedPyObject
+      PyDict_SetItem(kwdictObject, k, v)
+      Py_DecRef(k)
+      Py_DecRef(v)
+    }
+
     defer { Py_DecRef(kwdictObject) } // Py_DecRef is `nil` safe.
 
-    // Non-keyword arguments are passed as a tuple of objects.
-    let argTuple = pyTuple(args)
+    // Positional arguments are passed as a tuple of objects.
+    let argTuple = pyTuple(positionalArgs)
     defer { Py_DecRef(argTuple) }
 
     // Python calls always return a non-null object when successful. If the
@@ -305,57 +358,6 @@ public struct ThrowingPythonObject {
       throw PythonError.invalidCall(base)
     }
     return PythonObject(owning: result)
-  }
-
-  // Call `self` with the specified arguments.
-  /// - Precondition: `self` must be a Python callable.
-  /// - Parameters:
-  ///   - args: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
-  @discardableResult
-  public func call(
-    _ args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PythonObject {
-    return try call(argArray: args.map { $0.pythonObject }, kwargs: kwargs)
-  }
-
-  // Call a member with the specified arguments.
-  /// - Precondition: The member must be a Python callable.
-  /// - Parameters:
-  ///   - name: The name of the member.
-  ///   - argArray: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
-  @discardableResult
-  public func callMember<T : PythonConvertible>(
-    _ name: String,
-    argArray args: [T],
-    kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PythonObject {
-    // If the member lookup fails, reflect it as a Swift error.
-    guard let callee = base.checking[dynamicMember: name] else {
-      throw PythonError.invalidMember(name)
-    }
-    return try callee.throwing.call(argArray: args, kwargs: kwargs)
-  }
-
-  // Call a member with the specified arguments.
-  /// - Precondition: `self` must be a Python callable.
-  /// - Parameters:
-  ///   - name: The name of the member.
-  ///   - args: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
-  @discardableResult
-  public func callMember(
-    _ name: String,
-    with args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) throws -> PythonObject {
-    return try callMember(name, argArray: args.map { $0.pythonObject },
-                          kwargs: kwargs)
   }
 
   /// Converts to a 2-tuple, if possible.
@@ -561,65 +563,25 @@ public extension PythonObject {
     return (self[0], self[1], self[2], self[3])
   }
 
-  /// Call `self` with the specified arguments.
+  /// Call `self` with the specified positional arguments.
   /// - Precondition: `self` must be a Python callable.
-  /// - Parameters:
-  ///   - args: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
+  /// - Parameter args: Positional arguments for the Python callable.
   @discardableResult
-  func call<T : PythonConvertible>(
-    with args: [T],
-    kwargs: [(String, PythonConvertible)] = []
+  func dynamicallyCall(
+    withArguments args: [PythonConvertible] = []
   ) -> PythonObject {
-    return try! self.throwing.call(argArray: args, kwargs: kwargs)
+    return try! self.throwing.dynamicallyCall(withArguments: args)
   }
 
   /// Call `self` with the specified arguments.
   /// - Precondition: `self` must be a Python callable.
-  /// - Parameters:
-  ///   - args: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
+  /// - Parameter args: Positional or keyword arguments for the Python callable.
   @discardableResult
-  func call(with args: PythonConvertible...,
-            kwargs: [(String, PythonConvertible)] = []) -> PythonObject {
-    return try! self.throwing.call(argArray: args.map { $0.pythonObject },
-                                   kwargs: kwargs)
-  }
-
-  // Call a member with the specified arguments.
-  /// - Precondition: The member must be a Python callable.
-  /// - Parameters:
-  ///   - name: The name of the member.
-  ///   - argArray: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
-  @discardableResult
-  func callMember<T : PythonConvertible>(
-    _ name: String,
-    argArray args: [T],
-    kwargs: [(String, PythonConvertible)] = []
+  func dynamicallyCall(
+    withKeywordArguments args:
+      DictionaryLiteral<String, PythonConvertible> = [:]
   ) -> PythonObject {
-    return try! self.throwing.callMember(name, argArray: args, kwargs: kwargs)
-  }
-
-  // Call a member with the specified arguments.
-  /// - Precondition: The member must be a Python callable.
-  /// - Parameters:
-  ///   - name: The name of the member.
-  ///   - args: Positional arguments for the Python callable.
-  ///   - kwargs: Keyword arguments for the Python callable. Analoguous to
-  ///     `kwargs` in Python.
-  @discardableResult
-  func callMember(
-    _ name: String,
-    with args: PythonConvertible...,
-    kwargs: [(String, PythonConvertible)] = []
-  ) -> PythonObject {
-    return try! self.throwing.callMember(name,
-                                         argArray: args.map { $0.pythonObject },
-                                         kwargs: kwargs)
+    return try! self.throwing.dynamicallyCall(withKeywordArguments: args)
   }
 }
 
@@ -639,8 +601,8 @@ public extension PythonObject {
 ///
 ///     // Use builtin types and functions.
 ///     let list: PythonObject = [1, 2, 3]
-///     print(Python.len.call(with: list)) // Prints 3.
-///     print(Python.type.call(with: list) == Python.list) // Prints true.
+///     print(Python.len(list)) // Prints 3.
+///     print(Python.type(list) == Python.list) // Prints true.
 @_fixed_layout
 public let Python = PythonInterface()
 
@@ -753,7 +715,6 @@ public extension PythonObject {
   }
 }
 
-
 //===----------------------------------------------------------------------===//
 // `PythonConvertible` conformance for basic Swift types
 //===----------------------------------------------------------------------===//
@@ -765,7 +726,7 @@ private func isType(_ object: PythonObject,
   let typePyRef = PythonObject(
     borrowing: type.assumingMemoryBound(to: PyObject.self)
   )
-  let result = Python.isinstance.call(with: object, typePyRef)
+  let result = Python.isinstance(object, typePyRef)
 
   // We cannot use the normal failable Bool initializer from `PythonObject`
   // here because would cause an infinite loop.
@@ -862,7 +823,8 @@ extension Int : PythonConvertible {
 extension UInt : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
     // `PyInt_AsUnsignedLongMask` isn't documented as such, but in fact it does
-    // return -1 and set an error if the Python object is not integer compatible.
+    // return -1 and set an error if the Python object is not integer
+    // compatible.
     guard let value = pythonObject.converted(
       withError: ~0, by: PyInt_AsUnsignedLongMask) else {
       return nil
@@ -878,8 +840,8 @@ extension UInt : PythonConvertible {
 
 extension Double : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
-    // `PyFloat_AsDouble` return -1 and sets an error if the Python object is not
-    // float compatible.
+    // `PyFloat_AsDouble` return -1 and sets an error if the Python object is
+    // not float compatible.
     guard let value = pythonObject.converted(withError: -1,
                                              by: PyFloat_AsDouble) else {
       return nil
@@ -1066,19 +1028,19 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
 
 public extension PythonObject {
   static func + (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__add__.call(with: rhs)
+    return lhs.__add__(rhs)
   }
 
   static func - (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__sub__.call(with: rhs)
+    return lhs.__sub__(rhs)
   }
 
   static func * (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__mul__.call(with: rhs)
+    return lhs.__mul__(rhs)
   }
 
   static func / (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__truediv__.call(with: rhs)
+    return lhs.__truediv__(rhs)
   }
 
   static func += (lhs: inout PythonObject, rhs: PythonObject) {
@@ -1157,7 +1119,7 @@ extension PythonObject : Equatable, Comparable, Hashable {
   }
 
   public var hashValue: Int {
-    guard let hash = Int(self.__hash__.call()) else {
+    guard let hash = Int(self.__hash__()) else {
       fatalError("Cannot use '__hash__' on \(self)")
     }
     return hash
@@ -1173,7 +1135,7 @@ extension PythonObject : MutableCollection {
   }
 
   public var endIndex: Index {
-    return Python.len.call(with: self)
+    return Python.len(self)
   }
 
   public func index(after i: Index) -> Index {
@@ -1189,7 +1151,6 @@ extension PythonObject : MutableCollection {
     }
   }
 }
-
 
 //===----------------------------------------------------------------------===//
 // `ExpressibleByLiteral` conformances
