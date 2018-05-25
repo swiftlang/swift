@@ -1585,7 +1585,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         }
     }
     
-    @inlinable
     public mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer, count cnt: Int) {
         _validateRange(subrange)
         let nsRange = NSRange(location: subrange.lowerBound, length: subrange.upperBound - subrange.lowerBound)
@@ -1601,7 +1600,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Return a new copy of the data in a specified range.
     ///
     /// - parameter range: The range to copy.
-    @inlinable
     public func subdata(in range: Range<Index>) -> Data {
         _validateRange(range)
         if isEmpty {
@@ -1651,7 +1649,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         return hashValue
     }
     
-    @inlinable
     public func advanced(by amount: Int) -> Data {
         _validateIndex(startIndex + amount)
         let length = count - amount
