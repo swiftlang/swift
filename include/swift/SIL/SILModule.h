@@ -474,6 +474,14 @@ public:
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
                           std::unique_ptr<llvm::raw_ostream> &&RawStream);
 
+  // This is currently limited to VarDecl because the visibility of global
+  // variables and class properties is straighforward, while the visibility of
+  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // a different meaning when vtable layout is at stake.
+  bool isVisibleExternally(const VarDecl *decl) {
+    return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
+  }
+
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
   
