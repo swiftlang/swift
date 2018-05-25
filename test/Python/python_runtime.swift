@@ -17,9 +17,9 @@ PythonRuntimeTestSuite.test("check-version") {
 PythonRuntimeTestSuite.test("pylist") {
   let list: PythonObject = [0, 1, 2]
   expectEqual("[0, 1, 2]", list.description)
-  expectEqual(3, Python.len.call(with: list))
-  expectEqual("[0, 1, 2]", Python.str.call(with: list))
-  expectEqual("<type 'list'>", Python.str.call(with: Python.type.call(with: list)))
+  expectEqual(3, Python.len(list))
+  expectEqual("[0, 1, 2]", Python.str(list))
+  expectEqual("<type 'list'>", Python.str(Python.type(list)))
 
   let polymorphicList = PythonObject(["a", 2, true, 1.5])
   expectEqual("a", polymorphicList[0])
@@ -34,7 +34,7 @@ PythonRuntimeTestSuite.test("pylist") {
 
 PythonRuntimeTestSuite.test("pydict") {
   let dict: PythonObject = ["a": 1, 1: 0.5]
-  expectEqual(2, Python.len.call(with: dict))
+  expectEqual(2, Python.len(dict))
   expectEqual(1, dict["a"])
   expectEqual(0.5, dict[1])
 
@@ -46,7 +46,7 @@ PythonRuntimeTestSuite.test("pydict") {
 
 PythonRuntimeTestSuite.test("range") {
   let slice = PythonObject(5..<10)
-  expectEqual(Python.slice.call(with: 5, 10), slice)
+  expectEqual(Python.slice(5, 10), slice)
   expectEqual(5, slice.start)
   expectEqual(10, slice.stop)
 
@@ -60,7 +60,7 @@ PythonRuntimeTestSuite.test("range") {
 
 PythonRuntimeTestSuite.test("partialrangefrom") {
   let slice = PythonObject(5...)
-  expectEqual(Python.slice.call(with: 5, Python.None), slice)
+  expectEqual(Python.slice(5, Python.None), slice)
   expectEqual(5, slice.start)
 
   let range = PartialRangeFrom<Int>(slice)
@@ -72,7 +72,7 @@ PythonRuntimeTestSuite.test("partialrangefrom") {
 
 PythonRuntimeTestSuite.test("partialrangeupto") {
   let slice = PythonObject(..<5)
-  expectEqual(Python.slice.call(with: 5), slice)
+  expectEqual(Python.slice(5), slice)
   expectEqual(5, slice.stop)
 
   let range = PartialRangeUpTo<Int>(slice)
@@ -116,19 +116,15 @@ PythonRuntimeTestSuite.test("comparable") {
 }
 
 PythonRuntimeTestSuite.test("range-iter") {
-  for (index, val) in Python.range.call(with: 5).enumerated() {
+  for (index, val) in Python.range(5).enumerated() {
     expectEqual(PythonObject(index), val)
   }
 }
 
 PythonRuntimeTestSuite.test("errors") {
-  expectThrows(PythonError.exception("division by zero") as PythonError?, {
-    try PythonObject(1).throwing.callMember("__truediv__", with: 0)
-    // expectThrows does not fail if no error is thrown.
-    fatalError("No error was thrown.")
-  })
-  expectThrows(PythonError.invalidMember("undefinedMember") as PythonError?, {
-    try PythonObject(1).throwing.callMember("undefinedMember", with: 0)
+  expectThrows(PythonError.exception("division by zero"), {
+    try PythonObject(1).__truediv__.throwing.dynamicallyCall(withArguments: 0)
+    // `expectThrows` does not fail if no error is thrown.
     fatalError("No error was thrown.")
   })
 }
