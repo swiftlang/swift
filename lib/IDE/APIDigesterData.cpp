@@ -16,6 +16,8 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/IDE/APIDigesterData.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsDriver.h"
 
 using namespace swift;
 using namespace ide;
@@ -481,6 +483,7 @@ serialize(llvm::raw_ostream &os, ArrayRef<NameCorrectionInfo> Items) {
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
 private:
+  DiagnosticEngine &Diags;
   llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
   llvm::BumpPtrAllocator Allocator;
 
@@ -500,6 +503,7 @@ private:
   }
 
 public:
+  Implementation(DiagnosticEngine &Diags): Diags(Diags) {}
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   bool PrintUsr;
   std::vector<APIDiffItem*> AllItems;
@@ -509,7 +513,9 @@ public:
     {
       auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(FileName);
       if (!FileBufOrErr) {
-        llvm_unreachable("Failed to read JSON file");
+        Diags.diagnose(SourceLoc(), diag::cannot_find_migration_script,
+          FileName);
+        return;
       }
       pMemBuffer = FileBufOrErr->get();
       AllBuffer.push_back(std::move(FileBufOrErr.get()));
@@ -546,8 +552,8 @@ getDiffItems(StringRef Key) const {
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getAllDiffItems() const { return Impl.AllItems; }
 
-swift::ide::api::APIDiffItemStore::APIDiffItemStore() :
-  Impl(*new Implementation()) {}
+swift::ide::api::APIDiffItemStore::APIDiffItemStore(DiagnosticEngine &Diags) :
+  Impl(*new Implementation(Diags)) {}
 
 swift::ide::api::APIDiffItemStore::~APIDiffItemStore() { delete &Impl; }
 
