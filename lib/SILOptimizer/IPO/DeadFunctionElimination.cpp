@@ -373,6 +373,13 @@ protected:
   }
 
   /// Retrieve the visibility information from the AST.
+  ///
+  /// This differs from SILModule::isVisibleExternally(VarDecl *) because of
+  /// it's handling of class methods. It returns true for methods whose
+  /// declarations are not directly visible externally, but have been imported
+  /// from another module. This ensures that entries aren't deleted from vtables
+  /// imported from the stdlib.
+  /// FIXME: Passes should not embed special logic for handling linkage.
   bool isVisibleExternally(const ValueDecl *decl) {
     AccessLevel access = decl->getEffectiveAccess();
     SILLinkage linkage;
@@ -392,9 +399,7 @@ protected:
     if (isPossiblyUsedExternally(linkage, Module->isWholeModule()))
       return true;
 
-    // If a vtable or witness table (method) is only visible in another module
-    // it can be accessed inside that module and we don't see this access.
-    // We hit this case e.g. if a table is imported from the stdlib.
+    // Special case for vtable visibility.
     if (decl->getDeclContext()->getParentModule() != Module->getSwiftModule())
       return true;
 
