@@ -2702,7 +2702,6 @@ void generateDocCommentForSubscript(SubscriptDecl *subscriptDecl, swift::SourceL
 }
     
 bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
-#warning Implement here
     if (Tok.Kind != CursorInfoKind::ValueRef)
         return false;
     
@@ -2711,7 +2710,6 @@ bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok
 }
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
-#warning Implement here
     DeclKind tokenKind = CursorInfo.ValueD->getKind();
     if(tokenKind != DeclKind::Func && tokenKind != DeclKind::Constructor && tokenKind != DeclKind::Subscript) return true;
     
