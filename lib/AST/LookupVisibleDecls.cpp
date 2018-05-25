@@ -26,6 +26,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/SetVector.h"
 #include <set>
 
@@ -475,20 +476,17 @@ lookupVisibleMemberDeclsImpl(Type BaseTy, VisibleDeclConsumer &Consumer,
 
 class RestateFilteringConsumer : public VisibleDeclConsumer {
   VisibleDeclConsumer &parentConsumer;
-  const Type baseTy;
-  const DeclContext *DC;
   LazyResolver *resolver;
+
   llvm::DenseSet<DeclName> foundVars;
   llvm::DenseSet<std::pair<DeclName, CanType>> foundFuncs;
-  void validate() {
-    assert(DC && baseTy && !baseTy->hasLValueType());
-  }
+
 public:
   RestateFilteringConsumer(VisibleDeclConsumer &parentConsumer,
                            Type baseTy, const DeclContext *DC,
                            LazyResolver *resolver)
-  : parentConsumer(parentConsumer), baseTy(baseTy), DC(DC), resolver(resolver) {
-    validate();
+  : parentConsumer(parentConsumer), resolver(resolver) {
+    assert(DC && baseTy && !baseTy->hasLValueType());
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
@@ -512,29 +510,42 @@ public:
         parentConsumer.foundDecl(VD, Reason);
       return;
     }
+    auto type = stripSelfRequirementsIfNeeded(VD, AFT);
+    if (foundFuncs.insert({VD->getFullName(), type}).second) {
+      parentConsumer.foundDecl(VD, Reason);
+    }
+  }
+private:
+  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD, AnyFunctionType *AFT) {
     // Preserve the generic signature if this is a subscript, which are uncurried,
     // or if we have genenic params other than Self. Otherwise, strip if off
     // and use the resultType of the curried function type.
-    // When preserving the generic signature, we remove the requirement
-    // from Self to make sure it doesn't prevent us from recognizing restatements.
-    CanType type;
+    // When preserving the generic signature, we remove the requirements
+    // from Self to make they don't prevent us from recognizing restatements.
+
     // This can't be null since we are dealing with method or
     // subscript requirements, where Self is an implicit generic param.
     auto sig = AFT->getOptGenericSignature();
     auto params = sig->getGenericParams();
-    if (params.size() == 1 && !isa<SubscriptDecl>(VD)) {
-      type = AFT->getResult()->getCanonicalType();
-    } else {
-      auto newReqs = sig->getRequirements().drop_front();
-      auto newSig = GenericSignature::get(params, newReqs, false);
 
-      type = GenericFunctionType::get(newSig, AFT->getInput(),
-                                      AFT->getResult(), AFT->getExtInfo())
-        ->getCanonicalType(newSig);
+    if (params.size() == 1 && !isa<SubscriptDecl>(VD)) {
+      return AFT->getResult()->getCanonicalType();
     }
-    if (foundFuncs.insert({VD->getFullName(), type}).second) {
-      parentConsumer.foundDecl(VD, Reason);
+    GenericTypeParamType *SelfParam;
+    for (auto param: params) {
+      if (param->getName().str() == getTokenText(tok::kw_Self))
+        SelfParam = param;
     }
+    SmallVector<Requirement, 4> newReqs;
+    llvm::for_each(sig->getRequirements(), [&](Requirement req) {
+      if (!SelfParam->isEqual(req.getFirstType()))
+        newReqs.push_back(req);
+    });
+    auto newSig = GenericSignature::get(params, newReqs, false);
+
+    return GenericFunctionType::get(newSig, AFT->getInput(),
+                                    AFT->getResult(), AFT->getExtInfo())
+    ->getCanonicalType(newSig);
   }
 };
 
