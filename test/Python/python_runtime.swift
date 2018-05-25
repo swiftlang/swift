@@ -8,13 +8,13 @@ import StdlibUnittest
 
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
 
-PythonRuntimeTestSuite.test("check-version") {
+PythonRuntimeTestSuite.test("CheckVersion") {
   let sysModule = Python.import("sys")
   let version = String(sysModule.version)!
   expectEqual("2.7.", version.prefix(4))
 }
 
-PythonRuntimeTestSuite.test("pylist") {
+PythonRuntimeTestSuite.test("PythonList") {
   let list: PythonObject = [0, 1, 2]
   expectEqual("[0, 1, 2]", list.description)
   expectEqual(3, Python.len(list))
@@ -32,7 +32,7 @@ PythonRuntimeTestSuite.test("pylist") {
   expectEqual(2, polymorphicList[2])
 }
 
-PythonRuntimeTestSuite.test("pydict") {
+PythonRuntimeTestSuite.test("PythonDict") {
   let dict: PythonObject = ["a": 1, 1: 0.5]
   expectEqual(2, Python.len(dict))
   expectEqual(1, dict["a"])
@@ -44,7 +44,7 @@ PythonRuntimeTestSuite.test("pydict") {
   expectEqual("d", dict["b"])
 }
 
-PythonRuntimeTestSuite.test("range") {
+PythonRuntimeTestSuite.test("Range") {
   let slice = PythonObject(5..<10)
   expectEqual(Python.slice(5, 10), slice)
   expectEqual(5, slice.start)
@@ -58,7 +58,7 @@ PythonRuntimeTestSuite.test("range") {
   expectNil(Range<Int>(PythonObject(5...)))
 }
 
-PythonRuntimeTestSuite.test("partialrangefrom") {
+PythonRuntimeTestSuite.test("PartialRangeFrom") {
   let slice = PythonObject(5...)
   expectEqual(Python.slice(5, Python.None), slice)
   expectEqual(5, slice.start)
@@ -70,7 +70,7 @@ PythonRuntimeTestSuite.test("partialrangefrom") {
   expectNil(PartialRangeFrom<Int>(PythonObject(..<5)))
 }
 
-PythonRuntimeTestSuite.test("partialrangeupto") {
+PythonRuntimeTestSuite.test("PartialRangeUpTo") {
   let slice = PythonObject(..<5)
   expectEqual(Python.slice(5), slice)
   expectEqual(5, slice.stop)
@@ -82,7 +82,7 @@ PythonRuntimeTestSuite.test("partialrangeupto") {
   expectNil(PartialRangeUpTo<Int>(PythonObject(5...)))
 }
 
-PythonRuntimeTestSuite.test("binary-ops") {
+PythonRuntimeTestSuite.test("BinaryOps") {
   expectEqual(42, PythonObject(42))
   expectEqual(42, PythonObject(2) + PythonObject(40))
   expectEqual(2, PythonObject(2) * PythonObject(3) + PythonObject(-4))
@@ -106,22 +106,39 @@ PythonRuntimeTestSuite.test("binary-ops") {
   expectEqual(2.5, x)
 }
 
-PythonRuntimeTestSuite.test("comparable") {
-  let pyValArray: [PythonObject] = [-1, 10, 1, 0, 0]
-  expectEqual([-1, 0, 0, 1, 10], pyValArray.sorted())
-  let pyValArray2: PythonObject = [-1, 10, 1, 0, 0]
-  expectEqual([-1, 0, 0, 1, 10], pyValArray2.sorted())
-  let pyValArray3: [PythonObject] = ["a", 10, "b", "b", 0]
-  expectEqual([0, 10, "a", "b", "b"], pyValArray3.sorted())
+PythonRuntimeTestSuite.test("Comparable") {
+  let array: [PythonObject] = [-1, 10, 1, 0, 0]
+  expectEqual([-1, 0, 0, 1, 10], array.sorted())
+  let list: PythonObject = [-1, 10, 1, 0, 0]
+  expectEqual([-1, 0, 0, 1, 10], list.sorted())
+
+  // Heterogeneous array/list.
+  let array2: [PythonObject] = ["a", 10, "b", "b", 0]
+  expectEqual([0, 10, "a", "b", "b"], array2.sorted())
+  let list2: PythonObject = ["a", 10, "b", "b", 0]
+  expectEqual([0, 10, "a", "b", "b"], list2.sorted())
 }
 
-PythonRuntimeTestSuite.test("range-iter") {
+PythonRuntimeTestSuite.test("Hashable") {
+  func compareHashValues(_ x: PythonConvertible) {
+    let a = x.pythonObject
+    let b = x.pythonObject
+    expectEqual(a.hashValue, b.hashValue)
+  }
+
+  compareHashValues(1)
+  compareHashValues(3.14)
+  compareHashValues("asdf")
+  compareHashValues(PythonObject(tupleOf: 1, 2, 3))
+}
+
+PythonRuntimeTestSuite.test("RangeIteration") {
   for (index, val) in Python.range(5).enumerated() {
     expectEqual(PythonObject(index), val)
   }
 }
 
-PythonRuntimeTestSuite.test("errors") {
+PythonRuntimeTestSuite.test("Errors") {
   expectThrows(PythonError.exception("division by zero"), {
     try PythonObject(1).__truediv__.throwing.dynamicallyCall(withArguments: 0)
     // `expectThrows` does not fail if no error is thrown.
@@ -129,7 +146,7 @@ PythonRuntimeTestSuite.test("errors") {
   })
 }
 
-PythonRuntimeTestSuite.test("tuple") {
+PythonRuntimeTestSuite.test("Tuple") {
   let element1: PythonObject = 0
   let element2: PythonObject = "abc"
   let element3: PythonObject = [0, 0]
@@ -155,7 +172,25 @@ PythonRuntimeTestSuite.test("tuple") {
   expectEqual(element2, quadruple[1])
 }
 
-PythonRuntimeTestSuite.test("python-convertible") {
+PythonRuntimeTestSuite.test("MethodCalling") {
+  let list: PythonObject = [1, 2]
+  list.append(3)
+  expectEqual([1, 2, 3], list)
+
+  // Check method binding.
+  let append = list.append
+  append(4)
+  expectEqual([1, 2, 3, 4], list)
+
+  // Check *args/**kwargs behavior: `str.format(*args, **kwargs)`.
+  let greeting: PythonObject = "{0} {first} {last}!"
+  expectEqual("Hi John Smith!",
+              greeting.format("Hi", first: "John", last: "Smith"))
+  expectEqual("Hey Jane Doe!",
+              greeting.format("Hey", first: "Jane", last: "Doe"))
+}
+
+PythonRuntimeTestSuite.test("PythonConvertible") {
   // Ensure that we cover the -1 case as this is used by Python
   // to signal conversion errors.
   let minusOne: PythonObject = -1
