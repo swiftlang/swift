@@ -792,11 +792,11 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
   Type parentType;
   if (auto nominal = genericTypeAlias->getDeclContext()
                          ->getAsNominalTypeOrNominalTypeExtensionContext()) {
-    parentType = nominal->getDeclaredInterfaceType();
+    parentType = nominal->getDeclaredInterfaceType().subst(subMap);
   }
-  NameAliasType *NAT =
-      NameAliasType::get(genericTypeAlias, parentType, subMap,
-                         genericTypeAlias->getUnderlyingTypeLoc().getType());
+  NameAliasType *NAT = NameAliasType::get(
+      genericTypeAlias, parentType, subMap,
+      genericTypeAlias->getDeclaredInterfaceType().subst(subMap));
   result._types.push_back(NAT);
   result._decls.push_back(genericTypeAlias);
 }
