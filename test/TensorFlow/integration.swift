@@ -33,7 +33,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
-// CHECK: sil shared @{{.*}}testTensor{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> () {
+// CHECK: @{{.*}}testTensor{{.*}} : $@convention(thin) (@guaranteed Tensor<Float>, @guaranteed Tensor<Float>) -> () {
 
 // Graph lowering should succeed, producing a serialized program of 10+ bytes.
 // CHECK: string_literal bytes
@@ -123,7 +123,7 @@ public func testExitBranch1(i: Int) {
 
 // CHECK: bb1:
 // CHECK: [[TERMFN:%.*]] = function_ref @_swift_tfc_TerminateTensorComputation
-// CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@owned _TensorComputation) -> ()
+// CHECK-NEXT: apply [[TERMFN]]([[PROGRAM]]) : $@convention(thin) (@guaranteed _TensorComputation) -> ()
 // CHECK: unreachable
 
 // CHECK: bb2:
@@ -495,12 +495,9 @@ public func testNoInlineUser() {
 // CHECK: [[XS:%.*]] = struct $Tensor<Float> ([[X]] : $TensorHandle<Float>)
 // CHECK:  strong_retain [[SOME_T:%.*]] : $TensorHandle<Float>
 // CHECK-NEXT:  strong_release [[SOME_T]] : $TensorHandle<Float>
-// CHECK:  strong_retain [[SOME_T]] : $TensorHandle<Float>
 // CHECK:  [[FN:%.*]] = function_ref @${{.*}}noInlineUser
 // CHECK-NEXT: apply [[FN]]([[XS]])
 // CHECK-NEXT: apply [[FN]]([[XS]])
-// CHECK:  strong_release [[SOME_T]] : $TensorHandle<Float>
-// CHECK:  strong_release [[SOME_T]] : $TensorHandle<Float>
 // CHECK-LABEL: } // end sil function{{.*}}testNoInlineUser
 
 

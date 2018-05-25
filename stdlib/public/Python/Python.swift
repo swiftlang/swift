@@ -197,7 +197,7 @@ public extension PythonObject {
 }
 
 /// An error produced by a failable Python operation.
-@_fixed_layout
+@_frozen
 public enum PythonError : Error, Equatable {
   /// A Python runtime exception, produced by calling a Python function.
   case exception(PythonObject)

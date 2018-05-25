@@ -2595,7 +2595,8 @@ namespace {
         // init(handle:) initializer.
         cs.setType(expr, handleTy);
 
-        auto funcName = DeclName(ctx, ctx.Id_init, { handleId });
+        auto funcName =
+          DeclName(ctx, DeclBaseName::createConstructor(), {handleId});
         return convertLiteral(expr, type, type,
                               tensorProto, handleTy, funcName,
                               tensorProto, handleTy, funcName,
