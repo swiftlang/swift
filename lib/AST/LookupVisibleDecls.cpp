@@ -504,48 +504,39 @@ public:
       parentConsumer.foundDecl(VD, Reason);
       return;
     }
-    auto AFT = VD->getInterfaceType()->getAs<AnyFunctionType>();
-    if (!AFT) {
+    auto GFT = VD->getInterfaceType()->getAs<GenericFunctionType>();
+    if (!GFT) {
       if (foundVars.insert(VD->getFullName()).second)
         parentConsumer.foundDecl(VD, Reason);
       return;
     }
-    auto type = stripSelfRequirementsIfNeeded(VD, AFT);
+    auto type = stripSelfRequirementsIfNeeded(VD, GFT);
     if (foundFuncs.insert({VD->getFullName(), type}).second) {
       parentConsumer.foundDecl(VD, Reason);
     }
   }
 private:
-  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD, AnyFunctionType *AFT) {
+  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD, GenericFunctionType *GFT) {
     // Preserve the generic signature if this is a subscript, which are uncurried,
-    // or if we have genenic params other than Self. Otherwise, strip if off
-    // and use the resultType of the curried function type.
-    // When preserving the generic signature, we remove the requirements
-    // from Self to make they don't prevent us from recognizing restatements.
-
-    // This can't be null since we are dealing with method or
-    // subscript requirements, where Self is an implicit generic param.
-    auto sig = AFT->getOptGenericSignature();
-    auto params = sig->getGenericParams();
-
+    // or if we have generic params other than Self. Otherwise, use
+    // the resultType of the curried function type.
+    // When we keep the generic signature, we remove the requirements
+    // from Self to make sure they don't prevent us from recognizing restatements.
+    auto params = GFT->getGenericParams();
     if (params.size() == 1 && !isa<SubscriptDecl>(VD)) {
-      return AFT->getResult()->getCanonicalType();
+      return GFT->getResult()->getCanonicalType();
     }
-    GenericTypeParamType *SelfParam;
-    for (auto param: params) {
-      if (param->getName().str() == getTokenText(tok::kw_Self))
-        SelfParam = param;
-    }
+    auto Self = VD->getDeclContext()->getSelfInterfaceType();
     SmallVector<Requirement, 4> newReqs;
-    llvm::for_each(sig->getRequirements(), [&](Requirement req) {
-      if (!SelfParam->isEqual(req.getFirstType()))
+    for (auto req: GFT->getRequirements()) {
+      if (!Self->isEqual(req.getFirstType()))
         newReqs.push_back(req);
-    });
+    }
     auto newSig = GenericSignature::get(params, newReqs, false);
 
-    return GenericFunctionType::get(newSig, AFT->getInput(),
-                                    AFT->getResult(), AFT->getExtInfo())
-    ->getCanonicalType(newSig);
+    return GenericFunctionType::get(newSig, GFT->getInput(),
+                                    GFT->getResult(), GFT->getExtInfo())
+      ->getCanonicalType();
   }
 };
 
