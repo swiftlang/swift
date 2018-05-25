@@ -1138,6 +1138,10 @@ bool swift::performLLVM(IRGenOptions &Opts, ASTContext &Ctx,
   if (!TargetMachine)
     return true;
 
+  auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  // Use clang's datalayout.
+  Module->setDataLayout(Clang->getTargetInfo().getDataLayout());
+
   embedBitcode(Module, Opts);
   if (::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, Module,
                     TargetMachine.get(),
