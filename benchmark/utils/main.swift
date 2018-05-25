@@ -32,6 +32,7 @@ import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
+import COWArrayGuaranteedParameterOverhead
 import CString
 import CSVParsing
 import Calculator
@@ -96,6 +97,7 @@ import ObserverClosure
 import ObserverForwarderStruct
 import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
+import OpaqueConsumingUsers
 import OpenClose
 import PartialApplyDynamicType
 import Phonebook
@@ -184,6 +186,7 @@ registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
+registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(CSVParsingAlt)
@@ -253,6 +256,7 @@ registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)
 registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
+registerBenchmark(OpaqueConsumingUsers)
 registerBenchmark(OpenClose)
 registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
