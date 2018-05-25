@@ -332,7 +332,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   SourceLoc FileEndLoc;
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
-    ASTMigratorPass(Editor, SF, Opts),
+    ASTMigratorPass(Editor, SF, Opts), DiffStore(Diags),
     FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {
       SmallVector<Decl*, 16> TopDecls;
       SF->getTopLevelDecls(TopDecls);

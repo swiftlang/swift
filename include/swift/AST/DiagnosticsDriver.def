@@ -161,6 +161,9 @@ WARNING(warn_emit_public_type_metadata_accessors_deprecated, none,
 
 REMARK(remark_using_batch_mode,none, "using batch mode", ())
 
+ERROR(cannot_find_migration_script, none,
+      "missing migration script from path '%0'", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
