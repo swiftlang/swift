@@ -45,6 +45,7 @@ set(SWIFT_BENCH_MODULES
     single-source/BitCount
     single-source/ByteSwap
     single-source/COWTree
+    single-source/COWArrayGuaranteedParameterOverhead
     single-source/CString
     single-source/CSVParsing
     single-source/Calculator

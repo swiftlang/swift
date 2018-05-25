@@ -32,6 +32,7 @@ import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
+import COWArrayGuaranteedParameterOverhead
 import CString
 import CSVParsing
 import Calculator
@@ -184,6 +185,7 @@ registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
+registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(CSVParsingAlt)
