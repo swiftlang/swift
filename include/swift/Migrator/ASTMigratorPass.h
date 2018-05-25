@@ -24,6 +24,7 @@
 namespace swift {
 class SourceManager;
 struct MigratorOptions;
+class DiagnosticEngine;
 
 namespace migrator {
 class ASTMigratorPass {
@@ -34,12 +35,13 @@ protected:
   const StringRef Filename;
   const unsigned BufferID;
   SourceManager &SM;
+  DiagnosticEngine &Diags;
 
   ASTMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                   const MigratorOptions &Opts)
     : Editor(Editor), SF(SF), Opts(Opts), Filename(SF->getFilename()),
       BufferID(SF->getBufferID().getValue()),
-      SM(SF->getASTContext().SourceMgr) {}
+      SM(SF->getASTContext().SourceMgr), Diags(SF->getASTContext().Diags) {}
 };
 
 /// Run a general pass to migrate code based on SDK differences in the previous
