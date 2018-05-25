@@ -514,14 +514,9 @@ func testMetatypeCompletions() {
 func testMetatypeCompletionsWithoutDot() {
   NoMetaCompletions.Type.#^FOO_STRUCT_META_2^#
 }
-// FOO_STRUCT_META-NOT: Decl[StaticVar]/CurrNominal:    .foo[#Int#]; name=foo
-// FOO_STRUCT_META-NOT: Decl[StaticMethod]/CurrNominal: .bar()[#Void#]; name=bar()
-// FOO_STRUCT_META-NOT: Decl[TypeAlias]/CurrNominal:    .Foo[#Int#]; name=Foo
-// FOO_STRUCT_META-NOT: Decl[Constructor]/CurrNominal:  ()[#NoMetaCompletions#]; name=()
-// FOO_STRUCT_META-NOT: Decl[StaticVar]/CurrNominal:    foo[#Int#]; name=foo
-// FOO_STRUCT_META-NOT: Decl[StaticMethod]/CurrNominal: bar()[#Void#]; name=bar()
-// FOO_STRUCT_META-NOT: Decl[TypeAlias]/CurrNominal:    Foo[#Int#]; name=Foo
-// FOO_STRUCT_META-NOT: Decl[Constructor]/CurrNominal:  init()[#NoMetaCompletions#]; name=init()
+// FOO_STRUCT_META-NOT: Decl
+// FOO_STRUCT_META: Keyword[self]/CurrNominal: {{self|.self}}[#NoMetaCompletions.Type.Type#]; name=self
+// FOO_STRUCT_META-NOT: Decl
 
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
