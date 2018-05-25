@@ -509,10 +509,10 @@ struct NoMetaCompletions {
   typealias Foo = Int
 }
 func testMetatypeCompletions() {
-  NoMetaCompletions.Type#^FOO_STRUCT_META_1^#
+  NoMetaCompletions.Type.#^FOO_STRUCT_META_1^#
 }
 func testMetatypeCompletionsWithoutDot() {
-  NoMetaCompletions.Type.#^FOO_STRUCT_META_2^#
+  NoMetaCompletions.Type#^FOO_STRUCT_META_2^#
 }
 // FOO_STRUCT_META-NOT: Decl
 // FOO_STRUCT_META: Keyword[self]/CurrNominal: {{self|.self}}[#NoMetaCompletions.Type.Type#]; name=self
