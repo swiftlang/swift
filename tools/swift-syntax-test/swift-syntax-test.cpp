@@ -50,6 +50,7 @@ enum class ActionType {
   DeserializeRawTree,
   ParseOnly,
   ParserGen,
+  DumpAllSyntaxTokens,
   EOFPos,
   None
 };
@@ -87,6 +88,10 @@ Action(llvm::cl::desc("Action (required):"),
                    "deserialize-raw-tree",
                    "Parse the JSON file from the serialized raw tree "
                    "to the original"),
+        clEnumValN(ActionType::DumpAllSyntaxTokens,
+                   "dump-all-syntax-tokens",
+                   "Dump the names of all token kinds that shall be included "
+                   "in swiftSyntax"),
         clEnumValN(ActionType::EOFPos,
                    "eof",
                    "Parse the source file, calculate the absolute position"
@@ -766,6 +771,31 @@ int dumpParserGen(const char *MainExecutablePath, const StringRef InputFile) {
   });
 }
 
+void printToken(const StringRef name) {
+  // We don't expect any SIL related tokens on the SwiftSyntax side
+  if (name == "sil_dollar" ||
+      name == "sil_exclamation" ||
+      name == "sil_local_name") {
+    return;
+  }
+
+  // These token kinds are internal only and should not be exposed on the
+  // SwiftSyntax side
+  if (name == "code_complete" ||
+      name == "comment" ||
+      name == "eof") {
+    return;
+  }
+  llvm::outs() << name << '\n';
+}
+
+int dumpAllSyntaxTokens() {
+  #define TOKEN(KW) printToken(#KW);
+  #define SIL_KEYWORD(KW)
+  #include "swift/Syntax/TokenKinds.def"
+  return EXIT_SUCCESS;
+}
+
 int dumpEOFSourceLoc(const char *MainExecutablePath,
                      const StringRef InputFile) {
   return parseFile(MainExecutablePath, InputFile,
@@ -817,6 +847,9 @@ int invokeCommand(const char *MainExecutablePath,
     case ActionType::ParserGen:
       ExitCode = dumpParserGen(MainExecutablePath, InputSourceFilename);
       break;
+    case ActionType::DumpAllSyntaxTokens:
+      ExitCode = dumpAllSyntaxTokens();
+      break;
     case ActionType::EOFPos:
       ExitCode = dumpEOFSourceLoc(MainExecutablePath, InputSourceFilename);
       break;
@@ -835,6 +868,12 @@ int main(int argc, char *argv[]) {
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Syntax Test\n");
 
   int ExitCode = EXIT_SUCCESS;
+
+  if (options::Action == ActionType::DumpAllSyntaxTokens) {
+    // DumpAllSyntaxTokens doesn't require an input file. Hande it before we 
+    // reach input file handling
+    return dumpAllSyntaxTokens();
+  }
 
   if (options::InputSourceFilename.empty() &&
       options::InputSourceDirectory.empty()) {
