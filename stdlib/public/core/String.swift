@@ -13,7 +13,6 @@
 import SwiftShims
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @_semantics("optimize.sil.specialize.generic.partial.never")
 internal func _withCStringAndLength<
   Source : Collection,
@@ -54,7 +53,6 @@ extension _StringGuts {
   /// Invokes `body` on a null-terminated sequence of code units in the given
   /// encoding corresponding to the substring in `bounds`.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _withCSubstring<Result, TargetEncoding: Unicode.Encoding>(
     in bounds: Range<Int>,
     encoding targetEncoding: TargetEncoding.Type,
@@ -66,7 +64,6 @@ extension _StringGuts {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @_semantics("optimize.sil.specialize.generic.partial.never")
   internal func _withCSubstringAndLength<
     Result, TargetEncoding: Unicode.Encoding
@@ -135,7 +132,6 @@ extension _StringGuts {
 
 extension String {
   @inlinable
-  @usableFromInline
   internal static func _fromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -366,7 +362,7 @@ extension String {
 /// that point:
 ///
 ///     let name = "Marie Curie"
-///     let firstSpace = name.index(of: " ") ?? name.endIndex
+///     let firstSpace = name.firstIndex(of: " ") ?? name.endIndex
 ///     let firstName = name[..<firstSpace]
 ///     // firstName == "Marie"
 ///
@@ -517,7 +513,7 @@ extension String {
 /// of the string up to that point.
 ///
 ///     let name = "Marie Curie"
-///     let firstSpace = name.index(of: " ") ?? name.endIndex
+///     let firstSpace = name.firstIndex(of: " ") ?? name.endIndex
 ///     let firstName = name[..<firstSpace]
 ///     print(firstName)
 ///     // Prints "Marie"
@@ -629,40 +625,46 @@ extension String {
   }
 }
 
+internal func _isAllASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
+  for byte in input {
+    guard byte <= 0x7F else { return false }
+  }
+  return true
+}
+
 extension String {
-  @inlinable
-  @usableFromInline
-  static func _fromUTF8CodeUnitSequence<C : RandomAccessCollection>(
-    _ input: C, repair: Bool
-  ) -> String? where C.Element == UInt8 {
+  static func _fromUTF8CodeUnitSequence(
+    _ input: UnsafeBufferPointer<UInt8>, repair: Bool
+  ) -> String? {
+    if _isAllASCII(input) {
+      return _fromASCII(input)
+    }
+
     if let smol = _SmallUTF8String(input) {
       return String(_StringGuts(smol))
     }
+
     return String._fromCodeUnits(
       input, encoding: UTF8.self, repairIllFormedSequences: repair)
   }
 
-  @inlinable
   @usableFromInline
-  static func _fromASCII<C : RandomAccessCollection>(
-    _ input: C
-  ) -> String where C.Element == UInt8 {
+  static func _fromASCII(_ input: UnsafeBufferPointer<UInt8>) -> String {
     if let smol = _SmallUTF8String(input) {
       return String(_StringGuts(smol))
     }
     let storage = _SwiftStringStorage<UInt8>.create(
       capacity: input.count, count: input.count)
-    var (itr, end) = input._copyContents(initializing: storage.usedBuffer)
-    _sanityCheck(itr.next() == nil)
-    _sanityCheck(end == storage.usedBuffer.endIndex)
+    _sanityCheck(storage.count == input.count)
+    storage.start.initialize(
+      from: input.baseAddress._unsafelyUnwrappedUnchecked, count: input.count)
     return String(_StringGuts(_large: storage))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public // FIXME: @usableFromInline, currently public because testing...
-  static func _fromWellFormedUTF8CodeUnitSequence<C : RandomAccessCollection>(
-    _ input: C, repair: Bool = false
-  ) -> String where C.Element == UTF8.CodeUnit {
+  @usableFromInline
+  static func _fromWellFormedUTF8CodeUnitSequence(
+    _ input: UnsafeBufferPointer<UInt8>, repair: Bool = false
+  ) -> String {
     return String._fromUTF8CodeUnitSequence(input, repair: repair)!
   }
 }
@@ -680,9 +682,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
     //
     // TODO: All scalars are small
     if scalar.value <= 0x7f {
-      if let small = _SmallUTF8String(
-        Unicode.UTF8.encode(scalar)._unsafelyUnwrappedUnchecked
-      ) {
+      if let small = _SmallUTF8String(scalar) {
         self = String(_StringGuts(small))
         return
       } else {
@@ -798,7 +798,6 @@ extension String {
   /// Returns the number of code units occupied by this string
   /// in the given encoding.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _encodedLength<
     Encoding: Unicode.Encoding
   >(_ encoding: Encoding.Type) -> Int {
@@ -821,7 +820,6 @@ extension String {
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _encode<Encoding: Unicode.Encoding>(
     _ encoding: Encoding.Type,
     into processCodeUnit: (Encoding.CodeUnit) -> Void
@@ -901,7 +899,6 @@ extension String {
   ///     // Prints "Hello, friend"
   ///
   /// - Parameter other: Another string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ other: String) {
     self._guts.append(other._guts)
   }
@@ -919,7 +916,6 @@ extension String {
 
   // TODO(SSO): Consider small-checking version
   @inlinable // FIXME(sil-serialize-all)
-  public
   init<CodeUnit>(_largeStorage storage: _SwiftStringStorage<CodeUnit>)
   where CodeUnit : FixedWidthInteger & UnsignedInteger {
     _guts = _StringGuts(_large: storage)
@@ -978,13 +974,12 @@ extension Sequence where Element: StringProtocol {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where Self == Array<Substring>)
+  @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _joined(separator: String = "") -> String {
     let separatorSize = separator._guts.count
     var width = separator._guts.byteWidth
@@ -1040,25 +1035,21 @@ extension BidirectionalCollection where Iterator.Element == String {
   /// - Parameter separator: A string to insert between each of the elements
   ///   in this sequence. The default separator is an empty string.
   /// - Returns: A single, concatenated string.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where Self == Array<String>)
   public func joined(separator: String = "") -> String {
     return _joined(separator: separator)
   }
 }
 
 #if _runtime(_ObjC)
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringLowercaseString")
 internal func _stdlib_NSStringLowercaseString(_ str: AnyObject) -> _CocoaString
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_stdlib_NSStringUppercaseString")
 internal func _stdlib_NSStringUppercaseString(_ str: AnyObject) -> _CocoaString
 #else
-@inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
 
   // TODO (TODO: JIRA): check for small
@@ -1089,7 +1080,6 @@ internal func _nativeUnicodeLowercaseString(_ str: String) -> String {
   return String(_largeStorage: storage)
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
 
@@ -1132,7 +1122,6 @@ extension String {
   /// from the ASCII value of that character and divide by 2. The bit is set iff
   /// that character is a lower case character.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _asciiLowerCaseTable: UInt64 {
     @inline(__always)
     get {
@@ -1142,7 +1131,6 @@ extension String {
 
   /// The same table for upper case characters.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _asciiUpperCaseTable: UInt64 {
     @inline(__always)
     get {
@@ -1161,7 +1149,6 @@ extension String {
   /// - Returns: A lowercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public func lowercased() -> String {
     if _guts.isASCII {
       var guts = _guts
@@ -1209,7 +1196,6 @@ extension String {
   /// - Returns: An uppercase copy of the string.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public func uppercased() -> String {
     if _guts.isASCII {
       var guts = _guts

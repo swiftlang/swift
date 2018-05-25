@@ -75,7 +75,7 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
 //   1. Get the type metadata for U.RuncerType.Runcee.
 //     1a. Get the type metadata for U.RuncerType.
 //         Note that we actually look things up in T, which is going to prove unfortunate.
-// CHECK:      [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.Runcible, i32 1
+// CHECK:      [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.Runcible, i32 2
 // CHECK:      [[T0:%.*]] = load i8*, i8** [[T0_GEP]]
 // CHECK-NEXT: [[T1:%.*]] = bitcast i8* [[T0]] to %swift.metadata_response ([[INT]], %swift.type*, i8**)*
 // CHECK-NEXT: [[T2:%.*]] = call swiftcc %swift.metadata_response [[T1]]([[INT]] 0, %swift.type* %T, i8** %T.Runcible)

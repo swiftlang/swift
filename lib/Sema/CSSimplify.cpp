@@ -103,8 +103,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   
   auto params = levelTy->getParams();
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(levelTy->getInput(), decl, parameterDepth, defaultMap);
-  
+  computeDefaultMap(params, decl, parameterDepth, defaultMap);
+
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
@@ -702,7 +702,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   AnyFunctionType::decomposeInput(paramType, params);
   
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(paramType, callee, calleeLevel, defaultMap);
+  computeDefaultMap(params, callee, calleeLevel, defaultMap);
   
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
@@ -1033,7 +1033,7 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
   }
   
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(argType, callee, calleeLevel, defaultMap);
+  computeDefaultMap(type1, callee, calleeLevel, defaultMap);
   
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
@@ -1207,8 +1207,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       if (last->getKind() == ConstraintLocator::ApplyArgToParam) {
         if (auto *paren1 = dyn_cast<ParenType>(func1Input.getPointer())) {
           auto innerTy = paren1->getUnderlyingType();
-          if (func2Input->isVoid() && innerTy->isVoid())
+          if (func2Input->isVoid() && innerTy->isVoid()) {
             func1Input = innerTy;
+            // If the other input is also parenthesized, remove one
+            // layer of parens from it as well.
+            if (auto *paren2 = dyn_cast<ParenType>(func2Input.getPointer()))
+              func2Input = paren2->getUnderlyingType();
+          }
         }
       }
     }
@@ -1470,7 +1475,7 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchTypesBindTypeVar(
     TypeVariableType *typeVar, Type type, ConstraintKind kind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator,
-    std::function<TypeMatchResult()> formUnsolvedResult) {
+    llvm::function_ref<TypeMatchResult()> formUnsolvedResult) {
   assert(typeVar->is<TypeVariableType>() && "Expected a type variable!");
   // FIXME: Due to some SE-0110 related code farther up we can end
   // up with type variables wrapped in parens that will trip this
@@ -1690,8 +1695,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // left-hand side is bound to type variable which
         // is wrapped in `inout` type to preserve inout/lvalue pairing.
         if (auto *lvt = type2->getAs<LValueType>()) {
-          auto *tv = createTypeVariable(typeVar1->getImpl().getLocator(),
-                                        /*options=*/0);
+          auto *tv = createTypeVariable(typeVar1->getImpl().getLocator());
           assignFixedType(typeVar1, InOutType::get(tv));
 
           typeVar1 = tv;
@@ -2157,9 +2161,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // an implicit closure.
     if (auto function2 = type2->getAs<FunctionType>()) {
       if (function2->isAutoClosure())
-        return matchTypes(type1, function2->getResult(), kind, subflags,
-                          locator.withPathElement(ConstraintLocator::Load));
+        return matchTypes(
+            type1, function2->getResult(), kind, subflags,
+            locator.withPathElement(ConstraintLocator::AutoclosureResult));
     }
+
+    // It is never legal to form an autoclosure that results in these
+    // implicit conversions to pointer types.
+    bool isAutoClosureArgument = false;
+    if (auto last = locator.last())
+      if (last->getKind() == ConstraintLocator::AutoclosureResult)
+        isAutoClosureArgument = true;
 
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= ConstraintKind::ArgumentConversion) {
@@ -2179,23 +2191,24 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         case PTK_UnsafeMutablePointer:
           // UnsafeMutablePointer can be converted from an inout reference to a
           // scalar or array.
-          if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
-            auto inoutBaseType = inoutType1->getInOutObjectType();
+          if (!isAutoClosureArgument) {
+            if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
+              auto inoutBaseType = inoutType1->getInOutObjectType();
 
-            Type simplifiedInoutBaseType =
-              getFixedTypeRecursive(inoutBaseType,
-                                    kind == ConstraintKind::Equal,
-                                    isArgumentTupleConversion);
+              Type simplifiedInoutBaseType = getFixedTypeRecursive(
+                  inoutBaseType, kind == ConstraintKind::Equal,
+                  isArgumentTupleConversion);
 
-            // FIXME: If the base is still a type variable, we can't tell
-            // what to do here. Might have to try \c ArrayToPointer and make it
-            // more robust.
-            if (isArrayType(simplifiedInoutBaseType)) {
+              // FIXME: If the base is still a type variable, we can't tell
+              // what to do here. Might have to try \c ArrayToPointer and make
+              // it more robust.
+              if (isArrayType(simplifiedInoutBaseType)) {
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::ArrayToPointer);
+              }
               conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::ArrayToPointer);
+                  ConversionRestrictionKind::InoutToPointer);
             }
-            conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::InoutToPointer);
           }
           
           if (!flags.contains(TMF_ApplyingOperatorParameter) &&
@@ -2243,20 +2256,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             // AutoreleasingUnsafeMutablePointer.
             if (pointerKind == PTK_UnsafePointer
                 || pointerKind == PTK_UnsafeRawPointer) {
-              if (isArrayType(type1)) {
-                conversionsOrFixes.push_back(
-                                     ConversionRestrictionKind::ArrayToPointer);
-              }
-              
-              // The pointer can be converted from a string, if the element type
-              // is compatible.
-              if (type1->isEqual(TC.getStringType(DC))) {
-                auto baseTy = getFixedTypeRecursive(pointeeTy, false);
-                
-                if (baseTy->isTypeVariableOrMember() ||
-                    isStringCompatiblePointerBaseType(TC, DC, baseTy))
+              if (!isAutoClosureArgument) {
+                if (isArrayType(type1)) {
                   conversionsOrFixes.push_back(
-                                    ConversionRestrictionKind::StringToPointer);
+                      ConversionRestrictionKind::ArrayToPointer);
+                }
+
+                // The pointer can be converted from a string, if the element
+                // type is compatible.
+                if (type1->isEqual(TC.getStringType(DC))) {
+                  auto baseTy = getFixedTypeRecursive(pointeeTy, false);
+
+                  if (baseTy->isTypeVariableOrMember() ||
+                      isStringCompatiblePointerBaseType(TC, DC, baseTy))
+                    conversionsOrFixes.push_back(
+                        ConversionRestrictionKind::StringToPointer);
+                }
               }
               
               if (type1IsPointer && optionalityMatches &&
@@ -2272,7 +2287,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         case PTK_AutoreleasingUnsafeMutablePointer:
           // PTK_AutoreleasingUnsafeMutablePointer can be converted from an
           // inout reference to a scalar.
-          if (type1->is<InOutType>()) {
+          if (!isAutoClosureArgument && type1->is<InOutType>()) {
             conversionsOrFixes.push_back(
                                      ConversionRestrictionKind::InoutToPointer);
           }
@@ -2551,6 +2566,7 @@ ConstraintSystem::simplifyConstructionConstraint(
                            DeclBaseName::createConstructor(),
                            FunctionType::get(tv, resultType),
                            useDC, functionRefKind,
+                           /*outerAlternatives=*/{},
                            getConstraintLocator(
                              fnLocator, 
                              ConstraintLocator::ConstructorMember));
@@ -3439,14 +3455,11 @@ retry_after_fail:
   return result;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
-                                           Type baseTy, DeclName member,
-                                           Type memberTy,
-                                           DeclContext *useDC,
-                                           FunctionRefKind functionRefKind,
-                                           TypeMatchOptions flags,
-                                           ConstraintLocatorBuilder locatorB) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
+    ConstraintKind kind, Type baseTy, DeclName member, Type memberTy,
+    DeclContext *useDC, FunctionRefKind functionRefKind,
+    ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locatorB) {
   // Resolve the base type, if we can. If we can't resolve the base type,
   // then we can't solve this constraint.
   // FIXME: simplifyType() call here could be getFixedTypeRecursive?
@@ -3463,8 +3476,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::createMember(*this, kind, baseTy, memberTy, member, useDC,
-                                 functionRefKind, locator));
+        Constraint::createMemberOrOuterDisjunction(*this, kind, baseTy, memberTy, member, useDC,
+                                                   functionRefKind, outerAlternatives, locator));
       return SolutionKind::Solved;
     }
 
@@ -3481,8 +3494,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
     addOverloadSet(memberTy, result.ViableCandidates, useDC, locator,
-                   result.getFavoredChoice());
-    
+                   result.getFavoredChoice(), outerAlternatives);
+
     return SolutionKind::Solved;
   }
   
@@ -3518,7 +3531,8 @@ ConstraintSystem::simplifyMemberConstraint(ConstraintKind kind,
     
     // Look through one level of optional.
     addValueMemberConstraint(baseObjTy->getOptionalObjectType(),
-                             member, memberTy, useDC, functionRefKind, locator);
+                             member, memberTy, useDC, functionRefKind,
+                             outerAlternatives, locator);
     return SolutionKind::Solved;
   }
   return SolutionKind::Error;
@@ -4029,7 +4043,23 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         return SolutionKind::Error;
       }
       
-      if (!storage->isSettable(DC)) {
+      // See whether key paths can store to this component. (Key paths don't
+      // get any special power from being formed in certain contexts, such
+      // as the ability to assign to `let`s in initialization contexts, so
+      // we pass null for the DC to `isSettable` here.)
+      if (!getASTContext().isSwiftVersionAtLeast(5)) {
+        // As a source-compatibility measure, continue to allow
+        // WritableKeyPaths to be formed in the same conditions we did
+        // in previous releases even if we should not be able to set
+        // the value in this context.
+        if (!storage->isSettable(DC)) {
+          // A non-settable component makes the key path read-only, unless
+          // a reference-writable component shows up later.
+          capability = ReadOnly;
+          continue;
+        }
+      } else if (!storage->isSettable(nullptr)
+                 || !storage->isSetterAccessibleFrom(DC)) {
         // A non-settable component makes the key path read-only, unless
         // a reference-writable component shows up later.
         capability = ReadOnly;
@@ -5193,6 +5223,7 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                     constraint.getSecondType(),
                                     constraint.getMemberUseDC(),
                                     constraint.getFunctionRefKind(),
+                                    /*outerAlternatives=*/{},
                                     TMF_GenerateConstraints,
                                     constraint.getLocator());
 

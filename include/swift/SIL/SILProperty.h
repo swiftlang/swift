@@ -79,7 +79,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILProperty>
     : public ilist_default_traits<::swift::SILProperty> {
-  typedef ::swift::SILProperty SILProperty;
+  using SILProperty = ::swift::SILProperty;
 
 public:
   static void deleteNode(SILProperty *VT) { VT->~SILProperty(); }

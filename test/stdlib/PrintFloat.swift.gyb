@@ -5,10 +5,6 @@
 // RUN: %line-directive %t/FloatingPointPrinting.swift -- %target-run %t/main.out --locale ru_RU.UTF-8
 // REQUIRES: executable_test
 
-%{
-from gyb_stdlib_unittest_support import TRACE, stackTrace, trace
-}%
-
 import StdlibUnittest
 #if os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
   import Glibc
@@ -288,6 +284,7 @@ fileprivate let generatedCases_Double: [(Double, String)] = [
   (0x1.63ed4a60c9c91p+324, "4.751595491707413e+97")
 ]
 
+#if !os(Windows) && (arch(i386) || arch(x86_64))
 // Float80 found via Errol technique.
 //
 // As with Double, except for Float80.  The original list in this
@@ -334,6 +331,7 @@ fileprivate let generatedCases_Float80: [(Float80, String)] = [
   (0xd.4d512260c548f17p+242, "9.401053474771583868e+73"),
   (0xc.9240ee0f9d5e4d6p+252, "9.097859174935622588e+76"),
 ]
+#endif
 
 let PrintTests = TestSuite("FloatingPointPrinting")
 
@@ -345,11 +343,22 @@ let PrintTests = TestSuite("FloatingPointPrinting")
 // Verify that a particular value provides a specific description string.
 // Also check that the generated strings actually satisfy our
 // accuracy requirements.
-fileprivate func expectDescription(_ expected: String, _ object: ${FloatType}, ${TRACE}) {
-  expectEqual(expected, object.description, ${trace})
-  expectEqual(expected, object.debugDescription, ${trace})
-  expectAccurateDescription(object, ${trace})
- }
+fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  expectEqual(expected, object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectAccurateDescription(object,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
 
 // Verify our key requirements:
 //
@@ -362,7 +371,12 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType}, $
 // * Close. If there is more than one accurate and short value, we want the one
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
-fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
+fileprivate func expectAccurateDescription(_ object: ${FloatType},
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
   if !object.isFinite {
     return
   }
@@ -374,11 +388,15 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
   let text = object.debugDescription
   if let roundTrip = ${FloatType}(text) {
     if object != roundTrip {
-      expectationFailure("Round-trip inaccuracy: \(object) != \(roundTrip)", trace: ${trace})
+      expectationFailure("Round-trip inaccuracy: \(object) != \(roundTrip)",
+        trace: message(),
+        stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
       return
     }
   } else {
-    expectationFailure("Failed to parse \(text)", trace: ${trace})
+    expectationFailure("Failed to parse \(text)",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
     return
   }
 
@@ -395,11 +413,77 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType}, ${TRACE}) {
 % end
 
 // Special helper for NaN values
-fileprivate func expectNaN<T>(_ expected: String, _ object: T, ${TRACE}) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
+fileprivate func expectNaN<T>(_ expected: String, _ object: T,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) where T: FloatingPoint & CustomDebugStringConvertible & CustomStringConvertible {
   // Regular description always returns "nan"
-  expectEqual("nan", object.description, ${trace})
-  // Debug description returns a more detailed form:
-  expectEqual(expected, object.debugDescription, ${trace})
+  expectEqual("nan", object.description,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+
+  // debugDescription prints full details about NaNs, which is tricky to test
+  // because NaNs often get truncated: various implementations force all NaNs
+  // quiet, discard payloads, or clear sign bits.  In some cases, just passing a
+  // NaN into a function (via an FP register) is enough to mangle the value.
+
+#if arch(x86_64)
+  // Verify the exact debugDescription value only on x86_64, where we
+  // know the exact expected String:
+  expectEqual(expected, object.debugDescription,
+    message(),
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+#endif
+
+  // On all platforms, we verify that the generated debugDescription text
+  // follows the expected format, even when we can't verify the exact value.
+  var actual = object.debugDescription
+
+  // Optional leading "-"
+  if actual.hasPrefix("-") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Optional leading "s"
+  if actual.hasPrefix("s") {
+    actual = String(actual.dropFirst())
+  }
+
+  // Fixed text "nan"
+  if actual.prefix(3) != "nan" {
+    expectationFailure("Badly formatted NaN debug description (expected 'nan'): \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    return
+  }
+  actual = String(actual.dropFirst(3))
+
+  // Optional parenthesized payload after "nan"
+  if actual.hasPrefix("(0x") {
+    actual = String(actual.dropFirst(3))
+    while !actual.isEmpty {
+      if actual.hasPrefix(")") {
+        if actual != ")" {
+          expectationFailure("Malformed NaN: extra text after payload: \(object.debugDescription)", trace:
+            message(),
+            stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+        }
+        return
+      } else {
+        // TODO: verify hex digit
+      }
+      actual = String(actual.dropFirst())
+    }
+    expectationFailure("Malformed NaN: no closing parenthesis after payload: \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  } else if !actual.isEmpty {
+    expectationFailure("Badly formatted NaN debug description has invalid text after 'nan'.  Expected '(0x': \(object.debugDescription)", trace:
+      message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
 }
 
 // Foundation's String(format:) isn't available here, so
@@ -430,7 +514,7 @@ fileprivate func exponentialPowerOfTen(_ power: Int) -> String {
 // this logic to help verify that the output does not depend on
 // the C locale.
 PrintTests.setUp {
-  if let localeArgIndex = CommandLine.arguments.index(of: "--locale") {
+  if let localeArgIndex = CommandLine.arguments.firstIndex(of: "--locale") {
     let locale = CommandLine.arguments[localeArgIndex + 1]
     expectEqual("ru_RU.UTF-8", locale)
     setlocale(LC_ALL, locale)
@@ -508,7 +592,9 @@ PrintTests.test("Printable_Float") {
   expectDescription("-inf", -Float.infinity)
   expectDescription("3.1415925", Float.pi)
   expectDescription("3.4028235e+38", Float.greatestFiniteMagnitude)
+#if !arch(arm)
   expectDescription("1e-45", Float.leastNonzeroMagnitude)
+#endif
   expectDescription("1.1754944e-38", Float.leastNormalMagnitude)
 
   // Special cases for the underlying algorithms:
@@ -519,7 +605,10 @@ PrintTests.test("Printable_Float") {
   // closest to the midpoint between two binary floats
   expectDescription("7.0385313e-26", 7.0385313e-26 as Float)
   // Second-worst case for shortness:
-  expectDescription("7.038531e-26", 7.038531e-26 as Float)
+  expectDescription("7.038531e-26", Float("7.038531e-26")!)
+  // Note: The above test computes the reference value from a
+  // string because `7.038531e-26 as Float` is broken:
+  // See https://bugs.swift.org/browse/SR-7124
 
   // NaNs require special care in testing:
   // NaN is printed with additional detail to debugDescription, but not description
@@ -527,24 +616,23 @@ PrintTests.test("Printable_Float") {
   expectNaN("nan(0xffff)", Float(nan: 65535, signaling: false))
   expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fff_ffff))
   expectNaN("nan(0x1fffff)", Float(bitPattern: 0x7fdf_ffff))
-#if !arch(arm)
-  // ARM doesn't have negative Float nans
   expectNaN("-nan", -Float.nan)
-  expectNaN("-nan(0xffff)", -Float(nan: 65535, signaling: false)) // fail
-#endif
-#if !arch(i386) && !arch(arm)
-  // 32-bit i386 and ARM lack signaling Float nans
+  expectNaN("-nan(0xffff)", -Float(nan: 65535, signaling: false))
   expectNaN("snan", Float.signalingNaN)
   expectNaN("-snan", -Float.signalingNaN)
   expectNaN("snan(0xffff)", Float(nan: 65535, signaling: true))
   expectNaN("-snan(0xffff)", -Float(nan: 65535, signaling: true))
   expectNaN("snan(0x1fffff)", Float(bitPattern: 0x7fbf_ffff))
-#endif
 
   // Every power of 10 should print with only a single digit '1'
-  for power in -45 ... 38 {
+#if arch(arm)
+  let lowerBound = -37
+#else
+  let lowerBound = -45
+#endif
+  for power in lowerBound ... 38 {
     let s: String
-    if power < -4 || power > 5 { // Exponential form
+    if power < -4 || power > 7 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -562,8 +650,14 @@ PrintTests.test("Printable_Float") {
     expectAccurateDescription(f.nextUp)
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Float can represent all integers -(2^24)...(2^24)
+  let maxDecimalForm = Float(1 << 24)
+  expectDescription("16777216.0", maxDecimalForm)
+  expectDescription("-16777216.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.6777218e+07", maxDecimalForm.nextUp)
+  expectDescription("-1.6777218e+07", -maxDecimalForm.nextUp)
+
   expectDescription("1.00001", asFloat32(1.00001))
   expectDescription("1.25e+17", asFloat32(125000000000000000.0))
   expectDescription("1.25e+16", asFloat32(12500000000000000.0))
@@ -575,8 +669,8 @@ PrintTests.test("Printable_Float") {
   expectDescription("1.25e+10", asFloat32(12500000000.0))
   expectDescription("1.25e+09", asFloat32(1250000000.0))
   expectDescription("1.25e+08", asFloat32(125000000.0))
-  expectDescription("1.25e+07", asFloat32(12500000.0))
-  expectDescription("1.25e+06", asFloat32(1250000.0))
+  expectDescription("12500000.0", asFloat32(12500000.0))
+  expectDescription("1250000.0", asFloat32(1250000.0))
   expectDescription("125000.0", asFloat32(125000.0))
   expectDescription("12500.0",  asFloat32(12500.0))
   expectDescription("1250.0",   asFloat32(1250.0))
@@ -622,7 +716,9 @@ PrintTests.test("Printable_Double") {
   // Special values
   expectDescription("3.141592653589793", Double.pi)
   expectDescription("1.7976931348623157e+308", Double.greatestFiniteMagnitude)
+#if !arch(arm)
   expectDescription("5e-324", Double.leastNonzeroMagnitude)
+#endif
   expectDescription("2.2250738585072014e-308", Double.leastNormalMagnitude)
   expectDescription("inf", Double.infinity)
   expectDescription("-inf", -Double.infinity)
@@ -632,20 +728,6 @@ PrintTests.test("Printable_Double") {
   // Verify NaNs
   expectNaN("nan", Double.nan)
   expectNaN("-nan", -Double.nan)
-#if arch(i386)
-  expectNaN("nan", Double(nan: 65535, signaling: false))
-  expectNaN("nan", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
-  expectNaN("nan", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
-  expectNaN("-nan", -Double(nan: 65535, signaling: false))
-  if _isDebugAssertConfiguration() {
-    expectNaN("nan", Double.signalingNaN)
-    expectNaN("-nan", -Double.signalingNaN)
-    expectNaN("nan", Double(nan: 65535, signaling: true))
-    expectNaN("-nan", -Double(nan: 65535, signaling: true))
-    expectNaN("nan", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
-  }
-#else
-  // 32-bit i386 lacks signaling Double nans or payloads on NaNs
   expectNaN("nan(0xffff)", Double(nan: 65535, signaling: false))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7fff_ffff_ffff_ffff))
   expectNaN("nan(0x3ffffffffffff)", Float64(bitPattern: 0x7ffb_ffff_ffff_ffff))
@@ -655,12 +737,16 @@ PrintTests.test("Printable_Double") {
   expectNaN("snan(0xffff)", Double(nan: 65535, signaling: true))
   expectNaN("-snan(0xffff)", -Double(nan: 65535, signaling: true))
   expectNaN("snan(0x3ffffffffffff)", Float64(bitPattern: 0x7ff7_ffff_ffff_ffff))
-#endif
 
   // We know how every power of 10 should print
-  for power in -323 ... 308 {
+#if arch(arm)
+  let lowerBound = -307
+#else
+  let lowerBound = -323
+#endif
+  for power in lowerBound ... 308 {
     let s: String
-    if power < -4 || power > 14 { // Exponential form
+    if power < -4 || power > 15 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -687,12 +773,18 @@ PrintTests.test("Printable_Double") {
     }
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Double can represent all integers -(2^53)...(2^53)
+  let maxDecimalForm = Double((1 as Int64) << 53)
+  expectDescription("9007199254740992.0", maxDecimalForm)
+  expectDescription("-9007199254740992.0", -maxDecimalForm)
+  // Outside of that range, we use exponential form:
+  expectDescription("9.007199254740994e+15", maxDecimalForm.nextUp)
+  expectDescription("-9.007199254740994e+15", -maxDecimalForm.nextUp)
+
   expectDescription("1.00000000000001", asFloat64(1.00000000000001))
   expectDescription("1.25e+17", asFloat64(125000000000000000.0))
   expectDescription("1.25e+16", asFloat64(12500000000000000.0))
-  expectDescription("1.25e+15", asFloat64(1250000000000000.0))
+  expectDescription("1250000000000000.0", asFloat64(1250000000000000.0))
   expectDescription("125000000000000.0", asFloat64(125000000000000.0))
   expectDescription("12500000000000.0", asFloat64(12500000000000.0))
   expectDescription("1250000000000.0", asFloat64(1250000000000.0))
@@ -769,7 +861,7 @@ PrintTests.test("Printable_Float80") {
   // We know how every power of 10 should print
   for power in -4950 ... 4932 {
     let s: String
-    if power < -4 || power > 17 { // Exponential form
+    if power < -4 || power > 19 { // Exponential form
       s = exponentialPowerOfTen(power)
     } else if power < 0 { // Fractional decimal form
       s = "0." + String(repeating: "0", count: -power - 1) + "1"
@@ -794,11 +886,19 @@ PrintTests.test("Printable_Float80") {
     }
   }
 
-  // Check that the formatter chooses exponential
-  // format when it should:
+  // Float80 can represent all integers -(2^64)...(2^64):
+  let maxDecimalForm = Float80(UInt64.max) + 1.0
+  expectDescription("18446744073709551616.0", maxDecimalForm)
+  expectDescription("-18446744073709551616.0", -maxDecimalForm)
+  // Outside of that range, use exponential form
+  expectDescription("1.8446744073709551618e+19", maxDecimalForm.nextUp)
+  expectDescription("-1.8446744073709551618e+19", -maxDecimalForm.nextUp)
+
   expectDescription("1.00000000000000001", asFloat80(1.00000000000000001))
-  expectDescription("1.25e+19", asFloat80(12500000000000000000.0))
-  expectDescription("1.25e+18", asFloat80(1250000000000000000.0))
+  expectDescription("1.25e+21", asFloat80(1250000000000000000000.0))
+  expectDescription("1.25e+20", asFloat80(125000000000000000000.0))
+  expectDescription("12500000000000000000.0", asFloat80(12500000000000000000.0))
+  expectDescription("1250000000000000000.0", asFloat80(1250000000000000000.0))
   expectDescription("125000000000000000.0", asFloat80(125000000000000000.0))
   expectDescription("12500000000000000.0", asFloat80(12500000000000000.0))
   expectDescription("1250000000000000.0", asFloat80(1250000000000000.0))

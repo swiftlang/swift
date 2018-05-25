@@ -114,7 +114,6 @@ public struct UnfoldSequence<Element, State> : Sequence, IteratorProtocol {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_state: State, _next: @escaping (inout State) -> Element?) {
     self._state = _state
     self._next = _next

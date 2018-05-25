@@ -144,8 +144,8 @@ namespace {
   };
 } // end anonymous namespace
 
-SubstitutionList SILGenFunction::getForwardingSubstitutions() {
-  return F.getForwardingSubstitutions();
+SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
+  return F.getForwardingSubstitutionMap();
 }
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
@@ -394,7 +394,7 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.getLoweredType(decl->getType()).getASTType(),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
@@ -861,7 +861,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Reabstract to the substituted type, if needed.
         CanType substEltTy =
             value.getType()
-                .getSwiftRValueType()
+                .getASTType()
                 ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();
@@ -1287,51 +1287,6 @@ CleanupHandle SILGenFunction::enterDeallocStackCleanup(SILValue temp) {
 CleanupHandle SILGenFunction::enterDestroyCleanup(SILValue valueOrAddr) {
   Cleanups.pushCleanup<ReleaseValueCleanup>(valueOrAddr);
   return Cleanups.getTopCleanup();
-}
-
-PostponedCleanup::PostponedCleanup(SILGenFunction &sgf, bool recursive)
-    : depth(sgf.Cleanups.innermostScope), SGF(sgf),
-      previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
-      active(true), applyRecursively(recursive) {
-  SGF.CurrentlyActivePostponedCleanup = this;
-}
-
-PostponedCleanup::PostponedCleanup(SILGenFunction &sgf)
-    : depth(sgf.Cleanups.innermostScope), SGF(sgf),
-      previouslyActiveCleanup(sgf.CurrentlyActivePostponedCleanup),
-      active(true),
-      applyRecursively(previouslyActiveCleanup
-                           ? previouslyActiveCleanup->applyRecursively
-                           : false) {
-  SGF.CurrentlyActivePostponedCleanup = this;
-}
-
-PostponedCleanup::~PostponedCleanup() {
-  if (active) {
-    end();
-  }
-}
-
-void PostponedCleanup::end() {
-  if (previouslyActiveCleanup && applyRecursively &&
-      previouslyActiveCleanup->applyRecursively) {
-    previouslyActiveCleanup->deferredCleanups.append(deferredCleanups.begin(),
-                                                     deferredCleanups.end());
-  }
-
-  SGF.CurrentlyActivePostponedCleanup = previouslyActiveCleanup;
-  active = false;
-}
-
-void PostponedCleanup::postponeCleanup(CleanupHandle cleanup,
-                                       SILValue forValue) {
-  deferredCleanups.push_back(std::make_pair(cleanup, forValue));
-}
-
-void SILGenFunction::enterPostponedCleanup(SILValue forValue) {
-  auto handle = enterDestroyCleanup(forValue);
-  if (CurrentlyActivePostponedCleanup)
-    CurrentlyActivePostponedCleanup->postponeCleanup(handle, forValue);
 }
 
 namespace {

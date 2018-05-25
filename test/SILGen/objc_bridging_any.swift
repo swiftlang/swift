@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -464,7 +464,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:       [[THUNK_FN:%.*]] = function_ref @$SyXlIyBy_ypIegn_TR
   // CHECK-NEXT:  [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[BLOCK_COPY]])
-  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [[THUNK]]
+  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[THUNK]]
   // CHECK:       [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC017methodTakingBlockH3AnyyyyypXEF
@@ -543,7 +543,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[THUNK_FN:%.*]] = function_ref @$SyXlIyBa_ypIegr_TR
   // CHECK-NEXT:  [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[BLOCK_COPY]])
-  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [[THUNK]]
+  // CHECK-NEXT:  [[THUNK_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[THUNK]]
   // CHECK-NEXT:  [[BORROWED_ANY_COPY:%.*]] = begin_borrow [[ANY_COPY]]
   // CHECK-NEXT:  // function_ref
   // CHECK-NEXT:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyyypyXEF
@@ -697,5 +697,6 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
 // CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
-// CHECK-NEXT: method #Hashable._hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP5_hash4intoys7_HasherVz_tFTW
+// CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP4hash4intoys6HasherVz_tFTW
+// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP13_rawHashValue4seedSis6UInt64V_AHt_tFTW
 // CHECK-NEXT: }

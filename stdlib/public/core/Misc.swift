@@ -55,7 +55,6 @@ public func _autorelease(_ x: AnyObject) {
 /// This function is primarily useful to call various runtime functions
 /// written in C++.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _withUninitializedString<R>(
   _ body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {

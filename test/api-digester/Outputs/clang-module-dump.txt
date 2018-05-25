@@ -1,0 +1,97 @@
+{
+  "kind": "Root",
+  "name": "TopLevel",
+  "printedName": "TopLevel",
+  "children": [
+    {
+      "kind": "TypeDecl",
+      "name": "ClangInterface",
+      "printedName": "ClangInterface",
+      "declKind": "Class",
+      "usr": "c:objc(cs)ClangInterface",
+      "location": "",
+      "moduleName": "Foo",
+      "superclassUsr": "c:objc(cs)NSObject",
+      "conformingProtocols": [
+        "ObjcProt",
+        "NSObjectProtocol"
+      ],
+      "children": [
+        {
+          "kind": "Function",
+          "name": "someFunction",
+          "printedName": "someFunction()",
+          "declKind": "Func",
+          "usr": "c:objc(cs)ClangInterface(im)someFunction",
+          "location": "",
+          "moduleName": "Foo",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "Void",
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "Constructor",
+          "name": "init",
+          "printedName": "init()",
+          "declKind": "Constructor",
+          "usr": "c:objc(cs)NSObject(im)init",
+          "location": "",
+          "moduleName": "Foo",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "ClangInterface",
+              "printedName": "ClangInterface",
+              "usr": "c:objc(cs)ClangInterface"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "TypeDecl",
+      "name": "ObjcProt",
+      "printedName": "ObjcProt",
+      "declKind": "Protocol",
+      "usr": "c:objc(pl)ObjcProt",
+      "location": "",
+      "moduleName": "Foo",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "someFunctionFromProt",
+          "printedName": "someFunctionFromProt()",
+          "declKind": "Func",
+          "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
+          "location": "",
+          "moduleName": "Foo",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "Void",
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

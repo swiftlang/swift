@@ -446,13 +446,10 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   // Translate the context.
   auto contextOpt = translateContext(effectiveContext);
   if (!contextOpt) {
-    // If it is a declaration with a swift_name attribute, we might be
-    // able to resolve this later.
+    // We might be able to resolve this later.
     if (auto decl = newEntry.dyn_cast<clang::NamedDecl *>()) {
-      if (decl->hasAttr<clang::SwiftNameAttr>()) {
-        UnresolvedEntries.push_back(
-          std::make_tuple(name, newEntry, effectiveContext));
-      }
+      UnresolvedEntries.push_back(
+        std::make_tuple(name, newEntry, effectiveContext));
     }
 
     return;
@@ -1636,37 +1633,30 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
-  if (auto importedName = nameImporter.importName(named, currentVersion)) {
-    SmallPtrSet<DeclName, 8> distinctNames;
-    distinctNames.insert(importedName.getDeclName());
-    table.addEntry(importedName.getDeclName(), named,
-                   importedName.getEffectiveContext());
+  auto failed = nameImporter.forEachDistinctImportName(
+      named, currentVersion,
+      [&](ImportedName importedName, ImportNameVersion version) {
+        table.addEntry(importedName.getDeclName(), named,
+                       importedName.getEffectiveContext());
 
-    // Also add the subscript entry, if needed.
-    if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(nameImporter.getContext(),
-                              DeclBaseName::createSubscript(),
-                              ArrayRef<Identifier>()),
-                     named, importedName.getEffectiveContext());
+        // Also add the subscript entry, if needed.
+        if (version == currentVersion && importedName.isSubscriptAccessor()) {
+          table.addEntry(DeclName(nameImporter.getContext(),
+                                  DeclBaseName::createSubscript(),
+                                  {Identifier()}),
+                         named, importedName.getEffectiveContext());
+        }
 
-    currentVersion.forEachOtherImportNameVersion(
-        [&](ImportNameVersion alternateVersion) {
-      auto alternateName = nameImporter.importName(named, alternateVersion);
-      if (!alternateName)
+        return true;
+      });
+  if (failed) {
+    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+      // If the category is invalid, don't add it.
+      if (category->isInvalidDecl())
         return;
-      // FIXME: What if the DeclNames are the same but the contexts are
-      // different?
-      if (distinctNames.insert(alternateName.getDeclName()).second) {
-        table.addEntry(alternateName.getDeclName(), named,
-                       alternateName.getEffectiveContext());
-      }
-    });
-  } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
-    // If the category is invalid, don't add it.
-    if (category->isInvalidDecl())
-      return;
 
-    table.addCategory(category);
+      table.addCategory(category);
+    }
   }
 
   // Walk the members of any context that can have nested members.
@@ -1787,9 +1777,11 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
       auto decl = entry.get<clang::NamedDecl *>();
       auto swiftName = decl->getAttr<clang::SwiftNameAttr>();
 
-      nameImporter.getContext().Diags.diagnose(
-          SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
-          swiftName->getName());
+      if (swiftName) {
+        nameImporter.getContext().Diags.diagnose(
+            SourceLoc(), diag::unresolvable_clang_decl, decl->getNameAsString(),
+            swiftName->getName());
+      }
     }
   }
 }
@@ -1865,4 +1857,3 @@ SwiftNameLookupExtension::createExtensionReader(
   // Return the new reader.
   return std::move(tableReader);
 }
-

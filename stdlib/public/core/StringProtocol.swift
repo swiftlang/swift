@@ -162,7 +162,6 @@ internal protocol _SwiftStringView {
 
 extension _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _ephemeralContent : String { return _persistentContent }
 }
 
@@ -179,7 +178,6 @@ extension StringProtocol {
 
 extension String : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return self
   }

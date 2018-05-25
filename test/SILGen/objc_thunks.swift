@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-silgen -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -58,6 +58,36 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
   // CHECK-NEXT:   // function_ref
   // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC7copyFooSo5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
+  // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK-NEXT:   destroy_value [[THIS_COPY]]
+  // CHECK-NEXT:   return [[RES]]
+  // CHECK-NEXT: }
+
+  // NS_RETURNS_RETAINED by family (-mutableCopy)
+  @objc func mutableCopyFoo() -> Gizmo { return self }
+  // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC14mutableCopyFooSo5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
+  // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC14mutableCopyFooSo5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
+  // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
+  // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
+  // CHECK-NEXT:   destroy_value [[THIS_COPY]]
+  // CHECK-NEXT:   return [[RES]]
+  // CHECK-NEXT: }
+
+  // NS_RETURNS_RETAINED by family (-copy). This is different from Swift's
+  // normal notion of CamelCase, but it's what Clang does, so we should match 
+  // it.
+  @objc func copy8() -> Gizmo { return self }
+  // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6HoozitC5copy8So5GizmoCyFTo : $@convention(objc_method) (Hoozit) -> @owned Gizmo
+  // CHECK: bb0([[THIS:%.*]] : @unowned $Hoozit):
+  // CHECK-NEXT:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
+  // CHECK-NEXT:   [[BORROWED_THIS_COPY:%.*]] = begin_borrow [[THIS_COPY]]
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @$S11objc_thunks6HoozitC5copy8So5GizmoCyF : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK-NEXT:   [[RES:%.*]] = apply [[NATIVE]]([[BORROWED_THIS_COPY]])
   // CHECK-NEXT:   end_borrow [[BORROWED_THIS_COPY]] from [[THIS_COPY]]
   // CHECK-NEXT:   destroy_value [[THIS_COPY]]
@@ -423,12 +453,12 @@ class Wotsit<T> : Gizmo {
     return "Hello, world."
   }
 
-  // Ivar destroyer
-  // CHECK: sil hidden @$S11objc_thunks6WotsitCfETo
-
   // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6WotsitCACyxGSgycfcTo : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
   // CHECK-LABEL: sil hidden [thunk] @$S11objc_thunks6WotsitC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
+
+  // Ivar destroyer
+  // CHECK-LABEL: sil hidden @$S11objc_thunks6WotsitCfETo
 }
 
 // CHECK-NOT: sil hidden [thunk] @_TToF{{.*}}Wotsit{{.*}}

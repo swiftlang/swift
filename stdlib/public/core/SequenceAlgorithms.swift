@@ -488,6 +488,21 @@ extension Sequence {
     }
     return false
   }
+
+  /// Returns a Boolean value indicating whether every element of a sequence
+  /// satisfies a given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
+  }
 }
 
 extension Sequence where Element : Equatable {
@@ -675,10 +690,10 @@ extension Sequence {
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///
-  ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
+  ///     let mapped = numbers.map { Array(repeating: $0, count: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
   ///
-  ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
+  ///     let flatMapped = numbers.flatMap { Array(repeating: $0, count: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to

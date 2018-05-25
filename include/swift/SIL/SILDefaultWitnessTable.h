@@ -174,7 +174,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILDefaultWitnessTable> :
 public ilist_default_traits<::swift::SILDefaultWitnessTable> {
-  typedef ::swift::SILDefaultWitnessTable SILDefaultWitnessTable;
+  using SILDefaultWitnessTable = ::swift::SILDefaultWitnessTable;
 
 public:
   static void deleteNode(SILDefaultWitnessTable *WT) { WT->~SILDefaultWitnessTable(); }

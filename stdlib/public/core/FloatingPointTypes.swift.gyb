@@ -172,19 +172,16 @@ extension ${Self}: BinaryFloatingPoint {
 
   //  Implementation details.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _infinityExponent: UInt {
     @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _exponentBias: UInt {
     @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount) - 1
@@ -192,7 +189,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount - 1)
@@ -325,31 +321,26 @@ extension ${Self}: BinaryFloatingPoint {
     internal var _storage: (UInt64, UInt16, /* pad */ UInt16, UInt16, UInt16)
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var explicitSignificand: UInt64 { return _storage.0 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var signAndExponent: UInt16 { return _storage.1 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var sign: FloatingPointSign {
       return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
       _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
@@ -357,7 +348,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _representation: _Representation {
     return unsafeBitCast(self, to: _Representation.self)
   }
@@ -381,7 +371,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _explicitBitMask: UInt64 {
     @inline(__always) get { return 1 &<< 63 }
   }
@@ -1532,17 +1521,13 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 % end
 
 extension ${Self} : Hashable {
-  /// The number's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to
@@ -1550,13 +1535,29 @@ extension ${Self} : Hashable {
       v = 0
     }
   %if bits == 80:
-    hasher.append(v._representation.signAndExponent)
-    hasher.append(v.significandBitPattern)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
   %else:
-    hasher.append(v.bitPattern)
+    hasher.combine(v.bitPattern)
   %end
   }
 
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    // To satisfy the axiom that equality implies hash equality, we need to
+    // finesse the hash value of -0.0 to match +0.0.
+    let v = isZero ? 0 : self
+  %if bits == 80:
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
+    return hasher._finalize()
+  %elif bits == 64:
+    return Hasher._hash(seed: seed, v.bitPattern)
+  %elif bits == 32:
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %end
+  }
 }
 
 extension ${Self} {

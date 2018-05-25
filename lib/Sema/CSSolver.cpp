@@ -984,7 +984,7 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  typedef llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>> DomainMap;
+  using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
 
   // A collection of original domains of all of the expressions,
   // so they can be restored in case of failure.
@@ -1364,7 +1364,7 @@ ConstraintSystem::solve(Expr *&expr,
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
         if (type->is<UnresolvedType>())
-          return createTypeVariable(getConstraintLocator(expr), /*options*/0);
+          return createTypeVariable(getConstraintLocator(expr));
         return type;
       });
     }
@@ -1802,15 +1802,96 @@ static bool shouldSkipDisjunctionChoice(ConstraintSystem &cs,
   return false;
 }
 
+// Attempt to find a disjunction of bind constraints where all options
+// in the disjunction are binding the same type variable.
+//
+// Prefer disjunctions where the bound type variable is also the
+// right-hand side of a conversion constraint, since having a concrete
+// type that we're converting to can make it possible to split the
+// constraint system into multiple ones.
+static Constraint *selectBestBindingDisjunction(
+    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
+
+  // Collect any disjunctions that simply attempt bindings for a
+  // type variable.
+  SmallVector<Constraint *, 8> bindingDisjunctions;
+  for (auto *disjunction : disjunctions) {
+    llvm::Optional<TypeVariableType *> commonTypeVariable;
+    if (llvm::all_of(
+            disjunction->getNestedConstraints(),
+            [&](Constraint *bindingConstraint) {
+              if (bindingConstraint->getKind() != ConstraintKind::Bind)
+                return false;
+
+              auto *tv =
+                  bindingConstraint->getFirstType()->getAs<TypeVariableType>();
+              // Only do this for simple type variable bindings, not for
+              // bindings like: ($T1) -> $T2 bind String -> Int
+              if (!tv)
+                return false;
+
+              if (!commonTypeVariable.hasValue())
+                commonTypeVariable = tv;
+
+              if (commonTypeVariable.getValue() != tv)
+                return false;
+
+              return true;
+            })) {
+      bindingDisjunctions.push_back(disjunction);
+    }
+  }
+
+  for (auto *disjunction : bindingDisjunctions) {
+    auto nested = disjunction->getNestedConstraints();
+    assert(!nested.empty());
+    auto *tv = cs.simplifyType(nested[0]->getFirstType())
+                   ->getRValueType()
+                   ->getAs<TypeVariableType>();
+    assert(tv);
+
+    SmallVector<Constraint *, 8> constraints;
+    cs.getConstraintGraph().gatherConstraints(
+        tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass);
+
+    for (auto *constraint : constraints) {
+      if (constraint->getKind() != ConstraintKind::Conversion)
+        continue;
+
+      auto toType =
+          cs.simplifyType(constraint->getSecondType())->getRValueType();
+      auto *toTV = toType->getAs<TypeVariableType>();
+      if (tv != toTV)
+        continue;
+
+      return disjunction;
+    }
+  }
+
+  // If we had any binding disjunctions, return the first of
+  // those. These ensure that we attempt to bind types earlier than
+  // trying the elements of other disjunctions, which can often mean
+  // we fail faster.
+  if (!bindingDisjunctions.empty())
+    return bindingDisjunctions[0];
+
+  return nullptr;
+}
+
 Constraint *ConstraintSystem::selectDisjunction(
     SmallVectorImpl<Constraint *> &disjunctions) {
   if (disjunctions.empty())
     return nullptr;
 
+  auto *disjunction =
+      selectBestBindingDisjunction(*this, disjunctions);
+  if (disjunction)
+    return disjunction;
+
   // Pick the smallest disjunction.
   // FIXME: This heuristic isn't great, but it helped somewhat for
   // overload sets.
-  auto disjunction = disjunctions[0];
+  disjunction = disjunctions[0];
   auto bestSize = disjunction->countActiveNestedConstraints();
   if (bestSize > 2) {
     for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
@@ -1980,6 +2061,18 @@ bool ConstraintSystem::solveSimplified(
       auto locator = disjunction->getLocator();
       assert(locator && "remembered disjunction doesn't have a locator?");
       DisjunctionChoices.push_back({locator, index});
+
+      // Implicit unwraps of optionals are worse solutions than those
+      // not involving implicit unwraps.
+      if (!locator->getPath().empty()) {
+        auto kind = locator->getPath().back().getKind();
+        if (kind == ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+            kind == ConstraintLocator::DynamicLookupResult) {
+          assert(index == 0 || index == 1);
+          if (index == 1)
+            increaseScore(SK_ForceUnchecked);
+        }
+      }
     }
 
     if (auto score = currentChoice.solve(solutions, allowFreeTypeVariables)) {

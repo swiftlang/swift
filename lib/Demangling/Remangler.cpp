@@ -152,6 +152,9 @@ class Remangler {
   // nested generics. This factory owns them.
   NodeFactory Factory;
 
+  // A callback for resolving symbolic references.
+  SymbolicResolver Resolver;
+
   StringRef getBufferStr() const { return Buffer.getStringRef(); }
 
   void resetBuffer(size_t toPos) { Buffer.resetSize(toPos); }
@@ -284,7 +287,8 @@ class Remangler {
 #include "swift/Demangling/DemangleNodes.def"
 
 public:
-  Remangler(DemanglerPrinter &Buffer) : Buffer(Buffer) {}
+  Remangler(DemanglerPrinter &Buffer,
+            SymbolicResolver Resolver) : Buffer(Buffer), Resolver(Resolver) {}
 
   void mangle(Node *node) {
     switch (node->getKind()) {
@@ -455,6 +459,7 @@ void Remangler::mangleAnyNominalType(Node *node) {
     case Node::Kind::Enum: return mangleAnyGenericType(node, "O");
     case Node::Kind::Class: return mangleAnyGenericType(node, "C");
     case Node::Kind::OtherNominalType: return mangleAnyGenericType(node, "XY");
+    case Node::Kind::TypeAlias: return mangleAnyGenericType(node, "a");
     default:
       unreachable("bad nominal type kind");
   }
@@ -473,7 +478,8 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
-    case Node::Kind::BoundGenericClass: {
+    case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
@@ -585,13 +591,8 @@ void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
   mangleAnyNominalType(node);
 }
 
-template <size_t N>
-static bool stripPrefix(StringRef &string, const char (&data)[N]) {
-  constexpr size_t prefixLength = N - 1;
-  if (!string.startswith(StringRef(data, prefixLength)))
-    return false;
-  string = string.drop_front(prefixLength);
-  return true;
+void Remangler::mangleBoundGenericTypeAlias(Node *node) {
+  mangleAnyNominalType(node);
 }
 
 void Remangler::mangleBuiltinTypeName(Node *node) {
@@ -612,17 +613,17 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     Buffer << 't';
   } else if (text == BUILTIN_TYPE_NAME_WORD) {
     Buffer << 'w';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_INT)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_INT)) {
     Buffer << 'i' << text << '_';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_FLOAT)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_FLOAT)) {
     Buffer << 'f' << text << '_';
-  } else if (stripPrefix(text, BUILTIN_TYPE_NAME_VEC)) {
+  } else if (text.consume_front(BUILTIN_TYPE_NAME_VEC)) {
     auto split = text.split('x');
     if (split.second == "RawPointer") {
       Buffer << 'p';
-    } else if (stripPrefix(split.second, "Float")) {
+    } else if (split.second.consume_front("Float")) {
       Buffer << 'f' << split.second << '_';
-    } else if (stripPrefix(split.second, "Int")) {
+    } else if (split.second.consume_front("Int")) {
       Buffer << 'i' << split.second << '_';
     } else {
       unreachable("unexpected builtin vector type");
@@ -1018,14 +1019,34 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
       Buffer << 'x';
       return;
     default:
-      if (kindValue & unsigned(FunctionSigSpecializationParamKind::Dead)) {
+      if (kindValue &
+          unsigned(
+              FunctionSigSpecializationParamKind::ExistentialToGeneric)) {
+        Buffer << 'e';
+        if (kindValue & unsigned(FunctionSigSpecializationParamKind::Dead))
+          Buffer << 'D';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
+          Buffer << 'G';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+          Buffer << 'O';
+      } else if (kindValue &
+                 unsigned(FunctionSigSpecializationParamKind::Dead)) {
         Buffer << 'd';
         if (kindValue &
             unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
           Buffer << 'G';
+        if (kindValue &
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+          Buffer << 'O';
       } else if (kindValue &
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
         Buffer << 'g';
+      } else if (kindValue &
+                 unsigned(
+                     FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+        Buffer << 'o';
       }
       if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
         Buffer << 'X';
@@ -2003,18 +2024,25 @@ void Remangler::mangleUnresolvedSymbolicReference(Node *node) {
 }
 
 void Remangler::mangleSymbolicReference(Node *node) {
-  unreachable("should not try to mangle a symbolic reference; "
-              "resolve it to a non-symbolic demangling tree instead");
+  return mangle(Resolver((const void *)node->getIndex()));
 }
 
 } // anonymous namespace
 
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNode(const NodePointer &node) {
+  return mangleNode(node, [](const void *) -> NodePointer {
+    unreachable("should not try to mangle a symbolic reference; "
+                "resolve it to a non-symbolic demangling tree instead");
+  });
+}
+
+std::string
+Demangle::mangleNode(const NodePointer &node, SymbolicResolver resolver) {
   if (!node) return "";
 
   DemanglerPrinter printer;
-  Remangler(printer).mangle(node);
+  Remangler(printer, resolver).mangle(node);
 
   return std::move(printer).str();
 }
@@ -2025,6 +2053,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
       return true;
 
     case Node::Kind::Structure:
@@ -2060,7 +2089,8 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
-    case Node::Kind::BoundGenericOtherNominalType: {
+    case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);

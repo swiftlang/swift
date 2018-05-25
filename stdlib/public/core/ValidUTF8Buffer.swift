@@ -25,13 +25,11 @@ public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   internal var _biasedBits: Storage
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_biasedBits: Storage) {
     self._biasedBits = _biasedBits
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_containing e: Element) {
     _sanityCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
@@ -72,7 +70,6 @@ extension _ValidUTF8Buffer : Collection {
     internal var _biasedBits: Storage
     
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal init(_biasedBits: Storage) { self._biasedBits = _biasedBits }
     
     @inlinable // FIXME(sil-serialize-all)
@@ -186,7 +183,6 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func _isValid(_ i: Index) -> Bool {
     return i == endIndex || indices.contains(i)
   }
@@ -220,5 +216,13 @@ extension _ValidUTF8Buffer {
   @inlinable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : _ValidUTF8Buffer {
     return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
+  }
+
+  @inlinable
+  internal var _bytes: (bytes: UInt64, count: Int) {
+    let count = self.count
+    let mask: UInt64 = 1 &<< (UInt64(truncatingIfNeeded: count) &<< 3) &- 1
+    let unbiased = UInt64(truncatingIfNeeded: _biasedBits) &- 0x0101010101010101
+    return (unbiased & mask, count)
   }
 }

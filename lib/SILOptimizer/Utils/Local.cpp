@@ -169,7 +169,7 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 }
 
 namespace {
-  using CallbackTy = std::function<void(SILInstruction *)>;
+  using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
 void swift::
@@ -320,13 +320,6 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   if (!isa<TryApplyInst>(OldApply))
     cast<SingleValueInstruction>(OldApply)->replaceAllUsesWith(New);
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
-}
-
-bool swift::hasArchetypes(SubstitutionList Subs) {
-  // Check whether any of the substitutions are dependent.
-  return llvm::any_of(Subs, [](const Substitution &S) {
-    return S.getReplacement()->hasArchetype();
-  });
 }
 
 bool swift::mayBindDynamicSelf(SILFunction *F) {
@@ -552,7 +545,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getSwiftRValueType())
+    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getASTType())
       ->getCanonicalType();
     auto LoweredOptionalSrcType = SILType::getPrimitiveObjectType(
       OptionalSrcCanTy);
@@ -854,7 +847,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionList(), Arguments,
+                             SubstitutionMap(), Arguments,
                              false);
 }
 

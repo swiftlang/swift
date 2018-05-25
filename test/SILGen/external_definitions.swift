@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 

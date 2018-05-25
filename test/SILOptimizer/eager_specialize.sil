@@ -638,7 +638,7 @@ bb0(%0 : $*T, %1 : $*S):
 // CHECK:   %15 = unchecked_addr_cast %1 : $*S to $*S
 // function_ref specialized checkExplicitPartialSpecialization<A, B> (A, B) -> ()
 // CHECK:   %16 = function_ref @$S16eager_specialize34checkExplicitPartialSpecializationyyx_q_tr0_lFs5Int64Vq_ADRszr0_lIetyi_Tp5 : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
-// CHECK:   %17 = apply %16<S>(%14, %15) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
+// CHECK:   %17 = apply %16<Int64, S>(%14, %15) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 == Int64> (Int64, @in τ_0_1) -> ()
 // CHECK:   %18 = tuple ()
 // CHECK:   %19 = unchecked_trivial_bit_cast %18 : $() to $()
 // CHECK:   br bb2

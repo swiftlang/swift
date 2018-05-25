@@ -21,8 +21,8 @@ public struct ObjectIdentifier {
 
   /// Creates an instance that uniquely identifies the given class instance.
   ///
-  /// The following example creates an example class `A` and compares instances
-  /// of the class using their object identifiers and the identical-to
+  /// The following example creates an example class `IntegerRef` and compares
+  /// instances of the class using their object identifiers and the identical-to
   /// operator (`===`):
   ///
   ///     class IntegerRef {
@@ -84,15 +84,14 @@ extension ObjectIdentifier: Comparable {
 }
 
 extension ObjectIdentifier: Hashable {
-  // FIXME: Better hashing algorithm
-  /// The identifier's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return Int(Builtin.ptrtoint_Word(_value))
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(Builtin.ptrtoint_Word(_value)))
   }
 }
 

@@ -372,14 +372,14 @@ void SILDeclRef::dump() const {
 static void printGenericSpecializationInfo(
     raw_ostream &OS, StringRef Kind, StringRef Name,
     const GenericSpecializationInformation *SpecializationInfo,
-    SubstitutionList Subs = SubstitutionList()) {
+    SubstitutionMap Subs = { }) {
   if (!SpecializationInfo)
     return;
 
-  auto PrintSubstitutions = [&](SubstitutionList Subs) {
+  auto PrintSubstitutions = [&](SubstitutionMap Subs) {
     OS << '<';
-    interleave(Subs,
-               [&](const Substitution &s) { OS << s.getReplacement(); },
+    interleave(Subs.getReplacementTypes(),
+               [&](Type type) { OS << type; },
                [&] { OS << ", "; });
     OS << '>';
   };
@@ -436,7 +436,7 @@ void SILType::print(raw_ostream &OS) const {
   
   // Print other types as their Swift representation.
   PrintOptions SubPrinter = PrintOptions::printSIL();
-  getSwiftRValueType().print(OS, SubPrinter);
+  getASTType().print(OS, SubPrinter);
 }
 
 void SILType::dump() const {
@@ -496,7 +496,7 @@ class SILPrinter : public SILInstructionVisitor<SILPrinter> {
   
   SILPrinter &operator<<(SILType t) {
     printSILTypeColorAndSigil(PrintState.OS, t);
-    t.getSwiftRValueType().print(PrintState.OS, PrintState.ASTOptions);
+    t.getASTType().print(PrintState.OS, PrintState.ASTOptions);
     return *this;
   }
   
@@ -638,7 +638,7 @@ public:
           if (AI.getSpecializationInfo() && AI.getCalleeFunction())
             printGenericSpecializationInfo(
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
-                AI.getSpecializationInfo(), AI.getSubstitutions());
+                AI.getSpecializationInfo(), AI.getSubstitutionMap());
       }
       print(&I);
     }
@@ -1065,21 +1065,30 @@ public:
     printDebugVar(ABI->getVarInfo());
   }
 
-  void printSubstitutions(SubstitutionList Subs) {
-    if (Subs.empty())
-      return;
-    
+  void printSubstitutions(SubstitutionMap Subs,
+                          GenericSignature *Sig = nullptr) {
+    if (!Subs.hasAnySubstitutableParams()) return;
+
+    // FIXME: This is a hack to cope with cases where the substitution map uses
+    // a generic signature that's close-to-but-not-the-same-as expected.
+    auto genericSig = Sig ? Sig : Subs.getGenericSignature();
+
     *this << '<';
-    interleave(Subs,
-               [&](const Substitution &s) { *this << s.getReplacement(); },
-               [&] { *this << ", "; });
+    bool first = true;
+    for (auto gp : genericSig->getGenericParams()) {
+      if (first) first = false;
+      else *this << ", ";
+
+      *this << Type(gp).subst(Subs);
+    }
     *this << '>';
   }
 
   template <class Inst>
   void visitApplyInstBase(Inst *AI) {
     *this << Ctx.getID(AI->getCallee());
-    printSubstitutions(AI->getSubstitutions());
+    printSubstitutions(AI->getSubstitutionMap(),
+                       AI->getOrigCalleeType()->getGenericSignature());
     *this << '(';
     interleave(AI->getArguments(),
                [&](const SILValue &arg) { *this << Ctx.getID(arg); },
@@ -1436,6 +1445,7 @@ public:
   }
   void visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *CI) {
     *this << (CI->isLifetimeGuaranteed() ? "" : "[not_guaranteed] ")
+          << (CI->isEscapedByUser() ? "[escaped] " : "")
           << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
   void visitThinFunctionToPointerInst(ThinFunctionToPointerInst *CI) {
@@ -1780,6 +1790,10 @@ public:
   void visitCopyBlockInst(CopyBlockInst *RI) {
     *this << getIDAndType(RI->getOperand());
   }
+  void visitCopyBlockWithoutEscapingInst(CopyBlockWithoutEscapingInst *RI) {
+    *this << getIDAndType(RI->getBlock()) << " withoutEscaping "
+          << getIDAndType(RI->getClosure());
+  }
   void visitRefCountingInst(RefCountingInst *I) {
     if (I->isNonAtomic())
       *this << "[nonatomic] ";
@@ -1797,6 +1811,8 @@ public:
     *this << getIDAndType(CUI->getOperand());
   }
   void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+    if (CUI->getVerificationType())
+      *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());
   }
   void visitDeallocStackInst(DeallocStackInst *DI) {
@@ -1835,6 +1851,7 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitEndAccessInst(EndAccessInst *EAI) {
@@ -1845,12 +1862,14 @@ public:
     *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
+          << (BAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(BAI->getSource()) << ", " 
           << getIDAndType(BAI->getBuffer());
   }
   void visitEndUnpairedAccessInst(EndUnpairedAccessInst *EAI) {
-    *this << (EAI->isAborting() ? "[abort] " : "")
-          << '[' << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+    *this << (EAI->isAborting() ? "[abort] " : "") << '['
+          << getSILAccessEnforcementName(EAI->getEnforcement()) << "] "
+          << (EAI->isFromBuiltin() ? "[builtin] " : "")
           << getIDAndType(EAI->getOperand());
   }
 
@@ -2215,6 +2234,14 @@ void SILBasicBlock::dump() const {
 /// Pretty-print the SILBasicBlock to the designated stream.
 void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
+
+  // Print the debug scope (and compute if we didn't do it already).
+  auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
+  for (auto &I : *this) {
+    SILPrinter P(Ctx);
+    P.printDebugScope(I.getDebugScope(), SM);
+  }
+
   SILPrinter(Ctx).print(this);
 }
 
@@ -2589,17 +2616,17 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
 
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
-                     const SILModule::CoverageMapListType &CoverageMaps) {
+                     const SILModule::CoverageMapCollectionType &CoverageMaps) {
   if (!Ctx.sortSIL()) {
-    for (const SILCoverageMap &M : CoverageMaps)
-      M.print(Ctx);
+    for (const auto &M : CoverageMaps)
+      M.second->print(Ctx);
     return;
   }
 
   std::vector<const SILCoverageMap *> Maps;
   Maps.reserve(CoverageMaps.size());
-  for (const SILCoverageMap &M : CoverageMaps)
-    Maps.push_back(&M);
+  for (const auto &M : CoverageMaps)
+    Maps.push_back(M.second);
   std::sort(Maps.begin(), Maps.end(),
             [](const SILCoverageMap *LHS, const SILCoverageMap *RHS) -> bool {
               return LHS->getName().compare(RHS->getName()) == -1;
@@ -2681,7 +2708,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
-           isa<ExtensionDecl>(D)) &&
+           isa<ExtensionDecl>(D) || isa<ImportDecl>(D)) &&
           !D->isImplicit()) {
         if (isa<AccessorDecl>(D))
           continue;
@@ -2696,7 +2723,7 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
-  printSILCoverageMaps(PrintCtx, getCoverageMapList());
+  printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
   OS << "\n\n";
@@ -2923,9 +2950,9 @@ void SILDefaultWitnessTable::dump() const {
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_coverage_map " << QuotedString(getFile()) << " " << getName()
-     << " " << QuotedString(getPGOFuncName()) << " " << getHash() << " {\t// "
-     << demangleSymbol(getName()) << "\n";
+  OS << "sil_coverage_map " << QuotedString(getFile()) << " "
+     << QuotedString(getName()) << " " << QuotedString(getPGOFuncName()) << " "
+     << getHash() << " {\t// " << demangleSymbol(getName()) << "\n";
   if (PrintCtx.sortSIL())
     std::sort(MappedRegions.begin(), MappedRegions.end(),
               [](const MappedRegion &LHS, const MappedRegion &RHS) {
@@ -2990,9 +3017,12 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
     SILFunction *F = getFunction();
     assert(F);
     auto GenericEnv = F->getGenericEnvironment();
-    assert(GenericEnv);
     interleave(getRequirements(),
                [&](Requirement req) {
+                 if (!GenericEnv) {
+                   req.print(OS, SubPrinter);
+                   return;
+                 }
                  // Use GenericEnvironment to produce user-friendly
                  // names instead of something like t_0_0.
                  auto FirstTy = GenericEnv->getSugaredType(req.getFirstType());

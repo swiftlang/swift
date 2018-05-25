@@ -36,12 +36,14 @@ using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
 //===----------------------------------------------------------------------===//
 
 bool swift::isRetainInstruction(SILInstruction *I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
+  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
+         isa<UnownedRetainInst>(I);
 }
 
 
 bool swift::isReleaseInstruction(SILInstruction *I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+         isa<UnownedReleaseInst>(I);
 }
 
 //===----------------------------------------------------------------------===//

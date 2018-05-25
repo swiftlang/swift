@@ -21,7 +21,6 @@ extension Unicode.UTF16 : Unicode.Encoding {
   public typealias EncodedScalar = _UIntBuffer<UInt32, UInt16>
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _replacementCodeUnit: CodeUnit {
     @inline(__always) get { return 0xfffd }
   }
@@ -42,7 +41,6 @@ extension Unicode.UTF16 : Unicode.Encoding {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @inline(__always)
   internal static func _decodeSurrogates(
     _ lead: CodeUnit,

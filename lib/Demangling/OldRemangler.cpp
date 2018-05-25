@@ -641,6 +641,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+      Out << 'o';
     if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
@@ -1868,6 +1871,11 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
 }

@@ -219,7 +219,9 @@ struct X6<T> {
 
 extension X6 {
   var k: Int { return 0 } // expected-note{{previously declared here}}
-  func k() // expected-error{{invalid redeclaration of 'k()'}}
+  func k()
+  // expected-error@-1{{invalid redeclaration of 'k()'}}
+  // expected-error@-2{{expected '{' in body of function declaration}}
 }
 
 // Subscripting

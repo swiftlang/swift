@@ -55,7 +55,7 @@ extension String {
   /// `String` type's `init(_:)` initializer.
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
-  ///     if let i = favemoji.utf16.index(where: { $0 >= 128 }) {
+  ///     if let i = favemoji.utf16.firstIndex(where: { $0 >= 128 }) {
   ///         let asciiPrefix = String(favemoji.utf16[..<i])
   ///         print(asciiPrefix)
   ///     }
@@ -125,7 +125,6 @@ extension String {
     @_fixed_layout // FIXME(sil-serialize-all)
     public struct Indices {
       @inlinable // FIXME(sil-serialize-all)
-      @usableFromInline // FIXME(sil-serialize-all)
       internal init(
         _elements: String.UTF16View, _startIndex: Index, _endIndex: Index
       ) {
@@ -189,7 +188,6 @@ extension String {
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal func _internalIndex(at i: Int) -> Int {
       return _guts.startIndex + i
     }
@@ -256,20 +254,17 @@ extension String {
 #endif
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts) {
       self.init(_guts, offset: 0, length: _guts.count)
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
       self._guts = _guts
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var description: String {
       return String(_guts._extractSlice(_encodedOffsetRange))
     }
@@ -307,7 +302,7 @@ extension String {
   /// another string's `utf16` view.
   ///
   ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf16.index(of: 32) {
+  ///     if let i = picnicGuest.utf16.firstIndex(of: 32) {
   ///         let adjective = String(picnicGuest.utf16[..<i])
   ///         print(adjective)
   ///     }
@@ -351,20 +346,16 @@ extension String {
 
 extension String.UTF16View : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _ephemeralContent : String { return _persistentContent }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String { return String(self._guts) }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _wholeString : String {
     return String(_guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
     return _offset..<_offset+_length
   }
@@ -387,7 +378,7 @@ extension String.UTF16View.Index {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let stringIndex = cafe.index(of: "é")!
+  ///     let stringIndex = cafe.firstIndex(of: "é")!
   ///     let utf16Index = String.Index(stringIndex, within: cafe.utf16)!
   ///
   ///     print(cafe.utf16[...utf16Index])
@@ -415,7 +406,7 @@ extension String.UTF16View.Index {
   /// position in the string's `unicodeScalars` view.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let i = cafe.utf16.index(of: 32)!
+  ///     let i = cafe.utf16.firstIndex(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
   ///     print(cafe.unicodeScalars[..<j])
   ///     // Prints "Café"
@@ -459,7 +450,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   public typealias SubSequence = String.UTF16View.Indices
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(
     _elements: String.UTF16View,
     startIndex: Index,

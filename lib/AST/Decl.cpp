@@ -252,6 +252,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(TypeAlias, "type alias");
   ENTRY(GenericTypeParam, "generic parameter");
   ENTRY(AssociatedType, "associated type");
+  ENTRY(Type, "type");
   ENTRY(Enum, "enum");
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
@@ -259,6 +260,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
+  ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(Constructor, "initializer");
   ENTRY(Destructor, "deinitializer");
@@ -278,6 +280,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumElement, "enum element");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
+  ENTRY(Requirement, "requirement");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -294,6 +297,17 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
     return OS << "'class'";
   }
   llvm_unreachable("bad StaticSpellingKind");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
+                                     ReferenceOwnership RO) {
+  switch (RO) {
+  case ReferenceOwnership::Strong: return OS << "'strong'";
+  case ReferenceOwnership::Weak: return OS << "'weak'";
+  case ReferenceOwnership::Unowned: return OS << "'unowned'";
+  case ReferenceOwnership::Unmanaged: return OS << "'unowned(unsafe)'";
+  }
+  llvm_unreachable("bad ReferenceOwnership kind");
 }
 
 DeclContext *Decl::getInnermostDeclContext() const {
@@ -1519,7 +1533,7 @@ bool AbstractStorageDecl::isFormallyResilient() const {
   // Private and (unversioned) internal variables always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*respectVersionedAttr=*/true).isPublic())
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return false;
 
   // If we're an instance property of a nominal type, query the type.
@@ -1554,47 +1568,6 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
     return isResilient() && M != getModuleContext();
   }
   llvm_unreachable("bad resilience expansion");
-}
-
-
-bool ValueDecl::isDefinition() const {
-  switch (getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::MissingMember:
-    assert(!isa<ValueDecl>(this));
-    llvm_unreachable("non-value decls shouldn't get here");
-
-  case DeclKind::Func:
-  case DeclKind::Accessor:
-  case DeclKind::Constructor:
-  case DeclKind::Destructor:
-    return cast<AbstractFunctionDecl>(this)->hasBody();
-
-  case DeclKind::Subscript:
-  case DeclKind::Var:
-  case DeclKind::Param:
-  case DeclKind::Enum:
-  case DeclKind::EnumElement:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::TypeAlias:
-  case DeclKind::GenericTypeParam:
-  case DeclKind::AssociatedType:
-  case DeclKind::Protocol:
-  case DeclKind::Module:
-    return true;
-  }
-  llvm_unreachable("bad DeclKind");
 }
 
 bool ValueDecl::isInstanceMember() const {
@@ -1661,12 +1634,14 @@ bool ValueDecl::isInstanceMember() const {
   llvm_unreachable("bad DeclKind");
 }
 
-bool ValueDecl::needsCapture() const {
-  // We don't need to capture anything from non-local contexts.
-  if (!getDeclContext()->isLocalContext())
-    return false;
-  // We don't need to capture types.
-  return !isa<TypeDecl>(this);
+unsigned ValueDecl::getLocalDiscriminator() const {
+  return LocalDiscriminator;
+}
+
+void ValueDecl::setLocalDiscriminator(unsigned index) {
+  assert(getDeclContext()->isLocalContext());
+  assert(LocalDiscriminator == 0 && "LocalDiscriminator is set multiple times");
+  LocalDiscriminator = index;
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
@@ -1872,7 +1847,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   }
 
   if (auto *extension = dyn_cast<ExtensionDecl>(getDeclContext()))
-    if (extension->getGenericSignature())
+    if (extension->isGeneric())
       signature.InExtensionOfGenericType = true;
 
   return signature;
@@ -2084,6 +2059,9 @@ bool ValueDecl::canInferObjCFromRequirement(ValueDecl *requirement) {
 }
 
 SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
+  if (isImplicit())
+    return SourceLoc();
+
   if (auto var = dyn_cast<VarDecl>(this)) {
     // [attrs] var ...
     // The attributes are part of the VarDecl, but the 'var' is part of the PBD.
@@ -2106,12 +2084,16 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 bool ValueDecl::isUsableFromInline() const {
   assert(getFormalAccess() == AccessLevel::Internal);
 
-  if (getAttrs().hasAttribute<UsableFromInlineAttr>())
+  if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+      getAttrs().hasAttribute<InlinableAttr>())
     return true;
 
-  if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    if (accessor->getStorage()->getAttrs().hasAttribute<UsableFromInlineAttr>())
+  if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+    auto *storage = accessor->getStorage();
+    if (storage->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+        storage->getAttrs().hasAttribute<InlinableAttr>())
       return true;
+  }
 
   if (auto *EED = dyn_cast<EnumElementDecl>(this))
     if (EED->getParentEnum()->getAttrs().hasAttribute<UsableFromInlineAttr>())
@@ -2140,8 +2122,9 @@ static AccessLevel getTestableAccess(const ValueDecl *decl) {
 }
 
 AccessLevel ValueDecl::getEffectiveAccess() const {
-  auto effectiveAccess = getFormalAccess(/*useDC=*/nullptr,
-                                         /*respectVersionedAttr=*/true);
+  auto effectiveAccess =
+    getFormalAccess(/*useDC=*/nullptr,
+                    /*treatUsableFromInlineAsPublic=*/true);
 
   // Handle @testable.
   switch (effectiveAccess) {
@@ -2204,28 +2187,31 @@ AccessLevel ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
   return getFormalAccess();
 }
 
-AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
-                                            bool respectVersionedAttr) const {
+AccessScope
+ValueDecl::getFormalAccessScope(const DeclContext *useDC,
+                                bool treatUsableFromInlineAsPublic) const {
   const DeclContext *result = getDeclContext();
-  AccessLevel access = getFormalAccess(useDC, respectVersionedAttr);
+  AccessLevel access = getFormalAccess(useDC, treatUsableFromInlineAsPublic);
 
   while (!result->isModuleScopeContext()) {
     if (result->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(result, true);
 
     if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(result)) {
-      access = std::min(access,
-                        enclosingNominal->getFormalAccess(useDC,
-                                                          respectVersionedAttr));
+      auto enclosingAccess =
+        enclosingNominal->getFormalAccess(useDC,
+                                          treatUsableFromInlineAsPublic);
+      access = std::min(access, enclosingAccess);
 
     } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(result)) {
       // Just check the base type. If it's a constrained extension, Sema should
       // have already enforced access more strictly.
       if (auto extendedTy = enclosingExt->getExtendedType()) {
         if (auto nominal = extendedTy->getAnyNominal()) {
-          access = std::min(access,
-                            nominal->getFormalAccess(useDC,
-                                                     respectVersionedAttr));
+          auto nominalAccess =
+            nominal->getFormalAccess(useDC,
+                                     treatUsableFromInlineAsPublic);
+          access = std::min(access, nominalAccess);
         }
       }
 
@@ -2251,13 +2237,31 @@ AccessScope ValueDecl::getFormalAccessScope(const DeclContext *useDC,
   llvm_unreachable("unknown access level");
 }
 
-void ValueDecl::copyFormalAccessFrom(ValueDecl *source) {
+void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
+                                     bool sourceIsParentContext) {
   if (!hasAccess()) {
-    setAccess(source->getFormalAccess());
+    AccessLevel access = source->getFormalAccess();
+
+    // To make something have the same access as a 'private' parent, it has to
+    // be 'fileprivate' or greater.
+    if (sourceIsParentContext && access == AccessLevel::Private)
+      access = AccessLevel::FilePrivate;
+
+    // Only certain declarations can be 'open'.
+    if (access == AccessLevel::Open && !isPotentiallyOverridable()) {
+      assert(!isa<ClassDecl>(this) &&
+             "copying 'open' onto a class has complications");
+      access = AccessLevel::Public;
+    }
+
+    setAccess(access);
   }
 
   // Inherit the @usableFromInline attribute.
-  if (source->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+  if (source->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
+      !getAttrs().hasAttribute<UsableFromInlineAttr>() &&
+      !getAttrs().hasAttribute<InlinableAttr>() &&
+      DeclAttribute::canAttributeAppearOnDecl(DAK_UsableFromInline, this)) {
     auto &ctx = getASTContext();
     auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
     getAttrs().add(clonedAttr);
@@ -2332,7 +2336,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
   // Private and (unversioned) internal types always have a
   // fixed layout.
   if (!getFormalAccessScope(/*useDC=*/nullptr,
-                            /*respectVersionedAttr=*/true).isPublic())
+                            /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return false;
 
   // Check for an explicit @_fixed_layout or @_frozen attribute.
@@ -2806,7 +2810,7 @@ void ClassDecl::addImplicitDestructor() {
   setHasDestructor();
 
   // Propagate access control and versioned-ness.
-  DD->copyFormalAccessFrom(this);
+  DD->copyFormalAccessFrom(this, /*sourceIsParentContext*/true);
 
   // Wire up generic environment of DD.
   DD->setGenericEnvironment(getGenericEnvironmentOfContext());
@@ -4550,7 +4554,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+    DeclContext *parent, ArrayRef<ParameterList *> paramLists) {
   if (parent->isLocalContext()) {
     setParent(parent);
   }
@@ -5464,21 +5468,6 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                DiagnosticEngine *diags)
         : Decl(decl), Diags(diags) { }
 
-    bool isSelfExpr(Expr *E) {
-      E = E->getSemanticsProvidingExpr();
-
-      if (auto ATSE = dyn_cast<ArchetypeToSuperExpr>(E))
-        E = ATSE->getSubExpr();
-      if (auto IOE = dyn_cast<InOutExpr>(E))
-        E = IOE->getSubExpr();
-      if (auto LE = dyn_cast<LoadExpr>(E))
-        E = LE->getSubExpr();
-      if (auto DRE = dyn_cast<DeclRefExpr>(E))
-        return DRE->getDecl() == Decl->getImplicitSelfDecl();
-
-      return false;
-    }
-
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
       return !isa<NominalTypeDecl>(D);
@@ -5516,7 +5505,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       BodyInitKind myKind;
       if (arg->isSuperExpr())
         myKind = BodyInitKind::Chained;
-      else if (isSelfExpr(arg))
+      else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
         myKind = BodyInitKind::Delegating;
       else {
         // We're constructing something else.

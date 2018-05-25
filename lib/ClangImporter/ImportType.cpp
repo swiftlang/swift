@@ -663,12 +663,11 @@ namespace {
         auto underlyingType = type->desugar();
 
         // Figure out the bridgeability we would normally use for this typedef.
-        auto typedefBridgeability = getTypedefBridgeability(underlyingType);
+        auto typedefBridgeability =
+          getTypedefBridgeability(type->getDecl(), underlyingType);
 
         // Figure out the typedef we should actually use.
-        auto underlyingBridgeability =
-          (Bridging == Bridgeability::Full
-             ? typedefBridgeability : Bridgeability::None);
+        auto underlyingBridgeability = Bridging;
         SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
                                           underlyingBridgeability);
         auto underlyingResult = innerConverter.Visit(underlyingType);
@@ -685,7 +684,8 @@ namespace {
 #ifndef NDEBUG
         switch (underlyingResult.Hint) {
         case ImportHint::Block:
-          // Blocks change in all sorts of ways, due to bridging.
+        case ImportHint::ObjCBridged:
+          // Bridging is fine for Objective-C and blocks.
           break;
         case ImportHint::NSUInteger:
           // NSUInteger might be imported as Int rather than UInt depending
@@ -1088,7 +1088,6 @@ namespace {
 static bool canBridgeTypes(ImportTypeKind importKind) {
   switch (importKind) {
   case ImportTypeKind::Abstract:
-  case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
@@ -1104,6 +1103,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
   case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::Typedef:
     return true;
   }
 
@@ -1286,7 +1286,7 @@ static ImportedType adjustTypeForConcreteImport(
   // In a bridgeable context, or in the direct structure of a typedef,
   // we would prefer to instead use the default Swift convention.
   if (hint == ImportHint::Block) {
-    if (canBridgeTypes(importKind) || importKind == ImportTypeKind::Typedef) {
+    if (canBridgeTypes(importKind)) {
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
       if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
@@ -1330,13 +1330,18 @@ static ImportedType adjustTypeForConcreteImport(
   // bridge, do so.
   if (hint == ImportHint::ObjCBridged &&
       canBridgeTypes(importKind) &&
-      importKind != ImportTypeKind::PropertyWithReferenceSemantics) {
+      importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
+      !(importKind == ImportTypeKind::Typedef &&
+        bridging == Bridgeability::None)) {
     // id and Any can be bridged without Foundation. There would be
     // bootstrapping issues with the ObjectiveC module otherwise.
     if (hint.BridgedType->isAny()
         || impl.tryLoadFoundationModule()
         || impl.ImportForwardDeclarations) {
-      importedType = hint.BridgedType;
+
+      // Set the bridged type if it wasn't done already.
+      if (!importedType->isEqual(hint.BridgedType))
+        importedType = hint.BridgedType;
     }
   }
 
@@ -2015,9 +2020,6 @@ ImportedType ClangImporter::Implementation::importMethodType(
       continue;
     }
 
-    if (kind == SpecialMethodKind::NSDictionarySubscriptGetter)
-      nonNullArgs.empty();
-
     // Import the parameter type into Swift.
 
     // Check nullability of the parameter.
@@ -2487,7 +2489,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
     }
 
     return NameAliasType::get(typealias, parentType, SubstitutionMap(),
-                                   typealias->getUnderlyingTypeLoc().getType());
+                              typealias->getUnderlyingTypeLoc().getType());
   }
 
   return type->getDeclaredInterfaceType();

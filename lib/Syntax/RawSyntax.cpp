@@ -76,6 +76,14 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   Bits.ManualMemory = unsigned(ManualMemory);
   Bits.NumChildren = Layout.size();
 
+  // Compute the text length
+  Bits.TextLength = 0;
+  for (const auto ChildNode : Layout) {
+    if (ChildNode && !ChildNode->isMissing()) {
+      Bits.TextLength += ChildNode->getTextLength();
+    }
+  }
+
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
                           getTrailingObjects<RC<RawSyntax>>());
@@ -189,6 +197,24 @@ RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
   return Ret;
 }
 
+bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
+ if (isToken()) {
+    if (!isMissing()) {
+      for (auto &Leader: getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
+      return true;
+    }
+  } else {
+    for (auto &Child: getLayout()) {
+      if (!Child)
+        continue;
+      if (Child->accumulateLeadingTrivia(Pos))
+        return true;
+    }
+  }
+  return false;
+}
+
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
   if (isMissing())
     return;
@@ -219,6 +245,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
 
 void RawSyntax::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
+  llvm::errs() << '\n';
 }
 
 void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {

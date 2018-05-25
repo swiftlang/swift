@@ -627,7 +627,9 @@ bindParameterSource(SILParameterInfo param, unsigned paramIndex,
     llvm::Value *instanceRef = getParameter(paramIndex);
     SILType instanceType = SILType::getPrimitiveObjectType(paramType);
     llvm::Value *metadata =
-    emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+    emitDynamicTypeOfHeapObject(IGF, instanceRef,
+                                MetatypeRepresentation::Thick,
+                                instanceType);
     IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                           MetadataState::Complete);
     return;
@@ -686,7 +688,9 @@ void BindPolymorphicParameter::emit(Explosion &nativeParam, unsigned paramIndex)
   llvm::Value *instanceRef = nativeParam.getAll()[0];
   SILType instanceType = SILType::getPrimitiveObjectType(paramType);
   llvm::Value *metadata =
-    emitDynamicTypeOfHeapObject(IGF, instanceRef, instanceType);
+    emitDynamicTypeOfHeapObject(IGF, instanceRef,
+                                MetatypeRepresentation::Thick,
+                                instanceType);
   IGF.bindLocalTypeDataFromTypeMetadata(paramType, IsInexact, metadata,
                                         MetadataState::Complete);
 }
@@ -1161,6 +1165,21 @@ public:
     return nullptr;
   }
 };
+
+/// Emit a reference to the witness table for a foreign type.
+llvm::Value *uniqueForeignWitnessTableRef(IRGenFunction &IGF,
+                                          llvm::Value *candidate,
+                                          llvm::Value *typeDescriptorRef,
+                                          llvm::Value *protocolDescriptor) {
+  auto call = IGF.Builder.CreateCall(
+      IGF.IGM.getGetForeignWitnessTableFn(),
+      {candidate, typeDescriptorRef, protocolDescriptor});
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::NoUnwind);
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
+                     llvm::Attribute::ReadNone);
+  return call;
+}
 
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
@@ -1832,10 +1851,6 @@ static llvm::Constant *emitResilientWitnessTable(IRGenModule &IGM,
     SILFunction *Func = entry.getMethodWitness().Witness;
     llvm::Constant *witness;
     if (Func) {
-      // Force the thunk to be emitted in the current translation unit
-      // when in multi-threaded mode.
-      IGM.IRGen.forceLocalEmitOfLazyFunction(Func);
-
       witness = IGM.getAddrOfSILFunction(Func, NotForDefinition);
     } else {
       // The method is removed by dead method elimination.
@@ -1866,15 +1881,31 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   wtable = llvm::ConstantExpr::getBitCast(wtable, IGM.WitnessTablePtrTy);
 
+  auto conformingType = Conformance.getType()->getCanonicalType();
+  bool needsUniquing = Conformance.isSynthesizedNonUnique();
+
+  // We will unique the witness table if it is for a non-unique foreign type.
+  auto uniqueWitnessTableIfIsForeignType =
+      [&](llvm::Value *witness) -> llvm::Value * {
+    if (!needsUniquing)
+      return witness;
+    auto *nominal = conformingType->getAnyNominal();
+    auto *proto = Conformance.getProtocol();
+    return uniqueForeignWitnessTableRef(
+        IGF, witness,
+        IGM.getAddrOfTypeContextDescriptor(nominal, DontRequireMetadata),
+        IGM.getAddrOfProtocolDescriptor(proto));
+  };
+
   // If specialization isn't required, just return immediately.
   // TODO: allow dynamic specialization?
   if (!RequiresSpecialization) {
-    IGF.Builder.CreateRet(wtable);
+    auto res = uniqueWitnessTableIfIsForeignType(wtable);
+    IGF.Builder.CreateRet(res);
     return;
   }
 
-  // The target metadata is the first argument.
-  assert(isDependentConformance(&Conformance));
+  assert(isDependentConformance(&Conformance) || needsUniquing);
 
   Explosion params = IGF.collectParameters();
   llvm::Value *metadata;
@@ -1977,7 +2008,8 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
 
   call->setDoesNotThrow();
 
-  IGF.Builder.CreateRet(call);
+  // Possibly unique the witness table if this is a foreign type.
+  IGF.Builder.CreateRet(uniqueWitnessTableIfIsForeignType(call));
 }
 
 llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
@@ -2044,6 +2076,21 @@ llvm::Constant *WitnessTableBuilder::buildInstantiationFunction() {
   IGF.Builder.CreateRetVoid();
 
   return fn;
+}
+
+void IRGenModule::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
+  // Only resilient conformances use relative pointers for witness methods.
+  if (wt.isDeclaration() || isAvailableExternally(wt.getLinkage()) ||
+      !isResilientConformance(wt.getConformance()))
+    return;
+
+  for (auto &entry : wt.getEntries()) {
+    if (entry.getKind() != SILWitnessTable::Method)
+      continue;
+    auto *witness = entry.getMethodWitness().Witness;
+    if (witness)
+      IRGen.forceLocalEmitOfLazyFunction(witness);
+  }
 }
 
 /// Do a memoized witness-table layout for a protocol.
@@ -2114,7 +2161,10 @@ ProtocolInfo::getConformance(IRGenModule &IGM, ProtocolDecl *protocol,
   // If the conformance is dependent in any way, we need to unique it.
   // TODO: maybe this should apply whenever it's out of the module?
   // TODO: actually enable this
-  if (isDependentConformance(normalConformance)) {
+  if (isDependentConformance(normalConformance) ||
+      // Foreign types need to go through the accessor to unique the witness
+      // table.
+      normalConformance->isSynthesizedNonUnique()) {
     info = new AccessorConformanceInfo(conformance);
     Conformances.insert({conformance, info});
   } else {
@@ -2172,8 +2222,21 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
   // Trigger the lazy emission of the foreign type metadata.
   CanType conformingType = conf->getType()->getCanonicalType();
-  if (requiresForeignTypeMetadata(conformingType))
-    (void)getAddrOfForeignTypeMetadataCandidate(conformingType);
+  if (requiresForeignTypeMetadata(conformingType)) {
+    // Make sure we emit the metadata access function.
+    (void)getTypeMetadataAccessFunction(*this, conformingType,
+                                        ForDefinition);
+
+    // Make sure we emit the nominal type descriptor.
+    auto *nominal = conformingType->getAnyNominal();
+    auto entity = LinkEntity::forNominalTypeDescriptor(nominal);
+    if (auto entry = GlobalVars[entity]) {
+      if (!cast<llvm::GlobalValue>(entry)->isDeclaration())
+        return;
+    }
+
+    emitLazyTypeContextDescriptor(*this, nominal, RequireMetadata);
+  }
 }
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
@@ -2791,34 +2854,8 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   return wtable;
 }
 
-/// Emit the witness table references required for the given type
-/// substitution.
-void irgen::emitWitnessTableRefs(IRGenFunction &IGF,
-                                 const Substitution &sub,
-                                 llvm::Value **metadataCache,
-                                 SmallVectorImpl<llvm::Value*> &out) {
-  auto conformances = sub.getConformances();
-
-  // We don't need to do anything if we have no protocols to conform to.
-  if (conformances.empty()) return;
-
-  // Look at the replacement type.
-  CanType replType = sub.getReplacement()->getCanonicalType();
-
-  for (auto &conformance : conformances) {
-    auto *proto = conformance.getRequirement();
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      continue;
-
-    auto wtable = emitWitnessTableRef(IGF, replType, metadataCache,
-                                      conformance);
-
-    out.push_back(wtable);
-  }
-}
-
 static CanType getSubstSelfType(CanSILFunctionType origFnType,
-                                const SubstitutionMap &subs) {
+                                SubstitutionMap subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   assert(!origFnType->getParameters().empty());
@@ -2859,11 +2896,11 @@ namespace {
                              CanSILFunctionType polyFn)
       : PolymorphicConvention(IGF.IGM, polyFn), IGF(IGF) {}
 
-    void emit(const SubstitutionMap &subs,
+    void emit(SubstitutionMap subs,
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
-    void emitEarlySources(const SubstitutionMap &subs, Explosion &out) {
+    void emitEarlySources(SubstitutionMap subs, Explosion &out) {
       for (auto &source : getSources()) {
         switch (source.getKind()) {
         // Already accounted for in the parameters.
@@ -2892,13 +2929,13 @@ namespace {
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
-                                     const SubstitutionMap &subs,
+                                     SubstitutionMap subs,
                                      WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
   EmitPolymorphicArguments(IGF, origFnType).emit(subs, witnessMetadata, out);
 }
 
-void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
+void EmitPolymorphicArguments::emit(SubstitutionMap subs,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
@@ -2943,7 +2980,7 @@ void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
 NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          const SubstitutionMap &subs) {
+                                          SubstitutionMap subs) {
   NecessaryBindings bindings;
 
   // Bail out early if we don't have polymorphic parameters.
@@ -3029,7 +3066,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
 void
 GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
-                                               const SubstitutionMap &subs,
+                                               SubstitutionMap subs,
                                                FulfillmentCallback callback) {
   if (empty()) return;
 
@@ -3047,7 +3084,7 @@ GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
 }
 
 void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
-                                               const SubstitutionMap &subs,
+                                               SubstitutionMap subs,
                                                Address buffer) {
   if (Requirements.empty()) return;
 
@@ -3091,7 +3128,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
                                                ModuleDecl &module,
                                                GenericRequirement requirement,
-                                               const SubstitutionMap &subs) {
+                                               SubstitutionMap subs) {
   CanType depTy = requirement.TypeParameter;
   CanType argType = depTy.subst(subs)->getCanonicalType();
 
@@ -3295,7 +3332,8 @@ irgen::emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
   FunctionPointer witnessFnPtr(witness, sig);
 
   // Call the accessor.
-  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation()) &&
+  assert((!IGF.IGM.DebugInfo || IGF.Builder.getCurrentDebugLocation() ||
+          !IGF.CurFn->getSubprogram()) &&
          "creating a function call without a debug location");
   auto call = IGF.Builder.CreateCall(witnessFnPtr,
                                      { request.get(IGF),

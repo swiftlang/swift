@@ -92,33 +92,43 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
     auto conformanceIsFixed = SILWitnessTable::conformanceIsSerialized(
         normalConformance);
-    auto addSymbolIfNecessary = [&](SILDeclRef declRef) {
-      auto witnessLinkage = declRef.getLinkage(ForDefinition);
+    auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
+                                    ValueDecl *witnessDecl) {
+      auto witnessLinkage = SILDeclRef(witnessDecl).getLinkage(ForDefinition);
       if (conformanceIsFixed &&
           fixmeWitnessHasLinkageThatNeedsToBePublic(witnessLinkage)) {
         Mangle::ASTMangler Mangler;
-        addSymbol(Mangler.mangleWitnessThunk(normalConformance,
-                                             declRef.getDecl()));
+        addSymbol(
+            Mangler.mangleWitnessThunk(normalConformance, requirementDecl));
       }
     };
-    normalConformance->forEachValueWitness(nullptr, [&](ValueDecl *valueReq,
-                                                        Witness witness) {
-      if (isa<AbstractFunctionDecl>(valueReq)) {
-        addSymbolIfNecessary(SILDeclRef(valueReq));
-      } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
-        if (auto *getter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(getter));
-        if (auto *setter = storage->getGetter())
-          addSymbolIfNecessary(SILDeclRef(setter));
-        if (auto *materializeForSet = storage->getMaterializeForSetFunc())
-          addSymbolIfNecessary(SILDeclRef(materializeForSet));
-      }
-    });
+    normalConformance->forEachValueWitness(
+        nullptr, [&](ValueDecl *valueReq, Witness witness) {
+          auto witnessDecl = witness.getDecl();
+          if (isa<AbstractFunctionDecl>(valueReq)) {
+            addSymbolIfNecessary(valueReq, witnessDecl);
+          } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
+            auto witnessStorage = cast<AbstractStorageDecl>(witnessDecl);
+            if (auto *getter = storage->getGetter())
+              addSymbolIfNecessary(getter, witnessStorage->getGetter());
+            if (auto *setter = storage->getSetter())
+              addSymbolIfNecessary(setter, witnessStorage->getSetter());
+            if (auto *materializeForSet = storage->getMaterializeForSetFunc())
+              addSymbolIfNecessary(materializeForSet,
+                                   witnessStorage->getMaterializeForSetFunc());
+          }
+        });
   }
 }
 
 void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   addSymbol(SILDeclRef(AFD));
+
+  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
+    // A @_cdecl("...") function has an extra symbol, with the name from the
+    // attribute.
+    addSymbol(SILDeclRef(AFD).asForeign());
+  }
 
   if (!SwiftModule->getASTContext().isSwiftVersion3())
     return;
@@ -140,6 +150,22 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 }
 
+void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
+  // Do nothing: accessors are always nested within the storage decl, but
+  // sometimes appear outside it too. To avoid double-walking them, we
+  // explicitly visit them as members of the storage and ignore them when we
+  // visit them as part of the main walk, here.
+}
+
+void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
+  // Explicitly look at each accessor here: see visitAccessorDecl.
+  SmallVector<Decl *, 8> accessors;
+  ASD->getAllAccessorFunctions(accessors);
+  for (auto accessor : accessors) {
+    visitAbstractFunctionDecl(cast<AbstractFunctionDecl>(accessor));
+  }
+}
+
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
@@ -152,6 +178,8 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     if (!FileHasEntryPoint || VD->isStatic())
       addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
+
+  visitAbstractStorageDecl(VD);
 }
 
 void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
@@ -216,11 +244,25 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   visitNominalTypeDecl(CD);
 
-  // The below symbols are only emitted if the class is resilient.
-  if (!CD->isResilient(SwiftModule, ResilienceExpansion::Minimal))
+  auto hasResilientAncestor =
+      CD->isResilient(SwiftModule, ResilienceExpansion::Minimal);
+  auto ancestor = CD->getSuperclassDecl();
+  while (ancestor && !hasResilientAncestor) {
+    hasResilientAncestor |=
+        ancestor->isResilient(SwiftModule, ResilienceExpansion::Maximal);
+    ancestor = ancestor->getSuperclassDecl();
+  }
+
+  // Types with resilient superclasses have some extra symbols.
+  if (!hasResilientAncestor)
     return;
 
   addSymbol(LinkEntity::forClassMetadataBaseOffset(CD));
+
+  // And classes that are themselves resilient (not just a superclass) have even
+  // more.
+  if (!CD->isResilient())
+    return;
 
   // Emit dispatch thunks for every new vtable entry.
   struct VTableVisitor : public SILVTableVisitor<VTableVisitor> {
@@ -271,7 +313,7 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
   if (!PD->isObjC()) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    if (PD->isResilient(SwiftModule, ResilienceExpansion::Minimal)) {
+    if (PD->isResilient()) {
       for (auto *member : PD->getMembers()) {
         if (auto *funcDecl = dyn_cast<FuncDecl>(member)) {
           addDispatchThunk(SILDeclRef(funcDecl));
@@ -299,18 +341,41 @@ void TBDGenVisitor::visitProtocolDecl(ProtocolDecl *PD) {
 #endif
 }
 
+void TBDGenVisitor::visitEnumDecl(EnumDecl *ED) {
+  visitNominalTypeDecl(ED);
+
+  if (!ED->isResilient())
+    return;
+
+  // Emit resilient tags.
+  for (auto *elt : ED->getAllElements()) {
+    auto entity = LinkEntity::forEnumCase(elt);
+    addSymbol(entity);
+  }
+}
+
+void TBDGenVisitor::addFirstFileSymbols() {
+  if (!Opts.ModuleLinkName.empty()) {
+    SmallString<32> buf;
+    addSymbol(irgen::encodeForceLoadSymbolName(buf, Opts.ModuleLinkName));
+  }
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet &symbols,
-                                           bool hasMultipleIGMs,
                                            llvm::raw_ostream *os,
-                                           StringRef installName) {
+                                           TBDGenOptions &opts) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, hasMultipleIGMs, isWholeModule);
+  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
 
-  TBDGenVisitor visitor(symbols, target, linkInfo, M, installName);
+  TBDGenVisitor visitor(symbols, target, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
+    if (file == M->getFiles()[0]) {
+      visitor.addFirstFileSymbols();
+    }
+
     SmallVector<Decl *, 16> decls;
     file->getTopLevelDecls(decls);
 
@@ -343,18 +408,16 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
+                                   TBDGenOptions &opts) {
   enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
-                                 hasMultipleIGMs, nullptr, StringRef());
+                                 nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
-                                   bool hasMultipleIGMs) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, nullptr,
-                                 StringRef());
+                                   TBDGenOptions &opts) {
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
-                         bool hasMultipleIGMs, StringRef installName) {
+                         TBDGenOptions &opts) {
   StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, hasMultipleIGMs, &os,
-                                 installName);
+  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, &os, opts);
 }

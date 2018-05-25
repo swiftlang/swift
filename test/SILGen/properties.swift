@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name properties -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name properties -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 var zero: Int = 0
 
@@ -513,7 +513,7 @@ struct DidSetWillSetTests: ForceAccessors {
   }
 
   var a: Int {
-    // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
     willSet(newA) {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug_value %0
@@ -548,7 +548,7 @@ struct DidSetWillSetTests: ForceAccessors {
       // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
     }
 
-    // CHECK-LABEL: sil hidden @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+    // CHECK-LABEL: sil private @$S10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
     didSet {
       // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
       // CHECK-NEXT: debug
@@ -626,7 +626,7 @@ var global_observing_property : Int = zero {
   // CHECK: properties.zero.unsafeMutableAddressor
   // CHECK: return
 
-  // CHECK-LABEL: sil hidden @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
+  // CHECK-LABEL: sil private @$S10properties25global_observing_property{{[_0-9a-zA-Z]*}}vW
   didSet {
     // The didSet implementation needs to call takeInt.
     takeInt(global_observing_property)
@@ -1215,12 +1215,12 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
+// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
-// CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
-// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int

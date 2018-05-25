@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swiftgyb
+// RUN: %target-run-stdlib-swiftgyb
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -242,11 +242,11 @@ FixedPoint.test("${Self}.hashValue") {
     let input = get${Self}(${input})
     let output = getInt(input.hashValue)
 
-    var hasher = _SipHash13(key: _Hasher._seed)
+    var hasher = _SipHash13(_seed: Hasher._seed)
 %     if prepare_bit_pattern(input, word_bits, self_ty.is_signed) == input:
-    hasher.append(${input} as ${"" if self_ty.is_signed else "U"}Int)
+    hasher._combine(UInt(truncatingIfNeeded: ${input} as ${"" if self_ty.is_signed else "U"}Int))
 %     else:
-    hasher.append(input)
+    hasher._combine(UInt64(truncatingIfNeeded: input))
 %     end
     let expected = getInt(Int(truncatingIfNeeded: hasher.finalize()))
     expectEqual(expected, output, "input: \(input)")

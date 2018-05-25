@@ -190,6 +190,9 @@ struct A10 {
   subscript x(i: Int) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
     return 0
   }
+  subscript x<T>(i: T) -> Int { // expected-error {{subscripts cannot have a name}} {{13-14=}}
+    return 0
+  }
 }
 
 struct A11 {

@@ -98,7 +98,6 @@ public struct EnumeratedIterator<Base: IteratorProtocol> {
 
   /// Construct from a `Base` iterator.
   @inlinable
-  @usableFromInline
   internal init(_base: Base) {
     self._base = _base
     self._count = 0
@@ -145,7 +144,6 @@ public struct EnumeratedSequence<Base: Sequence> {
 
   /// Construct from a `Base` sequence.
   @inlinable
-  @usableFromInline
   internal init(_base: Base) {
     self._base = _base
   }

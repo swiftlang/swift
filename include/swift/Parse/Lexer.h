@@ -192,6 +192,15 @@ public:
     lex(Result, LeadingTrivia, TrailingTrivia);
   }
 
+  /// Reset the lexer's buffer pointer to \p Offset bytes after the buffer
+  /// start.
+  void resetToOffset(size_t Offset) {
+    assert(BufferStart + Offset <= BufferEnd && "Offset after buffer end");
+
+    CurPtr = BufferStart + Offset;
+    lexImpl();
+  }
+
   bool isKeepingComments() const {
     return RetainComments == CommentRetentionMode::ReturnAsTokens;
   }
@@ -318,7 +327,11 @@ public:
 
   /// Retrieve the string used to indent the line that contains the given
   /// source location.
-  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc);
+  ///
+  /// If \c ExtraIndentation is not null, it will be set to an appropriate
+  /// additional intendation for adding code in a smaller scope "within" \c Loc.
+  static StringRef getIndentationForLine(SourceManager &SM, SourceLoc Loc,
+                                         StringRef *ExtraIndentation = nullptr);
 
   /// \brief Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.

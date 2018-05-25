@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SIL/SILModule.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILBasicBlock.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -137,6 +138,11 @@ SILFunction::~SILFunction() {
 
   assert(RefCount == 0 &&
          "Function cannot be deleted while function_ref's still exist");
+}
+
+void SILFunction::createProfiler(ASTNode Root, ForDefinition_t forDefinition) {
+  assert(!Profiler && "Function already has a profiler");
+  Profiler = SILProfiler::create(Module, forDefinition, Root);
 }
 
 bool SILFunction::hasForeignBody() const {
@@ -418,7 +424,7 @@ bool SILFunction::hasSelfMetadataParam() const {
   if (!silTy.isObject())
     return false;
 
-  auto selfTy = silTy.getSwiftRValueType();
+  auto selfTy = silTy.getASTType();
 
   if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
     selfTy = metaTy.getInstanceType();
@@ -476,16 +482,14 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
+SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
+  if (ForwardingSubMap)
+    return ForwardingSubMap;
 
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
+  if (auto *env = getGenericEnvironment())
+    ForwardingSubMap = env->getForwardingSubstitutionMap();
 
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
+  return ForwardingSubMap;
 }
 
 bool SILFunction::shouldVerifyOwnership() const {

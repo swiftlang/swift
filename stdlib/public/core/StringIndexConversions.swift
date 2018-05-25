@@ -26,7 +26,7 @@ extension String.Index {
   ///     print(cafe)
   ///     // Prints "Café"
   ///
-  ///     let scalarsIndex = cafe.unicodeScalars.index(of: "e")!
+  ///     let scalarsIndex = cafe.unicodeScalars.firstIndex(of: "e")!
   ///     let stringIndex = String.Index(scalarsIndex, within: cafe)!
   ///
   ///     print(cafe[...stringIndex])
@@ -49,7 +49,6 @@ extension String.Index {
   ///     `sourcePosition` must be a valid index of at least one of the views
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(
     _ sourcePosition: String.Index,
     within target: String
@@ -67,7 +66,7 @@ extension String.Index {
   /// uses this method find the same position in the string's `utf8` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.index(of: "é") {
+  ///     if let i = cafe.firstIndex(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf8)!
   ///         print(Array(cafe.utf8[j...]))
   ///     }
@@ -96,7 +95,7 @@ extension String.Index {
   /// uses this method find the same position in the string's `utf16` view.
   ///
   ///     let cafe = "Café"
-  ///     if let i = cafe.index(of: "é") {
+  ///     if let i = cafe.firstIndex(of: "é") {
   ///         let j = i.samePosition(in: cafe.utf16)!
   ///         print(cafe.utf16[j])
   ///     }

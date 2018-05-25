@@ -229,7 +229,7 @@ FUNCTION(BridgeObjectRetainN, swift_bridgeObjectRetain_n,
          C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(BridgeObjectReleaseN, swift_bridgeObjectRelease_n,
@@ -243,7 +243,7 @@ FUNCTION(NonAtomicBridgeObjectRetainN, swift_nonatomic_bridgeObjectRetain_n,
          C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy, Int32Ty),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_nonatomic_bridgeObjectRelease_n(void *ptr, int32_t n);
 FUNCTION(NonAtomicBridgeObjectReleaseN, swift_nonatomic_bridgeObjectRelease_n,
@@ -328,7 +328,7 @@ FUNCTION(NonAtomicUnknownRelease, swift_nonatomic_unknownRelease, C_CC,
 FUNCTION(BridgeObjectStrongRetain, swift_bridgeObjectRetain, C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_bridgeRelease(void *ptr);
 FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, C_CC,
@@ -340,7 +340,7 @@ FUNCTION(BridgeObjectStrongRelease, swift_bridgeObjectRelease, C_CC,
 FUNCTION(NonAtomicBridgeObjectStrongRetain, swift_nonatomic_bridgeObjectRetain, C_CC,
          RETURNS(BridgeObjectPtrTy),
          ARGS(BridgeObjectPtrTy),
-         ATTRS(NoUnwind))
+         ATTRS(NoUnwind, FirstParamReturned))
 
 // void swift_nonatomic_bridgeRelease(void *ptr);
 FUNCTION(NonAtomicBridgeObjectStrongRelease, swift_nonatomic_bridgeObjectRelease, C_CC,
@@ -680,11 +680,13 @@ FUNCTION(IsUniquelyReferencedOrPinned_nonNull_native,
 // bool swift_isEscapingClosureAtFileLocation(const struct HeapObject *object,
 //                                            const unsigned char *filename,
 //                                            int32_t filenameLength,
-//                                            int32_t line);
+//                                            int32_t line,
+//                                            int32_t col,
+//                                            unsigned type);
 FUNCTION(IsEscapingClosureAtFileLocation, swift_isEscapingClosureAtFileLocation,
          C_CC,
          RETURNS(Int1Ty),
-         ARGS(RefCountedPtrTy, Int8PtrTy, Int32Ty, Int32Ty),
+         ARGS(RefCountedPtrTy, Int8PtrTy, Int32Ty, Int32Ty, Int32Ty, Int32Ty),
          ATTRS(NoUnwind, ZExt))
 
 // void swift_arrayInitWithCopy(opaque*, opaque*, size_t, type*);
@@ -801,6 +803,15 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
+// WitnessTable *swift_getForeignWitnessTable(const WitnessTable *candidate,
+//                                            const TypeContextDescriptor
+//                                            *forType);
+FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
+              ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // MetadataResponse swift_getGenericMetadata(MetadataRequest request,
 //                                           const void * const *arguments,
 //                                           TypeContextDescriptor *type);
@@ -827,7 +838,7 @@ FUNCTION(AllocateGenericValueMetadata, swift_allocateGenericValueMetadata,
          ATTRS(NoUnwind))
 
 // MetadataResponse swift_checkMetadataState(MetadataRequest request,
-//                                           cosnt Metadata *type);
+//                                           const Metadata *type);
 FUNCTION(CheckMetadataState, swift_checkMetadataState, SwiftCC,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, TypeMetadataPtrTy),
@@ -867,6 +878,12 @@ FUNCTION(GetObjCClassMetadata, swift_getObjCClassMetadata, C_CC,
 FUNCTION(GetObjCClassFromMetadata, swift_getObjCClassFromMetadata, C_CC,
          RETURNS(ObjCClassPtrTy),
          ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
+// Metadata *swift_getObjCClassFromObject(id object);
+FUNCTION(GetObjCClassFromObject, swift_getObjCClassFromObject, C_CC,
+         RETURNS(ObjCClassPtrTy),
+         ARGS(ObjCPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // MetadataResponse swift_getTupleTypeMetadata(MetadataRequest request,
@@ -942,13 +959,13 @@ FUNCTION(InitClassMetadata,
 //                               StructLayoutFlags flags,
 //                               size_t numFields,
 //                               TypeLayout * const *fieldTypes,
-//                               size_t *fieldOffsets);
+//                               uint32_t *fieldOffsets);
 FUNCTION(InitStructMetadata,
          swift_initStructMetadata, C_CC,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(0),
-              SizeTy->getPointerTo()),
+              Int32Ty->getPointerTo()),
          ATTRS(NoUnwind))
 
 // void swift_initEnumMetadataSingleCase(Metadata *enumType,

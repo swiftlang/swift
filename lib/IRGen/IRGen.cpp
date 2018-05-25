@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Platform.h"
@@ -26,6 +27,7 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/LLVMPasses/Passes.h"
@@ -174,9 +176,12 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
         llvm::createAlwaysInlinerLegacyPass(/*insertlifetime*/false);
   }
 
+  bool RunSwiftSpecificLLVMOptzns =
+      !Opts.DisableSwiftSpecificLLVMOptzns && !Opts.DisableLLVMOptzns;
+
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
   // and the Contract pass as late as possible.
-  if (!Opts.DisableLLVMARCOpts) {
+  if (RunSwiftSpecificLLVMOptzns) {
     PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
                            addSwiftARCOptPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
@@ -206,11 +211,12 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
                            addSanitizerCoveragePass);
   }
 
-  if (!Opts.DisableLLVMOptzns)
+  if (RunSwiftSpecificLLVMOptzns)
     addCoroutinePassesToExtensionPoints(PMBuilder);
 
-  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                         addSwiftMergeFunctionsPass);
+  if (RunSwiftSpecificLLVMOptzns)
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSwiftMergeFunctionsPass);
 
   // Configure the function passes.
   legacy::FunctionPassManager FunctionPasses(Module);
@@ -222,7 +228,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
   // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts) {
+  if (RunSwiftSpecificLLVMOptzns) {
     FunctionPasses.add(createSwiftAAWrapperPass());
     FunctionPasses.add(createExternalAAWrapperPass([](Pass &P, Function &,
                                                       AAResults &AAR) {
@@ -251,7 +257,7 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
   // the swift AA pass after the other ones.
-  if (!Opts.DisableLLVMARCOpts) {
+  if (RunSwiftSpecificLLVMOptzns) {
     ModulePasses.add(createSwiftAAWrapperPass());
     ModulePasses.add(createExternalAAWrapperPass([](Pass &P, Function &,
                                                     AAResults &AAR) {
@@ -791,22 +797,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.addLinkLibrary(linkLib);
     });
 
-    // Hack to handle thunks eagerly synthesized by the Clang importer.
-    swift::ModuleDecl *prev = nullptr;
-    for (auto external : Ctx.ExternalDefinitions) {
-      swift::ModuleDecl *next = external->getModuleContext();
-      if (next == prev)
-        continue;
-      prev = next;
-
-      if (next->getName() == M->getName())
-        continue;
-
-      next->collectLinkLibraries([&](LinkLibrary linkLib) {
-        IGM.addLinkLibrary(linkLib);
-      });
-    }
-
     if (!IGM.finalize())
       return nullptr;
 
@@ -933,8 +923,8 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel();
-  
+  irgen.emitGlobalTopLevel(true /*emitForParallelEmission*/);
+
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
       IRGenModule *IGM = irgen.getGenModule(SF);
@@ -975,22 +965,6 @@ static void performParallelIRGeneration(
                 [&](LinkLibrary linkLib) {
                   PrimaryGM->addLinkLibrary(linkLib);
                 });
-  
-  // Hack to handle thunks eagerly synthesized by the Clang importer.
-  swift::ModuleDecl *prev = nullptr;
-  for (auto external : Ctx.ExternalDefinitions) {
-    swift::ModuleDecl *next = external->getModuleContext();
-    if (next == prev)
-      continue;
-    prev = next;
-    
-    if (next->getName() == M->getName())
-      continue;
-    
-    next->collectLinkLibraries([&](LinkLibrary linkLib) {
-      PrimaryGM->addLinkLibrary(linkLib);
-    });
-  }
   
   llvm::StringSet<> referencedGlobals;
 

@@ -70,18 +70,22 @@ struct ExistentialLayout {
   }
   typedef ArrayRefView<Type,ProtocolType*,getProtocolType> ProtocolTypeArrayRef;
 
-  ProtocolTypeArrayRef getProtocols() const {
+  ProtocolTypeArrayRef getProtocols() const & {
+    if (singleProtocol)
+      return llvm::makeArrayRef(&singleProtocol, 1);
     return protocols;
   }
+  /// The returned ArrayRef may point directly to \c this->singleProtocol, so
+  /// calling this on a temporary is likely to be incorrect.
+  ProtocolTypeArrayRef getProtocols() const && = delete;
 
   LayoutConstraint getLayoutConstraint() const;
 
 private:
-  // Inline storage for 'protocols' member above when computing
-  // layout of a single ProtocolType
+  // The protocol from a ProtocolType
   Type singleProtocol;
 
-  /// Zero or more protocol constraints.
+  /// Zero or more protocol constraints from a ProtocolCompositionType
   ArrayRef<Type> protocols;
 };
 

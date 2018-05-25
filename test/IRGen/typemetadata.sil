@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
-// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -emit-ir %s | %FileCheck %s --check-prefix=OSIZE -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefix=OSIZE -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
-// XFAIL: linux
 
 sil_stage canonical
 

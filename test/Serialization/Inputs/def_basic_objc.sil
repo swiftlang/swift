@@ -1,4 +1,4 @@
-sil_stage raw // CHECK: sil_stage raw
+sil_stage raw // CHECK: sil_stage canonical
 
 import Builtin
 import Swift
@@ -8,7 +8,7 @@ protocol SomeProtocol { }
 class SomeClass : SomeProtocol { }
 
 // CHECK-LABEL: @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
-sil [serialized] @objc_classes : $@convention(thin) (@thick NSObject.Type) -> () {
+sil [transparent] [serialized] @objc_classes : $@convention(thin) (@thick NSObject.Type) -> () {
 bb0(%0 : $@thick NSObject.Type):
   %1 = thick_to_objc_metatype %0 : $@thick NSObject.Type to $@objc_metatype NSObject.Type
   // CHECK: %2 = alloc_ref_dynamic [objc] %1 : $@objc_metatype NSObject.Type, $NSObject
@@ -31,10 +31,10 @@ sil [serialized] @$SSSSSycSSmcfC : $@convention(thin) (@thin String.Type) -> @ow
 
 protocol SomeClassProtocol : class {}
 
-// CHECK-LABEL: sil public_external [serialized] [canonical] @metatype_to_object
+// CHECK-LABEL: sil public_external [transparent] [serialized] @metatype_to_object
 // CHECK:         {{%.*}} = objc_metatype_to_object {{%.*}} : $@objc_metatype SomeClass.Type to $AnyObject
 // CHECK:         {{%.*}} = objc_existential_metatype_to_object {{%.*}} : $@objc_metatype SomeClassProtocol.Type to $AnyObject
-sil [serialized] @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
+sil [transparent] [serialized] @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject) {
 entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtocol.Type):
   %x = objc_metatype_to_object %a : $@objc_metatype SomeClass.Type to $AnyObject
   %y = objc_existential_metatype_to_object %b : $@objc_metatype SomeClassProtocol.Type to $AnyObject
@@ -44,18 +44,18 @@ entry(%a : $@objc_metatype SomeClass.Type, %b : $@objc_metatype SomeClassProtoco
 
 @objc protocol ObjCProto {}
 
-// CHECK-LABEL: sil public_external [serialized] [canonical] @protocol_conversion
-sil [serialized] @protocol_conversion : $@convention(thin) () -> @owned Protocol {
+// CHECK-LABEL: sil public_external [transparent] [serialized] @protocol_conversion
+sil [transparent] [serialized] @protocol_conversion : $@convention(thin) () -> @owned Protocol {
 entry:
   // CHECK: {{%.*}} = objc_protocol #ObjCProto : $Protocol
   %p = objc_protocol #ObjCProto : $Protocol
   return %p : $Protocol
 }
 
-public func serialize_all() {
+@_transparent public func serialize_all() {
 }
 
-sil [serialized] [transparent] @$S14def_basic_objc13serialize_allyyF : $@convention(thin) () -> () {
+sil [transparent] [serialized] @$S14def_basic_objc13serialize_allyyF : $@convention(thin) () -> () {
 bb0:
   %26 = function_ref @objc_classes : $@convention(thin) (@thick NSObject.Type) -> ()
 

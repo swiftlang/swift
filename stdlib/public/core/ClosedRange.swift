@@ -168,19 +168,19 @@ extension ClosedRange.Index : Comparable {
 
 extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
-      hasher.append(0 as Int8)
-      hasher.append(value)
+      hasher.combine(0 as Int8)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(1 as Int8)
+      hasher.combine(1 as Int8)
     }
   }
 }
@@ -308,6 +308,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element <= upperBound
               ? .inRange(element) : nil
   }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
 }
 
 extension Comparable {  
@@ -390,14 +396,9 @@ extension ClosedRange: Equatable {
 
 extension ClosedRange: Hashable where Bound: Hashable {
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 
@@ -498,6 +499,6 @@ extension ClosedRange {
 
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
-@available(*, deprecated, renamed: "ClosedRange")
+
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger

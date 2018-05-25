@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -301,6 +301,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x & y             // 0b00000100
+  ///     // z == 4
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -317,6 +318,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x | y             // 0b00001111
+  ///     // z == 15
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -333,6 +335,7 @@ def operatorComment(operator, fixedWidth):
   ///     let x: UInt8 = 5          // 0b00000101
   ///     let y: UInt8 = 14         // 0b00001110
   ///     let z = x ^ y             // 0b00001011
+  ///     // z == 11
   ///
   /// - Parameters:
   ///   - lhs: An integer value.
@@ -343,9 +346,10 @@ def operatorComment(operator, fixedWidth):
   /// specified number of digits to the right, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The masking right shift operator (`&>>`) performs a *masking shift*,
-  /// where the value passed as `rhs` is masked to produce a value in the
-  /// range `0..<lhs.bitWidth`. The shift is performed using this masked
+  /// Use the masking right shift operator (`&>>`) when you need to perform a
+  /// shift and are sure that the shift amount is in the range
+  /// `0..<lhs.bitWidth`. Before shifting, the masking right shift operator
+  /// masks the shift to this range. The shift is performed using this masked
   /// value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
@@ -356,11 +360,16 @@ def operatorComment(operator, fixedWidth):
   ///     let y = x &>> 2
   ///     // y == 7                         // 0b00000111
   ///
-  /// However, if you use `19` as `rhs`, the operation first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  /// However, if you use `8` as the shift amount, the method first masks the
+  /// shift amount to zero, and then performs the shift, resulting in no change
+  /// to the original value.
   ///
-  ///     let z = x &>> 19
-  ///     // z == 3                         // 0b00000011
+  ///     let z = x &>> 8
+  ///     // z == 30                        // 0b00011110
+  ///
+  /// If the bit width of the shifted integer type is a power of two, masking
+  /// is performed using a bitmask; otherwise, masking is performed using a
+  /// modulo operation.
   ///
   /// - Parameters:
   ///   - lhs: The value to shift.
@@ -373,9 +382,11 @@ def operatorComment(operator, fixedWidth):
   /// specified number of digits to the left, masking the shift amount to the
   /// type's bit width.
   ///
-  /// The masking left shift operator (`&<<`) performs a *masking shift*, where
-  /// the value used as `rhs` is masked to produce a value in the range
-  /// `0..<lhs.bitWidth`. The shift is performed using this masked value.
+  /// Use the masking left shift operator (`&<<`) when you need to perform a
+  /// shift and are sure that the shift amount is in the range
+  /// `0..<lhs.bitWidth`. Before shifting, the masking left shift operator
+  /// masks the shift to this range. The shift is performed using this masked
+  /// value.
   ///
   /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
   /// unsigned integer type. If you use `2` as the right-hand-side value in an
@@ -385,11 +396,16 @@ def operatorComment(operator, fixedWidth):
   ///     let y = x &<< 2
   ///     // y == 120                       // 0b01111000
   ///
-  /// However, if you pass `19` as `rhs`, the method first bitmasks `rhs` to
-  /// `3`, and then uses that masked value as the number of bits to shift `lhs`.
+  /// However, if you use `8` as the shift amount, the method first masks the
+  /// shift amount to zero, and then performs the shift, resulting in no change
+  /// to the original value.
   ///
-  ///     let z = x &<< 19
-  ///     // z == 240                       // 0b11110000
+  ///     let z = x &<< 8
+  ///     // z == 30                        // 0b00011110
+  ///
+  /// If the bit width of the shifted integer type is a power of two, masking
+  /// is performed using a bitmask; otherwise, masking is performed using a
+  /// modulo operation.
   ///
   /// - Parameters:
   ///   - lhs: The value to shift.
@@ -952,9 +968,14 @@ def unsafeOperationComment(operator):
   /// Returns the sum of this value and the given value without checking for
   /// arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: The sum of this value and `rhs`.
@@ -963,9 +984,14 @@ def unsafeOperationComment(operator):
   /// Returns the difference obtained by subtracting the given value from this
   /// value without checking for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: The result of subtracting `rhs` from this value.
@@ -974,9 +1000,14 @@ def unsafeOperationComment(operator):
   /// Returns the product of this value and the given value without checking
   /// for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: The product of this value and `rhs`.
@@ -985,9 +1016,14 @@ def unsafeOperationComment(operator):
   /// Returns the quotient obtained by dividing this value by the given value
   /// without checking for arithmetic overflow.
   ///
-  /// If an arithmetic overflow occurs, the behavior is undefined. Use this
-  /// function only to avoid the cost of overflow checking when you are sure
-  /// that the operation won't overflow.
+  /// Use this function only to avoid the cost of overflow checking when you
+  /// are certain that the operation won't overflow. In optimized builds (`-O`)
+  /// the compiler is free to assume that overflow won't occur. Failure to
+  /// satisfy that assumption is a serious programming error and could lead to
+  /// statements being unexpectedly executed or skipped.
+  ///
+  /// In debug builds (`-Onone`) a runtime error is still triggered if the
+  /// operation overflows.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: The result of dividing this value by `rhs`.
@@ -1751,7 +1787,6 @@ ${operatorComment(x.nonMaskingOperator, False)}
 
 extension BinaryInteger {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal func _description(radix: Int, uppercase: Bool) -> String {
     _precondition(2...36 ~= radix, "Radix must be between 2 and 36")
@@ -1792,6 +1827,10 @@ extension BinaryInteger {
 
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
+
+    // TODO(FIXME JIRA): All current stdlib types fit in small. Use a stack
+    // buffer instead of an array on the heap.
+
     var result: [UInt8] = []
     while value != 0 {
       let (quotient, remainder) = _quotientAndRemainder(value)
@@ -1802,7 +1841,11 @@ extension BinaryInteger {
     if isNegative {
       result.append(UInt8(("-" as Unicode.Scalar).value))
     }
-    return String._fromASCII(result.reversed())
+
+    result.reverse()
+    return result.withUnsafeBufferPointer {
+      return String._fromASCII($0)
+    }
   }
 
   /// A textual representation of this value.
@@ -2257,23 +2300,23 @@ ${overflowOperationComment(x.operator)}
   /// otherwise overflow. Unlike traditional truncating multiplication, the
   /// `multipliedFullWidth(by:)` method returns a tuple containing both the
   /// `high` and `low` parts of the product of this value and `other`. The
-  /// following example uses this method to multiply two `UInt8` values that
+  /// following example uses this method to multiply two `Int8` values that
   /// normally overflow when multiplied:
   ///
-  ///     let x: UInt8 = 100
-  ///     let y: UInt8 = 20
+  ///     let x: Int8 = 48
+  ///     let y: Int8 = -40
   ///     let result = x.multipliedFullWidth(by: y)
-  ///     // result.high == 0b00000111
-  ///     // result.low  == 0b11010000
+  ///     // result.high == -8
+  ///     // result.low  == 128
   ///
-  /// The product of `x` and `y` is 2000, which is too large to represent in a
-  /// `UInt8` instance. The `high` and `low` properties of the `result` value
-  /// represent 2000 when concatenated to form a double-width integer; that
+  /// The product of `x` and `y` is `-1920`, which is too large to represent in
+  /// an `Int8` instance. The `high` and `low` compnents of the `result` value
+  /// represent `-1920` when concatenated to form a double-width integer; that
   /// is, using `result.high` as the high byte and `result.low` as the low byte
-  /// of a `UInt16` instance.
+  /// of an `Int16` instance.
   ///
-  ///     let z = UInt16(result.high) << 8 | UInt16(result.low)
-  ///     // z == 2000
+  ///     let z = Int16(result.high) << 8 | Int16(result.low)
+  ///     // z == -1920
   ///
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
@@ -2286,6 +2329,18 @@ ${overflowOperationComment(x.operator)}
   /// The resulting quotient must be representable within the bounds of the
   /// type. If the quotient is too large to represent in the type, a runtime
   /// error may occur.
+  ///
+  /// The following example divides a value that is too large to be represented
+  /// using a single `Int` instance by another `Int` value. Because the quotient
+  /// is representable as an `Int`, the division succeeds.
+  ///
+  ///     // 'dividend' represents the value 0x506f70652053616e74612049494949
+  ///     let dividend = (22640526660490081, 7959093232766896457 as UInt)
+  ///     let divisor = 2241543570477705381
+  ///
+  ///     let (quotient, remainder) = divisor.dividingFullWidth(dividend)
+  ///     // quotient == 186319822866995413
+  ///     // remainder == 0
   ///
   /// - Parameter dividend: A tuple containing the high and low parts of a
   ///   double-width integer.
@@ -2355,6 +2410,9 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+  static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self
 }
 
 extension FixedWidthInteger {
@@ -2482,6 +2540,159 @@ ${assignmentOperatorComment(x.operator, False)}
 
   % end
 }
+
+% for Range in ['Range', 'ClosedRange']:
+%   exampleRange = '1..<100' if Range == 'Range' else '1...100'
+
+extension ${Range}
+  where Bound: FixedWidthInteger, Bound.Stride : SignedInteger,
+  Bound.Magnitude: UnsignedInteger
+{
+      
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:using:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    guard !isEmpty else {
+      return nil
+    }
+    // Compute delta, the distance between the lower and upper bounds. This
+    // value may not representable by the type Bound if Bound is signed, but
+    // is always representable as Bound.Magnitude.
+    var delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
+%   if 'Closed' in Range:
+    // Subtle edge case: if the range is the whole set of representable values,
+    // then adding one to delta to account for a closed range will overflow.
+    // If we used &+ instead, the result would be zero, which isn't helpful,
+    // so we actually need to handle this case separately.
+    if delta == Bound.Magnitude.max {
+      return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
+    }
+    // Need to widen delta to account for the right-endpoint of a closed range.
+    delta += 1
+%   end
+    // The mathematical result we want is lowerBound plus a random value in
+    // 0 ..< delta. We need to be slightly careful about how we do this
+    // arithmetic; the Bound type cannot generally represent the random value,
+    // so we use a wrapping addition on Bound.Magnitude. This will often
+    // overflow, but produces the correct bit pattern for the result when
+    // converted back to Bound.
+    return Bound(truncatingIfNeeded:
+      Bound.Magnitude(truncatingIfNeeded: lowerBound) &+
+      generator.next(upperBound: delta)
+    )
+  }
+  
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
+  ///
+  /// This method uses the default random generator, `Random.default`. Calling
+  /// `(${exampleRange}).randomElement()` is equivalent to calling
+  /// `(${exampleRange}).randomElement(using: &Random.default)`.
+  ///
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
+  @inlinable
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
+  }
+}
+
+extension FixedWidthInteger
+where Self.Stride : SignedInteger,
+      Self.Magnitude : UnsignedInteger {
+
+  /// Returns a random value within the specified range, using the given
+  /// generator as a source for randomness.
+  ///
+  /// Use this method to generate an integer within a specific range when you
+  /// are using a custom random number generator. This example creates three
+  /// new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}, using: &myGenerator))
+  ///     }
+  ///     // Prints "7"
+  ///     // Prints "44"
+  ///     // Prints "21"
+  ///
+  /// - Parameters:
+  ///   - range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///     `range` must not be empty.
+%   end
+  ///   - generator: The random number generator to use when creating the
+  ///     new random value.
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    in range: ${Range}<Self>,
+    using generator: inout T
+  ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Can't get random value with an empty range"
+    )
+    return range.randomElement(using: &generator)!
+  }
+  
+  /// Returns a random value within the specified range.
+  ///
+  /// Use this method to generate an integer within a specific range. This
+  /// example creates three new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}))
+  ///     }
+  ///     // Prints "53"
+  ///     // Prints "64"
+  ///     // Prints "5"
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
+  /// `Int.random(in: ${exampleRange}, using: &Random.default)`.
+  ///
+  /// - Parameter range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///   `range` must not be empty.
+%   end
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return Self.random(in: range, using: &Random.default)
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 //===--- Operators on FixedWidthInteger -----------------------------------===//
@@ -2813,6 +3024,26 @@ ${assignmentOperatorComment('&' + x.operator, True)}
 % end
 }
 
+extension FixedWidthInteger {
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self {
+    if bitWidth <= UInt64.bitWidth {
+      return Self(truncatingIfNeeded: generator.next() as UInt64)
+    }
+
+    let (quotient, remainder) = bitWidth.quotientAndRemainder(
+      dividingBy: UInt64.bitWidth
+    )
+    var tmp: Self = 0
+    for i in 0 ..< quotient + remainder.signum() {
+      let next: UInt64 = generator.next()
+      tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
+    }
+    return tmp
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -2873,7 +3104,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     // This check is potentially removable by the optimizer
     if source.bitWidth >= Self.bitWidth {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
@@ -2983,7 +3214,7 @@ extension SignedInteger where Self : FixedWidthInteger {
     if (source.bitWidth > Self.bitWidth) ||
        (source.bitWidth == Self.bitWidth && !T.isSigned) {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
@@ -3647,34 +3878,42 @@ ${assignmentOperatorComment(x.operator, True)}
 %# end of concrete type: ${Self}
 
 extension ${Self} : Hashable {
-  /// The integer's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program. Do not persist the hash value across
-  /// program runs.
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    @inline(__always)
-    get {
-      return _hashValue(for: self)
-    }
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
     // to hash exactly the same way as the corresponding (U)Int64 value.  To fix
     // this, we should introduce a custom AnyHashable box for integer values
     // that sign-extends values to 64 bits.
     % if bits <= word_bits:
-    hasher.append(bits: _lowWord)
+    hasher._combine(_lowWord)
     % elif bits == 2 * word_bits:
     if let word = ${"" if signed else "U"}Int(exactly: self) {
-      hasher.append(bits: word._lowWord)
+      hasher._combine(word._lowWord)
     } else {
-      hasher.append(bits: UInt64(_value))
+      hasher._combine(UInt64(_value))
     }
+    % else:
+    fatalError("Unsupported integer width")
+    % end
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    // FIXME(hasher): Note that the AnyHashable concern applies here too,
+    // because hashValue uses top-level hashing.
+    % if bits <= word_bits:
+    return Hasher._hash(seed: seed, _lowWord)
+    % elif bits == 2 * word_bits:
+    if let word = ${"" if signed else "U"}Int(exactly: self) {
+      return Hasher._hash(seed: seed, word._lowWord)
+    }
+    return Hasher._hash(seed: seed, UInt64(_value))
     % else:
     fatalError("Unsupported integer width")
     % end
@@ -3806,6 +4045,16 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 }
 % end
 
+extension ${Self} {
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> ${Self} {
+    var result: ${Self} = 0
+    withUnsafeMutableBytes(of: &result) { generator._fill(bytes: $0) }
+    return result
+  }
+}
+
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 % end # end of concrete FixedWidthInteger section
@@ -3841,7 +4090,6 @@ public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs + rhs
@@ -3852,7 +4100,6 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeSubtracting`
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs - rhs

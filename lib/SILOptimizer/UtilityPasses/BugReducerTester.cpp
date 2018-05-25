@@ -77,7 +77,7 @@ class BugReducerTester : public SILFunctionTransform {
     auto EmptyTupleCanType = getFunction()
                                  ->getModule()
                                  .Types.getEmptyTupleType()
-                                 .getSwiftRValueType();
+                                 .getASTType();
     ResultInfoArray.push_back(
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(
@@ -148,7 +148,7 @@ class BugReducerTester : public SILFunctionTransform {
         RuntimeCrasherFunc->dump();
         SILBuilder B(Apply->getIterator());
         B.createApply(Loc, B.createFunctionRef(Loc, RuntimeCrasherFunc),
-                      SubstitutionList(),
+                      SubstitutionMap(),
                       ArrayRef<SILValue>(), false /*NoThrow*/);
 
         Apply->replaceAllUsesWith(SILUndef::get(Apply->getType(), M));

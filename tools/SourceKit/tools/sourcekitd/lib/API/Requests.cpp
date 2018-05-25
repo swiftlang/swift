@@ -1230,13 +1230,6 @@ public:
 };
 } // end anonymous namespace
 
-static bool isSwiftPrefixed(StringRef MangledName) {
-  if (MangledName.size() < 2)
-    return false;
-  return MangledName[0] == '_' &&
-         (MangledName[1] == 'T' || MangledName[1] == MANGLING_PREFIX_STR[1]);
-}
-
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified) {
   swift::Demangle::DemangleOptions DemangleOptions;
@@ -1246,7 +1239,7 @@ static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
   }
 
   auto getDemangledName = [&](StringRef MangledName) -> std::string {
-    if (!isSwiftPrefixed(MangledName))
+    if (!swift::Demangle::isSwiftSymbol(MangledName))
       return std::string(); // Not a mangled name
 
     std::string Result = swift::Demangle::demangleSymbolAsString(
@@ -2718,7 +2711,7 @@ void CompileTrackingConsumer::operationStarted(
   Dict.set(KeyCompileID, std::to_string(OpId));
   Dict.set(KeyFilePath, Inv.Args.PrimaryFile);
   // FIXME: OperationKind
-  Dict.set(KeyCompilerArgs, Inv.Args.Args);
+  Dict.set(KeyCompilerArgsString, Inv.Args.Arguments);
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 

@@ -272,10 +272,15 @@ BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
 /// reinterpretCast has type T -> U.
 BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 
-/// addressof ([inout] T) -> Builtin.RawPointer
-/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
-/// valid within the scope of the statement for logical lvalues.
+/// addressof (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
+
+/// addressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///
@@ -293,6 +298,27 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// Like the Gep-builtin, but rounds up the resulting address to a tail-
 /// allocated element type 'E'.
 BUILTIN_SIL_OPERATION(GetTailAddr, "getTailAddr", Integer)
+
+/// performInstantaneousReadAccess(Builtin.RawPointer, T.Type) -> ()
+/// Begin and then immediately end a read access to the given raw pointer,
+/// which will be treated as an address of type 'T'.
+BUILTIN_SIL_OPERATION(PerformInstantaneousReadAccess,
+                      "performInstantaneousReadAccess", Special)
+
+/// beginUnpairedModifyAccess(Builtin.RawPointer, Builtin.RawPointer,
+///                           T.Type) -> ()
+/// Begins but does not end a 'modify' access to the first raw pointer argument.
+/// The second raw pointer must be a pointer to an UnsafeValueBuffer, which
+/// will be used by the runtime to record the access. The lifetime of the
+/// value buffer must be longer than that of the access itself. The accessed
+/// address will be treated as having type 'T'.
+BUILTIN_SIL_OPERATION(BeginUnpairedModifyAccess, "beginUnpairedModifyAccess",
+                      Special)
+
+/// endUnpairedAccess(Builtin.RawPointer) -> ()
+/// Ends an in-progress unpaired access. The raw pointer argument must be
+/// be a pointer to an UnsafeValueBuffer that records an in progress access.
+BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.

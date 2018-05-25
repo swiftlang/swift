@@ -213,3 +213,13 @@ func conditionalDowncastToObject(b: B?) -> D {
   return b as? D! // expected-error {{value of optional type 'D?' not unwrapped; did you mean to use '!' or '?'?}}
   // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
 }
+
+// Ensure that we select the overload that does *not* involve forcing an IUO.
+func sr6988(x: Int?, y: Int?) -> Int { return x! }
+func sr6988(x: Int, y: Int) -> Float { return Float(x) }
+
+var x: Int! = nil
+var y: Int = 2
+
+let r = sr6988(x: x, y: y)
+let _: Int = r

@@ -32,6 +32,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrimitiveParsing.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Config.h"
@@ -611,8 +612,8 @@ private:
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
                     bool openBracket = true, bool closeBracket = true);
-  void printNominalDeclGenericParams(NominalTypeDecl *decl);
-  void printNominalDeclGenericRequirements(NominalTypeDecl *decl);
+  void printGenericDeclGenericParams(GenericContext *decl);
+  void printGenericDeclGenericRequirements(GenericContext *decl);
   void printInherited(const Decl *decl);
 
   void printEnumElement(EnumElementDecl *elt);
@@ -624,7 +625,7 @@ private:
                          bool Curried, bool ArgNameIsAPIByDefault);
 
   void printParameterList(ParameterList *PL, Type paramListTy, bool isCurried,
-                          std::function<bool()> isAPINameByDefault);
+                          llvm::function_ref<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
   /// to match the original function declaration.
@@ -1655,13 +1656,13 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
     Printer << "}";
 }
 
-void PrintAST::printNominalDeclGenericParams(NominalTypeDecl *decl) {
+void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
   if (decl->getGenericParams())
     if (auto GenericSig = decl->getGenericSignature())
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
 }
 
-void PrintAST::printNominalDeclGenericRequirements(NominalTypeDecl *decl) {
+void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
   if (decl->getGenericParams())
     if (auto GenericSig = decl->getGenericSignature())
       printGenericSignature(GenericSig, PrintRequirements | InnermostOnly);
@@ -1776,10 +1777,7 @@ void PrintAST::printSynthesizedExtension(Type ExtendedType,
 
     printExtendedTypeName(ExtendedType, Printer, Options);
     printInherited(ExtDecl);
-
-    if (ExtDecl->getGenericParams())
-      if (auto *GenericSig = ExtDecl->getGenericSignature())
-        printGenericSignature(GenericSig, PrintRequirements | InnermostOnly);
+    printGenericDeclGenericRequirements(ExtDecl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(ExtDecl, false,
@@ -1933,9 +1931,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     [&]{
       Printer.printName(decl->getName());
     }, [&]{ // Signature
-      if (decl->getGenericParams())
-        if (auto *genericSig = decl->getGenericSignature())
-          printGenericSignature(genericSig, PrintParams | InnermostOnly);
+      printGenericDeclGenericParams(decl);
     });
   bool ShouldPrint = true;
   Type Ty = decl->getUnderlyingTypeLoc().getType();
@@ -1947,6 +1943,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   if (ShouldPrint) {
     Printer << " = ";
     printTypeLoc(decl->getUnderlyingTypeLoc());
+    printGenericDeclGenericRequirements(decl);
   }
 }
 
@@ -2008,10 +2005,10 @@ void PrintAST::visitEnumDecl(EnumDecl *decl) {
       [&]{
         Printer.printName(decl->getName());
       }, [&]{ // Signature
-        printNominalDeclGenericParams(decl);
+        printGenericDeclGenericParams(decl);
       });
     printInherited(decl);
-    printNominalDeclGenericRequirements(decl);
+    printGenericDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2036,10 +2033,10 @@ void PrintAST::visitStructDecl(StructDecl *decl) {
       [&]{
         Printer.printName(decl->getName());
       }, [&]{ // Signature
-        printNominalDeclGenericParams(decl);
+        printGenericDeclGenericParams(decl);
       });
     printInherited(decl);
-    printNominalDeclGenericRequirements(decl);
+    printGenericDeclGenericRequirements(decl);
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -2064,11 +2061,11 @@ void PrintAST::visitClassDecl(ClassDecl *decl) {
       [&]{
         Printer.printName(decl->getName());
       }, [&]{ // Signature
-        printNominalDeclGenericParams(decl);
+        printGenericDeclGenericParams(decl);
       });
 
     printInherited(decl);
-    printNominalDeclGenericRequirements(decl);
+    printGenericDeclGenericRequirements(decl);
   }
 
   if (Options.TypeDefinitions) {
@@ -2314,7 +2311,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
 void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
                                   bool isCurried,
-                                  std::function<bool()> isAPINameByDefault) {
+                                  llvm::function_ref<bool()> isAPINameByDefault) {
   SmallVector<ParameterTypeFlags, 4> paramFlags;
   if (paramListTy && !paramListTy->hasError()) {
     if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {
@@ -2511,10 +2508,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
             Printer << " ";
         }
       }, [&] { // Parameters
-        if (decl->isGeneric())
-          if (auto *genericSig = decl->getGenericSignature())
-            printGenericSignature(genericSig, PrintParams | InnermostOnly);
-
+        printGenericDeclGenericParams(decl);
         printFunctionParameters(decl);
       });
 
@@ -2538,9 +2532,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         printTypeLoc(ResultTyLoc);
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
-    if (decl->isGeneric())
-      if (auto *genericSig = decl->getGenericSignature())
-        printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
+    printGenericDeclGenericRequirements(decl);
   }
 
   if (auto BodyFunc = Options.FunctionBody) {
@@ -2596,11 +2588,15 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     Printer.printStructurePost(PrintStructureKind::NumberLiteral);
     break;
   }
-  case ExprKind::StringLiteral:
+  case ExprKind::StringLiteral: {
     Printer.callPrintStructurePre(PrintStructureKind::StringLiteral);
-    Printer << "\"" << cast<StringLiteralExpr>(raw)->getValue() << "\"";
+    llvm::SmallString<32> str;
+    llvm::raw_svector_ostream os(str);
+    os << QuotedString(cast<StringLiteralExpr>(raw)->getValue());
+    Printer << str;
     Printer.printStructurePost(PrintStructureKind::StringLiteral);
     break;
+  }
   default:
     break; // Incorrect raw value; skip it for error recovery.
   }
@@ -2639,10 +2635,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   recordDeclLoc(decl, [&]{
     Printer << "subscript";
   }, [&] { // Parameters
-    if (decl->isGeneric())
-      if (auto *genericSig = decl->getGenericSignature())
-        printGenericSignature(genericSig, PrintParams | InnermostOnly);
-
+    printGenericDeclGenericParams(decl);
     printParameterList(decl->getIndices(),
                        decl->hasInterfaceType()
                          ? decl->getIndicesInterfaceType()
@@ -2661,9 +2654,7 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   else
     printTypeLoc(elementTy);
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
-  if (decl->isGeneric())
-    if (auto *genericSig = decl->getGenericSignature())
-      printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
+  printGenericDeclGenericRequirements(decl);
   printAccessors(decl);
 }
 
@@ -2699,16 +2690,11 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
         break;
       }
 
-      if (decl->isGeneric())
-        if (auto *genericSig = decl->getGenericSignature())
-          printGenericSignature(genericSig, PrintParams | InnermostOnly);
-
+      printGenericDeclGenericParams(decl);
       printFunctionParameters(decl);
     });
 
-  if (decl->isGeneric())
-    if (auto *genericSig = decl->getGenericSignature())
-      printGenericSignature(genericSig, PrintRequirements | InnermostOnly);
+  printGenericDeclGenericRequirements(decl);
 
   if (auto BodyFunc = Options.FunctionBody) {
     Printer << " {";
@@ -2965,6 +2951,9 @@ void PrintAST::visitSwitchStmt(SwitchStmt *stmt) {
 }
 
 void PrintAST::visitCaseStmt(CaseStmt *CS) {
+  if (CS->hasUnknownAttr())
+    Printer << "@unknown ";
+
   if (CS->isDefault()) {
     Printer << tok::kw_default;
   } else {
@@ -3063,35 +3052,6 @@ void Pattern::print(llvm::raw_ostream &OS, const PrintOptions &Options) const {
   Printer.printPattern(this);
 }
 
-static bool isSimple(Type type) {
-  switch (type->getKind()) {
-  case TypeKind::Function:
-  case TypeKind::GenericFunction:
-    return false;
-
-  case TypeKind::Metatype:
-  case TypeKind::ExistentialMetatype:
-    return !cast<AnyMetatypeType>(type.getPointer())->hasRepresentation();
-
-  case TypeKind::Archetype: {
-    auto arch = type->getAs<ArchetypeType>();
-    return !arch->isOpenedExistential();
-  }
-
-  case TypeKind::ProtocolComposition: {
-    // 'Any', 'AnyObject' and single protocol compositions are simple
-    auto composition = type->getAs<ProtocolCompositionType>();
-    auto memberCount = composition->getMembers().size();
-    if (composition->hasExplicitAnyObject())
-      return memberCount == 0;
-    return memberCount <= 1;
-  }
-
-  default:
-    return true;
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //  Type Printing
 //===----------------------------------------------------------------------===//
@@ -3122,12 +3082,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
     }
 
-    if (!isSimple(T)) {
+    if (T->hasSimpleTypeRepr()) {
+      visit(T);
+    } else {
       Printer << "(";
       visit(T);
       Printer << ")";
-    } else {
-      visit(T);
     }
   }
 
@@ -3759,11 +3719,11 @@ public:
     }
 
     // The arguments to the layout, if any, do come from the outer environment.
-    if (!T->getGenericArgs().empty()) {
+    if (auto subMap = T->getSubstitutions()) {
       Printer << " <";
-      interleave(T->getGenericArgs(),
-                 [&](const Substitution &arg) {
-                   visit(arg.getReplacement());
+      interleave(subMap.getReplacementTypes(),
+                 [&](Type type) {
+                   visit(type);
                  }, [&]{
                    Printer << ", ";
                  });
@@ -4124,12 +4084,12 @@ std::string Type::getStringAsComponent(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
 
-  if (!isSimple(*this)) {
+  if (getPointer()->hasSimpleTypeRepr()) {
+    print(OS, PO);
+  } else {
     OS << "(";
     print(OS, PO);
     OS << ")";
-  } else {
-    print(OS, PO);
   }
 
   return OS.str();
@@ -4139,12 +4099,12 @@ std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
 
-  if (!isSimple(const_cast<TypeBase *>(this))) {
+  if (hasSimpleTypeRepr()) {
+    print(OS, PO);
+  } else {
     OS << "(";
     print(OS, PO);
     OS << ")";
-  } else {
-    print(OS, PO);
   }
 
   return OS.str();
@@ -4202,9 +4162,10 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
   case ProtocolConformanceKind::Specialized: {
     auto spec = cast<SpecializedProtocolConformance>(this);
     os << "specialize <";
-    interleave(spec->getGenericSubstitutions(),
-               [&](const Substitution &s) { s.print(os, PO); },
+    interleave(spec->getSubstitutionMap().getReplacementTypes(),
+               [&](Type type) { type.print(os, PO); },
                [&] { os << ", "; });
+
     os << "> (";
     spec->getGenericConformance()->printName(os, PO);
     os << ")";
@@ -4218,11 +4179,6 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     break;
   }
   }
-}
-
-void Substitution::print(llvm::raw_ostream &os,
-                         const PrintOptions &PO) const {
-  Replacement->print(os, PO);
 }
 
 void swift::printEnumElementsAsCases(

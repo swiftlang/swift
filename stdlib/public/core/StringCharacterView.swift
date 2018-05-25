@@ -52,7 +52,7 @@ extension String {
   /// using the `String` type's `init(_:)` initializer.
   ///
   ///     let name = "Marie Curie"
-  ///     if let firstSpace = name.characters.index(of: " ") {
+  ///     if let firstSpace = name.characters.firstIndex(of: " ") {
   ///         let firstName = String(name.characters[..<firstSpace])
   ///         print(firstName)
   ///     }
@@ -121,7 +121,7 @@ extension String {
   ///     var str = "All this happened, more or less."
   ///     let afterSpace = str.withMutableCharacters {
   ///         chars -> String.CharacterView in
-  ///         if let i = chars.index(of: " ") {
+  ///         if let i = chars.firstIndex(of: " ") {
   ///             let result = chars[chars.index(after: i)...]
   ///             chars.removeSubrange(i...)
   ///             return result
@@ -181,19 +181,16 @@ extension String {
 
 extension String._CharacterView : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String {
     return _base
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _wholeString : String {
     return _base
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _encodedOffsetRange : Range<Int> {
     return _base._encodedOffsetRange
   }
@@ -201,7 +198,6 @@ extension String._CharacterView : _SwiftStringView {
 
 extension String._CharacterView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var _guts: _StringGuts {
     return _base._guts
   }
@@ -211,7 +207,6 @@ extension String._CharacterView {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_base._guts, coreOffset: _baseOffset)
   }
@@ -225,7 +220,6 @@ extension String._CharacterView : BidirectionalCollection {
   /// Translates a view index into an index in the underlying base string using
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _toBaseIndex(_ index: Index) -> Index {
     return Index(
       encodedOffset: index.encodedOffset - _baseOffset,
@@ -235,7 +229,6 @@ extension String._CharacterView : BidirectionalCollection {
   /// Translates an index in the underlying base string into a view index using
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _toViewIndex(_ index: Index) -> Index {
     return Index(
       encodedOffset: index.encodedOffset + _baseOffset,
@@ -281,7 +274,7 @@ extension String._CharacterView : BidirectionalCollection {
   /// letter and then prints the character at the found index:
   ///
   ///     let greeting = "Hello, friend!"
-  ///     if let i = greeting.characters.index(where: { "A"..."Z" ~= $0 }) {
+  ///     if let i = greeting.characters.firstIndex(where: { "A"..."Z" ~= $0 }) {
   ///         print("First capital letter: \(greeting.characters[i])")
   ///     }
   ///     // Prints "First capital letter: H"
@@ -337,7 +330,6 @@ extension String._CharacterView : RangeReplaceableCollection {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _base.reserveCapacity(n)
   }
@@ -345,7 +337,6 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// Appends the given character to the character view.
   ///
   /// - Parameter c: The character to append to the character view.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     _base.append(c)
   }
@@ -368,14 +359,13 @@ extension String._CharacterView {
   /// not including, the first comma (`","`) in the string.
   ///
   ///     let str = "All this happened, more or less."
-  ///     let i = str.characters.index(of: ",")!
+  ///     let i = str.characters.firstIndex(of: ",")!
   ///     let substring = str.characters[str.characters.startIndex ..< i]
   ///     print(String(substring))
   ///     // Prints "All this happened"
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public subscript(bounds: Range<Index>) -> String.CharacterView {

@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollectorOwnership.h"
+#include "MandatoryOptUtils.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -44,8 +45,6 @@ llvm::cl::opt<bool> TriggerUnreachableOnFailure(
                    "Meant for debugging ONLY!"),
     llvm::cl::Hidden);
 
-STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
-
 template<typename ...ArgTypes>
 static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
                                    ArgTypes... args) {
@@ -55,83 +54,6 @@ static InFlightDiagnostic diagnose(SILModule &M, SILLocation loc,
     llvm_unreachable("Triggering standard assertion failure routine");
   return diag;
 }
-
-enum class PartialInitializationKind {
-  /// The box contains a fully-initialized value.
-  IsNotInitialization,
-
-  /// The box contains a class instance that we own, but the instance has
-  /// not been initialized and should be freed with a special SIL
-  /// instruction made for this purpose.
-  IsReinitialization,
-
-  /// The box contains an undefined value that should be ignored.
-  IsInitialization,
-};
-
-/// Emit the sequence that an assign instruction lowers to once we know
-/// if it is an initialization or an assignment.  If it is an assignment,
-/// a live-in value can be provided to optimize out the reload.
-static void LowerAssignInstruction(SILBuilderWithScope &B, AssignInst *Inst,
-                                   PartialInitializationKind isInitialization) {
-  DEBUG(llvm::dbgs() << "  *** Lowering [isInit=" << unsigned(isInitialization)
-                     << "]: " << *Inst << "\n");
-
-  ++NumAssignRewritten;
-
-  SILValue Src = Inst->getSrc();
-  SILLocation Loc = Inst->getLoc();
-
-  if (isInitialization == PartialInitializationKind::IsInitialization ||
-      Inst->getDest()->getType().isTrivial(Inst->getModule())) {
-
-    // If this is an initialization, or the storage type is trivial, we
-    // can just replace the assignment with a store.
-    assert(isInitialization != PartialInitializationKind::IsReinitialization);
-    B.createTrivialStoreOr(Loc, Src, Inst->getDest(),
-                           StoreOwnershipQualifier::Init);
-    Inst->eraseFromParent();
-    return;
-  }
-
-  if (isInitialization == PartialInitializationKind::IsReinitialization) {
-    // We have a case where a convenience initializer on a class
-    // delegates to a factory initializer from a protocol extension.
-    // Factory initializers give us a whole new instance, so the existing
-    // instance, which has not been initialized and never will be, must be
-    // freed using dealloc_partial_ref.
-    SILValue Pointer =
-        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
-    B.createStore(Loc, Src, Inst->getDest(), StoreOwnershipQualifier::Init);
-
-    auto MetatypeTy = CanMetatypeType::get(
-        Inst->getDest()->getType().getSwiftRValueType(),
-        MetatypeRepresentation::Thick);
-    auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
-    SILValue Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
-
-    B.createDeallocPartialRef(Loc, Pointer, Metatype);
-    Inst->eraseFromParent();
-    return;
-  }
-
-  assert(isInitialization == PartialInitializationKind::IsNotInitialization);
-  // Otherwise, we need to replace the assignment with the full
-  // load/store/release dance. Note that the new value is already
-  // considered to be retained (by the semantics of the storage type),
-  // and we're transferring that ownership count into the destination.
-
-  // This is basically TypeLowering::emitStoreOfCopy, except that if we have
-  // a known incoming value, we can avoid the load.
-  SILValue IncomingVal =
-      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Take);
-  B.createStore(Inst->getLoc(), Src, Inst->getDest(),
-                StoreOwnershipQualifier::Init);
-
-  B.emitDestroyValueOperation(Loc, IncomingVal);
-  Inst->eraseFromParent();
-}
-
 
 /// Insert a CFG diamond at the position specified by the SILBuilder, with a
 /// conditional branch based on "Cond".
@@ -1912,7 +1834,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
 
     SmallVector<SILInstruction*, 4> InsertedInsts;
     SILBuilderWithScope B(Inst, &InsertedInsts);
-    LowerAssignInstruction(B, AI, PartialInitKind);
+    lowerAssignInstruction(B, AI, PartialInitKind);
 
     // If lowering of the assign introduced any new loads or stores, keep track
     // of them.
@@ -1962,7 +1884,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
         Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
       auto MetatypeTy = CanMetatypeType::get(
-          TheMemory.MemorySILType.getSwiftRValueType(),
+          TheMemory.MemorySILType.getASTType(),
           MetatypeRepresentation::Thick);
       auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
       SILValue Metatype;
@@ -2899,268 +2821,35 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                      <<  Fn.getName() << "\n");
   bool Changed = false;
-  for (auto &BB : Fn) {
-    for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
-      SILInstruction *Inst = &*I;
-      if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst))
-        Changed |= processMemoryObject(MUI);
-    }
-  }
-  return Changed;
-}
 
-/// lowerRawSILOperations - There are a variety of raw-sil instructions like
-/// 'assign' that are only used by this pass.  Now that definite initialization
-/// checking is done, remove them.
-static bool lowerRawSILOperations(SILFunction &Fn) {
-  bool Changed = false;
   for (auto &BB : Fn) {
-    auto I = BB.begin(), E = BB.end();
-    while (I != E) {
+    for (auto I = BB.begin(), E = BB.end(); I != E;) {
       SILInstruction *Inst = &*I;
+
+      auto *MUI = dyn_cast<MarkUninitializedInst>(Inst);
+      if (!MUI || !processMemoryObject(MUI)) {
+        ++I;
+        continue;
+      }
+
+      // Move off of the MUI only after we have processed memory objects. The
+      // lifetime checker may rewrite instructions, so it is important to not
+      // move onto the next element until after it runs.
       ++I;
-
-      // Unprocessed assigns just lower into assignments, not initializations.
-      if (auto *AI = dyn_cast<AssignInst>(Inst)) {
-        SILBuilderWithScope B(AI);
-        LowerAssignInstruction(B, AI,
-            PartialInitializationKind::IsNotInitialization);
-        // Assign lowering may split the block. If it did,
-        // reset our iteration range to the block after the insertion.
-        if (B.getInsertionBB() != &BB)
-          I = E;
-        Changed = true;
-        continue;
-      }
-
-      // mark_uninitialized just becomes a noop, resolving to its operand.
-      if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst)) {
-        MUI->replaceAllUsesWith(MUI->getOperand());
-        MUI->eraseFromParent();
-        Changed = true;
-        continue;
-      }
-      
-      // mark_function_escape just gets zapped.
-      if (isa<MarkFunctionEscapeInst>(Inst)) {
-        Inst->eraseFromParent();
-        Changed = true;
-        continue;
-      }
+      MUI->replaceAllUsesWith(MUI->getOperand());
+      MUI->eraseFromParent();
+      Changed = true;
     }
   }
-  return Changed;
-}
 
-static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
-   auto numSuccs = SEI->getNumSuccessors();
-   if (numSuccs != 2)
-     return nullptr;
-   auto *SuccSome = SEI->getCase(0).second;
-   auto *SuccNone = SEI->getCase(1).second;
-   if (SuccSome->args_size() != 1)
-     std::swap(SuccSome, SuccNone);
-
-   if (SuccSome->args_size() != 1 || SuccNone->args_size() != 0)
-     return nullptr;
-
-   auto *Succ = SuccSome->getSingleSuccessorBlock();
-   if (!Succ)
-     return nullptr;
-
-   if (SuccNone == Succ)
-     return Succ;
-
-   SuccNone = SuccNone->getSingleSuccessorBlock();
-   if (SuccNone == Succ)
-     return Succ;
-
-   SuccNone = SuccNone->getSingleSuccessorBlock();
-   if (SuccNone == Succ)
-     return Succ;
-
-   return nullptr;
-}
-
-/// Extend the lifetime of the convert_escape_to_noescape's operand to the end
-/// of the function.
-void extendLifetimeToEndOfFunction(SILFunction &Fn,
-                                   ConvertEscapeToNoEscapeInst *Cvt) {
-  auto EscapingClosure = Cvt->getOperand();
-  auto EscapingClosureTy = EscapingClosure->getType();
-  auto OptionalEscapingClosureTy = SILType::getOptionalType(EscapingClosureTy);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-
-  SILBuilderWithScope B(Cvt);
-  auto NewCvt = B.createConvertEscapeToNoEscape(
-      Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
-  Cvt->replaceAllUsesWith(NewCvt);
-  Cvt->eraseFromParent();
-  Cvt = NewCvt;
-
-  // Create an alloc_stack Optional<() -> ()> at the beginning of the function.
-  AllocStackInst *Slot;
-  auto &Context = Cvt->getModule().getASTContext();
-  {
-    SILBuilderWithScope B(Fn.getEntryBlock()->begin());
-    Slot = B.createAllocStack(loc, OptionalEscapingClosureTy);
-    auto *NoneDecl = Context.getOptionalNoneDecl();
-    // Store None to it.
-    B.createStore(
-        loc, B.createEnum(loc, SILValue(), NoneDecl, OptionalEscapingClosureTy),
-        Slot, StoreOwnershipQualifier::Init);
-  }
-  // Insert a copy before the convert_escape_to_noescape and store it to the
-  // alloc_stack location.
-  {
-    SILBuilderWithScope B(Cvt);
-    auto *SomeDecl = Context.getOptionalSomeDecl();
-    B.createDestroyAddr(loc, Slot);
-    auto ClosureCopy = B.createCopyValue(loc, EscapingClosure);
-    B.createStore(
-        loc,
-        B.createEnum(loc, ClosureCopy, SomeDecl, OptionalEscapingClosureTy),
-        Slot, StoreOwnershipQualifier::Init);
-  }
-  // Insert destroys at the function exits.
-  SmallVector<SILBasicBlock *, 4> ExitingBlocks;
-  Fn.findExitingBlocks(ExitingBlocks);
-  for (auto *Exit : ExitingBlocks) {
-    auto *Term = Exit->getTerminator();
-    SILBuilderWithScope B(Term);
-    B.setInsertionPoint(Term);
-    B.createDestroyAddr(loc, Slot);
-    B.createDeallocStack(loc, Slot);
-  }
-}
-
-/// Ensure the lifetime of the closure accross an
-///
-///   optional<@escaping () -> ()> to
-///   optional<@noescape @convention(block) () -> ()>
-///
-///   conversion and its use.
-///
-///   The pattern this is looking for
-///                            switch_enum %closure
-///                           /           \
-///     convert_escape_to_noescape          nil
-///                             switch_enum
-///                           /           \
-///                convertToBlock          nil
-///                           \            /
-///                     (%convertOptionalBlock :)
-///   We will insert a copy_value of the original %closure before the two
-///   diamonds. And a destroy of %closure at the last destroy of
-///   %convertOptionalBlock.
-static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
-  auto *blockArg = dyn_cast<SILArgument>(Cvt->getOperand());
-  if (!blockArg)
-    return false;
-  auto *PredBB = Cvt->getParent()->getSinglePredecessorBlock();
-  if (!PredBB)
-    return false;
-  auto *ConvertSuccessorBlock = Cvt->getParent()->getSingleSuccessorBlock();
-  if (!ConvertSuccessorBlock)
-    return false;
-  auto *SwitchEnum1 = dyn_cast<SwitchEnumInst>(PredBB->getTerminator());
-  if (!SwitchEnum1)
-    return false;
-  auto *DiamondSucc = getOptionalDiamondSuccessor(SwitchEnum1);
-  if (!DiamondSucc)
-    return false;
-  auto *SwitchEnum2 = dyn_cast<SwitchEnumInst>(DiamondSucc->getTerminator());
-  if (!SwitchEnum2)
-    return false;
-  auto *DiamondSucc2 = getOptionalDiamondSuccessor(SwitchEnum2);
-  if (!DiamondSucc2)
-    return false;
-  if (DiamondSucc2->getNumArguments() != 1)
-    return false;
-
-  // Look for the last and only destroy.
-  SILInstruction *onlyDestroy = [&]() -> SILInstruction * {
-    SILInstruction *lastDestroy = nullptr;
-    for (auto *Use : DiamondSucc2->getArgument(0)->getUses()) {
-      SILInstruction *Usr = Use->getUser();
-      if (isa<ReleaseValueInst>(Usr) || isa<StrongReleaseInst>(Usr) ||
-          isa<DestroyValueInst>(Usr)) {
-        if (lastDestroy)
-          return nullptr;
-        lastDestroy = Usr;
-      }
-    }
-    return lastDestroy;
-  }();
-  if (!onlyDestroy)
-    return false;
-
-  // Replace the convert_escape_to_noescape instruction.
-  {
-    SILBuilderWithScope B(Cvt);
-    auto NewCvt = B.createConvertEscapeToNoEscape(
-        Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), true);
-    Cvt->replaceAllUsesWith(NewCvt);
-    Cvt->eraseFromParent();
-    Cvt = NewCvt;
-  }
-
-  // Extend the lifetime.
-  SILBuilderWithScope B(SwitchEnum1);
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  auto copy =
-      B.createCopyValue(loc, SwitchEnum1->getOperand());
-  B.setInsertionPoint(onlyDestroy);
-  B.createDestroyValue(loc, copy);
-  return true;
-}
-
-llvm::cl::opt<bool> DIDisableConvertEscapeToNoEscapeSwitchEnumPeephole(
-    "sil-di-disable-convert-escape-to-noescape-switch-peephole",
-    llvm::cl::init(false),
-    llvm::cl::desc(
-        "Disable the convert_escape_to_noescape switch enum peephole. "),
-    llvm::cl::Hidden);
-
-/// Fix-up the lifetime of the escaping closure argument of
-/// convert_escape_to_noescape [not_guaranteed] instructions.
-///
-/// convert_escape_to_noescape [not_guaranteed] assume that someone guarantees
-/// the lifetime of the operand for the duration of the trivial closure result.
-/// SILGen does not guarantee this for '[not_guaranteed]' instructions so we
-/// ensure it here.
-static bool fixupConvertEscapeToNoEscapeLifetime(SILFunction &Fn) {
-  bool Changed = false;
-  for (auto &BB : Fn) {
-    auto I = BB.begin();
-    while (I != BB.end()) {
-      SILInstruction *Inst = &*I;
-      ++I;
-      auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Inst);
-      if (!Cvt || Cvt->isLifetimeGuaranteed())
-        continue;
-
-      // First try to peephole a known pattern.
-      if (!DIDisableConvertEscapeToNoEscapeSwitchEnumPeephole &&
-          trySwitchEnumPeephole(Cvt)) {
-        Changed |= true;
-        continue;
-      }
-
-      // Otherwise, extend the lifetime of the operand to the end of the
-      // function.
-      extendLifetimeToEndOfFunction(Fn, Cvt);
-      Changed |= true;
-    }
-  }
   return Changed;
 }
 
 namespace {
+
 /// Perform definitive initialization analysis and promote alloc_box uses into
 /// SSA registers for later SSA-based dataflow passes.
 class DefiniteInitialization : public SILFunctionTransform {
-
   /// The entry point to the transformation.
   void run() override {
     // Don't rerun diagnostics on deserialized functions.
@@ -3171,20 +2860,9 @@ class DefiniteInitialization : public SILFunctionTransform {
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
-
-    DEBUG(getFunction()->verify());
-
-    // Lower raw-sil only instructions used by this pass, like "assign".
-    if (lowerRawSILOperations(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-
-    // Fixup lifetimes of optional convertEscapeToNoEscape.
-    if (fixupConvertEscapeToNoEscapeLifetime(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-
   }
-
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createDefiniteInitialization() {

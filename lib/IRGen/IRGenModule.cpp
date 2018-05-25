@@ -793,8 +793,9 @@ static void appendEncodedName(llvm::SmallVectorImpl<char> &buf,
   appendEncodedName(os, name);
 }
 
-static StringRef encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
-                                           StringRef name) {
+StringRef
+swift::irgen::encodeForceLoadSymbolName(llvm::SmallVectorImpl<char> &buf,
+                                        StringRef name) {
   llvm::raw_svector_ostream os{buf};
   os << "_swift_FORCE_LOAD_$";
   appendEncodedName(os, name);
@@ -1047,8 +1048,10 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
-    case llvm::Triple::COFF:
       ModuleHash->setSection(".swift_modhash");
+      break;
+    case llvm::Triple::COFF:
+      ModuleHash->setSection(".sw5hash");
       break;
     default:
       llvm_unreachable("Don't know how to emit the module hash for the selected"

@@ -21,7 +21,6 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
@@ -95,7 +94,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class Substitution;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -186,19 +184,26 @@ class SILLayout; // From SIL
 /// DispatchQueues. Summary: if you think you need a global or static variable,
 /// you probably need to put it here instead.
 
-class ASTContext {
+class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
+
+  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
-  Implementation &Impl;
-  
+  Implementation &getImpl() const;
+
   friend ConstraintCheckerArenaRAII;
-public:
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+
+  void operator delete(void *Data) throw();
+
+  static ASTContext *get(LangOptions &langOpts,
+                         SearchPathOptions &SearchPathOpts,
+                         SourceManager &SourceMgr,
+                         DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// \brief The language options used for translation.
@@ -471,12 +476,8 @@ public:
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
-  /// Retrieve the declaration of
-  /// Swift._combineHashValues(Int, Int) -> Int.
-  FuncDecl *getCombineHashValuesDecl() const;
-
-  /// Retrieve the declaration of Swift._mixInt(Int) -> Int.
-  FuncDecl *getMixIntDecl() const;
+  /// Retrieve the declaration of Swift._hashValue<H>(for: H) -> Int.
+  FuncDecl *getHashValueForDecl() const;
 
   /// Retrieve the declaration of Array.append(element:)
   FuncDecl *getArrayAppendElementDecl() const;
@@ -532,6 +533,11 @@ public:
   /// as part of the current module or source file, but are otherwise not
   /// nested within it.
   void addExternalDecl(Decl *decl);
+
+  /// Add a declaration that was synthesized to a per-source file list if
+  /// if is part of a source file, or the external declarations list if
+  /// it is part of an imported type context.
+  void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
@@ -739,30 +745,11 @@ public:
   /// \param generic The generic conformance.
   ///
   /// \param substitutions The set of substitutions required to produce the
-  /// specialized conformance from the generic conformance. This list is
-  /// copied so passing a temporary is permitted.
+  /// specialized conformance from the generic conformance.
   ProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
-                            SubstitutionList substitutions,
-                            bool alreadyCheckedCollapsed = false);
-
-  /// \brief Produce a specialized conformance, which takes a generic
-  /// conformance and substitutions written in terms of the generic
-  /// conformance's signature.
-  ///
-  /// \param type The type for which we are retrieving the conformance.
-  ///
-  /// \param generic The generic conformance.
-  ///
-  /// \param substitutions The set of substitutions required to produce the
-  /// specialized conformance from the generic conformance. The keys must
-  /// be generic parameters, not archetypes, so for example passing in
-  /// TypeBase::getContextSubstitutionMap() is OK.
-  ProtocolConformance *
-  getSpecializedConformance(Type type,
-                            ProtocolConformance *generic,
-                            const SubstitutionMap &substitutions);
+                            SubstitutionMap substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.

@@ -353,6 +353,16 @@ public protocol RangeReplaceableCollection : Collection
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   mutating func removeAll(keepingCapacity keepCapacity: Bool /*= false*/)
 
+  /// Removes from the collection all elements that satisfy the given predicate.
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool) rethrows
+
   // FIXME(ABI): Associated type inference requires this.
   subscript(bounds: Index) -> Element { get }
 
@@ -544,7 +554,7 @@ extension RangeReplaceableCollection {
   /// Removes the elements in the specified subrange from the collection.
   ///
   /// All the elements following the specified position are moved to close the
-  /// gap. This example removes two elements from the middle of an array of
+  /// gap. This example removes three elements from the middle of an array of
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
@@ -745,7 +755,7 @@ extension RangeReplaceableCollection {
   /// Removes the elements in the specified subrange from the collection.
   ///
   /// All the elements following the specified position are moved to close the
-  /// gap. This example removes two elements from the middle of an array of
+  /// gap. This example removes three elements from the middle of an array of
   /// measurements.
   ///
   ///     var measurements = [1.2, 1.5, 2.9, 1.2, 1.5]
@@ -1073,5 +1083,65 @@ extension RangeReplaceableCollection {
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> Self {
     return try Self(self.lazy.filter(isIncluded))
+  }
+}
+
+extension RangeReplaceableCollection where Self: MutableCollection {
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the odd values from an
+  /// array of numbers:
+  ///
+  ///     var numbers = [5, 6, 7, 8, 9, 10, 11]
+  ///     numbers.removeAll(where: { $0 % 2 == 1 })
+  ///     // numbers == [6, 8, 10]
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool
+  ) rethrows {
+    guard var i = try firstIndex(where: shouldBeRemoved) else { return }
+    var j = index(after: i)
+    while j != endIndex {
+      if try !shouldBeRemoved(self[j]) {
+        swapAt(i, j)
+        formIndex(after: &i)
+      }
+      formIndex(after: &j)
+    }
+    removeSubrange(i...)
+  }
+}
+
+extension RangeReplaceableCollection {
+  /// Removes all the elements that satisfy the given predicate.
+  ///
+  /// Use this method to remove every element in a collection that meets
+  /// particular criteria. This example removes all the vowels from a string:
+  ///
+  ///     var phrase = "The rain in Spain stays mainly in the plain."
+  ///
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     phrase.removeAll(where: { vowels.contains($0) })
+  ///     // phrase == "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter shouldBeRemoved: A closure that takes an element of the
+  ///   sequence as its argument and returns a Boolean value indicating
+  ///   whether the element should be removed from the collection.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @inlinable
+  public mutating func removeAll(
+    where shouldBeRemoved: (Element) throws -> Bool
+  ) rethrows {
+    // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
+    // self = try filter { try !predicate($0) }
+    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
   }
 }

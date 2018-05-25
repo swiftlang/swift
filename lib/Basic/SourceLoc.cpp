@@ -212,14 +212,14 @@ void SourceRange::widen(SourceRange Other) {
     End = Other.End;
 }
 
-void SourceLoc::printLineAndColumn(raw_ostream &OS,
-                                   const SourceManager &SM) const {
+void SourceLoc::printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
+                                   unsigned BufferID) const {
   if (isInvalid()) {
     OS << "<invalid loc>";
     return;
   }
 
-  auto LineAndCol = SM.getLineAndColumn(*this);
+  auto LineAndCol = SM.getLineAndColumn(*this, BufferID);
   OS << "line:" << LineAndCol.first << ':' << LineAndCol.second;
 }
 

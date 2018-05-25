@@ -174,7 +174,7 @@ namespace llvm {
 template <>
 struct ilist_traits<::swift::SILVTable> :
 public ilist_default_traits<::swift::SILVTable> {
-  typedef ::swift::SILVTable SILVTable;
+  using SILVTable = ::swift::SILVTable;
 
   static void deleteNode(SILVTable *VT) { VT->~SILVTable(); }
 

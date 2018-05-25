@@ -22,7 +22,6 @@ enum _GutsClassification: UInt {
 }
 
 extension _StringGuts {
-  @usableFromInline
   @inlinable
   var classification: _GutsClassification {
     if _isSmall { return .smallUTF8 }
@@ -684,7 +683,6 @@ internal func _tryNormalize(
 
 extension _UnmanagedString where CodeUnit == UInt8 {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func compareASCII(to other: _UnmanagedString<UInt8>) -> Int {
     // FIXME Results should be the same across all platforms.
     if self.start == other.start {
@@ -939,26 +937,29 @@ extension _UnmanagedString where CodeUnit == UInt8 {
       if _fastPath(
         other._parseRawScalar(startingFrom: idx).0._isNormalizedSuperASCII
       ) {
-       return .less
+        return .less
       }
-    } else {
-      let selfASCIIChar = UInt16(self[idx])
-      _sanityCheck(selfASCIIChar != otherCU, "should be different")
-      if idx+1 == other.count {
-        return _lexicographicalCompare(selfASCIIChar, otherCU)
-      }
-      if _fastPath(other.hasNormalizationBoundary(after: idx)) {
-        return _lexicographicalCompare(selfASCIIChar, otherCU)
-      }
+
+      // Rare pathological case, e.g. Kelvin symbol
+      var selfIterator = _NormalizedCodeUnitIterator(self)
+      return selfIterator.compare(with: _NormalizedCodeUnitIterator(other))
+    }
+
+    let selfASCIIChar = UInt16(self[idx])
+    _sanityCheck(selfASCIIChar != otherCU, "should be different")
+    if idx+1 == other.count {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
+    }
+    if _fastPath(other.hasNormalizationBoundary(after: idx)) {
+      return _lexicographicalCompare(selfASCIIChar, otherCU)
     }
 
     //
     // Otherwise, need to normalize the segment and then compare
     //
-    let selfASCIIChar = UInt16(self[idx])
     return _compareStringsPostSuffix(
-      selfASCIIChar: selfASCIIChar, otherUTF16: other[idx...]
-      )
+      selfASCIIChar: selfASCIIChar, otherUTF16WithLeadingASCII: other[idx...]
+    )
   }
 }
 
@@ -1010,15 +1011,17 @@ extension BidirectionalCollection where Element == UInt16, SubSequence == Self {
   }
 }
 
+@inline(never) // @outlined
 private func _compareStringsPostSuffix(
   selfASCIIChar: UInt16,
-  otherUTF16: _UnmanagedString<UInt16>
+  otherUTF16WithLeadingASCII: _UnmanagedString<UInt16>
 ) -> _Ordering {
-  let otherCU = otherUTF16[0]
+  let otherCU = otherUTF16WithLeadingASCII[0]
   _sanityCheck(otherCU <= 0x7F, "should be ASCII, otherwise no need to call")
 
-  let segmentEndIdx = otherUTF16._findNormalizationSegmentEnd(startingFrom: 0)
-  let segment = otherUTF16[..<segmentEndIdx]
+  let segmentEndIdx = otherUTF16WithLeadingASCII._findNormalizationSegmentEnd(
+    startingFrom: 0)
+  let segment = otherUTF16WithLeadingASCII[..<segmentEndIdx]
 
   // Fast path: If prenormal, we're done.
   if _Normalization._prenormalQuickCheckYes(segment) {

@@ -377,6 +377,7 @@ public:
   
   template<typename StmtTy>
   bool typeCheckStmt(StmtTy *&S) {
+    PrettyStackTraceStmt trace(TC.Context, "type-checking", S);
     StmtTy *S2 = cast_or_null<StmtTy>(visit(S));
     if (S2 == nullptr)
       return true;
@@ -480,8 +481,7 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/true);
-    TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
+    TC.typeCheckDecl(DS->getTempDecl());
 
     Expr *theCall = DS->getCallExpr();
     TC.typeCheckExpression(theCall, DC);
@@ -822,7 +822,7 @@ public:
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
     auto resultTy = TC.typeCheckExpression(subjectExpr, DC);
-    auto hadError = !resultTy;
+    auto limitExhaustivityChecks = !resultTy;
     if (Expr *newSubjectExpr = TC.coerceToRValue(subjectExpr))
       subjectExpr = newSubjectExpr;
     S->setSubjectExpr(subjectExpr);
@@ -836,8 +836,7 @@ public:
     // the list of raw cases.
     for (auto node : S->getRawCases()) {
       if (!node.is<Decl*>()) continue;
-      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/true);
-      TC.typeCheckDecl(node.get<Decl*>(), /*isFirstPass*/false);
+      TC.typeCheckDecl(node.get<Decl*>());
     }
 
     auto cases = S->getCases();
@@ -858,7 +857,7 @@ public:
           // Coerce the pattern to the subject's type.
           if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
                                      TypeResolutionFlags::InExpression)) {
-            hadError = true;
+            limitExhaustivityChecks = true;
 
             // If that failed, mark any variables binding pieces of the pattern
             // as invalid to silence follow-on errors.
@@ -909,11 +908,44 @@ public:
         }
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
-          hadError |= TC.typeCheckCondition(guard, DC);
+          limitExhaustivityChecks |= TC.typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
-        
+
+      // Check restrictions on '@unknown'.
+      if (caseBlock->hasUnknownAttr()) {
+        if (caseBlock->getCaseLabelItems().size() != 1) {
+          assert(!caseBlock->getCaseLabelItems().empty() &&
+                 "parser should not produce case blocks with no items");
+          TC.diagnose(caseBlock->getLoc(),
+                      diag::unknown_case_multiple_patterns)
+            .highlight(caseBlock->getCaseLabelItems()[1].getSourceRange());
+          limitExhaustivityChecks = true;
+        }
+
+        if (FallthroughDest != nullptr) {
+          if (!caseBlock->isDefault())
+            TC.diagnose(caseBlock->getLoc(), diag::unknown_case_must_be_last);
+          limitExhaustivityChecks = true;
+        }
+
+        const CaseLabelItem &labelItem = caseBlock->getCaseLabelItems().front();
+        if (labelItem.getGuardExpr() && !labelItem.isDefault()) {
+          TC.diagnose(labelItem.getStartLoc(),
+                      diag::unknown_case_where_clause)
+            .highlight(labelItem.getGuardExpr()->getSourceRange());
+        }
+
+        const Pattern *pattern =
+            labelItem.getPattern()->getSemanticsProvidingPattern();
+        if (!isa<AnyPattern>(pattern)) {
+          TC.diagnose(labelItem.getStartLoc(),
+                      diag::unknown_case_must_be_catchall)
+            .highlight(pattern->getSourceRange());
+        }
+      }
+
       // If the previous case fellthrough, similarly check that that case's bindings
       // includes our first label item's pattern bindings and types.
       if (PreviousFallthrough) {
@@ -952,13 +984,13 @@ public:
       // Type-check the body statements.
       PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
-      hadError |= typeCheckStmt(body);
+      limitExhaustivityChecks |= typeCheckStmt(body);
       caseBlock->setBody(body);
       previousBlock = caseBlock;
     }
 
     if (!S->isImplicit()) {
-      TC.checkSwitchExhaustiveness(S, DC, /*limitChecking*/hadError);
+      TC.checkSwitchExhaustiveness(S, DC, limitExhaustivityChecks);
     }
 
     return S;
@@ -1290,7 +1322,7 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         .highlight(SR1).highlight(SR2);
     } else
       diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
-               valueE->getType())
+               isa<ClosureExpr>(fn), valueE->getType())
         .highlight(SR1).highlight(SR2);
 
     return;
@@ -1356,8 +1388,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         (Loc == EndTypeCheckLoc || SM.isBeforeInBuffer(EndTypeCheckLoc, Loc)))
       break;
 
-    TC.typeCheckDecl(SubDecl, /*isFirstPass*/true);
-    TC.typeCheckDecl(SubDecl, /*isFirstPass*/false);
+    TC.typeCheckDecl(SubDecl);
   }
   
   return BS;
@@ -1397,28 +1428,26 @@ static void checkDefaultArguments(TypeChecker &tc,
 /// Check the default arguments that occur within this pattern.
 void TypeChecker::checkDefaultArguments(ArrayRef<ParameterList *> paramLists,
                                         ValueDecl *VD) {
+  auto access =
+    VD->getFormalAccessScope(/*useDC=*/nullptr,
+                             /*treatUsableFromInlineAsPublic=*/true);
+
   // In Swift 4 mode, default argument bodies are inlined into the
   // caller.
   if (auto *func = dyn_cast<AbstractFunctionDecl>(VD)) {
     auto expansion = func->getResilienceExpansion();
-    if (!Context.isSwiftVersion3() &&
-        func->getFormalAccessScope(/*useDC=*/nullptr,
-                                   /*respectVersionedAttr=*/true).isPublic())
+    if (!Context.isSwiftVersion3() && access.isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     func->setDefaultArgumentResilienceExpansion(expansion);
   } else {
     auto *EED = cast<EnumElementDecl>(VD);
-    auto expansion = EED->getParentEnum()->getResilienceExpansion();
-    // Enum payloads parameter lists may have default arguments as of Swift 5.
-    if (Context.isSwiftVersionAtLeast(5) &&
-        EED->getFormalAccessScope(/*useDC=*/nullptr,
-                                  /*respectVersionedAttr=*/true).isPublic())
+    auto expansion = ResilienceExpansion::Maximal;
+    if (access.isPublic())
       expansion = ResilienceExpansion::Minimal;
 
     EED->setDefaultArgumentResilienceExpansion(expansion);
   }
-
 
   unsigned nextArgIndex = 0;
   for (auto *paramList : paramLists)
@@ -1443,8 +1472,17 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  // HACK: don't type-check the same function body twice.  This is
+  // supposed to be handled by just not enqueuing things twice,
+  // but that gets tricky with synthesized function bodies.
+  if (AFD->isBodyTypeChecked())
+    return false;
+
   if (!AFD->getBody())
     return false;
+
+  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-fn", AFD);
+  PrettyStackTraceDecl StackEntry("type-checking", AFD);
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
@@ -1456,9 +1494,12 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   for (auto paramList : AFD->getParameterLists())
     requestRequiredNominalTypeLayoutForParameters(paramList);
 
-  if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
+  bool error = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  AFD->setBodyTypeCheckedIfPresent();
+
+  if (error)
     return true;
-  
+
   performAbstractFuncDeclDiagnostics(*this, AFD);
   return false;
 }
@@ -1659,9 +1700,10 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
     // declarations.
     if (!isDelegating && ClassD->isResilient() &&
         ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      auto kind = getFragileFunctionKind(ctor);
       diagnose(ctor, diag::class_designated_init_inlinable_resilient,
                ClassD->getDeclaredInterfaceType(),
-               static_cast<unsigned>(getFragileFunctionKind(ctor)));
+               static_cast<unsigned>(kind.first));
     }
   }
 

@@ -119,86 +119,135 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
   return Args;
 }
 
-static void validateArgs(DiagnosticEngine &diags, const ArgList &Args) {
-  if (Args.hasArgNoClaim(options::OPT_import_underlying_module) &&
-      Args.hasArgNoClaim(options::OPT_import_objc_header)) {
+static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
+                                       const ArgList &args) {
+  if (args.hasArgNoClaim(options::OPT_import_underlying_module) &&
+      args.hasArgNoClaim(options::OPT_import_objc_header)) {
     diags.diagnose({}, diag::error_framework_bridging_header);
   }
+}
+
+static void validateDeploymentTarget(DiagnosticEngine &diags,
+                                     const ArgList &args) {
+  const Arg *A = args.getLastArg(options::OPT_target);
+  if (!A)
+    return;
 
   // Check minimum supported OS versions.
-  if (const Arg *A = Args.getLastArg(options::OPT_target)) {
-    llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
-    if (triple.isMacOSX()) {
-      if (triple.isMacOSXVersionLT(10, 9))
+  llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
+  if (triple.isMacOSX()) {
+    if (triple.isMacOSXVersionLT(10, 9))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "OS X 10.9");
+  } else if (triple.isiOS()) {
+    if (triple.isTvOS()) {
+      if (triple.isOSVersionLT(9, 0)) {
         diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "OS X 10.9");
-    } else if (triple.isiOS()) {
-      if (triple.isTvOS()) {
-        if (triple.isOSVersionLT(9, 0)) {
-          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                         "tvOS 9.0");
-          return;
-        }
-      }
-      if (triple.isOSVersionLT(7))
-        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "iOS 7");
-      if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
-        diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
-                       triple.getOSMajorVersion());
-      }
-    } else if (triple.isWatchOS()) {
-      if (triple.isOSVersionLT(2, 0)) {
-          diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                         "watchOS 2.0");
-          return;
+                       "tvOS 9.0");
+        return;
       }
     }
+    if (triple.isOSVersionLT(7))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "iOS 7");
+    if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
+      diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
+                     triple.getOSMajorVersion());
+    }
+  } else if (triple.isWatchOS()) {
+    if (triple.isOSVersionLT(2, 0)) {
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "watchOS 2.0");
+      return;
+    }
   }
+}
 
-  // Check for conflicting warning control flags
-  if (Args.hasArg(options::OPT_suppress_warnings) &&
-      Args.hasArg(options::OPT_warnings_as_errors)) {
+static void validateWarningControlArgs(DiagnosticEngine &diags,
+                                       const ArgList &args) {
+  if (args.hasArg(options::OPT_suppress_warnings) &&
+      args.hasArg(options::OPT_warnings_as_errors)) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-warnings-as-errors", "-suppress-warnings");
   }
+}
 
-  // Check for conflicting profiling flags
-  const Arg *ProfileGenerate = Args.getLastArg(options::OPT_profile_generate);
-  const Arg *ProfileUse = Args.getLastArg(options::OPT_profile_use);
-  if (ProfileGenerate && ProfileUse)
+static void validateProfilingArgs(DiagnosticEngine &diags,
+                                  const ArgList &args) {
+  const Arg *ProfileGenerate = args.getLastArg(options::OPT_profile_generate);
+  const Arg *ProfileUse = args.getLastArg(options::OPT_profile_use);
+  if (ProfileGenerate && ProfileUse) {
     diags.diagnose(SourceLoc(), diag::error_conflicting_options,
                    "-profile-generate", "-profile-use");
-
-  // Check if the profdata is missing
-  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue()))
-    diags.diagnose(SourceLoc(), diag::error_profile_missing,
-                  ProfileUse->getValue());
-
-  // Check for missing debug option when verifying debug info.
-  if (Args.hasArg(options::OPT_verify_debug_info)) {
-    bool hasDebugOption = true;
-    Arg *Arg = Args.getLastArg(swift::options::OPT_g_Group);
-    if (!Arg || Arg->getOption().matches(swift::options::OPT_gnone))
-      hasDebugOption = false;
-    if (!hasDebugOption)
-      diags.diagnose(SourceLoc(),
-                     diag::verify_debug_info_requires_debug_option);
   }
 
-  for (const Arg *A : Args.filtered(options::OPT_D)) {
+  // Check if the profdata is missing
+  if (ProfileUse && !llvm::sys::fs::exists(ProfileUse->getValue())) {
+    diags.diagnose(SourceLoc(), diag::error_profile_missing,
+                   ProfileUse->getValue());
+  }
+}
+
+static void validateDebugInfoArgs(DiagnosticEngine &diags,
+                                  const ArgList &args) {
+  // Check for missing debug option when verifying debug info.
+  if (args.hasArg(options::OPT_verify_debug_info)) {
+    Arg *debugOpt = args.getLastArg(swift::options::OPT_g_Group);
+    if (!debugOpt || debugOpt->getOption().matches(swift::options::OPT_gnone)) {
+      diags.diagnose(SourceLoc(),
+                     diag::verify_debug_info_requires_debug_option);
+    }
+  }
+}
+
+static void validateCompilationConditionArgs(DiagnosticEngine &diags,
+                                             const ArgList &args) {
+  for (const Arg *A : args.filtered(options::OPT_D)) {
     StringRef name = A->getValue();
-    if (name.find('=') != StringRef::npos)
+    if (name.find('=') != StringRef::npos) {
       diags.diagnose(SourceLoc(),
                      diag::cannot_assign_value_to_conditional_compilation_flag,
                      name);
-    else if (name.startswith("-D"))
+    } else if (name.startswith("-D")) {
       diags.diagnose(SourceLoc(), diag::redundant_prefix_compilation_flag,
                      name);
-    else if (!Lexer::isIdentifier(name))
+    } else if (!Lexer::isIdentifier(name)) {
       diags.diagnose(SourceLoc(), diag::invalid_conditional_compilation_flag,
                      name);
+    }
   }
+}
+
+static void validateAutolinkingArgs(DiagnosticEngine &diags,
+                                    const ArgList &args) {
+  auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
+  if (!forceLoadArg)
+    return;
+  auto *incrementalArg = args.getLastArg(options::OPT_incremental);
+  if (!incrementalArg)
+    return;
+
+  // Note: -incremental can itself be overridden by other arguments later
+  // on, but since -autolink-force-load is a rare and not-really-recommended
+  // option it's not worth modeling that complexity here (or moving the
+  // check somewhere else).
+  diags.diagnose(SourceLoc(), diag::error_option_not_supported,
+                 forceLoadArg->getSpelling(), incrementalArg->getSpelling());
+}
+
+/// Perform miscellaneous early validation of arguments.
+static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
+  validateBridgingHeaderArgs(diags, args);
+  validateDeploymentTarget(diags, args);
+  validateWarningControlArgs(diags, args);
+  validateProfilingArgs(diags, args);
+  validateDebugInfoArgs(diags, args);
+  validateCompilationConditionArgs(diags, args);
+  validateAutolinkingArgs(diags, args);
+
+  if (args.hasArg(options::OPT_emit_public_type_metadata_accessors))
+    diags.diagnose(SourceLoc(),
+                   diag::warn_emit_public_type_metadata_accessors_deprecated);
 }
 
 std::unique_ptr<ToolChain>
@@ -223,7 +272,9 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   case llvm::Triple::FreeBSD:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   case llvm::Triple::Win32:
-    return llvm::make_unique<toolchains::Cygwin>(*this, target);
+    if (target.isWindowsCygwinEnvironment())
+      return llvm::make_unique<toolchains::Cygwin>(*this, target);
+    return llvm::make_unique<toolchains::Windows>(*this, target);
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   default:
@@ -268,6 +319,47 @@ class Driver::InputInfoMap
 };
 using InputInfoMap = Driver::InputInfoMap;
 
+/// Get the filename for build record. Returns true if failed.
+/// Additionally, set 'outputBuildRecordForModuleOnlyBuild' to true if this is
+/// full compilation with swiftmodule.
+static bool getCompilationRecordPath(std::string &buildRecordPath,
+                                     bool &outputBuildRecordForModuleOnlyBuild,
+                                     const OutputInfo &OI,
+                                     const Optional<OutputFileMap> &OFM,
+                                     DiagnosticEngine *Diags) {
+  if (!OFM) {
+    // FIXME: This should work without an output file map. We should have
+    // another way to specify a build record and where to put intermediates.
+    if (Diags)
+      Diags->diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
+    return true;
+  }
+
+  if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+    buildRecordPath = masterOutputMap->lookup(file_types::TY_SwiftDeps);
+
+  if (buildRecordPath.empty()) {
+    if (Diags)
+      Diags->diagnose(SourceLoc(),
+                      diag::incremental_requires_build_record_entry,
+                      file_types::getTypeName(file_types::TY_SwiftDeps));
+    return true;
+  }
+
+  // In 'emit-module' only mode, use build-record filename suffixed with
+  // '~moduleonly'. So that module-only mode doesn't mess up build-record
+  // file for full compilation.
+  if (OI.CompilerOutputType == file_types::TY_SwiftModuleFile) {
+    buildRecordPath = buildRecordPath.append("~moduleonly");
+  } else if (OI.ShouldTreatModuleAsTopLevelOutput) {
+    // If we emit module along with full compilation, emit build record
+    // file for '-emit-module' only mode as well.
+    outputBuildRecordForModuleOnlyBuild = true;
+  }
+
+  return false;
+}
+
 static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
                                      StringRef buildRecordPath,
                                      StringRef reason = "") {
@@ -282,7 +374,9 @@ static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
   return true;
 }
 
-static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
+static bool populateOutOfDateMap(InputInfoMap &map,
+                                 llvm::sys::TimePoint<> &LastBuildTime,
+                                 StringRef argsHashStr,
                                  const InputFileList &inputs,
                                  StringRef buildRecordPath,
                                  bool ShowIncrementalBuildDecisions) {
@@ -392,7 +486,7 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
       llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
         return true;
-      map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
+      LastBuildTime = timeVal;
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
       auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
@@ -493,13 +587,38 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
 }
 
 // warn if -embed-bitcode is set and the output type is not an object
-static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
+static void validateEmbedBitcode(DerivedArgList &Args, const OutputInfo &OI,
                                  DiagnosticEngine &Diags) {
   if (Args.hasArg(options::OPT_embed_bitcode) &&
       OI.CompilerOutputType != file_types::TY_Object) {
     Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
     Args.eraseArg(options::OPT_embed_bitcode);
   }
+}
+
+/// Gets the filelist threshold to use. Diagnoses and returns true on error.
+static bool getFilelistThreshold(DerivedArgList &Args, size_t &FilelistThreshold,
+                                   DiagnosticEngine &Diags) {
+  FilelistThreshold = 128;
+
+  // claim and diagnose deprecated -driver-use-filelists
+  bool HasUseFilelists = Args.hasArg(options::OPT_driver_use_filelists);
+  if (HasUseFilelists)
+    Diags.diagnose(SourceLoc(), diag::warn_use_filelists_deprecated);
+
+  if (const Arg *A = Args.getLastArg(options::OPT_driver_filelist_threshold)) {
+    // Use the supplied threshold
+    if (StringRef(A->getValue()).getAsInteger(10, FilelistThreshold)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  } else if (HasUseFilelists) {
+    // Treat -driver-use-filelists as -driver-filelist-threshold=0
+    FilelistThreshold = 0;
+  } // else stick with the default
+
+  return false;
 }
 
 std::unique_ptr<Compilation>
@@ -551,13 +670,7 @@ Driver::buildCompilation(const ToolChain &TC,
     Incremental = false;
   }
 
-  bool BatchMode = ArgList->hasFlag(options::OPT_enable_batch_mode,
-                                    options::OPT_disable_batch_mode,
-                                    false);
-
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
-  bool ContinueBuildingAfterErrors =
-    ArgList->hasArg(options::OPT_continue_building_after_errors);
   bool ShowDriverTimeCompilation =
     ArgList->hasArg(options::OPT_driver_time_compilation);
 
@@ -588,7 +701,29 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // Determine the OutputInfo for the driver.
   OutputInfo OI;
+  bool BatchMode = false;
+  OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
+
+  // Note: Batch mode handling of serialized diagnostics requires that all
+  // batches get to run, in order to make sure that all diagnostics emitted
+  // during the compilation end up in at least one serialized diagnostic file.
+  // Therefore, treat batch mode as implying -continue-building-after-errors.
+  // (This behavior could be limited to only when serialized diagnostics are
+  // being emitted, but this seems more consistent and less surprising for
+  // users.)
+  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
+  // If we fail to precompile a bridging header, for example, there's no need
+  // to go on to compilation of source files, and if compilation of source files
+  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
+  // but not schedule any new ones.
+  const bool ContinueBuildingAfterErrors =
+      BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
+
+  // Issue a remark to facilitate recognizing the use of batch mode in the build
+  // log.
+  if (BatchMode)
+    Diags.diagnose(SourceLoc(), diag::remark_using_batch_mode);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -637,40 +772,22 @@ Driver::buildCompilation(const ToolChain &TC,
     return nullptr;
   }
 
+  std::string buildRecordPath;
+  bool outputBuildRecordForModuleOnlyBuild = false;
+  getCompilationRecordPath(buildRecordPath, outputBuildRecordForModuleOnlyBuild,
+                           OI, OFM, Incremental ? &Diags : nullptr);
+
   SmallString<32> ArgsHash;
   computeArgsHash(ArgsHash, *TranslatedArgList);
-
+  llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
   bool rebuildEverything = true;
-  if (Incremental) {
-    if (!OFM) {
-      // FIXME: This should work without an output file map. We should have
-      // another way to specify a build record and where to put intermediates.
-      Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
-
+  if (Incremental && !buildRecordPath.empty()) {
+    if (populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash, Inputs,
+                             buildRecordPath, ShowIncrementalBuildDecisions)) {
+      // FIXME: Distinguish errors from "file removed", which is benign.
     } else {
-      StringRef buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-        auto iter = masterOutputMap->find(file_types::TY_SwiftDeps);
-        if (iter != masterOutputMap->end())
-          buildRecordPath = iter->second;
-      }
-
-      if (buildRecordPath.empty()) {
-        Diags.diagnose(SourceLoc(),
-                       diag::incremental_requires_build_record_entry,
-                       file_types::getTypeName(file_types::TY_SwiftDeps));
-        rebuildEverything = true;
-
-      } else {
-        if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                                 buildRecordPath,
-                                 ShowIncrementalBuildDecisions)) {
-          // FIXME: Distinguish errors from "file removed", which is benign.
-        } else {
-          rebuildEverything = false;
-        }
-      }
+      rebuildEverything = false;
     }
   }
 
@@ -682,6 +799,10 @@ Driver::buildCompilation(const ToolChain &TC,
       return nullptr;
     }
   }
+
+  size_t DriverFilelistThreshold;
+  if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
+    return nullptr;
 
   OutputLevel Level = OutputLevel::Normal;
   if (const Arg *A =
@@ -697,20 +818,27 @@ Driver::buildCompilation(const ToolChain &TC,
       llvm_unreachable("Unknown OutputLevel argument!");
   }
 
-  std::unique_ptr<Compilation> C(new Compilation(Diags, TC, OI, Level,
-                                                 std::move(ArgList),
-                                                 std::move(TranslatedArgList),
-                                                 std::move(Inputs),
-                                                 ArgsHash, StartTime,
-                                                 NumberOfParallelCommands,
-                                                 Incremental,
-                                                 BatchMode,
-                                                 DriverBatchSeed,
-                                                 DriverForceOneBatchRepartition,
-                                                 DriverSkipExecution,
-                                                 SaveTemps,
-                                                 ShowDriverTimeCompilation,
-                                                 std::move(StatsReporter)));
+  std::unique_ptr<Compilation> C(
+      new Compilation(Diags, TC, OI, Level,
+                      std::move(ArgList),
+                      std::move(TranslatedArgList),
+                      std::move(Inputs),
+                      buildRecordPath,
+                      outputBuildRecordForModuleOnlyBuild,
+                      ArgsHash,
+                      StartTime,
+                      LastBuildTime,
+                      DriverFilelistThreshold,
+                      NumberOfParallelCommands,
+                      Incremental,
+                      BatchMode,
+                      DriverBatchSeed,
+                      DriverForceOneBatchRepartition,
+                      DriverSkipExecution,
+                      SaveTemps,
+                      ShowDriverTimeCompilation,
+                      std::move(StatsReporter)));
+
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI, OFM ? OFM.getPointer() : nullptr,
@@ -748,17 +876,6 @@ Driver::buildCompilation(const ToolChain &TC,
   if (rebuildEverything)
     C->disableIncrementalBuild();
 
-  if (OFM) {
-    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-      C->setCompilationRecordPath(
-          masterOutputMap->lookup(file_types::TY_SwiftDeps));
-
-      auto buildEntry = outOfDateMap.find(nullptr);
-      if (buildEntry != outOfDateMap.end())
-        C->setLastBuildTime(buildEntry->second.previousModTime);
-    }
-  }
-
   if (Diags.hadAnyError())
     return nullptr;
 
@@ -776,7 +893,7 @@ static Arg *makeInputArg(const DerivedArgList &Args, OptTable &Opts,
   return A;
 }
 
-using RemainingArgsHandler = std::function<void(InputArgList &, unsigned)>;
+using RemainingArgsHandler = llvm::function_ref<void(InputArgList &, unsigned)>;
 
 std::unique_ptr<InputArgList>
 parseArgsUntil(const llvm::opt::OptTable& Opts,
@@ -1102,8 +1219,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                               ? file_types::TY_Nothing
                               : file_types::TY_Object;
 
-  OI.CompilerMode = computeCompilerMode(Args, Inputs);
-
   if (const Arg *A = Args.getLastArg(options::OPT_num_threads)) {
     if (BatchMode) {
       Diags.diagnose(SourceLoc(), diag::warning_cannot_multithread_batch_mode);
@@ -1373,26 +1488,31 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
 OutputInfo::Mode
 Driver::computeCompilerMode(const DerivedArgList &Args,
-                            const InputFileList &Inputs) const {
+                            const InputFileList &Inputs,
+                            bool &BatchModeOut) const {
 
   if (driverKind == Driver::DriverKind::Interactive)
     return Inputs.empty() ? OutputInfo::Mode::REPL
                           : OutputInfo::Mode::Immediate;
 
-  const Arg *ArgRequiringWMO = Args.getLastArg(
+  const Arg *ArgRequiringSingleCompile = Args.getLastArg(
       options::OPT_whole_module_optimization, options::OPT_index_file);
 
-  if (!ArgRequiringWMO)
+  BatchModeOut = Args.hasFlag(options::OPT_enable_batch_mode,
+                              options::OPT_disable_batch_mode,
+                              false);
+
+  if (!ArgRequiringSingleCompile)
     return OutputInfo::Mode::StandardCompile;
 
-  // Test for -enable-batch-mode, rather than the BatchMode flag that is
-  // passed into the caller because the diagnostic is intended to warn against
-  // overriding *explicit* batch mode. No warning should be given if in batch
-  // mode by default.
-  if (Args.hasArg(options::OPT_enable_batch_mode))
+  // Override batch mode if given -wmo or -index-file.
+  if (BatchModeOut) {
+    BatchModeOut = false;
+    // Emit a warning about such overriding (FIXME: we might conditionalize
+    // this based on the user or xcode passing -disable-batch-mode).
     Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
-                   ArgRequiringWMO->getOption().getPrefixedName());
-
+                   ArgRequiringSingleCompile->getOption().getPrefixedName());
+  }
   return OutputInfo::Mode::SingleCompile;
 }
 
@@ -1734,7 +1854,8 @@ Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
       OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
-                   llvm::toString(std::move(Err)));
+                   llvm::toString(std::move(Err)), A->getValue());
+    return None;
   }
   return *OFM;
 }
@@ -2164,6 +2285,16 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     BaseInput = Out.getBaseInput(i);
     // Use the first Job's Primary Output as our PrimaryInput.
     PrimaryInput = Out.getPrimaryOutputFilenames()[i];
+  }
+
+  // With -index-file option, the primary input is the one passed with
+  // -index-file-path.
+  // FIXME: Figure out how this better fits within the driver infrastructure.
+  if (JA->getType() == file_types::TY_IndexData) {
+    if (Arg *A = C.getArgs().getLastArg(options::OPT_index_file_path)) {
+      BaseInput = A->getValue();
+      PrimaryInput = A->getValue();
+    }
   }
 
   const TypeToPathMap *OutputMap = nullptr;
@@ -2689,7 +2820,8 @@ void Driver::printHelp(bool ShowHidden) const {
     ExcludedFlagsBitmask |= HelpHidden;
 
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
-                      IncludedFlagsBitmask, ExcludedFlagsBitmask);
+                      IncludedFlagsBitmask, ExcludedFlagsBitmask,
+                      /*ShowAllAliases*/false);
 }
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(

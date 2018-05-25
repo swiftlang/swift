@@ -35,15 +35,19 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
     return;
   }
 
+  auto formalType = type.getASTType();
+  if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
+    return;
+  }
+
   // If the type is a legal formal type, add it as a formal type.
   // FIXME: does this force us to emit a more expensive metadata than we need
   // to?
-  CanType formalType = type.getSwiftRValueType();
   if (formalType->isLegalFormalType()) {
     return collectFormalTypeMetadata(formalType);
   }
 
-  auto key = LocalTypeDataKey(type.getSwiftRValueType(),
+  auto key = LocalTypeDataKey(type.getASTType(),
                             LocalTypeDataKind::forRepresentationTypeMetadata());
   if (Values.count(key)) return;
 
@@ -53,9 +57,7 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
 
 void OutliningMetadataCollector::collectFormalTypeMetadata(CanType type) {
   // If the type has no archetypes, we can emit it from scratch in the callee.
-  if (!type->hasArchetype()) {
-    return;
-  }
+  assert(type->hasArchetype());
 
   auto key = LocalTypeDataKey(type, LocalTypeDataKind::forFormalTypeMetadata());
   if (Values.count(key)) return;
@@ -98,7 +100,7 @@ void OutliningMetadataCollector::bindMetadataParameters(IRGenFunction &IGF,
 
 std::pair<CanType, CanGenericSignature>
 irgen::getTypeAndGenericSignatureForManglingOutlineFunction(SILType type) {
-  auto loweredType = type.getSwiftRValueType();
+  auto loweredType = type.getASTType();
   if (loweredType->hasArchetype()) {
     GenericEnvironment *env = nullptr;
     loweredType.findIf([&env](Type t) -> bool {

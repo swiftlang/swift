@@ -1,0 +1,56 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+//
+// REQUIRES: CPU=i386 || CPU=x86_64
+//
+// Tests that check constant-folding of conversions of floating point values
+// to integer types for x86 architectures.
+
+import Swift
+import Builtin
+
+sil @foldFPToUInt8UsingDouble : $@convention(thin) () -> UInt8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x4006FF00000000000000 // 255
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+%2 = struct $Double (%1 : $Builtin.FPIEEE64)
+%3 = struct_extract %2 : $Double, #Double._value
+%4 = builtin "fptoui_FPIEEE64_Int8"(%3 : $Builtin.FPIEEE64) : $Builtin.Int8
+%5 = struct $UInt8 (%4 : $Builtin.Int8)
+return %5 : $UInt8
+
+// CHECK-LABEL: sil @foldFPToUInt8UsingDouble
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK-NOT: struct $Double
+// CHECK-NOT: struct_extract
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int8, -1
+// CHECK-NEXT: [[RES:%.*]] = struct $UInt8 ([[LIT]] : $Builtin.Int8)
+// CHECK-NEXT: return [[RES]] : $UInt8
+}
+
+sil @foldFPToInt64 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80,  0xC03DFFFFFFFFFFFFFFFE // -9223372036854775807
+%1 = builtin "fptosi_FPIEEE80_Int64"(%0 : $Builtin.FPIEEE80) : $Builtin.Int64
+return %1 : $Builtin.Int64
+
+// CHECK-LABEL: sil @foldFPToInt64
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, -9223372036854775807
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil @foldFPToInt64Unsigned : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x403EFFFFFFFFFFFFFFFF // 18446744073709551615
+%1 = builtin "fptoui_FPIEEE80_Int64"(%0 : $Builtin.FPIEEE80) : $Builtin.Int64
+return %1 : $Builtin.Int64
+
+// CHECK-LABEL: sil @foldFPToInt64Unsigned
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, -1
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}

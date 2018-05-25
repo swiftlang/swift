@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift -enable-testing
-// RUN: %target-swift-frontend -module-name enum_resilience_testable -I %t -enable-sil-ownership -emit-silgen -enable-nonfrozen-enum-exhaustivity-diagnostics -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name enum_resilience_testable -I %t -enable-sil-ownership -enable-nonfrozen-enum-exhaustivity-diagnostics -swift-version 5 %s | %FileCheck %s
 
 // This is mostly testing the same things as enum_resilienc.swift, just in a
 // context where the user will never be forced to write a default case. It's the
@@ -38,7 +38,10 @@
 // CHECK-NEXT:    dealloc_stack [[BOX]]
 // CHECK-NEXT:    br bb6
 // CHECK:       bb5:
-// CHECK-NEXT:    builtin "int_trap"()
+// CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[DIAGNOSE:%.+]] = function_ref @$Ss27_diagnoseUnexpectedEnumCase
+// CHECK-NEXT:    = apply [[DIAGNOSE]]<Medium>([[METATYPE]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Never
 // CHECK-NEXT:    unreachable
 // CHECK:       bb6:
 // CHECK-NOT:    destroy_addr %0

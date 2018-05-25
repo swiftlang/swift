@@ -68,7 +68,8 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, c.timesMakeIteratorCalled.value)
     expectEqual(0, c.timesStartIndexCalled.value)
     let copy = c._copyToContiguousArray()
-    expectEqual(0, c.timesMakeIteratorCalled.value)
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, c.timesMakeIteratorCalled.value)
     expectNotEqual(0, c.timesStartIndexCalled.value)
     expectEqualSequence(
       Array(10..<27),
@@ -82,7 +83,8 @@ CopyToNativeArrayBufferTests.test("Collection._copyToContiguousArray()") {
     expectEqual(0, wrapped.timesMakeIteratorCalled.value)
     expectEqual(0, wrapped.timesStartIndexCalled.value)
     let copy = s._copyToContiguousArray()
-    expectEqual(0, wrapped.timesMakeIteratorCalled.value)
+    // _copyToContiguousArray calls Sequence._copyContents, which makes an iterator.
+    expectEqual(1, wrapped.timesMakeIteratorCalled.value)
     expectNotEqual(0, wrapped.timesStartIndexCalled.value)
 
     expectEqualSequence(
@@ -190,21 +192,55 @@ ArrayTestSuite.test("init(repeating:count:)") {
 }
 
 ArrayTestSuite.test("Hashable") {
-  let a1: Array<Int> = [1, 2, 3]
-  let a2: Array<Int> = [1, 3, 2]
-  let a3: Array<Int> = [3, 1, 2]
-  let a4: Array<Int> = [1, 2]
-  let a5: Array<Int> = [1]
-  let a6: Array<Int> = []
-  let a7: Array<Int> = [1, 1, 1]
-  checkHashable([a1, a2, a3, a4, a5, a6, a7], equalityOracle: { $0 == $1 })
+  let a1: [Array<Int>] = [
+    [1, 2, 3],
+    [1, 3, 2],
+    [3, 1, 2],
+    [1, 2],
+    [1],
+    [],
+    [1, 1, 1]
+  ]
+  checkHashable(a1, equalityOracle: { $0 == $1 })
 
-  let aa1: Array<Array<Int>> = [[], [1], [1, 2], [2, 1]]
-  let aa2: Array<Array<Int>> = [[], [1], [2, 1], [2, 1]]
-  let aa3: Array<Array<Int>> = [[1], [], [2, 1], [2, 1]]
-  let aa4: Array<Array<Int>> = [[1], [], [2, 1], [2]]
-  let aa5: Array<Array<Int>> = [[1], [], [2, 1]]
-  checkHashable([aa1, aa2, aa3, aa4, aa5], equalityOracle: { $0 == $1 })
+  let a2: [Array<Array<Int>>] = [
+    [[], [1], [1, 2], [2, 1]],
+    [[], [1], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2, 1]],
+    [[1], [], [2, 1], [2]],
+    [[1], [], [2, 1]]
+  ]
+  checkHashable(a2, equalityOracle: { $0 == $1 })
+
+  // These arrays share the same sequence of leaf integers, but they must
+  // still all hash differently.
+  let a3: [Array<Array<Int>>] = [
+    // Grouping changes must perturb the hash.
+    [[1], [2], [3], [4], [5]],
+    [[1, 2], [3], [4], [5]],
+
+    [[1], [2, 3], [4], [5]],
+    [[1], [2], [3, 4], [5]],
+    [[1], [2], [3], [4, 5]],
+
+    [[1, 2, 3], [4], [5]],
+    [[1], [2, 3, 4], [5]],
+    [[1], [2], [3, 4, 5]],
+
+    [[1, 2, 3, 4], [5]],
+    [[1], [2, 3, 4, 5]],
+
+    [[1, 2], [3, 4], [5]],
+    [[1], [2, 3], [4, 5]],
+    [[1, 2, 3, 4, 5]],
+
+    // Empty arrays must perturb the hash.
+    [[], [1], [2], [3], [4], [5]],
+    [[1], [], [2], [3], [4], [5]],
+    [[1], [2], [3], [4], [5], []],
+    [[1], [], [], [2], [3], [], [4], [], [5]],
+  ]
+  checkHashable(a3, equalityOracle: { $0 == $1 })
 }
 
 
@@ -2384,10 +2420,9 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     ? evilBoundsError
     : "invalid Collection: count differed in successive traversals"
 
-  let constructionMessage =
-    /*_isStdlibInternalChecksEnabled() && !evilBoundsCheck && step <= 0
-      ? "_UnsafePartiallyInitializedContiguousArrayBuffer has no more capacity"
-      :*/ message
+  let constructionMessage = step < 0
+    ? "invalid Collection: less than 'count' elements in collection"
+    : "invalid Collection: more than 'count' elements in collection"
 
   // The invalid Collection error is a _debugPreconditon that will only fire
   // in a Debug assert configuration.
@@ -2438,7 +2473,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
 
-    if expectedToFail {
+    if step < 0 || _isDebugAssertConfiguration() {
       expectCrashLater()
     }
 

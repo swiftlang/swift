@@ -456,8 +456,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // marked as @_fixed_layout.
     if (isStoredPropertyInitializer()) {
       auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
-      auto scope = nominal->getFormalAccessScope(/*useDC=*/nullptr,
-                                                 /*respectVersionedAttr=*/true);
+      auto scope =
+        nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
       if (!scope.isPublic())
         return IsNotSerialized;
       if (nominal->isFormallyResilient())

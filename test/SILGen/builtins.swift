@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -enable-sil-ownership -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -367,6 +367,31 @@ func getTailAddr<T1, T2>(start: Builtin.RawPointer, i: Builtin.Word, ty1: T1.Typ
   // CHECK: [[A2P:%.*]] = address_to_pointer [[TA]]
   // CHECK: return [[A2P]]
   return Builtin.getTailAddr_Word(start, i, ty1, ty2)
+}
+
+// CHECK-LABEL: sil hidden @$S8builtins25beginUnpairedModifyAccess{{[_0-9a-zA-Z]*}}F
+func beginUnpairedModifyAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
+  // CHECK: [[P2A_ADDR:%.*]] = pointer_to_address %0
+  // CHECK: [[P2A_SCRATCH:%.*]] = pointer_to_address %1
+  // CHECK: begin_unpaired_access [modify] [dynamic] [builtin] [[P2A_ADDR]] : $*T1, [[P2A_SCRATCH]] : $*Builtin.UnsafeValueBuffer
+  // CHECK: [[RESULT:%.*]] = tuple ()
+  // CHECK: [[RETURN:%.*]] = tuple ()
+  // CHECK: return [[RETURN]] : $()
+
+  Builtin.beginUnpairedModifyAccess(address, scratch, ty1);
+}
+
+// CHECK-LABEL: sil hidden @$S8builtins30performInstantaneousReadAccess{{[_0-9a-zA-Z]*}}F
+func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Builtin.RawPointer, ty1: T1.Type) {
+  // CHECK: [[P2A_ADDR:%.*]] = pointer_to_address %0
+  // CHECK: [[SCRATCH:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+  // CHECK: begin_unpaired_access [read] [dynamic] [no_nested_conflict] [builtin] [[P2A_ADDR]] : $*T1, [[SCRATCH]] : $*Builtin.UnsafeValueBuffer
+  // CHECK-NOT: end_{{.*}}access
+  // CHECK: [[RESULT:%.*]] = tuple ()
+  // CHECK: [[RETURN:%.*]] = tuple ()
+  // CHECK: return [[RETURN]] : $()
+
+  Builtin.performInstantaneousReadAccess(address, ty1);
 }
 
 // CHECK-LABEL: sil hidden @$S8builtins8condfail{{[_0-9a-zA-Z]*}}F

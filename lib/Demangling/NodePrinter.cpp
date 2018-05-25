@@ -267,6 +267,7 @@ private:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -813,8 +814,11 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer Node,
 
   assert(
       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
        (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::Dead))) &&
+       (V & unsigned(FunctionSigSpecializationParamKind::Dead))||
+       (V & unsigned(
+                FunctionSigSpecializationParamKind::ExistentialToGeneric))) &&
       "Invalid OptionSet");
   print(Node->getChild(Idx++));
   return Idx;
@@ -1213,16 +1217,30 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     uint64_t raw = Node->getIndex();
 
     bool printedOptionSet = false;
+    if (raw &
+        uint64_t(FunctionSigSpecializationParamKind::ExistentialToGeneric)) {
+      printedOptionSet = true;
+      Printer << "Existential To Protocol Constrained Generic";
+    }
+
     if (raw & uint64_t(FunctionSigSpecializationParamKind::Dead)) {
+      if (printedOptionSet)
+        Printer << " and ";
       printedOptionSet = true;
       Printer << "Dead";
     }
-
     if (raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
       if (printedOptionSet)
         Printer << " and ";
       printedOptionSet = true;
       Printer << "Owned To Guaranteed";
+    }
+
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+      if (printedOptionSet)
+        Printer << " and ";
+      printedOptionSet = true;
+      Printer << "Guaranteed To Owned";
     }
 
     if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
@@ -1260,8 +1278,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamKind::GuaranteedToOwned:
     case FunctionSigSpecializationParamKind::SROA:
       printer_unreachable("option sets should have been handled earlier");
     }
@@ -1540,6 +1560,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);
     return nullptr;
   case Node::Kind::DynamicSelf:

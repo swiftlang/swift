@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name guaranteed_self -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name guaranteed_self -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
 
 protocol Fooable {
   init()

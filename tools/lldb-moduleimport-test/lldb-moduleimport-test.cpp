@@ -116,7 +116,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
   for (auto &name : InputNames) {
     auto OF = llvm::object::ObjectFile::createObjectFile(name);
     if (!OF) {
-      llvm::outs() << name << " is not an object file.\n";
+      llvm::outs() << "error: " << name << " "
+                   << errorToErrorCode(OF.takeError()).message() << "\n";
       return false;
     }
     auto *Obj = OF->getBinary();
@@ -198,6 +199,25 @@ int main(int argc, char **argv) {
   DumpModule.removeArgument();
   DumpTypeFromMangled.removeArgument();
   InputNames.removeArgument();
+
+  auto validateInputFile = [](std::string Filename) {
+    if (Filename.empty())
+      return true;
+    if (!llvm::sys::fs::exists(llvm::Twine(Filename))) {
+      llvm::errs() << Filename << " does not exists, exiting.\n";
+      return false;
+    }
+    if (!llvm::sys::fs::is_regular_file(llvm::Twine(Filename))) {
+      llvm::errs() << Filename << " is not a regular file, exiting.\n";
+      return false;
+    }
+    return true;
+  };
+
+  if (!validateInputFile(DumpTypeFromMangled))
+    return 1;
+  if (!validateInputFile(DumpDeclFromMangled))
+    return 1;
 
   // Fetch the serialized module bitstreams from the Mach-O files and
   // register them with the module loader.

@@ -1,4 +1,10 @@
+sil non_abi [serialized] @other_public_non_abi_function : $@convention(thin) () -> () {
+  %0 = tuple ()
+  return %0 : $()
+}
+
 sil non_abi [serialized] @public_non_abi_function : $@convention(thin) () -> () {
+  %fn = function_ref @other_public_non_abi_function : $@convention(thin) () -> ()
   %0 = tuple ()
   return %0 : $()
 }

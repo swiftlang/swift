@@ -897,19 +897,19 @@ extension ${Self}: Comparable {
   }
 }
 extension ${Self}: Hashable {
-  /// The pointer's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @inlinable
-  public var hashValue: Int {
-    return _hashValue(for: self)
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(UInt(bitPattern: self))
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(bitPattern: self))
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }
 
@@ -1003,7 +1003,6 @@ extension ${Self} : CustomReflectable {
 
 extension ${Self} : CustomPlaygroundQuickLookable {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var summary: String {
     let selfType = "${Self}"
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -1055,7 +1054,6 @@ extension UInt {
 
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _max : ${Self} {
     return ${Self}(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride

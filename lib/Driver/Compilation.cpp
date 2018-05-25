@@ -102,7 +102,12 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
                          InputFileList InputsWithTypes,
-                         StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
+                         std::string CompilationRecordPath,
+                         bool OutputCompilationRecordForModuleOnlyBuild,
+                         StringRef ArgsHash,
+                         llvm::sys::TimePoint<> StartTime,
+                         llvm::sys::TimePoint<> LastBuildTime,
+                         size_t FilelistThreshold,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
@@ -117,17 +122,23 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     Level(Level),
     RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)),
-    InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
+    InputFilesWithTypes(std::move(InputsWithTypes)),
+    CompilationRecordPath(CompilationRecordPath),
+    ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
+    LastBuildTime(LastBuildTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
+    OutputCompilationRecordForModuleOnlyBuild(
+        OutputCompilationRecordForModuleOnlyBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
-    Stats(std::move(StatsReporter)) {
+    Stats(std::move(StatsReporter)),
+    FilelistThreshold(FilelistThreshold) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
@@ -162,6 +173,16 @@ namespace driver {
     /// to their underlying non-Batch Jobs, when running a callback from
     /// TaskQueue.
     CommandSet BatchJobs;
+
+    /// Persistent counter for allocating quasi-PIDs to Jobs combined into
+    /// BatchJobs. Quasi-PIDs are _negative_ PID-like unique keys used to
+    /// masquerade BatchJob constituents as (quasi)processes, when writing
+    /// parseable output to consumers that don't understand the idea of a batch
+    /// job. They are negative in order to avoid possibly colliding with real
+    /// PIDs (which are always positive). We start at -1000 here as a crude but
+    /// harmless hedge against colliding with an errno value that might slip
+    /// into the stream of real PIDs (say, due to a TaskQueue bug).
+    int64_t NextBatchQuasiPID = -1000;
 
     /// All jobs which have finished execution or which have been determined
     /// that they don't need to run.
@@ -302,6 +323,10 @@ namespace driver {
       }
     }
 
+    bool isBatchJob(const Job *MaybeBatchJob) const {
+      return BatchJobs.count(MaybeBatchJob) != 0;
+    }
+
     /// Callback which will be called immediately after a task has started. This
     /// callback may be used to provide output indicating that the task began.
     void taskBegan(ProcessId Pid, void *Context) {
@@ -332,7 +357,9 @@ namespace driver {
         BeganCmd->printCommandLine(llvm::errs());
         break;
       case OutputLevel::Parseable:
-        parseable_output::emitBeganMessage(llvm::errs(), *BeganCmd, Pid);
+        BeganCmd->forEachContainedJobAndPID(Pid, [&](const Job *J, Job::PID P) {
+          parseable_output::emitBeganMessage(llvm::errs(), *J, P);
+        });
         break;
       }
     }
@@ -482,13 +509,16 @@ namespace driver {
           break;
         case OutputLevel::Parseable:
           // Parseable output was requested.
-          parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                                ReturnCode, Output);
+          FinishedCmd->forEachContainedJobAndPID(
+              Pid, [&](const Job *J, Job::PID P) {
+                parseable_output::emitFinishedMessage(llvm::errs(), *J, P,
+                                                      ReturnCode, Output);
+              });
           break;
         }
       }
 
-      if (BatchJobs.count(FinishedCmd) != 0) {
+      if (isBatchJob(FinishedCmd)) {
         return unpackAndFinishBatch(ReturnCode, Output, Errors,
                                     static_cast<const BatchJob *>(FinishedCmd));
       }
@@ -516,6 +546,11 @@ namespace driver {
                               FinishedCmd->getSource().getClassName(),
                               ReturnCode);
         }
+
+        // See how ContinueBuildingAfterErrors gets set up in Driver.cpp for
+        // more info.
+        assert((Comp.ContinueBuildingAfterErrors || !Comp.EnableBatchMode) &&
+               "batch mode diagnostics require ContinueBuildingAfterErrors");
 
         return Comp.ContinueBuildingAfterErrors ?
           TaskFinishedResponse::ContinueExecution :
@@ -546,8 +581,11 @@ namespace driver {
 
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
-        parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd,
-                                               Pid, ErrorMsg, Output, Signal);
+        SignalledCmd->forEachContainedJobAndPID(
+            Pid, [&](const Job *J, Job::PID P) {
+              parseable_output::emitSignalledMessage(llvm::errs(), *J, P,
+                                                     ErrorMsg, Output, Signal);
+            });
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.
@@ -582,7 +620,8 @@ namespace driver {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
+        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands,
+                               Comp.Stats.get()));
       if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
@@ -729,7 +768,7 @@ namespace driver {
         llvm::outs() << "Forming batch job from "
                      << Batch.size() << " constituents\n";
       auto const &TC = Comp.getToolChain();
-      auto J = TC.constructBatchJob(Batch, Comp);
+      auto J = TC.constructBatchJob(Batch, NextBatchQuasiPID, Comp);
       if (J)
         Batches.push_back(Comp.addJob(std::move(J)));
     }
@@ -1192,6 +1231,12 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+
+    if (OutputCompilationRecordForModuleOnlyBuild) {
+      // TODO: Optimize with clonefile(2) ?
+      llvm::sys::fs::copy_file(CompilationRecordPath,
+                               CompilationRecordPath + "~moduleonly");
+    }
   }
 
   abnormalExit = State.hadAnyAbnormalExit();

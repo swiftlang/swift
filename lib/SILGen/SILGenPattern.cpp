@@ -22,7 +22,9 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -1449,7 +1451,7 @@ emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
                           CanType substFormalType) {
   // Return if there's no abstraction.  (The first condition is just
   // a fast path.)
-  if (value.getType().getSwiftRValueType() == substFormalType ||
+  if (value.getType().getASTType() == substFormalType ||
       value.getType() == SGF.getLoweredType(substFormalType))
     return value;
 
@@ -1863,7 +1865,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2024,7 +2026,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2555,19 +2557,93 @@ void SILGenFunction::usingImplicitVariablesForPattern(Pattern *pattern, CaseStmt
   variableSwapper();
 }
 
+static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue value,
+                                                  const EnumDecl *enumDecl) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCaseValue(nullptr);
+  if (!diagnoseFailure) {
+    SGF.B.createBuiltinTrap(loc);
+    return;
+  }
+
+  assert(enumDecl->isObjC());
+  assert(enumDecl->hasRawType());
+  assert(value.getType().isTrivial(SGF.getModule()));
+
+  // Get the enum type as an Any.Type value.
+  CanType switchedValueSwiftType = value.getType().getASTType();
+  SILType metatypeType = SGF.getLoweredType(
+      CanMetatypeType::get(switchedValueSwiftType,
+                           MetatypeRepresentation::Thick));
+  SILValue metatype = SGF.B.createMetatype(loc, metatypeType);
+
+  // Bitcast the enum value to its raw type. (This is only safe for @objc
+  // enums.)
+  SILType loweredRawType = SGF.getLoweredType(enumDecl->getRawType());
+  assert(loweredRawType.isTrivial(SGF.getModule()));
+  assert(loweredRawType.isObject());
+  auto rawValue = SGF.B.createUncheckedTrivialBitCast(loc, value,
+                                                      loweredRawType);
+  auto materializedRawValue = rawValue.materialize(SGF, loc);
+
+  auto genericSig = diagnoseFailure->getGenericSignature();
+  auto subs = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type {
+        auto genericParam = cast<GenericTypeParamType>(type);
+        assert(genericParam->getDepth() == 0);
+        assert(genericParam->getIndex() < 2);
+        switch (genericParam->getIndex()) {
+        case 0:
+          return switchedValueSwiftType;
+
+        case 1:
+          return enumDecl->getRawType();
+
+        default:
+          llvm_unreachable("wrong generic signature for expected case value");
+        }
+      },
+      LookUpConformanceInSignature(*genericSig));
+
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
+                                  {ManagedValue::forUnmanaged(metatype),
+                                   materializedRawValue},
+                                  SGFContext());
+}
+
+static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             ManagedValue value) {
+  ASTContext &ctx = SGF.getASTContext();
+  auto diagnoseFailure = ctx.getDiagnoseUnexpectedEnumCase(nullptr);
+  if (!diagnoseFailure) {
+    SGF.B.createBuiltinTrap(loc);
+    return;
+  }
+
+  // Get the switched-upon value's type.
+  CanType switchedValueSwiftType = value.getType().getASTType();
+  SILType metatypeType = SGF.getLoweredType(
+      CanMetatypeType::get(switchedValueSwiftType,
+                           MetatypeRepresentation::Thick));
+  ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
+
+  auto diagnoseSignature = diagnoseFailure->getGenericSignature();
+  auto genericArgsMap = diagnoseSignature->getSubstitutionMap(
+      [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
+      LookUpConformanceInSignature(*diagnoseSignature));
+
+  SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
+                                  metatype,
+                                  SGFContext());
+}
+
 void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   DEBUG(llvm::dbgs() << "emitting switch stmt\n";
         S->print(llvm::dbgs());
         llvm::dbgs() << '\n');
-  auto failure = [this](SILLocation location) {
-    // If we fail to match anything, we trap. This can happen with a switch
-    // over an @objc enum, which may contain any value of its underlying type.
-    // FIXME: Even if we can't say what the invalid value was, we should at
-    // least mention that this was because of a non-exhaustive enum.
-    B.createBuiltinTrap(location);
-    B.createUnreachable(location);
-  };
-  
   // If the subject expression is uninhabited, we're already dead.
   // Emit an unreachable in place of the switch statement.
   if (S->getSubjectExpr()->getType()->isStructurallyUninhabited()) {
@@ -2651,10 +2727,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   PatternMatchEmission emission(*this, S, completionHandler);
 
   // Add a row for each label of each case.
-  //
-  // We use std::vector because it supports emplace_back; moving a ClauseRow is
-  // expensive.
-  std::vector<ClauseRow> clauseRows;
+  SmallVector<ClauseRow, 8> clauseRows;
   clauseRows.reserve(S->getRawCases().size());
   bool hasFallthrough = false;
   for (auto caseBlock : S->getCases()) {
@@ -2694,6 +2767,27 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   // Emit the subject value. Dispatching will consume it.
   ManagedValue subjectMV = emitRValueAsSingleValue(S->getSubjectExpr());
   auto subject = ConsumableManagedValue::forOwned(subjectMV);
+
+  auto failure = [&](SILLocation location) {
+    // If we fail to match anything, we trap. This can happen with a switch
+    // over an @objc enum, which may contain any value of its underlying type,
+    // or a switch over a non-frozen Swift enum when the user hasn't written a
+    // catch-all case.
+    SWIFT_DEFER { B.createUnreachable(location); };
+
+    // Special case: if it's a single @objc enum, we can print the raw value.
+    CanType ty = S->getSubjectExpr()->getType()->getCanonicalType();
+    if (auto *singleEnumDecl = ty->getEnumOrBoundGenericEnum()) {
+      if (singleEnumDecl->isObjC()) {
+        emitDiagnoseOfUnexpectedEnumCaseValue(*this, location,
+                                              subject.getFinalManagedValue(),
+                                              singleEnumDecl);
+        return;
+      }
+    }
+    emitDiagnoseOfUnexpectedEnumCase(*this, location,
+                                     subject.getFinalManagedValue());
+  };
 
   // Set up an initial clause matrix.
   ClauseMatrix clauses(clauseRows);

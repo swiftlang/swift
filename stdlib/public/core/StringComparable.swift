@@ -20,7 +20,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isEqual(
     _ left: _StringGuts, to right: _StringGuts
   ) -> Bool {
@@ -32,7 +31,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isEqual(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
@@ -45,7 +43,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isLess(
     _ left: _StringGuts, than right: _StringGuts
   ) -> Bool {
@@ -57,7 +54,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isLess(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     than right: _StringGuts, _ rightRange: Range<Int>
@@ -70,7 +66,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func compare(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
@@ -92,7 +87,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func compare(
     _ left: _StringGuts, to right: _StringGuts
   ) -> Int {

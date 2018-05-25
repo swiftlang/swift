@@ -45,7 +45,6 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
     GET_MANGLING(AssignWithCopy) \
     GET_MANGLING(InitializeWithTake) \
     GET_MANGLING(AssignWithTake) \
-    GET_MANGLING(InitializeBufferWithTakeOfBuffer) \
     GET_MANGLING(GetEnumTagSinglePayload) \
     GET_MANGLING(StoreEnumTagSinglePayload) \
     GET_MANGLING(StoreExtraInhabitant) \
@@ -81,10 +80,8 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
 
 SymbolicMangling
 IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
-                                      Type Ty,
-                                      ModuleDecl *Module,
-                                      bool isSingleFieldOfBox) {
-  Mod = Module;
+                                      Type Ty) {
+  Mod = IGM.getSwiftModule();
   OptimizeProtocolNames = false;
 
   llvm::SaveAndRestore<std::function<bool (const DeclContext *)>>
@@ -109,8 +106,6 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   SymbolicReferences.clear();
   
   appendType(Ty);
-  if (isSingleFieldOfBox)
-    appendOperator("Xb");
   
   return {finalize(), std::move(SymbolicReferences)};
 }

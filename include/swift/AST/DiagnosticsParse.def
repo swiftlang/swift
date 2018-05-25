@@ -37,7 +37,7 @@
 #endif
 
 //==============================================================================
-// Lexing and Parsing diagnostics
+// MARK: Lexing and Parsing diagnostics
 //==============================================================================
 
 NOTE(opening_brace,none,
@@ -99,7 +99,7 @@ WARNING(escaped_parameter_name,none,
         (StringRef))
 
 //------------------------------------------------------------------------------
-// Lexer diagnostics
+// MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
 
 WARNING(lex_nul_character,none,
@@ -121,6 +121,8 @@ ERROR(lex_invalid_curly_quote,none,
 NOTE(lex_confusable_character,none,
       "unicode character '%0' looks similar to '%1'; did you mean to use '%1'?",
       (StringRef, StringRef))
+WARNING(lex_nonbreaking_space,none,
+        "non-breaking space (U+00A0) used instead of regular space", ())
 
 ERROR(lex_unterminated_block_comment,none,
       "unterminated '/*' comment", ())
@@ -184,7 +186,7 @@ WARNING(lex_editor_placeholder_in_playground,none,
 ERROR(lex_conflict_marker_in_file,none,
       "source control conflict marker in source file", ())
 //------------------------------------------------------------------------------
-// Declaration parsing diagnostics
+// MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
@@ -206,8 +208,7 @@ ERROR(number_cant_start_decl_name,none,
 ERROR(expected_identifier_after_case_comma,none,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
-      "%select{declaration|definition}0 conflicts with previous value",
-      (bool))
+      "definition conflicts with previous value", ())
 ERROR(let_cannot_be_computed_property,none,
       "'let' declarations cannot be computed properties", ())
 ERROR(let_cannot_be_observing_property,none,
@@ -333,8 +334,6 @@ ERROR(associated_type_generic_parameter_list,PointsToFirstBadToken,
 // Func
 ERROR(func_decl_without_paren,PointsToFirstBadToken,
       "expected '(' in argument list of function declaration", ())
-ERROR(enum_element_decl_without_paren,PointsToFirstBadToken,
-      "expected '(' in argument list of enum element declaration", ())
 ERROR(static_func_decl_global_scope,none,
       "%select{%error|static methods|class methods}0 may only be declared on a type",
       (StaticSpellingKind))
@@ -364,6 +363,8 @@ ERROR(expected_lbrace_class,PointsToFirstBadToken,
       "expected '{' in class", ())
 ERROR(expected_rbrace_class,none,
       "expected '}' in class", ())
+ERROR(expected_colon_class, PointsToFirstBadToken,
+      "expected ':' to begin inheritance clause",())
 
 // Protocol
 ERROR(generic_arguments_protocol,PointsToFirstBadToken,
@@ -701,7 +702,7 @@ ERROR(sil_coverage_invalid_operator, none,
       "expected '+' or '-'", ())
 
 //------------------------------------------------------------------------------
-// Type parsing diagnostics
+// MARK: Type parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_type,PointsToFirstBadToken,
@@ -799,7 +800,7 @@ ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
-// Layout constraint diagnostics
+// MARK: Layout constraint diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(layout_size_should_be_positive,none,
@@ -812,7 +813,7 @@ ERROR(layout_constraints_only_inside_specialize_attr,none,
       "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
-// Pattern parsing diagnostics
+// MARK: Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_pattern,PointsToFirstBadToken,
@@ -1078,7 +1079,7 @@ ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
 
 //------------------------------------------------------------------------------
-// Expression parsing diagnostics
+// MARK: Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_expr,none,
@@ -1256,7 +1257,7 @@ ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
 //------------------------------------------------------------------------------
-// Attribute-parsing diagnostics
+// MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(replace_equal_with_colon_for_value,none,
@@ -1265,6 +1266,8 @@ ERROR(expected_attribute_name,none,
       "expected an attribute name", ())
 ERROR(unknown_attribute,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unexpected_lparen_in_attribute,none,
+      "unexpected '(' in attribute '%0'", (StringRef))
 ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
@@ -1318,6 +1321,8 @@ ERROR(attr_renamed, none,
       "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
 WARNING(attr_renamed_warning, none,
         "'@%0' has been renamed to '@%1'", (StringRef, StringRef))
+ERROR(attr_name_close_match, none,
+      "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 
 // availability
 ERROR(attr_availability_platform,none,
@@ -1451,7 +1456,7 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 //------------------------------------------------------------------------------
-// Generics parsing diagnostics
+// MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(expected_rangle_generics_param,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
@@ -1485,7 +1490,7 @@ ERROR(where_inside_brackets,none,
         "must be written following the declaration's type", ())
 
 //------------------------------------------------------------------------------
-// Conditional compilation parsing diagnostics
+// MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unsupported_conditional_compilation_binary_expression,none,
       "expected '&&' or '||' expression", ())
@@ -1540,7 +1545,7 @@ WARNING(likely_simulator_platform_condition,none,
       ())
 
 //------------------------------------------------------------------------------
-// Availability query parsing diagnostics
+// MARK: Availability query parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(avail_query_expected_condition,PointsToFirstBadToken,
       "expected availability condition", ())
@@ -1581,10 +1586,10 @@ ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
 //------------------------------------------------------------------------------
-// syntax parsing diagnostics
+// MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
-WARNING(unknown_syntax_entity, PointsToFirstBadToken,
-        "unknown %0 syntax exists in the source", (StringRef))
+ERROR(unknown_syntax_entity, PointsToFirstBadToken,
+      "unknown %0 syntax exists in the source", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

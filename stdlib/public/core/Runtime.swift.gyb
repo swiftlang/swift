@@ -146,7 +146,6 @@ func _swift_stdlib_atomicStoreUInt${bits}(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _swift_stdlib_atomicStoreInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   desired: Int${bits}) {
@@ -164,7 +163,6 @@ func _swift_stdlib_atomicLoadUInt${bits}(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _swift_stdlib_atomicLoadInt${bits}(
   object target: UnsafeMutablePointer<Int${bits}>) -> Int${bits} {
 
@@ -189,7 +187,6 @@ func _swift_stdlib_atomicFetch${operation}UInt${bits}(
 
 // Warning: no overflow checking.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
@@ -204,7 +201,6 @@ internal func _swift_stdlib_atomicFetch${operation}Int${bits}(
 % end
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _stdlib_atomicCompareExchangeStrongInt(
   object target: UnsafeMutablePointer<Int>,
   expected: UnsafeMutablePointer<Int>,
@@ -221,7 +217,6 @@ internal func _stdlib_atomicCompareExchangeStrongInt(
 }
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int) {
@@ -284,7 +279,6 @@ public final class _stdlib_AtomicInt {
   internal var _value: Int
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _valuePtr: UnsafeMutablePointer<Int> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Int.self)
@@ -344,7 +338,6 @@ public final class _stdlib_AtomicInt {
 @usableFromInline // FIXME(sil-serialize-all)
 internal struct _Buffer32 {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 % for i in range(32):
   @usableFromInline // FIXME(sil-serialize-all)
@@ -352,7 +345,6 @@ internal struct _Buffer32 {
 % end
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
@@ -368,7 +360,6 @@ internal struct _Buffer32 {
 @usableFromInline // FIXME(sil-serialize-all)
 internal struct _Buffer72 {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 % for i in range(72):
   @usableFromInline // FIXME(sil-serialize-all)
@@ -376,7 +367,6 @@ internal struct _Buffer72 {
 % end
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func withBytes<Result>(
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result
@@ -393,7 +383,6 @@ internal struct _Buffer72 {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_float${bits}ToString")
 internal func _float${bits}ToStringImpl(
@@ -403,7 +392,6 @@ internal func _float${bits}ToStringImpl(
 ) -> UInt
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> String {
@@ -422,7 +410,6 @@ internal func _float${bits}ToString(
 
 % end
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
@@ -432,7 +419,6 @@ internal func _int64ToStringImpl(
 ) -> UInt
 
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
 ) -> String {
@@ -455,7 +441,6 @@ internal func _int64ToString(
   }
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
@@ -488,7 +473,6 @@ func _uint64ToString(
 }
 
 @inlinable
-@usableFromInline
 internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(
@@ -515,11 +499,9 @@ internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSArrayBase)
 internal class _SwiftNativeNSArray {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 
@@ -528,11 +510,9 @@ internal class _SwiftNativeNSArray {
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSDictionaryBase)
 internal class _SwiftNativeNSDictionary {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 
@@ -541,11 +521,9 @@ internal class _SwiftNativeNSDictionary {
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSSetBase)
 internal class _SwiftNativeNSSet {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 
@@ -554,11 +532,9 @@ internal class _SwiftNativeNSSet {
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSEnumeratorBase)
 internal class _SwiftNativeNSEnumerator {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @nonobjc
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 
@@ -581,12 +557,10 @@ open class _SwiftNativeNSData {
 @objc
 internal class _stdlib_ReturnAutoreleasedDummy {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   @objc
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
   // Use 'dynamic' to force Objective-C dispatch, which uses the
@@ -630,30 +604,24 @@ public func _stdlib_initializeReturnAutoreleased() {
 @usableFromInline // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSArray {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSDictionary {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal class _SwiftNativeNSSet {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 }
 

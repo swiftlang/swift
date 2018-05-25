@@ -52,7 +52,7 @@ private:
     BracePair(const SourceRange &BR) : BraceRange(BR) {}
   };
 
-  typedef std::forward_list<BracePair> BracePairStack;
+  using BracePairStack = std::forward_list<BracePair>;
 
   BracePairStack BracePairs;
   class BracePairPusher {
@@ -95,7 +95,7 @@ private:
     }
   };
 
-  typedef SmallVector<swift::ASTNode, 3> ElementVector;
+  using ElementVector = SmallVector<swift::ASTNode, 3>;
 
   // Before a "return," "continue" or similar statement, emit pops of
   // all the braces up to its target.
@@ -370,7 +370,7 @@ public:
 
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
-    typedef SmallVector<swift::ASTNode, 3> ElementVector;
+    using ElementVector = SmallVector<swift::ASTNode, 3>;
     ElementVector Elements(OriginalElements.begin(), OriginalElements.end());
 
     SourceRange SR = BS->getSourceRange();

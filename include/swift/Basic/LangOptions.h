@@ -258,7 +258,9 @@ namespace swift {
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
-    /// Whether to parse syntax tree.
+    /// Whether to parse syntax tree. If the syntax tree is built, the generated
+    /// AST may not be correct when syntax nodes are reused as part of
+    /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.

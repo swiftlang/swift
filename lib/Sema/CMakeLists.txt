@@ -27,7 +27,6 @@ add_swift_library(swiftSema STATIC
   DerivedConformances.cpp
   ITCDecl.cpp
   ITCNameLookup.cpp
-  ITCType.cpp
   InstrumenterSupport.cpp
   IterativeTypeChecker.cpp
   MiscDiagnostics.cpp

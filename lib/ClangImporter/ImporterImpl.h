@@ -196,8 +196,14 @@ enum class Bridgeability {
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(clang::QualType type) {
-  return type->isBlockPointerType() ? Bridgeability::Full : Bridgeability::None;
+static inline Bridgeability getTypedefBridgeability(
+                                          const clang::TypedefNameDecl *decl,
+                                          clang::QualType type) {
+    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
+      ? Bridgeability::Full
+        : type->isBlockPointerType()
+        ? Bridgeability::Full
+          : Bridgeability::None;
 }
 
 /// \brief Describes the kind of the C type that can be mapped to a stdlib
@@ -557,11 +563,6 @@ private:
   /// Records those modules that we have looked up.
   llvm::DenseMap<Identifier, ModuleDecl *> checkedModules;
 
-  /// External Decls that we have imported but not passed to the ASTContext yet.
-  SmallVector<Decl *, 4> RegisteredExternalDecls;
-
-  unsigned NumCurrentImportingEntities = 0;
-
   /// Mapping from delayed conformance IDs to the set of delayed
   /// protocol conformances.
   llvm::DenseMap<unsigned, SmallVector<ProtocolConformance *, 4>>
@@ -576,19 +577,6 @@ private:
     ImportedProtocols;
 
   void startedImportingEntity();
-  void finishedImportingEntity();
-  void finishPendingActions();
-
-  struct ImportingEntityRAII {
-    Implementation &Impl;
-
-    ImportingEntityRAII(Implementation &Impl) : Impl(Impl) {
-      Impl.startedImportingEntity();
-    }
-    ~ImportingEntityRAII() {
-      Impl.finishedImportingEntity();
-    }
-  };
 
 public:
   importer::PlatformAvailability platformAvailability;
@@ -624,7 +612,8 @@ public:
 
 public:
   void registerExternalDecl(Decl *D) {
-    RegisteredExternalDecls.push_back(D);
+    if (!hasFinishedTypeChecking())
+      SwiftContext.addExternalDecl(D);
   }
 
   void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
@@ -1363,7 +1352,9 @@ public:
   void forEachDistinctName(
       const clang::NamedDecl *decl,
       llvm::function_ref<bool(importer::ImportedName,
-                              importer::ImportNameVersion)> action);
+                              importer::ImportNameVersion)> action) {
+    getNameImporter().forEachDistinctImportName(decl, CurrentVersion, action);
+  }
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();

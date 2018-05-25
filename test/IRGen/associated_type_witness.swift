@@ -12,7 +12,7 @@ protocol Assocked {
 
 struct Universal : P, Q {}
 
-// CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc TwoAssoc ThreeAssoc\00"
+// CHECK: [[ASSOC_TYPE_NAMES:@.*]] = private constant [29 x i8] c"OneAssoc ThreeAssoc TwoAssoc\00"
 // CHECK: @"$S23associated_type_witness18HasThreeAssocTypesMp" =
 // CHECK-SAME: [[ASSOC_TYPE_NAMES]] to i64
 

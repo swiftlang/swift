@@ -33,22 +33,18 @@ extension String {
 /// Convenience accessors
 extension String.Index._Cache {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var utf16: Void? {
     if case .utf16 = self { return () } else { return nil }
   }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var utf8: String.Index._UTF8Buffer? {
     if case .utf8(let r) = self { return r } else { return nil }
   }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var character: UInt16? {
     if case .character(let r) = self { return r } else { return nil }
   }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var unicodeScalar: UnicodeScalar? {
     if case .unicodeScalar(let r) = self { return r } else { return nil }
   }
@@ -69,9 +65,14 @@ extension String.Index : Comparable {
 }
 
 extension String.Index : Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _compoundOffset.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_compoundOffset)
   }
 }
 
@@ -88,21 +89,17 @@ extension String.Index {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(encodedOffset o: Int, transcodedOffset: Int = 0, _ c: _Cache) {
     _compoundOffset = UInt64(o << _Self._strideBits | transcodedOffset)
     _cache = c
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _strideBits : Int { return 2 }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _mask : UInt64 { return (1 &<< _Self._strideBits) &- 1 }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal mutating func _setEncodedOffset(_ x: Int) {
     _compoundOffset = UInt64(x << _Self._strideBits)
   }
@@ -115,7 +112,6 @@ extension String.Index {
 
   /// The offset of this index within whatever encoding this is being viewed as
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var _transcodedOffset : Int {
     get {
       return Int(_compoundOffset & _Self._mask)

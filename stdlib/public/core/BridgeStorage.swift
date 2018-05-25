@@ -158,7 +158,6 @@ struct _BridgeStorage<
   
   //===--- private --------------------------------------------------------===//
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _isTagged: Bool {
     @inline(__always) get {
       return Bool(Builtin.classifyBridgeObject(rawValue).isObjCTaggedPointer)

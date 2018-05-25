@@ -45,6 +45,10 @@ public protocol Decodable {
 }
 
 /// A type that can convert itself into and out of an external representation.
+///
+/// `Codable` is a type alias for the `Encodable` and `Decodable` protocols.
+/// When you use `Codable` as a type or a generic constraint, it matches
+/// any type that conforms to both protocols.
 public typealias Codable = Encodable & Decodable
 
 //===----------------------------------------------------------------------===//
@@ -1094,6 +1098,16 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
+
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self.rawValue)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1312,13 +1326,11 @@ internal struct _GenericIndexKey : CodingKey {
   internal var intValue: Int?
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(stringValue: String) {
     return nil
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(intValue: Int) {
     self.stringValue = "Index \(intValue)"
     self.intValue = intValue
@@ -1400,42 +1412,35 @@ public extension DecodingError {
 @usableFromInline
 internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(){}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
   // These must all be given a concrete implementation in _*Box.
   @inlinable
-  @usableFromInline
   internal var codingPath: [CodingKey] {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func encodeNil(forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   internal func encode(_ value: ${type}, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 % end
 
   @inlinable
-  @usableFromInline
   internal func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -1444,14 +1449,12 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   internal func encodeIfPresent(_ value: ${type}?, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 % end
 
   @inlinable
-  @usableFromInline
   internal func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
@@ -1459,7 +1462,6 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   }
 
   @inlinable
-  @usableFromInline
   internal func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type, forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> {
@@ -1467,20 +1469,17 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   }
 
   @inlinable
-  @usableFromInline
   internal func nestedUnkeyedContainer(
     forKey key: Key) -> UnkeyedEncodingContainer {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func superEncoder() -> Encoder {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func superEncoder(forKey key: Key) -> Encoder {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
@@ -1497,33 +1496,28 @@ internal final class _KeyedEncodingContainerBox<
   internal var concrete: Concrete
 
   @inlinable
-  @usableFromInline
   internal init(_ container: Concrete) {
     concrete = container
   }
 
   @inlinable
-  @usableFromInline
   override internal var codingPath: [CodingKey] {
     return concrete.codingPath
   }
 
   @inlinable
-  @usableFromInline
   override internal func encodeNil(forKey key: Key) throws {
     try concrete.encodeNil(forKey: key)
   }
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   override internal func encode(_ value: ${type}, forKey key: Key) throws {
     try concrete.encode(value, forKey: key)
   }
 % end
 
   @inlinable
-  @usableFromInline
   override internal func encode<T : Encodable>(
     _ value: T, forKey key: Key) throws
   {
@@ -1531,7 +1525,6 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func encodeConditional<T : AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
@@ -1540,7 +1533,6 @@ internal final class _KeyedEncodingContainerBox<
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   override internal func encodeIfPresent(
     _ value: ${type}?, forKey key: Key) throws
   {
@@ -1549,7 +1541,6 @@ internal final class _KeyedEncodingContainerBox<
 % end
 
   @inlinable
-  @usableFromInline
   override internal func encodeIfPresent<T : Encodable>(
     _ value: T?, forKey key: Key) throws
   {
@@ -1557,7 +1548,6 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func nestedContainer<NestedKey>(
     keyedBy keyType: NestedKey.Type, forKey key: Key
   ) -> KeyedEncodingContainer<NestedKey> {
@@ -1565,7 +1555,6 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func nestedUnkeyedContainer(
     forKey key: Key) -> UnkeyedEncodingContainer
   {
@@ -1573,13 +1562,11 @@ internal final class _KeyedEncodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func superEncoder() -> Encoder {
     return concrete.superEncoder()
   }
 
   @inlinable
-  @usableFromInline
   override internal func superEncoder(forKey key: Key) -> Encoder {
     return concrete.superEncoder(forKey: key)
   }
@@ -1589,40 +1576,33 @@ internal final class _KeyedEncodingContainerBox<
 @usableFromInline
 internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(){}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
   @inlinable
-  @usableFromInline
   internal var codingPath: [CodingKey] {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal var allKeys: [Key] {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func contains(_ key: Key) -> Bool {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func decodeNil(forKey key: Key) throws -> Bool {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   internal func decode(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}
   {
@@ -1631,7 +1611,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 % end
 
   @inlinable
-  @usableFromInline
   internal func decode<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
@@ -1640,7 +1619,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   internal func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -1649,7 +1627,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 % end
 
   @inlinable
-  @usableFromInline
   internal func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
@@ -1657,7 +1634,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 
   @inlinable
-  @usableFromInline
   internal func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type, forKey key: Key
   ) throws -> KeyedDecodingContainer<NestedKey> {
@@ -1665,7 +1641,6 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 
   @inlinable
-  @usableFromInline
   internal func nestedUnkeyedContainer(
     forKey key: Key) throws -> UnkeyedDecodingContainer
   {
@@ -1673,13 +1648,11 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 
   @inlinable
-  @usableFromInline
   internal func superDecoder() throws -> Decoder {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
 
   @inlinable
-  @usableFromInline
   internal func superDecoder(forKey key: Key) throws -> Decoder {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
@@ -1696,38 +1669,32 @@ internal final class _KeyedDecodingContainerBox<
   internal var concrete: Concrete
 
   @inlinable
-  @usableFromInline
   internal init(_ container: Concrete) {
     concrete = container
   }
 
   @inlinable
-  @usableFromInline
   override var codingPath: [CodingKey] {
     return concrete.codingPath
   }
 
   @inlinable
-  @usableFromInline
   override var allKeys: [Key] {
     return concrete.allKeys
   }
 
   @inlinable
-  @usableFromInline
   override internal func contains(_ key: Key) -> Bool {
     return concrete.contains(key)
   }
 
   @inlinable
-  @usableFromInline
   override internal func decodeNil(forKey key: Key) throws -> Bool {
     return try concrete.decodeNil(forKey: key)
   }
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   override internal func decode(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}
   {
@@ -1736,7 +1703,6 @@ internal final class _KeyedDecodingContainerBox<
 % end
 
   @inlinable
-  @usableFromInline
   override internal func decode<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
@@ -1745,7 +1711,6 @@ internal final class _KeyedDecodingContainerBox<
 
 % for type in codable_types:
   @inlinable
-  @usableFromInline
   override internal func decodeIfPresent(
     _ type: ${type}.Type, forKey key: Key) throws -> ${type}?
   {
@@ -1754,7 +1719,6 @@ internal final class _KeyedDecodingContainerBox<
 % end
 
   @inlinable
-  @usableFromInline
   override internal func decodeIfPresent<T : Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
@@ -1762,7 +1726,6 @@ internal final class _KeyedDecodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func nestedContainer<NestedKey>(
     keyedBy type: NestedKey.Type, forKey key: Key
   ) throws -> KeyedDecodingContainer<NestedKey> {
@@ -1770,7 +1733,6 @@ internal final class _KeyedDecodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func nestedUnkeyedContainer(
     forKey key: Key) throws -> UnkeyedDecodingContainer
   {
@@ -1778,13 +1740,11 @@ internal final class _KeyedDecodingContainerBox<
   }
 
   @inlinable
-  @usableFromInline
   override internal func superDecoder() throws -> Decoder {
     return try concrete.superDecoder()
   }
 
   @inlinable
-  @usableFromInline
   override internal func superDecoder(forKey key: Key) throws -> Decoder {
     return try concrete.superDecoder(forKey: key)
   }
@@ -1821,7 +1781,8 @@ extension ${type} : Codable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Encodable {
-  /// Encodes this value into the given encoder.
+  /// Encodes this value into the given encoder, when the type's `RawValue`
+  /// is `${type}`.
   ///
   /// This function throws an error if any values are invalid for the given
   /// encoder's format.
@@ -1835,7 +1796,8 @@ extension RawRepresentable where RawValue == ${type}, Self : Encodable {
 }
 
 extension RawRepresentable where RawValue == ${type}, Self : Decodable {
-  /// Creates a new instance by decoding from the given decoder.
+  /// Creates a new instance by decoding from the given decoder, when the
+  /// type's `RawValue` is `${type}`.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
   /// if the data read is corrupted or otherwise invalid.
@@ -1978,14 +1940,12 @@ internal struct _DictionaryCodingKey : CodingKey {
   internal let intValue: Int?
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(stringValue: String) {
     self.stringValue = stringValue
     self.intValue = Int(stringValue)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init?(intValue: Int) {
     self.stringValue = "\(intValue)"
     self.intValue = intValue

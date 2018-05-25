@@ -7,6 +7,22 @@
 // RUN: sed -ne '/--->/s/^.*---> *//p' < %S/Inputs/decl-reconstr-names.txt > %t.check
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/DeclReconstr -emit-module
+
+// Input validation tests.
+// RUN: not %lldb-moduleimport-test patatino 2>&1 | %FileCheck %s \
+// RUN:   --check-prefix=INVALID-INPUT
+// INVALID-INPUT: patatino No such file or directory
+
+// RUN: not %lldb-moduleimport-test %t/DeclReconstr \
+// RUN:   --decl-from-mangled=patatino 2>&1 | \
+// RUN:   %FileCheck %s --check-prefix=INVALID-DECL
+// INVALID-DECL: patatino does not exists, exiting.
+
+// RUN: not %lldb-moduleimport-test %t/DeclReconstr \
+// RUN:   --type-from-mangled=patatino 2>&1 | \
+// RUN:   %FileCheck %s --check-prefix=INVALID-TYPE
+// INVALID-TYPE: patatino does not exists, exiting.
+
 // RUN: %lldb-moduleimport-test %t/DeclReconstr \
 // RUN:   -decl-from-mangled=%t.input > %t.output 2>&1
 // RUN: diff %t.check %t.output
@@ -23,3 +39,19 @@ func patatino() -> Int {
 }
 
 patatino()
+
+class Foo<T> {
+  var x : T
+  init(_ x : T) {
+    self.x = x
+  }
+}
+
+typealias Patatino<T> = Foo<T>
+
+func main() -> Int {
+  var p : Patatino<Int> = Patatino(23);
+  return 0
+}
+
+let _ = main()

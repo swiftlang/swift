@@ -18,7 +18,6 @@ public struct LazyPrefixWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
@@ -50,7 +49,6 @@ extension LazyPrefixWhileSequence {
     internal let _predicate: (Element) -> Bool
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator, predicate: @escaping (Element) -> Bool) {
       self._base = _base
       self._predicate = predicate
@@ -117,7 +115,6 @@ public struct LazyPrefixWhileCollection<Base: Collection> {
   public typealias SubSequence = Slice<LazyPrefixWhileCollection<Base>>
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
@@ -158,7 +155,6 @@ extension LazyPrefixWhileCollection {
 
     /// Creates a new index wrapper for `i`.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ i: Base.Index) {
       self._value = .index(i)
     }
@@ -167,7 +163,6 @@ extension LazyPrefixWhileCollection {
     /// `LazyPrefixWhileCollection<Base>`. This is not the same as a wrapper
     /// around `Base.endIndex`.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(endOf: Base) {
       self._value = .pastEnd
     }
@@ -207,18 +202,18 @@ extension LazyPrefixWhileCollection.Index: Comparable {
 }
 
 extension LazyPrefixWhileCollection.Index: Hashable where Base.Index: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  public func hash(into hasher: inout Hasher) {
     switch _value {
     case .index(let value):
-      hasher.append(value)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(Int.max)
+      hasher.combine(Int.max)
     }
   }
 }

@@ -251,10 +251,10 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
-bool DiagnosticEngine::finishProcessing() {
+bool DiagnosticEngine::finishProcessing(SourceManager &SM) {
   bool hadError = false;
   for (auto &Consumer : Consumers) {
-    hadError |= Consumer->finishProcessing();
+    hadError |= Consumer->finishProcessing(SM);
   }
   return hadError;
 }
@@ -472,6 +472,19 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for PatternKind argument");
     Out << Arg.getAsPatternKind();
     break;
+
+  case DiagnosticArgumentKind::ReferenceOwnership:
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              unsigned(Arg.getAsReferenceOwnership()),
+                              FormatOpts, Out);
+    } else {
+      assert(Modifier.empty() &&
+             "Improper modifier for ReferenceOwnership argument");
+      Out << Arg.getAsReferenceOwnership();
+    }
+    break;
+
   case DiagnosticArgumentKind::StaticSpellingKind:
     if (Modifier == "select") {
       formatSelectionArgument(ModifierArguments, Args,
@@ -809,9 +822,11 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
   Info.FixIts = diagnostic.getFixIts();
   for (auto &Consumer : Consumers) {
     Consumer->handleDiagnostic(SourceMgr, loc, toDiagnosticKind(behavior),
-                               diagnosticStrings[(unsigned)Info.ID],
-                               diagnostic.getArgs(),
-                               Info);
+                               diagnosticStringFor(Info.ID),
+                               diagnostic.getArgs(), Info);
   }
 }
 
+const char *DiagnosticEngine::diagnosticStringFor(const DiagID id) {
+  return diagnosticStrings[(unsigned)id];
+}

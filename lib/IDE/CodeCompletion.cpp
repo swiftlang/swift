@@ -939,10 +939,15 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
       Ty->is<ErrorType>() ||
       ExpectedTy->is<ErrorType>())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
-  if (Ty->isEqual(ExpectedTy))
-    return CodeCompletionResult::ExpectedTypeRelation::Identical;
-  if (isConvertibleTo(Ty, ExpectedTy, *DC))
-    return CodeCompletionResult::ExpectedTypeRelation::Convertible;
+
+  // Equality/Conversion of GenericTypeParameterType won't account for
+  // requirements – ignore them
+  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
+    if (Ty->isEqual(ExpectedTy))
+      return CodeCompletionResult::ExpectedTypeRelation::Identical;
+    if (isConvertibleTo(Ty, ExpectedTy, *DC))
+      return CodeCompletionResult::ExpectedTypeRelation::Convertible;
+  }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
     if (FT->getResult()->isVoid())
       return CodeCompletionResult::ExpectedTypeRelation::Invalid;
@@ -1313,7 +1318,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (!DC)
       return;
     auto *CD = DC->getAsClassOrClassExtensionContext();
-    if (CD == nullptr)
+    if (!CD)
       return;
     Type ST = CD->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
@@ -1539,7 +1544,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
   SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(funcType->getInput(), FD,
+  computeDefaultMap(funcType->getParams(), FD,
                     /*level*/ FD->isInstanceMember() ? 1 : 0, defaultMap);
   
   bool OneArg = defaultMap.size() == 1;
@@ -1827,36 +1832,47 @@ public:
 
   void addImportModuleNames() {
     // FIXME: Add user-defined swift modules
-    SmallVector<clang::Module*, 20> Modules;
-    Ctx.getVisibleTopLevelClangModules(Modules);
-    std::sort(Modules.begin(), Modules.end(),
-              [](clang::Module* LHS , clang::Module* RHS) {
-                return LHS->getTopLevelModuleName().compare_lower(
-                  RHS->getTopLevelModuleName()) < 0;
+    SmallVector<StringRef, 20> ModuleNames;
+
+    // Collect clang module names.
+    {
+      SmallVector<clang::Module*, 20> ClangModules;
+      Ctx.getVisibleTopLevelClangModules(ClangModules);
+      for (auto *M : ClangModules) {
+        if (!M->isAvailable())
+          continue;
+        if (M->getTopLevelModuleName().startswith("_"))
+          continue;
+        if (M->getTopLevelModuleName() == Ctx.SwiftShimsModuleName.str())
+          continue;
+
+        ModuleNames.push_back(M->getTopLevelModuleName());
+      }
+    }
+
+    std::sort(ModuleNames.begin(), ModuleNames.end(),
+              [](StringRef LHS, StringRef RHS) {
+                return LHS.compare_lower(RHS) < 0;
               });
+
     llvm::StringSet<> ImportedModules;
     collectImportedModules(ImportedModules);
-    for (auto *M : Modules) {
-      if (M->isAvailable() &&
-          !M->getTopLevelModuleName().startswith("_") &&
-          M->getTopLevelModuleName() != CurrDeclContext->getASTContext().
-            SwiftShimsModuleName.str()) {
-        auto MD = ModuleDecl::create(Ctx.getIdentifier(M->getTopLevelModuleName()),
-                                     Ctx);
-        CodeCompletionResultBuilder Builder(Sink,
-                                            CodeCompletionResult::ResultKind::
-                                              Declaration,
-                                            SemanticContextKind::OtherModule,
-                                            ExpectedTypes);
-        Builder.setAssociatedDecl(MD);
-        Builder.addTextChunk(MD->getNameStr());
-        Builder.addTypeAnnotation("Module");
 
-        // Imported modules are not recommended.
-        if (ImportedModules.count(MD->getNameStr()) != 0)
-          Builder.setNotRecommended(CodeCompletionResult::NotRecommendedReason::
-                                      Redundant);
-      }
+    for (auto ModuleName : ModuleNames) {
+      auto MD = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+      CodeCompletionResultBuilder Builder(
+          Sink,
+          CodeCompletionResult::ResultKind::Declaration,
+          SemanticContextKind::OtherModule,
+          ExpectedTypes);
+      Builder.setAssociatedDecl(MD);
+      Builder.addTextChunk(MD->getNameStr());
+      Builder.addTypeAnnotation("Module");
+
+      // Imported modules are not recommended.
+      if (ImportedModules.count(MD->getNameStr()) != 0)
+        Builder.setNotRecommended(
+            CodeCompletionResult::NotRecommendedReason::Redundant);
     }
   }
 
@@ -2822,23 +2838,29 @@ public:
   }
 
   void addKeyword(StringRef Name, Type TypeAnnotation,
-                  SemanticContextKind SK = SemanticContextKind::None) {
+                  SemanticContextKind SK = SemanticContextKind::None,
+                  CodeCompletionKeywordKind KeyKind
+                    = CodeCompletionKeywordKind::None) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword, SK, ExpectedTypes);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
+    Builder.setKeywordKind(KeyKind);
     if (!TypeAnnotation.isNull())
       addTypeAnnotation(Builder, TypeAnnotation);
   }
 
-  void addKeyword(StringRef Name, StringRef TypeAnnotation) {
+  void addKeyword(StringRef Name, StringRef TypeAnnotation,
+                  CodeCompletionKeywordKind KeyKind
+                    = CodeCompletionKeywordKind::None) {
     CodeCompletionResultBuilder Builder(
         Sink,
         CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, ExpectedTypes);
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
+    Builder.setKeywordKind(KeyKind);
     if (!TypeAnnotation.empty())
       Builder.addTypeAnnotation(TypeAnnotation);
   }
@@ -3243,14 +3265,13 @@ public:
     ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
     if (ExprType->hasTypeParameter()) {
-      DeclContext *DC;
-      if (VD) {
+      DeclContext *DC = nullptr;
+      if (VD)
         DC = VD->getInnermostDeclContext();
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
+      else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal())
         DC = NTD;
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      }
+      if (DC)
+        ExprType = DC->mapTypeIntoContext(ExprType);
     }
 
     // Handle special cases
@@ -4852,20 +4873,14 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
   auto AddCSKeyword = [&](StringRef Name) {
     AddKeyword(Name, CodeCompletionKeywordKind::None);
   };
-  AddCSKeyword("weak");
-  AddCSKeyword("unowned");
-  AddCSKeyword("optional");
-  AddCSKeyword("required");
-  AddCSKeyword("lazy");
-  AddCSKeyword("final");
-  AddCSKeyword("dynamic");
-  AddCSKeyword("prefix");
-  AddCSKeyword("postfix");
-  AddCSKeyword("infix");
-  AddCSKeyword("override");
-  AddCSKeyword("mutating");
-  AddCSKeyword("nonmutating");
-  AddCSKeyword("convenience");
+
+#define CONTEXTUAL_CASE(KW) AddCSKeyword(#KW);
+#define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#include <swift/AST/Attr.def>
+#undef CONTEXTUAL_CASE
+
 }
 
 static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) {
@@ -5306,6 +5321,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
 
+    if (!ExprType.getValue()->getAs<ModuleType>())
+      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+                        SemanticContextKind::CurrentNominal,
+                        CodeCompletionKeywordKind::kw_self);
+
     if (isa<BindOptionalExpr>(ParsedExpr) || isa<ForceValueExpr>(ParsedExpr))
       Lookup.setIsUnwrappedOptional(true);
 
@@ -5354,6 +5374,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       Lookup.setIsDynamicLookup();
     Lookup.getValueExprCompletions(*ExprType, ReferencedDecl.getDecl());
     Lookup.getOperatorCompletions(ParsedExpr, leadingSequenceExprs);
+
+    if (!ExprType.getValue()->getAs<ModuleType>())
+      Lookup.addKeyword("self", (*ExprType)->getRValueType(),
+                        SemanticContextKind::CurrentNominal,
+                        CodeCompletionKeywordKind::kw_self);
     break;
   }
 

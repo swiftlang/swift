@@ -942,13 +942,13 @@ StringTests.test("stringGutsReserve")
     expectEqual(isSwiftNative(base), startedNative)
     
     let originalBuffer = base.bufferID
-    let isUnique = base._guts.isUniqueNative()
+    let isUnique = base._guts._isUniqueNative()
     let startedUnique =
       startedNative &&
       base._guts._objectIdentifier != nil &&
       isUnique
     
-    base.reserveCapacity(0)
+    base.reserveCapacity(16)
     // Now it's unique
     
     // If it was already native and unique, no reallocation
@@ -1065,11 +1065,11 @@ StringTests.test("reserveCapacity") {
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
-  s.reserveCapacity(oldCap + 2)
-  print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  s.reserveCapacity(oldCap + 18)
+  print("reserving \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
   let id1 = s.bufferID
-  s.insert(contentsOf: repeatElement(x, count: oldCap + 2), at: s.endIndex)
-  print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._guts.byteWidth)")
+  s.insert(contentsOf: repeatElement(x, count: oldCap + 18), at: s.endIndex)
+  print("extending by \(oldCap + 18) -> \(s.capacity), width = \(s._guts.byteWidth)")
   expectEqual(id1, s.bufferID)
   s.insert(contentsOf: repeatElement(x, count: s.capacity + 100), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
@@ -1102,7 +1102,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String._fromWellFormedUTF8CodeUnitSequence(chars)
+    let str = String(decoding: chars, as: UTF8.self)
     expectNil(Int(str))
   }
 

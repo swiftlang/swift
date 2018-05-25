@@ -28,6 +28,7 @@
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Parse/SyntaxParsingCache.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
@@ -206,6 +207,7 @@ private:
     unsigned TestingEnabled : 1;
     unsigned FailedToLoad : 1;
     unsigned ResilienceStrategy : 1;
+    unsigned HasResolvedImports : 1;
   } Flags;
 
   ModuleDecl(Identifier name, ASTContext &ctx);
@@ -255,6 +257,13 @@ public:
   }
   void setFailedToLoad(bool failed = true) {
     Flags.FailedToLoad = failed;
+  }
+
+  bool hasResolvedImports() const {
+    return Flags.HasResolvedImports;
+  }
+  void setHasResolvedImports() {
+    Flags.HasResolvedImports = true;
   }
 
   ResilienceStrategy getResilienceStrategy() const {
@@ -400,23 +409,17 @@ public:
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///        results, with the given access path.
-  /// \param includePrivateTopLevelImports If true, imports listed in all
-  ///        file units within this module are traversed. Otherwise (the
-  ///        default), only re-exported imports are traversed.
   /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
   ///        Return \c false to abort iteration.
   ///
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<bool(ImportedModule)> fn);
 
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             llvm::function_ref<void(ImportedModule)> fn) {
     return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
                                 [=](const ImportedModule &import) -> bool {
       fn(import);
       return true;
@@ -425,19 +428,10 @@ public:
 
   template <typename Fn>
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            bool includePrivateTopLevelImports,
                             Fn &&fn) {
     using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
     llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath,
-                                includePrivateTopLevelImports,
-                                wrapped);
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath, Fn &&fn) {
-    return forAllVisibleModules(topLevelAccessPath, false,
-                                std::forward<Fn>(fn));
+    return forAllVisibleModules(topLevelAccessPath, wrapped);
   }
 
   /// @}
@@ -845,6 +839,10 @@ public:
   /// The list of top-level declarations in the source file.
   std::vector<Decl*> Decls;
 
+  /// A cache of syntax nodes that can be reused when creating the syntax tree
+  /// for this file.
+  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
 
@@ -853,6 +851,14 @@ public:
   /// module is still not imported by the time type checking is
   /// complete, we diagnose.
   llvm::SetVector<const DeclAttribute *> AttrsRequiringFoundation;
+
+  /// A set of synthesized declarations that need to be type checked.
+  llvm::SmallVector<Decl *, 8> SynthesizedDecls;
+
+  /// We might perform type checking on the same source file more than once,
+  /// if its the main file or a REPL instance, so keep track of the last
+  /// checked synthesized declaration to avoid duplicating work.
+  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.

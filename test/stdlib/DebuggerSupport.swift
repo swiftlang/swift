@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 
 import StdlibUnittest
 
@@ -98,5 +99,32 @@ StringForPrintObjectTests.test("DontBridgeThisStruct") {
   expectEqual(printed, "▿ DontBridgeThisStruct\n  - message : \"Hello World\"\n")
 }
 #endif
+
+class RefCountedObj {
+  var patatino : Int
+  init(_ p : Int) {
+    self.patatino = p
+  }
+  public func f() -> Int {
+    return self.patatino
+  }
+}
+
+let RefcountTests = TestSuite("RefCount")
+RefcountTests.test("Basic") {
+  var Obj = RefCountedObj(47);
+
+  // Counters for live objects should be always positive.
+  // We try to be a little bit more lax here because optimizations
+  // or different stdlib versions might impact the exact value of
+  // refcounting, and we're just interested in testing whether the
+  // stub works properly.
+  expectGT(_getRetainCount(Obj), 0);
+  expectGT(_getWeakRetainCount(Obj), 0);
+  expectGT(_getUnownedRetainCount(Obj), 0);
+
+  // Try to keep the object live here.
+  let _ = Obj.f()
+}
 
 runAllTests()

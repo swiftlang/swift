@@ -82,4 +82,8 @@ swift_stdlib_NSStringUppercaseString(NSString *SWIFT_NS_RELEASES_ARGUMENT str) {
   }
 }
 
+#else
+
+extern char ignore_pedantic_warning;
+
 #endif

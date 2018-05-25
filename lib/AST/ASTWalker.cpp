@@ -1705,7 +1705,7 @@ bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
 
 bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
   for (auto &field : T->getFields()) {
-    if (doIt(field.FieldType))
+    if (doIt(field.getFieldType()))
       return true;
   }
   for (auto &arg : T->getGenericArguments()) {

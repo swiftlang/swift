@@ -11,7 +11,10 @@ struct S {
 protocol SomeProtocol {
   lazy var x : Int  // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
   // expected-error@-1 {{property in protocol must have explicit { get } or { get set } specifier}}
+  // expected-error@-2 {{lazy properties must have an initializer}}
   lazy var y : Int { get } // expected-error {{'lazy' isn't allowed on a protocol requirement}} {{3-8=}}
+  // expected-error@-1 {{'lazy' must not be used on a computed property}}
+  // expected-error@-2 {{lazy properties must have an initializer}}
 }
 
 
@@ -22,6 +25,7 @@ class TestClass {
   lazy let b = 42  // expected-error {{'lazy' cannot be used on a let}} {{3-8=}}
 
   lazy var c : Int { return 42 } // expected-error {{'lazy' must not be used on a computed property}} {{3-8=}}
+  // expected-error@-1 {{lazy properties must have an initializer}}
 
   lazy var d : Int  // expected-error {{lazy properties must have an initializer}} {{3-8=}}
 

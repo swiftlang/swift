@@ -41,7 +41,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   // Derive the tuple type from the elements.
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : elts)
-    eltTypes.push_back(elt->getType().getSwiftRValueType());
+    eltTypes.push_back(elt->getType().getASTType());
   auto tupleType = SILType::getPrimitiveObjectType(
       CanType(TupleType::get(eltTypes, getASTContext())));
 
@@ -50,7 +50,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
-                                        SubstitutionList subs,
+                                        SubstitutionMap subs,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())

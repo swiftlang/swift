@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 // Check that we don't crash if a local function references another local
 // function without captures.

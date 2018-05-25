@@ -157,12 +157,10 @@ public struct Mirror {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _noSuperclassMirror() -> Mirror? { return nil }
 
   @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
-  @inlinable // FIXME(sil-serialize-all)
   @usableFromInline
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
@@ -399,14 +397,12 @@ extension Mirror {
   @usableFromInline // FIXME(sil-serialize-all)
   internal struct _Dummy : CustomReflectable {
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(mirror: Mirror) {
       self.mirror = mirror
     }
     @usableFromInline // FIXME(sil-serialize-all)
     internal var mirror: Mirror
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal var customMirror: Mirror { return mirror }
   }
 
@@ -426,7 +422,7 @@ extension Mirror {
   ///         i0 != children.endIndex
   ///     {
   ///         let grandChildren = Mirror(reflecting: children[i0].value).children
-  ///         if let i1 = grandChildren.index(where: { $0.label == "two" }) {
+  ///         if let i1 = grandChildren.firstIndex(where: { $0.label == "two" }) {
   ///             let greatGrandChildren =
   ///                 Mirror(reflecting: grandChildren[i1].value).children
   ///             if let i2 = greatGrandChildren.index(
@@ -463,7 +459,7 @@ extension Mirror {
       let children = Mirror(reflecting: result).children
       let position: Children.Index
       if case let label as String = e {
-        position = children.index { $0.label == label } ?? children.endIndex
+        position = children.firstIndex { $0.label == label } ?? children.endIndex
       }
       else if let offset = e as? Int {
         position = children.index(children.startIndex,
@@ -669,11 +665,11 @@ public protocol _DefaultCustomPlaygroundQuickLookable {
 /// Some operations that are efficient on a dictionary are slower when using
 /// `DictionaryLiteral`. In particular, to find the value matching a key, you
 /// must search through every element of the collection. The call to
-/// `index(where:)` in the following example must traverse the whole
+/// `firstIndex(where:)` in the following example must traverse the whole
 /// collection to find the element that matches the predicate:
 ///
 ///     let runner = "Marlies Gohr"
-///     if let index = recordTimes.index(where: { $0.0 == runner }) {
+///     if let index = recordTimes.firstIndex(where: { $0.0 == runner }) {
 ///         let time = recordTimes[index].1
 ///         print("\(runner) set a 100m record of \(time) seconds.")
 ///     } else {

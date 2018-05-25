@@ -89,8 +89,12 @@ extension String : StringProtocol, RangeReplaceableCollection {
   @inlinable // FIXME(sil-serialize-all)
   public var endIndex: Index { return Index(encodedOffset: _guts.count) }
 
+  /// The number of characters in a string.
+  public var count: Int {
+    return distance(from: startIndex, to: endIndex)
+  }
+
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ index: Index) {
     _precondition(index.encodedOffset >= 0 && index.encodedOffset < _guts.count,
@@ -98,7 +102,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ range: Range<Index>) {
     _precondition(
@@ -108,7 +111,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   }
 
   @inlinable
-  @usableFromInline
   @inline(__always)
   internal func _boundsCheck(_ range: ClosedRange<Index>) {
     _precondition(
@@ -117,8 +119,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
       "String index range is out of bounds")
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _index(atEncodedOffset offset: Int) -> Index {
     return _visitGuts(_guts, args: offset,
       ascii: { ascii, offset in return ascii.characterIndex(atOffset: offset) },
@@ -132,7 +132,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index value immediately after `i`.
-  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in ascii.characterIndex(after: i) },
@@ -145,7 +144,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in ascii.characterIndex(before: i) },
@@ -175,7 +173,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   to `index(before:)`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @inlinable // FIXME(sil-serialize-all)
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return _visitGuts(_guts, args: (i, n),
       ascii: { ascii, args in let (i, n) = args
@@ -223,7 +220,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   ///   the method returns `nil`.
   ///
   /// - Complexity: O(*n*), where *n* is the absolute value of `n`.
-  @inlinable // FIXME(sil-serialize-all)
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -245,7 +241,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// - Returns: The distance between `start` and `end`.
   ///
   /// - Complexity: O(*n*), where *n* is the resulting distance.
-  @inlinable // FIXME(sil-serialize-all)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return _visitGuts(_guts, args: (start, end),
       ascii: { ascii, args in let (start, end) = args
@@ -262,16 +257,15 @@ extension String : StringProtocol, RangeReplaceableCollection {
   /// For example, this code finds the first letter after the first space:
   ///
   ///     let str = "Greetings, friend! How are you?"
-  ///     let firstSpace = str.index(of: " ") ?? str.endIndex
+  ///     let firstSpace = str.firstIndex(of: " ") ?? str.endIndex
   ///     let substr = str[firstSpace...]
-  ///     if let nextCapital = substr.index(where: { $0 >= "A" && $0 <= "Z" }) {
+  ///     if let nextCapital = substr.firstIndex(where: { $0 >= "A" && $0 <= "Z" }) {
   ///         print("Capital after a space: \(str[nextCapital])")
   ///     }
   ///     // Prints "Capital after a space: H"
   ///
   /// - Parameter i: A valid index of the string. `i` must be less than the
   ///   string's end index.
-  @inlinable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Character {
     return _visitGuts(_guts, args: i,
       ascii: { ascii, i in return ascii.character(at: i) },
@@ -315,7 +309,6 @@ extension String {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
@@ -330,7 +323,6 @@ extension String {
   ///     // Prints "Globe 🌍"
   ///
   /// - Parameter c: The character to append to the string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let small = c._smallUTF16 {
       _guts.append(contentsOf: small)
@@ -340,12 +332,10 @@ extension String {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: String) {
     append(newElements)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: Substring) {
     _guts.append(
       newElements._wholeString._guts,
@@ -440,7 +430,7 @@ extension String {
   /// removes the hyphen from the middle of a string.
   ///
   ///     var nonempty = "non-empty"
-  ///     if let i = nonempty.index(of: "-") {
+  ///     if let i = nonempty.firstIndex(of: "-") {
   ///         nonempty.remove(at: i)
   ///     }
   ///     print(nonempty)
@@ -464,7 +454,6 @@ extension String {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _stride(of i: Index) -> Int {
     if case .character(let stride) = i._cache {
       // TODO: should _fastPath the case somehow

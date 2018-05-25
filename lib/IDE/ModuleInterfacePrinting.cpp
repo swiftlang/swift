@@ -622,10 +622,11 @@ void swift::ide::printSubmoduleInterface(
                              // For sub-decls, all extensions should be printed.
                   SynthesizedExtensionAnalyzer::MergeGroupKind::All,
               [&](ArrayRef<ExtensionInfo> Decls) {
+                // Whether we've started the extension merge group in printing.
+                bool Opened = false;
                 for (auto ET : Decls) {
-                  AdjustedOptions.BracketOptions = {
-                      ET.Ext, Decls.front().Ext == ET.Ext,
-                      Decls.back().Ext == ET.Ext, true};
+                  AdjustedOptions.BracketOptions = { ET.Ext, !Opened,
+                    Decls.back().Ext == ET.Ext, true};
                   if (AdjustedOptions.BracketOptions.shouldOpenExtension(
                           ET.Ext))
                     Printer << "\n";
@@ -636,7 +637,8 @@ void swift::ide::printSubmoduleInterface(
                     else
                       AdjustedOptions.initForSynthesizedExtension(NTD);
                   }
-                  ET.Ext->print(Printer, AdjustedOptions);
+                  // Set opened if we actually printed this extension.
+                  Opened |= ET.Ext->print(Printer, AdjustedOptions);
                   if (ET.IsSynthesized)
                     AdjustedOptions.clearSynthesizedExtension();
                   if (AdjustedOptions.BracketOptions.shouldCloseExtension(

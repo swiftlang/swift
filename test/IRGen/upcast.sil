@@ -2,7 +2,7 @@
 
 // Make sure that we are able to lower upcast addresses.
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @upcast_test(%T6upcast1DC** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @upcast_test(%T6upcast1DC** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK-NEXT: bitcast %T6upcast1DC** {{%[0-0]+}} to %T6upcast1CC**
 // CHECK-NEXT: ret void

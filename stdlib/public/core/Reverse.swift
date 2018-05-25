@@ -49,8 +49,6 @@ extension MutableCollection where Self: BidirectionalCollection {
 /// * `c.reversed()` does not create new storage
 /// * `c.reversed().map(f)` maps eagerly and returns a new array
 /// * `c.lazy.reversed().map(f)` maps lazily and returns a `LazyMapCollection`
-///
-/// - See also: `ReversedRandomAccessCollection`
 @_fixed_layout
 public struct ReversedCollection<Base: BidirectionalCollection> {
   public let _base: Base
@@ -59,7 +57,6 @@ public struct ReversedCollection<Base: BidirectionalCollection> {
   /// reverse order.
   ///
   /// - Complexity: O(1)
-  @usableFromInline
   @inlinable
   internal init(_base: Base) {
     self._base = _base
@@ -85,7 +82,7 @@ extension ReversedCollection {
     }
   }
 }
- 
+
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
   
@@ -132,7 +129,7 @@ extension ReversedCollection {
     ///
     ///     func indexOfLastEven(_ numbers: [Int]) -> Int? {
     ///         let reversedNumbers = numbers.reversed()
-    ///         guard let i = reversedNumbers.index(where: { $0 % 2 == 0 })
+    ///         guard let i = reversedNumbers.firstIndex(where: { $0 % 2 == 0 })
     ///             else { return nil }
     ///
     ///         return numbers.index(before: i.base)
@@ -155,7 +152,7 @@ extension ReversedCollection {
     /// `"a"` character in a string's character view.
     ///
     ///     let name = "Horatio"
-    ///     let aIndex = name.index(of: "a")!
+    ///     let aIndex = name.firstIndex(of: "a")!
     ///     // name[aIndex] == "a"
     ///
     ///     let reversedName = name.reversed()
@@ -194,14 +191,14 @@ extension ReversedCollection.Index: Comparable {
 }
 
 extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return base.hashValue
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(base)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(base)
   }
 }
 
@@ -253,6 +250,17 @@ extension ReversedCollection: BidirectionalCollection {
 }
 
 extension ReversedCollection: RandomAccessCollection where Base: RandomAccessCollection { }
+
+extension ReversedCollection {
+  /// Reversing a reversed collection returns the original collection.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @available(swift, introduced: 4.2)
+  public func reversed() -> Base {
+    return _base
+  }
+}
 
 extension BidirectionalCollection {
   /// Returns a view presenting the elements of the collection in reverse

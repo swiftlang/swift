@@ -28,17 +28,15 @@ class Job;
 
 namespace parseable_output {
 
-using swift::sys::ProcessId;
-
 /// \brief Emits a "began" message to the given stream.
-void emitBeganMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid);
+void emitBeganMessage(raw_ostream &os, const Job &Cmd, int64_t Pid);
 
 /// \brief Emits a "finished" message to the given stream.
-void emitFinishedMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
+void emitFinishedMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
                          int ExitStatus, StringRef Output);
 
 /// \brief Emits a "signalled" message to the given stream.
-void emitSignalledMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
+void emitSignalledMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
                           StringRef ErrorMsg, StringRef Output, Optional<int> Signal);
 
 /// \brief Emits a "skipped" message to the given stream.

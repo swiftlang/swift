@@ -20,30 +20,20 @@ using namespace swift;
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
 
-void swift::performSILLinking(SILModule *M, bool LinkAll) {
-  auto LinkMode = LinkAll? SILModule::LinkingMode::LinkAll :
-    SILModule::LinkingMode::LinkNormal;
-  for (auto &Fn : *M)
-    M->linkFunction(&Fn, LinkMode);
-
-  if (!LinkAll)
-    return;
-
-  M->linkAllWitnessTables();
-  M->linkAllVTables();
-}
-
-
 namespace {
 
 /// Copies code from the standard library into the user program to enable
 /// optimizations.
 class SILLinker : public SILModuleTransform {
+  SILModule::LinkingMode LinkMode;
+
+public:
+  explicit SILLinker(SILModule::LinkingMode LinkMode) : LinkMode(LinkMode) {}
 
   void run() override {
     SILModule &M = *getModule();
     for (auto &Fn : M)
-      if (M.linkFunction(&Fn, SILModule::LinkingMode::LinkAll))
+      if (M.linkFunction(&Fn, LinkMode))
         invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
 
@@ -51,6 +41,10 @@ class SILLinker : public SILModuleTransform {
 } // end anonymous namespace
 
 
-SILTransform *swift::createSILLinker() {
-  return new SILLinker();
+SILTransform *swift::createMandatorySILLinker() {
+  return new SILLinker(SILModule::LinkingMode::LinkNormal);
+}
+
+SILTransform *swift::createPerformanceSILLinker() {
+  return new SILLinker(SILModule::LinkingMode::LinkAll);
 }

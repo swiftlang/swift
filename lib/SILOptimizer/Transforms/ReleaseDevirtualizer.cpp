@@ -144,8 +144,8 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
     return false;
 
   CanSILFunctionType DeallocType = Dealloc->getLoweredFunctionType();
-  auto *NTD = AllocType.getSwiftRValueType()->getAnyNominal();
-  auto AllocSubMap = AllocType.getSwiftRValueType()
+  auto *NTD = AllocType.getASTType()->getAnyNominal();
+  auto AllocSubMap = AllocType.getASTType()
     ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
 
   DeallocType = DeallocType->substGenericArgs(M, AllocSubMap);
@@ -163,11 +163,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   // argument.
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
 
-  SmallVector<Substitution, 4> AllocSubsts;
-  if (auto *Sig = NTD->getGenericSignature())
-    Sig->getSubstitutions(AllocSubMap, AllocSubsts);
-
-  B.createApply(ReleaseInst->getLoc(), MI, AllocSubsts, {object}, false);
+  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object}, false);
 
   NumReleasesDevirtualized++;
   ReleaseInst->eraseFromParent();

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name specialize_attr -emit-silgen -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name specialize_attr -enable-sil-ownership -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: @_specialize(exported: false, kind: full, where T == Int, U == Float)
 // CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)

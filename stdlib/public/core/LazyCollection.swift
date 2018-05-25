@@ -53,7 +53,6 @@ public struct LazyCollection<Base : Collection> {
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
   @inlinable
-  @usableFromInline
   internal init(_base: Base) {
     self._base = _base
   }
@@ -175,18 +174,31 @@ extension LazyCollection : Collection {
     return _base.count
   }
 
-  // The following requirement enables dispatching for index(of:) when
-  // the element type is Equatable.
+  // The following requirement enables dispatching for firstIndex(of:) and
+  // lastIndex(of:) when the element type is Equatable.
 
   /// Returns `Optional(Optional(index))` if an element was found;
-  /// `nil` otherwise.
+  /// `Optional(nil)` if the element doesn't exist in the collection;
+  /// `nil` if a search was not performed.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: Better than O(*n*)
   @inlinable
   public func _customIndexOfEquatableElement(
     _ element: Element
   ) -> Index?? {
     return _base._customIndexOfEquatableElement(element)
+  }
+
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `Optional(nil)` if the element doesn't exist in the collection;
+  /// `nil` if a search was not performed.
+  ///
+  /// - Complexity: Better than O(*n*)
+  @inlinable
+  public func _customLastIndexOfEquatableElement(
+    _ element: Element
+  ) -> Index?? {
+    return _base._customLastIndexOfEquatableElement(element)
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.

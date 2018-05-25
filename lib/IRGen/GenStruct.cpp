@@ -158,16 +158,16 @@ namespace {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
     }
-       
-    /// Return the constant offset of a field as a SizeTy, or nullptr if the
+
+    /// Return the constant offset of a field as a Int32Ty, or nullptr if the
     /// field is not at a fixed offset.
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.getKind() == ElementLayout::Kind::Fixed
           || fieldInfo.getKind() == ElementLayout::Kind::Empty) {
-        return llvm::ConstantInt::get(IGM.SizeTy,
-                                    fieldInfo.getFixedByteOffset().getValue());
+        return llvm::ConstantInt::get(
+            IGM.Int32Ty, fieldInfo.getFixedByteOffset().getValue());
       }
       return nullptr;
     }
@@ -494,11 +494,15 @@ namespace {
                                   WitnessSizedTypeInfo<NonFixedStructTypeInfo>>
   {
   public:
-    NonFixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
+    NonFixedStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                           FieldsAreABIAccessible_t fieldsAccessible,
+                           llvm::Type *T,
                            Alignment align,
-                           IsPOD_t isPOD, IsBitwiseTakable_t isBT)
+                           IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                           IsABIAccessible_t structAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
-                           fields, T, align, isPOD, isBT) {
+                           fields, fieldsAccessible,
+                           T, align, isPOD, isBT, structAccessible) {
     }
 
     // We have an indirect schema.
@@ -556,11 +560,16 @@ namespace {
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
+                                     FieldsAreABIAccessible_t fieldsAccessible,
                                            StructLayout &&layout) {
-      return NonFixedStructTypeInfo::create(fields, layout.getType(),
+      auto structAccessible = IsABIAccessible_t(
+        IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
+      return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
+                                            layout.getType(),
                                             layout.getAlignment(),
                                             layout.isPOD(),
-                                            layout.isBitwiseTakable());
+                                            layout.isBitwiseTakable(),
+                                            structAccessible);
     }
 
     StructFieldInfo getFieldInfo(unsigned index,
@@ -766,7 +775,7 @@ private:
     NextExplosionIndex += explosionSize;
     unsigned explosionEnd = NextExplosionIndex;
 
-    ElementLayout layout = ElementLayout::getIncomplete(fieldType);
+    ElementLayout layout = ElementLayout::getIncomplete(fieldType, fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
       layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),
@@ -871,24 +880,29 @@ namespace {
       : public ResilientTypeInfo<ResilientStructTypeInfo>
   {
   public:
-    ResilientStructTypeInfo(llvm::Type *T)
-      : ResilientTypeInfo(T) {
+    ResilientStructTypeInfo(llvm::Type *T, IsABIAccessible_t abiAccessible)
+      : ResilientTypeInfo(T, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
   };
 } // end anonymous namespace
 
-const TypeInfo *TypeConverter::convertResilientStruct() {
+const TypeInfo *
+TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
   llvm::Type *storageType = IGM.OpaquePtrTy->getElementType();
-  return new ResilientStructTypeInfo(storageType);
+  return new ResilientStructTypeInfo(storageType, abiAccessible);
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
                                                  StructDecl *D) {
   // All resilient structs have the same opaque lowering, since they are
-  // indistinguishable as values.
-  if (IGM.isResilient(D, ResilienceExpansion::Maximal))
-    return &getResilientStructTypeInfo();
+  // indistinguishable as values --- except that we have to track
+  // ABI-accessibility.
+  if (IGM.isResilient(D, ResilienceExpansion::Maximal)) {
+    auto structAccessible =
+      IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
+    return &getResilientStructTypeInfo(structAccessible);
+  }
 
   // Create the struct type.
   auto ty = IGM.createNominalType(type);

@@ -30,19 +30,16 @@ import SwiftShims
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
   typealias Indices = Range<Int>
   @inlinable
-  @usableFromInline
   internal var startIndex: Int {
     return 0
   }
 
   @inlinable
-  @usableFromInline
   internal var endIndex: Int {
     return buffer.count
   }
 
   @inlinable
-  @usableFromInline
   internal subscript(i: Int) -> AnyObject {
     return buffer.objectAt(i)
   }
@@ -58,7 +55,6 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
   ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumerating.
   @inlinable
-  @usableFromInline
   internal func contiguousStorage(
     _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>?
@@ -82,7 +78,6 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(_ buffer: _NSArrayCore) {
     self.buffer = buffer

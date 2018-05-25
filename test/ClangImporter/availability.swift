@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs/custom-modules %s -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 
@@ -23,6 +23,28 @@ func test_unavailable_method_in_protocol_use_class_instance(_ x : NSObject) {
 
 func test_unavailable_func(_ x : NSObject) {
   NSDeallocateObject(x) // expected-error {{'NSDeallocateObject' is unavailable}}
+}
+
+func test_unavailable_accessors(_ obj: UnavailableAccessors) {
+  _ = obj.fullyUnavailable // expected-error {{'fullyUnavailable' is unavailable}}
+  obj.fullyUnavailable = 0 // expected-error {{'fullyUnavailable' is unavailable}}
+  obj.fullyUnavailable += 1 // expected-error {{'fullyUnavailable' is unavailable}}
+
+  _ = obj.getterUnavailable // expected-error {{getter for 'getterUnavailable' is unavailable}}
+  obj.getterUnavailable = 0
+  obj.getterUnavailable += 1 // expected-error {{getter for 'getterUnavailable' is unavailable}}
+
+  _ = UnavailableAccessors.getterUnavailableClass // expected-error {{getter for 'getterUnavailableClass' is unavailable}}
+  UnavailableAccessors.getterUnavailableClass = 0
+  UnavailableAccessors.getterUnavailableClass += 1 // expected-error {{getter for 'getterUnavailableClass' is unavailable}}
+
+  _ = obj.setterUnavailable
+  obj.setterUnavailable = 0 // expected-error {{setter for 'setterUnavailable' is unavailable}}
+  obj.setterUnavailable += 1 // expected-error {{setter for 'setterUnavailable' is unavailable}}
+
+  _ = UnavailableAccessors.setterUnavailableClass
+  UnavailableAccessors.setterUnavailableClass = 0 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
+  UnavailableAccessors.setterUnavailableClass += 1 // expected-error {{setter for 'setterUnavailableClass' is unavailable}}
 }
 
 func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecations) {

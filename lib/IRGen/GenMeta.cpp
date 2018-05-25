@@ -101,6 +101,8 @@ static Address createPointerSizedGEP(IRGenFunction &IGF,
 }
 
 void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
+  disableAddressSanitizer(*this, var);
+  
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
@@ -223,10 +225,10 @@ namespace {
       
       for (auto param : canSig->getGenericParams()) {
         // Currently, there are only type parameters. The parameter is a key
-        // argument if it hasn't been grounded by a same-type constraint.
+        // argument if it's canonical in its generic context.
         asImpl().addGenericParameter(GenericParamKind::Type,
-                               /*key argument*/ !canSig->isConcreteType(param),
-                               /*extra argument*/ false);
+                 /*key argument*/ canSig->isCanonicalTypeInContext(param),
+                 /*extra argument*/ false);
       }
       
       // Pad the structure up to four bytes for the following requirements.
@@ -363,8 +365,8 @@ namespace {
     }
     
     void addExtendedContext() {
-      auto string = getTypeRef(IGM,
-                               E->getSelfInterfaceType()->getCanonicalType());
+      auto string = IGM.getTypeRef(
+          E->getSelfInterfaceType()->getCanonicalType());
       B.addRelativeAddress(string);
     }
     
@@ -2422,6 +2424,8 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
     IGM.addObjCClass(var,
               classDecl->getAttrs().hasAttribute<ObjCNonLazyRealizationAttr>());
   }
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(classDecl);
 }
 
 llvm::Value *IRGenFunction::emitInvariantLoad(Address address,
@@ -2629,8 +2633,12 @@ namespace {
         B.add(offset);
       } else {
         asImpl().flagUnfilledFieldOffset();
-        B.addInt(IGM.IntPtrTy, 0);
+        B.addInt(IGM.Int32Ty, 0);
       }
+    }
+
+    void noteEndOfFieldOffsets() {
+      B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
     void addGenericArgument(CanType type) {
@@ -2727,7 +2735,7 @@ namespace {
     /// Fill in a constant field offset vector if possible.
     PartialPattern buildExtraDataPattern() {
       ConstantInitBuilder builder(IGM);
-      auto init = builder.beginArray(IGM.SizeTy);
+      auto init = builder.beginArray(IGM.Int32Ty);
 
       struct Scanner : StructMetadataScanner<Scanner> {
         SILType Type;
@@ -2744,7 +2752,11 @@ namespace {
           }
           assert(IGM.isKnownEmpty(Type.getFieldType(field, IGM.getSILModule()),
                                   ResilienceExpansion::Maximal));
-          B.addInt(IGM.SizeTy, 0);
+          B.addInt32(0);
+        }
+
+        void noteEndOfFieldOffsets() {
+          B.addAlignmentPadding(IGM.getPointerAlignment());
         }
       };
       Scanner(IGM, Target, getLoweredType(), init).layout();
@@ -2810,6 +2822,19 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
 
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(structDecl);
+}
+
+void IRGenerator::noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type) {
+  // If this is a nested type we also potentially might need the outer types.
+  auto *declCtxt = type->getDeclContext();
+  auto *parentNominalDecl =
+    declCtxt->getAsNominalTypeOrNominalTypeExtensionContext();
+  if (!parentNominalDecl)
+    return;
+
+  noteUseOfTypeMetadata(parentNominalDecl);
 }
 
 // Enums
@@ -3014,6 +3039,8 @@ void irgen::emitEnumMetadata(IRGenModule &IGM, EnumDecl *theEnum) {
   
   IGM.defineTypeMetadata(declaredType, isIndirect, isPattern,
                          canBeConstant, init.finishAndCreateFuture());
+
+  IGM.IRGen.noteUseOfAnyParentTypeMetadata(theEnum);
 }
 
 llvm::Value *IRGenFunction::emitObjCSelectorRefLoad(StringRef selector) {
@@ -3340,7 +3367,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto classType = dyn_cast<ClassType>(type)) {
     assert(!classType.getParent());
     auto classDecl = classType->getDecl();
-    assert(classDecl->isForeign());
+    assert(classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType);
 
     ForeignClassMetadataBuilder builder(*this, classDecl, init);
     builder.layout();
@@ -3381,7 +3408,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   if (auto enclosing = type->getNominalParent()) {
     auto canonicalEnclosing = enclosing->getCanonicalType();
     if (requiresForeignTypeMetadata(canonicalEnclosing)) {
-      getAddrOfForeignTypeMetadataCandidate(canonicalEnclosing);
+      (void)getTypeMetadataAccessFunction(*this, canonicalEnclosing,
+                                          ForDefinition);
     }
   }
 
@@ -3634,7 +3662,7 @@ namespace {
 
       // Look up the dispatch thunk if the protocol is resilient.
       llvm::Constant *thunk = nullptr;
-      if (Protocol->isResilient())
+      if (IGM.isResilient(Protocol, ResilienceExpansion::Minimal))
         thunk = IGM.getAddrOfDispatchThunk(func, NotForDefinition);
 
       // Classify the function.
@@ -3699,7 +3727,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   }
 
   SILDefaultWitnessTable *defaultWitnesses = nullptr;
-  if (protocol->isResilient())
+  if (isResilient(protocol, ResilienceExpansion::Minimal))
     defaultWitnesses = getSILModule().lookUpDefaultWitnessTable(protocol);
 
   ConstantInitBuilder initBuilder(*this);
@@ -3710,6 +3738,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
   auto var = cast<llvm::GlobalVariable>(
           getAddrOfProtocolDescriptor(protocol, init.finishAndCreateFuture()));
   var->setConstant(true);
+  disableAddressSanitizer(*this, var);
 
   // Note that we emitted this protocol.
   SwiftProtocols.push_back(protocol);
@@ -3804,15 +3833,13 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       break;
 
     case RequirementKind::Conformance: {
-      // ABI TODO: We also need a *key* argument that uniquely identifies
-      // the conformance for conformance requirements as well.
       auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
         ->getDecl();
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
-                                           /*TODO key argument*/ false,
-                                           needsWitnessTable);
+                                           /*key argument*/needsWitnessTable,
+                                           /*extra argument*/false);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,
@@ -3829,7 +3856,7 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
 
       auto flags = GenericRequirementFlags(abiKind, false, false);
       auto typeName =
-        getTypeRef(IGM, requirement.getSecondType()->getCanonicalType());
+        IGM.getTypeRef(requirement.getSecondType()->getCanonicalType());
 
       addGenericRequirement(IGM, B, metadata, sig, flags,
                             requirement.getFirstType(),

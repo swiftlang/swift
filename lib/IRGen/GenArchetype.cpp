@@ -89,7 +89,8 @@ namespace {
 class OpaqueArchetypeTypeInfo
   : public ResilientTypeInfo<OpaqueArchetypeTypeInfo>
 {
-  OpaqueArchetypeTypeInfo(llvm::Type *type) : ResilientTypeInfo(type) {}
+  OpaqueArchetypeTypeInfo(llvm::Type *type)
+    : ResilientTypeInfo(type, IsABIAccessible) {}
 
 public:
   static const OpaqueArchetypeTypeInfo *create(llvm::Type *type) {
@@ -99,7 +100,7 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     // We'll need formal type metadata for this archetype.
-    collector.collectFormalTypeMetadata(T.getSwiftRValueType());
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
@@ -172,19 +173,6 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // TODO: don't give this absolute precedence over other access paths.
   auto wtable = IGF.tryGetLocalTypeData(archetype, localDataKind);
   if (wtable) return wtable;
-
-  // It can happen with class constraints that Sema will consider a
-  // constraint to be abstract, but the minimized signature will
-  // eliminate it as concrete.  Handle this by performing a concrete
-  // lookup.
-  // TODO: maybe Sema shouldn't ever do this?
-  if (Type classBound = archetype->getSuperclass()) {
-    auto conformance =
-      IGF.IGM.getSwiftModule()->lookupConformance(classBound, protocol);
-    if (conformance && conformance->isConcrete()) {
-      return emitWitnessTableRef(IGF, archetype, *conformance);
-    }
-  }
 
   // If we don't have an environment, this must be an implied witness table
   // reference.

@@ -84,7 +84,7 @@ public:
 };
 
 /// \brief A set of saved type variable bindings.
-typedef SmallVector<SavedTypeVariableBinding, 16> SavedTypeVariableBindings;
+using SavedTypeVariableBindings = SmallVector<SavedTypeVariableBinding, 16>;
 
 class ConstraintLocator;
 
@@ -547,9 +547,10 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
-typedef std::pair<GenericTypeParamType *, TypeVariableType *> OpenedType;
+using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
-typedef llvm::DenseMap<GenericTypeParamType *, TypeVariableType *> OpenedTypeMap;
+using OpenedTypeMap =
+    llvm::DenseMap<GenericTypeParamType *, TypeVariableType *>;
 
 /// \brief A complete solution to a constraint system.
 ///
@@ -672,17 +673,8 @@ public:
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
-  ///
-  /// \param substitutions Will be populated with the set of substitutions
-  /// to be applied to the generic function type.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocator *locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
-
-  /// Same as above but with a lazily-constructed locator.
-  void computeSubstitutions(GenericSignature *sig,
-                            ConstraintLocatorBuilder locator,
-                            SmallVectorImpl<Substitution> &substitutions) const;
+  SubstitutionMap computeSubstitutions(GenericSignature *sig,
+                                       ConstraintLocatorBuilder locator) const;
 
   /// Return the disjunction choice for the given constraint location.
   unsigned getDisjunctionChoice(ConstraintLocator *locator) const {
@@ -789,7 +781,7 @@ struct SpecificConstraint {
 };
 
 /// An intrusive, doubly-linked list of constraints.
-typedef llvm::ilist<Constraint> ConstraintList;
+using ConstraintList = llvm::ilist<Constraint>;
 
 enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
@@ -805,7 +797,7 @@ enum class ConstraintSystemFlags {
 };
 
 /// Options that affect the constraint system as a whole.
-typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
+using ConstraintSystemOptions = OptionSet<ConstraintSystemFlags>;
 
 /// This struct represents the results of a member lookup of
 struct MemberLookupResult {
@@ -1182,7 +1174,7 @@ private:
     ///
     /// \param processor The processor function to be applied to each of
     /// the constraints retrieved.
-    void forEachRetired(std::function<void(Constraint &)> processor) {
+    void forEachRetired(llvm::function_ref<void(Constraint &)> processor) {
       for (auto &constraint : retiredConstraints)
         processor(constraint);
     }
@@ -1566,7 +1558,7 @@ public:
 
   /// \brief Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options);
+                                       unsigned options = 0);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -1747,6 +1739,13 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
+  /// \brief Give the deprecation warning for referring to a global function
+  /// when there's a method from a conditional conformance in a smaller/closer
+  /// scope.
+  void
+  diagnoseDeprecatedConditionalConformanceOuterAccess(UnresolvedDotExpr *UDE,
+                                                      ValueDecl *choice);
+
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
@@ -1783,14 +1782,15 @@ public:
   void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
                                 DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
+                                ArrayRef<OverloadChoice> outerAlternatives,
                                 ConstraintLocatorBuilder locator) {
     assert(baseTy);
     assert(memberTy);
     assert(name);
     assert(useDC);
-    switch (simplifyMemberConstraint(ConstraintKind::ValueMember, baseTy, name,
-                                     memberTy, useDC, functionRefKind,
-                                     TMF_GenerateConstraints, locator)) {
+    switch (simplifyMemberConstraint(
+        ConstraintKind::ValueMember, baseTy, name, memberTy, useDC,
+        functionRefKind, outerAlternatives, TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
 
@@ -1799,10 +1799,9 @@ public:
 
     case SolutionKind::Error:
       if (shouldAddNewFailingConstraint()) {
-        addNewFailingConstraint(
-          Constraint::createMember(*this, ConstraintKind::ValueMember, baseTy,
-                                   memberTy, name, useDC, functionRefKind,
-                                   getConstraintLocator(locator)));
+        addNewFailingConstraint(Constraint::createMemberOrOuterDisjunction(
+            *this, ConstraintKind::ValueMember, baseTy, memberTy, name, useDC,
+            functionRefKind, outerAlternatives, getConstraintLocator(locator)));
       }
       break;
     }
@@ -1821,6 +1820,7 @@ public:
     switch (simplifyMemberConstraint(ConstraintKind::UnresolvedValueMember,
                                      baseTy, name, memberTy,
                                      useDC, functionRefKind,
+                                     /*outerAlternatives=*/{},
                                      TMF_GenerateConstraints, locator)) {
     case SolutionKind::Unsolved:
       llvm_unreachable("Unsolved result when generating constraints!");
@@ -1909,6 +1909,12 @@ public:
   /// due to a change.
   ConstraintList &getActiveConstraints() { return ActiveConstraints; }
 
+  void findConstraints(SmallVectorImpl<Constraint *> &found,
+                       llvm::function_ref<bool(const Constraint &)> pred) {
+    filterConstraints(ActiveConstraints, pred, found);
+    filterConstraints(InactiveConstraints, pred, found);
+  }
+
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
@@ -1942,7 +1948,7 @@ public:
   };
 
   /// Options that govern how type matching should proceed.
-  typedef OptionSet<TypeMatchFlags> TypeMatchOptions;
+  using TypeMatchOptions = OptionSet<TypeMatchFlags>;
 
   /// \brief Retrieve the fixed type corresponding to the given type variable,
   /// or a null type if there is no fixed type.
@@ -2074,6 +2080,16 @@ private:
   /// into the worklist.
   void addTypeVariableConstraintsToWorkList(TypeVariableType *typeVar);
 
+  static void
+  filterConstraints(ConstraintList &constraints,
+                    llvm::function_ref<bool(const Constraint &)> pred,
+                    SmallVectorImpl<Constraint *> &found) {
+    for (auto &constraint : constraints) {
+      if (pred(constraint))
+        found.push_back(&constraint);
+    }
+  }
+
 public:
 
   /// \brief Coerce the given expression to an rvalue, if it isn't already.
@@ -2189,7 +2205,8 @@ public:
   /// sets.
   void addOverloadSet(Type boundType, ArrayRef<OverloadChoice> choices,
                       DeclContext *useDC, ConstraintLocator *locator,
-                      OverloadChoice *favored = nullptr);
+                      OverloadChoice *favored = nullptr,
+                      ArrayRef<OverloadChoice> outerAlternatives = {});
 
   /// \brief Retrieve the allocator used by this constraint system.
   llvm::BumpPtrAllocator &getAllocator() { return Allocator; }
@@ -2197,7 +2214,7 @@ public:
   template <typename It>
   ArrayRef<typename std::iterator_traits<It>::value_type>
   allocateCopy(It start, It end) {
-    typedef typename std::iterator_traits<It>::value_type T;
+    using T = typename std::iterator_traits<It>::value_type;
     T *result = (T*)getAllocator().Allocate(sizeof(T)*(end-start), alignof(T));
     unsigned i;
     for (i = 0; start != end; ++start, ++i)
@@ -2337,11 +2354,10 @@ public:
 
   /// \brief Subroutine of \c matchTypes(), used to bind a type to a
   /// type variable.
-  TypeMatchResult
-  matchTypesBindTypeVar(TypeVariableType *typeVar, Type type,
-                        ConstraintKind kind, TypeMatchOptions flags,
-                        ConstraintLocatorBuilder locator,
-                        std::function<TypeMatchResult()> formUnsolvedResult);
+  TypeMatchResult matchTypesBindTypeVar(
+      TypeVariableType *typeVar, Type type, ConstraintKind kind,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator,
+      llvm::function_ref<TypeMatchResult()> formUnsolvedResult);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
   /// \brief Attempt to match up types \c type1 and \c type2, which in effect
@@ -2413,6 +2429,13 @@ public:
   void
   buildDisjunctionForOptionalVsUnderlying(Type boundTy, Type type,
                                           ConstraintLocator *locator) {
+    // NOTE: If we use other locator kinds for these disjunctions, we
+    // need to account for it in solution scores for forced-unwraps.
+    assert(locator->getPath().back().getKind() ==
+               ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice ||
+           locator->getPath().back().getKind() ==
+               ConstraintLocator::DynamicLookupResult);
+
     // Create the constraint to bind to the optional type and make it
     // the favored choice.
     auto *bindToOptional =
@@ -2553,14 +2576,12 @@ private:
                                              ConstraintLocatorBuilder locator);
 
   /// \brief Attempt to simplify the given member constraint.
-  SolutionKind simplifyMemberConstraint(ConstraintKind kind,
-                                        Type baseType, DeclName member,
-                                        Type memberType, DeclContext *useDC,
-                                        FunctionRefKind functionRefKind,
-                                        TypeMatchOptions flags,
-                                        ConstraintLocatorBuilder locator);
+  SolutionKind simplifyMemberConstraint(
+      ConstraintKind kind, Type baseType, DeclName member, Type memberType,
+      DeclContext *useDC, FunctionRefKind functionRefKind,
+      ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
 
-  
   /// \brief Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(
                                           Type first, Type second,
@@ -2714,8 +2735,8 @@ private:
   };
 
   struct PotentialBindings {
-    typedef std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>
-        BindingScore;
+    using BindingScore =
+        std::tuple<bool, bool, bool, bool, unsigned char, unsigned int>;
 
     TypeVariableType *TypeVar;
 
@@ -2769,10 +2790,7 @@ private:
       if (formBindingScore(x) < formBindingScore(y))
         return true;
 
-      if (!x.hasNonDefaultableBindings())
-        return false;
-
-      if (x.FullyBound || x.SubtypeOfExistentialType)
+      if (formBindingScore(y) < formBindingScore(x))
         return false;
 
       // If the only difference is default types,
@@ -3136,7 +3154,7 @@ static inline bool computeTupleShuffle(TupleType *fromTuple,
 /// Describes the arguments to which a parameter binds.
 /// FIXME: This is an awful data structure. We want the equivalent of a
 /// TinyPtrVector for unsigned values.
-typedef SmallVector<unsigned, 1> ParamBinding;
+using ParamBinding = SmallVector<unsigned, 1>;
 
 /// Class used as the base for listeners to the \c matchCallArguments process.
 ///
@@ -3369,6 +3387,12 @@ TypeVariableType *TypeVariableType::getNew(const ASTContext &C, unsigned ID,
 /// underlying forced downcast expression.
 ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 
+
+// Erases any opened existentials from the given expression.
+// Note: this may update the provided expr pointer.
+void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
+
+
 /// ExprCleaner - This class is used by shrink to ensure that in
 /// no situation will an expr node be left with a dangling type variable stuck
 /// to it.  Often type checking will create new AST nodes and replace old ones
@@ -3377,9 +3401,6 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 /// their type variables, and we don't want pointers into the original AST to
 /// dereference these now-dangling types.
 class ExprCleaner {
-  llvm::SmallVector<Expr*,4> Exprs;
-  llvm::SmallVector<TypeLoc*, 4> TypeLocs;
-  llvm::SmallVector<Pattern*, 4> Patterns;
   llvm::SmallVector<VarDecl*, 4> Vars;
 public:
 
@@ -3387,21 +3408,6 @@ public:
     struct ExprCleanerImpl : public ASTWalker {
       ExprCleaner *TS;
       ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
-
-      std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-        TS->Exprs.push_back(expr);
-        return { true, expr };
-      }
-
-      bool walkToTypeLocPre(TypeLoc &TL) override {
-        TS->TypeLocs.push_back(&TL);
-        return true;
-      }
-
-      std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-        TS->Patterns.push_back(P);
-        return { true, P };
-      }
 
       bool walkToDeclPre(Decl *D) override {
         if (auto VD = dyn_cast<VarDecl>(D))
@@ -3423,22 +3429,6 @@ public:
   ~ExprCleaner() {
     // Check each of the expression nodes to verify that there are no type
     // variables hanging out.  If so, just nuke the type.
-    for (auto E : Exprs) {
-      if (E->getType() && E->getType()->hasTypeVariable())
-        E->setType(Type());
-    }
-
-    for (auto TL : TypeLocs) {
-      if (TL->getTypeRepr() && TL->getType() &&
-          TL->getType()->hasTypeVariable())
-        TL->setType(Type(), false);
-    }
-
-    for (auto P : Patterns) {
-      if (P->hasType() && P->getType()->hasTypeVariable())
-        P->setType(Type());
-    }
-
     for (auto VD : Vars) {
       if (VD->hasType() && VD->getType()->hasTypeVariable()) {
         VD->setType(Type());

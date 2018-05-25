@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_set_bridging -emit-silgen %s -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_set_bridging %s -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 

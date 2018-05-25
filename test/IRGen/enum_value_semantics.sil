@@ -94,10 +94,9 @@ enum GenericFixedLayout<T> {
 }
 
 
-// CHECK-LABEL: @"$S20enum_value_semantics20SinglePayloadTrivialOWV" = internal constant [18 x i8*] [
+// CHECK-LABEL: @"$S20enum_value_semantics20SinglePayloadTrivialOWV" = internal constant [17 x i8*] [
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
-// CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
@@ -118,13 +117,13 @@ enum GenericFixedLayout<T> {
 
 // CHECK-LABEL: @"$S20enum_value_semantics20SinglePayloadTrivialOMf" =
 // CHECK-SAME:   internal constant <{ {{.*}} }> <{
-// CHECK-SAME:   i8** getelementptr inbounds ([18 x i8*], [18 x i8*]* @"$S20enum_value_semantics20SinglePayloadTrivialOWV", i32 0, i32 0),
+// CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$S20enum_value_semantics20SinglePayloadTrivialOWV", i32 0, i32 0),
 // CHECK-SAME:   i64 2,
 // CHECK-SAME:   {{.*}}* @"$S20enum_value_semantics20SinglePayloadTrivialOMn"
 // CHECK-SAME: }>
 
 
-// CHECK-LABEL: @"$S20enum_value_semantics23SinglePayloadNontrivialOWV" = internal constant [18 x i8*] [
+// CHECK-LABEL: @"$S20enum_value_semantics23SinglePayloadNontrivialOWV" = internal constant [17 x i8*] [
 // CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwCP" to i8*),
 // CHECK:   i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwxx" to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* (%swift.opaque*, %swift.opaque*, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwcp" to i8*),
@@ -148,7 +147,7 @@ enum GenericFixedLayout<T> {
 
 // CHECK-LABEL: @"$S20enum_value_semantics23SinglePayloadNontrivialOMf" =
 // CHECK-SAME: internal constant <{ {{.*}} }> <{
-// CHECK-SAME:   i8** getelementptr inbounds ([18 x i8*], [18 x i8*]* @"$S20enum_value_semantics23SinglePayloadNontrivialOWV", i32 0, i32 0),
+// CHECK-SAME:   i8** getelementptr inbounds ([17 x i8*], [17 x i8*]* @"$S20enum_value_semantics23SinglePayloadNontrivialOWV", i32 0, i32 0),
 // CHECK-SAME:   i64 2,
 // CHECK-SAME:   {{.*}}* @"$S20enum_value_semantics23SinglePayloadNontrivialOMn"
 // CHECK-SAME: }>
@@ -166,7 +165,7 @@ enum GenericFixedLayout<T> {
 //   Pattern flags.  0x400000 == (MetadataKind::Enum << 21).
 // CHECK-SAME:    i32 4194304,
 //   Value witness table.
-// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([18 x i8*]* @"$S20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
+// CHECK-SAME:    i32 trunc (i64 sub (i64 ptrtoint ([17 x i8*]* @"$S20enum_value_semantics18GenericFixedLayoutOWV" to i64), i64 ptrtoint (i32* getelementptr inbounds (<{ i32, i32, i32, i32 }>, <{ i32, i32, i32, i32 }>* @"$S20enum_value_semantics18GenericFixedLayoutOMP", i32 0, i32 3) to i64)) to i32)
 // CHECK-SAME:  }>
 
 sil @single_payload_nontrivial_copy_destroy : $(@owned SinglePayloadNontrivial) -> () {
@@ -179,7 +178,7 @@ bb0(%0 : $SinglePayloadNontrivial):
   return %v : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(i64)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_nontrivial_copy_destroy(i64)
 // CHECK:      call void @"$S20enum_value_semantics23SinglePayloadNontrivialOWOy"
 // CHECK-NEXT: call swiftcc void @single_payload_nontrivial_user
 // CHECK-NEXT: call void @"$S20enum_value_semantics23SinglePayloadNontrivialOWOe"

@@ -43,13 +43,13 @@ SetTests.test("index<Hashable>(of:)") {
   let s: Set<AnyHashable> = [
     AnyHashable(1010), AnyHashable(2020), AnyHashable(3030.0)
   ]
-  expectEqual(AnyHashable(1010), s[s.index(of: 1010)!])
-  expectEqual(AnyHashable(2020), s[s.index(of: 2020)!])
-  expectEqual(AnyHashable(3030.0), s[s.index(of: 3030.0)!])
+  expectEqual(AnyHashable(1010), s[s.firstIndex(of: 1010)!])
+  expectEqual(AnyHashable(2020), s[s.firstIndex(of: 2020)!])
+  expectEqual(AnyHashable(3030.0), s[s.firstIndex(of: 3030.0)!])
 
-  expectNil(s.index(of: 1010.0))
-  expectNil(s.index(of: 2020.0))
-  expectNil(s.index(of: 3030))
+  expectNil(s.firstIndex(of: 1010.0))
+  expectNil(s.firstIndex(of: 2020.0))
+  expectNil(s.firstIndex(of: 3030))
 }
 
 SetTests.test("insert<Hashable>(_:)") {

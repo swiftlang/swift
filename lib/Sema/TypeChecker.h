@@ -42,6 +42,7 @@ class NominalTypeDecl;
 class NormalProtocolConformance;
 class TopLevelContext;
 class TypeChecker;
+class TypoCorrectionResults;
 class ExprPattern;
 
 namespace constraints {
@@ -53,14 +54,14 @@ namespace constraints {
 
 /// \brief A mapping from substitutable types to the protocol-conformance
 /// mappings for those types.
-typedef llvm::DenseMap<SubstitutableType *,
-                       SmallVector<ProtocolConformance *, 2>> ConformanceMap;
+using ConformanceMap =
+    llvm::DenseMap<SubstitutableType *, SmallVector<ProtocolConformance *, 2>>;
 
 /// \brief Used for recursive lookups into an expr that is already
 /// being type-checked and the constraint system in which its type is
 /// stored.
-typedef std::pair<Expr *,
-                  constraints::ConstraintSystem *> ExprAndConstraintSystem;
+using ExprAndConstraintSystem =
+    std::pair<Expr *, constraints::ConstraintSystem *>;
 
 /// Special-case type checking semantics for certain declarations.
 enum class DeclTypeCheckingSemantics {
@@ -85,35 +86,57 @@ class LookupResult {
 private:
   /// The set of results found.
   SmallVector<LookupResultEntry, 4> Results;
+  size_t IndexOfFirstOuterResult = 0;
 
 public:
   LookupResult() {}
 
-  explicit
-  LookupResult(const SmallVectorImpl<LookupResultEntry> &Results)
-    : Results(Results.begin(), Results.end()) {}
+  explicit LookupResult(const SmallVectorImpl<LookupResultEntry> &Results,
+                        size_t indexOfFirstOuterResult)
+      : Results(Results.begin(), Results.end()),
+        IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
-  typedef SmallVectorImpl<LookupResultEntry>::iterator iterator;
+  using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
   iterator begin() { return Results.begin(); }
-  iterator end() { return Results.end(); }
-  unsigned size() const { return Results.size(); }
-  bool empty() const { return Results.empty(); }
+  iterator end() {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+  unsigned size() const { return innerResults().size(); }
+  bool empty() const { return innerResults().empty(); }
+
+  ArrayRef<LookupResultEntry> innerResults() const {
+    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+  }
+
+  ArrayRef<LookupResultEntry> outerResults() const {
+    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+  }
 
   const LookupResultEntry& operator[](unsigned index) const {
     return Results[index];
   }
 
-  LookupResultEntry front() const { return Results.front(); }
-  LookupResultEntry back() const { return Results.back(); }
+  LookupResultEntry front() const { return innerResults().front(); }
+  LookupResultEntry back() const { return innerResults().back(); }
 
   /// Add a result to the set of results.
-  void add(LookupResultEntry result) { Results.push_back(result); }
+  void add(LookupResultEntry result, bool isOuter) {
+    Results.push_back(result);
+    if (!isOuter) {
+      IndexOfFirstOuterResult++;
+      assert(IndexOfFirstOuterResult == Results.size() &&
+             "found an outer result before an inner one");
+    } else {
+      assert(IndexOfFirstOuterResult > 0 &&
+             "found outer results without an inner one");
+    }
+  }
 
   void clear() { Results.clear(); }
 
   /// Determine whether the result set is nonempty.
   explicit operator bool() const {
-    return !Results.empty();
+    return !empty();
   }
 
   TypeDecl *getSingleTypeResult() const {
@@ -124,7 +147,8 @@ public:
   }
 
   /// Filter out any results that aren't accepted by the given predicate.
-  void filter(const std::function<bool(LookupResultEntry)> &pred);
+  void
+  filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
 };
 
 /// The result of name lookup for types.
@@ -135,7 +159,7 @@ class LookupTypeResult {
   friend class TypeChecker;
 
 public:
-  typedef SmallVectorImpl<std::pair<TypeDecl *, Type>>::iterator iterator;
+  using iterator = SmallVectorImpl<std::pair<TypeDecl *, Type>>::iterator;
   iterator begin() { return Results.begin(); }
   iterator end() { return Results.end(); }
   unsigned size() const { return Results.size(); }
@@ -232,7 +256,7 @@ enum class TypeCheckExprFlags {
   SkipApplyingSolution = 0x100,
 };
 
-typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
+using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
 
 inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
                                       TypeCheckExprFlags flag2) {
@@ -259,10 +283,13 @@ enum class NameLookupFlags {
   /// Whether to ignore access control for this lookup, allowing inaccessible
   /// results to be returned.
   IgnoreAccessControl = 0x10,
+  /// Whether to include results from outside the innermost scope that has a
+  /// result.
+  IncludeOuterResults = 0x20,
 };
 
 /// A set of options that control name lookup.
-typedef OptionSet<NameLookupFlags> NameLookupOptions;
+using NameLookupOptions = OptionSet<NameLookupFlags>;
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
@@ -545,7 +572,7 @@ enum class TypeResolutionFlags : unsigned {
 };
 
 /// Option set describing how type resolution should work.
-typedef OptionSet<TypeResolutionFlags> TypeResolutionOptions;
+using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
@@ -677,7 +704,7 @@ enum class ConformanceCheckFlags {
 };
 
 /// Options that control protocol conformance checking.
-typedef OptionSet<ConformanceCheckFlags> ConformanceCheckOptions;
+using ConformanceCheckOptions = OptionSet<ConformanceCheckFlags>;
 
 inline ConformanceCheckOptions operator|(ConformanceCheckFlags lhs,
                                          ConformanceCheckFlags rhs) {
@@ -710,6 +737,9 @@ public:
 
   /// \brief The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
+
+  /// Declarations that need their conformances checked.
+  llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
   /// The list of protocol conformances that were "used" and will need to be
   /// completed before type checking is considered complete.
@@ -840,6 +870,7 @@ public:
 
 private:
   Type IntLiteralType;
+  Type MaxIntegerType;
   Type FloatLiteralType;
   Type BooleanLiteralType;
   Type UnicodeScalarType;
@@ -891,6 +922,14 @@ private:
   /// If non-zero, abort the expression type checker if it takes more
   /// than this many seconds.
   unsigned ExpressionTimeoutThreshold = 600;
+
+  /// If non-zero, abort the switch statement exhaustiveness checker if
+  /// the Space::minus function is called more than this many times.
+  ///
+  /// Why this number? Times out in about a second on a 2017 iMac, Retina 5K,
+  // 4.2 GHz Intel Core i7.
+  // (It's arbitrary, but will keep the compiler from taking too much time.)
+  unsigned SwitchCheckingInvocationThreshold = 200000;
 
   /// If true, the time it takes to type-check each function will be dumped
   /// to llvm::errs().
@@ -967,8 +1006,24 @@ public:
   /// the upper bound for the number of seconds we'll let the
   /// expression type checker run before considering an expression
   /// "too complex".
+  /// If zero, do not limit the checking.
   unsigned getExpressionTimeoutThresholdInSeconds() {
     return ExpressionTimeoutThreshold;
+  }
+
+  /// Get the threshold that determines the upper bound for the number
+  /// of times we'll let the Space::minus routine run before
+  /// considering a switch statement "too complex".
+  /// If zero, do not limit the checking.
+  unsigned getSwitchCheckingInvocationThreshold() const {
+    return SwitchCheckingInvocationThreshold;
+  }
+
+  /// Set the threshold that determines the upper bound for the number
+  /// of times we'll let the Space::minus routine run before
+  /// considering a switch statement "too complex".
+  void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
+    SwitchCheckingInvocationThreshold = invocationCount;
   }
 
   bool getInImmediateMode() {
@@ -994,6 +1049,7 @@ public:
   Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
+  Type getMaxIntegerType(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
   Type getNSErrorType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
@@ -1156,7 +1212,6 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
   /// \param genericArgs The list of generic arguments to apply to the type.
-  /// \param options The type resolution context.
   /// \param resolver The generic type resolver.
   ///
   /// \returns A BoundGenericType bound to the given arguments, or null on
@@ -1166,8 +1221,7 @@ public:
   Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
                                     GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
-                                    MutableArrayRef<TypeLoc> genericArgs,
-                                    TypeResolutionOptions options,
+                                    ArrayRef<Type> genericArgs,
                                     GenericTypeResolver *resolver,
                                     UnsatisfiedDependency *unsatisfiedDependency);
 
@@ -1302,7 +1356,7 @@ public:
                            unsigned StartElem);
   Identifier getNextResponseVariableName(DeclContext *DC);
 
-  void typeCheckDecl(Decl *D, bool isFirstPass);
+  void typeCheckDecl(Decl *D);
 
   void checkDeclAttributesEarly(Decl *D);
   void checkDeclAttributes(Decl *D);
@@ -1330,6 +1384,9 @@ public:
     validateExtension(ext);
     checkInheritanceClause(ext);
   }
+  virtual void resolveExtensionForConformanceConstruction(
+      ExtensionDecl *ext,
+      SmallVectorImpl<ConformanceConstructionInfo> &protocols) override;
 
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
@@ -1528,17 +1585,13 @@ public:
   /// Retrieve the set of inherited protocols for this protocol type.
   llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
+  /// Diagnose if the class has no designated initializers.
+  void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
+
+  ///
   /// \brief Add any implicitly-defined constructors required for the given
   /// struct or class.
   void addImplicitConstructors(NominalTypeDecl *typeDecl);
-
-  /// \brief Add the RawOptionSet (todo:, Equatable, and Hashable) methods to an
-  /// imported NS_OPTIONS struct.
-  void addImplicitStructConformances(StructDecl *ED);
-
-  /// \brief Add the RawRepresentable, Equatable, and Hashable methods to an
-  /// enum with a raw type.
-  void addImplicitEnumConformances(EnumDecl *ED);
 
   /// Synthesize the member with the given name on the target if applicable,
   /// i.e. if the member is synthesizable and has not yet been added to the
@@ -1563,24 +1616,24 @@ public:
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionList SelfInterfaceSubs,
-                               SubstitutionList SelfContextSubs);
+                               SubstitutionMap interfaceMap,
+                               SubstitutionMap contextMap);
   
   /// Instantiate the parameter implementation for a behavior-backed
   /// property.
   void completePropertyBehaviorParameter(VarDecl *VD,
                                FuncDecl *BehaviorParameter,
                                NormalProtocolConformance *BehaviorConformance,
-                               SubstitutionList SelfInterfaceSubs,
-                               SubstitutionList SelfContextSubs);
+                               SubstitutionMap interfaceMap,
+                               SubstitutionMap contextMap);
   
   /// Instantiate the accessor implementations for a behavior-backed
   /// property.
   void completePropertyBehaviorAccessors(VarDecl *VD,
                                      VarDecl *ValueImpl,
                                      Type valueTy,
-                                     SubstitutionList SelfInterfaceSubs,
-                                     SubstitutionList SelfContextSubs);
+                                     SubstitutionMap interfaceMap,
+                                     SubstitutionMap contextMap);
 
   /// Pre-check the expression, validating any types that occur in the
   /// expression and folding sequence expressions.
@@ -1692,7 +1745,7 @@ public:
       ExprTypeCheckListener *listener = nullptr);
 
   void getPossibleTypesOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, SmallVectorImpl<Type> &types,
+      Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
       FreeTypeVariableBinding allowFreeTypeVariables =
           FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
@@ -2033,7 +2086,7 @@ public:
     Optional<ProtocolConformanceRef>
     operator()(CanType dependentType,
                Type conformingReplacementType,
-               ProtocolType *conformedProtocol) const;
+               ProtocolDecl *conformedProtocol) const;
   };
 
   /// Completely check the given conformance.
@@ -2262,12 +2315,6 @@ public:
   /// we're parsing the standard library.
   ModuleDecl *getStdlibModule(const DeclContext *dc);
 
-  /// \name AST Mutation Listener Implementation
-  /// @{
-  void handleExternalDecl(Decl *decl);
-
-  /// @}
-
   /// \name Lazy resolution.
   ///
   /// Routines that perform lazy resolution as required for AST operations.
@@ -2295,9 +2342,6 @@ public:
 
   void diagnoseInlinableLocalType(const NominalTypeDecl *NTD);
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
-                                const DeclContext *DC);
-
   /// Used in diagnostic %selects.
   enum class FragileFunctionKind : unsigned {
     Transparent,
@@ -2307,11 +2351,20 @@ public:
     PropertyInitializer
   };
 
+  bool diagnoseInlinableDeclRef(SourceLoc loc, const ValueDecl *D,
+                                const DeclContext *DC,
+                                FragileFunctionKind Kind,
+                                bool TreatUsableFromInlineAsPublic);
+
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
+  /// The second element of the pair is true if references to @usableFromInline
+  /// declarations are permitted.
+  ///
   /// \see FragileFunctionKind
-  FragileFunctionKind getFragileFunctionKind(const DeclContext *DC);
+  std::pair<FragileFunctionKind, bool>
+  getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
   ///
@@ -2482,16 +2535,11 @@ public:
   void performTypoCorrection(DeclContext *DC,
                              DeclRefKind refKind,
                              Type baseTypeOrNull,
-                             DeclName name,
-                             SourceLoc lookupLoc,
                              NameLookupOptions lookupOptions,
-                             LookupResult &result,
+                             TypoCorrectionResults &corrections,
                              GenericSignatureBuilder *gsb = nullptr,
                              unsigned maxResults = 4);
 
-  void noteTypoCorrection(DeclName name, DeclNameLoc nameLoc,
-                          ValueDecl *decl);
-  
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
@@ -2500,16 +2548,15 @@ public:
 /// \brief RAII object that cleans up the given expression if not explicitly
 /// disabled.
 class CleanupIllFormedExpressionRAII {
-  ASTContext &Context;
   Expr **expr;
 
 public:
-  CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
-    : Context(Context), expr(&expr) { }
+  CleanupIllFormedExpressionRAII(Expr *&expr)
+    : expr(&expr) { }
 
   ~CleanupIllFormedExpressionRAII();
 
-  static void doIt(Expr *expr, ASTContext &Context);
+  static void doIt(Expr *expr);
 
   /// \brief Disable the cleanup of this expression; it doesn't need it.
   void disable() {
