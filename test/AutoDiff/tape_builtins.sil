@@ -8,9 +8,9 @@ import Builtin
 sil @foo : $@convention(thin) (Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float):
   %tape = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
-  %id = integer_literal $Builtin.Int64, 0
-  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Int64) : $()
-  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Int64) : $Float
+  %id = integer_literal $Builtin.Word, 0
+  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Word) : $()
+  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Word) : $Float
   builtin "autodiffDestroyTape"<Float>(%tape : $_AutoDiffTape<Float>) : $()
   return %val : $Float
 }
@@ -18,8 +18,8 @@ bb0(%0 : $Float, %1 : $Float):
 // CHECK-LABEL: @foo
 // CHECK: bb0(%0 : $Float, %1 : $Float):
 // CHECK:  [[tape:%.*]] = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
-// CHECK:  [[id:%.*]] = integer_literal $Builtin.Int64, 0
-// CHECK:  builtin "autodiffPushToTape"<Float>([[tape]] : $_AutoDiffTape<Float>, %0 : $Float, [[id]] : $Builtin.Int64) : $()
-// CHECK:  [[val:%.*]] = builtin "autodiffPopFromTape"<Float>([[tape]] : $_AutoDiffTape<Float>, [[id]] : $Builtin.Int64) : $Float
+// CHECK:  [[id:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:  builtin "autodiffPushToTape"<Float>([[tape]] : $_AutoDiffTape<Float>, %0 : $Float, [[id]] : $Builtin.Word) : $()
+// CHECK:  [[val:%.*]] = builtin "autodiffPopFromTape"<Float>([[tape]] : $_AutoDiffTape<Float>, [[id]] : $Builtin.Word) : $Float
 // CHECK:  builtin "autodiffDestroyTape"<Float>([[tape]] : $_AutoDiffTape<Float>) : $()
 // CHECK:  return [[val]] : $Float
