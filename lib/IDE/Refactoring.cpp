@@ -2687,37 +2687,56 @@ void generateDocCommentForConstructor(ConstructorDecl *constructorDecl, swift::S
 
 }
     
+void generateDocCommentForSubscript(SubscriptDecl *subscriptDecl, swift::SourceLoc startLocation, SourceEditConsumer &EditConsumer, SourceManager &SM) {
+    
+    if(subscriptDecl == nullptr) return;
+    
+    EditConsumer.accept(SM, startLocation, "/// <#Subscript Summary#>\n");
+    
+    processParameters(subscriptDecl->getIndices(), startLocation, EditConsumer, SM);
+    
+    Type returnType = subscriptDecl->getElementTypeLoc().getType();
+    processReturn(returnType, startLocation, EditConsumer, SM);
+    
+    EditConsumer.accept(SM, startLocation,"///\n");
+}
+    
 bool RefactoringActionDocCommentBoilerplate::isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
 #warning Implement here
     if (Tok.Kind != CursorInfoKind::ValueRef)
         return false;
     
     DeclKind tokenKind = Tok.ValueD->getKind();
-    return (tokenKind == DeclKind::Func) || (tokenKind == DeclKind::Constructor);
+    return (tokenKind == DeclKind::Func) || (tokenKind == DeclKind::Constructor || (tokenKind == DeclKind::Subscript));
 }
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
 #warning Implement here
     DeclKind tokenKind = CursorInfo.ValueD->getKind();
-    if(tokenKind != DeclKind::Func && tokenKind != DeclKind::Constructor) return true;
+    if(tokenKind != DeclKind::Func && tokenKind != DeclKind::Constructor && tokenKind != DeclKind::Subscript) return true;
     
     FuncDecl *funcDecl = nullptr;
     ConstructorDecl *constructorDecl = nullptr;
+    SubscriptDecl *subscriptDecl = nullptr;
+    
+    swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
     
     if(isa<FuncDecl>(CursorInfo.ValueD)) {
         funcDecl = (FuncDecl *)CursorInfo.ValueD;
+        generateDocCommentForFunction(funcDecl, startLocation, EditConsumer, SM);
     }
     else if(isa<ConstructorDecl>(CursorInfo.ValueD)) {
         constructorDecl = (ConstructorDecl *)CursorInfo.ValueD;
+        generateDocCommentForConstructor(constructorDecl, startLocation, EditConsumer, SM);
+    }
+    else if(isa<SubscriptDecl>(CursorInfo.ValueD)) {
+        subscriptDecl = (SubscriptDecl *)CursorInfo.ValueD;
+        generateDocCommentForSubscript(subscriptDecl, startLocation, EditConsumer, SM);
     }
     else {
         return true;
     }
     
-    swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
-    
-    generateDocCommentForFunction(funcDecl, startLocation, EditConsumer, SM);
-    generateDocCommentForConstructor(constructorDecl, startLocation, EditConsumer, SM);
     
     return false;
 }
