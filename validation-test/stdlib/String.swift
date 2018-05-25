@@ -942,7 +942,7 @@ StringTests.test("stringGutsReserve")
     expectEqual(isSwiftNative(base), startedNative)
     
     let originalBuffer = base.bufferID
-    let isUnique = base._guts.isUniqueNative()
+    let isUnique = base._guts._isUniqueNative()
     let startedUnique =
       startedNative &&
       base._guts._objectIdentifier != nil &&
@@ -1102,7 +1102,7 @@ StringTests.test("toInt") {
   ) {
     var chars = Array(String(initialValue).utf8)
     modification(&chars)
-    let str = String._fromWellFormedUTF8CodeUnitSequence(chars)
+    let str = String(decoding: chars, as: UTF8.self)
     expectNil(Int(str))
   }
 

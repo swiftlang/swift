@@ -309,7 +309,6 @@ extension String {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
@@ -324,7 +323,6 @@ extension String {
   ///     // Prints "Globe 🌍"
   ///
   /// - Parameter c: The character to append to the string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let small = c._smallUTF16 {
       _guts.append(contentsOf: small)
@@ -334,12 +332,10 @@ extension String {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: String) {
     append(newElements)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: Substring) {
     _guts.append(
       newElements._wholeString._guts,
@@ -459,11 +455,8 @@ extension String {
 
   @inlinable // FIXME(sil-serialize-all)
   internal func _stride(of i: Index) -> Int {
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      _sanityCheck(stride > 0)
-      return Int(stride)
-    }
+    if let stride = i.characterStride { return stride }
+
     let offset = i.encodedOffset
     return _visitGuts(_guts, args: offset,
       ascii: { ascii, offset in

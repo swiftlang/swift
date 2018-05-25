@@ -194,3 +194,8 @@ public func getInt(_ x: Int) -> Int { return x }
 // The same for String.
 @inline(never)
 public func getString(_ s: String) -> String { return s }
+
+// The same for Substring.
+@inline(never)
+public func getSubstring(_ s: Substring) -> Substring { return s }
+

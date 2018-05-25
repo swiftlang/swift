@@ -129,7 +129,7 @@ extension _SmallUTF8String {
 
   @inlinable
   public // @testable
-  init?<C: RandomAccessCollection>(_ codeUnits: C) where C.Element == UInt8 {
+  init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
 #if arch(i386) || arch(arm)
     return nil // Never form small strings on 32-bit
 #else
@@ -137,13 +137,12 @@ extension _SmallUTF8String {
     guard count <= _SmallUTF8String.capacity else { return nil }
     self.init()
     self._withAllUnsafeMutableBytes { rawBufPtr in
-      let bufPtr = UnsafeMutableBufferPointer(
-        start: rawBufPtr.baseAddress.unsafelyUnwrapped.assumingMemoryBound(
-          to: UInt8.self),
-        count: rawBufPtr.count)
-      var (itr, written) = codeUnits._copyContents(initializing: bufPtr)
-      _sanityCheck(itr.next() == nil)
-      _sanityCheck(count == written)
+      let rawDst = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
+      memcpy_(
+        dst: rawDst.assumingMemoryBound(to: UInt8.self),
+        src: codeUnits.baseAddress._unsafelyUnwrappedUnchecked,
+        count: count
+      )
     }
     _sanityCheck(self.count == 0, "overwrote count early?")
     self.count = count
@@ -152,6 +151,20 @@ extension _SmallUTF8String {
     if !self.isASCII { return nil }
 
     _invariantCheck()
+#endif
+  }
+
+  @inlinable
+  public // @testable
+  init?(_ scalar: Unicode.Scalar) {
+#if arch(i386) || arch(arm)
+    return nil // Never form small strings on 32-bit
+#else
+    // FIXME: support transcoding
+    guard scalar.value <= 0x7F else { return nil }
+    self.init()
+    self.count = 1
+    self[0] = UInt8(truncatingIfNeeded: scalar.value)
 #endif
   }
 }

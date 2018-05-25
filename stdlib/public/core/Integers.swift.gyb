@@ -1827,6 +1827,10 @@ extension BinaryInteger {
 
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
+
+    // TODO(FIXME JIRA): All current stdlib types fit in small. Use a stack
+    // buffer instead of an array on the heap.
+
     var result: [UInt8] = []
     while value != 0 {
       let (quotient, remainder) = _quotientAndRemainder(value)
@@ -1837,7 +1841,11 @@ extension BinaryInteger {
     if isNegative {
       result.append(UInt8(("-" as Unicode.Scalar).value))
     }
-    return String._fromASCII(result.reversed())
+
+    result.reverse()
+    return result.withUnsafeBufferPointer {
+      return String._fromASCII($0)
+    }
   }
 
   /// A textual representation of this value.

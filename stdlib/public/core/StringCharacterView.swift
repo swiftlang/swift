@@ -221,18 +221,14 @@ extension String._CharacterView : BidirectionalCollection {
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
   internal func _toBaseIndex(_ index: Index) -> Index {
-    return Index(
-      encodedOffset: index.encodedOffset - _baseOffset,
-      index._cache)
+    return String.Index(from: index, adjustingEncodedOffsetBy: -_baseOffset)
   }
 
   /// Translates an index in the underlying base string into a view index using
   /// this view's `_baseOffset`.
   @inlinable // FIXME(sil-serialize-all)
   internal func _toViewIndex(_ index: Index) -> Index {
-    return Index(
-      encodedOffset: index.encodedOffset + _baseOffset,
-      index._cache)
+    return String.Index(from: index, adjustingEncodedOffsetBy: _baseOffset)
   }
 
   /// The position of the first character in a nonempty character view.
@@ -330,7 +326,6 @@ extension String._CharacterView : RangeReplaceableCollection {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _base.reserveCapacity(n)
   }
@@ -338,7 +333,6 @@ extension String._CharacterView : RangeReplaceableCollection {
   /// Appends the given character to the character view.
   ///
   /// - Parameter c: The character to append to the character view.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     _base.append(c)
   }
@@ -368,7 +362,6 @@ extension String._CharacterView {
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
   public subscript(bounds: Range<Index>) -> String.CharacterView {
