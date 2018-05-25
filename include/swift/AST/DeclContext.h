@@ -408,10 +408,6 @@ public:
     return false;
   }
 
-  /// Compute a context C such that C is a parent context of A and B.
-  /// If no such context exists, return \c nullptr.
-  static DeclContext *getCommonParentContext(DeclContext *A, DeclContext *B);
-
   /// Returns the module context that contains this context.
   ModuleDecl *getParentModule() const;
 
