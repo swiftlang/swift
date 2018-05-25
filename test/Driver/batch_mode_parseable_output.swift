@@ -2,7 +2,7 @@
 // RUN: touch %t/file-01.swift %t/file-02.swift %t/file-03.swift
 // RUN: echo 'public func main() {}' >%t/main.swift
 //
-// RUN: %swiftc_driver -enable-batch-mode -parseable-output -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift 2>&1 | %FileCheck %s
+// RUN: %swiftc_driver -enable-batch-mode -parseable-output -driver-skip-execution -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift 2>&1 | %FileCheck %s
 //
 //
 // CHECK: {{[1-9][0-9]*}}
@@ -45,7 +45,10 @@
 // CHECK-NEXT:       "path": "{{.*}}/file-01-[[SWIFTDOC01]].swiftdoc"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}}
+// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
@@ -87,7 +90,10 @@
 // CHECK-NEXT:       "path": "{{.*}}/file-02-[[SWIFTDOC02]].swiftdoc"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}}
+// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
@@ -129,7 +135,10 @@
 // CHECK-NEXT:       "path": "{{.*}}/file-03-[[SWIFTDOC03]].swiftdoc"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}}
+// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
@@ -171,13 +180,20 @@
 // CHECK-NEXT:       "path": "{{.*}}/main-[[SWIFTDOCMAIN]].swiftdoc"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}}
+// CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
@@ -185,6 +201,10 @@
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
@@ -192,6 +212,10 @@
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
@@ -199,6 +223,10 @@
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
@@ -238,12 +266,19 @@
 // CHECK-NEXT:       "path": "main.swiftdoc"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
-// CHECK-NEXT:   "pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   "pid": {{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 // CHECK-NEXT: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "finished",
 // CHECK-NEXT:   "name": "merge-module",
 // CHECK-NEXT:   "pid": {{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:   	"real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
 // CHECK-NEXT:   "exit-status": 0
 // CHECK-NEXT: }

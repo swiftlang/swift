@@ -893,6 +893,8 @@ if(HAVE_EL_WGETS)
 endif()
 cmake_pop_check_state()
 
+check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
+
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
