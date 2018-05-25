@@ -323,10 +323,15 @@ swift::classifyDynamicCast(ModuleDecl *M,
 
   // Casting to a less-optional type can always fail.
   } else if (sourceObject) {
-    return atBest(classifyDynamicCast(M, sourceObject, target,
-                                      /* isSourceTypeExact */ false,
-                                      isWholeModuleOpts),
-                  DynamicCastFeasibility::MaySucceed);
+    auto result = atBest(classifyDynamicCast(M, sourceObject, target,
+                                             /* isSourceTypeExact */ false,
+                                             isWholeModuleOpts),
+                         DynamicCastFeasibility::MaySucceed);
+    if (target.isExistentialType()) {
+      result = atWorst(result, classifyDynamicCastToProtocol(
+                                   M, source, target, isWholeModuleOpts));
+    }
+    return result;
   }
   assert(!sourceObject && !targetObject);
 
