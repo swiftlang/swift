@@ -144,6 +144,31 @@ Type TypeChecker::getUInt8Type(DeclContext *dc) {
   return ::getStdlibType(*this, UInt8Type, dc, "UInt8");
 }
 
+/// Returns the maximum-sized builtin integer type.
+Type TypeChecker::getMaxIntegerType(DeclContext *dc) {
+  if (!MaxIntegerType.isNull())
+    return MaxIntegerType;
+
+  SmallVector<ValueDecl *, 1> lookupResults;
+  getStdlibModule(dc)->lookupValue(/*AccessPath=*/{},
+                                   Context.Id_MaxBuiltinIntegerType,
+                                   NLKind::QualifiedLookup, lookupResults);
+  if (lookupResults.size() != 1)
+    return MaxIntegerType;
+
+  auto *maxIntegerTypeDecl = dyn_cast<TypeAliasDecl>(lookupResults.front());
+  if (!maxIntegerTypeDecl)
+    return MaxIntegerType;
+
+  validateDecl(maxIntegerTypeDecl);
+  if (!maxIntegerTypeDecl->hasInterfaceType() ||
+      !maxIntegerTypeDecl->getDeclaredInterfaceType()->is<BuiltinIntegerType>())
+    return MaxIntegerType;
+
+  MaxIntegerType = maxIntegerTypeDecl->getUnderlyingTypeLoc().getType();
+  return MaxIntegerType;
+}
+
 /// Find the standard type of exceptions.
 ///
 /// We call this the "exception type" to try to avoid confusion with
@@ -435,8 +460,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
              genericParams->size(), genericArgs.size(),
              genericArgs.size() < genericParams->size())
         .highlight(generic->getAngleBrackets());
-    diagnose(decl, diag::generic_type_declared_here,
-             decl->getName());
+    diagnose(decl, diag::kind_identifier_declared_here,
+             DescriptiveDeclKind::GenericType, decl->getName());
     return ErrorType::get(Context);
   }
 
@@ -470,7 +495,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   if (!genericDecl->hasValidSignature()) {
     diagnose(loc, diag::recursive_type_reference,
              genericDecl->getDescriptiveKind(), genericDecl->getName());
-    diagnose(genericDecl, diag::type_declared_here);
+    diagnose(genericDecl, diag::kind_declared_here,
+             DescriptiveDeclKind::Type);
     return ErrorType::get(Context);
   }
 
@@ -646,8 +672,8 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
         diag.fixItInsertAfter(loc, genericArgsToAdd);
     }
   }
-  tc.diagnose(unbound->getDecl(), diag::generic_type_declared_here,
-              unbound->getDecl()->getName());
+  tc.diagnose(unbound->getDecl(), diag::kind_identifier_declared_here,
+              DescriptiveDeclKind::GenericType, unbound->getDecl()->getName());
 }
 
 // Produce a diagnostic if the type we referenced was an
@@ -705,7 +731,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     if (!typeDecl->hasInterfaceType()) {
       TC.diagnose(loc, diag::recursive_type_reference,
                   typeDecl->getDescriptiveKind(), typeDecl->getName());
-      TC.diagnose(typeDecl->getLoc(), diag::type_declared_here);
+      TC.diagnose(typeDecl->getLoc(), diag::kind_declared_here,
+                  DescriptiveDeclKind::Type);
       return ErrorType::get(TC.Context);
     }
   }
@@ -846,7 +873,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
       for (auto lookupResult : inaccessibleResults)
-        tc.diagnose(lookupResult.getValueDecl(), diag::type_declared_here);
+        tc.diagnose(lookupResult.getValueDecl(), diag::kind_declared_here,
+                    DescriptiveDeclKind::Type);
 
       // Don't try to recover here; we'll get more access-related diagnostics
       // downstream if we do.
@@ -912,7 +940,8 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
     for (auto lookupResult : inaccessibleMembers)
-      tc.diagnose(lookupResult.first, diag::type_declared_here);
+      tc.diagnose(lookupResult.first, diag::kind_declared_here,
+                  DescriptiveDeclKind::Type);
 
     // Don't try to recover here; we'll get more access-related diagnostics
     // downstream if we do.
@@ -2310,14 +2339,14 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     bool ok = true;
     subMap = genericSig->getSubstitutionMap(
       QueryTypeSubstitutionMap{genericArgMap},
-      [&](CanType depTy, Type replacement, ProtocolType *proto)
+      [&](CanType depTy, Type replacement, ProtocolDecl *proto)
       -> ProtocolConformanceRef {
-        auto result = TC.conformsToProtocol(replacement, proto->getDecl(), DC,
+        auto result = TC.conformsToProtocol(replacement, proto, DC,
                                             ConformanceCheckOptions());
         // TODO: getSubstitutions callback ought to return Optional.
         if (!result) {
           ok = false;
-          return ProtocolConformanceRef(proto->getDecl());
+          return ProtocolConformanceRef(proto);
         }
         
         return *result;

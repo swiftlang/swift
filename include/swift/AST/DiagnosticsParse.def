@@ -37,7 +37,7 @@
 #endif
 
 //==============================================================================
-// Lexing and Parsing diagnostics
+// MARK: Lexing and Parsing diagnostics
 //==============================================================================
 
 NOTE(opening_brace,none,
@@ -99,7 +99,7 @@ WARNING(escaped_parameter_name,none,
         (StringRef))
 
 //------------------------------------------------------------------------------
-// Lexer diagnostics
+// MARK: Lexer diagnostics
 //------------------------------------------------------------------------------
 
 WARNING(lex_nul_character,none,
@@ -186,7 +186,7 @@ WARNING(lex_editor_placeholder_in_playground,none,
 ERROR(lex_conflict_marker_in_file,none,
       "source control conflict marker in source file", ())
 //------------------------------------------------------------------------------
-// Declaration parsing diagnostics
+// MARK: Declaration parsing diagnostics
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
@@ -702,7 +702,7 @@ ERROR(sil_coverage_invalid_operator, none,
       "expected '+' or '-'", ())
 
 //------------------------------------------------------------------------------
-// Type parsing diagnostics
+// MARK: Type parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_type,PointsToFirstBadToken,
@@ -800,7 +800,7 @@ ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
 //------------------------------------------------------------------------------
-// Layout constraint diagnostics
+// MARK: Layout constraint diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(layout_size_should_be_positive,none,
@@ -813,7 +813,7 @@ ERROR(layout_constraints_only_inside_specialize_attr,none,
       "layout constraints are only allowed inside '_specialize' attributes", ())
 
 //------------------------------------------------------------------------------
-// Pattern parsing diagnostics
+// MARK: Pattern parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_pattern,PointsToFirstBadToken,
@@ -1079,7 +1079,7 @@ ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
 
 //------------------------------------------------------------------------------
-// Expression parsing diagnostics
+// MARK: Expression parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(expected_expr,none,
@@ -1257,7 +1257,7 @@ ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
 //------------------------------------------------------------------------------
-// Attribute-parsing diagnostics
+// MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
 
 ERROR(replace_equal_with_colon_for_value,none,
@@ -1456,7 +1456,7 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 //------------------------------------------------------------------------------
-// Generics parsing diagnostics
+// MARK: Generics parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(expected_rangle_generics_param,PointsToFirstBadToken,
       "expected '>' to complete generic parameter list", ())
@@ -1490,7 +1490,7 @@ ERROR(where_inside_brackets,none,
         "must be written following the declaration's type", ())
 
 //------------------------------------------------------------------------------
-// Conditional compilation parsing diagnostics
+// MARK: Conditional compilation parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unsupported_conditional_compilation_binary_expression,none,
       "expected '&&' or '||' expression", ())
@@ -1545,7 +1545,7 @@ WARNING(likely_simulator_platform_condition,none,
       ())
 
 //------------------------------------------------------------------------------
-// Availability query parsing diagnostics
+// MARK: Availability query parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(avail_query_expected_condition,PointsToFirstBadToken,
       "expected availability condition", ())
@@ -1586,7 +1586,7 @@ ERROR(availability_query_repeated_platform, none,
       "version for '%0' already specified", (StringRef))
 
 //------------------------------------------------------------------------------
-// syntax parsing diagnostics
+// MARK: syntax parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unknown_syntax_entity, PointsToFirstBadToken,
       "unknown %0 syntax exists in the source", (StringRef))

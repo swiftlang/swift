@@ -252,6 +252,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(TypeAlias, "type alias");
   ENTRY(GenericTypeParam, "generic parameter");
   ENTRY(AssociatedType, "associated type");
+  ENTRY(Type, "type");
   ENTRY(Enum, "enum");
   ENTRY(Struct, "struct");
   ENTRY(Class, "class");
@@ -259,6 +260,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(GenericEnum, "generic enum");
   ENTRY(GenericStruct, "generic struct");
   ENTRY(GenericClass, "generic class");
+  ENTRY(GenericType, "generic type");
   ENTRY(Subscript, "subscript");
   ENTRY(Constructor, "initializer");
   ENTRY(Destructor, "deinitializer");
@@ -278,6 +280,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(EnumElement, "enum element");
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
+  ENTRY(Requirement, "requirement");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -4551,7 +4554,7 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, MutableArrayRef<ParameterList *> paramLists) {
+    DeclContext *parent, ArrayRef<ParameterList *> paramLists) {
   if (parent->isLocalContext()) {
     setParent(parent);
   }
@@ -5465,21 +5468,6 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                DiagnosticEngine *diags)
         : Decl(decl), Diags(diags) { }
 
-    bool isSelfExpr(Expr *E) {
-      E = E->getSemanticsProvidingExpr();
-
-      if (auto ATSE = dyn_cast<ArchetypeToSuperExpr>(E))
-        E = ATSE->getSubExpr();
-      if (auto IOE = dyn_cast<InOutExpr>(E))
-        E = IOE->getSubExpr();
-      if (auto LE = dyn_cast<LoadExpr>(E))
-        E = LE->getSubExpr();
-      if (auto DRE = dyn_cast<DeclRefExpr>(E))
-        return DRE->getDecl() == Decl->getImplicitSelfDecl();
-
-      return false;
-    }
-
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
       return !isa<NominalTypeDecl>(D);
@@ -5517,7 +5505,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       BodyInitKind myKind;
       if (arg->isSuperExpr())
         myKind = BodyInitKind::Chained;
-      else if (isSelfExpr(arg))
+      else if (arg->isSelfExprOf(Decl, /*sameBase*/true))
         myKind = BodyInitKind::Delegating;
       else {
         // We're constructing something else.

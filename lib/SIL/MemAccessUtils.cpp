@@ -599,3 +599,19 @@ void swift::visitAccessedAddress(SILInstruction *I,
     return;
   }
 }
+
+SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
+  while (!beginAccess->use_empty()) {
+    Operand *op = *beginAccess->use_begin();
+
+    // Delete any associated end_access instructions.
+    if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
+      endAccess->eraseFromParent();
+
+      // Forward all other uses to the original address.
+    } else {
+      op->set(beginAccess->getSource());
+    }
+  }
+  return beginAccess->getParent()->erase(beginAccess);
+}

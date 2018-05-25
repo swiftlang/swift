@@ -1244,7 +1244,7 @@ computeUsesAndLiveness(SILValue Base) {
 #ifndef NDEBUG
   DEBUG(llvm::dbgs() << "Final Leafs: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
-  getLeafTypes(LeafTypes);
+  getLiveLeafTypes(LeafTypes);
   for (SILType Leafs : LeafTypes) {
     DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
   }

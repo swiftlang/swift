@@ -225,12 +225,12 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
@@ -241,7 +241,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 11
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -771,7 +771,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536

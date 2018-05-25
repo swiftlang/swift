@@ -4767,6 +4767,24 @@ Decodes the bit representation of the specified ``Builtin.BridgeObject`` value,
 returning two bits: the first indicates whether the object is an Objective-C
 object, the second indicates whether it is an Objective-C tagged pointer value.
 
+value_to_bridge_object
+``````````````````````
+::
+
+  sil-instruction ::= 'value_to_bridge_object' sil-operand
+
+  %1 = value_to_bridge_object %0 : $T
+  // %1 will be of type Builtin.BridgeObject
+
+Sets the BridgeObject to a tagged pointer representation holding its operands
+by tagging and shifting the operand if needed::
+
+  value_to_bridge_object %x ===
+  (x << _swift_abi_ObjCReservedLowBits) | _swift_BridgeObject_TaggedPointerBits
+
+``%x`` thus must not be using any high bits shifted away or the tag bits post-shift.
+ARC operations on such tagged values are NOPs.
+
 ref_to_bridge_object
 ````````````````````
 ::

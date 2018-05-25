@@ -58,7 +58,7 @@ func testNotCoveredCase(x: Int) {
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}
 
 }
 

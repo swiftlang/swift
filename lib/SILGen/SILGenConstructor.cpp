@@ -969,9 +969,8 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                        },
                        [](CanType dependentType,
                            Type conformingReplacementType,
-                           ProtocolType *conformedProtocol) {
-                         return ProtocolConformanceRef(
-                                  conformedProtocol->getDecl());
+                           ProtocolDecl *conformedProtocol) {
+                         return ProtocolConformanceRef(conformedProtocol);
                        });
         }
 

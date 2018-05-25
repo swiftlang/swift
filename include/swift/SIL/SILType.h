@@ -439,7 +439,7 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                           const SubstitutionMap &SubMap) const;
+                           SubstitutionMap SubMap) const;
 
   /// If the original type is generic, pass the signature as genericSig.
   ///
@@ -450,7 +450,7 @@ public:
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig=CanGenericSignature()) const;
 
-  SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
+  SILType subst(SILModule &silModule, SubstitutionMap subs) const;
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.

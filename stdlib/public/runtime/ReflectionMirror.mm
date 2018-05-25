@@ -622,8 +622,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
     }
 
     /// TODO: Implement specialized mirror witnesses for all kinds.
-    case MetadataKind::Function:
-    case MetadataKind::Existential:
+    default:
       break;
 
     // Types can't have these kinds.
@@ -725,9 +724,9 @@ const char *swift_OpaqueSummary(const Metadata *T) {
       return "(Heap Generic Local Variable)";
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
+    default:
+      return "(Unknown)";
   }
-
-  return "(Unknown)";
 }
 
 #if SWIFT_OBJC_INTEROP

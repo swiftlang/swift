@@ -465,7 +465,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
   if (AD.Explode) {
     ++NumSROAArguments;
     llvm::SmallVector<const ProjectionTreeNode *, 8> LeafNodes;
-    AD.ProjTree.getLeafNodes(LeafNodes);
+    AD.ProjTree.getLiveLeafNodes(LeafNodes);
     for (auto Node : LeafNodes) {
       SILType Ty = Node->getType();
       DEBUG(llvm::dbgs() << "                " << Ty << "\n");
@@ -1130,7 +1130,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // We do this in the same order as leaf types since ProjTree expects that the
     // order of leaf values matches the order of leaf types.
     llvm::SmallVector<const ProjectionTreeNode*, 8> LeafNodes;
-    AD.ProjTree.getLeafNodes(LeafNodes);
+    AD.ProjTree.getLiveLeafNodes(LeafNodes);
 
     for (auto *Node : LeafNodes) {
       auto OwnershipKind = *AD.getTransformedOwnershipKind(Node->getType());

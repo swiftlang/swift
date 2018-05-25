@@ -2855,7 +2855,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
 }
 
 static CanType getSubstSelfType(CanSILFunctionType origFnType,
-                                const SubstitutionMap &subs) {
+                                SubstitutionMap subs) {
   // Grab the apparent 'self' type.  If there isn't a 'self' type,
   // we're not going to try to access this anyway.
   assert(!origFnType->getParameters().empty());
@@ -2896,11 +2896,11 @@ namespace {
                              CanSILFunctionType polyFn)
       : PolymorphicConvention(IGF.IGM, polyFn), IGF(IGF) {}
 
-    void emit(const SubstitutionMap &subs,
+    void emit(SubstitutionMap subs,
               WitnessMetadata *witnessMetadata, Explosion &out);
 
   private:
-    void emitEarlySources(const SubstitutionMap &subs, Explosion &out) {
+    void emitEarlySources(SubstitutionMap subs, Explosion &out) {
       for (auto &source : getSources()) {
         switch (source.getKind()) {
         // Already accounted for in the parameters.
@@ -2929,13 +2929,13 @@ namespace {
 /// Pass all the arguments necessary for the given function.
 void irgen::emitPolymorphicArguments(IRGenFunction &IGF,
                                      CanSILFunctionType origFnType,
-                                     const SubstitutionMap &subs,
+                                     SubstitutionMap subs,
                                      WitnessMetadata *witnessMetadata,
                                      Explosion &out) {
   EmitPolymorphicArguments(IGF, origFnType).emit(subs, witnessMetadata, out);
 }
 
-void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
+void EmitPolymorphicArguments::emit(SubstitutionMap subs,
                                     WitnessMetadata *witnessMetadata,
                                     Explosion &out) {
   // Add all the early sources.
@@ -2980,7 +2980,7 @@ void EmitPolymorphicArguments::emit(const SubstitutionMap &subs,
 NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          const SubstitutionMap &subs) {
+                                          SubstitutionMap subs) {
   NecessaryBindings bindings;
 
   // Bail out early if we don't have polymorphic parameters.
@@ -3066,7 +3066,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
 
 void
 GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
-                                               const SubstitutionMap &subs,
+                                               SubstitutionMap subs,
                                                FulfillmentCallback callback) {
   if (empty()) return;
 
@@ -3084,7 +3084,7 @@ GenericTypeRequirements::enumerateFulfillments(IRGenModule &IGM,
 }
 
 void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
-                                               const SubstitutionMap &subs,
+                                               SubstitutionMap subs,
                                                Address buffer) {
   if (Requirements.empty()) return;
 
@@ -3128,7 +3128,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
                                                CanGenericSignature generics,
                                                ModuleDecl &module,
                                                GenericRequirement requirement,
-                                               const SubstitutionMap &subs) {
+                                               SubstitutionMap subs) {
   CanType depTy = requirement.TypeParameter;
   CanType argType = depTy.subst(subs)->getCanonicalType();
 

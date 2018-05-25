@@ -1738,11 +1738,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
             TC.diagnose(behavior->getLoc(),
                         diag::property_behavior_protocol_reqt_ambiguous,
                         TC.Context.Id_value);
-            TC.diagnose(valueProp->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(valueProp->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
-            TC.diagnose(foundVar->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(foundVar->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
             break;
           }
@@ -2024,6 +2022,12 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
       auto *clonedAttr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
       ctor->getAttrs().add(clonedAttr);
     }
+  }
+
+  // Inherit the @discardableResult attribute.
+  if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+    auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
   }
 
   // Make sure the constructor is only as available as its superclass's

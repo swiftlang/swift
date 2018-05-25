@@ -174,21 +174,21 @@ func testStringLiteral() -> String {
   return "abc"
 }
 
-func testCollapseNestedIf() {
+func testCollapseNestedIf1() {
   let a = 3
   if a > 2 {
     if a < 10 {}
   }
 }
 
-func testMultiConditionalNestedIf() {
+func testCollapseNestedIf2() {
   let a = 3
   if a > 2, a != 4 {
     if a < 10 {}
   }
 }
 
-func testExtraDeclNestedIf() {
+func testCollapseNestedIf3() {
   let a = 3
   if a > 2 {
     if a < 10 {}
@@ -196,11 +196,31 @@ func testExtraDeclNestedIf() {
   }
 }
 
-func testExtraIfNestedIf() {
+func testCollapseNestedIf4() {
+  let a = 3
+  if a > 2 {
+    let b = 0
+    if a < 10 {}
+  }
+}
+
+func testCollapseNestedIf5() {
   let a = 3
   if a > 2 {
     if a < 10 {}
-    let b = 0
+  } else {
+    print("else")
+  }
+}
+
+func testCollapseNestedIf6() {
+  let a = 3
+  if a > 2 {
+    if a < 10 {
+      print("if")
+    } else if a < 5 {
+      print("else")
+    }
   }
 }
 
@@ -313,25 +333,27 @@ func testConvertToTernaryExpr() {
 
 // RUN: %refactor -source-filename %s -pos=173:3 -end-pos=173:27| %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
 
-// RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
-// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF-EXPRESSION
+// RUN: %refactor -source-filename %s -pos=179:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF
+// RUN: %refactor -source-filename %s -pos=186:3 | %FileCheck %s -check-prefix=CHECK-COLLAPSE-NESTED-IF
 // RUN: %refactor -source-filename %s -pos=193:3 | %FileCheck %s -check-prefix=CHECK-NONE
 // RUN: %refactor -source-filename %s -pos=201:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=209:3 | %FileCheck %s -check-prefix=CHECK-NONE
+// RUN: %refactor -source-filename %s -pos=218:3 | %FileCheck %s -check-prefix=CHECK-NONE
 
-// RUN: %refactor -source-filename %s -pos=210:11 -end-pos=210:24 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
-// RUN: %refactor -source-filename %s -pos=211:11 -end-pos=211:26 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
-// RUN: %refactor -source-filename %s -pos=212:11 -end-pos=212:21 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+// RUN: %refactor -source-filename %s -pos=230:11 -end-pos=230:24 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+// RUN: %refactor -source-filename %s -pos=231:11 -end-pos=231:26 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
+// RUN: %refactor -source-filename %s -pos=232:11 -end-pos=232:21 | %FileCheck %s -check-prefix=CHECK-STRINGS-INTERPOLATION
 
-// RUN: %refactor -source-filename %s -pos=217:11 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
-// RUN: %refactor -source-filename %s -pos=217:12 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
-// RUN: %refactor -source-filename %s -pos=217:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
-// RUN: %refactor -source-filename %s -pos=217:14 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=237:11 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=237:12 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=237:13 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
+// RUN: %refactor -source-filename %s -pos=237:14 | %FileCheck %s -check-prefix=CHECK-TRY-CATCH
 
-// RUN: %refactor -source-filename %s -pos=225:3 | %FileCheck %s -check-prefix=CHECK-EXPAND-SWITCH
+// RUN: %refactor -source-filename %s -pos=245:3 | %FileCheck %s -check-prefix=CHECK-EXPAND-SWITCH
 
-// RUN: %refactor -source-filename %s -pos=231:3 -end-pos=231:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
+// RUN: %refactor -source-filename %s -pos=251:3 -end-pos=251:24 | %FileCheck %s -check-prefix=CHECK-EXPAND-TERNARY-EXPRESSEXPRESSION
 
-// RUN: %refactor -source-filename %s -pos=237:3 -end-pos=242:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
+// RUN: %refactor -source-filename %s -pos=257:3 -end-pos=262:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-TERNARY-EXPRESSEXPRESSION
 
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
@@ -368,7 +390,7 @@ func testConvertToTernaryExpr() {
 
 // CHECK-LOCALIZE-STRING: Localize String
 
-// CHECK-COLLAPSE-NESTED-IF-EXPRESSION: Collapse Nested If Expression
+// CHECK-COLLAPSE-NESTED-IF: Collapse Nested If Statements
 
 // CHECK-STRINGS-INTERPOLATION: Convert to String Interpolation
 

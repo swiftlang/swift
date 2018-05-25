@@ -2704,7 +2704,8 @@ class InterfaceTypeChangeDetector {
 
   bool detectTypeRewritten(SDKNodeType *Node, SDKNodeType *Counter) {
     if (IsVisitingLeft &&
-        (Node->getName() != Counter->getName()||
+        Node->getPrintedName() != Counter->getPrintedName() &&
+        (Node->getName() != Counter->getName() ||
         Node->getChildrenCount() != Counter->getChildrenCount())) {
       Node->annotate(NodeAnnotation::TypeRewritten);
       Node->annotate(NodeAnnotation::TypeRewrittenLeft, Node->getPrintedName());
@@ -2794,6 +2795,8 @@ class InterfaceTypeChangeDetector {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalDictionaryKeyUpdate :
                     NodeAnnotation::RevertDictionaryKeyUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
       }
       return true;
     }
@@ -2843,6 +2846,8 @@ class InterfaceTypeChangeDetector {
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertOptionalArrayMemberUpdate :
                     NodeAnnotation::RevertArrayMemberUpdate);
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
       }
       return true;
     }
@@ -2874,6 +2879,8 @@ class InterfaceTypeChangeDetector {
                     NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
                     NodeAnnotation::SimpleStringRepresentableUpdate);
       } else {
+        R->annotate(NodeAnnotation::RawTypeLeft, KeyChangedTo);
+        R->annotate(NodeAnnotation::RawTypeRight, Raw);
         R->annotate(HasOptional ?
                     NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
                     NodeAnnotation::RevertSimpleStringRepresentableUpdate);
@@ -2987,8 +2994,8 @@ void TypeMemberDiffFinder::dump(llvm::raw_ostream &os) const {
 }
 
 namespace {
-template<typename T>
 
+template<typename T>
 void removeRedundantAndSort(std::vector<T> &Diffs) {
   std::set<T> DiffSet(Diffs.begin(), Diffs.end());
   Diffs.assign(DiffSet.begin(), DiffSet.end());
@@ -2997,7 +3004,6 @@ void removeRedundantAndSort(std::vector<T> &Diffs) {
 
 template<typename T>
 void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
-  removeRedundantAndSort(Diffs);
   if (Diffs.empty())
     return;
   Fs << "\n";
@@ -3052,6 +3058,12 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::SimpleStringRepresentableUpdate:
       case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
         return Node->getAnnotateComment(NodeAnnotation::RawTypeLeft);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
@@ -3070,6 +3082,12 @@ class DiffItemEmitter : public SDKNodeVisitor {
       case NodeAnnotation::OptionalDictionaryKeyUpdate:
       case NodeAnnotation::SimpleStringRepresentableUpdate:
       case NodeAnnotation::SimpleOptionalStringRepresentableUpdate:
+      case NodeAnnotation::RevertArrayMemberUpdate:
+      case NodeAnnotation::RevertOptionalArrayMemberUpdate:
+      case NodeAnnotation::RevertDictionaryKeyUpdate:
+      case NodeAnnotation::RevertOptionalDictionaryKeyUpdate:
+      case NodeAnnotation::RevertSimpleStringRepresentableUpdate:
+      case NodeAnnotation::RevertSimpleOptionalStringRepresentableUpdate:
         return Node->getAnnotateComment(NodeAnnotation::RawTypeRight);
       case NodeAnnotation::TypeRewritten:
         return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
@@ -3807,6 +3825,22 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   RefinementPass.pass(LeftModule, RightModule);
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
+
+  auto &AliasMap = Ctx.getTypeAliasUpdateMap();
+  // Find type alias change first.
+  TypeAliasDiffFinder(LeftModule, RightModule, AliasMap).search();
+
+  for (auto Pair: AliasMap) {
+    auto Left = Pair.first->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->
+      getPrintedName();
+    auto Right = AliasMap[(SDKNode*)Pair.first]->getAs<SDKNodeDeclType>()->
+      getRawValueType()->getPrintedName();
+    auto *D = Pair.first->getAs<SDKNodeDecl>();
+    AllItems.emplace_back(SDKNodeKind::DeclTypeAlias,
+      NodeAnnotation::TypeAliasDeclToRawRepresentable, "0",
+      D->getUsr(), "", Left, Right, D->getModuleName());
+  }
+
   AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
                                 [&](CommonDiffItem &Item) {
     return Item.DiffKind == NodeAnnotation::RemovedDecl &&
@@ -3823,6 +3857,10 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   auto &typeMemberDiffs = Ctx.getTypeMemberDiffs();
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
+  removeRedundantAndSort(AllItems);
+  removeRedundantAndSort(typeMemberDiffs);
+  removeRedundantAndSort(AllNoEscapingFuncs);
+  removeRedundantAndSort(Overloads);
   if (options::OutputInJson) {
     std::vector<APIDiffItem*> TotalItems;
     std::transform(AllItems.begin(), AllItems.end(),

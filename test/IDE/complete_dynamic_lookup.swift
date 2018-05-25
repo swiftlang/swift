@@ -234,9 +234,11 @@ protocol Bar { func bar() }
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .topLevelObjcClass_Property1[#Int#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#];
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#];
+// TLOC_MEMBERS_NO_DOT-NEXT: Keyword[self]/CurrNominal: .self[#TopLevelObjcClass#]; name=self
 // TLOC_MEMBERS_NO_DOT-NEXT: End completions
 
 // TLOC_MEMBERS_DOT: Begin completions
+// TLOC_MEMBERS_DOT-NEXT: Keyword[self]/CurrNominal: self[#TopLevelObjcClass#]; name=self
 // TLOC_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // TLOC_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: topLevelObjcClass_InstanceFunc1()[#Void#]{{; name=.+$}}
 // TLOC_MEMBERS_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    topLevelObjcClass_Property1[#Int#]{{; name=.+$}}
@@ -474,6 +476,7 @@ func testAnyObject13(_ dl: AnyObject) {
 }
 // DL_FUNC_NAME_BANG_1: Begin completions
 // DL_FUNC_NAME_BANG_1-NEXT: Pattern/CurrModule: ({#Int#})[#TopLevelObjcClass#]
+// DL_FUNC_NAME_BANG_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> TopLevelObjcClass#]; name=self
 // DL_FUNC_NAME_BANG_1-NEXT: End completions
 
 func testAnyObject14() {

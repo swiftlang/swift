@@ -1270,7 +1270,7 @@ public:
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       const SubstitutionMap &subMap);
+                       SubstitutionMap subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
@@ -1331,7 +1331,7 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     const SubstitutionMap &subMap,
+                                     SubstitutionMap subMap,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
@@ -1397,10 +1397,10 @@ public:
   llvm::SmallDenseMap<OpaqueValueExpr *, OpaqueValueState>
     OpaqueValues;
 
-  /// A mapping from opaque value lvalue expressions to the address of the
-  /// opened value in memory.
-  llvm::SmallDenseMap<OpaqueValueExpr *, std::pair<SILValue, CanType>>
-    OpaqueLValues;
+  /// A mapping from opaque value expressions to the open-existential
+  /// expression that determines them, used while lowering lvalues.
+  llvm::SmallDenseMap<OpaqueValueExpr *, OpenExistentialExpr *>
+    OpaqueValueExprs;
 
   /// RAII object that introduces a temporary binding for an opaque value.
   ///
