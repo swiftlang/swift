@@ -1668,12 +1668,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     /// Sets or returns the byte at the specified index.
     public subscript(index: Index) -> UInt8 {
-        @inlinable
         get {
             _validateIndex(index)
             return _backing.get(index)
         }
-        @inlinable
         set {
             _validateIndex(index)
             if !isKnownUniquelyReferenced(&_backing) {
@@ -1684,12 +1682,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public subscript(bounds: Range<Index>) -> Data {
-        @inlinable
         get {
             _validateRange(bounds)
             return Data(backing: _backing, range: bounds)
         }
-        @inlinable
         set {
             replaceSubrange(bounds, with: newValue)
         }
@@ -1697,7 +1693,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
         where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
-        @inlinable
         get {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)
@@ -1708,7 +1703,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _validateRange(r)
             return Data(backing: _backing, range: r)
         }
-        @inlinable
         set {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)
@@ -1724,7 +1718,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     /// The start `Index` in the data.
     public var startIndex: Index {
-        @inlinable
         get {
             return _sliceRange.lowerBound
         }
@@ -1734,24 +1727,20 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// This is the "one-past-the-end" position, and will always be equal to the `count`.
     public var endIndex: Index {
-        @inlinable
         get {
             return _sliceRange.upperBound
         }
     }
     
-    @inlinable
     public func index(before i: Index) -> Index {
         return i - 1
     }
     
-    @inlinable
     public func index(after i: Index) -> Index {
         return i + 1
     }
     
     public var indices: Range<Int> {
-        @inlinable
         get {
             return startIndex..<endIndex
         }
