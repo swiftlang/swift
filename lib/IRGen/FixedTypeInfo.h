@@ -131,12 +131,12 @@ public:
   /// patterns that don't represent valid values of the type) in the type
   /// representation.
   virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const {
-    return getSpareBitExtraInhabitantCount();
+    return getSpareBitExtraInhabitantCount(IGM);
   }
 
   /// Returns the number of extra inhabitants available by exercising spare
   /// bits.
-  unsigned getSpareBitExtraInhabitantCount() const;
+  unsigned getSpareBitExtraInhabitantCount(IRGenModule &IGM) const;
 
   /// We can statically determine the presence of extra inhabitants for fixed
   /// types.
