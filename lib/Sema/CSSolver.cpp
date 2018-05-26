@@ -483,6 +483,9 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
   PreviousScore = cs.CurrentScore;
+  if (cs.Timer) {
+    startTime = cs.Timer->getElapsedProcessTimeInFractionalSeconds();
+  }
 
   cs.solverState->registerScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
