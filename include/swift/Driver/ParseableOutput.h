@@ -29,15 +29,19 @@ class Job;
 namespace parseable_output {
 
 /// \brief Emits a "began" message to the given stream.
-void emitBeganMessage(raw_ostream &os, const Job &Cmd, int64_t Pid);
+void emitBeganMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
+                      sys::TaskProcessInformation ProcInfo);
 
 /// \brief Emits a "finished" message to the given stream.
 void emitFinishedMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
-                         int ExitStatus, StringRef Output);
+                         int ExitStatus, StringRef Output,
+                         sys::TaskProcessInformation ProcInfo);
 
 /// \brief Emits a "signalled" message to the given stream.
 void emitSignalledMessage(raw_ostream &os, const Job &Cmd, int64_t Pid,
-                          StringRef ErrorMsg, StringRef Output, Optional<int> Signal);
+                          StringRef ErrorMsg, StringRef Output,
+                          Optional<int> Signal,
+                          sys::TaskProcessInformation ProcInfo);
 
 /// \brief Emits a "skipped" message to the given stream.
 void emitSkippedMessage(raw_ostream &os, const Job &Cmd);
