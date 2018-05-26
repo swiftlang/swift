@@ -2735,7 +2735,7 @@ bool RefactoringActionDocCommentBoilerplate::
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
   DeclKind tokenKind = CursorInfo.ValueD->getKind();
-  if (canGenerateDocComment(tokenKind)) return true;
+  if (!canGenerateDocComment(tokenKind)) return true;
   
   swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
   
