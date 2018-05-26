@@ -28,6 +28,19 @@
 @_frozen
 public enum Never {}
 
+extension Never: Error {}
+
+extension Never: Equatable {}
+
+extension Never: Comparable {
+  public static func < (lhs: Never, rhs: Never) -> Bool {
+    switch (lhs, rhs) {
+    }
+  }
+}
+
+extension Never: Hashable {}
+
 //===----------------------------------------------------------------------===//
 // Standardized aliases
 //===----------------------------------------------------------------------===//
