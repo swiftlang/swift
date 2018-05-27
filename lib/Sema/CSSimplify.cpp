@@ -2299,11 +2299,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   if (concrete && kind >= ConstraintKind::OperatorArgumentConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
-    if (auto *iot = type2->getAs<InOutType>()) {
-      return matchTypes(type1, LValueType::get(iot->getObjectType()),
-                        kind, subflags,
-                        locator.withPathElement(
-                                ConstraintLocator::LValueConversion));
+    if (auto *lvt = type1->getAs<LValueType>()) {
+      if (auto *iot = type2->getAs<InOutType>()) {
+        return matchTypes(lvt->getObjectType(), iot->getObjectType(),
+                          kind, subflags,
+                          locator.withPathElement(
+                                  ConstraintLocator::LValueConversion));
+      }
     }
   }
 
