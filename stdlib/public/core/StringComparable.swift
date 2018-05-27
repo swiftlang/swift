@@ -160,3 +160,26 @@ extension String : Comparable {
 }
 
 extension Substring : Equatable {}
+
+extension String {
+  //@usableFromInline
+  @effects(readonly)
+  public func _find(in haystack: UnsafeBufferPointer<String>) -> Int? {
+    defer { _fixLifetime(self) }
+    if _fastPath(_guts._isSmall) {
+      defer { _fixLifetime(self) }
+      if _guts._smallUTF8String.isASCII {
+        for i in 0 ..< haystack.count {
+          if _guts.rawBits == haystack[i]._guts.rawBits { return i }
+          if !haystack[i]._guts._isSmall, self == haystack[i] { return i }
+        }
+        return nil
+      }
+    }
+    // Slow path
+    for i in 0 ..< haystack.count {
+      if self == haystack[i] { return i }
+    }
+    return nil
+  }
+}

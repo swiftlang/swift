@@ -19,7 +19,7 @@ internal var _smallHashTableLimit: Int {
   @inline(__always) get {
     // Note that this must be a power of two, or it will get rounded up,
     // breaking assumptions made elsewhere in the code.
-    return 1 << 4
+    return 1 << 6
   }
 }
 

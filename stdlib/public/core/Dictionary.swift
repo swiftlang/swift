@@ -2580,10 +2580,22 @@ extension _NativeDictionaryBuffer where Key: Hashable
       return _find(key, startBucket: _bucket(key))
     }
     // Elements are collected in the last `count` buckets.
-    for bucket in bucketCount - count ..< bucketCount {
-      _sanityCheck(isInitializedEntry(at: bucket))
-      if self.key(at: bucket) == key {
-        return (Index(offset: bucket), true)
+    if Key.self == String.self {
+      let key = key as! String
+      let start = _storage.keys.assumingMemoryBound(to: String.self)
+      let offset = bucketCount - count
+      let buffer = UnsafeBufferPointer(
+        start: start + offset,
+        count: count)
+      if let pos = key._find(in: buffer) {
+        return (Index(offset: offset + pos), true)
+      }
+    } else {
+      for bucket in bucketCount - count ..< bucketCount {
+        _sanityCheck(isInitializedEntry(at: bucket))
+        if self.key(at: bucket) == key {
+          return (Index(offset: bucket), true)
+        }
       }
     }
     _sanityCheck(
