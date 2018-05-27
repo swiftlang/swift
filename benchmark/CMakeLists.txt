@@ -20,7 +20,7 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
 if(SWIFT_BENCHMARK_SUBCMAKE_BUILD)
-  precondition(SWIFT_BENCHMARK_BUILD_STANDALONE
+  precondition(SWIFT_BENCHMARK_BUILT_STANDALONE
     MESSAGE "If we are a subcmake build, we must be built standalone")
 endif()
 
