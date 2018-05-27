@@ -1925,7 +1925,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         cast<LValueType>(desugar2)->getObjectType(),
                         ConstraintKind::Equal, subflags,
                         locator.withPathElement(
-                          ConstraintLocator::ArrayElementType));
+                          ConstraintLocator::LValueConversion));
     
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
@@ -1936,7 +1936,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Equal, subflags,
-                  locator.withPathElement(ConstraintLocator::ArrayElementType));
+                  locator.withPathElement(ConstraintLocator::LValueConversion));
 
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
@@ -2303,7 +2303,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchTypes(type1, LValueType::get(iot->getObjectType()),
                         kind, subflags,
                         locator.withPathElement(
-                                ConstraintLocator::ArrayElementType));
+                                ConstraintLocator::LValueConversion));
     }
   }
 
@@ -2337,7 +2337,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return matchTypes(iot->getObjectType(), lvt->getObjectType(),
                           ConstraintKind::Bind, subflags,
                           locator.withPathElement(
-                            ConstraintLocator::ArrayElementType));
+                            ConstraintLocator::LValueConversion));
       }
     }
   }

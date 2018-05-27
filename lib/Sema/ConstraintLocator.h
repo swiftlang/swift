@@ -95,8 +95,11 @@ public:
     SubscriptResult,
     /// \brief The lookup for a constructor member.
     ConstructorMember,
-    /// \brief Rvalue adjustment.
-    RvalueAdjustment,
+    /// \brief An implicit @lvalue-to-inout conversion; only valid for operator
+    /// arguments.
+    LValueConversion,
+    /// \brief RValue adjustment.
+    RValueAdjustment,
     /// \brief The result of a closure.
     ClosureResult,
     /// \brief The parent of a nested type.
@@ -107,8 +110,6 @@ public:
     SequenceIteratorProtocol,
     /// \brief The element type of a generator.
     GeneratorElementType,
-    /// \brief The element of an array type.
-    ArrayElementType,
     /// \brief The scalar type of a tuple type.
     ScalarToTuple,
     /// \brief An argument passed in an autoclosure parameter
@@ -152,13 +153,13 @@ public:
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ClosureResult:
     case ParentType:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ScalarToTuple:
     case AutoclosureResult:
     case Requirement:
@@ -202,7 +203,6 @@ public:
     case ApplyArgToParam:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:
@@ -212,7 +212,8 @@ public:
     case MemberRefBase:
     case UnresolvedMember:
     case ParentType:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ScalarToTuple:
     case SubscriptIndex:
     case SubscriptMember:
