@@ -234,18 +234,15 @@ llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
                                 packing == FixedPacking::OffsetZero);
 }
 
-unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
+unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount(IRGenModule &IGM) const{
   if (SpareBits.none())
     return 0;
-  // The runtime supports a max of 0x7FFFFFFF extra inhabitants, which ought
-  // to be enough for anybody.
-  if (getFixedSize().getValue() >= 4)
-    return 0x7FFFFFFF;
   unsigned spareBitCount = SpareBits.count();
   assert(spareBitCount <= getFixedSize().getValueInBits()
          && "more spare bits than storage bits?!");
   unsigned inhabitedBitCount = getFixedSize().getValueInBits() - spareBitCount;
-  return ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  unsigned count = ((1U << spareBitCount) - 1U) << inhabitedBitCount;
+  return std::min<unsigned>(count, getHeapObjectExtraInhabitantCount(IGM));
 }
 
 void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask,
