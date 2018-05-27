@@ -2147,7 +2147,13 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   case ReferenceOwnership::Strong:
     llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
   case ReferenceOwnership::Unowned:
+    break;
   case ReferenceOwnership::Unmanaged:
+    // The Clang importer can create optional Unmanaged. Otherwise this is not
+    // allowed. Allow optionalness under SIL for testing and debugging.
+    if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
+      if (sourceFile->Kind == SourceFileKind::SIL)
+        allowOptional = true;
     break;
   case ReferenceOwnership::Weak:
     allowOptional = true;
