@@ -17,9 +17,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -28,8 +29,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -98,6 +99,12 @@ SILParserState::SILParserState(SILModule *M)
     : Impl(M ? llvm::make_unique<SILParserTUState>(*M) : nullptr) {}
 
 SILParserState::~SILParserState() = default;
+
+void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
+  out << "With parser at source location: ";
+  P.Tok.getLoc().print(out, P.Context.SourceMgr);
+  out << '\n';
+}
 
 bool swift::parseIntoSourceFile(SourceFile &SF,
                                 unsigned BufferID,
@@ -5372,6 +5379,47 @@ bool SILParserTUState::parseDeclSILStage(Parser &P) {
   return false;
 }
 
+/// Lookup a global variable declaration from its demangled name.
+///
+/// A variable declaration exists for all sil_global variables defined in
+/// Swift. A Swift global defined outside this module will be exposed
+/// via an addressor rather than as a sil_global. Globals imported
+/// from clang will produce a sil_global but will not have any corresponding
+/// VarDecl.
+///
+/// FIXME: lookupGlobalDecl() can handle collisions between private or
+/// fileprivate global variables in the same SIL Module, but the typechecker
+/// will still incorrectly diagnose this as an "invalid redeclaration" and give
+/// all but the first declaration an error type.
+static Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
+                                            SILLinkage GlobalLinkage,
+                                            SILType GlobalType, Parser &P) {
+  std::string GlobalDeclName = Demangle::demangleSymbolAsString(
+      GlobalName.str(),
+      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+  SmallVector<ValueDecl *, 4> CurModuleResults;
+  P.SF.getParentModule()->lookupValue(
+      {}, P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
+      CurModuleResults);
+  // Bail-out on clang-imported globals.
+  if (CurModuleResults.empty())
+    return nullptr;
+
+  // private and fileprivate globals of the same name may be merged into a
+  // single SIL module. Find the declaration with the correct type and
+  // linkage. (If multiple globals have the same type and linkage then it
+  // doesn't matter which declaration we use).
+  for (ValueDecl *ValDecl : CurModuleResults) {
+    auto *VD = cast<VarDecl>(ValDecl);
+    CanType DeclTy = VD->getType()->getCanonicalType();
+    if (DeclTy == GlobalType.getASTType()
+        && getDeclSILLinkage(VD) == GlobalLinkage) {
+      return VD;
+    }
+  }
+  return None;
+}
+
 /// decl-sil-global: [[only in SIL mode]]
 ///   'sil_global' sil-linkage @name : sil-type [external]
 bool SILParserTUState::parseSILGlobal(Parser &P) {
@@ -5404,11 +5452,16 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   if (!GlobalLinkage.hasValue())
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
-  // FIXME: check for existing global variable?
-  auto *GV = SILGlobalVariable::create(M, GlobalLinkage.getValue(),
-                                       isSerialized,
-                                       GlobalName.str(),GlobalType,
-                                       RegularLocation(NameLoc));
+  // Lookup the global variable declaration for this sil_global.
+  auto VD =
+      lookupGlobalDecl(GlobalName, GlobalLinkage.getValue(), GlobalType, P);
+  if (!VD) {
+    P.diagnose(NameLoc, diag::sil_global_variable_not_found, GlobalName);
+    return true;
+  }
+  auto *GV = SILGlobalVariable::create(
+      M, GlobalLinkage.getValue(), isSerialized, GlobalName.str(), GlobalType,
+      RegularLocation(NameLoc), VD.getValue());
 
   GV->setLet(isLet);
   // Parse static initializer if exists.
