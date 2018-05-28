@@ -2606,10 +2606,13 @@ public:
       assert(isa<ConstructorDecl>(CurrDeclContext) &&
              "can call super.init only inside a constructor");
       needInit = true;
-    } else if (addName.empty() && HaveDot &&
-               Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-      // This case is querying the init function as member
-      needInit = true;
+    } else if (addName.empty() && HaveDot) {
+      if (Reason == DeclVisibilityKind::MemberOfCurrentNominal ||
+          Reason == DeclVisibilityKind::MemberOfSuper ||
+          Reason == DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal) {
+        // This case is querying the init function as member
+        needInit = true;
+      }
     }
 
     // If we won't be able to provide a result, bail out.
@@ -2943,38 +2946,21 @@ public:
           return;
         }
 
-        if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
-          if (HaveDot) {
-            Type Ty;
-            for (Ty = MT; Ty && Ty->is<AnyMetatypeType>();
-                 Ty = Ty->getAs<AnyMetatypeType>()->getInstanceType());
-            assert(Ty && "Cannot find instance type.");
-
-            // Add init() as member of the metatype.
-            if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-              if (IsStaticMetatype || CD->isRequired() ||
-                  !Ty->is<ClassType>())
-                addConstructorCall(CD, Reason, None, None);
-            }
-            return;
-          }
-        }
-
         if (auto MT = ExprType->getAs<AnyMetatypeType>()) {
-          if (HaveDot)
-            return;
+          Type Ty = MT->getInstanceType();
+          assert(Ty && "Cannot find instance type.");
 
-          // If instance type is type alias, showing users that the constructed
+          // If instance type is type alias, show users that the constructed
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
-          if (auto AT = MT->getInstanceType()) {
-            if (!CD->getInterfaceType()->is<ErrorType>() &&
-                (isa<NameAliasType>(AT.getPointer()) &&
-                 AT->getDesugaredType() ==
-                   CD->getResultInterfaceType().getPointer()))
-              Result = AT;
+          if (!CD->getInterfaceType()->is<ErrorType>() &&
+              isa<NameAliasType>(Ty.getPointer()) &&
+              Ty->getDesugaredType() ==
+                CD->getResultInterfaceType().getPointer()) {
+            Result = Ty;
           }
-          addConstructorCall(CD, Reason, None, Result);
+          if (IsStaticMetatype || CD->isRequired() || !Ty->is<ClassType>())
+            addConstructorCall(CD, Reason, None, Result);
         }
         if (IsSuperRefExpr || IsSelfRefExpr) {
           if (!isa<ConstructorDecl>(CurrDeclContext))
