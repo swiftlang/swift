@@ -221,6 +221,7 @@ public:
     }
   }
 
+  /// Return true if the storage is guaranteed local.
   bool isLocal() const {
     switch (getKind()) {
     case Box:
