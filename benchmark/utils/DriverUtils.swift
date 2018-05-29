@@ -63,7 +63,7 @@ struct Test {
   }
 
   /// The "main routine" of the benchmark.
-  var runFunction: (Int) -> () {
+  var runFunction: ((Int) -> ())? {
     return benchInfo.runFunction
   }
 
@@ -358,8 +358,18 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
+func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
+
+  // Before we do anything, check that we actually have a function to
+  // run. If we don't it is because the benchmark is not supported on
+  // the platform and we should skip it.
+  guard let testFn = test.runFunction else {
+    if c.verbose {
+	print("Skipping unsupported benchmark \(test.name)!")
+    }
+    return nil
+  }
 
   if c.verbose {
     print("Running \(test.name) for \(c.numSamples) samples.")
@@ -373,7 +383,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
       test.setUpFunction?()
-      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: 1)
+      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
       test.tearDownFunction?()
 
       if elapsed_time > 0 {
@@ -395,7 +405,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
         print("    Measuring with scale \(scale).")
       }
       test.setUpFunction?()
-      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: scale)
+      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: scale)
       test.tearDownFunction?()
     } else {
       scale = 1
@@ -442,7 +452,11 @@ func runBenchmarks(_ c: TestConfig) {
   sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    let results = runBench(t, c)
+    guard let results = runBench(t, c) else {
+      print("\(t.index)\(c.delim)\(t.name)\(c.delim)Unsupported")
+      fflush(stdout)
+      continue
+    }
     print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
