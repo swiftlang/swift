@@ -93,7 +93,6 @@ enum TestAction {
   case run
   case listTests
   case fail(String)
-  case help([String])
 }
 
 struct TestConfig {
@@ -137,7 +136,7 @@ struct TestConfig {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
-      "--tags", "--skip-tags", "--help"
+      "--tags", "--skip-tags"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
@@ -146,10 +145,6 @@ struct TestConfig {
     let benchArgs = maybeBenchArgs!
 
     filters = benchArgs.positionalArgs
-
-    if benchArgs.optionalArgsMap["--help"] == nil {
-      return .help(validOptions)
-    }
 
     if let x = benchArgs.optionalArgsMap["--iter-scale"] {
       if x.isEmpty { return .fail("--iter-scale requires a value") }
@@ -483,11 +478,6 @@ public func main() {
   var config = TestConfig()
 
   switch (config.processArguments()) {
-    case let .help(validOptions):
-      print("Valid options:")
-      for v in validOptions {
-        print("    \(v)")
-      }
     case let .fail(msg):
       // We do this since we need an autoclosure...
       fatalError("\(msg)")
