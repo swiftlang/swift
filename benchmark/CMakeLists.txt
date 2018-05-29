@@ -199,38 +199,6 @@ set(BENCH_DRIVER_LIBRARY_MODULES
 # Build Configuration
 #===-----------------------------------------------------------------------===#
 
-add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
-                -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
-
-if(NOT ONLY_PLATFORMS)
-  set(ONLY_PLATFORMS "macosx" "iphoneos" "appletvos" "watchos")
-endif()
-
-if(NOT SWIFT_EXEC)
-  runcmd(COMMAND "xcrun" "-f" "swiftc"
-         VARIABLE SWIFT_EXEC
-         ERROR "Unable to find Swift driver")
-endif()
-
-if(NOT SWIFT_LIBRARY_PATH)
-  get_filename_component(tmp_dir "${SWIFT_EXEC}" DIRECTORY)
-  get_filename_component(tmp_dir "${tmp_dir}" DIRECTORY)
-  set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
-endif()
-
-# If the CMAKE_C_COMPILER is already clang, don't find it again,
-# thus allowing the --host-cc build-script argument to work here.
-get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
-
-if(${c_compiler} STREQUAL "clang")
-  set(CLANG_EXEC ${CMAKE_C_COMPILER})
-else()
-  runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
-         VARIABLE CLANG_EXEC
-         ERROR "Unable to find Clang driver")
-endif()
-
-
 # You have to delete CMakeCache.txt in the swift build to force a
 # reconfiguration.
 set(SWIFT_EXTRA_BENCH_CONFIGS CACHE STRING
@@ -286,38 +254,13 @@ set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
 set(BENCHOPTS_SINGLEFILE "")
 
+configure_build()
+
 #===-----------------------------------------------------------------------===#
 # SDK Configuration
 #===-----------------------------------------------------------------------===#
 
-set(macosx_arch "x86_64")
-set(iphoneos_arch "arm64" "armv7")
-set(appletvos_arch "arm64")
-set(watchos_arch "armv7k")
-
-set(macosx_ver "10.9")
-set(iphoneos_ver "8.0")
-set(appletvos_ver "9.1")
-set(watchos_ver "2.0")
-
-set(macosx_triple_platform "macosx")
-set(iphoneos_triple_platform "ios")
-set(appletvos_triple_platform "tvos")
-set(watchos_triple_platform "watchos")
-
-set(sdks)
-set(platforms)
-foreach(platform ${ONLY_PLATFORMS})
-  execute_process(
-      COMMAND "xcrun" "--sdk" "${platform}" "--show-sdk-path"
-      OUTPUT_VARIABLE ${platform}_sdk
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if("${result}" MATCHES "0")
-    list(APPEND sdks "${${platform}_sdk}")
-    list(APPEND platforms ${platform})
-  endif()
-endforeach()
+configure_sdks()
 
 #===---------------------------------------------------------------------===#
 # Statement of Configuration for Build Users
