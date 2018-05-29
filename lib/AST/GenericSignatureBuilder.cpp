@@ -5461,6 +5461,9 @@ public:
       return Action::Continue;
     }
 
+    if (!ty->isSpecialized())
+      return Action::Continue;
+
     // Infer from generic nominal types.
     auto decl = ty->getAnyNominal();
     if (!decl) return Action::Continue;

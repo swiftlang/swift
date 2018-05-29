@@ -197,7 +197,7 @@ bb0:
 // Demote both read accesses to non_nested, then remove the local outer access.
 //
 // CHECK-LABEL: sil @testCaptureReadRead : $@convention(thin) () -> () {
-// CHECK-NOT: begin_access
+// CHECK: begin_access [read] [static] [no_nested_conflict] %0 : $*X
 // CHECK-LABEL: } // end sil function 'testCaptureReadRead'
 sil @testCaptureReadRead : $@convention(thin) () -> () {
 bb0:
@@ -246,7 +246,9 @@ bb0(%0 : $*X):
 // Demote both read accesses to non_nested, and remove the local outer access.
 //
 // CHECK-LABEL: sil @testCaptureBoxReadRead : $@convention(thin) () -> () {
-// CHECK-NOT: begin_access
+// CHECK: [[BOX:%.*]] = alloc_box ${ var X }, var, name "x"
+// CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var X }, 0
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*X
 // CHECK-LABEL: } // end sil function 'testCaptureBoxReadRead'
 sil @testCaptureBoxReadRead : $@convention(thin) () -> () {
 bb0:
@@ -361,7 +363,10 @@ bb0(%0 : $*Int64):
 // Demote read/read access to [no_nested_conflict].
 //
 // CHECK-LABEL: sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
-// CHECK-NOT: begin_access
+// CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
+// CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*Int64
 // CHECK-LABEL: } // end sil function 'testInoutReadEscapeRead'
 sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
 bb0:

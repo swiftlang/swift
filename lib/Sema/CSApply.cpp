@@ -95,8 +95,9 @@ SubstitutionMap Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  return sig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
-                                 lookupConformanceFn);
+  return SubstitutionMap::get(sig,
+                              QueryTypeSubstitutionMap{subs},
+                              lookupConformanceFn);
 }
 
 /// \brief Find a particular named function witness for a type that conforms to
@@ -1824,7 +1825,8 @@ namespace {
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
 
-      auto subMap = genericSig->getSubstitutionMap(
+      auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *type) -> Type {
           assert(type->isEqual(genericSig->getGenericParams()[0]));
           return valueType;

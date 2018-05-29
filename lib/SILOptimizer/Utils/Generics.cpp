@@ -1178,11 +1178,12 @@ public:
     // Each generic parameter of the callee is mapped to its own
     // archetype.
     SpecializedInterfaceToCallerArchetypeMap =
-        SpecializedGenericSig->getSubstitutionMap(
-            [&](SubstitutableType *type) -> Type {
-              return CalleeGenericEnv->mapTypeIntoContext(type);
-            },
-            LookUpConformanceInSignature(*SpecializedGenericSig));
+      SubstitutionMap::get(
+        SpecializedGenericSig,
+        [&](SubstitutableType *type) -> Type {
+          return CalleeGenericEnv->mapTypeIntoContext(type);
+        },
+        LookUpConformanceInSignature(*SpecializedGenericSig));
   }
 
   GenericSignature *getSpecializedGenericSignature() {
@@ -1243,11 +1244,12 @@ void FunctionSignaturePartialSpecializer::
     return;
 
   CallerInterfaceToSpecializedInterfaceMap =
-      CallerGenericSig->getSubstitutionMap(
-          [&](SubstitutableType *type) -> Type {
-            return CallerInterfaceToSpecializedInterfaceMapping.lookup(type);
-          },
-          LookUpConformanceInSignature(*CallerGenericSig));
+    SubstitutionMap::get(
+      CallerGenericSig,
+      [&](SubstitutableType *type) -> Type {
+        return CallerInterfaceToSpecializedInterfaceMapping.lookup(type);
+      },
+      LookUpConformanceInSignature(*CallerGenericSig));
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCallerInterfaceToSpecializedInterfaceMap map:\n";
         CallerInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs()));
@@ -1258,20 +1260,21 @@ void FunctionSignaturePartialSpecializer::
   // Define a substitution map for re-mapping interface types of
   // the specialized function to contextual types of the caller.
   SpecializedInterfaceToCallerArchetypeMap =
-      SpecializedGenericSig->getSubstitutionMap(
-          [&](SubstitutableType *type) -> Type {
-            LLVM_DEBUG(llvm::dbgs()
-                      << "Mapping specialized interface type to caller "
-                         "archetype:\n";
-                  llvm::dbgs() << "Interface type: "; type->dump();
-                  llvm::dbgs() << "Archetype: ";
-                  auto Archetype =
-                      SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
-                  if (Archetype) Archetype->dump();
-                  else llvm::dbgs() << "Not found!\n";);
-            return SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
-          },
-          LookUpConformanceInSignature(*SpecializedGenericSig));
+    SubstitutionMap::get(
+      SpecializedGenericSig,
+      [&](SubstitutableType *type) -> Type {
+        LLVM_DEBUG(llvm::dbgs()
+                  << "Mapping specialized interface type to caller "
+                     "archetype:\n";
+              llvm::dbgs() << "Interface type: "; type->dump();
+              llvm::dbgs() << "Archetype: ";
+              auto Archetype =
+                  SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
+              if (Archetype) Archetype->dump();
+              else llvm::dbgs() << "Not found!\n";);
+        return SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
+      },
+      LookUpConformanceInSignature(*SpecializedGenericSig));
   LLVM_DEBUG(llvm::dbgs() << "\n\nSpecializedInterfaceToCallerArchetypeMap map:\n";
         SpecializedInterfaceToCallerArchetypeMap.dump(llvm::dbgs()));
 }
@@ -1279,11 +1282,12 @@ void FunctionSignaturePartialSpecializer::
 void FunctionSignaturePartialSpecializer::
     computeCalleeInterfaceToSpecializedInterfaceMap() {
   CalleeInterfaceToSpecializedInterfaceMap =
-      CalleeGenericSig->getSubstitutionMap(
-          [&](SubstitutableType *type) -> Type {
-            return CalleeInterfaceToSpecializedInterfaceMapping.lookup(type);
-          },
-          LookUpConformanceInSignature(*CalleeGenericSig));
+    SubstitutionMap::get(
+      CalleeGenericSig,
+      [&](SubstitutableType *type) -> Type {
+        return CalleeInterfaceToSpecializedInterfaceMapping.lookup(type);
+      },
+      LookUpConformanceInSignature(*CalleeGenericSig));
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCalleeInterfaceToSpecializedInterfaceMap:\n";
         CalleeInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs()));
@@ -1485,18 +1489,19 @@ FunctionSignaturePartialSpecializer::
 }
 
 SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs() {
-  return CalleeGenericSig->getSubstitutionMap(
-      [&](SubstitutableType *type) -> Type {
-        LLVM_DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
-                           << Type(type) << "\n"
-                           << "in generic signature:\n";
-              CalleeGenericSig->dump());
-        auto SpecializedInterfaceTy =
-            Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
-        return SpecializedGenericEnv->mapTypeIntoContext(
-            SpecializedInterfaceTy);
-      },
-      LookUpConformanceInSignature(*SpecializedGenericSig));
+  return SubstitutionMap::get(
+    CalleeGenericSig,
+    [&](SubstitutableType *type) -> Type {
+      LLVM_DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
+                              << Type(type) << "\n"
+                              << "in generic signature:\n";
+            CalleeGenericSig->dump());
+      auto SpecializedInterfaceTy =
+          Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
+      return SpecializedGenericEnv->mapTypeIntoContext(
+          SpecializedInterfaceTy);
+    },
+    LookUpConformanceInSignature(*SpecializedGenericSig));
 }
 
 SubstitutionMap FunctionSignaturePartialSpecializer::getCallerParamSubs() {
@@ -1505,17 +1510,18 @@ SubstitutionMap FunctionSignaturePartialSpecializer::getCallerParamSubs() {
 
 void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
     SubstitutionMap &CallerInterfaceSubs) {
-  CallerInterfaceSubs = CalleeGenericSig->getSubstitutionMap(
-      [&](SubstitutableType *type) -> Type {
-        // First, map callee's interface type to specialized interface type.
-        auto Ty = Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
-        Type SpecializedInterfaceTy =
-          SpecializedGenericEnv->mapTypeIntoContext(Ty)
-            ->mapTypeOutOfContext();
-        assert(!SpecializedInterfaceTy->hasError());
-        return SpecializedInterfaceTy;
-      },
-      LookUpConformanceInSignature(*CalleeGenericSig));
+  CallerInterfaceSubs = SubstitutionMap::get(
+    CalleeGenericSig,
+    [&](SubstitutableType *type) -> Type {
+      // First, map callee's interface type to specialized interface type.
+      auto Ty = Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
+      Type SpecializedInterfaceTy =
+        SpecializedGenericEnv->mapTypeIntoContext(Ty)
+          ->mapTypeOutOfContext();
+      assert(!SpecializedInterfaceTy->hasError());
+      return SpecializedInterfaceTy;
+    },
+    LookUpConformanceInSignature(*CalleeGenericSig));
 
   LLVM_DEBUG(llvm::dbgs() << "\n\nCallerInterfaceSubs map:\n";
         CallerInterfaceSubs.dump(llvm::dbgs()));

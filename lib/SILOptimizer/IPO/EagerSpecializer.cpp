@@ -459,9 +459,10 @@ emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
 
 static SubstitutionMap getSingleSubstititutionMap(SILFunction *F,
                                                   Type Ty) {
-  return F->getGenericEnvironment()->getGenericSignature()->
-    getSubstitutionMap([&](SubstitutableType *type) { return Ty; },
-                       MakeAbstractConformanceForGenericType());
+  return SubstitutionMap::get(
+    F->getGenericEnvironment()->getGenericSignature(),
+    [&](SubstitutableType *type) { return Ty; },
+    MakeAbstractConformanceForGenericType());
 }
 
 void EagerDispatch::emitIsTrivialCheck(SILBasicBlock *FailedTypeCheckBB,

@@ -644,10 +644,11 @@ Type TypeChecker::applyUnboundGenericArguments(
   Type parentType = unboundType->getParent();
   if (typealias && (!parentType || !parentType->isAnyExistentialType())) {
     auto genericSig = typealias->getGenericSignature();
-    auto subMap = genericSig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
-                                                 LookUpConformance(*this, dc));
+    auto subMap = SubstitutionMap::get(genericSig,
+                                       QueryTypeSubstitutionMap{subs},
+                                       LookUpConformance(*this, dc));
     resultType = NameAliasType::get(typealias, parentType,
-                                         subMap, resultType);
+                                    subMap, resultType);
   }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
@@ -2337,7 +2338,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    subMap = genericSig->getSubstitutionMap(
+    subMap = SubstitutionMap::get(
+      genericSig,
       QueryTypeSubstitutionMap{genericArgMap},
       [&](CanType depTy, Type replacement, ProtocolDecl *proto)
       -> ProtocolConformanceRef {
