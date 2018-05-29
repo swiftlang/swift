@@ -17,9 +17,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/Parse/Parser.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -28,8 +29,8 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Syntax/SyntaxKind.h"
 #include "swift/Subsystems.h"
+#include "swift/Syntax/SyntaxKind.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -5404,11 +5405,27 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
   if (!GlobalLinkage.hasValue())
     GlobalLinkage = SILLinkage::DefaultForDefinition;
 
-  // FIXME: check for existing global variable?
-  auto *GV = SILGlobalVariable::create(M, GlobalLinkage.getValue(),
-                                       isSerialized,
-                                       GlobalName.str(),GlobalType,
-                                       RegularLocation(NameLoc));
+  // Lookup the global variable declaration for this sil_global.
+  std::string GlobalDeclName = Demangle::demangleSymbolAsString(
+    GlobalName.str(), Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+  SmallVector<ValueDecl *, 4> CurModuleResults;
+  P.SF.getParentModule()->lookupValue(
+      {}, P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
+      CurModuleResults);
+  // A variable declaration exists for all sil_global variables defined in
+  // Swift. If a Swift global is defined outside this module, it will be exposed
+  // via an addressor rather than as a sil_global. However, globals imported
+  // from clang *will* result in a sil_global *without* any corresponding
+  // variable declaration.
+  VarDecl *VD = nullptr;
+  if (!CurModuleResults.empty()) {
+    assert(CurModuleResults.size() == 1);
+    VD = cast<VarDecl>(CurModuleResults[0]);
+    assert(getDeclSILLinkage(VD) == GlobalLinkage);
+  }
+  auto *GV = SILGlobalVariable::create(
+      M, GlobalLinkage.getValue(), isSerialized, GlobalName.str(), GlobalType,
+      RegularLocation(NameLoc), VD);
 
   GV->setLet(isLet);
   // Parse static initializer if exists.

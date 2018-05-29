@@ -855,3 +855,22 @@ SILProperty *SILProperty::create(SILModule &M,
   return prop;
 }
 
+// Definition from SILLinkage.h.
+SILLinkage swift::getDeclSILLinkage(const ValueDecl *decl) {
+  AccessLevel access = decl->getEffectiveAccess();
+  SILLinkage linkage;
+  switch (access) {
+  case AccessLevel::Private:
+  case AccessLevel::FilePrivate:
+    linkage = SILLinkage::Private;
+    break;
+  case AccessLevel::Internal:
+    linkage = SILLinkage::Hidden;
+    break;
+  case AccessLevel::Public:
+  case AccessLevel::Open:
+    linkage = SILLinkage::Public;
+    break;
+  }
+  return linkage;
+}

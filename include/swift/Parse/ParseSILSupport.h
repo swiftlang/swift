@@ -13,6 +13,7 @@
 #ifndef SWIFT_PARSER_PARSESILSUPPORT_H
 #define SWIFT_PARSER_PARSESILSUPPORT_H
 
+#include "swift/Parse/Parser.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
