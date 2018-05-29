@@ -112,7 +112,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
                          bool ForceOneBatchRepartition,
-                         bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
@@ -126,7 +125,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     LastBuildTime(LastBuildTime),
-    SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     OutputCompilationRecordForModuleOnlyBuild(
         OutputCompilationRecordForModuleOnlyBuild),
@@ -1223,7 +1221,7 @@ int Compilation::performJobsImpl(bool &abnormalExit,
   State.runTaskQueueToCompletion();
   State.checkUnfinishedJobs();
 
-  if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
+  if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
     State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);

@@ -296,7 +296,10 @@ std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
     }
   }
 
-  if (C.wantsDummyQueue()) {
+  const bool DriverSkipExecution =
+    ArgList.hasArg(options::OPT_driver_skip_execution,
+                   options::OPT_driver_print_jobs);
+  if (DriverSkipExecution) {
     return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
   } else {
     return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
@@ -656,9 +659,6 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution,
-                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -843,7 +843,6 @@ Driver::buildCompilation(const ToolChain &TC,
                       BatchMode,
                       DriverBatchSeed,
                       DriverForceOneBatchRepartition,
-                      DriverSkipExecution,
                       SaveTemps,
                       ShowDriverTimeCompilation,
                       std::move(StatsReporter)));

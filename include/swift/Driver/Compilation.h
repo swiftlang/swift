@@ -149,13 +149,6 @@ private:
   /// If unknown, this will be some time in the past.
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
 
-  /// Indicates whether this Compilation should use skip execution of
-  /// subtasks during performJobs() by using a dummy TaskQueue.
-  ///
-  /// \note For testing purposes only; similar user-facing features should be
-  /// implemented separately, as the dummy TaskQueue may provide faked output.
-  const bool SkipTaskExecution;
-
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
   bool ContinueBuildingAfterErrors = false;
@@ -236,7 +229,6 @@ public:
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
               bool ForceOneBatchRepartition = false,
-              bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
@@ -295,10 +287,6 @@ public:
   }
 
   bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
-
-  bool wantsDummyQueue() const {
-    return SkipTaskExecution;
-  }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
