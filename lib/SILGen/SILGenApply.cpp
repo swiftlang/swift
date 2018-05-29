@@ -4252,9 +4252,18 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // Emit the raw application.
   auto genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
-  if (genericSig != subs.getGenericSignature()) {
-    // FIXME: This should not happen
-    subs = SubstitutionMap::get(genericSig, subs);
+
+  // When calling a closure that's defined in a generic context but does not
+  // capture any generic parameters, we will have substitutions, but the
+  // function type won't have a generic signature. Drop the substitutions in
+  // this case.
+  if (genericSig == nullptr) {
+    subs = SubstitutionMap();
+
+  // Otherwise, the substitutions should match the generic signature.
+  } else {
+    assert(genericSig->getCanonicalSignature() ==
+           subs.getGenericSignature()->getCanonicalSignature());
   }
 
   SILValue rawDirectResult = emitRawApply(
