@@ -525,7 +525,7 @@ function (swift_benchmark_compile_archopts)
         ${bench_library_objects} ${bench_driver_objects} ${SWIFT_BENCH_OBJFILES}
         "${objcfile}" ${opt_view_dirs}
       COMMAND
-        "${CLANG_EXEC}"
+        "${SWIFT_EXEC}"
         "-fno-stack-protector"
         "-fPIC"
         "-Werror=date-time"
