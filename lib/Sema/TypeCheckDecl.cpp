@@ -1826,6 +1826,33 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   }
 }
 
+static void checkRequirementAccess(TypeChecker &TC,
+                                   ArrayRef<RequirementRepr> requirements,
+                                   const DeclContext *useDC,
+                                   AccessScope accessScope,
+                                   llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+  for (auto &requirement : requirements) {
+    switch (requirement.getKind()) {
+    case RequirementReprKind::TypeConstraint:
+      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
+                          accessScope, useDC, diagnose);
+      checkTypeAccessImpl(TC, requirement.getConstraintLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    case RequirementReprKind::LayoutConstraint:
+      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    case RequirementReprKind::SameType:
+      checkTypeAccessImpl(TC, requirement.getFirstTypeLoc(),
+                          accessScope, useDC, diagnose);
+      checkTypeAccessImpl(TC, requirement.getSecondTypeLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    }
+  }
+}
+
 static void checkGenericParamAccess(TypeChecker &TC,
                                     const GenericParamList *params,
                                     const Decl *owner,
@@ -1869,31 +1896,9 @@ static void checkGenericParamAccess(TypeChecker &TC,
   }
   callbackACEK = ACEK::Requirement;
 
-  for (auto &requirement : params->getRequirements()) {
-    switch (requirement.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      checkTypeAccessImpl(TC, requirement.getConstraintLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    case RequirementReprKind::LayoutConstraint:
-      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    case RequirementReprKind::SameType:
-      checkTypeAccessImpl(TC, requirement.getFirstTypeLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      checkTypeAccessImpl(TC, requirement.getSecondTypeLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    }
-  }
+  checkRequirementAccess(TC, params->getRequirements(),
+                         owner->getDeclContext(), accessScope,
+                         callback);
 
   if (minAccessScope.isPublic())
     return;
