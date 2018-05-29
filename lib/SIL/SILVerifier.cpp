@@ -4677,21 +4677,13 @@ public:
     // Make sure that each of the successors/predecessors of this basic block
     // have this basic block in its predecessor/successor list.
     for (const auto *SuccBB : BB->getSuccessorBlocks()) {
-      bool FoundSelfInSuccessor = false;
-      if (SuccBB->isPredecessorBlock(BB)) {
-        FoundSelfInSuccessor = true;
-        break;
-      }
-      require(FoundSelfInSuccessor, "Must be a predecessor of each successor.");
+      require(SuccBB->isPredecessorBlock(BB),
+              "Must be a predecessor of each successor.");
     }
 
     for (const SILBasicBlock *PredBB : BB->getPredecessorBlocks()) {
-      bool FoundSelfInPredecessor = false;
-      if (PredBB->isSuccessorBlock(BB)) {
-        FoundSelfInPredecessor = true;
-        break;
-      }
-      require(FoundSelfInPredecessor, "Must be a successor of each predecessor.");
+      require(PredBB->isSuccessorBlock(BB),
+              "Must be a successor of each predecessor.");
     }
     
     SILInstructionVisitor::visitSILBasicBlock(BB);
