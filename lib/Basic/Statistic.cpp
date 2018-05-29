@@ -692,7 +692,11 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif
+  flushTracesAndProfiles();
+}
 
+void
+UnifiedStatsReporter::flushTracesAndProfiles() {
   if (FrontendStatsEvents && SourceMgr) {
     std::error_code EC;
     raw_fd_ostream tstream(TraceFilename, EC, fs::F_Append | fs::F_Text);
@@ -754,6 +758,10 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
 #undef FRONTEND_STATISTIC
     }
   }
+  LastTracedFrontendCounters.reset();
+  FrontendStatsEvents.reset();
+  EventProfilers.reset();
+  EntityProfilers.reset();
 }
 
 } // namespace swift

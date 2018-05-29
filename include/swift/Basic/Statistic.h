@@ -176,6 +176,7 @@ public:
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
+  void flushTracesAndProfiles();
   void noteCurrentProcessExitStatus(int);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
 };
