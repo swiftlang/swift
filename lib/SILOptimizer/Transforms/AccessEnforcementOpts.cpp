@@ -10,10 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 ///
+/// Pass order dependencies:
+///
+/// - Will benefit from running after AccessEnforcementSelection.
+///
+/// - Should run immediately before the AccessEnforcementWMO to share
+///   AccessedStorageAnalysis results.
+///
 /// This pass optimizes access enforcement as follows:
 ///
-/// Access marker folding: Find begin/end access scopes that are uninterrupted
-/// by a potential conflicting access. Flag those as [nontracking] access.
+/// **Access marker folding**
+///
+/// Find begin/end access scopes that are uninterrupted by a potential
+/// conflicting access. Flag those as [nontracking] access.
 ///
 /// Folding must prove that no dynamic conflicts occur inside of an access
 /// scope. That is, a scope has no "nested inner conflicts". The access itself
@@ -39,8 +48,15 @@
 /// any path to an access' end of scope has a potentially conflicting access,
 /// then that access is marked as a nested conflict.
 ///
-/// Pass order dependencies:
-/// - Will benefit from running after AccessEnforcementSelection.
+/// **Local access marker removal**
+///
+/// When none of the local accesses on local storage (box/stack) have nested
+/// conflicts, then all the local accesses may be disabled by setting their
+/// enforcement to `static`. This is somwhat rare because static diagnostics
+/// already promote the obvious cases to static checks. However, there are two
+/// reasons that dynamic local markers may be disabled: (1) inlining may cause
+/// closure access to become local access (2) local storage may truly escape,
+/// but none of the the local access scopes cross a call site.
 ///
 /// TODO: Perform another run of AccessEnforcementSelection immediately before
 /// this pass. Currently, that pass only works well when run before
@@ -558,14 +574,25 @@ foldNonNestedAccesses(AccessConflictAnalysis::AccessMap &accessMap) {
   return changed;
 }
 
-/// Eliminate accesses to uniquely identified local storage for which no
-/// accesses can have nested conflicts. This is only valid if the function's
-/// local storage cannot be potentially modified by unidentified access.
+/// Perform local access marker elimination.
 ///
-/// This simply invalidates the AccessMap result rather than erasing individual
-/// entries.
+/// Disable accesses to uniquely identified local storage for which no
+/// accesses can have nested conflicts. This is only valid if the function's
+/// local storage cannot be potentially modified by unidentified access:
+///
+/// - Arguments cannot alias with local storage, so accessing an argument has no
+///   effect on analysis of the current function. When a callee accesses an
+///   argument, AccessedStorageAnalysis will either map the accessed storage to
+///   a value in the caller's function, or mark it as unidentified.
+///
+/// - Stack or Box local storage could potentially be accessed via Unidentified
+///   access. (Some Unidentified accesses are for initialization or for
+///   temporary storage instead, but those should never have Dynamic
+///   enforcement). These accesses can only be eliminated when there is no
+///   Unidentified access within the function without the [no_nested_conflict]
+///   flag.
 static bool
-removeLocalNonNestedAccess(AccessConflictAnalysis::Result &&result,
+removeLocalNonNestedAccess(const AccessConflictAnalysis::Result &result,
                            const FunctionAccessedStorage &functionAccess) {
   if (functionAccess.hasUnidentifiedAccess())
     return false;
@@ -574,24 +601,18 @@ removeLocalNonNestedAccess(AccessConflictAnalysis::Result &&result,
   SmallVector<BeginAccessInst *, 8> deadAccesses;
   for (auto &beginAccessAndInfo : result.accessMap) {
     BeginAccessInst *beginAccess = beginAccessAndInfo.first;
-    AccessInfo &info = beginAccessAndInfo.second;
+    const AccessInfo &info = beginAccessAndInfo.second;
     if (info.seenNestedConflict() || !info.isLocal())
       continue;
 
     // This particular access to local storage is marked
     // [no_nested_conflict]. Now check FunctionAccessedStorage to determine if
     // that is true for all access to the same storage.
-    if (functionAccess.hasNoNestedConflict(info))
-      deadAccesses.push_back(beginAccess);
-  }
-  std::sort(deadAccesses.begin(), deadAccesses.end(),
-            [&result](BeginAccessInst *a, BeginAccessInst *b) {
-              return result.getAccessIndex(a) < result.getAccessIndex(b);
-            });
-  for (BeginAccessInst *beginAccess : deadAccesses) {
-    DEBUG(llvm::dbgs() << "Removing dead access " << *beginAccess);
-    changed = true;
-    removeBeginAccess(beginAccess);
+    if (functionAccess.hasNoNestedConflict(info)) {
+      DEBUG(llvm::dbgs() << "Disabling dead access " << *beginAccess);
+      beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      changed = true;
+    }
   }
   return changed;
 }
@@ -618,15 +639,14 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
 
     // Use the updated AccessedStorageAnalysis to find any uniquely identified
     // local storage that has no nested conflict on any of its accesses within
-    // this function. These can be removed entirely.
+    // this function. All the accesses can be marked as statically enforced.
     //
     // Note that the storage address may be passed as an argument and there may
     // be nested conflicts within that call, but none of the accesses within
     // this function will overlap.
     const FunctionAccessedStorage &functionAccess = ASA->getEffects(F);
-    if (removeLocalNonNestedAccess(std::move(result), functionAccess))
+    if (removeLocalNonNestedAccess(result, functionAccess))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    // `result` is now invalid.
   }
 };
 } // namespace
