@@ -1488,6 +1488,16 @@ ConstraintSystem::matchTypesBindTypeVar(
   if (!isBindable(typeVar, type))
     return formUnsolvedResult();
 
+  // Since member lookup doesn't check requirements
+  // it might sometimes return types which are not
+  // visible in the current context e.g. typealias
+  // defined in constrained extension, substitution
+  // of which might produce error type for base, so
+  // assignement should thead lightly and just fail
+  // if it encounters such types.
+  if (type->hasError())
+    return getTypeMatchFailure(locator);
+
   // Equal constraints allow mixed LValue/RValue bindings, but
   // if we bind a type to a type variable that can bind to
   // LValues as part of simplifying the Equal constraint we may
