@@ -8299,11 +8299,7 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
           [](SubstitutableType *type) -> Type {
             return Type(type);
           },
-          [](CanType dependentType,
-             Type replacementType,
-             ProtocolDecl *proto) {
-            return ProtocolConformanceRef(proto);
-          });
+          MakeAbstractConformanceForGenericType());
 
       mustInferRequirements = true;
     }

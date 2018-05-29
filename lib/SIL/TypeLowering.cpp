@@ -2391,10 +2391,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
     [&](SubstitutableType *type) -> Type {
       return signature->getCanonicalTypeInContext(type);
     },
-    [](Type depTy, Type replacementTy, ProtocolDecl *proto)
-    -> ProtocolConformanceRef {
-      return ProtocolConformanceRef(proto);
-    });
+    MakeAbstractConformanceForGenericType());
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG

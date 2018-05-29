@@ -969,11 +969,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
 
               return Type(type);
             },
-            [](CanType dependentType,
-                Type conformingReplacementType,
-                ProtocolDecl *conformedProtocol) {
-              return ProtocolConformanceRef(conformedProtocol);
-            });
+            MakeAbstractConformanceForGenericType());
         }
 
         // Get the type of the initialization result, in terms
