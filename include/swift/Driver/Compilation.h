@@ -40,6 +40,9 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
+  namespace sys {
+    class TaskQueue;
+  }
 
 namespace driver {
   class Driver;
@@ -72,6 +75,7 @@ enum class PreserveOnSignal : bool {
 
 class Compilation {
   friend class PerformJobsState;
+
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -144,10 +148,6 @@ private:
   ///
   /// If unknown, this will be some time in the past.
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
-
-  /// The number of commands which this compilation should attempt to run in
-  /// parallel.
-  const unsigned NumberOfParallelCommands;
 
   /// Indicates whether this Compilation should use skip execution of
   /// subtasks during performJobs() by using a dummy TaskQueue.
@@ -232,7 +232,6 @@ public:
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
               llvm::sys::TimePoint<> LastBuildTime,
               size_t FilelistThreshold,
-              unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
@@ -284,10 +283,6 @@ public:
     return DerivedOutputFileMap;
   }
 
-  unsigned getNumberOfParallelCommands() const {
-    return NumberOfParallelCommands;
-  }
-
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
@@ -300,6 +295,10 @@ public:
   }
 
   bool getForceOneBatchRepartition() const { return ForceOneBatchRepartition; }
+
+  bool wantsDummyQueue() const {
+    return SkipTaskExecution;
+  }
 
   bool getContinueBuildingAfterErrors() const {
     return ContinueBuildingAfterErrors;
@@ -320,6 +319,10 @@ public:
     return FilelistThreshold;
   }
 
+  UnifiedStatsReporter *getStatsReporter() const {
+    return Stats.get();
+  }
+
   /// Requests the path to a file containing all input source files. This can
   /// be shared across jobs.
   ///
@@ -330,9 +333,12 @@ public:
   const char *getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
+  ///
+  /// \param TQ The TaskQueue used to schedule jobs for execution.
+  ///
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
-  int performJobs();
+  int performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
   /// to a frontend job.
@@ -355,10 +361,11 @@ private:
   ///
   /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
   /// crashes).
+  /// \param TQ The task queue on which jobs will be scheduled.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  int performJobsImpl(bool &abnormalExit);
+  int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///

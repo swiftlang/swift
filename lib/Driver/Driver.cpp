@@ -285,6 +285,25 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   return nullptr;
 }
 
+std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
+  const auto &ArgList = C.getArgs();
+  unsigned NumberOfParallelCommands = 1;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_j)) {
+    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+      return nullptr;
+    }
+  }
+
+  if (C.wantsDummyQueue()) {
+    return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
+  } else {
+    return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
+                                             C.getStatsReporter());
+  }
+}
+
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
   interestingArgs.reserve(args.size());
@@ -791,15 +810,6 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
-  unsigned NumberOfParallelCommands = 1;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
-    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-      return nullptr;
-    }
-  }
-
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
     return nullptr;
@@ -829,7 +839,6 @@ Driver::buildCompilation(const ToolChain &TC,
                       StartTime,
                       LastBuildTime,
                       DriverFilelistThreshold,
-                      NumberOfParallelCommands,
                       Incremental,
                       BatchMode,
                       DriverBatchSeed,

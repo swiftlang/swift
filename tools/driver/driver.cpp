@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
@@ -219,11 +220,13 @@ int main(int argc_, const char **argv_) {
 
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));
+
   if (Diags.hadAnyError())
     return 1;
 
   if (C) {
-    return C->performJobs();
+    std::unique_ptr<sys::TaskQueue> TQ = TheDriver.buildTaskQueue(*C);
+    return C->performJobs(std::move(TQ));
   }
 
   return 0;
