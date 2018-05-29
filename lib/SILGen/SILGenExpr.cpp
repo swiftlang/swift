@@ -3655,13 +3655,13 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
       if (auto genericSig =
               hashTy.castTo<SILFunctionType>()->getGenericSignature()) {
-        hashableSubsMap =
-            genericSig->getSubstitutionMap(
-              [&](SubstitutableType *type) -> Type { return formalTy; },
-              [&](CanType dependentType, Type replacementType,
-                  ProtocolDecl *proto)->Optional<ProtocolConformanceRef> {
-                return hashable;
-              });
+        hashableSubsMap = SubstitutionMap::get(
+          genericSig,
+          [&](SubstitutableType *type) -> Type { return formalTy; },
+          [&](CanType dependentType, Type replacementType,
+              ProtocolDecl *proto)->Optional<ProtocolConformanceRef> {
+            return hashable;
+          });
       }
 
       auto hashWitness = subSGF.B.createWitnessMethod(loc,
@@ -4154,7 +4154,8 @@ visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
   }
 
   auto projectionGenericSig = projectFn->getGenericSignature();
-  auto genericArgsMap = projectionGenericSig->getSubstitutionMap(
+  auto genericArgsMap = SubstitutionMap::get(
+      projectionGenericSig,
       [&](SubstitutableType *type) -> Type {
         auto genericParam = cast<GenericTypeParamType>(type);
         auto index =

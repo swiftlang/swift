@@ -434,7 +434,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
   if (empty()) return SubstitutionMap();
 
-  return getGenericSignature()->getSubstitutionMap(
+  return get(
+    getGenericSignature(),
     [&](SubstitutableType *type) {
       return Type(type).subst(*this, SubstFlags::UseErrorType)
                .subst(subs, conformances, SubstFlags::UseErrorType);
@@ -455,7 +456,8 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           ProtocolConformanceRef conformance) {
   auto protocolSelfType = protocol->getSelfInterfaceType();
 
-  return protocol->getGenericSignature()->getSubstitutionMap(
+  return get(
+    protocol->getGenericSignature(),
     [&](SubstitutableType *type) -> Type {
       if (type->isEqual(protocolSelfType))
         return selfType;
@@ -526,7 +528,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   if (derivedSubs)
     origSubMap = *derivedSubs;
   else if (derivedSig) {
-    origSubMap = derivedSig->getSubstitutionMap(
+    origSubMap = get(
+        derivedSig,
         [](SubstitutableType *type) -> Type { return type; },
         MakeAbstractConformanceForGenericType());
   }
@@ -569,7 +572,8 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
     return type;
   };
 
-  return genericSig->getSubstitutionMap(
+  return get(
+    genericSig,
     [&](SubstitutableType *type) {
       auto replacement = replaceGenericParameter(type);
       if (replacement)

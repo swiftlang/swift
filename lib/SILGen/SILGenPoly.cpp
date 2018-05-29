@@ -2693,7 +2693,8 @@ buildThunkSignature(SILGenFunction &SGF,
   // archetypes.
   if (auto calleeGenericSig = SGF.F.getLoweredFunctionType()
           ->getGenericSignature()) {
-    contextSubs = calleeGenericSig->getSubstitutionMap(
+    contextSubs = SubstitutionMap::get(
+      calleeGenericSig,
       [&](SubstitutableType *type) -> Type {
         return genericEnv->mapTypeIntoContext(type);
       },
@@ -2701,7 +2702,8 @@ buildThunkSignature(SILGenFunction &SGF,
   }
 
   // Calculate substitutions to map interface types to the caller's archetypes.
-  interfaceSubs = genericSig->getSubstitutionMap(
+  interfaceSubs = SubstitutionMap::get(
+    genericSig,
     [&](SubstitutableType *type) -> Type {
       if (type->isEqual(newGenericParam))
         return openedExistential;

@@ -2386,7 +2386,8 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                SILField(loweredInterfaceType, isMutable));
   
   // Instantiate the layout with identity substitutions.
-  auto subMap = signature->getSubstitutionMap(
+  auto subMap = SubstitutionMap::get(
+    signature,
     [&](SubstitutableType *type) -> Type {
       return signature->getCanonicalTypeInContext(type);
     },

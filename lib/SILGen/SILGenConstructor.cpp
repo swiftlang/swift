@@ -518,7 +518,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   SubstitutionMap subMap;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
     auto *genericSig = genericEnv->getGenericSignature();
-    subMap = genericSig->getSubstitutionMap(
+    subMap = SubstitutionMap::get(
+      genericSig,
       [&](SubstitutableType *t) -> Type {
         return genericEnv->mapTypeIntoContext(
           t->castTo<GenericTypeParamType>());
@@ -959,19 +960,20 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           // Generate a set of substitutions for the initialization function,
           // whose generic signature is that of the type context, and whose
           // replacement types are the archetypes of the initializer itself.
-          subs = typeGenericSig->getSubstitutionMap(
-                       [&](SubstitutableType *type) {
-                         if (auto gp = type->getAs<GenericTypeParamType>()) {
-                           return genericEnv->mapTypeIntoContext(gp);
-                         }
+          subs = SubstitutionMap::get(
+            typeGenericSig,
+            [&](SubstitutableType *type) {
+              if (auto gp = type->getAs<GenericTypeParamType>()) {
+                return genericEnv->mapTypeIntoContext(gp);
+              }
 
-                         return Type(type);
-                       },
-                       [](CanType dependentType,
-                           Type conformingReplacementType,
-                           ProtocolDecl *conformedProtocol) {
-                         return ProtocolConformanceRef(conformedProtocol);
-                       });
+              return Type(type);
+            },
+            [](CanType dependentType,
+                Type conformingReplacementType,
+                ProtocolDecl *conformedProtocol) {
+              return ProtocolConformanceRef(conformedProtocol);
+            });
         }
 
         // Get the type of the initialization result, in terms

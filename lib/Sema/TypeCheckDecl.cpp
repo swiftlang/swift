@@ -8294,15 +8294,16 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
-      subMap = typealiasSig->getSubstitutionMap(
-                              [](SubstitutableType *type) -> Type {
-                                return Type(type);
-                              },
-                              [](CanType dependentType,
-                                 Type replacementType,
-                                 ProtocolDecl *proto) {
-                                return ProtocolConformanceRef(proto);
-                              });
+      subMap = SubstitutionMap::get(
+          typealiasSig,
+          [](SubstitutableType *type) -> Type {
+            return Type(type);
+          },
+          [](CanType dependentType,
+             Type replacementType,
+             ProtocolDecl *proto) {
+            return ProtocolConformanceRef(proto);
+          });
 
       mustInferRequirements = true;
     }

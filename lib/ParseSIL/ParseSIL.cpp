@@ -1591,7 +1591,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
   }
 
   bool failed = false;
-  SubstitutionMap subMap = genericSig->getSubstitutionMap(
+  auto subMap = SubstitutionMap::get(
+    genericSig,
     [&](SubstitutableType *type) -> Type {
       auto genericParam = dyn_cast<GenericTypeParamType>(type);
       if (!genericParam) return nullptr;
