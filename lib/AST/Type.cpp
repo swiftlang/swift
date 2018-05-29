@@ -3289,9 +3289,10 @@ SubstitutionMap TypeBase::getContextSubstitutionMap(
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (genericSig == nullptr)
     return SubstitutionMap();
-  return genericSig->getSubstitutionMap(
-      QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
-      LookUpConformanceInModule(module));
+  return SubstitutionMap::get(
+    genericSig,
+    QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
+    LookUpConformanceInModule(module));
 }
 
 TypeSubstitutionMap TypeBase::getMemberSubstitutions(
@@ -3336,7 +3337,8 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
   if (genericSig == nullptr)
     return SubstitutionMap();
   auto subs = getMemberSubstitutions(member, genericEnv);
-  return genericSig->getSubstitutionMap(
+  return SubstitutionMap::get(
+      genericSig,
       QueryTypeSubstitutionMap{subs},
       LookUpConformanceInModule(module));
 }

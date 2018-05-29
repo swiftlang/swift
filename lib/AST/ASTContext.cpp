@@ -4934,8 +4934,9 @@ CanSILBoxType SILBoxType::get(CanType boxedType) {
                                SILField(CanType(genericParam),
                                         /*mutable*/ true));
 
-  SubstitutionMap subMap =
-    singleGenericParamSignature->getSubstitutionMap(
+  auto subMap =
+    SubstitutionMap::get(
+      singleGenericParamSignature,
       [&](SubstitutableType *type) -> Type {
         if (type->isEqual(genericParam)) return boxedType;
 
