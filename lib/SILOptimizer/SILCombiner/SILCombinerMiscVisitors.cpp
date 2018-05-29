@@ -686,20 +686,6 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   return nullptr;
 }
 
-static bool isValueToBridgeObjectremovable(ValueToBridgeObjectInst *VTBOI) {
-  SILValue operand = VTBOI->getOperand();
-  // If operand is a struct $UInt (% : $Builtin.), fetch the real source
-  if (auto *SI = dyn_cast<StructInst>(operand)) {
-    assert(SI->SILInstruction::getAllOperands().size() == 1 &&
-           "Expected a single operand");
-    operand = SI->getOperand(0);
-  }
-  if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
-    return (BI->getBuiltinInfo().ID == BuiltinValueKind::StringObjectOr);
-  }
-  return false;
-}
-
 SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   // Retain of ThinToThickFunction is a no-op.
   SILValue funcOper = SRI->getOperand();
@@ -718,8 +704,7 @@ SILInstruction *SILCombiner::visitStrongRetainInst(StrongRetainInst *SRI) {
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
   if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    if (isValueToBridgeObjectremovable(VTBOI))
-      return eraseInstFromFunction(*SRI);
+    return eraseInstFromFunction(*SRI);
   }
 
   // Sometimes in the stdlib due to hand offs, we will see code like:
@@ -1169,8 +1154,7 @@ SILInstruction *SILCombiner::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   // builtin "stringObjectOr_Int64" (or to tag the string)
   // value_to_bridge_object (cast the UInt to bridge object)
   if (auto *VTBOI = dyn_cast<ValueToBridgeObjectInst>(SRI->getOperand())) {
-    if (isValueToBridgeObjectremovable(VTBOI))
-      return eraseInstFromFunction(*SRI);
+    return eraseInstFromFunction(*SRI);
   }
 
   // Release of a classbound existential converted from a class is just a
