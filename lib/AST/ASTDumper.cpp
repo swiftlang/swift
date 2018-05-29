@@ -2643,6 +2643,17 @@ public:
     printCommon(E, "key_path_dot_expr");
     OS << ")";
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitPoundAssertExpr(PoundAssertExpr *E) {
+    printCommon(E, "pound_assert");
+    if (E->getMessage()) {
+      OS << " message=" << QuotedString(E->getMessage().getValue());
+    }
+    OS << "\n";
+    printRec(E->getCondition());
+    OS << ")";
+  }
 };
 
 } // end anonymous namespace

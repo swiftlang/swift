@@ -190,7 +190,8 @@ UNCHECKED_EXPR(KeyPathDot, Expr)
 ABSTRACT_EXPR(ReverseAutoDiff, Expr)
   EXPR(Gradient, ReverseAutoDiffExpr)
   EXPR(ValueAndGradient, ReverseAutoDiffExpr)
-LAST_EXPR(ValueAndGradient)
+EXPR(PoundAssert, Expr)
+LAST_EXPR(PoundAssert)
 
 #undef EXPR_RANGE
 #undef LITERAL_EXPR
