@@ -312,7 +312,8 @@ BridgedProperty::outline(SILModule &M) {
   // Get the function type.
   auto FunctionType = getOutlinedFunctionType(M);
 
-  std::string name = getOutlinedFunctionName();
+  std::string nameTmp = getOutlinedFunctionName();
+  auto name = M.allocateCopy(nameTmp);
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
@@ -922,7 +923,8 @@ std::pair<SILFunction *, SILBasicBlock::iterator>
 ObjCMethodCall::outline(SILModule &M) {
 
   auto FunctionType = getOutlinedFunctionType(M);
-  std::string name = getOutlinedFunctionName();
+  std::string nameTmp = getOutlinedFunctionName();
+  auto name = M.allocateCopy(nameTmp);
 
   auto *Fun = FuncBuilder.getOrCreateFunction(
       ObjCMethod->getLoc(), name, SILLinkage::Shared, FunctionType, IsNotBare,
