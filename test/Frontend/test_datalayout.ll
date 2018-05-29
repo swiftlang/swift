@@ -1,10 +1,10 @@
-; RUN: %swiftc_driver_plain -frontend -target x86_64-apple-darwin10 -emit-object %s
+; RUN: %swift -target x86_64-apple-darwin10 -emit-object %s
 
 ; REQUIRES: CPU=x86_64
 
 ; Make sure we update the datalayout with the current clang's. clang knows
 ; better about the ABI intricacies.
-; This test case woud crash if we did not do this because of i64:128 in the
+; This test case would crash if we did not do this because of i64:128 in the
 ; string below.
 
 target datalayout = "e-m:o-i64:128-f80:128-n8:16:32:64-S128"
