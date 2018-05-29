@@ -1745,11 +1745,14 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
+  /// \param valueType The optional type associated with given value, if it's
+  /// not set, type of the declaration is going to be used instead.
+  ///
   /// \param base The optional base expression of this value reference
   ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                  DeclContext *UseDC,
+                                  DeclContext *UseDC, Type valueType = Type(),
                                   const DeclRefExpr *base = nullptr,
                                   bool wantInterfaceType = false);
 

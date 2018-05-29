@@ -801,16 +801,19 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
-                                             DeclContext *UseDC,
+                                             DeclContext *UseDC, Type valueType,
                                              const DeclRefExpr *base,
                                              bool wantInterfaceType) {
-  validateDecl(value);
-  if (!value->hasValidSignature() || value->isInvalid())
-    return ErrorType::get(Context);
 
-  Type requestedType = (wantInterfaceType
-                        ? value->getInterfaceType()
-                        : value->getType());
+  Type requestedType = valueType;
+  if (!requestedType) {
+    validateDecl(value);
+    if (!value->hasValidSignature() || value->isInvalid())
+      return ErrorType::get(Context);
+
+    requestedType =
+        (wantInterfaceType ? value->getInterfaceType() : value->getType());
+  }
 
   requestedType = requestedType->getWithoutSpecifierType()
     ->getReferenceStorageReferent();
@@ -1013,8 +1016,8 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), useDC, base,
-                                                 wantInterfaceType);
+  Type valueType = TC.getUnopenedTypeOfReference(
+      varDecl, Type(), DC, getType(varDecl, false), base, wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -1334,9 +1337,9 @@ ConstraintSystem::getTypeOfMemberReference(
       refType = FunctionType::get(indicesTy, elementTy,
                                   AnyFunctionType::ExtInfo());
     } else {
-      refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value),
-                                              baseTy, useDC, base,
-                                              /*wantInterfaceType=*/true);
+      refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy,
+                                              useDC, getType(value, false),
+                                              base, /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();

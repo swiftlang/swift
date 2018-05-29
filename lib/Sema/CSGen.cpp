@@ -1341,15 +1341,26 @@ namespace {
         }
       }
 
-      // If we're referring to an invalid declaration, don't type-check.
-      //
-      // FIXME: If the decl is in error, we get no information from this.
-      // We may, alternatively, want to use a type variable in that case,
-      // and possibly infer the type of the variable that way.
-      CS.getTypeChecker().validateDecl(E->getDecl());
-      if (E->getDecl()->isInvalid()) {
-        CS.setType(E, E->getDecl()->getInterfaceType());
-        return nullptr;
+      if (auto *param = dyn_cast<ParamDecl>(E->getDecl())) {
+        if (param->hasInterfaceType()) {
+          auto type = param->getInterfaceType();
+          if (type->hasTypeParameter())
+            type = param->getDeclContext()->mapTypeIntoContext(type);
+
+          CS.setType(param, type);
+          CS.setFavoredType(E, type.getPointer());
+        }
+      } else {
+        // If we're referring to an invalid declaration, don't type-check.
+        //
+        // FIXME: If the decl is in error, we get no information from this.
+        // We may, alternatively, want to use a type variable in that case,
+        // and possibly infer the type of the variable that way.
+        CS.getTypeChecker().validateDecl(E->getDecl());
+        if (E->getDecl()->isInvalid()) {
+          CS.setType(E, E->getDecl()->getInterfaceType());
+          return nullptr;
+        }
       }
 
       auto locator = CS.getConstraintLocator(E);
@@ -1362,19 +1373,6 @@ namespace {
       OverloadChoice choice =
           OverloadChoice(Type(), E->getDecl(), E->getFunctionRefKind());
       CS.resolveOverload(locator, tv, choice, CurDC);
-
-      if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
-        if (VD->getInterfaceType() &&
-            !VD->getInterfaceType()->is<TypeVariableType>()) {
-          // FIXME: ParamDecls in closures shouldn't get an interface type
-          // until the constraint system has been solved.
-          auto type = VD->getInterfaceType();
-          if (type->hasTypeParameter())
-            type = VD->getDeclContext()->mapTypeIntoContext(type);
-          CS.setFavoredType(E, type.getPointer());
-        }
-      }
-
       return tv;
     }
 
@@ -1992,19 +1990,17 @@ namespace {
           // FIXME: Need a better locator for a pattern as a base.
           Type openedType = CS.openUnboundGenericType(type, locator);
           assert(!param->isImmutable() || !openedType->is<InOutType>());
-          param->setType(openedType->getInOutObjectType());
-          param->setInterfaceType(openedType->getInOutObjectType());
+          CS.setType(param, openedType->getInOutObjectType());
           continue;
         }
 
         // Otherwise, create a fresh type variable.
-        Type ty = CS.createTypeVariable(locator, TVO_CanBindToInOut);
-
-        param->setType(ty);
-        param->setInterfaceType(ty);
+        CS.setType(param, CS.createTypeVariable(locator, TVO_CanBindToInOut));
       }
-      
-      return params->getType(CS.getASTContext());
+
+      return params->getType(CS.getASTContext(), [&](ParamDecl *param) {
+        return CS.getType(param);
+      });
     }
 
     
