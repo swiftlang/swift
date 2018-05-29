@@ -96,7 +96,11 @@ import Glibc
 @inline(__always)
 func getRandomBuf(_ arg: UnsafeMutableBufferPointer<UInt8>) {
 #if os(Linux)
-    getrandom(arg.baseAddress, arg.count, 0)
+    let fd = open("/dev/urandom", O_RDONLY)
+    defer { if (fd >= 0) { close(fd) } }
+    if fd >= 0 {
+         read(fd, arg.baseAddress, arg.count)
+    }
 #else
     arc4random_buf(arg.baseAddress, arg.count)
 #endif
@@ -105,7 +109,11 @@ func getRandomBuf(_ arg: UnsafeMutableBufferPointer<UInt8>) {
 @inline(__always)
 func getRandomBuf(baseAddress: UnsafeMutablePointer<UInt8>, count: Int) {
 #if os(Linux)
-    getrandom(arg.baseAddress, arg.count, 0)
+    let fd = open("/dev/urandom", O_RDONLY)
+    defer { if (fd >= 0) { close(fd) } }
+    if fd >= 0 {
+         read(fd, baseAddress, count)
+    }
 #else
     arc4random_buf(baseAddress, count)
 #endif
