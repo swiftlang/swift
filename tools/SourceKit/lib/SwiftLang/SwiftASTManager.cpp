@@ -512,8 +512,26 @@ SwiftInvocationRef
 SwiftASTManager::getInvocation(ArrayRef<const char *> OrigArgs,
                                StringRef PrimaryFile,
                                std::string &Error) {
+
+  DiagnosticEngine Diags(Impl.SourceMgr);
+  EditorDiagConsumer CollectDiagConsumer;
+  Diags.addConsumer(CollectDiagConsumer);
+
   CompilerInvocation CompInvok;
-  if (initCompilerInvocation(CompInvok, OrigArgs, PrimaryFile, Error)) {
+  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile, Error)) {
+    // We create a traced operation here to represent the failure to parse
+    // arguments since we cannot reach `createAST` where that would normally
+    // happen.
+    trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
+    if (TracedOp.enabled()) {
+      trace::SwiftInvocation TraceInfo;
+      trace::initTraceInfo(TraceInfo, PrimaryFile, OrigArgs);
+      TracedOp.setDiagnosticProvider(
+        [&CollectDiagConsumer](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          CollectDiagConsumer.getAllDiagnostics(diags);
+        });
+      TracedOp.start(TraceInfo);
+    }
     return nullptr;
   }
 
