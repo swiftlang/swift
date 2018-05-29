@@ -2737,12 +2737,10 @@ bool RefactoringActionDocCommentBoilerplate::performChange() {
                                   EditConsumer, SM);
   } else if (auto constructorDecl =
            dyn_cast<ConstructorDecl>(CursorInfo.ValueD)) {
-    constructorDecl = (ConstructorDecl *)CursorInfo.ValueD;
     generateDocCommentForConstructor(constructorDecl, startLocation,
                                      EditConsumer, SM);
   } else if (auto subscriptDecl =
            dyn_cast<SubscriptDecl>(CursorInfo.ValueD)) {
-    subscriptDecl = (SubscriptDecl *)CursorInfo.ValueD;
     generateDocCommentForSubscript(subscriptDecl, startLocation,
                                    EditConsumer, SM);
   } else {
