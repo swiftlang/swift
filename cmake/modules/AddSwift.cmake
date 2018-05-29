@@ -770,9 +770,9 @@ function(_add_swift_library_single target name)
           ${SWIFTLIB_SINGLE_SDK} STREQUAL "OSX")
         # HACK: don't build WatchKit API notes for OS X.
       else()
-        if (NOT IS_DIRECTORY "${SWIFT_SOURCE_DIR}/stdlib/public/SDK/${framework_name}")
-          list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
-        endif()
+        # Always build the "non-overlay" apinotes to keep them in sync
+        # rdar://40496966
+        list(APPEND SWIFTLIB_SINGLE_API_NOTES "${framework_name}")
       endif()
     endforeach()
   endif()
@@ -782,9 +782,6 @@ function(_add_swift_library_single target name)
     set(module_name "Swift")
   else()
     string(REPLACE swift "" module_name "${name}")
-  endif()
-  if("${module_name}" IN_LIST SWIFT_API_NOTES_INPUTS)
-    set(SWIFTLIB_SINGLE_API_NOTES "${module_name}")
   endif()
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "WINDOWS")
