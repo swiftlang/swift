@@ -231,11 +231,8 @@ extension String {
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type) {
 
-    let codeUnits = _SentinelCollection(
-      UnsafeBufferPointer(_unboundedStartingAt: nullTerminatedCodeUnits),
-      until: _IsZero()
-    )
-    self.init(decoding: codeUnits, as: sourceEncoding)
+    self = String.decodeCString(
+      nullTerminatedCodeUnits, as: sourceEncoding)!.result
   }
 
   /// Calls the given closure with a pointer to the contents of the string,

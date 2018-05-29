@@ -63,7 +63,6 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
-    "SentinelCollection.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
