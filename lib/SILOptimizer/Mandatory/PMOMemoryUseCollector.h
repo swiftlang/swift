@@ -9,12 +9,33 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file declares logic used by definitive analysis related passes that look
-// at all the instructions that access a memory object.  This is quite specific
-// to definitive analysis in that it is tuple element sensitive instead of
-// relying on SROA.
-//
+///
+/// \file
+///
+/// High Level Overview
+/// -------------------
+///
+/// This file declares logic that is used by the predictable memory optimization
+/// pass. Like definite initialization, it is tuple element sensitive instead of
+/// relying on an SROA optimization or the like to chop up structs.
+///
+/// NOTE: PMO is an abbreviation for "Predictable Memory Optimizations".
+///
+/// Historical Note
+/// ---------------
+///
+/// This file looks very similar to DIMemoryUseCollector.* and has many
+/// connections to Definite Initialization. This is because early in the
+/// development of Swift, Predictable Memory Optimizations and Definite
+/// Initialization were actually the same pass. The pass grew really big and the
+/// two passes were split, but still used similra utility code. This became the
+/// original DIMemoryUseCollector.*. This code was full of conditional logic for
+/// all of the various cases that made it difficult to understand which code was
+/// needed for Predictable Mem Opts and what was needed for DI. The introduction
+/// of the SIL ownership model to SIL was used as an opportunity to split the
+/// two, flatten the sphagetti conditional code so the logic was clear, and
+/// allow the two passes to diverge and hew their form closer to their function.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_MANDATORY_PMOMEMORYUSECOLLECTOR_H
