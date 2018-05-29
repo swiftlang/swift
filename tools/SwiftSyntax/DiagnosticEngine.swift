@@ -27,7 +27,7 @@ public class DiagnosticEngine {
   public private(set) var diagnostics = [Diagnostic]()
 
   /// Adds the provided consumer to the consumers list.
-  func addConsumer(_ consumer: DiagnosticConsumer) {
+  public func addConsumer(_ consumer: DiagnosticConsumer) {
     consumers.append(consumer)
 
     // Start the consumer with all previous diagnostics.
@@ -44,12 +44,17 @@ public class DiagnosticEngine {
   public func diagnose(_ message: Diagnostic.Message,
                        location: SourceLocation? = nil,
                        actions: ((inout Diagnostic.Builder) -> Void)? = nil) {
-    let diagnostic = Diagnostic(message: message, location: location, 
+    let diagnostic = Diagnostic(message: message, location: location,
                                 actions: actions)
     diagnostics.append(diagnostic)
     for consumer in consumers {
       consumer.handle(diagnostic)
     }
+  }
+
+  /// If any of the diagnostics in this engine have the `error` severity.
+  public var hasErrors: Bool {
+    return diagnostics.contains(where: { $0.message.severity == .error })
   }
 
   /// Tells each consumer to finalize their diagnostic output.

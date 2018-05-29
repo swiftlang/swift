@@ -6,6 +6,7 @@ from __future__ import print_function
 
 import os
 import re
+import sys
 try:
     from cStringIO import StringIO
 except ImportError:
@@ -572,6 +573,8 @@ class ExecutionContext(object):
                 # We can only insert the line directive at a line break
                 if len(self.result_text) == 0 \
                    or self.result_text[-1].endswith('\n'):
+                    if sys.platform == 'win32':
+                        file = file.replace('\\', '/')
                     substitutions = {'file': file, 'line': line + 1}
                     format_str = self.line_directive + '\n'
                     self.result_text.append(format_str % substitutions)

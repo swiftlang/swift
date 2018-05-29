@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "SILGen.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
-#include "SwitchCaseFullExpr.h"
+#include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -143,8 +144,8 @@ namespace {
   };
 } // end anonymous namespace
 
-SubstitutionList SILGenFunction::getForwardingSubstitutions() {
-  return F.getForwardingSubstitutions();
+SubstitutionMap SILGenFunction::getForwardingSubstitutionMap() {
+  return F.getForwardingSubstitutionMap();
 }
 
 void SILGenFunction::visitFuncDecl(FuncDecl *fd) {
@@ -192,15 +193,27 @@ void SingleBufferInitialization::
 copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF, SILLocation loc,
                                 ManagedValue value, bool isInit,
                                 SILValue destAddr) {
+  // Emit an unchecked access around initialization of the local buffer to
+  // silence access marker verification.
+  //
+  // FIXME: This is not a good place for FormalEvaluationScope +
+  // UnenforcedFormalAccess.  However, there's no way to identify the buffer
+  // initialization sequence after SILGen, and no easy way to wrap the
+  // Initialization in an access during top-level expression evaluation.
+  FormalEvaluationScope scope(SGF);
   if (!isInit) {
     assert(value.getValue() != destAddr && "copying in place?!");
-    value.copyInto(SGF, destAddr, loc);
+    SILValue accessAddr =
+      UnenforcedFormalAccess::enter(SGF, loc, destAddr, SILAccessKind::Modify);
+    value.copyInto(SGF, accessAddr, loc);
     return;
   }
   
   // If we didn't evaluate into the initialization buffer, do so now.
   if (value.getValue() != destAddr) {
-    value.forwardInto(SGF, loc, destAddr);
+    SILValue accessAddr =
+      UnenforcedFormalAccess::enter(SGF, loc, destAddr, SILAccessKind::Modify);
+    value.forwardInto(SGF, loc, accessAddr);
   } else {
     // If we did evaluate into the initialization buffer, disable the
     // cleanup.
@@ -372,7 +385,7 @@ public:
   /// initialization is completed.
   LocalVariableInitialization(VarDecl *decl,
                               Optional<MarkUninitializedInst::Kind> kind,
-                              unsigned ArgNo, SILGenFunction &SGF)
+                              uint16_t ArgNo, SILGenFunction &SGF)
       : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
            "can't emit a local var for a non-local var decl");
@@ -381,14 +394,14 @@ public:
 
     auto boxType = SGF.SGM.Types
       .getContextBoxTypeForCapture(decl,
-                     SGF.getLoweredType(decl->getType()).getSwiftRValueType(),
+                     SGF.getLoweredType(decl->getType()).getASTType(),
                      SGF.F.getGenericEnvironment(),
                      /*mutable*/ true);
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    SILValue allocBox =
-        SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
+    SILDebugVariable DbgVar(decl->isLet(), ArgNo);
+    SILValue allocBox = SGF.B.createAllocBox(decl, boxType, DbgVar);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
@@ -564,10 +577,11 @@ public:
     // lifetime.
     SILLocation PrologueLoc(vd);
     PrologueLoc.markAsPrologue();
+    SILDebugVariable DbgVar(vd->isLet(), /*ArgNo=*/0);
     if (address)
-      SGF.B.createDebugValueAddr(PrologueLoc, value);
+      SGF.B.createDebugValueAddr(PrologueLoc, value, DbgVar);
     else
-      SGF.B.createDebugValue(PrologueLoc, value);
+      SGF.B.createDebugValue(PrologueLoc, value, DbgVar);
   }
   
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
@@ -765,7 +779,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   // path, causing a use (the destroy on the negative path) to be created that
   // does not dominate its definition (in the positive path).
   auto handler = [&SGF, &loc, &failureDest](ManagedValue mv,
-                                            SwitchCaseFullExpr &expr) {
+                                            SwitchCaseFullExpr &&expr) {
     expr.exit();
     SGF.Cleanups.emitBranchAndCleanups(failureDest, loc);
   };
@@ -790,7 +804,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
   switchBuilder.addCase(
       eltDecl, someBlock, contBlock,
       [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
-                                               SwitchCaseFullExpr &expr) {
+                                               SwitchCaseFullExpr &&expr) {
         // If the enum case has no bound value, we're done.
         if (!eltDecl->hasAssociatedValues()) {
           assert(
@@ -828,10 +842,14 @@ void EnumElementPatternInitialization::emitEnumMatch(
           SILValue boxedValue = SGF.B.createProjectBox(loc, mv.getValue(), 0);
           auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
           // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
-          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses())
-            boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
+            UnenforcedAccess access;
+            SILValue accessAddress =
+              access.beginAccess(SGF, loc, boxedValue, SILAccessKind::Read);
+            boxedValue = boxedTL.emitLoad(SGF.B, loc, accessAddress,
                                           LoadOwnershipQualifier::Take);
-
+            access.endAccess(SGF);
+          }
           // We must treat the boxed value as +0 since it may be shared. Copy it
           // if nontrivial.
           //
@@ -843,7 +861,7 @@ void EnumElementPatternInitialization::emitEnumMatch(
         // Reabstract to the substituted type, if needed.
         CanType substEltTy =
             value.getType()
-                .getSwiftRValueType()
+                .getASTType()
                 ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
                                   eltDecl->getArgumentInterfaceType())
                 ->getCanonicalType();

@@ -19,9 +19,6 @@
 //   - Subsystem is a token to be stringified as a name prefix
 //   - Id is an identifier suitable for use in C++
 //
-// FRONTEND_RECURSIVE_SHARED_TIMER(Id)
-//   - Id is an identifier suitable for use in C++
-//
 //===----------------------------------------------------------------------===//
 
 /// Driver statistics are collected for driver processes
@@ -43,6 +40,12 @@ DRIVER_STATISTIC(NumDriverJobsSkipped)
 /// Total number of driver processes that exited with EXIT_FAILURE / not with
 /// EXIT_SUCCESS.
 DRIVER_STATISTIC(NumProcessFailures)
+
+/// Total number of driver poll() calls on subprocess pipes.
+DRIVER_STATISTIC(NumDriverPipePolls)
+
+/// Total number of driver read() calls on subprocess pipes.
+DRIVER_STATISTIC(NumDriverPipeReads)
 
 /// Next 10 statistics count dirtying-events in the driver's dependency graph,
 /// which it uses to decide which files are invalid (and thus which files to
@@ -135,6 +138,9 @@ FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 /// Number of conformances used by code processed by this frontend job.
 FRONTEND_STATISTIC(AST, NumUsedConformances)
 
+/// Number of full function bodies parsed.
+FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 
@@ -142,6 +148,11 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// solving expression type constraints. A rough proxy for "how much work the
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
+
+/// Number of constraints considered per attempt to
+/// contract constraint graph edges.
+/// This is a measure of complexity of the contraction algorithm.
+FRONTEND_STATISTIC(Sema, NumConstraintsConsideredForEdgeContraction)
 
 /// Number of declarations that were deserialized. A rough proxy for the amount
 /// of material loaded from other modules.
@@ -218,14 +229,4 @@ FRONTEND_STATISTIC(IRModule, NumIRInsts)
 /// of the frontend job, which should be the same as the size of
 /// the .o file you find on disk after the frontend exits.
 FRONTEND_STATISTIC(LLVM, NumLLVMBytesOutput)
-#endif
-
-/// Frontend timers for recursive routines
-#ifdef FRONTEND_RECURSIVE_SHARED_TIMER
-
-/// Time spent in  NominalTypeDecl::lookupDirect.
-FRONTEND_RECURSIVE_SHARED_TIMER(NominalTypeDecl__lookupDirect)
-
-/// Time spent in ClangImporter::Implementation::loadAllMembers.
-FRONTEND_RECURSIVE_SHARED_TIMER(ClangImporter__Implementation__loadAllMembers)
 #endif

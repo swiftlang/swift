@@ -70,15 +70,17 @@ DevirtualizationResult tryDevirtualizeApply(ApplySite AI,
 bool canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA);
 bool isNominalTypeWithUnboundGenericParameters(SILType Ty, SILModule &M);
 bool canDevirtualizeClassMethod(FullApplySite AI, SILType ClassInstanceType,
-                                OptRemark::Emitter *ORE = nullptr);
+                                OptRemark::Emitter *ORE = nullptr,
+                                bool isEffectivelyFinalMethod = false);
 SILFunction *getTargetClassMethod(SILModule &M, SILType ClassOrMetatypeType,
                                   MethodInst *MI);
 DevirtualizationResult devirtualizeClassMethod(FullApplySite AI,
                                                SILValue ClassInstance,
                                                OptRemark::Emitter *ORE);
-DevirtualizationResult tryDevirtualizeClassMethod(FullApplySite AI,
-                                                  SILValue ClassInstance,
-                                                  OptRemark::Emitter *ORE);
+DevirtualizationResult
+tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+                           OptRemark::Emitter *ORE,
+                           bool isEffectivelyFinalMethod = false);
 DevirtualizationResult
 tryDevirtualizeWitnessMethod(ApplySite AI, OptRemark::Emitter *ORE);
 }

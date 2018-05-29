@@ -35,7 +35,7 @@ class IRGenModule;
 template <class Impl> class ClassMetadataVisitor
     : public NominalMetadataVisitor<Impl>,
       public SILVTableVisitor<Impl> {
-  typedef NominalMetadataVisitor<Impl> super;
+  using super = NominalMetadataVisitor<Impl>;
 
 protected:
   using super::IGM;
@@ -113,8 +113,7 @@ private:
     asImpl().noteStartOfImmediateMembers(theClass);
 
     // Add space for the generic parameters, if applicable.
-    // Note that we only add references for the immediate parameters;
-    // parameters for the parent context are handled by the parent.
+    // This must always be the first item in the immediate members.
     asImpl().addGenericFields(theClass, type, theClass);
 
     // Add vtable entries.
@@ -158,7 +157,8 @@ private:
 /// the metadata layout, maintaining the offset of the next field.
 template <class Impl>
 class ClassMetadataScanner : public ClassMetadataVisitor<Impl> {
-  typedef ClassMetadataVisitor<Impl> super;
+  using super = ClassMetadataVisitor<Impl>;
+
 protected:
   Size NextOffset = Size(0);
 

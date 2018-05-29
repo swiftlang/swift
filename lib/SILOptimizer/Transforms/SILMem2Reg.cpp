@@ -164,6 +164,11 @@ class MemoryToRegisters {
   /// AllocStackInst itself!
   void removeSingleBlockAllocation(AllocStackInst *ASI);
 
+  /// Attempt to promote the specified stack allocation, returning true if so
+  /// or false if not.  On success, all uses of the AllocStackInst have been
+  /// removed, but the ASI itself is still in the program.
+  bool promoteSingleAllocation(AllocStackInst *ASI,
+                               DomTreeLevelMap &DomTreeLevels);
 public:
   /// C'tor
   MemoryToRegisters(SILFunction &Func, DominanceInfo *Dt) : F(Func), DT(Dt),
@@ -272,10 +277,12 @@ bool MemoryToRegisters::isWriteOnlyAllocation(AllocStackInst *ASI) {
 /// Promote a DebugValueAddr to a DebugValue of the given value.
 static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
+  assert(DVAI->getOperand()->getType().isLoadable(DVAI->getModule()) &&
+         "Unexpected promotion of address-only type!");
   assert(Value && "Expected valid value");
   B.setInsertionPoint(DVAI);
   B.setCurrentDebugScope(DVAI->getDebugScope());
-  B.createDebugValue(DVAI->getLoc(), Value, DVAI->getVarInfo());
+  B.createDebugValue(DVAI->getLoc(), Value, *DVAI->getVarInfo());
   DVAI->eraseFromParent();
 }
 
@@ -821,6 +828,61 @@ void StackAllocationPromoter::run() {
   promoteAllocationToPhi();
 }
 
+/// Attempt to promote the specified stack allocation, returning true if so
+/// or false if not.  On success, this returns true and usually drops all of the
+/// uses of the AllocStackInst, but never deletes the ASI itself.  Callers
+/// should check to see if the ASI is dead after this and remove it if so.
+bool MemoryToRegisters::promoteSingleAllocation(AllocStackInst *alloc,
+                                                DomTreeLevelMap &DomTreeLevels){
+  DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *alloc);
+  NumAllocStackFound++;
+
+  // Don't handle captured AllocStacks.
+  bool inSingleBlock = false;
+  if (isCaptured(alloc, inSingleBlock)) {
+    NumAllocStackCaptured++;
+    return false;
+  }
+
+  // Remove write-only AllocStacks.
+  if (isWriteOnlyAllocation(alloc)) {
+    eraseUsesOfInstruction(alloc);
+
+    DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *alloc);
+    return true;
+  }
+
+  // For AllocStacks that are only used within a single basic blocks, use
+  // the linear sweep to remove the AllocStack.
+  if (inSingleBlock) {
+    removeSingleBlockAllocation(alloc);
+
+    DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
+                       << *alloc);
+    if (!alloc->use_empty()) {
+      // Handle a corner case where the ASI still has uses:
+      // This can come up if the source contains a withUnsafePointer where
+      // the pointer escapes. It's illegal code but we should not crash.
+      // Re-insert a dealloc_stack so that the verifier is happy.
+      B.setInsertionPoint(std::next(alloc->getIterator()));
+      B.createDeallocStack(alloc->getLoc(), alloc);
+    }
+    return true;
+  }
+
+  DEBUG(llvm::dbgs() << "*** Need to insert BB arguments for " << *alloc);
+
+  // Promote this allocation.
+  StackAllocationPromoter(alloc, DT, DomTreeLevels, B).run();
+
+  // Make sure that all of the allocations were promoted into registers.
+  assert(isWriteOnlyAllocation(alloc) && "Non-write uses left behind");
+  // ... and erase the allocation.
+  eraseUsesOfInstruction(alloc);
+  return true;
+}
+
+
 bool MemoryToRegisters::run() {
   bool Changed = false;
 
@@ -840,68 +902,14 @@ bool MemoryToRegisters::run() {
         continue;
       }
 
-      DEBUG(llvm::dbgs() << "*** Memory to register looking at: " << *I);
-      NumAllocStackFound++;
-
-      // Don't handle captured AllocStacks.
-      bool inSingleBlock = false;
-      if (isCaptured(ASI, inSingleBlock)) {
-        NumAllocStackCaptured++;
-        ++I;
-        continue;
-      }
-
-      // Remove write-only AllocStacks.
-      if (isWriteOnlyAllocation(ASI)) {
-        eraseUsesOfInstruction(ASI);
-
-        DEBUG(llvm::dbgs() << "*** Deleting store-only AllocStack: " << *ASI);
-        I++;
-        ASI->eraseFromParent();
-        Changed = true;
-        NumInstRemoved++;
-        continue;
-      }
-
-      // For AllocStacks that are only used within a single basic blocks, use
-      // the linear sweep to remove the AllocStack.
-      if (inSingleBlock) {
-        removeSingleBlockAllocation(ASI);
-
-        DEBUG(llvm::dbgs() << "*** Deleting single block AllocStackInst: "
-                           << *ASI);
-        I++;
-        if (ASI->use_empty()) {
-          // After removing all the allocation instructions the ASI should not
-          // have any uses.
+      bool promoted = promoteSingleAllocation(ASI, DomTreeLevels);
+      ++I;
+      if (promoted) {
+        if (ASI->use_empty())
           ASI->eraseFromParent();
-          NumInstRemoved++;
-        } else {
-          // Handle a corner case where the ASI still has uses:
-          // This can come up if the source contains a withUnsafePointer where
-          // the pointer escapes. It's illegal code but we should not crash.
-          // Re-insert a dealloc_stack so that the verifier is happy.
-          B.setInsertionPoint(std::next(ASI->getIterator()));
-          B.createDeallocStack(ASI->getLoc(), ASI);
-        }
+        NumInstRemoved++;
         Changed = true;
-        continue;
       }
-
-      DEBUG(llvm::dbgs() << "*** Need to insert Phis for " << *ASI);
-
-      // Promote this allocation.
-      StackAllocationPromoter(ASI, DT, DomTreeLevels, B).run();
-
-      // Make sure that all of the allocations were promoted into registers.
-      assert(isWriteOnlyAllocation(ASI) && "Non-write uses left behind");
-      // ... and erase the allocation.
-      eraseUsesOfInstruction(ASI);
-
-      I++;
-      ASI->eraseFromParent();
-      NumInstRemoved++;
-      Changed = true;
     }
   }
   return Changed;

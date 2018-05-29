@@ -266,7 +266,7 @@ static SILValue getTerminatorCondition(TermInst *Term) {
 
 /// Is this basic block jump threadable.
 static bool isThreadableBlock(SILBasicBlock *BB,
-                              SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders) {
+                              SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders) {
   if (isa<ReturnInst>(BB->getTerminator()))
     return false;
 
@@ -444,7 +444,7 @@ static SILValue createValueForEdge(SILInstruction *UserInst,
 /// of the operand of 'DominatingBB's terminator.
 static bool tryDominatorBasedSimplifications(
     SILBasicBlock *DominatingBB, DominanceInfo *DT,
-    SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders,
+    SmallPtrSetImpl<SILBasicBlock *> &LoopHeaders,
     SmallVectorImpl<ThreadInfo> &JumpThreadableEdges,
     llvm::DenseSet<std::pair<SILBasicBlock *, SILBasicBlock *>>
         &ThreadedEdgeSet,
@@ -767,7 +767,7 @@ bool SimplifyCFG::simplifyAfterDroppingPredecessor(SILBasicBlock *BB) {
 
 static NullablePtr<EnumElementDecl>
 getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
-                     llvm::SmallPtrSet<SILArgument *, 8> HandledArgs) {
+                     llvm::SmallPtrSetImpl<SILArgument *> &HandledArgs) {
   // Limit the number of recursions. This is an easy way to cope with cycles
   // in the SSA graph.
   if (RecursionDepth > 3)
@@ -1115,11 +1115,8 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       // unreachable block. In this case it can reference itself as operand.
       if (Result && Result != I) {
         DEBUG(llvm::dbgs() << "simplify branch operand " << *I);
-        I->replaceAllUsesWith(Result);
-        if (isInstructionTriviallyDead(I)) {
-          eraseFromParentWithDebugInsts(I);
-          Simplified = true;
-        }
+        replaceAllSimplifiedUsesAndErase(I, Result);
+        Simplified = true;
       }
     }
   }
@@ -1130,7 +1127,7 @@ static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
   TermInst *Terminator = BB->getTerminator();
   SILBasicBlock::iterator Iter = BB->begin();
   while (&*Iter != Terminator) {
-    if (!isDebugInst(&*Iter))
+    if (!(&*Iter)->isDebugInstruction())
       return false;
     Iter++;
   }
@@ -1412,13 +1409,7 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 /// condition.
 static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
                            SILBuilder &Builder) {
-  if (inverted) {
-    auto *True = Builder.createIntegerLiteral(Orig->getLoc(), Cond->getType(), 1);
-    Cond = Builder.createBuiltinBinaryFunction(Orig->getLoc(), "xor",
-                                               Cond->getType(), Cond->getType(),
-                                               {Cond, True});
-  }
-  Builder.createCondFail(Orig->getLoc(), Cond);
+  Builder.createCondFail(Orig->getLoc(), Cond, inverted);
 }
 
 /// Inverts the expected value of 'PotentialExpect' (if it is an expect
@@ -2004,6 +1995,10 @@ static SILValue getActualCallee(SILValue Callee) {
       Callee = CFI->getConverted();
       continue;
     }
+    if (auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Callee)) {
+      Callee = Cvt->getConverted();
+      continue;
+    }
     if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(Callee)) {
       Callee = TTI->getConverted();
       continue;
@@ -2019,7 +2014,14 @@ static SILValue getActualCallee(SILValue Callee) {
 static bool isTryApplyOfConvertFunction(TryApplyInst *TAI,
                                               SILValue &Callee,
                                               SILType &CalleeType) {
-  auto *CFI = dyn_cast<ConvertFunctionInst>(TAI->getCallee());
+  auto CalleeOperand = TAI->getCallee();
+
+  // Look through a @noescape conversion.
+  auto *Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeOperand);
+  if (Cvt)
+    CalleeOperand = Cvt->getConverted();
+
+  auto *CFI = dyn_cast<ConvertFunctionInst>(CalleeOperand);
   if (!CFI)
     return false;
   
@@ -2083,14 +2085,14 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
       TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-                                                TAI->getSubstitutions());
+                                                TAI->getSubstitutionMap());
     }
     SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutions());
+                                            TAI->getSubstitutionMap());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
@@ -2110,7 +2112,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     DEBUG(llvm::dbgs() << "replace with apply: " << *TAI);
     ApplyInst *NewAI = Builder.createApply(TAI->getLoc(), Callee,
-                                           TAI->getSubstitutions(),
+                                           TAI->getSubstitutionMap(),
                                            Args, CalleeFnTy->hasErrorResult());
 
     auto Loc = TAI->getLoc();
@@ -3583,30 +3585,35 @@ bool SimplifyCFG::simplifyProgramTerminationBlock(SILBasicBlock *BB) {
 
 namespace {
 class SimplifyCFGPass : public SILFunctionTransform {
-  bool EnableJumpThread;
-
 public:
-  SimplifyCFGPass(bool EnableJumpThread)
-      : EnableJumpThread(EnableJumpThread) {}
-
-  /// The entry point to the transformation.
   void run() override {
     if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
-                    EnableJumpThread)
+                    /*EnableJumpThread=*/false)
             .run())
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
-
 };
 } // end anonymous namespace
 
 
 SILTransform *swift::createSimplifyCFG() {
-  return new SimplifyCFGPass(false);
+  return new SimplifyCFGPass();
 }
 
+namespace {
+class JumpThreadSimplifyCFGPass : public SILFunctionTransform {
+public:
+  void run() override {
+    if (SimplifyCFG(*getFunction(), PM, getOptions().VerifyAll,
+                    /*EnableJumpThread=*/true)
+            .run())
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
+};
+} // end anonymous namespace
+
 SILTransform *swift::createJumpThreadSimplifyCFG() {
-  return new SimplifyCFGPass(true);
+  return new JumpThreadSimplifyCFGPass();
 }
 
 //===----------------------------------------------------------------------===//

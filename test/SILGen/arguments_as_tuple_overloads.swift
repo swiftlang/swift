@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -module-name=test -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -module-name=test -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 // Check if we mangle the following constructors, functions, and
 // subscripts correctly.
@@ -43,11 +43,11 @@ public func test(_ t: (Int, Int)) {
 public func testNoLabel(_: (Int, Int)) {
 }
 
-// CHECK: sil @$S4test0A5FnArgyyySi_SitcF :
+// CHECK: sil @$S4test0A5FnArgyyySi_SitXEF :
 public func testFnArg(_: (Int, Int) -> Void) {
 }
 
-// CHECK: sil @$S4test0A5FnArgyyySi_Sit_tcF :
+// CHECK: sil @$S4test0A5FnArgyyySi_Sit_tXEF :
 public func testFnArg(_: ((Int, Int)) -> Void) {
 }
 

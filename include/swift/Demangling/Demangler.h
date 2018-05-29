@@ -207,8 +207,7 @@ protected:
   size_t Capacity = 0;
 
 public:
-  
-  typedef T *iterator;
+  using iterator = T *;
 
   Vector() { }
 
@@ -302,6 +301,8 @@ protected:
   static const int MaxNumWords = 26;
   StringRef Words[MaxNumWords];
   int NumWords = 0;
+  
+  std::function<NodePointer (int32_t, const void *)> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
     if (!Text.substr(Pos).startswith(str)) return false;
@@ -473,6 +474,7 @@ protected:
 
   NodePointer demangleObjCTypeName();
   NodePointer demangleTypeMangling();
+  NodePointer demangleSymbolicReference(const void *at);
 
   void dump();
 
@@ -481,6 +483,12 @@ public:
   
   void clear() override;
 
+  /// Install a resolver for symbolic references in a mangled string.
+  void setSymbolicReferenceResolver(
+                  std::function<NodePointer (int32_t, const void*)> resolver) {
+    SymbolicReferenceResolver = resolver;
+  }
+  
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the

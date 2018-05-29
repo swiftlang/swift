@@ -229,10 +229,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   TopLevelCodeDecl *newTopLevel = new (Context) TopLevelCodeDecl(&SF);
 
   // Build function of type T->() which prints the operand.
-  auto *Arg = new (Context) ParamDecl(VarDecl::Specifier::Owned, SourceLoc(),
-                                         SourceLoc(), Identifier(),
-                                         Loc, Context.getIdentifier("arg"),
-                                         E->getType(), /*DC*/ newTopLevel);
+  auto *Arg = new (Context) ParamDecl(
+      VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(), Loc,
+      Context.getIdentifier("arg"), E->getType(), /*DC*/ newTopLevel);
   Arg->setInterfaceType(E->getType());
   auto params = ParameterList::createWithoutLoc(Arg);
 
@@ -269,9 +268,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
 
-  Expr *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
-  if (TC.typeCheckExpressionShallow(TheCall, Arg->getDeclContext()))
-    return ;
+  auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
+  TheCall->getArg()->setType(ParenType::get(Context, E->getType()));
+  TheCall->setType(Context.TheEmptyTupleType);
 
   // Inject the call into the top level stream by wrapping it with a TLCD.
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),

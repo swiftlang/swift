@@ -19,6 +19,8 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
@@ -161,7 +163,9 @@ public:
         }
       });
 
-      gft->getInput().walk(walker);
+      for (const auto &param : gft->getParams())
+        param.getType().walk(walker);
+
       gft->getResult().walk(walker);
     }
   }
@@ -231,8 +235,13 @@ public:
     // parameter references transitively.
     if (!D->getDeclContext()->isLocalContext()) {
       if (!AFR.isObjC() || !D->isObjC() || isa<ConstructorDecl>(D)) {
-        for (auto sub : DRE->getDeclRef().getSubstitutions()) {
-          checkType(sub.getReplacement(), DRE->getLoc());
+        if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
+          auto genericSig = subMap.getGenericSignature();
+          for (auto gp : genericSig->getGenericParams()) {
+            if (auto type = Type(gp).subst(subMap)) {
+              checkType(type, DRE->getLoc());
+            }
+          }
         }
       }
     }
@@ -262,7 +271,8 @@ public:
                         NTD->getDescriptiveKind(),
                         D->getBaseName().getIdentifier());
 
-            TC.diagnose(NTD->getLoc(), diag::type_declared_here);
+            TC.diagnose(NTD->getLoc(), diag::kind_declared_here,
+                        DescriptiveDeclKind::Type);
 
             TC.diagnose(D, diag::decl_declared_here, D->getFullName());
             return { false, DRE };
@@ -743,9 +753,20 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   // their context.
   if (AFD && GenericParamCaptureLoc.isValid()) {
     if (auto Clas = AFD->getParent()->getAsClassOrClassExtensionContext()) {
-      if (Clas->isGenericContext() && Clas->hasClangNode()) {
+      if (Clas->usesObjCGenericsModel()) {
         diagnose(AFD->getLoc(),
                  diag::objc_generic_extension_using_type_parameter);
+
+        // If it's possible, suggest adding @objc.
+        Optional<ForeignErrorConvention> errorConvention;
+        if (!AFD->isObjC() &&
+            isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
+                                  errorConvention)) {
+          diagnose(AFD->getLoc(),
+                   diag::objc_generic_extension_using_type_parameter_try_objc)
+            .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
+        }
+
         diagnose(GenericParamCaptureLoc,
                  diag::objc_generic_extension_using_type_parameter_here);
       }

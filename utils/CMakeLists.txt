@@ -1,4 +1,5 @@
 add_subdirectory(vim)
+add_subdirectory(lldb)
 
 swift_install_in_component(editor-integration
     FILES swift-mode.el

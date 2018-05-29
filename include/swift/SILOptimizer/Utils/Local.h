@@ -63,7 +63,7 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
 void
 recursivelyDeleteTriviallyDeadInstructions(
   ArrayRef<SILInstruction*> I, bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief If the given instruction is dead, delete it along with its dead
 /// operands.
@@ -76,7 +76,7 @@ void
 recursivelyDeleteTriviallyDeadInstructions(
   SILInstruction *I,
   bool Force = false,
-  std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+  llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
@@ -96,17 +96,13 @@ collectUsesOfValue(SILValue V, llvm::SmallPtrSetImpl<SILInstruction *> &Insts);
 /// instruction itself)
 void eraseUsesOfInstruction(
     SILInstruction *Inst,
-    std::function<void(SILInstruction *)> C = [](SILInstruction *){});
+    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *){});
 
 /// \brief Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue V);
 
 FullApplySite findApplyFromDevirtualizedResult(SILValue value);
-
-/// Check that this is a partial apply of a reabstraction thunk and return the
-/// argument of the partial apply if it is.
-SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
 /// Cast a value into the expected, ABI compatible type if necessary.
 /// This may happen e.g. when:
@@ -127,10 +123,6 @@ ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
 /// then delete the apply and the instructions that produce its callee
 /// if possible.
 void replaceDeadApply(ApplySite Old, ValueBase *New);
-
-/// \brief Return true if the substitution list contains replacement types
-/// that are dependent on the type parameters of the caller.
-bool hasArchetypes(SubstitutionList Subs);
 
 /// \brief Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
@@ -164,8 +156,6 @@ SingleValueInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(SILFunction *Fn, DominanceInfo *DT,
                           SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist);
-
-void recalcDomTreeForCCBOpt(DominanceInfo *DT, SILFunction &F);
 
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.

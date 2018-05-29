@@ -47,7 +47,8 @@ func b<T : Ordinable>(seq seq: T) -> (Int) -> Int {
 // -- <rdar://problem/14443343> Boxing of tuples with generic elements
 // CHECK: define hidden swiftcc { i8*, %swift.refcounted* } @"$S7closure14captures_tuple1xx_q_tycx_q_t_tr0_lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U)
 func captures_tuple<T, U>(x x: (T, U)) -> () -> (T, U) {
-  // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2(i64 0, %swift.type* %T, %swift.type* %U, i8* null, i8** null)
+  // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK-NOT: @swift_getTupleTypeMetadata2
   // CHECK: [[BOX:%.*]] = call swiftcc { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1

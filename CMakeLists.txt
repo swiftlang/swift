@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.4.3)
 
+# TODO: Fix RPATH usage to be CMP0068 compliant
+# Disable Policy CMP0068 for CMake 3.9
+# rdar://37725888
+if(POLICY CMP0068)
+  cmake_policy(SET CMP0068 OLD)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -10,6 +17,8 @@ cmake_host_system_information(
 set_property(GLOBAL PROPERTY JOB_POOLS local_jobs=${localhost_logical_cores})
 # Put linking in that category
 set_property(GLOBAL PROPERTY JOB_POOL_LINK local_jobs)
+
+ENABLE_LANGUAGE(C)
 
 # First include general CMake utilities.
 include(SwiftUtils)
@@ -119,7 +128,7 @@ set_property(CACHE SWIFT_ANALYZE_CODE_COVERAGE PROPERTY
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "4.1")
+set(SWIFT_VERSION "4.2")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -171,6 +180,9 @@ option(SWIFT_FORCE_OPTIMIZED_TYPECHECKER "Override the optimization setting of
 # User-configurable Android specific options.
 #
 
+set(SWIFT_ANDROID_API_LEVEL "" CACHE STRING
+  "Version number for the Android API")
+
 set(SWIFT_ANDROID_NDK_PATH "" CACHE STRING
   "Path to the directory that contains the Android NDK tools that are executable on the build machine")
 set(SWIFT_ANDROID_NDK_GCC_VERSION "" CACHE STRING
@@ -185,14 +197,16 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
 #
 
 foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU)
-  set(SWIFT_${sdk}_ICU_UC "" CACHE STRING
-      "Path to a directory containing the icuuc library for ${sdk}")
-  set(SWIFT_${sdk}_ICU_UC_INCLUDE "" CACHE STRING
-      "Path to a directory containing headers for icuuc for ${sdk}")
-  set(SWIFT_${sdk}_ICU_I18N "" CACHE STRING
-      "Path to a directory containing the icui18n library for ${sdk}")
-  set(SWIFT_${sdk}_ICU_I18N_INCLUDE "" CACHE STRING
-      "Path to a directory containing headers icui18n for ${sdk}")
+  foreach(arch aarch64;armv6;armv7;i686;powerpc64;powerpc64le;s390x;x86_64)
+    set(SWIFT_${sdk}_${arch}_ICU_UC "" CACHE STRING
+        "Path to a directory containing the icuuc library for ${sdk}")
+    set(SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE "" CACHE STRING
+        "Path to a directory containing headers for icuuc for ${sdk}")
+    set(SWIFT_${sdk}_${arch}_ICU_I18N "" CACHE STRING
+        "Path to a directory containing the icui18n library for ${sdk}")
+    set(SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE "" CACHE STRING
+        "Path to a directory containing headers icui18n for ${sdk}")
+  endforeach()
 endforeach()
 
 #
@@ -284,10 +298,6 @@ option(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
   "Should the runtime be built with support for non-thread-safe leak detecting entrypoints"
   FALSE)
 
-option(SWIFT_STDLIB_ENABLE_RESILIENCE
-    "Build the standard libraries and overlays with resilience enabled; see docs/LibraryEvolution.rst"
-    FALSE)
-
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"
     FALSE)
@@ -298,10 +308,14 @@ option(SWIFT_STDLIB_ENABLE_SIL_OWNERSHIP
 
 option(SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
   "Build the standard libraries, overlays, and runtime with normal arguments at +0"
-  FALSE)
+  TRUE)
 
 option(SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS
   "Enable runtime function counters and expose the API."
+  FALSE)
+
+option(SWIFT_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING
+  "Build stdlibCore with exclusivity checking enabled"
   FALSE)
 
 #
@@ -372,6 +386,10 @@ endif()
 
 if(SWIFT_BUILT_STANDALONE)
   project(Swift C CXX ASM)
+endif()
+
+if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
+  include(ClangClCompileRules)
 endif()
 
 precondition(CMAKE_SYSTEM_NAME)
@@ -552,7 +570,7 @@ endif()
 
 # If SWIFT_HOST_VARIANT_ARCH not given, try to detect from the CMAKE_SYSTEM_PROCESSOR.
 if(SWIFT_HOST_VARIANT_ARCH)
-  set(SWIFT_HOST_VARIANT_ARCH_default, "${SWIFT_HOST_VARIANT_ARCH}")
+  set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 else()
   if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
@@ -739,20 +757,6 @@ endif()
 # Should we cross-compile the standard library for Android?
 is_sdk_requested(ANDROID swift_build_android)
 if(swift_build_android AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-  # Get the prebuilt suffix to create the correct toolchain path when using the NDK
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-    set(_swift_android_prebuilt_suffix "darwin-x86_64")
-  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    set(_swift_android_prebuilt_suffix "linux-x86_64")
-  endif()
-
-  set(SWIFT_ANDROID_PREBUILT_PATH
-      "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}")
-  
-  # Resolve the correct linker based on the file name of CMAKE_LINKER (being 'ld' or 'ld.gold' the options)
-  get_filename_component(SWIFT_ANDROID_LINKER_NAME "${CMAKE_LINKER}" NAME)
-  set(SWIFT_SDK_ANDROID_ARCH_armv7_LINKER 
-      "${SWIFT_ANDROID_NDK_PATH}/toolchains/arm-linux-androideabi-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_suffix}/bin/arm-linux-androideabi-${SWIFT_ANDROID_LINKER_NAME}")
 
   configure_sdk_unix(ANDROID "Android" "android" "android" "armv7" "armv7-none-linux-androideabi" "${SWIFT_ANDROID_SDK_PATH}")
 
@@ -807,20 +811,23 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
 endif()
 
 message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
-message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Assertions: ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:        ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
+message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
+message(STATUS "  +0 Normal Args: ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
 message(STATUS "")
 
-if (SWIFT_BULID_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
+if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
 
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type: ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions: ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  +0 Normal Args:   ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
+  message(STATUS "  +0 Normal Args:                     ${SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS}")
   message(STATUS "")
 
 else()
@@ -833,8 +840,35 @@ endif()
 #
 # Find required dependencies.
 #
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND "${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "")
-  find_package(ICU REQUIRED COMPONENTS uc i18n)
+
+function(swift_icu_variables_set sdk arch result)
+  string(TOUPPER "${sdk}" sdk)
+
+  set(icu_var_ICU_UC_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_UC_INCLUDE})
+  set(icu_var_ICU_UC ${SWIFT_${sdk}_${arch}_ICU_UC})
+  set(icu_var_ICU_I18N_INCLUDE ${SWIFT_${sdk}_${arch}_ICU_I18N_INCLUDE})
+  set(icu_var_ICU_I18N ${SWIFT_${sdk}_${arch}_ICU_I18N})
+
+  if(icu_var_ICU_UC_INCLUDE AND icu_var_ICU_UC AND
+     icu_var_ICU_I18N_INCLUDE AND icu_var_ICU_I18N)
+    set(${result} TRUE PARENT_SCOPE)
+  else()
+    set(${result} FALSE PARENT_SCOPE)
+  endif()
+endfunction()
+
+# ICU is provided through CoreFoundation on Darwin.  On other hosts, assume that
+# we are compiling for the build as the host.  In such a case, if the ICU
+# unicode and i18n include and library paths are not defined, perform a standard
+# package lookup.  Otherwise, rely on the paths specified by the user.  These
+# need to be defined when cross-compiling.
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  swift_icu_variables_set("${SWIFT_HOST_VARIANT_SDK_default}"
+                          "${SWIFT_HOST_VARIANT_ARCH_default}"
+                          ICU_CONFIGURED)
+  if("${SWIFT_PATH_TO_LIBICU_BUILD}" STREQUAL "" AND NOT ${ICU_CONFIGURED})
+    find_package(ICU REQUIRED COMPONENTS uc i18n)
+  endif()
 endif()
 
 find_package(PythonInterp REQUIRED)
@@ -858,6 +892,8 @@ if(HAVE_EL_WGETS)
   set(HAVE_UNICODE_LIBEDIT 1)
 endif()
 cmake_pop_check_state()
+
+check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")

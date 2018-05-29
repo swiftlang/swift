@@ -22,7 +22,9 @@
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "GenEnum.h"
+#include "GenOpaque.h"
 #include "LoadableTypeInfo.h"
+#include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -44,7 +46,7 @@ template <class FieldImpl> class RecordField {
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
-    : Layout(ElementLayout::getIncomplete(elementTI)) {}
+    : Layout(ElementLayout::getIncomplete(elementTI, elementTI)) {}
 
   explicit RecordField(const ElementLayout &layout,
                        unsigned begin, unsigned end)
@@ -54,7 +56,7 @@ protected:
     return static_cast<const FieldImpl*>(this);
   }
 public:
-  const TypeInfo &getTypeInfo() const { return Layout.getType(); }
+  const TypeInfo &getTypeInfo() const { return Layout.getTypeForLayout(); }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
@@ -66,6 +68,10 @@ public:
 
   IsPOD_t isPOD() const {
     return Layout.isPOD();
+  }
+
+  IsABIAccessible_t isABIAccessible() const {
+    return Layout.getTypeForLayout().isABIAccessible();
   }
 
   Address projectAddress(IRGenFunction &IGF, Address seq,
@@ -92,6 +98,11 @@ public:
   }
 };
 
+enum FieldsAreABIAccessible_t : bool {
+  FieldsAreNotABIAccessible = false,
+  FieldsAreABIAccessible = true,
+};
+
 /// A metaprogrammed TypeInfo implementation for record types.
 template <class Impl, class Base, class FieldImpl_,
           bool IsLoadable = std::is_base_of<LoadableTypeInfo, Base>::value>
@@ -100,17 +111,22 @@ class RecordTypeInfoImpl : public Base,
   friend class llvm::TrailingObjects<Impl, FieldImpl_>;
 
 public:
-  typedef FieldImpl_ FieldImpl;
+  using FieldImpl = FieldImpl_;
 
 private:
   const unsigned NumFields;
+  const unsigned AreFieldsABIAccessible : 1;
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
 
   template <class... As> 
-  RecordTypeInfoImpl(ArrayRef<FieldImpl> fields, As&&...args)
-      : Base(std::forward<As>(args)...), NumFields(fields.size()) {
+  RecordTypeInfoImpl(ArrayRef<FieldImpl> fields,
+                     FieldsAreABIAccessible_t fieldsABIAccessible,
+                     As&&...args)
+      : Base(std::forward<As>(args)...),
+        NumFields(fields.size()),
+        AreFieldsABIAccessible(fieldsABIAccessible) {
     std::uninitialized_copy(fields.begin(), fields.end(),
                             this->template getTrailingObjects<FieldImpl>());
   }
@@ -137,6 +153,11 @@ public:
 
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitAssignWithCopyCall(IGF, T, dest, src);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -149,17 +170,17 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
     }
   }
 
   void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitAssignWithTakeCall(IGF, T, dest, src);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -172,12 +193,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedAssignWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
   }
 
@@ -188,6 +204,11 @@ public:
         isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
           IGF, dest, src, T, isOutlined);
+    }
+
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
     if (isOutlined || T.hasOpenedExistential()) {
@@ -202,12 +223,7 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithCopyFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
     }
   }
 
@@ -219,6 +235,11 @@ public:
                  asImpl().Impl::getSize(IGF, T),
                  std::min(dest.getAlignment(), src.getAlignment()).getValue());
       return;
+    }
+
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitInitializeWithTakeCall(IGF, T, dest, src);
     }
 
     if (isOutlined || T.hasOpenedExistential()) {
@@ -233,17 +254,17 @@ public:
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedCopyAddr(
-          IGF, *this, dest, src, T,
-          &IRGenModule::getOrCreateOutlinedInitializeWithTakeFunction,
-          &typeToMetadataVec);
+      this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
     }
   }
 
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
                bool isOutlined) const override {
+    // If the fields are not ABI-accessible, use the value witness table.
+    if (!AreFieldsABIAccessible) {
+      return emitDestroyCall(IGF, T, addr);
+    }
+
     if (isOutlined || T.hasOpenedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -255,33 +276,19 @@ public:
                                     field.getType(IGF.IGM, T), isOutlined);
       }
     } else {
-      llvm::MapVector<CanType, llvm::Value *> typeToMetadataVec;
-      collectArchetypeMetadata(IGF, typeToMetadataVec, T);
-      IGF.IGM.generateCallToOutlinedDestroy(IGF, *this, addr, T,
-                                            &typeToMetadataVec);
+      this->callOutlinedDestroy(IGF, addr, T);
     }
   }
 
-  void collectArchetypeMetadata(
-      IRGenFunction &IGF,
-      llvm::MapVector<CanType, llvm::Value *> &typeToMetadataVec,
-      SILType T) const override {
-    auto canType = T.getSwiftRValueType();
-    // get the size before insertions
-    auto SZ = typeToMetadataVec.size();
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
     for (auto &field : getFields()) {
       if (field.isEmpty())
         continue;
-      auto fType = field.getType(IGF.IGM, T);
-      field.getTypeInfo().collectArchetypeMetadata(IGF, typeToMetadataVec,
-                                                   fType);
+      auto fType = field.getType(collector.IGF.IGM, T);
+      field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    if (typeToMetadataVec.find(canType) == typeToMetadataVec.end() &&
-        typeToMetadataVec.size() != SZ) {
-      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
-      assert(metadata && "Expected Type Metadata Ref");
-      typeToMetadataVec.insert(std::make_pair(canType, metadata));
-    }
+    collector.collectTypeMetadataForLayout(T);
   }
 };
 
@@ -300,7 +307,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ false, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   /// The index+1 of the unique non-empty field, or zero if there is none.
   unsigned UniqueNonEmptyFieldIndexPlusOne;
@@ -315,22 +322,6 @@ protected:
 
 public:
   using super::getStorageType;
-
-  Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                           Address destBuffer,
-                                           Address srcBuffer,
-                                           SILType type) const override {
-    if (auto field = getUniqueNonEmptyField()) {
-      auto &fieldTI = field->getTypeInfo();
-      Address fieldResult =
-        fieldTI.initializeBufferWithTakeOfBuffer(IGF, destBuffer, srcBuffer,
-                                                 field->getType(IGF.IGM, type));
-      return IGF.Builder.CreateElementBitCast(fieldResult, getStorageType());
-    } else {
-      return super::initializeBufferWithTakeOfBuffer(IGF, destBuffer,
-                                                     srcBuffer, type);
-    }
-  }
 
   Address initializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
                                            Address destBuffer,
@@ -356,6 +347,9 @@ private:
       // Ignore empty fields.
       if (field.isEmpty()) continue;
 
+      // If the field is not ABI-accessible, suppress this.
+      if (!field.isABIAccessible()) continue;
+
       // If we've already found an index, then there isn't a
       // unique non-empty field.
       if (result) return 0;
@@ -380,10 +374,12 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ false>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
+
 protected:
   template <class... As> 
-  RecordTypeInfo(As&&...args) : super(std::forward<As>(args)...) {}
+  RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
+    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...) {}
 };
 
 /// An implementation of RecordTypeInfo for loadable types. 
@@ -391,7 +387,7 @@ template <class Impl, class Base, class FieldImpl>
 class RecordTypeInfo<Impl, Base, FieldImpl,
                      /*IsFixedSize*/ true, /*IsLoadable*/ true>
     : public RecordTypeInfoImpl<Impl, Base, FieldImpl> {
-  typedef RecordTypeInfoImpl<Impl, Base, FieldImpl> super;
+  using super = RecordTypeInfoImpl<Impl, Base, FieldImpl>;
 
   unsigned ExplosionSize : 16;
 
@@ -399,9 +395,10 @@ protected:
   using super::asImpl;
 
   template <class... As> 
-  RecordTypeInfo(ArrayRef<FieldImpl> fields, unsigned explosionSize,
+  RecordTypeInfo(ArrayRef<FieldImpl> fields,
+                 unsigned explosionSize,
                  As &&...args)
-    : super(fields, std::forward<As>(args)...),
+    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...),
       ExplosionSize(explosionSize) {}
 
 private:
@@ -550,14 +547,17 @@ public:
     fieldTypesForLayout.reserve(astFields.size());
 
     bool loadable = true;
+    auto fieldsABIAccessible = FieldsAreABIAccessible;
 
     unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
       auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
-      assert(fieldTI.isComplete());
       fieldTypesForLayout.push_back(&fieldTI);
+
+      if (!fieldTI.isABIAccessible())
+        fieldsABIAccessible = FieldsAreNotABIAccessible;
 
       fields.push_back(FieldImpl(asImpl()->getFieldInfo(i, astField, fieldTI)));
 
@@ -582,11 +582,14 @@ public:
     // Create the type info.
     if (loadable) {
       assert(layout.isFixedLayout());
+      assert(fieldsABIAccessible);
       return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
     } else if (layout.isFixedLayout()) {
+      assert(fieldsABIAccessible);
       return asImpl()->createFixed(fields, std::move(layout));
     } else {
-      return asImpl()->createNonFixed(fields, std::move(layout));
+      return asImpl()->createNonFixed(fields, fieldsABIAccessible,
+                                      std::move(layout));
     }
   }  
 };

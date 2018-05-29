@@ -78,7 +78,7 @@ bool DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind DK, const Decl *D) {
 }
 
 bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) {
-  unsigned Options = getOptions(DAK);
+  auto Options = getOptions(DAK);
   switch (DK) {
 #define DECL(Id, Parent) case DeclKind::Id: return (Options & On##Id) != 0;
 #include "swift/AST/DeclNodes.def"
@@ -338,7 +338,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 #include "swift/AST/Attr.def"
   case DAK_Inline:
   case DAK_AccessControl:
-  case DAK_Ownership:
+  case DAK_ReferenceOwnership:
   case DAK_Effects:
   case DAK_Optimize:
     if (DeclAttribute::isDeclModifier(getKind())) {
@@ -370,7 +370,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DAK_Alignment:
     Printer.printAttrName("@_alignment");
-    Printer << "(" << cast<AlignmentAttr>(this)->Value << ")";
+    Printer << "(" << cast<AlignmentAttr>(this)->getValue() << ")";
     break;
 
   case DAK_SILGenName:
@@ -498,14 +498,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_StaticInitializeObjCMetadata:
-    Printer.printAttrName("@_staticInitializeObjCMetadata");
-    break;
-
-  case DAK_DowngradeExhaustivityCheck:
-    Printer.printAttrName("@_downgrade_exhaustivity_check");
-    break;
-
   case DAK_ClangImporterSynthesizedType: {
     Printer.printAttrName("@_clangImporterSynthesizedType");
     auto *attr = cast<ClangImporterSynthesizedTypeAttr>(this);
@@ -517,8 +509,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
+#define SIMPLE_DECL_ATTR(X, CLASS, ...) case DAK_##CLASS:
+#include "swift/AST/Attr.def"
+    llvm_unreachable("handled above");
+
   default:
-    llvm_unreachable("handled before this switch");
+    assert(DeclAttribute::isDeclModifier(getKind()) &&
+           "handled above");
   }
 
   return true;
@@ -541,7 +538,7 @@ void DeclAttribute::print(llvm::raw_ostream &OS, const Decl *D) const {
   print(P, PrintOptions(), D);
 }
 
-unsigned DeclAttribute::getOptions(DeclAttrKind DK) {
+uint64_t DeclAttribute::getOptions(DeclAttrKind DK) {
   switch (DK) {
   case DAK_Count:
     llvm_unreachable("getOptions needs a valid attribute");
@@ -604,6 +601,8 @@ StringRef DeclAttribute::getAttrName() const {
         return "effects(readnone)";
       case EffectsKind::ReadOnly:
         return "effects(readonly)";
+      case EffectsKind::ReleaseNone:
+        return "effects(releasenone)";
       case EffectsKind::ReadWrite:
         return "effects(readwrite)";
       case EffectsKind::Unspecified:
@@ -625,12 +624,16 @@ StringRef DeclAttribute::getAttrName() const {
     }
     llvm_unreachable("bad access level");
 
-  case DAK_Ownership:
-    switch (cast<OwnershipAttr>(this)->get()) {
-    case Ownership::Strong: llvm_unreachable("Never present in the attribute");
-    case Ownership::Weak:      return "weak";
-    case Ownership::Unowned:   return "unowned";
-    case Ownership::Unmanaged: return "unowned(unsafe)";
+  case DAK_ReferenceOwnership:
+    switch (cast<ReferenceOwnershipAttr>(this)->get()) {
+    case ReferenceOwnership::Strong:
+      llvm_unreachable("Never present in the attribute");
+    case ReferenceOwnership::Weak:
+      return "weak";
+    case ReferenceOwnership::Unowned:
+      return "unowned";
+    case ReferenceOwnership::Unmanaged:
+      return "unowned(unsafe)";
     }
     llvm_unreachable("bad ownership kind");
   case DAK_RawDocComment:
@@ -661,17 +664,17 @@ ObjCAttr::ObjCAttr(SourceLoc atLoc, SourceRange baseRange,
     NameData = name->getOpaqueValue();
 
     // Store location information.
-    ObjCAttrBits.HasTrailingLocationInfo = true;
+    Bits.ObjCAttr.HasTrailingLocationInfo = true;
     getTrailingLocations()[0] = parenRange.Start;
     getTrailingLocations()[1] = parenRange.End;
     std::memcpy(getTrailingLocations().slice(2).data(), nameLocs.data(),
                 nameLocs.size() * sizeof(SourceLoc));
   } else {
-    ObjCAttrBits.HasTrailingLocationInfo = false;
+    Bits.ObjCAttr.HasTrailingLocationInfo = false;
   }
 
-  ObjCAttrBits.ImplicitName = false;
-  ObjCAttrBits.Swift3Inferred = false;
+  Bits.ObjCAttr.ImplicitName = false;
+  Bits.ObjCAttr.Swift3Inferred = false;
 }
 
 ObjCAttr *ObjCAttr::create(ASTContext &Ctx, Optional<ObjCSelector> name,
@@ -862,17 +865,20 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                bool exported,
                                SpecializationKind kind)
     : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      numRequirements(0), trailingWhereClause(clause),
-      kind(kind), exported(exported) {
+      trailingWhereClause(clause) {
+  Bits.SpecializeAttr.exported = exported;
+  Bits.SpecializeAttr.kind = unsigned(kind);
+  Bits.SpecializeAttr.numRequirements = 0;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                ArrayRef<Requirement> requirements,
                                bool exported,
                                SpecializationKind kind)
-    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false),
-      numRequirements(0), kind(kind), exported(exported) {
-  numRequirements = requirements.size();
+    : DeclAttribute(DAK_Specialize, atLoc, range, /*Implicit=*/false) {
+  Bits.SpecializeAttr.exported = exported;
+  Bits.SpecializeAttr.kind = unsigned(kind);
+  Bits.SpecializeAttr.numRequirements = requirements.size();
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 
@@ -883,7 +889,7 @@ void SpecializeAttr::setRequirements(ASTContext &Ctx,
   assert(requirements.size() <= numClauseRequirements);
   if (!numClauseRequirements)
     return;
-  numRequirements = requirements.size();
+  Bits.SpecializeAttr.numRequirements = requirements.size();
   std::copy(requirements.begin(), requirements.end(), getRequirementsData());
 }
 

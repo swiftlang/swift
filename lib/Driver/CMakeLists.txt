@@ -1,15 +1,17 @@
 set(swiftDriver_sources
   Action.cpp
   Compilation.cpp
+  DarwinToolChains.cpp
   DependencyGraph.cpp
   Driver.cpp
   FrontendUtil.cpp
   Job.cpp
-  OutputFileMap.cpp
   ParseableOutput.cpp
+  PrettyStackTrace.cpp
   ToolChain.cpp
   ToolChains.cpp
-  Types.cpp
+  UnixToolChains.cpp
+  WindowsToolChains.cpp
   )
 
 set(swiftDriver_targetDefines)

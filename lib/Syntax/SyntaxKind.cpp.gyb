@@ -18,8 +18,45 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Syntax/SyntaxKind.h"
+#include "swift/Syntax/TokenKinds.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace swift {
+
+static StringRef getTokenTextInternal(tok kind) {
+  switch(kind) {
+% for token in SYNTAX_TOKENS:
+%   if token.text:
+  case tok::${token.kind}: return "${token.text}";
+%   end
+% end
+  default: return StringRef();
+  }
+}
+
+bool isTokenTextDetermined(tok kind) {
+  return !getTokenTextInternal(kind).empty();
+}
+
+StringRef getTokenText(tok kind) {
+  auto text = getTokenTextInternal(kind);
+  assert(!text.empty() && "token kind cannot be determined");
+  return text;
+}
+
+bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {
+  switch(Kind) {
+%   for node in SYNTAX_NODES:
+%     if node.shall_be_omitted_when_empty():
+  case syntax::SyntaxKind::${node.syntax_kind}:
+%     end
+%   end
+    return true;
+  default:
+    return false;
+  }
+}
+
 namespace syntax {
 
 void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
@@ -100,3 +137,21 @@ SyntaxKind getUnknownKind(SyntaxKind Kind) {
 }
 } // end namespace syntax
 } // end namespace swift
+
+llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &OS,
+                                    swift::syntax::SyntaxKind Kind) {
+  switch (Kind) {
+% for node in SYNTAX_NODES:
+    case swift::syntax::SyntaxKind::${node.syntax_kind}:
+    OS << "${node.syntax_kind}";
+    break;
+% end
+    case swift::syntax::SyntaxKind::Token:
+    OS << "TokenSyntax";
+    break;
+    case swift::syntax::SyntaxKind::Unknown:
+    OS << "UnknownSyntax";
+    break;
+  }
+  return OS;
+}

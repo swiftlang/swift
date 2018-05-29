@@ -435,8 +435,7 @@ extension StringProtocol where Index == String.Index {
 
   // self can be a Substring so we need to subtract/add this offset when
   // passing _ns to the Foundation APIs. Will be 0 if self is String.
-  @_inlineable
-  @_versioned
+  @inlinable
   internal var _substringOffset: Int {
     return self.startIndex.encodedOffset
   }
@@ -447,8 +446,7 @@ extension StringProtocol where Index == String.Index {
     return Index(encodedOffset: utf16Index + _substringOffset)
   }
 
-  @_inlineable
-  @_versioned
+  @inlinable
   internal func _toRelativeNSRange(_ r: Range<String.Index>) -> NSRange {
     return NSRange(
       location: r.lowerBound.encodedOffset - _substringOffset,
@@ -542,7 +540,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A capitalized representation of the string that is produced
   /// using the current locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedCapitalized: String {
     return _ns.localizedCapitalized
   }
@@ -888,7 +886,7 @@ extension StringProtocol where Index == String.Index {
 
   /// A lowercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedLowercase: String {
     return _ns.localizedLowercase
   }
@@ -953,7 +951,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardContains<
     T : StringProtocol
   >(_ string: T) -> Bool {
@@ -1128,7 +1126,7 @@ extension StringProtocol where Index == String.Index {
 
   /// An uppercase version of the string that is produced using the current
   /// locale.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public var localizedUppercase: String {
     return _ns.localizedUppercase as String
   }
@@ -1185,7 +1183,7 @@ extension StringProtocol where Index == String.Index {
 
 #if !DEPLOYMENT_RUNTIME_SWIFT
   /// Perform string transliteration.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func applyingTransform(
     _ transform: StringTransform, reverse: Bool
   ) -> String? {
@@ -1604,7 +1602,7 @@ extension StringProtocol where Index == String.Index {
   /// similar to how searches are done generally in the system.  The search is
   /// locale-aware, case and diacritic insensitive.  The exact list of search
   /// options applied may change over time.
-  @available(OSX 10.11, iOS 9.0, *)
+  @available(macOS 10.11, iOS 9.0, *)
   public func localizedStandardRange<
     T : StringProtocol
   >(of string: T) -> Range<Index>? {
@@ -1638,7 +1636,7 @@ extension StringProtocol where Index == String.Index {
   /// Equivalent to `self.rangeOfString(other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {
     let r = self.range(of: other) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
+    if #available(macOS 10.10, iOS 8.0, *) {
       _sanityCheck(r == _ns.contains(other._ephemeralString))
     }
     return r
@@ -1661,7 +1659,7 @@ extension StringProtocol where Index == String.Index {
     let r = self.range(
       of: other, options: .caseInsensitive, locale: Locale.current
     ) != nil
-    if #available(OSX 10.10, iOS 8.0, *) {
+    if #available(macOS 10.10, iOS 8.0, *) {
       _sanityCheck(r ==
         _ns.localizedCaseInsensitiveContains(other._ephemeralString))
     }

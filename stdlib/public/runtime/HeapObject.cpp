@@ -372,6 +372,10 @@ size_t swift::swift_unownedRetainCount(HeapObject *object) {
   return object->refCounts.getUnownedCount();
 }
 
+size_t swift::swift_weakRetainCount(HeapObject *object) {
+  return object->refCounts.getWeakCount();
+}
+
 HeapObject *swift::swift_unownedRetain(HeapObject *object) {
   SWIFT_RT_TRACK_INVOCATION(object, swift_unownedRetain);
   if (!isValidPointerForNativeRetain(object))
@@ -658,10 +662,10 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
     }
 #endif
 
-    if (auto fn = classMetadata->getIVarDestroyer())
-      fn(object);
+    if (classMetadata->IVarDestroyer)
+      classMetadata->IVarDestroyer(object);
 
-    classMetadata = classMetadata->SuperClass->getClassObject();
+    classMetadata = classMetadata->Superclass->getClassObject();
     assert(classMetadata && "Given metatype not a superclass of object type?");
   }
 
@@ -671,7 +675,7 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   if (!usesNativeSwiftReferenceCounting(classMetadata)) {
     // Find the pure Objective-C superclass.
     while (!classMetadata->isPureObjC())
-      classMetadata = classMetadata->SuperClass->getClassObject();
+      classMetadata = classMetadata->Superclass->getClassObject();
 
     // Set the class to the pure Objective-C superclass, so that when dealloc
     // runs, it starts at that superclass.
@@ -859,3 +863,24 @@ WeakReference *swift::swift_weakTakeAssign(WeakReference *dest,
   return dest;
 }
 
+#ifndef NDEBUG
+
+void HeapObject::dump() const {
+  auto *Self = const_cast<HeapObject *>(this);
+  printf("HeapObject: %p\n", Self);
+  printf("HeapMetadata Pointer: %p.\n", Self->metadata);
+  printf("Strong Ref Count: %d.\n", Self->refCounts.getCount());
+  printf("Unowned Ref Count: %d.\n", Self->refCounts.getUnownedCount());
+  printf("Weak Ref Count: %d.\n", Self->refCounts.getWeakCount());
+  if (Self->metadata->getKind() == MetadataKind::Class) {
+    printf("Uses Native Retain: %s.\n",
+           (objectUsesNativeSwiftReferenceCounting(Self) ? "true" : "false"));
+  } else {
+    printf("Uses Native Retain: Not a class. N/A.\n");
+  }
+  printf("RefCount Side Table: %p.\n", Self->refCounts.getSideTable());
+  printf("Is Deiniting: %s.\n",
+         (Self->refCounts.isDeiniting() ? "true" : "false"));
+}
+
+#endif

@@ -111,7 +111,7 @@ MetadataLayout &IRGenModule::getMetadataLayout(NominalTypeDecl *decl) {
   auto &entry = MetadataLayouts[decl];
   if (!entry) {
     if (auto theClass = dyn_cast<ClassDecl>(decl)) {
-      if (theClass->isForeign())
+      if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
         entry = new ForeignClassMetadataLayout(*this, theClass);
       else
         entry = new ClassMetadataLayout(*this, theClass);
@@ -162,10 +162,12 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
   if (offset.isStatic())
     return Offset(offset.getStaticOffset());
 
-  Address offsetBaseAddr(
-    IGF.IGM.getAddrOfClassMetadataBaseOffset(cast<ClassDecl>(getDecl()),
-                                             NotForDefinition),
+  Address layoutAddr(
+    IGF.IGM.getAddrOfClassMetadataBounds(cast<ClassDecl>(getDecl()),
+                                         NotForDefinition),
     IGF.IGM.getPointerAlignment());
+
+  auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
   // FIXME: Should this be an invariant load?
   llvm::Value *offsetVal = IGF.Builder.CreateLoad(offsetBaseAddr, "base");
@@ -246,7 +248,11 @@ Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
     }
   }();
 
-  return IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.SizeTy,
+  auto *elementSize = IGF.IGM.SizeTy;
+  if (isa<StructDecl>(decl))
+    elementSize = IGF.IGM.Int32Ty;
+
+  return IGF.emitAddressAtOffset(metadata, offset, elementSize,
                                  IGF.IGM.getPointerAlignment());
 }
 
@@ -450,7 +456,7 @@ ClassMetadataLayout::getFieldOffsetVectorOffset(IRGenFunction &IGF) const {
 
 Size irgen::getClassFieldOffsetOffset(IRGenModule &IGM, ClassDecl *theClass,
                                       VarDecl *field) {
-  if (theClass->isForeign())
+  if (theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return Size();
 
   return IGM.getClassMetadataLayout(theClass).getStaticFieldOffset(field);
@@ -478,6 +484,16 @@ Address irgen::emitAddressOfClassFieldOffset(IRGenFunction &IGF,
   return slot;
 }
 
+Address irgen::emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                         llvm::Value *metadata) {
+  // The superclass field in a class type is the first field past the isa.
+  unsigned index = 1;
+
+  Address addr(metadata, IGF.IGM.getPointerAlignment());
+  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
+  return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
+}
+
 /*********************************** ENUMS ************************************/
 
 EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
@@ -489,6 +505,11 @@ EnumMetadataLayout::EnumMetadataLayout(IRGenModule &IGM, EnumDecl *decl)
     EnumMetadataLayout &Layout;
     Scanner(IRGenModule &IGM, EnumDecl *decl, EnumMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
+
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfEnumTypeSpecificMetadataMembers());
+    }
 
     void addPayloadSize() {
       Layout.PayloadSizeOffset = getNextOffset();
@@ -527,6 +548,11 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     Scanner(IRGenModule &IGM, StructDecl *decl, StructMetadataLayout &layout)
       : super(IGM, decl), Layout(layout) {}
 
+    void noteStartOfTypeSpecificMembers() {
+      assert(getNextOffset().getStaticOffset() ==
+               IGM.getOffsetOfStructTypeSpecificMetadataMembers());
+    }
+
     void noteStartOfGenericRequirements() {
       Layout.GenericRequirements = getNextOffset();
       super::noteStartOfGenericRequirements();
@@ -540,6 +566,10 @@ StructMetadataLayout::StructMetadataLayout(IRGenModule &IGM, StructDecl *decl)
     void addFieldOffset(VarDecl *field) {
       Layout.FieldOffsets.try_emplace(field, getNextOffset());
       super::addFieldOffset(field);
+    }
+
+    void noteEndOfFieldOffsets() {
+      super::noteEndOfFieldOffsets();
     }
 
     void layout() {
@@ -572,7 +602,8 @@ StructMetadataLayout::getFieldOffsetVectorOffset() const {
 ForeignClassMetadataLayout::ForeignClassMetadataLayout(IRGenModule &IGM,
                                                        ClassDecl *theClass)
     : MetadataLayout(Kind::ForeignClass), Class(theClass) {
-  assert(theClass->isForeign() && "Not a foreign class");
+  assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::CFType &&
+         "Not a foreign class");
 
   struct Scanner : LayoutScanner<Scanner, ForeignClassMetadataScanner> {
     using super = LayoutScanner;

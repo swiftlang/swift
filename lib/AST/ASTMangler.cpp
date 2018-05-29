@@ -476,7 +476,6 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   std::string OldName = mangleNodeOld(NewGlobal);
-  verifyOld(OldName);
   return OldName;
 #endif
 }
@@ -504,6 +503,7 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   } else if (isa<AssociatedTypeDecl>(Decl)) {
     appendContextOf(Decl);
     appendDeclName(Decl);
+    appendOperator("Qa");
   } else {
     appendEntity(Decl);
   }
@@ -736,15 +736,34 @@ void ASTMangler::appendType(Type type) {
                             cast<BuiltinVectorType>(tybase)->getNumElements());
     case TypeKind::NameAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
-      auto NameAliasTy = cast<NameAliasType>(tybase);
-      TypeAliasDecl *decl = NameAliasTy->getDecl();
-      if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
-        // It's not possible to mangle the context of the builtin module.
-        return appendType(NameAliasTy->getSinglyDesugaredType());
-      }
+      auto aliasTy = cast<NameAliasType>(tybase);
 
+      // It's not possible to mangle the context of the builtin module.
       // For the DWARF output we want to mangle the type alias + context,
       // unless the type alias references a builtin type.
+      TypeAliasDecl *decl = aliasTy->getDecl();
+      if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
+        return appendType(aliasTy->getSinglyDesugaredType());
+      }
+
+      if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(tybase))
+          return;
+
+        appendAnyGenericType(decl);
+        bool isFirstArgList = true;
+        if (auto *nominalType = type->getAs<NominalType>()) {
+          if (nominalType->getParent())
+            type = nominalType->getParent();
+        }
+        appendBoundGenericArgs(type, isFirstArgList);
+        appendRetroactiveConformances(type);
+        appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
+      }
+
       return appendAnyGenericType(decl);
     }
 
@@ -754,10 +773,6 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Optional:
     case TypeKind::Dictionary:
       return appendSugaredType<SyntaxSugarType>(type);
-
-    case TypeKind::ImplicitlyUnwrappedOptional: {
-      llvm_unreachable("Should no longer have IUOs");
-    }
 
     case TypeKind::ExistentialMetatype: {
       ExistentialMetatypeType *EMT = cast<ExistentialMetatypeType>(tybase);
@@ -838,20 +853,23 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Struct:
     case TypeKind::BoundGenericClass:
     case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct:
+    case TypeKind::BoundGenericStruct: {
+      // We can't use getAnyNominal here because this can be TypeAliasDecl only
+      // in case of UnboundGenericType. Such mangling happens in, for instance,
+      // SourceKit 'cursorinfo' request.
+      auto *Decl = type->getAnyGeneric();
       if (type->isSpecialized()) {
         // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(type.getPointer()))
+        if (tryMangleSubstitution(tybase))
           return;
 
-        NominalTypeDecl *NDecl = type->getAnyNominal();
-        if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
+        if (isStdlibType(Decl) && Decl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
           appendOperator("Sg");
         } else {
-          appendAnyGenericType(NDecl);
+          appendAnyGenericType(Decl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
           appendRetroactiveConformances(type);
@@ -860,8 +878,9 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendAnyGenericType(tybase->getAnyNominal());
+      appendAnyGenericType(Decl);
       return;
+    }
 
     case TypeKind::SILFunction:
       return appendImplFunctionType(cast<SILFunctionType>(tybase));
@@ -983,8 +1002,8 @@ void ASTMangler::appendType(Type type) {
 
       if (auto sig = layout->getGenericSignature()) {
         fieldsList.clear();
-        for (auto &arg : box->getGenericArgs()) {
-          fieldsList.push_back(TupleTypeElt(arg.getReplacement()));
+        for (Type type : box->getSubstitutions().getReplacementTypes()) {
+          fieldsList.push_back(TupleTypeElt(type));
         }
         appendTypeList(TupleType::get(fieldsList, tybase->getASTContext())
                          ->getCanonicalType());
@@ -1500,6 +1519,15 @@ const clang::NamedDecl *ASTMangler::getClangDeclForMangling(const ValueDecl *vd)
   return namedDecl;
 }
 
+void ASTMangler::appendSymbolicReference(const DeclContext *context) {
+  // Drop in a placeholder. The real reference value has to be filled in during
+  // lowering to IR.
+  Buffer << '\1';
+  auto offset = Buffer.str().size();
+  Buffer << StringRef("\0\0\0\0", 4);
+  SymbolicReferences.emplace_back(context, offset);
+}
+
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Check for certain standard types.
   if (tryAppendStandardSubstitution(decl))
@@ -1519,6 +1547,15 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Try to mangle the entire name as a substitution.
   if (tryMangleSubstitution(key.getPointer()))
     return;
+  
+  // Try to mangle a symbolic reference.
+  if (CanSymbolicReference
+      && CanSymbolicReference(key->getAnyNominal())) {
+    appendSymbolicReference(key->getAnyNominal());
+    // Substitutions can refer back to the symbolic reference.
+    addSubstitution(key.getPointer());
+    return;
+  }
 
   appendContextOf(decl);
 
@@ -1596,7 +1633,7 @@ void ASTMangler::appendFunction(AnyFunctionType *fn, bool isFunctionMangling) {
       else
         appendOperator("_");
     }
-  } else if (parameters.size() > 0) {
+  } else if (!parameters.empty()) {
     appendOperator("y");
   }
 
@@ -1629,8 +1666,14 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn) {
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
-    if (fn->isAutoClosure())
-      return appendOperator("XK");
+    if (fn->isAutoClosure()) {
+      if (fn->isNoEscape())
+        return appendOperator("XK");
+      else
+        return appendOperator("XA");
+    } else if (fn->isNoEscape()) {
+      return appendOperator("XE");
+    }
     return appendOperator("c");
 
   case AnyFunctionType::Representation::CFunctionPointer:
@@ -1705,10 +1748,20 @@ void ASTMangler::appendTypeList(Type listTy) {
 void ASTMangler::appendTypeListElement(Identifier name, Type elementType,
                                        ParameterTypeFlags flags) {
   appendType(elementType->getInOutObjectType());
-  if (flags.isInOut())
+  switch (flags.getValueOwnership()) {
+  case ValueOwnership::Default:
+    /* nothing */
+    break;
+  case ValueOwnership::InOut:
     appendOperator("z");
-  if (flags.isShared())
+    break;
+  case ValueOwnership::Shared:
     appendOperator("h");
+    break;
+  case ValueOwnership::Owned:
+    appendOperator("n");
+    break;
+  }
   if (!name.empty())
     appendIdentifier(name.str());
   if (flags.isVariadic())

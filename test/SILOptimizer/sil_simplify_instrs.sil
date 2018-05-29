@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 import Builtin
 import Swift
@@ -313,3 +313,42 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-NEXT: return %1 : $(Builtin.Int64, Builtin.Int64, Builtin.Int64)
 }
 
+public class A {
+  var b: B
+  init(b: B)
+  deinit
+}
+
+public class B {
+  var x: Int
+  init(x: Int)
+  deinit
+}
+
+// simplify access markers
+sil @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %badr = ref_element_addr %0 : $A, #A.b
+  %ba1 = begin_access [read] [dynamic] %badr : $*B
+  end_access %ba1 : $*B
+  %ba2 = begin_access [read] [dynamic] %badr : $*B
+  fix_lifetime %ba2 : $*B
+  end_access %ba2 : $*B
+  %ba3 = begin_access [read] [dynamic] %badr : $*B
+  %b = load %ba3 : $*B
+  end_access %ba3 : $*B
+  %xadr = ref_element_addr %b : $B, #B.x
+  %xaccess = begin_access [read] [dynamic] %xadr : $*Int
+  end_access %xaccess : $*Int
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @simplify_accesssil : $@convention(method) (@guaranteed A) -> () {
+// CHECK: bb0(%0 : $A):
+// CHECK-NEXT: [[ADR:%.*]] = ref_element_addr %0 : $A, #A.b
+// CHECK-NEXT: fix_lifetime [[ADR]] : $*B
+// CHECK-NEXT: %{{.*}} = tuple ()
+// CHECK-NEXT: return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'simplify_accesssil'

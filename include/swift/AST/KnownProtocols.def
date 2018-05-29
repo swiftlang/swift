@@ -57,6 +57,7 @@ PROTOCOL(Comparable)
 PROTOCOL(Error)
 PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
+PROTOCOL(CaseIterable)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)

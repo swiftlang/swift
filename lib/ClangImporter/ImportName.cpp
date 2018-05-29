@@ -578,6 +578,8 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
   if (!bestSoFar.empty() && bestSoFar <= info.Version)
     return VersionedSwiftNameAction::Ignore;
 
+  auto requestedClangVersion = requestedVersion.asClangVersionTuple();
+
   if (info.IsReplacedByActive) {
     // We know that there are no versioned names between the active version and
     // a replacement version, because otherwise /that/ name would be active.
@@ -586,7 +588,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     // new value that is now active. (Special case: replacement = 0 means that
     // a header annotation was replaced by an unversioned API notes annotation.)
     if (info.Version.empty() ||
-        info.Version.getMajor() >= requestedVersion.majorVersionNumber()) {
+        info.Version >= requestedClangVersion) {
       return VersionedSwiftNameAction::ResetToActive;
     }
     if (bestSoFar.empty())
@@ -594,7 +596,7 @@ checkVersionedSwiftName(VersionedSwiftNameInfo info,
     return VersionedSwiftNameAction::Ignore;
   }
 
-  if (info.Version.getMajor() < requestedVersion.majorVersionNumber())
+  if (info.Version < requestedClangVersion)
     return VersionedSwiftNameAction::Ignore;
   return VersionedSwiftNameAction::Use;
 }
@@ -887,7 +889,8 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
   if (isa<clang::EnumConstantDecl>(decl)) {
     auto enumDecl = cast<clang::EnumDecl>(dc);
     switch (getEnumKind(enumDecl)) {
-    case EnumKind::Enum:
+    case EnumKind::NonFrozenEnum:
+    case EnumKind::FrozenEnum:
     case EnumKind::Options:
       // Enums are mapped to Swift enums, Options to Swift option sets.
       if (version != ImportNameVersion::raw()) {
@@ -1005,7 +1008,8 @@ static bool shouldBeSwiftPrivate(NameImporter &nameImporter,
   if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(decl)) {
     auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
     switch (nameImporter.getEnumKind(ED)) {
-    case EnumKind::Enum:
+    case EnumKind::NonFrozenEnum:
+    case EnumKind::FrozenEnum:
     case EnumKind::Options:
       if (version != ImportNameVersion::raw())
         break;
@@ -1712,7 +1716,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     }
   }
 
-  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction);
+  result.declName = formDeclName(swiftCtx, baseName, argumentNames, isFunction,
+                                 isInitializer);
   return result;
 }
 
@@ -1772,6 +1777,40 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   if (!givenName)
     importNameCache[key] = res;
   return res;
+}
+
+bool NameImporter::forEachDistinctImportName(
+    const clang::NamedDecl *decl, ImportNameVersion activeVersion,
+    llvm::function_ref<bool(ImportedName, ImportNameVersion)> action) {
+  using ImportNameKey = std::pair<DeclName, EffectiveClangContext>;
+  SmallVector<ImportNameKey, 8> seenNames;
+
+  ImportedName newName = importName(decl, activeVersion);
+  if (!newName)
+    return true;
+  ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+  if (action(newName, activeVersion))
+    seenNames.push_back(key);
+
+  activeVersion.forEachOtherImportNameVersion(
+      [&](ImportNameVersion nameVersion) {
+        // Check to see if the name is different.
+        ImportedName newName = importName(decl, nameVersion);
+        if (!newName)
+          return;
+        ImportNameKey key(newName.getDeclName(), newName.getEffectiveContext());
+
+        bool seen = llvm::any_of(
+            seenNames, [&key](const ImportNameKey &existing) -> bool {
+              return key.first == existing.first &&
+                     key.second.equalsWithoutResolving(existing.second);
+            });
+        if (seen)
+          return;
+        if (action(newName, nameVersion))
+          seenNames.push_back(key);
+      });
+  return false;
 }
 
 const InheritedNameSet *NameImporter::getAllPropertyNames(
@@ -1841,4 +1880,3 @@ const InheritedNameSet *NameImporter::getAllPropertyNames(
 
   return known->second.get();
 }
-

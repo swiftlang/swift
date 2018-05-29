@@ -149,13 +149,16 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
       DEBUG(llvm::dbgs() << "SC: Simplify Old = " << *I << '\n'
                          << "    New = " << *Result << '\n');
 
-      // Everything uses the new instruction now.
-      replaceInstUsesWith(*cast<SingleValueInstruction>(I), Result);
+      // Erase the simplified instruction and any instructions that end its
+      // scope. Nothing needs to be added to the worklist except for Result,
+      // because the instruction and all non-replaced users will be deleted.
+      replaceAllSimplifiedUsesAndErase(
+          I, Result,
+          [this](SILInstruction *Deleted) { Worklist.remove(Deleted); });
 
       // Push the new instruction and any users onto the worklist.
       Worklist.addUsersToWorklist(Result);
 
-      eraseInstFromFunction(*I);
       MadeChange = true;
       continue;
     }

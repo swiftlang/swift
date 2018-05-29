@@ -21,9 +21,9 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -37,17 +37,20 @@ STATISTIC(NumConformanceLookupTables, "# of conformance lookup tables built");
 
 using namespace swift;
 
-Witness::Witness(ValueDecl *decl, SubstitutionList substitutions,
+Witness::Witness(ValueDecl *decl, SubstitutionMap substitutions,
                  GenericEnvironment *syntheticEnv,
-                 SubstitutionList reqToSynthesizedEnvSubs) {
-  auto &ctx = decl->getASTContext();
+                 SubstitutionMap reqToSynthesizedEnvSubs) {
+  if (!syntheticEnv && substitutions.empty() &&
+      reqToSynthesizedEnvSubs.empty()) {
+    storage = decl;
+    return;
+  }
 
-  auto declRef = ConcreteDeclRef(ctx, decl, substitutions);
+  auto &ctx = decl->getASTContext();
+  auto declRef = ConcreteDeclRef(decl, substitutions);
   auto storedMem = ctx.Allocate(sizeof(StoredWitness), alignof(StoredWitness));
-  auto stored = new (storedMem)
-      StoredWitness{declRef, syntheticEnv,
-                    ctx.AllocateCopy(reqToSynthesizedEnvSubs)};
-  ctx.addDestructorCleanup(*stored);
+  auto stored = new (storedMem) StoredWitness{declRef, syntheticEnv,
+                                              reqToSynthesizedEnvSubs};
 
   storage = stored;
 }
@@ -115,8 +118,7 @@ ProtocolConformanceRef::subst(Type origType,
 
   // Check the conformance map.
   if (auto result = conformances(origType->getCanonicalType(),
-                                 substType,
-                                 proto->getDeclaredType())) {
+                                 substType, proto)) {
     return *result;
   }
 
@@ -196,6 +198,13 @@ DeclContext *ProtocolConformance::getDeclContext() const {
 /// Retrieve the state of this conformance.
 ProtocolConformanceState ProtocolConformance::getState() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getState, ())
+}
+
+ConformanceEntryKind ProtocolConformance::getSourceKind() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getSourceKind, ())
+}
+NormalProtocolConformance *ProtocolConformance::getImplyingConformance() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getImplyingConformance, ())
 }
 
 bool
@@ -374,7 +383,7 @@ ProtocolConformanceRef::getConditionalRequirements() const {
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
-  assert(ConditionalRequirements.size() == 0 &&
+  assert(ConditionalRequirements.empty() &&
          "should not recompute conditional requirements");
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();
@@ -407,7 +416,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
   ConditionalRequirements =
-    ctxt.AllocateCopy(canExtensionSig->requirementsNotSatisfiedBy(canTypeSig));
+      ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig));
 }
 
 void NormalProtocolConformance::setSignatureConformances(
@@ -764,7 +773,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
 SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
-    SubstitutionList substitutions)
+    SubstitutionMap substitutions)
   : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
     GenericSubstitutions(substitutions)
@@ -788,14 +797,6 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   }
-}
-
-SubstitutionMap SpecializedProtocolConformance::getSubstitutionMap() const {
-  auto *genericSig = GenericConformance->getGenericSignature();
-  if (genericSig)
-    return genericSig->getSubstitutionMap(GenericSubstitutions);
-
-  return SubstitutionMap();
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
@@ -880,8 +881,9 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
 }
 
 ConcreteDeclRef
-SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                                  LazyResolver *resolver) const {
+SpecializedProtocolConformance::getWitnessDeclRef(
+                                              ValueDecl *requirement,
+                                              LazyResolver *resolver) const {
   auto baseWitness = GenericConformance->getWitnessDeclRef(requirement, resolver);
   if (!baseWitness || !baseWitness.isSpecialized())
     return baseWitness;
@@ -889,21 +891,15 @@ SpecializedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
   auto specializationMap = getSubstitutionMap();
 
   auto witnessDecl = baseWitness.getDecl();
-  auto witnessSig =
-    witnessDecl->getInnermostDeclContext()->getGenericSignatureOfContext();
-  auto witnessMap =
-    witnessSig->getSubstitutionMap(baseWitness.getSubstitutions());
+  auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
 
-  SmallVector<Substitution, 4> substSubs;
-  witnessSig->getSubstitutions(combinedMap, substSubs);
-
   // Fast path if the substitutions didn't change.
-  if (SubstitutionList(substSubs) == baseWitness.getSubstitutions())
+  if (combinedMap == baseWitness.getSubstitutions())
     return baseWitness;
 
-  return ConcreteDeclRef(witnessDecl->getASTContext(), witnessDecl, substSubs);
+  return ConcreteDeclRef(witnessDecl, combinedMap);
 }
 
 ProtocolConformanceRef
@@ -985,9 +981,8 @@ ProtocolConformance::subst(Type substType,
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
 
-      SubstitutionMap subMap;
-      if (auto *genericSig = getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs, conformances);
+      auto subMap = SubstitutionMap::get(getGenericSignature(),
+                                         subs, conformances);
 
       return substType->getASTContext()
         .getSpecializedConformance(substType,
@@ -1180,8 +1175,7 @@ DeclContext::getLocalProtocols(
 
   // Sort if required.
   if (sorted) {
-    llvm::array_pod_sort(result.begin(), result.end(),
-                         &ProtocolType::compareProtocols);
+    llvm::array_pod_sort(result.begin(), result.end(), TypeDecl::compare);
   }
 
   return result;
@@ -1249,72 +1243,11 @@ bool ProtocolConformance::isCanonical() const {
     auto genericConformance = spec->getGenericConformance();
     if (!genericConformance->isCanonical())
       return false;
-    auto specSubs = spec->getGenericSubstitutions();
-    for (const auto &sub : specSubs) {
-      if (!sub.isCanonical())
-        return false;
-    }
+    if (!spec->getSubstitutionMap().isCanonical()) return false;
     return true;
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
-}
-
-Substitution Substitution::getCanonicalSubstitution(bool *wasCanonical) const {
-  bool createdNewCanonicalConformances = false;
-  bool createdCanReplacement = false;
-  SmallVector<ProtocolConformanceRef, 4> newCanConformances;
-
-  CanType canReplacement = getReplacement()->getCanonicalType();
-
-  if (!getReplacement()->isCanonical()) {
-    createdCanReplacement = true;
-  }
-
-  for (auto conf : getConformances()) {
-    if (conf.isCanonical()) {
-      newCanConformances.push_back(conf);
-      continue;
-    }
-    newCanConformances.push_back(conf.getCanonicalConformanceRef());
-    createdNewCanonicalConformances = true;
-  }
-
-  ArrayRef<ProtocolConformanceRef> canConformances = getConformances();
-  if (createdNewCanonicalConformances) {
-    auto &C = canReplacement->getASTContext();
-    canConformances = C.AllocateCopy(newCanConformances);
-  }
-
-  if (createdCanReplacement || createdNewCanonicalConformances) {
-    if (wasCanonical)
-      *wasCanonical = false;
-    return Substitution(canReplacement, canConformances);
-  }
-  if (wasCanonical)
-    *wasCanonical = true;
-  return *this;
-}
-
-SubstitutionList
-swift::getCanonicalSubstitutionList(SubstitutionList subs,
-                                    SmallVectorImpl<Substitution> &canSubs) {
-  bool subListWasCanonical = true;
-  for (auto &sub : subs) {
-    bool subWasCanonical = false;
-    auto canSub = sub.getCanonicalSubstitution(&subWasCanonical);
-    if (!subWasCanonical)
-      subListWasCanonical = false;
-    canSubs.push_back(canSub);
-  }
-
-  if (subListWasCanonical) {
-    canSubs.clear();
-    return subs;
-  }
-
-  subs = canSubs;
-  return subs;
 }
 
 /// Check of all types used by the conformance are canonical.
@@ -1342,13 +1275,10 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
     auto genericConformance = spec->getGenericConformance();
-    auto specSubs = spec->getGenericSubstitutions();
-    SmallVector<Substitution, 4> newSpecSubs;
-    auto canSpecSubs = getCanonicalSubstitutionList(specSubs, newSpecSubs);
     return Ctx.getSpecializedConformance(
-        getType()->getCanonicalType(),
-        genericConformance->getCanonicalConformance(),
-        newSpecSubs.empty() ? canSpecSubs : Ctx.AllocateCopy(canSpecSubs));
+                                getType()->getCanonicalType(),
+                                genericConformance->getCanonicalConformance(),
+                                spec->getSubstitutionMap().getCanonical());
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -1366,4 +1296,40 @@ ProtocolConformanceRef::getCanonicalConformanceRef() const {
   if (isAbstract())
     return *this;
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
+}
+
+// See swift/Basic/Statistic.h for declaration: this enables tracing
+// ProtocolConformances, is defined here to avoid too much layering violation /
+// circular linkage dependency.
+
+struct ProtocolConformanceTraceFormatter
+    : public UnifiedStatsReporter::TraceFormatter {
+  void traceName(const void *Entity, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    C->printName(OS);
+  }
+  void traceLoc(const void *Entity, SourceManager *SM,
+                clang::SourceManager *CSM, raw_ostream &OS) const {
+    if (!Entity)
+      return;
+    const ProtocolConformance *C =
+        static_cast<const ProtocolConformance *>(Entity);
+    if (auto const *NPC = dyn_cast<NormalProtocolConformance>(C)) {
+      NPC->getLoc().print(OS, *SM);
+    } else if (auto const *DC = C->getDeclContext()) {
+      if (auto const *D = DC->getAsDeclOrDeclExtensionContext())
+        D->getLoc().print(OS, *SM);
+    }
+  }
+};
+
+static ProtocolConformanceTraceFormatter TF;
+
+template<>
+const UnifiedStatsReporter::TraceFormatter*
+FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>() {
+  return &TF;
 }

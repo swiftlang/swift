@@ -41,6 +41,11 @@ protocol P3 {
     func p3Required()
 }
 
+extension Dictionary.Keys where Key : Hashable {
+
+    func foo()
+}
+
 
 [
   {
@@ -383,6 +388,52 @@ protocol P3 {
     key.kind: source.lang.swift.syntaxtype.identifier,
     key.offset: 439,
     key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 455,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Dictionary",
+    key.usr: "s:s10DictionaryV",
+    key.offset: 465,
+    key.length: 10
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Keys",
+    key.usr: "s:s10DictionaryV4KeysV",
+    key.offset: 476,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 481,
+    key.length: 5
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.typeidentifier,
+    key.offset: 487,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "Hashable",
+    key.usr: "s:s8HashableP",
+    key.offset: 493,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 509,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 514,
+    key.length: 3
   }
 ]
 [
@@ -608,6 +659,39 @@ protocol P3 {
         key.offset: 434,
         key.length: 17,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>p3Required</decl.name>()</decl.function.method.instance>"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "Key"
+      },
+      {
+        key.name: "Value"
+      }
+    ],
+    key.generic_requirements: [
+      {
+        key.description: "Key : Hashable"
+      }
+    ],
+    key.offset: 455,
+    key.length: 66,
+    key.extends: {
+      key.kind: source.lang.swift.ref.struct,
+      key.name: "Keys",
+      key.usr: "s:s10DictionaryV4KeysV"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "foo()",
+        key.usr: "s:s10DictionaryV4KeysV5cake1E3fooyyF",
+        key.offset: 509,
+        key.length: 10,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>()</decl.function.method.instance>"
       }
     ]
   }

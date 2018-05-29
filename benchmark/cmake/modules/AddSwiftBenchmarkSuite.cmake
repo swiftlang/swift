@@ -2,23 +2,69 @@
 include(CMakeParseArguments)
 include(SwiftBenchmarkUtils)
 
-# Run a shell command and assign output to a variable or fail with an error.
-# Example usage:
-#   runcmd(COMMAND "xcode-select" "-p"
-#          VARIABLE xcodepath
-#          ERROR "Unable to find current Xcode path")
-function(runcmd)
-  cmake_parse_arguments(RUNCMD "" "VARIABLE;ERROR" "COMMAND" ${ARGN})
-  execute_process(
-      COMMAND ${RUNCMD_COMMAND}
-      OUTPUT_VARIABLE ${RUNCMD_VARIABLE}
-      RESULT_VARIABLE result
-      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if(NOT "${result}" MATCHES "0")
-    message(FATAL_ERROR "${RUNCMD_ERROR}")
+macro (configure_build)
+  add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
+                  -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
+
+  if(NOT ONLY_PLATFORMS)
+    set(ONLY_PLATFORMS "macosx" "iphoneos" "appletvos" "watchos")
   endif()
-  set(${RUNCMD_VARIABLE} ${${RUNCMD_VARIABLE}} PARENT_SCOPE)
-endfunction(runcmd)
+
+  if(NOT SWIFT_EXEC)
+    runcmd(COMMAND "xcrun" "-f" "swiftc"
+           VARIABLE SWIFT_EXEC
+           ERROR "Unable to find Swift driver")
+  endif()
+
+  if(NOT SWIFT_LIBRARY_PATH)
+    get_filename_component(tmp_dir "${SWIFT_EXEC}" DIRECTORY)
+    get_filename_component(tmp_dir "${tmp_dir}" DIRECTORY)
+    set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
+  endif()
+
+  # If the CMAKE_C_COMPILER is already clang, don't find it again,
+  # thus allowing the --host-cc build-script argument to work here.
+  get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
+
+  if(${c_compiler} STREQUAL "clang")
+    set(CLANG_EXEC ${CMAKE_C_COMPILER})
+  else()
+    runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
+           VARIABLE CLANG_EXEC
+           ERROR "Unable to find Clang driver")
+  endif()
+endmacro()
+
+macro (configure_sdks)
+  set(macosx_arch "x86_64")
+  set(iphoneos_arch "arm64" "armv7")
+  set(appletvos_arch "arm64")
+  set(watchos_arch "armv7k")
+
+  set(macosx_ver "10.9")
+  set(iphoneos_ver "8.0")
+  set(appletvos_ver "9.1")
+  set(watchos_ver "2.0")
+
+  set(macosx_triple_platform "macosx")
+  set(iphoneos_triple_platform "ios")
+  set(appletvos_triple_platform "tvos")
+  set(watchos_triple_platform "watchos")
+
+  set(sdks)
+  set(platforms)
+  foreach(platform ${ONLY_PLATFORMS})
+    execute_process(
+        COMMAND "xcrun" "--sdk" "${platform}" "--show-sdk-path"
+        OUTPUT_VARIABLE ${platform}_sdk
+        RESULT_VARIABLE result
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if("${result}" MATCHES "0")
+      list(APPEND sdks "${${platform}_sdk}")
+      list(APPEND platforms ${platform})
+    endif()
+  endforeach()
+endmacro()
 
 function (add_swift_benchmark_library objfile_out sibfile_out)
   cmake_parse_arguments(BENCHLIB "" "MODULE_PATH;SOURCE_DIR;OBJECT_DIR" "SOURCES;LIBRARY_FLAGS;DEPENDS" ${ARGN})
@@ -219,7 +265,6 @@ function (swift_benchmark_compile_archopts)
     endif()
   endif()
 
-  set(common_swift3_options ${common_options} "-swift-version" "3")
   set(common_swift4_options ${common_options} "-swift-version" "4")
 
   # Always optimize the driver modules.
@@ -247,7 +292,7 @@ function (swift_benchmark_compile_archopts)
       SOURCE_DIR "${srcdir}"
       OBJECT_DIR "${objdir}"
       SOURCES ${sources}
-      LIBRARY_FLAGS ${common_swift3_options})
+      LIBRARY_FLAGS ${common_swift4_options})
     precondition(objfile_out)
     list(APPEND bench_library_objects "${objfile_out}")
     if (SWIFT_BENCHMARK_EMIT_SIB)
@@ -316,10 +361,11 @@ function (swift_benchmark_compile_archopts)
             ${stdlib_dependencies} ${bench_library_objects}
             "${srcdir}/${module_name_path}.swift"
           COMMAND "${SWIFT_EXEC}"
-          ${common_swift3_options}
+          ${common_swift4_options}
           ${extra_options}
           "-parse-as-library"
           ${bench_flags}
+          ${SWIFT_BENCHMARK_EXTRA_FLAGS}
           "-module-name" "${module_name}"
           "-emit-module-path" "${swiftmodule}"
           "-I" "${objdir}"
@@ -334,9 +380,10 @@ function (swift_benchmark_compile_archopts)
               ${stdlib_dependencies} ${bench_library_sibfiles}
               "${srcdir}/${module_name_path}.swift"
             COMMAND "${SWIFT_EXEC}"
-            ${common_swift3_options}
+            ${common_swift4_options}
             "-parse-as-library"
             ${bench_flags}
+            ${SWIFT_BENCHMARK_EXTRA_FLAGS}
             "-module-name" "${module_name}"
             "-I" "${objdir}"
             "-emit-sib"
@@ -364,7 +411,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
@@ -382,7 +429,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift3_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -400,7 +447,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfile_out)
       list(APPEND SWIFT_BENCH_OBJFILES "${objfile_out}")
@@ -418,7 +465,7 @@ function (swift_benchmark_compile_archopts)
         SOURCE_DIR "${srcdir}"
         OBJECT_DIR "${objdir}"
         SOURCES ${${module_name}_sources}
-        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags}
+        LIBRARY_FLAGS ${common_swift4_options} ${bench_flags} ${SWIFT_BENCHMARK_EXTRA_FLAGS}
         DEPENDS ${bench_library_objects} ${stdlib_dependencies})
       precondition(objfiles_out)
       list(APPEND SWIFT_BENCH_OBJFILES ${objfiles_out})
@@ -435,7 +482,7 @@ function (swift_benchmark_compile_archopts)
         ${bench_library_sibfiles} ${bench_driver_sibfiles}
         ${SWIFT_BENCH_SIBFILES} "${source}"
       COMMAND "${SWIFT_EXEC}"
-      ${common_swift3_options}
+      ${common_swift4_options}
       "-force-single-frontend-invocation"
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"

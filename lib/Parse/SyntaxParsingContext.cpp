@@ -34,20 +34,41 @@ using RootContextData = SyntaxParsingContext::RootContextData;
 
 SyntaxParsingContext::SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder,
                                            SourceFile &SF, unsigned BufferID)
-    : RootDataOrParent(new RootContextData(SF, SF.getASTContext().Diags,
-                                           SF.getASTContext().SourceMgr,
-                                           BufferID)),
-      CtxtHolder(CtxtHolder), Arena(SF.getASTContext().getSyntaxArena()),
-      Storage(getRootData().Storage), Offset(0), Mode(AccumulationMode::Root),
-      Enabled(SF.shouldKeepSyntaxInfo()) {
+    : RootDataOrParent(new RootContextData(
+          SF, SF.getASTContext().Diags, SF.getASTContext().SourceMgr, BufferID,
+          SF.getASTContext().getSyntaxArena(), SF.SyntaxParsingCache)),
+      CtxtHolder(CtxtHolder),
+      RootData(RootDataOrParent.get<RootContextData *>()), Offset(0),
+      Mode(AccumulationMode::Root), Enabled(SF.shouldBuildSyntaxTree()) {
   CtxtHolder = this;
-  Storage.reserve(128);
+  getStorage().reserve(128);
+}
+
+size_t SyntaxParsingContext::loadFromCache(size_t LexerOffset) {
+  assert(getStorage().size() == Offset &&
+         "Cannot load from cache if nodes have "
+         "already been gathered");
+  assert(Mode == AccumulationMode::CreateSyntax &&
+         "Loading from cache is only supported for mode CreateSyntax");
+  if (!getSyntaxParsingCache()) {
+    // We don't have a cache, so there's nothing to look up
+    return 0;
+  }
+  auto CacheLookup = getSyntaxParsingCache()->lookUp(LexerOffset, SynKind);
+  if (!CacheLookup) {
+    return 0;
+  }
+  Mode = AccumulationMode::LoadedFromCache;
+  RC<RawSyntax> RawLookup = CacheLookup->getRaw().get();
+  getStorage().push_back(RawLookup);
+  return RawLookup->getTextLength();
 }
 
 RC<RawSyntax>
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
                                         ArrayRef<RC<RawSyntax>> Parts) {
   assert(isUnknownKind(Kind));
+  SyntaxArena &Arena = getArena();
   return RawSyntax::make(Kind, Parts, SourcePresence::Present, &Arena);
 }
 
@@ -55,6 +76,7 @@ RC<RawSyntax>
 SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
                                      ArrayRef<RC<RawSyntax>> Parts) {
   // Try to create the node of the given syntax.
+  SyntaxArena &Arena = getArena();
   if (auto Node = SyntaxFactory::createRaw(Kind, Parts, &Arena))
     return Node;
 
@@ -68,17 +90,10 @@ RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
   if (Parts.size() == 1) {
     auto RawNode = Parts.front();
     switch (Kind) {
-    case SyntaxContextKind::Stmt: {
-      if (RawNode->isStmt())
-        return RawNode;
-      else if (RawNode->isDecl())
-        return createSyntaxAs(SyntaxKind::DeclarationStmt, Parts);
-      else if (RawNode->isExpr())
-        return createSyntaxAs(SyntaxKind::ExpressionStmt, Parts);
-      else
+    case SyntaxContextKind::Stmt:
+      if (!RawNode->isStmt())
         return makeUnknownSyntax(SyntaxKind::UnknownStmt, Parts);
       break;
-    }
     case SyntaxContextKind::Decl:
       if (!RawNode->isDecl())
         return makeUnknownSyntax(SyntaxKind::UnknownDecl, Parts);
@@ -100,6 +115,9 @@ RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
       break;
     }
     return RawNode;
+  } else if (Parts.empty()) {
+    // Just omit the unknown node if it does not have any children
+    return nullptr;
   } else {
     SyntaxKind UnknownKind;
     switch (Kind) {
@@ -128,10 +146,10 @@ RC<RawSyntax> SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
 
 /// Add RawSyntax to the parts.
 void SyntaxParsingContext::addRawSyntax(RC<RawSyntax> Raw) {
-  Storage.emplace_back(Raw);
+  getStorage().emplace_back(Raw);
 }
 
-SyntaxParsingContext *SyntaxParsingContext::getRoot() {
+const SyntaxParsingContext *SyntaxParsingContext::getRoot() const {
   auto Curr = this;
   while (!Curr->isRoot())
     Curr = Curr->getParent();
@@ -144,6 +162,7 @@ void SyntaxParsingContext::addToken(Token &Tok, Trivia &LeadingTrivia,
   if (!Enabled)
     return;
 
+  auto &Arena = getArena();
   addRawSyntax(RawSyntax::getToken(Arena, Tok.getKind(), Tok.getText(),
                                    LeadingTrivia.Pieces,
                                    TrailingTrivia.Pieces));
@@ -158,16 +177,17 @@ void SyntaxParsingContext::addSyntax(Syntax Node) {
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N) {
   if (N == 0) {
-    Storage.push_back(createSyntaxAs(Kind, {}));
+    if (!parserShallOmitWhenNoChildren(Kind))
+      getStorage().push_back(createSyntaxAs(Kind, {}));
     return;
   }
 
-  auto I = Storage.end() - N;
+  auto I = getStorage().end() - N;
   *I = createSyntaxAs(Kind, getParts().take_back(N));
 
   // Remove consumed parts.
   if (N != 1)
-    Storage.erase(I + 1, Storage.end());
+    getStorage().erase(I + 1, getStorage().end());
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
@@ -180,12 +200,16 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind) {
   case SyntaxKind::OptionalChainingExpr:
   case SyntaxKind::ForcedValueExpr:
   case SyntaxKind::PostfixUnaryExpr:
-  case SyntaxKind::TernaryExpr: {
+  case SyntaxKind::TernaryExpr:
+  case SyntaxKind::AvailabilityLabeledArgument: {
     auto Pair = SyntaxFactory::countChildren(Kind);
     assert(Pair.first == Pair.second);
     createNodeInPlace(Kind, Pair.first);
     break;
   }
+  case SyntaxKind::CodeBlockItem:
+  case SyntaxKind::IdentifierExpr:
+  case SyntaxKind::SpecializeExpr:
   case SyntaxKind::MemberAccessExpr:
   case SyntaxKind::DotSelfExpr:
   case SyntaxKind::ImplicitMemberExpr:
@@ -238,7 +262,21 @@ public:
                             "expression");
     visitChildren(Node);
   }
-
+  void visit(UnknownStmtSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "statement");
+    visitChildren(Node);
+  }
+  void visit(UnknownTypeSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "type");
+    visitChildren(Node);
+  }
+  void visit(UnknownPatternSyntax Node) override {
+    RootData.Diags.diagnose(getSourceLoc(Node), diag::unknown_syntax_entity,
+                            "pattern");
+    visitChildren(Node);
+  }
   void verify(Syntax Node) {
     Node.accept(*this);
   }
@@ -253,8 +291,8 @@ void finalizeSourceFile(RootContextData &RootData,
 
   if (SF.hasSyntaxRoot()) {
     auto SourceRaw = SF.getSyntaxRoot().getRaw();
-    auto Decls = SourceRaw->getChild(SourceFileSyntax::Cursor::TopLevelDecls)
-                     ->getLayout();
+    auto Decls =
+        SourceRaw->getChild(SourceFileSyntax::Cursor::Statements)->getLayout();
     std::copy(Decls.begin(), Decls.end(), std::back_inserter(AllTopLevel));
     EOFToken = SourceRaw->getChild(SourceFileSyntax::Cursor::EOFToken);
   }
@@ -265,12 +303,13 @@ void finalizeSourceFile(RootContextData &RootData,
   }
 
   for (auto RawNode : Parts) {
-    if (RawNode->getKind() != SyntaxKind::StmtList)
+    if (RawNode->getKind() != SyntaxKind::CodeBlockItemList)
       // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
       // the first place.
       continue;
-    AllTopLevel.push_back(
-        SyntaxFactory::createRaw(SyntaxKind::TopLevelCodeDecl, {RawNode}));
+
+    auto Items = RawNode->getLayout();
+    std::copy(Items.begin(), Items.end(), std::back_inserter(AllTopLevel));
   }
 
   if (!EOFToken)
@@ -279,12 +318,16 @@ void finalizeSourceFile(RootContextData &RootData,
   auto newRaw = SyntaxFactory::createRaw(
       SyntaxKind::SourceFile,
       {
-          SyntaxFactory::createRaw(SyntaxKind::DeclList, AllTopLevel), EOFToken,
+          SyntaxFactory::createRaw(SyntaxKind::CodeBlockItemList, AllTopLevel),
+          EOFToken,
       });
+  assert(newRaw);
   SF.setSyntaxRoot(make<SourceFileSyntax>(newRaw));
 
-  if (SF.getASTContext().LangOpts.VerifySyntaxTree) {
-    // Verify the added nodes if specified.
+  // Verify the tree if specified.
+  // Do this only when we see the real EOF token because parseIntoSourceFile()
+  // can get called multiple times for single source file.
+  if (EOFToken->isPresent() && SF.getASTContext().LangOpts.VerifySyntaxTree) {
     SyntaxVerifier Verifier(RootData);
     Verifier.verify(SF.getSyntaxRoot());
   }
@@ -297,11 +340,33 @@ void SyntaxParsingContext::finalizeRoot() {
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
-  finalizeSourceFile(getRootData(), getParts());
+  finalizeSourceFile(*getRootData(), getParts());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
-  getRootData().Storage.clear();
+  getStorage().clear();
+}
+
+void SyntaxParsingContext::synthesize(tok Kind, StringRef Text) {
+  if (!Enabled)
+    return;
+  if (Text.empty())
+    Text = getTokenText(Kind);
+  getStorage().push_back(RawSyntax::missing(Kind, Text));
+}
+
+void SyntaxParsingContext::synthesize(SyntaxKind Kind) {
+  if (!Enabled)
+    return;
+  getStorage().push_back(RawSyntax::missing(Kind));
+}
+
+void SyntaxParsingContext::dumpStorage() const  {
+  llvm::errs() << "======================\n";
+  for (auto Node : getStorage()) {
+    Node->dump();
+    llvm::errs() << "\n--------------\n";
+  }
 }
 
 SyntaxParsingContext::~SyntaxParsingContext() {
@@ -318,6 +383,8 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   if (!Enabled)
     return;
 
+  auto &Storage = getStorage();
+
   switch (Mode) {
   // Create specified Syntax node from the parts and add it to the parent.
   case AccumulationMode::CreateSyntax:
@@ -329,7 +396,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   case AccumulationMode::CoerceKind: {
     assert(!isRoot());
     if (Storage.size() == Offset) {
-      Storage.push_back(bridgeAs(CtxtKind, {}));
+      if (auto BridgedNode = bridgeAs(CtxtKind, {})) {
+        Storage.push_back(BridgedNode);
+      }
     } else {
       auto I = Storage.begin() + Offset;
       *I = bridgeAs(CtxtKind, getParts());
@@ -348,6 +417,9 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Remove all parts in this context.
   case AccumulationMode::Discard:
     Storage.resize(Offset);
+    break;
+
+  case AccumulationMode::LoadedFromCache:
     break;
 
   // Accumulate parsed toplevel syntax onto the SourceFile.

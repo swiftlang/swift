@@ -579,7 +579,7 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
 
   for (auto *UseInst : AddressUsers) {
 
-    if (isDebugInst(UseInst))
+    if (UseInst->isDebugInstruction())
       continue;
 
     if (auto *AI = dyn_cast<ApplyInst>(UseInst)) {
@@ -698,7 +698,7 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     if (isa<MarkDependenceInst>(UseInst))
       continue;
 
-    if (isDebugInst(UseInst))
+    if (UseInst->isDebugInstruction())
       continue;
     
     // Found an unsafe or unknown user. The Array may escape here.
@@ -761,7 +761,7 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   if (isa<MarkDependenceInst>(UseInst))
     return true;
 
-  if (isDebugInst(UseInst))
+  if (UseInst->isDebugInstruction())
     return true;
   
   // If this is an instruction which is a safe array element use if and only if
@@ -1394,11 +1394,11 @@ bool COWArrayOpt::hasLoopOnlyDestructorSafeArrayOperations() {
         // Checking
         // that all types are the same make guarantees that this cannot happen.
         if (SameTy.isNull()) {
-          SameTy = Sem.getSelf()->getType().getSwiftRValueType();
+          SameTy = Sem.getSelf()->getType().getASTType();
           continue;
         }
         
-        if (Sem.getSelf()->getType().getSwiftRValueType() != SameTy) {
+        if (Sem.getSelf()->getType().getASTType() != SameTy) {
           DEBUG(llvm::dbgs() << "    (NO) mismatching array types\n");
           return ReturnWithCleanup(false);
         }
@@ -1764,7 +1764,7 @@ private:
   bool checkSafeArrayAddressUses(UserList &AddressUsers) {
     for (auto *UseInst : AddressUsers) {
 
-      if (isDebugInst(UseInst))
+      if (UseInst->isDebugInstruction())
         continue;
 
       if (isa<DeallocStackInst>(UseInst)) {
@@ -2367,9 +2367,7 @@ class SwiftArrayOptPass : public SILFunctionTransform {
                             DT, nullptr);
 
       DEBUG(getFunction()->viewCFG());
-    }
 
-    if (HasChanged) {
       // We preserve the dominator tree. Let's invalidate everything
       // else.
       DA->lockInvalidation();

@@ -474,6 +474,8 @@ public:
   createAggFromFirstLevelProjections(SILBuilder &B, SILLocation Loc,
                                      SILType BaseType,
                                      llvm::SmallVectorImpl<SILValue> &Values);
+
+  void print(raw_ostream &os, SILType baseType) const;
 private:
   /// Convenience method for getting the raw underlying index as a pointer.
   TypeBase *getPointer() const {
@@ -685,8 +687,8 @@ public:
 
   void verify(SILModule &M);
 
-  raw_ostream &print(raw_ostream &OS, SILModule &M);
-  void dump(SILModule &M);
+  raw_ostream &print(raw_ostream &OS, SILModule &M) const;
+  void dump(SILModule &M) const;
 };
 
 /// Returns the hashcode for the new projection path.
@@ -836,6 +838,9 @@ class ProjectionTree {
   SILModule &Mod;
 
   /// The allocator we use to allocate ProjectionTreeNodes in the tree.
+  ///
+  /// FIXME: This should be a reference to an outside allocator. We shouldn't
+  /// have each ProjectionTree have its own allocator.
   llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
 
   // A common pattern is a 3 field struct.
@@ -924,8 +929,7 @@ public:
     return false;
   }
 
-
-  void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
+  void getLiveLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
@@ -933,8 +937,8 @@ public:
     }
   }
 
-  void
-  getLeafNodes(llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
+  void getLiveLeafNodes(
+      llvm::SmallVectorImpl<const ProjectionTreeNode *> &Out) const {
     for (unsigned LeafIndex : LiveLeafIndices) {
       const ProjectionTreeNode *Node = getNode(LeafIndex);
       assert(Node->IsLive && "We are only interested in leafs that are live");
@@ -943,9 +947,7 @@ public:
   }
 
   /// Return the number of live leafs in the projection.
-  size_t liveLeafCount() const {
-    return LiveLeafIndices.size();
-  }
+  unsigned getLiveLeafCount() const { return LiveLeafIndices.size(); }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,
                            llvm::SmallVectorImpl<SILValue> &Leafs) const;

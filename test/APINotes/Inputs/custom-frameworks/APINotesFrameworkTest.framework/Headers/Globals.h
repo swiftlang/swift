@@ -20,4 +20,6 @@ int multiVersionedGlobal345Notes;
 int multiVersionedGlobal345Header __attribute__((swift_name("multiVersionedGlobal345Header_NEW")));
 int multiVersionedGlobal345Both __attribute__((swift_name("multiVersionedGlobal345Both_OLD")));
 
+int multiVersionedGlobal34_4_2;
+
 #pragma clang assume_nonnull end

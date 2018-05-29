@@ -145,14 +145,23 @@ public:
         OS << '\n';
       }
 
-      if (flags.isInOut())
+      switch (flags.getValueOwnership()) {
+      case ValueOwnership::Default:
+        /* nothing */
+        break;
+      case ValueOwnership::InOut:
         printHeader("inout");
+        break;
+      case ValueOwnership::Shared:
+        printHeader("shared");
+        break;
+      case ValueOwnership::Owned:
+        printHeader("owned");
+        break;
+      }
 
       if (flags.isVariadic())
         printHeader("variadic");
-
-      if (flags.isShared())
-        printHeader("shared");
 
       printRec(param.getType());
 
@@ -420,92 +429,22 @@ GenericArgumentMap TypeRef::getSubstMap() const {
   return Substitutions;
 }
 
-namespace {
-bool isStruct(Demangle::NodePointer Node) {
-  switch (Node->getKind()) {
-    case Demangle::Node::Kind::Type:
-      return isStruct(Node->getChild(0));
-    case Demangle::Node::Kind::Structure:
-    case Demangle::Node::Kind::BoundGenericStructure:
-      return true;
-    default:
-      return false;
-  }
-}
-bool isEnum(Demangle::NodePointer Node) {
-  switch (Node->getKind()) {
-    case Demangle::Node::Kind::Type:
-      return isEnum(Node->getChild(0));
-    case Demangle::Node::Kind::Enum:
-    case Demangle::Node::Kind::BoundGenericEnum:
-      return true;
-    default:
-      return false;
-  }
-}
-bool isClass(Demangle::NodePointer Node) {
-  switch (Node->getKind()) {
-    case Demangle::Node::Kind::Type:
-      return isClass(Node->getChild(0));
-    case Demangle::Node::Kind::Class:
-    case Demangle::Node::Kind::BoundGenericClass:
-      return true;
-    default:
-      return false;
-  }
-}
-bool isProtocol(Demangle::NodePointer Node) {
-  switch (Node->getKind()) {
-    case Demangle::Node::Kind::Type:
-      return isProtocol(Node->getChild(0));
-    case Demangle::Node::Kind::Protocol:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool isAlias(Demangle::NodePointer Node) {
-  switch (Node->getKind()) {
-    case Demangle::Node::Kind::Type:
-      return isAlias(Node->getChild(0));
-    case Demangle::Node::Kind::TypeAlias:
-      return true;
-    default:
-      return false;
-  }
-}
-} // end anonymous namespace
-
 bool NominalTypeTrait::isStruct() const {
-  Demangle::Demangler Dem;
-  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
-  return ::isStruct(Demangled);
+  return Demangle::isStruct(MangledName);
 }
 
-bool NominalTypeTrait::isEnum() const {
-  Demangle::Demangler Dem;
-  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
-  return ::isEnum(Demangled);
-}
+bool NominalTypeTrait::isEnum() const { return Demangle::isEnum(MangledName); }
 
 bool NominalTypeTrait::isClass() const {
-  Demangle::Demangler Dem;
-  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
-  return ::isClass(Demangled);
+  return Demangle::isClass(MangledName);
 }
 
 bool NominalTypeTrait::isProtocol() const {
-  Demangle::Demangler Dem;
-  StringRef adjustedMangledName = Demangle::dropSwiftManglingPrefix(MangledName);
-  Demangle::NodePointer Demangled = Dem.demangleType(adjustedMangledName);
-  return ::isProtocol(Demangled);
+  return Demangle::isProtocol(MangledName);
 }
 
 bool NominalTypeTrait::isAlias() const {
-  Demangle::Demangler Dem;
-  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
-  return ::isAlias(Demangled);
+  return Demangle::isAlias(MangledName);
 }
 
 /// Visitor class to set the WasAbstract flag of any MetatypeTypeRefs

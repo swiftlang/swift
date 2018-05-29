@@ -113,7 +113,8 @@ static llvm::cl::opt<IRGenOutputKind>
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift LLVM IR Generator\n");
 
@@ -163,8 +164,6 @@ int main(int argc, char **argv) {
 
   // Setup the IRGen Options.
   IRGenOptions &Opts = Invocation.getIRGenOptions();
-  Opts.MainInputFilename = InputFilename;
-  Opts.OutputFilenames.push_back(OutputFilename);
   Opts.OutputKind = OutputKind;
 
   serialization::ExtendedValidationInfo extendedInfo;
@@ -206,8 +205,11 @@ int main(int argc, char **argv) {
       SL->getAll();
   }
 
-  std::unique_ptr<llvm::Module> Mod = performIRGeneration(
-      Opts, CI.getMainModule(), CI.takeSILModule(),
-      CI.getMainModule()->getName().str(), getGlobalLLVMContext());
+  const PrimarySpecificPaths PSPs(OutputFilename, InputFilename);
+  std::unique_ptr<llvm::Module> Mod =
+      performIRGeneration(Opts, CI.getMainModule(), CI.takeSILModule(),
+                          CI.getMainModule()->getName().str(),
+                          PSPs,
+                          getGlobalLLVMContext(), ArrayRef<std::string>());
   return CI.getASTContext().hadError();
 }

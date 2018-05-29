@@ -15,7 +15,6 @@
 // RUN: %target-run %t/TestData
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// UNSUPPORTED: resilient_stdlib
 
 import Foundation
 import Dispatch
@@ -3741,6 +3740,14 @@ class TestData : TestDataSuper {
 
         expectEqual(Data(bytes: [4, 5, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]), t)
     }
+
+    func test_rangeOfSlice() {
+        let data = "FooBar".data(using: .ascii)!
+        let slice = data[3...] // Bar
+
+        let range = slice.range(of: "a".data(using: .ascii)!)
+        expectEqual(range, Range<Data.Index>(4..<5))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -4058,6 +4065,7 @@ DataTests.test("test_validateMutation_slice_mutableBacking_withUnsafeMutableByte
 DataTests.test("test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound") { TestData().test_validateMutation_slice_customMutableBacking_withUnsafeMutableBytes_lengthLessThanLowerBound() }
 DataTests.test("test_byte_access_of_discontiguousData") { TestData().test_byte_access_of_discontiguousData() }
+DataTests.test("test_rangeOfSlice") { TestData().test_rangeOfSlice() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {

@@ -132,6 +132,9 @@ public:
   /// Deserialize all DefaultWitnessTables in all SILModules.
   void getAllDefaultWitnessTables();
 
+  /// Deserialize all Properties in all SILModules.
+  void getAllProperties();
+
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;
   SerializedSILLoader &operator=(const SerializedSILLoader &) = delete;

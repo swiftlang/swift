@@ -747,7 +747,7 @@ The exact syntax of the @_specialize function attribute is defined as: ::
   @_specialize(exported: false, kind: partial, where K: _Trivial64)
   func dictFunction<K, V>(dict: Dictionary<K, V>) {
   }
-    
+
 If 'exported' is set, the corresponding specialization would have a public
 visibility and can be used by clients. If 'exported' is omitted, it's value
 is assumed to be 'false'.
@@ -757,7 +757,7 @@ produce an error if you forget to specify the type for some of the generic
 parameters in the 'where' clause. If 'kind' is 'partial' it means a partial
 specialization. If 'kind' is omitted, its value is assumed to be 'full.
 
-The requirements in the where clause may be same-type constaints like 'T == Int',
+The requirements in the where clause may be same-type constraints like 'T == Int',
 but they may also specify so-called layout constraints like 'T: _Trivial'.
 
 The following layout constraints are currently supported:
@@ -773,7 +773,7 @@ The following layout constraints are currently supported:
     exactly 'SizeInBits' bits.
   * _TrivialAtMost(SizeInBits) - like _Trivial, but the size of the type should
     be at most 'SizeInBits' bits.
-  
+
 
 Existential Types and Generics
 ------------------------------

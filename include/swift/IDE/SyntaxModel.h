@@ -48,6 +48,8 @@ enum class SyntaxNodeKind : uint8_t {
   BuildConfigKeyword,
   /// An identifier in a #if condition.
   BuildConfigId,
+  /// #-keywords like #warning, #sourceLocation
+  PoundDirectiveKeyword,
   /// Any occurrence of '@<attribute-name>' anywhere.
   AttributeId,
   /// A "resolved/active" attribute. Mis-applied attributes will be AttributeId.

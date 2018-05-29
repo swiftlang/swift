@@ -59,30 +59,12 @@ SuperclassPropertiesTest.test("InsertSuperclass") {
     }
     if getVersion() == 0 {
       expectEqual(Leaf().property, "Base.property")
+      expectEqual(Leaf().nonOverriddenProperty, "Base.nonOverriddenProperty")
       expectEqual(Leaf.classProperty, "Base.classProperty")
     } else {
       expectEqual(Leaf().property, "InBetween.property")
+      expectEqual(Leaf().nonOverriddenProperty, "Base.nonOverriddenProperty")
       expectEqual(Leaf.classProperty, "InBetween.classProperty")
-    }
-  }
-}
-
-SuperclassPropertiesTest.test("ChangeRoot") {
-  do {
-    class Leaf : ChangeRoot {
-      override var property: String {
-        return super.property
-      }
-      override class var classProperty: String {
-        return super.classProperty
-      }
-    }
-    if getVersion() == 0 {
-      expectEqual(Leaf().property, "Base.property")
-      expectEqual(Leaf.classProperty, "Base.classProperty")
-    } else {
-      expectEqual(Leaf().property, "OtherBase.property")
-      expectEqual(Leaf.classProperty, "OtherBase.classProperty")
     }
   }
 }

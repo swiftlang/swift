@@ -116,6 +116,7 @@ const ValueWitnessTable swift::WEAK_VALUE_WITNESS_SYM(BO) =
 /*** Functions ***************************************************************/
 
 namespace {
+  // @escaping function types.
   struct ThickFunctionBox
     : AggregateBox<FunctionPointerBox, SwiftRetainableBox> {
 
@@ -130,12 +131,32 @@ namespace {
       return FunctionPointerBox::getExtraInhabitantIndex((void * const *) src);
     }
   };
+  /// @noescape function types.
+  struct TrivialThickFunctionBox
+      : AggregateBox<FunctionPointerBox, RawPointerBox> {
+
+    static constexpr unsigned numExtraInhabitants =
+        FunctionPointerBox::numExtraInhabitants;
+
+    static void storeExtraInhabitant(char *dest, int index) {
+      FunctionPointerBox::storeExtraInhabitant((void **)dest, index);
+    }
+
+    static int getExtraInhabitantIndex(const char *src) {
+      return FunctionPointerBox::getExtraInhabitantIndex((void *const *)src);
+    }
+  };
 } // end anonymous namespace
 
-/// The basic value-witness table for function types.
+/// The basic value-witness table for escaping function types.
 const ExtraInhabitantsValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
+
+/// The basic value-witness table for @noescape function types.
+const ExtraInhabitantsValueWitnessTable
+  swift::VALUE_WITNESS_SYM(NOESCAPE_FUNCTION_MANGLING) =
+    ValueWitnessTableForBox<TrivialThickFunctionBox>::table;
 
 /// The basic value-witness table for thin function types.
 const ExtraInhabitantsValueWitnessTable
@@ -170,3 +191,4 @@ METADATA_SYM(EMPTY_TUPLE_MANGLING) = {
     nullptr                    // Labels
   }
 };
+

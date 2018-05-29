@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
@@ -114,6 +113,11 @@ public:
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const;
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const;
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const;
 
   /// Determine whether this conformance is complete.
   bool isComplete() const {
@@ -349,6 +353,20 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// Also stores the "invalid" bit.
   llvm::PointerIntPair<Context, 1, bool> ContextAndInvalid;
 
+  /// \brief The reason that this conformance exists.
+  ///
+  /// Either Explicit (e.g. 'struct Foo: Protocol {}' or 'extension Foo:
+  /// Protocol {}'), Synthesized (e.g. RawRepresentable for 'enum Foo: Int {}')
+  /// or Implied (e.g. 'Foo : Protocol' in 'protocol Other: Protocol {} struct
+  /// Foo: Other {}'). In only the latter case, the conformance is non-null and
+  /// points to the conformance that implies this one.
+  ///
+  /// This should never be Inherited: that is handled by
+  /// InheritedProtocolConformance.
+  llvm::PointerIntPair<NormalProtocolConformance *, 2, ConformanceEntryKind>
+      SourceKindAndImplyingConformance = {nullptr,
+                                          ConformanceEntryKind::Explicit};
+
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
@@ -445,6 +463,28 @@ public:
   void setInvalid() {
     ContextAndInvalid.setInt(true);
     SignatureConformances = {};
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return SourceKindAndImplyingConformance.getInt();
+  }
+
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    assert(getSourceKind() == ConformanceEntryKind::Implied);
+    return SourceKindAndImplyingConformance.getPointer();
+  }
+
+  void setSourceKindAndImplyingConformance(
+      ConformanceEntryKind sourceKind,
+      NormalProtocolConformance *implyingConformance) {
+    assert(sourceKind != ConformanceEntryKind::Inherited &&
+           "a normal conformance cannot be inherited");
+    assert((sourceKind == ConformanceEntryKind::Implied) ==
+               (bool)implyingConformance &&
+           "an implied conformance needs something that implies it");
+    SourceKindAndImplyingConformance = {implyingConformance, sourceKind};
   }
 
   /// Determine whether this conformance is lazily loaded.
@@ -610,7 +650,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  SubstitutionList GenericSubstitutions;
+  SubstitutionMap GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -626,7 +666,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 SubstitutionList substitutions);
+                                 SubstitutionMap substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -635,15 +675,9 @@ public:
     return GenericConformance;
   }
 
-  /// Get the substitutions used to produce this specialized conformance from
-  /// the generic conformance.
-  SubstitutionList getGenericSubstitutions() const {
-    return GenericSubstitutions;
-  }
-
   /// Get the substitution map representing the substitutions used to produce
   /// this specialized conformance.
-  SubstitutionMap getSubstitutionMap() const;
+  SubstitutionMap getSubstitutionMap() const { return GenericSubstitutions; }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
   ArrayRef<Requirement> getConditionalRequirements() const {
@@ -664,6 +698,15 @@ public:
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
     return GenericConformance->getState();
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return GenericConformance->getSourceKind();
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    return GenericConformance->getImplyingConformance();
   }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
@@ -694,16 +737,15 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getGenericConformance(),
-            getGenericSubstitutions());
+    Profile(ID, getType(), getGenericConformance(), getSubstitutionMap());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
                       ProtocolConformance *genericConformance,
-                      SubstitutionList subs) {
+                      SubstitutionMap subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
-    profileSubstitutionList(ID, subs);
+    subs.profile(ID);
   }
 
   static bool classof(const ProtocolConformance *conformance) {
@@ -767,6 +809,13 @@ public:
   ProtocolConformanceState getState() const {
     return InheritedConformance->getState();
   }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Inherited;
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const { return nullptr; }
 
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const {

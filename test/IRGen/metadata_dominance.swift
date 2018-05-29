@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT -DINT=i%target-ptrsize
 
 func use_metadata<F>(_ f: F) {}
 
@@ -12,7 +12,8 @@ func cond() -> Bool { return true }
 func test1() {
 // CHECK: call swiftcc i1 @"$S18metadata_dominance4condSbyF"()
   if cond() {
-// CHECK: [[T0:%.*]] = call %swift.type* @"$SyycMa"()
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SyycMa"([[INT]] 0)
+// CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: call swiftcc void @"$S18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     use_metadata(voidToVoid)
 // CHECK: call swiftcc i1 @"$S18metadata_dominance4condSbyF"()
@@ -26,7 +27,8 @@ func test1() {
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[T1:%.*]] = call %swift.type* @"$SyycMa"()
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SyycMa"([[INT]] 0)
+// CHECK: [[T1:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: call swiftcc void @"$S18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T1]])
   use_metadata(voidToVoid)
 }
@@ -36,17 +38,20 @@ func test2() {
 // CHECK: call swiftcc i1 @"$S18metadata_dominance4condSbyF"()
   if cond() {
 // CHECK: call swiftcc i1 @"$S18metadata_dominance4condSbyF"()
-// CHECK: [[T0:%.*]] = call %swift.type* @"$SyycMa"()
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SyycMa"([[INT]] 0)
+// CHECK: [[T0:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: call swiftcc void @"$S18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
-// CHECK: [[T1:%.*]] = call %swift.type* @"$SyycMa"()
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SyycMa"([[INT]] 0)
+// CHECK: [[T1:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: call swiftcc void @"$S18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T1]])
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[T2:%.*]] = call %swift.type* @"$SyycMa"()
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$SyycMa"([[INT]] 0)
+// CHECK: [[T2:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: call swiftcc void @"$S18metadata_dominance04use_A0yyxlF"(%swift.opaque* {{.*}}, %swift.type* [[T2]])
   use_metadata(voidToVoid)
 }

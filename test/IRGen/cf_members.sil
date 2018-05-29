@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -verify -I %S/../IDE/Inputs/custom-modules %s
-// REQUIRES: objc_interop
 
 sil_stage canonical
 

@@ -1,3 +1,4 @@
+
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -array-element-propagation %s | %FileCheck %s
 sil_stage canonical
 
@@ -362,6 +363,7 @@ sil [_semantics "array.append_contentsOf"] @arrayAppendContentsOfHello : $@conve
 // CHECK-NEXT: store %1 to [[STACK]]
 // CHECK-NEXT: apply [[AEFUN]]<Hello>([[STACK]], %0)
 // CHECK-NEXT: dealloc_stack [[STACK]]
+// CHECK-NEXT: strong_release %1
 // CHECK-NEXT: release_value [[OWNER]]
 // CHECK-NEXT: return
 sil @append_contentsOf_class : $@convention(thin) (@inout Array<Hello>, @owned Hello) -> @owned Hello {

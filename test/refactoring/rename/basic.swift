@@ -19,7 +19,7 @@ guard let top = Optional.some("top") else {
 }
 print(top)
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -rename -source-filename %s -pos=2:15 -new-name new_S1 >> %t.result/S1.swift
 // RUN: diff -u %S/Outputs/basic/S1.swift.expected %t.result/S1.swift
 // RUN: %refactor -rename -source-filename %s -pos=4:16 -new-name new_c1>> %t.result/C1.swift
@@ -46,7 +46,7 @@ print(top)
 // RUN: diff -u %S/Outputs/basic/local.swift.expected %t.result/local.swift
 // RUN: %refactor -rename -source-filename %s -pos=20:7 -new-name 'bottom' > %t.result/top_level.swift
 // RUN: diff -u %S/Outputs/basic/top_level.swift.expected %t.result/top_level.swift
-// RUN: rm -rf %t.ranges && mkdir -p %t.ranges
+// RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=2:15 > %t.ranges/S1.swift
 // RUN: diff -u %S/Outputs/basic_ranges/S1.swift.expected %t.ranges/S1.swift
 // RUN: %refactor -find-local-rename-ranges -source-filename %s -pos=4:16 > %t.ranges/C1.swift

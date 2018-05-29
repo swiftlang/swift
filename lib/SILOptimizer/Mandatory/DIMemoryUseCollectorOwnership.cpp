@@ -62,19 +62,9 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(SILInstruction *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MemoryInst) {
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
-           "analyzing multi-field boxes not implemented");
-    return {ABI->getBoxType()->getFieldType(MemoryInst->getModule(), 0), false};
-  }
-
-  if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    return {ASI->getElementType(), false};
-  }
-
-  auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+  auto *MUI = MemoryInst;
   SILType MemorySILType = MUI->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -89,7 +79,7 @@ computeMemorySILType(SILInstruction *MemoryInst) {
   return {MemorySILType, VDecl->isLet()};
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
+DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
@@ -352,9 +342,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
-  if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-    if (MUI->isVar())
-      return MUI->getLoc().getAsASTNode<VarDecl>();
+  if (MemoryInst->isVar())
+    return MemoryInst->getLoc().getAsASTNode<VarDecl>();
 
   // Otherwise, we can't.
   return nullptr;
@@ -387,23 +376,6 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // Otherwise, we miscounted elements?
   assert(Element == 0 && "Element count problem");
   return false;
-}
-
-void DIMemoryObjectInfo::collectRetainCountInfo(
-    DIElementUseInfo &OutVar) const {
-  if (isa<MarkUninitializedInst>(MemoryInst))
-    return;
-
-  // Collect information about the retain count result as well.
-  for (auto *Op : MemoryInst->getUses()) {
-    auto *User = Op->getUser();
-
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
-      OutVar.trackDestroy(User);
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -535,17 +507,10 @@ public:
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
       collectClassSelfUses();
-      TheMemory.collectRetainCountInfo(UseInfo);
       return;
     }
 
-    if (auto *ABI = TheMemory.getContainer()) {
-      collectContainerUses(ABI);
-    } else {
-      collectUses(TheMemory.getAddress(), 0);
-    }
-
-    TheMemory.collectRetainCountInfo(UseInfo);
+    collectUses(TheMemory.MemoryInst, 0);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -558,7 +523,6 @@ public:
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
-  void collectContainerUses(AllocBoxInst *ABI);
   void collectClassSelfUses();
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
@@ -668,29 +632,6 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   }
 
   collectUses(SEAI, BaseEltNo);
-}
-
-void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (auto *Op : ABI->getUses()) {
-    auto *User = Op->getUser();
-
-    // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
-        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
-      continue;
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(PBI, PBI->getFieldIndex());
-      continue;
-    }
-
-    // Other uses of the container are considered escapes of the values.
-    for (unsigned Field : indices(ABI->getBoxType()->getLayout()->getFields())) {
-      addElementUses(Field,
-                     ABI->getBoxType()->getFieldType(ABI->getModule(), Field),
-                     User, DIUseKind::Escape);
-    }
-  }
 }
 
 /// Return the underlying accessed pointer value. This peeks through
@@ -1092,10 +1033,9 @@ void ElementUseCollector::collectClassSelfUses() {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-  if (MUI->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(TheMemory.getAddress(), TheMemory.MemorySILType,
-                         EltNumbering);
+  auto *MemoryInst = TheMemory.MemoryInst;
+  if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
+    collectClassSelfUses(MemoryInst, TheMemory.MemorySILType, EltNumbering);
     return;
   }
 
@@ -1112,7 +1052,9 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MemoryInst->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Stores to self.
@@ -1121,7 +1063,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MUI->getParent()) {
+          if (Arg->getParent() == MemoryInst->getParent()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1136,7 +1078,7 @@ void ElementUseCollector::collectClassSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MUI)
+          if (LI->getOperand() == MemoryInst)
             continue;
 
         // Any other store needs to be recorded.
@@ -1148,6 +1090,14 @@ void ElementUseCollector::collectClassSelfUses() {
     // Ignore end_borrows. These can only come from us being the source of a
     // load_borrow.
     if (isa<EndBorrowInst>(User))
+      continue;
+
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
       continue;
 
     // Loads of the box produce self, so collect uses from them.
@@ -1379,8 +1329,8 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // Skip end_borrow.
-    if (isa<EndBorrowInst>(User))
+    // Skip end_borrow and end_access.
+    if (isa<EndBorrowInst>(User) || isa<EndAccessInst>(User))
       continue;
 
     // ref_element_addr P, #field lookups up a field.
@@ -1417,10 +1367,9 @@ void ElementUseCollector::collectClassSelfUses(
 
     // Look through begin_borrow, upcast, unchecked_ref_cast
     // and copy_value.
-    if (isa<BeginBorrowInst>(User) ||
-        isa<UpcastInst>(User) ||
-        isa<UncheckedRefCastInst>(User) ||
-        isa<CopyValueInst>(User)) {
+    if (isa<BeginBorrowInst>(User) || isa<BeginAccessInst>(User)
+        || isa<UpcastInst>(User) || isa<UncheckedRefCastInst>(User)
+        || isa<CopyValueInst>(User)) {
       auto value = cast<SingleValueInstruction>(User);
       std::copy(value->use_begin(), value->use_end(),
                 std::back_inserter(Worklist));
@@ -1450,24 +1399,79 @@ void ElementUseCollector::collectClassSelfUses(
 }
 
 //===----------------------------------------------------------------------===//
-//                     DelegatingInitElementUseCollector
+//                    DelegatingValueTypeInitUseCollector
+//===----------------------------------------------------------------------===//
+
+static void
+collectValueTypeDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
+                                   DIElementUseInfo &UseInfo,
+                                   SingleValueInstruction *I) {
+  for (auto *Op : I->getUses()) {
+    auto *User = Op->getUser();
+
+    // destroy_addr is a release of the entire value. This can result from an
+    // early release due to a conditional initializer.
+    if (isa<DestroyAddrInst>(User)) {
+      UseInfo.trackDestroy(User);
+      continue;
+    }
+
+    // For delegating initializers, we only track calls to self.init with
+    // specialized code. All other uses are modeled as escapes.
+    //
+    // *NOTE* This intentionally ignores all stores, which (if they got emitted
+    // as copyaddr or assigns) will eventually get rewritten as assignments (not
+    // initializations), which is the right thing to do.
+    DIUseKind Kind = DIUseKind::Escape;
+
+    // Stores *to* the allocation are writes.  If the value being stored is a
+    // call to self.init()... then we have a self.init call.
+    if (auto *AI = dyn_cast<AssignInst>(User)) {
+      if (AI->getDest() == I) {
+        UseInfo.trackStoreToSelf(AI);
+        Kind = DIUseKind::InitOrAssign;
+      }
+    }
+
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (CAI->getDest() == I) {
+        UseInfo.trackStoreToSelf(CAI);
+        Kind = DIUseKind::InitOrAssign;
+      }
+    }
+
+    // Look through begin_access
+    if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
+      collectValueTypeDelegatingInitUses(TheMemory, UseInfo, BAI);
+      continue;
+    }
+
+    // Ignore end_access
+    if (isa<EndAccessInst>(User))
+      continue;
+
+    // We can safely handle anything else as an escape.  They should all happen
+    // after self.init is invoked.
+    UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                   DelegatingClassInitElementUseCollector
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-class DelegatingInitElementUseCollector {
+class DelegatingClassInitElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
-  void collectValueTypeInitSelfUses(SingleValueInstruction *I);
-
 public:
-  DelegatingInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                                    DIElementUseInfo &UseInfo)
+  DelegatingClassInitElementUseCollector(const DIMemoryObjectInfo &TheMemory,
+                                         DIElementUseInfo &UseInfo)
       : TheMemory(TheMemory), UseInfo(UseInfo) {}
 
   void collectClassInitSelfUses();
-  void collectValueTypeInitSelfUses();
 
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
@@ -1479,12 +1483,12 @@ public:
 
 /// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
 /// delegating-constructor-for-a-class case.
-void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
+void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
   assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
+  auto *MUI = TheMemory.MemoryInst;
 
   // The number of stores of the initial 'self' argument into the self box
   // that we saw.
@@ -1498,12 +1502,22 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  for (auto *Op : MUI->getUses()) {
+  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  while (!Uses.empty()) {
+    Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
 
     // Ignore end_borrow. If we see an end_borrow it can only come from a
     // load_borrow from ourselves.
     if (isa<EndBorrowInst>(User))
+      continue;
+
+    // Recurse through begin_access.
+    if (auto *beginAccess = dyn_cast<BeginAccessInst>(User)) {
+      Uses.append(beginAccess->getUses().begin(), beginAccess->getUses().end());
+      continue;
+    }
+    if (isa<EndAccessInst>(User))
       continue;
 
     // Stores to self.
@@ -1612,70 +1626,9 @@ void DelegatingInitElementUseCollector::collectClassInitSelfUses() {
   }
 }
 
-void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses(
-    SingleValueInstruction *I) {
-  for (auto Op : I->getUses()) {
-    auto *User = Op->getUser();
-
-    // destroy_addr is a release of the entire value. This can result from an
-    // early release due to a conditional initializer.
-    if (isa<DestroyAddrInst>(User)) {
-      UseInfo.trackDestroy(User);
-      continue;
-    }
-
-    // For delegating initializers, we only track calls to self.init with
-    // specialized code. All other uses are modeled as escapes.
-    //
-    // *NOTE* This intentionally ignores all stores, which (if they got emitted
-    // as copyaddr or assigns) will eventually get rewritten as assignments (not
-    // initializations), which is the right thing to do.
-    DIUseKind Kind = DIUseKind::Escape;
-
-    // Stores *to* the allocation are writes.  If the value being stored is a
-    // call to self.init()... then we have a self.init call.
-    if (auto *AI = dyn_cast<AssignInst>(User)) {
-      if (AI->getDest() == I) {
-        UseInfo.trackStoreToSelf(AI);
-        Kind = DIUseKind::InitOrAssign;
-      }
-    }
-
-    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == I) {
-        UseInfo.trackStoreToSelf(CAI);
-        Kind = DIUseKind::InitOrAssign;
-      }
-    }
-
-    // Look through begin_access
-    if (auto *BAI = dyn_cast<BeginAccessInst>(User)) {
-      collectValueTypeInitSelfUses(BAI);
-      continue;
-    }
-
-    // Ignore end_access
-    if (isa<EndAccessInst>(User))
-      continue;
-
-    // We can safely handle anything else as an escape.  They should all happen
-    // after self.init is invoked.
-    UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
-  }
-}
-
-void DelegatingInitElementUseCollector::collectValueTypeInitSelfUses() {
-  // When we're analyzing a delegating constructor, we aren't field sensitive at
-  // all.  Just treat all members of self as uses of the single
-  // non-field-sensitive value.
-  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-  collectValueTypeInitSelfUses(MUI);
-}
-
-void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
-    MarkUninitializedInst *MUI, SingleValueInstruction *LI) {
+void DelegatingClassInitElementUseCollector::
+collectDelegatingClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+                                       SingleValueInstruction *LI) {
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
   // If we have a load, then this is a use of the box.  Look at the uses of
@@ -1756,32 +1709,37 @@ void DelegatingInitElementUseCollector::collectDelegatingClassInitSelfLoadUses(
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
+static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
+  if (MemoryInfo.isDelegatingInit()) {
+    assert(MemoryInfo.isClassInitSelf());
+    return true;
+  }
+
+  return MemoryInfo.isNonDelegatingInit() &&
+         MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.isDerivedClassSelfOnly();
+}
+
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
 void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
     bool isDIFinished, bool TreatAddressToPointerAsInout) {
-  // If we have a delegating init, use the delegating init element use
-  // collector.
-  if (MemoryInfo.isDelegatingInit()) {
-    DelegatingInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
-    if (MemoryInfo.isClassInitSelf()) {
-      UseCollector.collectClassInitSelfUses();
-    } else {
-      UseCollector.collectValueTypeInitSelfUses();
-    }
 
-    MemoryInfo.collectRetainCountInfo(UseInfo);
+  if (MemoryInfo.isDelegatingInit() && !MemoryInfo.isClassInitSelf()) {
+    // When we're analyzing a delegating constructor, we aren't field sensitive
+    // at all. Just treat all members of self as uses of the single
+    // non-field-sensitive value.
+    assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
+    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo,
+                                       MemoryInfo.MemoryInst);
     return;
   }
 
-  if (MemoryInfo.isNonDelegatingInit() &&
-      MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
-      MemoryInfo.isDerivedClassSelfOnly()) {
-    DelegatingInitElementUseCollector(MemoryInfo, UseInfo)
-        .collectClassInitSelfUses();
-    MemoryInfo.collectRetainCountInfo(UseInfo);
+  if (shouldPerformClassInitSelf(MemoryInfo)) {
+    DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
+    UseCollector.collectClassInitSelfUses();
     return;
   }
 

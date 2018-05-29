@@ -59,6 +59,7 @@ EXPR_NODES = [
     Node('DeclNameArgumentList', kind='SyntaxCollection',
          element='DeclNameArgument'),
     Node('DeclNameArguments', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('Arguments', kind='DeclNameArgumentList'),
@@ -74,6 +75,7 @@ EXPR_NODES = [
                        'SelfToken',
                        'CapitalSelfToken',
                        'DollarIdentifierToken',
+                       'SpacedBinaryOperatorToken',
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),
@@ -156,9 +158,19 @@ EXPR_NODES = [
          ]),
 
     # An operator like + or -.
+    # NOTE: This appears only in SequenceExpr.
     Node('BinaryOperatorExpr', kind='Expr',
          children=[
              Child('OperatorToken', kind='BinaryOperatorToken'),
+         ]),
+
+    # arrow-expr -> 'throws'? '->'
+    # NOTE: This appears only in SequenceExpr.
+    Node('ArrowExpr', kind='Expr',
+         children=[
+             Child('ThrowsToken', kind='ThrowsToken',
+                   is_optional=True),
+             Child('ArrowToken', kind='ArrowToken'),
          ]),
 
     # A floating-point literal
@@ -171,6 +183,7 @@ EXPR_NODES = [
          ]),
 
     Node('TupleExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('LeftParen', kind='LeftParenToken'),
              Child('ElementList', kind='TupleElementList'),
@@ -180,21 +193,21 @@ EXPR_NODES = [
     # Array literal, e.g. [1, 2, 3]
     Node('ArrayExpr', kind='Expr',
          children=[
-             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('LeftSquare', kind='LeftSquareBracketToken'),
              Child('Elements', kind='ArrayElementList'),
-             Child('RightSquare', kind='RightSquareToken'),
+             Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
     # Dictionary literal, e.g. [1:1, 2:2, 3:3]
     Node('DictionaryExpr', kind='Expr',
          children=[
-             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('LeftSquare', kind='LeftSquareBracketToken'),
              Child('Content', kind='Syntax',
                    node_choices=[
                        Child('Colon', kind='ColonToken'),
                        Child('Elements', kind='DictionaryElementList'),
                    ]),
-             Child('RightSquare', kind='RightSquareToken'),
+             Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
     # .foo
@@ -208,6 +221,7 @@ EXPR_NODES = [
 
     # function-call-argument -> label? ':'? expression ','?
     Node('FunctionCallArgument', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
                    is_optional=True),
@@ -220,6 +234,7 @@ EXPR_NODES = [
 
     # An element inside a tuple element list
     Node('TupleElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Label', kind='IdentifierToken',
                    is_optional=True),
@@ -232,6 +247,7 @@ EXPR_NODES = [
 
     # element inside an array expression: expression ','?
     Node('ArrayElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Expression', kind='Expr'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
@@ -239,6 +255,7 @@ EXPR_NODES = [
 
     # element inside an array expression: expression ','?
     Node('DictionaryElement', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('KeyExpression', kind='Expr'),
              Child('Colon', kind='ColonToken'),
@@ -283,7 +300,9 @@ EXPR_NODES = [
     # a.b
     Node('MemberAccessExpr', kind='Expr',
          children=[
-             Child("Base", kind='Expr'),
+             # The base needs to be optional to parse expressions in key paths
+             # like \.a
+             Child("Base", kind='Expr', is_optional=True),
              Child("Dot", kind='PeriodToken'),
              Child("Name", kind='Token'),
              Child('DeclNameArguments', kind='DeclNameArguments',
@@ -328,6 +347,7 @@ EXPR_NODES = [
          ]),
 
     Node('ClosureCaptureItem', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child("Specifier", kind='TokenList', is_optional=True),
              Child("Name", kind='IdentifierToken', is_optional=True),
@@ -341,12 +361,13 @@ EXPR_NODES = [
 
     Node('ClosureCaptureSignature', kind='Syntax',
          children=[
-             Child('LeftSquare', kind='LeftSquareToken'),
+             Child('LeftSquare', kind='LeftSquareBracketToken'),
              Child('Items', kind='ClosureCaptureItemList', is_optional=True),
-             Child('RightSquare', kind='RightSquareToken'),
+             Child('RightSquare', kind='RightSquareBracketToken'),
          ]),
 
     Node('ClosureParam', kind='Syntax',
+         traits=['WithTrailingComma'],
          children=[
              Child('Name', kind='Token',
                    token_choices=[
@@ -374,10 +395,11 @@ EXPR_NODES = [
          ]),
 
     Node('ClosureExpr', kind='Expr',
+         traits=['Braced', 'WithStatements'],
          children=[
              Child('LeftBrace', kind='LeftBraceToken'),
              Child('Signature', kind='ClosureSignature', is_optional=True),
-             Child('Statements', kind='StmtList'),
+             Child('Statements', kind='CodeBlockItemList'),
              Child('RightBrace', kind='RightBraceToken'),
          ]),
 
@@ -416,7 +438,7 @@ EXPR_NODES = [
     Node('OptionalChainingExpr', kind='Expr',
          children=[
              Child('Expression', kind='Expr'),
-             Child('QuetionMark', kind='PostfixQuestionMarkToken'),
+             Child('QuestionMark', kind='PostfixQuestionMarkToken'),
          ]),
 
     # forced-value-expr -> expr '!'
@@ -433,6 +455,13 @@ EXPR_NODES = [
              Child('OperatorToken', kind='PostfixOperatorToken'),
          ]),
 
+    # specialize-expr -> expr generic-argument-clause?
+    Node('SpecializeExpr', kind='Expr',
+         children=[
+             Child('Expression', kind='Expr'),
+             Child('GenericArgumentClause', kind='GenericArgumentClause'),
+         ]),
+
     # string literal segment in a string interpolation expression.
     Node('StringSegment', kind='Syntax',
          children=[
@@ -441,6 +470,7 @@ EXPR_NODES = [
 
     # expression segment in a string interpolation expression.
     Node('ExpressionSegment', kind='Syntax',
+         traits=['Parenthesized'],
          children=[
              Child('Backslash', kind='BackslashToken'),
              Child('LeftParen', kind='LeftParenToken'),
@@ -468,7 +498,19 @@ EXPR_NODES = [
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
+             Child('RootExpr', kind='Expr', is_optional=True, 
+                   node_choices=[
+                       Child('IdentifierExpr', kind='IdentifierExpr'),
+                       Child('SpecializeExpr', kind='SpecializeExpr')
+                   ]), 
              Child('Expression', kind='Expr'),
+         ]),
+
+    # The period in the key path serves as the base on which the 
+    # right-hand-side of the key path is evaluated
+    Node('KeyPathBaseExpr', kind='Expr', 
+         children=[
+             Child('Period', kind='PeriodToken'),
          ]),
 
     # e.g. "a." or "a"
@@ -483,10 +525,26 @@ EXPR_NODES = [
 
     # e.g. "#keyPath(a.b.c)"
     Node('ObjcKeyPathExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('KeyPath', kind='PoundKeyPathToken'),
              Child('LeftParen', kind='LeftParenToken'),
              Child('Name', kind='ObjcName'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # e.g. "#selector(getter:Foo.bar)"
+    Node('ObjcSelectorExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundSelector', kind='PoundSelectorToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Kind', kind='ContextualKeywordToken',
+                   text_choices=['getter', 'setter'],
+                   is_optional=True),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Name', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 
@@ -497,6 +555,7 @@ EXPR_NODES = [
          ]),
     # #fileLiteral(a, b, c)
     Node('ObjectLiteralExpr', kind='Expr',
+         traits=['Parenthesized'],
          children=[
              Child('Identifier', kind='Token',
                    token_choices=[

@@ -1,5 +1,19 @@
+include(CheckIncludeFiles)
+check_include_files("xpc/xpc.h" HAVE_XPC_H)
+
+swift_is_installing_component(sourcekit-inproc SOURCEKIT_INSTALLING_INPROC)
+
+if(HAVE_XPC_H AND SWIFT_BUILD_SOURCEKIT AND NOT SOURCEKIT_INSTALLING_INPROC)
+  set(BUILD_SOURCEKIT_XPC_SERVICE TRUE)
+else()
+  set(BUILD_SOURCEKIT_XPC_SERVICE FALSE)
+endif()
+
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
+if(SWIFT_BUILD_SOURCEKIT)
+  list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
+endif()
 
 add_swift_tool_subdirectory(driver)
 add_swift_tool_subdirectory(sil-opt)
@@ -16,10 +30,19 @@ add_swift_tool_subdirectory(swift-api-digester)
 add_swift_tool_subdirectory(swift-syntax-test)
 add_swift_tool_subdirectory(swift-refactor)
 
+if(LLVM_USE_SANITIZE_COVERAGE)
+add_swift_tool_subdirectory(swift-demangle-fuzzer)
+endif()
+
+if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  set(BUILD_FOUNDATION TRUE)
+else()
+  set(BUILD_FOUNDATION FALSE)
+endif()
+
 if(SWIFT_BUILD_SOURCEKIT)
   add_swift_tool_subdirectory(SourceKit)
 endif()
-
 
 if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # Only build Darwin-specific tools when deploying to OS X.
@@ -28,7 +51,7 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
   # SwiftSyntax depends on both the standard library (because it's a
   # Swift module), and the SDK overlays (because it depends on Foundation).
   # Ensure we only build SwiftSyntax when we're building both.
-  if(SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
+  if(BUILD_FOUNDATION)
     add_subdirectory(SwiftSyntax)
   endif()
 endif()

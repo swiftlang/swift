@@ -2,7 +2,7 @@
 
 #
 # Generate the static-stdlib-args.lnk used by the -static-stdlib option for
-# 'GenericUnix' (eg linux) plaforms. Tries to find static .a files for libs
+# 'GenericUnix' (eg linux) platforms. Tries to find static .a files for libs
 # not normally installed by default (currently libicu)
 # If libicu is built locally then include libicudata
 #

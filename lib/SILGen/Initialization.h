@@ -235,7 +235,6 @@ public:
   void finishUninitialized(SILGenFunction &SGF) override {}
 };
 
-/// Abstract base class for single-buffer initializations.
 class TemporaryInitialization : public SingleBufferInitialization {
   SILValue Addr;
   CleanupHandle Cleanup;

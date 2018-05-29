@@ -204,6 +204,13 @@ public:
                     : getResolutionStrategy(idKind)));
   }
   
+  constexpr static KeyPathComponentHeader
+  forExternalComponent() {
+    return KeyPathComponentHeader(
+      _SwiftKeyPathComponentHeader_ExternalTag
+      << _SwiftKeyPathComponentHeader_DiscriminatorShift);
+  }
+  
   constexpr uint32_t getData() const { return Data; }
 };
 

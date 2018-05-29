@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-astscope-lookup  -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$S15local_recursionAA_1yySi_SitF : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : @trivial $Int, [[Y:%1]] : @trivial $Int):
@@ -62,7 +62,7 @@ func local_recursion(_ x: Int, y: Int) {
   // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
   tc(x)
 
-  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$S15local_recursionAA_1yySi_SitFySicfU_
+  // CHECK: [[CLOSURE_REF:%.*]] = function_ref @$S15local_recursionAA_1yySi_SitFySiXEfU_
   // CHECK: apply [[CLOSURE_REF]]([[X]], [[X]], [[Y]])
   let _: Void = {
     self_recursive($0)

@@ -1,3 +1,4 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-stdlib -parse-as-library  -module-name TestMod %S/Inputs/TestMod.sil -emit-module-path %t/TestMod.swiftmodule
 // RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -inline -I %t %s | %FileCheck %s
@@ -13,17 +14,17 @@ import TestMod
 struct MyStruct {
 }
 
-sil @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
-sil @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+sil @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
+sil @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
 
 // CHECK-LABEL: sil @testit
 sil @testit : $@convention(thin) () -> MyStruct {
 bb0:
-  %x0 = function_ref @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <X> (@in X) -> @out X
-  %13 = function_ref @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %x0 = function_ref @_TF7TestMod10genlibfuncurFq_q_ : $@convention(thin) <X> (@in_guaranteed X) -> @out X
+  %13 = function_ref @_TF7TestMod11genlibfunc2urFq_q_ : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %14 = alloc_stack $MyStruct
   %16 = alloc_stack $MyStruct
-  %17 = apply %13<MyStruct>(%16, %14) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %17 = apply %13<MyStruct>(%16, %14) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %18 = struct $MyStruct ()
   dealloc_stack %16 : $*MyStruct
   dealloc_stack %14 : $*MyStruct

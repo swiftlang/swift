@@ -345,8 +345,8 @@ public class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAsso
 private class ID_PrivateAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
   public var publicValue: Int = 0
   public var filePrivateValue: Int = 0
-  // CHECK-DAG: {{^}} internal typealias PublicValue
-  // CHECK-DAG: {{^}} internal typealias FilePrivateValue
+  // CHECK-DAG: {{^}} fileprivate typealias PublicValue
+  // CHECK-DAG: {{^}} fileprivate typealias FilePrivateValue
 } // CHECK: {{^[}]}}
 
 // CHECK-LABEL: class MultipleAttributes {

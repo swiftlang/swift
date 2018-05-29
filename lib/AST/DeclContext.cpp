@@ -47,15 +47,33 @@ ASTContext &DeclContext::getASTContext() const {
 
 GenericTypeDecl *
 DeclContext::getAsTypeOrTypeExtensionContext() const {
-  if (auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext())) {
-    if (auto ED = dyn_cast<ExtensionDecl>(decl)) {
-      if (auto type = ED->getExtendedType())
-        return type->getAnyNominal();
-      return nullptr;
+  auto decl = const_cast<Decl*>(getAsDeclOrDeclExtensionContext());
+  if (!decl) return nullptr;
+
+  auto ext = dyn_cast<ExtensionDecl>(decl);
+  if (!ext) return dyn_cast<GenericTypeDecl>(decl);
+
+  auto type = ext->getExtendedType();
+  if (!type) return nullptr;
+
+  while (true) {
+    // expected case: we reference a nominal type (potentially through sugar)
+    if (auto nominal = type->getAnyNominal())
+      return nominal;
+
+    // early type checking case: we have a typealias reference that is still
+    // unsugared, so explicitly look through the underlying type if there is
+    // one.
+    if (auto typealias =
+          dyn_cast_or_null<TypeAliasDecl>(type->getAnyGeneric())) {
+      type = typealias->getUnderlyingTypeLoc().getType();
+      if (!type) return nullptr;
+
+      continue;
     }
-    return dyn_cast<GenericTypeDecl>(decl);
+
+    return nullptr;
   }
-  return nullptr;
 }
 
 /// If this DeclContext is a NominalType declaration or an
@@ -128,9 +146,14 @@ static Type computeExtensionType(const ExtensionDecl *ED, DeclTypeKind kind) {
     return type->getAnyNominal()->getDeclaredType();
   case DeclTypeKind::DeclaredTypeInContext:
     return type;
-  case DeclTypeKind::DeclaredInterfaceType:
+  case DeclTypeKind::DeclaredInterfaceType: {
     // FIXME: Need a sugar-preserving getExtendedInterfaceType for extensions
-    return type->getAnyNominal()->getDeclaredInterfaceType();
+    if (auto nominal = type->getAnyNominal())
+      return nominal->getDeclaredInterfaceType();
+
+    auto typealias = cast<TypeAliasDecl>(type->getAnyGeneric());
+    return typealias->getUnderlyingTypeLoc().getType();
+  }
   }
 
   llvm_unreachable("Unhandled DeclTypeKind in switch.");
@@ -273,23 +296,6 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
-DeclContext *DeclContext::getCommonParentContext(DeclContext *A,
-                                                 DeclContext *B) {
-  if (A == B)
-    return A;
-
-  if (A->isChildContextOf(B))
-    return B;
-
-  // Peel away layers of A until we reach a common parent
-  for (DeclContext *CurDC = A; CurDC; CurDC = CurDC->getParent()) {
-    if (B->isChildContextOf(CurDC))
-      return CurDC;
-  }
-
-  return nullptr;
-}
-
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
@@ -341,8 +347,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     // if the type is formally fixed layout.
     if (isa<PatternBindingInitializer>(dc)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(dc->getParent())) {
-        if (!NTD->getFormalAccessScope(/*useDC=*/nullptr,
-                                       /*respectVersionedAttr=*/true).isPublic())
+        auto nominalAccess =
+          NTD->getFormalAccessScope(/*useDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true);
+        if (!nominalAccess.isPublic())
           return ResilienceExpansion::Maximal;
 
         if (NTD->isFormallyResilient())
@@ -363,10 +371,13 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (!AFD->hasAccess())
         break;
 
+      auto funcAccess =
+        AFD->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true);
+
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!AFD->getFormalAccessScope(/*useDC=*/nullptr,
-                                     /*respectVersionedAttr=*/true).isPublic())
+      if (!funcAccess.isPublic())
         break;
 
       // Bodies of public transparent and always-inline functions are
@@ -374,17 +385,17 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (AFD->isTransparent())
         return ResilienceExpansion::Minimal;
 
-      if (AFD->getAttrs().hasAttribute<InlineableAttr>())
+      if (AFD->getAttrs().hasAttribute<InlinableAttr>())
         return ResilienceExpansion::Minimal;
 
       if (auto attr = AFD->getAttrs().getAttribute<InlineAttr>())
         if (attr->getKind() == InlineKind::Always)
           return ResilienceExpansion::Minimal;
 
-      // If a property or subscript is @_inlineable, the accessors are
-      // @_inlineable also.
+      // If a property or subscript is @inlinable, the accessors are
+      // @inlinable also.
       if (auto accessor = dyn_cast<AccessorDecl>(AFD))
-        if (accessor->getStorage()->getAttrs().getAttribute<InlineableAttr>())
+        if (accessor->getStorage()->getAttrs().getAttribute<InlinableAttr>())
           return ResilienceExpansion::Minimal;
     }
   }
@@ -793,6 +804,9 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
 getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  if (DC->getASTContext().isSwiftVersion3())
+    return DC;
+
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;

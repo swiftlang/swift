@@ -118,6 +118,16 @@ public:
                               StringRef PrimaryFile,
                               std::string &Error);
 
+  /// Initializes \p Invocation as if for typechecking, but with no inputs.
+  ///
+  /// If \p AllowInputs is false, it is an error for \p OrigArgs to contain any
+  /// input files.
+  bool initCompilerInvocationNoInputs(swift::CompilerInvocation &Invocation,
+                                      ArrayRef<const char *> OrigArgs,
+                                      swift::DiagnosticEngine &Diags,
+                                      std::string &Error,
+                                      bool AllowInputs = true);
+
   void removeCachedAST(SwiftInvocationRef Invok);
 
   struct Implementation;

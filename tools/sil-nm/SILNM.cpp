@@ -139,7 +139,8 @@ static void nmModule(SILModule *M) {
 }
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "SIL NM\n");
 

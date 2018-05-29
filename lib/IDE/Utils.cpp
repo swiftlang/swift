@@ -375,7 +375,7 @@ static void walkOverriddenClangDecls(const clang::NamedDecl *D, const FnTy &Fn){
 
 void
 ide::walkOverriddenDecls(const ValueDecl *VD,
-                         std::function<void(llvm::PointerUnion<
+                         llvm::function_ref<void(llvm::PointerUnion<
                              const ValueDecl*, const clang::NamedDecl*>)> Fn) {
   for (auto CurrOver = VD; CurrOver; CurrOver = CurrOver->getOverriddenDecl()) {
     if (CurrOver != VD)
@@ -940,6 +940,10 @@ swift::ide::SourceEditOutputConsumer::~SourceEditOutputConsumer() { delete &Impl
 void swift::ide::SourceEditOutputConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<Replacement> Replacements) {
+  // ignore mismatched or
+  if (RegionType == RegionType::Unmatched || RegionType == RegionType::Mismatch)
+    return;
+
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }

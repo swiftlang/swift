@@ -41,13 +41,13 @@
 #include "GenClass.h"
 #include "GenFunc.h"
 #include "GenHeap.h"
-#include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"
@@ -487,21 +487,6 @@ namespace {
 
     static constexpr struct ForGetter_t { } ForGetter{};
     static constexpr struct ForSetter_t { } ForSetter{};
-
-#define FOREACH_FAMILY(FAMILY)         \
-    FAMILY(Alloc, "alloc")             \
-    FAMILY(Copy, "copy")               \
-    FAMILY(Init, "init")               \
-    FAMILY(MutableCopy, "mutableCopy") \
-    FAMILY(New, "new")
-
-    // Note that these are in parallel with 'prefixes', below.
-    enum class Family {
-      None,
-#define GET_LABEL(LABEL, PREFIX) LABEL,
-      FOREACH_FAMILY(GET_LABEL)
-#undef GET_LABEL
-    };
     
     Selector() = default;
 
@@ -571,31 +556,6 @@ namespace {
     StringRef str() const {
       return Text;
     }
-
-    /// Return the family string of this selector.
-    Family getFamily() const {
-      StringRef text = str();
-      while (!text.empty() && text[0] == '_') text = text.substr(1);
-
-#define CHECK_PREFIX(LABEL, PREFIX) \
-      if (hasPrefix(text, PREFIX)) return Family::LABEL;
-      FOREACH_FAMILY(CHECK_PREFIX)
-#undef CHECK_PREFIX
-
-      return Family::None;
-    }
-
-  private:
-    /// Does the given selector start with the given string as a
-    /// prefix, in the sense of the selector naming conventions?
-    static bool hasPrefix(StringRef text, StringRef prefix) {
-      if (!text.startswith(prefix)) return false;
-      if (text.size() == prefix.size()) return true;
-      assert(text.size() > prefix.size());
-      return !clang::isLowercase(text[prefix.size()]);
-    }
-
-#undef FOREACH_FAMILY
   };
 } // end anonymous namespace
 
@@ -621,6 +581,7 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
   if (isInstanceMethod) {
     searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                            MetadataValueType::ObjCClass,
+                                           MetadataState::Complete,
                                            /*allow uninitialized*/ true);
   } else {
     searchClass = cast<MetatypeType>(searchClass).getInstanceType();
@@ -628,6 +589,7 @@ static llvm::Value *emitSuperArgument(IRGenFunction &IGF,
     if (doesClassMetadataRequireDynamicInitialization(IGF.IGM, searchClassDecl)) {
       searchValue = emitClassHeapMetadataRef(IGF, searchClass,
                                              MetadataValueType::ObjCClass,
+                                             MetadataState::Complete,
                                              /*allow uninitialized*/ true);
       searchValue = emitLoadOfObjCHeapMetadataRef(IGF, searchValue);
       searchValue = IGF.Builder.CreateBitCast(searchValue, IGF.IGM.ObjCClassPtrTy);
@@ -725,7 +687,7 @@ Callee irgen::getObjCMethodCallee(IRGenFunction &IGF,
   if (auto searchType = methodInfo.getSearchType()) {
     receiverValue =
       emitSuperArgument(IGF, isInstanceMethod, selfValue,
-                        searchType.getSwiftRValueType());
+                        searchType.getASTType());
   } else {
     receiverValue = selfValue;
   }
@@ -972,8 +934,8 @@ void irgen::emitObjCPartialApplication(IRGenFunction &IGF,
   Address fieldAddr = fieldLayout.project(IGF, dataAddr, offsets);
   Explosion selfParams;
   selfParams.add(self);
-  fieldLayout.getType().initializeFromParams(IGF, selfParams, fieldAddr,
-                                             fieldType, false);
+  fieldLayout.getTypeForAccess().initializeFromParams(IGF, selfParams, fieldAddr,
+                                                      fieldType, false);
 
   // Create the forwarding stub.
   llvm::Function *forwarder = emitObjCPartialApplicationForwarder(IGF.IGM,
@@ -1102,7 +1064,7 @@ static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
   assert(getter);
   CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
   return IGM.getClangType(
-      methodTy->getFormalCSemanticResult().getSwiftRValueType());
+      methodTy->getFormalCSemanticResult().getASTType());
 }
 
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
@@ -1134,7 +1096,7 @@ static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
 
   // Return type.
   {
-    auto clangType = IGM.getClangType(resultType.getSwiftRValueType());
+    auto clangType = IGM.getClangType(resultType.getASTType());
     if (clangType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,
@@ -1381,7 +1343,6 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
-                                  ResilienceExpansion::Minimal,
                                   1, 
                                   /*foreign*/ true);
   Selector selector(declRef);

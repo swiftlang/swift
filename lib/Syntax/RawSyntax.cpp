@@ -30,7 +30,7 @@ static bool isTrivialSyntaxKind(SyntaxKind Kind) {
     return true;
   switch(Kind) {
   case SyntaxKind::SourceFile:
-  case SyntaxKind::TopLevelCodeDecl:
+  case SyntaxKind::CodeBlockItem:
   case SyntaxKind::ExpressionStmt:
   case SyntaxKind::DeclarationStmt:
     return true;
@@ -75,6 +75,14 @@ RawSyntax::RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
   Bits.Presence = unsigned(Presence);
   Bits.ManualMemory = unsigned(ManualMemory);
   Bits.NumChildren = Layout.size();
+
+  // Compute the text length
+  Bits.TextLength = 0;
+  for (const auto ChildNode : Layout) {
+    if (ChildNode && !ChildNode->isMissing()) {
+      Bits.TextLength += ChildNode->getTextLength();
+    }
+  }
 
   // Initialize layout data.
   std::uninitialized_copy(Layout.begin(), Layout.end(),
@@ -179,12 +187,32 @@ RawSyntax::accumulateAbsolutePosition(AbsolutePosition &Pos) const {
       Trailer.accumulateAbsolutePosition(Pos);
   } else {
     for (auto &Child : getLayout()) {
+      if (!Child)
+        continue;
       auto Result = Child->accumulateAbsolutePosition(Pos);
       if (!Ret && Result)
         Ret = Result;
     }
   }
   return Ret;
+}
+
+bool RawSyntax::accumulateLeadingTrivia(AbsolutePosition &Pos) const {
+ if (isToken()) {
+    if (!isMissing()) {
+      for (auto &Leader: getLeadingTrivia())
+        Leader.accumulateAbsolutePosition(Pos);
+      return true;
+    }
+  } else {
+    for (auto &Child: getLayout()) {
+      if (!Child)
+        continue;
+      if (Child->accumulateLeadingTrivia(Pos))
+        return true;
+    }
+  }
+  return false;
 }
 
 void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
@@ -217,6 +245,7 @@ void RawSyntax::print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const {
 
 void RawSyntax::dump() const {
   dump(llvm::errs(), /*Indent*/ 0);
+  llvm::errs() << '\n';
 }
 
 void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
@@ -254,6 +283,8 @@ void RawSyntax::dump(llvm::raw_ostream &OS, unsigned Indent) const {
     }
   } else {
     for (auto &Child : getLayout()) {
+      if (!Child)
+        continue;
       OS << "\n";
       Child->dump(OS, Indent + 1);
     }

@@ -346,7 +346,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
       return;
     }
   } else if (auto *TI = dyn_cast<TupleInst>(Inst)) {
-    if (isTupleWithArray(TI->getType().getSwiftRValueType())) {
+    if (isTupleWithArray(TI->getType().getASTType())) {
       // Add dependencies from array elements to the tuple itself.
       for (Operand &Op : TI->getAllOperands()) {
         SILValue V = Op.get();
@@ -379,7 +379,7 @@ void GlobalPropertyOpt::scanInstruction(swift::SILInstruction *Inst) {
   // the instruction value to false.
   for (auto result : Inst->getResults()) {
     SILType Type = result->getType();
-    if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
+    if (isArrayType(Type) || isTupleWithArray(Type.getASTType())) {
       DEBUG(llvm::dbgs() << "      value could be non-native array: "
                          << *result);
       setNotNative(getValueEntry(result));
@@ -400,7 +400,7 @@ void GlobalPropertyOpt::scanInstructions() {
       for (auto *BBArg : BB.getArguments()) {
         bool hasPreds = false;
         SILType Type = BBArg->getType();
-        if (isArrayType(Type) || isTupleWithArray(Type.getSwiftRValueType())) {
+        if (isArrayType(Type) || isTupleWithArray(Type.getASTType())) {
           for (auto *Pred : BB.getPredecessorBlocks()) {
             hasPreds = true;
             auto *Term = Pred->getTerminator();

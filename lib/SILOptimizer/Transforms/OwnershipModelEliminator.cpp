@@ -297,6 +297,10 @@ namespace {
 struct OwnershipModelEliminator : SILModuleTransform {
   void run() override {
     for (auto &F : *getModule()) {
+      // Don't rerun early lowering on deserialized functions.
+      if (F.wasDeserializedCanonical())
+        continue;
+
       // Set F to have unqualified ownership.
       F.setUnqualifiedOwnership();
 

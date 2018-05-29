@@ -14,7 +14,7 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix THREE-OUTPUTS %s < %t.complex.txt
 
-// RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-use-filelists %s %S/../Inputs/empty.swift -module-name main 2>&1 | %FileCheck -check-prefix FILELISTS %s
+// RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-filelist-threshold=0 %s %S/../Inputs/empty.swift -module-name main 2>&1 | %FileCheck -check-prefix FILELISTS %s
 
 // CHECK: bin/swift{{c?}} -frontend
 // CHECK: -module-name {{[^ ]+}}
@@ -53,16 +53,16 @@
 
 
 // TWO-OUTPUTS: bin/swift{{c?}} -frontend
-// TWO-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // TWO-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
+// TWO-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // TWO-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // TWO-OUTPUTS: bin/swift{{c?}} -frontend
 // TWO-OUTPUTS: -emit-module [[MODULE]]
 // TWO-OUTPUTS: -o main.swiftmodule
 
 // THREE-OUTPUTS: bin/swift{{c?}} -frontend
-// THREE-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // THREE-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
+// THREE-OUTPUTS: -emit-module-doc-path {{[^ ]*}}/merge-module-{{[^ ]*}}.swiftdoc
 // THREE-OUTPUTS: -o {{[^ ]*}}/merge-module-{{[^ ]*}}.o
 // THREE-OUTPUTS: bin/swift{{c?}} -frontend
 // THREE-OUTPUTS: -emit-module [[MODULE]]

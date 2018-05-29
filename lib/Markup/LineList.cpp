@@ -25,7 +25,7 @@ std::string LineList::str() const {
     return "";
 
   auto FirstLine = Lines.begin();
-  while (FirstLine->Text.empty() && FirstLine != Lines.end())
+  while (FirstLine != Lines.end() && FirstLine->Text.empty())
     ++FirstLine;
 
   if (FirstLine == Lines.end())

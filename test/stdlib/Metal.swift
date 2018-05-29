@@ -1,4 +1,4 @@
-// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos
@@ -72,7 +72,7 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
       /* Setup */
 
       let device = MTLCreateSystemDefaultDevice()!
-      #if os(OSX)
+      #if os(macOS)
         let options = MTLResourceOptions.storageModeManaged
       #else
         let options = MTLResourceOptions.storageModePrivate
@@ -81,7 +81,7 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
 
       /* Call APIs */
 
-      #if os(OSX)
+      #if os(macOS)
         buf.didModifyRange(0..<4)
       #endif
       buf.addDebugMarker("test marker", range: 0..<4)
@@ -97,7 +97,7 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
       let queue = device.makeCommandQueue()!
       let cmdBuf = queue.makeCommandBuffer()!
 
-      #if os(OSX)
+      #if os(macOS)
         let options = MTLResourceOptions.storageModeManaged
       #else
         let options = MTLResourceOptions.storageModePrivate
@@ -162,7 +162,7 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
       let queue = device.makeCommandQueue()!
       let cmdBuf = queue.makeCommandBuffer()!
 
-      #if os(OSX)
+      #if os(macOS)
         let options = MTLResourceOptions.storageModeManaged
       #else
         let options = MTLResourceOptions.storageModePrivate
@@ -182,7 +182,7 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
       let encoder = cmdBuf.makeRenderCommandEncoder(descriptor: rpDesc)!
       encoder.useResources([buf], usage: MTLResourceUsage.read)
       encoder.useHeaps([heap])
-      #if os(OSX)
+      #if os(macOS)
         encoder.setViewports([MTLViewport()])
         encoder.setScissorRects([MTLScissorRect(x:0, y:0, width:1, height:1)])
       #endif

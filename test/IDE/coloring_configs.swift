@@ -280,8 +280,8 @@ class NestedPoundIf {
 // CHECK: <kw>class</kw> NestedPoundIf {
     func foo1() {
 // CHECK: <kw>func</kw> foo1() {
-        #if os(OSX)
-// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>OSX</#id>)
+        #if os(macOS)
+// CHECK: <#kw>#if</#kw> <#id>os</#id>(<#id>macOS</#id>)
           var a = 1
 // CHECK: <kw>var</kw> a = <int>1</int>
             #if USE_METAL
@@ -316,3 +316,10 @@ class NestedPoundIf {
     func foo3() {}
 // CHECK: <kw>func</kw> foo3() {}
 }
+
+// CHECK: <#kw>#error</#kw>(<str>"Error"</str>)
+#error("Error")
+// CHECK: <#kw>#warning</#kw>(<str>"Warning"</str>)
+#warning("Warning")
+// CHECK: <#kw>#sourceLocation</#kw>(file: <str>"x"</str>, line: <int>1</int>)
+#sourceLocation(file: "x", line: 1)

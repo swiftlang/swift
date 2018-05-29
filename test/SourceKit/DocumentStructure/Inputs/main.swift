@@ -107,3 +107,23 @@ protocol FooProtocol {
 
 // SR-5717
 a.b(c: d?.e?.f, h: i)
+
+// SR-6926
+/* 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦 */
+`init`(x: Int, y: Int) {}
+class C {
+/* 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦 */
+`init`(x: Int, y: Int) {}
+}
+var // comment
+  `$` = 1
+func /* comment */`foo`(x: Int) {}
+
+// rdar://40085232
+enum MyEnum {
+  case Bar(arg: Int)
+}
+
+enum MySecondEnum {
+  case One = 1
+}

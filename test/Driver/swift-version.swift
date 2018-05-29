@@ -14,7 +14,7 @@
 // RUN: not %target-swiftc_driver -swift-version 5 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_5 %s
 
 // BAD: invalid value
-// BAD: note: valid arguments to '-swift-version' are '3', '4', '5'
+// BAD: note: valid arguments to '-swift-version' are '3', '4', '4.2', '5'
 
 // FIXIT_3: use major version, as in '-swift-version 3'
 // FIXIT_4: use major version, as in '-swift-version 4'

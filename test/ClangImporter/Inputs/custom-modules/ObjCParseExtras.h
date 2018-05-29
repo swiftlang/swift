@@ -154,6 +154,19 @@ __weak id globalWeakVar;
 - (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
 @end
 
+@interface DesignatedInitWithClassExtension : DesignatedInitRoot
+- (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
+- (instancetype)initWithConvenienceInt:(NSInteger)value;
+@end
+@interface DesignatedInitWithClassExtension ()
+- (instancetype)initWithFloat:(float)value __attribute__((objc_designated_initializer));
+@end
+
+@interface DesignatedInitWithClassExtensionInAnotherModule : DesignatedInitRoot
+- (instancetype)initWithInt:(NSInteger)value __attribute__((objc_designated_initializer));
+- (instancetype)initWithConvenienceInt:(NSInteger)value;
+@end
+
 
 @protocol ExplicitSetterProto
 @property (readonly) id foo;
@@ -212,3 +225,19 @@ typedef NSArray<NSString *> *NSStringArray;
 
 typedef NSString * _Nonnull (*FPTypedef)(NSString * _Nonnull);
 extern FPTypedef _Nonnull getFP(void);
+
+
+#if !__has_feature(objc_arc_fields)
+# error "Your Clang is not new enough"
+#endif
+struct NonTrivialToCopy {
+  __strong id field;
+};
+
+struct NonTrivialToCopyWrapper {
+  struct NonTrivialToCopy inner;
+};
+
+struct TrivialToCopy {
+  __unsafe_unretained id field;
+};

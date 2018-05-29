@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-emit-sil -verify %s
 
 struct Block {}
 

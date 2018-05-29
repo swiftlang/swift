@@ -578,12 +578,16 @@ const TypeInfo *TypeConverter::convertFunctionType(SILFunctionType *T) {
     spareBits.append(IGM.getFunctionPointerSpareBits());
     spareBits.append(IGM.getHeapObjectSpareBits());
     
-    return FuncTypeInfo::create(CanSILFunctionType(T),
-                                IGM.FunctionPairTy,
-                                IGM.getPointerSize() * 2,
-                                IGM.getPointerAlignment(),
-                                std::move(spareBits),
-                                IsNotPOD);
+    if (T->isNoEscape()) {
+      // @noescape thick functions are trivial types.
+      return FuncTypeInfo::create(
+          CanSILFunctionType(T), IGM.NoEscapeFunctionPairTy,
+          IGM.getPointerSize() * 2, IGM.getPointerAlignment(),
+          std::move(spareBits), IsPOD);
+    }
+    return FuncTypeInfo::create(
+        CanSILFunctionType(T), IGM.FunctionPairTy, IGM.getPointerSize() * 2,
+        IGM.getPointerAlignment(), std::move(spareBits), IsNotPOD);
   }
   }
   llvm_unreachable("bad function type representation");
@@ -713,11 +717,10 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy =
-    getArgumentLoweringType(argType.getSwiftRValueType(), param);
+  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
   auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
   // Empty values don't matter.
-  return ti.getSchema().size() == 0 && !param.isFormalIndirect();
+  return ti.getSchema().empty() && !param.isFormalIndirect();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially
@@ -754,7 +757,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType origType,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
-                                   SubstitutionList subs,
+                                   SubstitutionMap subs,
                                    HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   auto outSig = IGM.getSignature(outType);
@@ -929,7 +932,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
-      layout->getBindings().restore(subIGF, bindingsAddr);
+      layout->getBindings().restore(subIGF, bindingsAddr,
+                                    MetadataState::Complete);
     }
 
   // There's still a placeholder to claim if the target type is thick
@@ -943,8 +947,9 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.empty() != hasPolymorphicParameters(origType) ||
-         (subs.empty() && origType->getRepresentation() ==
+  assert((subs.hasAnySubstitutableParams()
+            == hasPolymorphicParameters(origType) ||
+         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
@@ -980,10 +985,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       (void)param.claimAll();
     }
 
-    SubstitutionMap subMap;
-    if (auto genericSig = origType->getGenericSignature())
-      subMap = genericSig->getSubstitutionMap(subs);
-    emitPolymorphicArguments(subIGF, origType, subMap,
+    emitPolymorphicArguments(subIGF, origType, subs,
                              &witnessMetadata, polyArgs);
   }
 
@@ -1058,6 +1060,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       if (RetainableValue->getType() != subIGF.IGM.RefCountedPtrTy)
         RetainableValue = subIGF.Builder.CreateBitCast(
             RetainableValue, subIGF.IGM.RefCountedPtrTy);
+      needsAllocas = true;
       auto temporary = subIGF.createAlloca(RetainableValue->getType(),
                                            subIGF.IGM.getPointerAlignment(),
                                            "partial-apply.context");
@@ -1087,7 +1090,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto &fieldTy = layout->getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
-      auto &fieldTI = fieldLayout.getType();
+      auto &fieldTI = fieldLayout.getTypeForAccess();
       auto fieldSchema = fieldTI.getSchema();
       
       Explosion param;
@@ -1171,16 +1174,15 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // If the parameters can live independent of the context, release it now
     // so we can tail call. The safety of this assumes that neither this release
     // nor any of the loads can throw.
-    if (consumesContext && !dependsOnContextLifetime && rawData)
+    if (consumesContext && !dependsOnContextLifetime && rawData) {
+      assert(!outType->isNoEscape() && "Trivial context must not be released");
       subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+    }
 
     // Now that we have bound generic parameters from the captured arguments
     // emit the polymorphic arguments.
     if (hasPolymorphicParameters(origType)) {
-      SubstitutionMap subMap;
-      if (auto genericSig = origType->getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs);
-      emitPolymorphicArguments(subIGF, origType, subMap,
+      emitPolymorphicArguments(subIGF, origType, subs,
                                &witnessMetadata, polyArgs);
     }
   }
@@ -1272,8 +1274,10 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   }
   
   // If the parameters depended on the context, consume the context now.
-  if (rawData && consumesContext && dependsOnContextLifetime)
+  if (rawData && consumesContext && dependsOnContextLifetime) {
+    assert(!outType->isNoEscape() && "Trivial context must not be released");
     subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
+  }
 
   // Reabstract the result value as substituted.
   SILFunctionConventions origConv(origType, IGM.getSILModule());
@@ -1324,7 +1328,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 void irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
-    SubstitutionList subs, CanSILFunctionType origType,
+    SubstitutionMap subs, CanSILFunctionType origType,
     CanSILFunctionType substType, CanSILFunctionType outType, Explosion &out,
     bool isOutlined) {
   // If we have a single Swift-refcounted context value, we can adopt it
@@ -1337,12 +1341,11 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
 
+  assert(!outType->isNoEscape());
+
   // Reserve space for polymorphic bindings.
-  SubstitutionMap subMap;
-  if (auto genericSig = origType->getGenericSignature())
-    subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                            origType, subMap);
+                                                            origType, subs);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
@@ -1357,14 +1360,13 @@ void irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
-    auto argLoweringTy =
-        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     // Empty values don't matter.
     auto schema = ti.getSchema();
-    if (schema.size() == 0 && !param.isFormalIndirect())
+    if (schema.empty() && !param.isFormalIndirect())
       continue;
 
     argValTypes.push_back(argType);
@@ -1563,9 +1565,9 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        auto addr = fieldLayout.getType().getAddressForPointer(args.claimNext());
-        fieldLayout.getType().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
-                                                 isOutlined);
+        auto addr = fieldLayout.getTypeForAccess().getAddressForPointer(args.claimNext());
+        fieldLayout.getTypeForAccess().initializeWithTake(IGF, fieldAddr, addr, fieldTy,
+                                                          isOutlined);
         break;
       }
       // Take direct value arguments and inout pointers by value.
@@ -1574,7 +1576,7 @@ void irgen::emitFunctionPartialApplication(
       case ParameterConvention::Direct_Guaranteed:
       case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable:
-        cast<LoadableTypeInfo>(fieldLayout.getType())
+        cast<LoadableTypeInfo>(fieldLayout.getTypeForAccess())
             .initialize(IGF, args, fieldAddr, isOutlined);
         break;
       }

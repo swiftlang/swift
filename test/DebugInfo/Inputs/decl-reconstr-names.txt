@@ -1,0 +1,3 @@
+$S12DeclReconstr8patatinoSiyF ---> func patatino() -> Int
+$S12DeclReconstr1SVACycfC ---> init()
+$S12DeclReconstr8PatatinoaySiGD ---> typealias Patatino<T> = Foo<T>

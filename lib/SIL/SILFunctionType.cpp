@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -267,6 +268,42 @@ public:
   getIndirectSelfParameter(const AbstractionPattern &type) const = 0;
   virtual ParameterConvention
   getDirectSelfParameter(const AbstractionPattern &type) const = 0;
+
+  // Helpers that branch based on a value ownership.
+  ParameterConvention getIndirect(ValueOwnership ownership, bool forSelf,
+                                  unsigned index,
+                                  const AbstractionPattern &type,
+                                  const TypeLowering &substTL) const {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      if (forSelf)
+        return getIndirectSelfParameter(type);
+      return getIndirectParameter(index, type, substTL);
+    case ValueOwnership::InOut:
+      return ParameterConvention::Indirect_Inout;
+    case ValueOwnership::Shared:
+      return ParameterConvention::Indirect_In_Guaranteed;
+    case ValueOwnership::Owned:
+      return ParameterConvention::Indirect_In;
+    }
+  }
+
+  ParameterConvention getDirect(ValueOwnership ownership, bool forSelf,
+                                unsigned index, const AbstractionPattern &type,
+                                const TypeLowering &substTL) const {
+    switch (ownership) {
+    case ValueOwnership::Default:
+      if (forSelf)
+        return getDirectSelfParameter(type);
+      return getDirectParameter(index, type, substTL);
+    case ValueOwnership::InOut:
+      return ParameterConvention::Indirect_Inout;
+    case ValueOwnership::Shared:
+      return ParameterConvention::Direct_Guaranteed;
+    case ValueOwnership::Owned:
+      return ParameterConvention::Direct_Owned;
+    }
+  }
 };
 
 /// A visitor for breaking down formal result types into a SILResultInfo
@@ -321,7 +358,7 @@ public:
       }
     }
 
-    SILResultInfo result(substResultTL.getLoweredType().getSwiftRValueType(),
+    SILResultInfo result(substResultTL.getLoweredType().getASTType(),
                          convention);
     Results.push_back(result);
   }
@@ -448,7 +485,7 @@ private:
     if (clangTy->isPointerType()
         && clangTy->getPointeeType().isConstQualified()) {
       // Peek through optionals.
-      if (auto substObjTy = substTy.getAnyOptionalObjectType())
+      if (auto substObjTy = substTy.getOptionalObjectType())
         substTy = substObjTy;
 
       // Void pointers aren't usefully indirectable.
@@ -522,40 +559,6 @@ private:
     }
   }
 
-  void visitSharedType(AbstractionPattern origType, CanType substType,
-                       SILFunctionTypeRepresentation rep) {
-    NextOrigParamIndex++;
-
-    auto &substTL =
-      M.Types.getTypeLowering(origType, substType);
-    ParameterConvention convention;
-    if (origType.getAs<InOutType>()) {
-      convention = ParameterConvention::Indirect_Inout;
-    } else if (isa<TupleType>(substType) && !origType.isTypeParameter()) {
-      // Do not lower tuples @guaranteed.  This can create conflicts with
-      // substitutions for witness thunks e.g. we take $*(T, T)
-      // @in_guaranteed and try to substitute it for $*T.
-      return visit(origType, substType);
-    } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
-      if (rep == SILFunctionTypeRepresentation::WitnessMethod)
-        convention = ParameterConvention::Indirect_In_Guaranteed;
-      else
-        convention = Convs.getIndirectSelfParameter(origType);
-      assert(isIndirectFormalParameter(convention));
-
-    } else if (substTL.isTrivial()) {
-      convention = ParameterConvention::Direct_Unowned;
-    } else {
-      convention = Convs.getDirectSelfParameter(origType);
-      assert(!isIndirectFormalParameter(convention));
-    }
-
-    auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-    Inputs.push_back(SILParameterInfo(loweredType, convention));
-
-    maybeAddForeignParameters();
-  }
-
   /// This is a special entry point that allows destructure inputs to handle
   /// self correctly.
   void visitTopLevelParams(AbstractionPattern origType,
@@ -564,11 +567,15 @@ private:
     unsigned numEltTypes = params.size();
     unsigned numNonSelfParams = numEltTypes - 1;
 
+    auto silRepresentation = extInfo.getSILRepresentation();
+
     // We have to declare this out here so that the lambda scope lasts for
     // the duration of the loop below.
     auto handleForeignSelf = [&] {
-      visit(origType.getTupleElementType(numNonSelfParams),
-            params[numNonSelfParams].getType());
+      // This is a "self", but it's not a Swift self, we handle it differently.
+      visit(ValueOwnership::Default,
+            /*forSelf=*/false, origType.getTupleElementType(numNonSelfParams),
+            params[numNonSelfParams].getType(), silRepresentation);
     };
 
     // If we have a foreign-self, install handleSelf as the handler.
@@ -586,42 +593,43 @@ private:
     // to substitute.
     if (params.empty()) {
       if (origType.isTypeParameter())
-        visit(origType, M.getASTContext().TheEmptyTupleType);
+        visit(ValueOwnership::Default, /*forSelf=*/false, origType,
+              M.getASTContext().TheEmptyTupleType, silRepresentation);
       return;
     }
 
     assert(numEltTypes > 0);
+
+    auto handleParameter = [&](AbstractionPattern pattern,
+                               ParameterTypeFlags paramFlags, CanType ty) {
+      CanTupleType tty = dyn_cast<TupleType>(ty);
+      // If the abstraction pattern is opaque, and the tuple type is
+      // materializable -- if it doesn't contain an l-value type -- then it's
+      // a valid target for substitution and we should not expand it.
+      if (!tty || (pattern.isTypeParameter() && !tty->hasInOutElement())) {
+        visit(paramFlags.getValueOwnership(), /*forSelf=*/false, pattern, ty,
+              silRepresentation);
+        return;
+      }
+
+      for (auto i : indices(tty.getElementTypes())) {
+        auto patternEltTy = pattern.getTupleElementType(i);
+        auto trueEltTy = tty.getElementType(i);
+        auto flags = tty->getElement(i).getParameterFlags();
+        visit(flags.getValueOwnership(), /*forSelf=*/false, patternEltTy,
+              trueEltTy, silRepresentation);
+      }
+    };
 
     // If we don't have 'self', we don't need to do anything special.
     if (!extInfo.hasSelfParam() && !Foreign.Self.isImportAsMember()) {
       CanType ty = AnyFunctionType::composeInput(M.getASTContext(), params,
                                                  /*canonicalVararg*/true)
                       ->getCanonicalType();
-      CanTupleType tty = dyn_cast<TupleType>(ty);
-      // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (origType.isTypeParameter() && !tty->hasInOutElement())) {
-        auto flags = (params.size() == 1)
-                   ? params.front().getParameterFlags()
-                   : ParameterTypeFlags();
-        if (flags.isShared()) {
-          visitSharedType(origType, ty, extInfo.getSILRepresentation());
-        } else {
-          visit(origType, ty);
-        }
-        return;
-      }
+      auto flags = (params.size() == 1) ? params.front().getParameterFlags()
+                                        : ParameterTypeFlags();
 
-      for (auto i : indices(tty.getElementTypes())) {
-        if (tty->getElement(i).getParameterFlags().isShared()) {
-          visitSharedType(origType.getTupleElementType(i),
-                          tty.getElementType(i),
-                          extInfo.getSILRepresentation());
-        } else {
-          visit(origType.getTupleElementType(i), tty.getElementType(i));
-        }
-      }
+      handleParameter(origType, flags, ty);
       return;
     }
 
@@ -629,49 +637,51 @@ private:
 
     // Process all the non-self parameters.
     for (unsigned i = 0; i != numNonSelfParams; ++i) {
-      CanType ty =  params[i].getType();
-      CanTupleType tty = dyn_cast<TupleType>(ty);
+      CanType ty = params[i].getType();
       AbstractionPattern eltPattern = origType.getTupleElementType(i);
-      // If the abstraction pattern is opaque, and the tuple type is
-      // materializable -- if it doesn't contain an l-value type -- then it's
-      // a valid target for substitution and we should not expand it.
-      if (!tty || (eltPattern.isTypeParameter() && !tty->hasInOutElement())) {
-        if (params[i].isShared()) {
-          visitSharedType(eltPattern, ty, extInfo.getSILRepresentation());
-        } else {
-          visit(eltPattern, ty);
-        }
-        continue;
-      }
+      auto flags = params[i].getParameterFlags();
 
-      assert(eltPattern.isTuple());
-      for (unsigned j = 0; j < eltPattern.getNumTupleElements(); ++j) {
-        visit(eltPattern.getTupleElementType(j), tty.getElementType(j));
-      }
+      handleParameter(eltPattern, flags, ty);
     }
 
     // Process the self parameter.  Note that we implicitly drop self
     // if this is a static foreign-self import.
     if (!Foreign.Self.isImportAsMember()) {
-      visitSharedType(origType.getTupleElementType(numNonSelfParams),
-                      params[numNonSelfParams].getType(),
-                      extInfo.getSILRepresentation());
+      visit(ValueOwnership::Default, /*forSelf=*/true,
+            origType.getTupleElementType(numNonSelfParams),
+            params[numNonSelfParams].getType(), silRepresentation);
     }
 
     // Clear the foreign-self handler for safety.
     HandleForeignSelf.reset();
   }
 
-  void visit(AbstractionPattern origType, CanType substType) {
-    // Expand tuples.
+  void visit(ValueOwnership ownership, bool forSelf,
+             AbstractionPattern origType, CanType substType,
+             SILFunctionTypeRepresentation rep) {
+    // Tuples get handled specially, in some cases:
     CanTupleType substTupleTy = dyn_cast<TupleType>(substType);
     if (substTupleTy && !origType.isTypeParameter()) {
       assert(origType.getNumTupleElements() == substTupleTy->getNumElements());
-      for (auto i : indices(substTupleTy.getElementTypes())) {
-        visit(origType.getTupleElementType(i),
-              substTupleTy.getElementType(i));
+      switch (ownership) {
+      case ValueOwnership::Default:
+      case ValueOwnership::Owned:
+        // Expand the tuple.
+        for (auto i : indices(substTupleTy.getElementTypes())) {
+          visit(ownership, forSelf, origType.getTupleElementType(i),
+                substTupleTy.getElementType(i), rep);
+        }
+        return;
+      case ValueOwnership::Shared:
+        // Do not lower tuples @guaranteed.  This can create conflicts with
+        // substitutions for witness thunks e.g. we take $*(T, T)
+        // @in_guaranteed and try to substitute it for $*T.
+        return visit(ValueOwnership::Default, forSelf, origType, substType,
+                     rep);
+      case ValueOwnership::InOut:
+        // handled below
+        break;
       }
-      return;
     }
 
     unsigned origParamIndex = NextOrigParamIndex++;
@@ -682,17 +692,20 @@ private:
       assert(origType.isTypeParameter() || origType.getAs<InOutType>());
       convention = ParameterConvention::Indirect_Inout;
     } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
-      convention = Convs.getIndirectParameter(origParamIndex,
-                                              origType, substTL);
+      if (forSelf && rep == SILFunctionTypeRepresentation::WitnessMethod)
+        convention = ParameterConvention::Indirect_In_Guaranteed;
+      else
+        convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
+                                       origType, substTL);
       assert(isIndirectFormalParameter(convention));
     } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
-      convention = Convs.getDirectParameter(origParamIndex, origType,
-                                            substTL);
+      convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
+                                   substTL);
       assert(!isIndirectFormalParameter(convention));
     }
-    auto loweredType = substTL.getLoweredType().getSwiftRValueType();
+    auto loweredType = substTL.getLoweredType().getASTType();
 
     Inputs.push_back(SILParameterInfo(loweredType, convention));
 
@@ -717,7 +730,7 @@ private:
       M.Types.getLoweredType(Foreign.Error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
-    Inputs.push_back(SILParameterInfo(foreignErrorTy.getSwiftRValueType(),
+    Inputs.push_back(SILParameterInfo(foreignErrorTy.getASTType(),
                                       ParameterConvention::Direct_Unowned));
     NextOrigParamIndex++;
     return true;
@@ -780,7 +793,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 
   // These conventions wrap the result type in a level of optionality.
   case ForeignErrorConvention::NilResult:
-    assert(!substFormalResultType->getAnyOptionalObjectType());
+    assert(!substFormalResultType->getOptionalObjectType());
     substFormalResultType =
         OptionalType::get(substFormalResultType)->getCanonicalType();
     origResultType =
@@ -850,14 +863,14 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       } else {
         convention = ParameterConvention::Direct_Guaranteed;
       }
-      SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
+      SILParameterInfo param(loweredTy.getASTType(), convention);
       inputs.push_back(param);
       break;
     }
     case CaptureKind::Box: {
       // Lvalues are captured as a box that owns the captured value.
       auto boxTy = Types.getInterfaceBoxTypeForCapture(
-          VD, loweredTy.getSwiftRValueType(),
+          VD, loweredTy.getASTType(),
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention);
@@ -868,7 +881,7 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       // Non-escaping lvalues are captured as the address of the value.
       SILType ty = loweredTy.getAddressType();
       auto param =
-          SILParameterInfo(ty.getSwiftRValueType(),
+          SILParameterInfo(ty.getASTType(),
                            ParameterConvention::Indirect_InoutAliasable);
       inputs.push_back(param);
       break;
@@ -946,7 +959,7 @@ static CanSILFunctionType getSILFunctionType(
            "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(M.getASTContext());
     assert(exnType.isObject());
-    errorResult = SILResultInfo(exnType.getSwiftRValueType(),
+    errorResult = SILResultInfo(exnType.getASTType(),
                                 ResultConvention::Owned);
   }
 
@@ -1249,6 +1262,7 @@ static CanSILFunctionType getNativeSILFunctionType(
   case SILFunctionType::Representation::WitnessMethod: {
     switch (constant ? constant->kind : SILDeclRef::Kind::Func) {
     case SILDeclRef::Kind::Initializer:
+    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 DefaultInitializerConventions(), ForeignInfo(),
                                 constant, witnessMethodConformance);
@@ -1271,7 +1285,6 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::StoredPropertyInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer:
-    case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substInterfaceType, extInfo,
                                 getNormalArgumentConvention(M), ForeignInfo(),
                                 constant, witnessMethodConformance);
@@ -1441,6 +1454,11 @@ public:
     // use one of the unowned conventions.
     if (tl.isTrivial()) {
       if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+        return ResultConvention::UnownedInnerPointer;
+
+      auto type = tl.getLoweredType();
+      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
+          == type.getASTContext().getUnmanagedDecl())
         return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
     }
@@ -1723,8 +1741,12 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  /// Does the given selector start with the given string as a
-  /// prefix, in the sense of the selector naming conventions?
+  // Does the given selector start with the given string as a prefix, in the
+  // sense of the selector naming conventions?
+  // This implementation matches the one used by
+  // clang::Selector::getMethodFamily, to make sure we behave the same as Clang
+  // ARC. We're not just calling that method here because it means allocating a
+  // clang::IdentifierInfo, which requires a Clang ASTContext.
   auto hasPrefix = [](StringRef text, StringRef prefix) {
     if (!text.startswith(prefix)) return false;
     if (text.size() == prefix.size()) return true;
@@ -1744,61 +1766,49 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   return result;
 }
 
-/// Get the ObjC selector family a SILDeclRef implicitly belongs to.
+/// Get the ObjC selector family a foreign SILDeclRef belongs to.
 static SelectorFamily getSelectorFamily(SILDeclRef c) {
+  assert(c.isForeign);
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     if (!c.hasDecl())
       return SelectorFamily::None;
       
     auto *FD = cast<FuncDecl>(c.getDecl());
-    auto accessor = dyn_cast<AccessorDecl>(FD);
-    if (!accessor)
-      return getSelectorFamily(FD->getName());
-
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsGetter:
-      // Getter selectors can belong to families if their name begins with the
-      // wrong thing.
-      if (accessor->getStorage()->isObjC() || c.isForeign) {
-        auto declName = accessor->getStorage()->getBaseName();
-        switch (declName.getKind()) {
-        case DeclBaseName::Kind::Normal:
-          return getSelectorFamily(declName.getIdentifier());
-        case DeclBaseName::Kind::Subscript:
-          return SelectorFamily::None;
-        case DeclBaseName::Kind::Destructor:
-          return SelectorFamily::None;
-        }
+    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+      switch (accessor->getAccessorKind()) {
+      case AccessorKind::IsGetter:
+      case AccessorKind::IsSetter:
+        break;
+      case AccessorKind::IsWillSet:
+      case AccessorKind::IsDidSet:
+      case AccessorKind::IsAddressor:
+      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::IsMaterializeForSet:
+        llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
-      return SelectorFamily::None;
-
-      // Other accessors are never selector family members.
-    case AccessorKind::IsSetter:
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
-      return SelectorFamily::None;
     }
+
+    return getSelectorFamily(FD->getObjCSelector().getSelectorPieces().front());
   }
   case SILDeclRef::Kind::Initializer:
-    case SILDeclRef::Kind::IVarInitializer:
+  case SILDeclRef::Kind::IVarInitializer:
     return SelectorFamily::Init;
 
   /// Currently IRGen wraps alloc/init methods into Swift constructors
   /// with Swift conventions.
   case SILDeclRef::Kind::Allocator:
   /// These constants don't correspond to method families we care about yet.
-  case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
-  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::IVarDestroyer:
+    return SelectorFamily::None;
+
+  case SILDeclRef::Kind::EnumElement:
+  case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return SelectorFamily::None;
+    llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
@@ -1844,7 +1854,7 @@ public:
       break;
     }
 
-    auto type = tl.getLoweredType().getSwiftRValueType();
+    auto type = tl.getLoweredType().getASTType();
     if (type->hasRetainablePointerRepresentation()
         || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
       return ResultConvention::Autoreleased;
@@ -2146,11 +2156,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
                                                 CanType base) {
   // Unwrap optionals, but remember that we did.
   bool derivedWasOptional = false;
-  if (auto object = derived.getAnyOptionalObjectType()) {
+  if (auto object = derived.getOptionalObjectType()) {
     derivedWasOptional = true;
     derived = object;
   }
-  if (auto object = base.getAnyOptionalObjectType()) {
+  if (auto object = base.getOptionalObjectType()) {
     base = object;
   }
 
@@ -2365,7 +2375,7 @@ public:
   }
 
   SILType subst(SILType type) {
-    return SILType::getPrimitiveType(visit(type.getSwiftRValueType()),
+    return SILType::getPrimitiveType(visit(type.getASTType()),
                                      type.getCategory());
   }
 
@@ -2405,7 +2415,7 @@ public:
   /// Optionals need to have their object types substituted by these rules.
   CanType visitBoundGenericEnumType(CanBoundGenericEnumType origType) {
     // Only use a special rule if it's Optional.
-    if (!origType->getDecl()->classifyAsOptionalType()) {
+    if (!origType->getDecl()->isOptionalDecl()) {
       return visitType(origType);
     }
 
@@ -2430,7 +2440,7 @@ public:
 
     AbstractionPattern abstraction(Sig, origType);
     return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getSwiftRValueType();
+             .getASTType();
   }
 };
 
@@ -2450,7 +2460,7 @@ SILType SILType::subst(SILModule &silModule,
   return STST.subst(*this);
 }
 
-SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
+SILType SILType::subst(SILModule &silModule, SubstitutionMap subs) const{
   return subst(silModule,
                QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
@@ -2461,22 +2471,7 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  SubstitutionList subs) {
-  if (subs.empty()) {
-    assert(!isPolymorphic() && "no args for polymorphic substitution");
-    return CanSILFunctionType(this);
-  }
-
-  auto subMap = GenericSig->getSubstitutionMap(subs);
-  return substGenericArgs(silModule, subMap);
-}
-
-/// Apply a substitution to this polymorphic SILFunctionType so that
-/// it has the form of the normal SILFunctionType for the substituted
-/// type, except using the original conventions.
-CanSILFunctionType
-SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  const SubstitutionMap &subs) {
+                                  SubstitutionMap subs) {
   if (!isPolymorphic()) {
     return CanSILFunctionType(this);
   }
@@ -2747,13 +2742,13 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
     auto types = tup.getElementTypes();
     aElements.append(types.begin(), types.end());
   } else {
-    aElements.push_back(a.getSwiftRValueType());
+    aElements.push_back(a.getASTType());
   }
   if (auto tup = b.getAs<TupleType>()) {
     auto types = tup.getElementTypes();
     bElements.append(types.begin(), types.end());
   } else {
-    bElements.push_back(b.getSwiftRValueType());
+    bElements.push_back(b.getASTType());
   }
 
   if (aElements.size() != bElements.size())
@@ -2778,8 +2773,8 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
       continue;
 
     // Optional and IUO are interchangeable if their elements are.
-    auto aObject = aa.getAnyOptionalObjectType();
-    auto bObject = bb.getAnyOptionalObjectType();
+    auto aObject = aa.getOptionalObjectType();
+    auto bObject = bb.getOptionalObjectType();
     if (aObject && bObject && areABICompatibleParamsOrReturns(aObject, bObject))
       continue;
     // Optional objects are ABI-interchangeable with non-optionals;
@@ -2890,6 +2885,12 @@ SILFunctionType::isABICompatibleWith(CanSILFunctionType other) const {
       return {ABICompatibilityCheckResult::ABIIncompatibleParameterType, i};
   }
 
+  // This needs to be checked last because the result implies everying else has
+  // already been checked and this is the only difference.
+  if (isNoEscape() != other->isNoEscape() &&
+      (getRepresentation() == SILFunctionType::Representation::Thick))
+    return ABICompatibilityCheckResult::ABIEscapeToNoEscapeConversion;
+
   return ABICompatibilityCheckResult::None;
 }
 
@@ -2918,6 +2919,8 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "Differing parameter convention";
   case innerty::ABIIncompatibleParameterType:
     return "ABI incompatible parameter type.";
+  case innerty::ABIEscapeToNoEscapeConversion:
+    return "Escape to no escape conversion";
   }
   llvm_unreachable("Covered switch isn't completely covered?!");
 }

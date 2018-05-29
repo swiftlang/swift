@@ -1,6 +1,7 @@
+
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -g -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name objc_ir -I %S/Inputs/custom-modules -emit-ir -g -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -72,7 +73,7 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 
-   // CHECK: load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+   // CHECK: load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1
@@ -80,7 +81,7 @@ func propertyAccess(b b: B) {
 
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$S7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
-  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
@@ -115,7 +116,7 @@ func protocolMetatype(p: FooProto) -> FooProto.Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processFooType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void @swift_unknownRelease(%objc_object* %0)
+  // CHECK-NOT: call void @swift_unknownRelease(%objc_object* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processFooType(type(of: p))
   return type
@@ -132,7 +133,7 @@ func protocolCompositionMetatype(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
+  // CHECK-NOT: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processComboType(type(of: p))
   return type
@@ -145,7 +146,7 @@ func protocolCompositionMetatype2(p: Impl) -> (FooProto & AnotherProto).Type {
   // CHECK: [[RAW_RESULT:%.+]] = call i8* @processComboType2(i8* {{%.+}})
   // CHECK: [[CASTED_RESULT:%.+]] = bitcast i8* [[RAW_RESULT]] to %objc_class*
   // CHECK: [[SWIFT_RESULT:%.+]] = call %swift.type* @swift_getObjCClassMetadata(%objc_class* [[CASTED_RESULT]])
-  // CHECK: call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T7objc_ir4ImplC*)*)(%T7objc_ir4ImplC* %0)
+  // CHECK-NOT: @swift_release
   // CHECK: ret %swift.type* [[SWIFT_RESULT]]
   let type = processComboType2(type(of: p))
   return type

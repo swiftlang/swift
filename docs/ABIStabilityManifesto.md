@@ -116,7 +116,7 @@ In order to allow for cross-module optimizations for modules that are distribute
 
 Resilient types are required to have opaque layout when exposed outside their resilience domain. Inside a resilience domain, this requirement is lifted and their layout may be statically known or opaque as determined by their type (see [previous section](#opaque-layout)).
 
-Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How how this will impact the ABI is still under investigation [[SR-3911](https://bugs.swift.org/browse/SR-3911)].
+Annotations may be applied to a library's types in future versions of that library, in which case the annotations are versioned, yet the library remains binary compatible. How this will impact the ABI is still under investigation [[SR-3911](https://bugs.swift.org/browse/SR-3911)].
 
 
 #### <a name="abstraction-levels"></a>Abstraction Levels

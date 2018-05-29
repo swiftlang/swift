@@ -25,10 +25,11 @@ class CompilerInstance;
 
 namespace migrator {
 
-/// Run the migrator on the compiler invocation's input file and emit a
-/// "replacement map" describing the requested changes to the source file.
-bool updateCodeAndEmitRemap(CompilerInstance *Instance,
-                            const CompilerInvocation &Invocation);
+/// If needed, run the migrator on the compiler invocation's input file and emit
+/// a "replacement map" describing the requested changes to the source file.
+/// \return true on error.
+bool updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance,
+                                    const CompilerInvocation &Invocation);
 
 struct Migrator {
   CompilerInstance *StartInstance;

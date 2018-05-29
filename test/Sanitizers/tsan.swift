@@ -3,7 +3,11 @@
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
-#if os(OSX) || os(iOS)
+
+// https://bugs.swift.org/browse/SR-6622
+// XFAIL: linux
+
+#if os(macOS) || os(iOS)
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin)
 import Glibc
@@ -34,7 +38,7 @@ var threads: [pthread_t] = []
 var racey_x: Int;
 
 for _ in 1...5 {
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
   var t : pthread_t?
 #else
   var t : pthread_t = 0
@@ -45,7 +49,7 @@ for _ in 1...5 {
 
     return nil
   }, nil)
-#if os(OSX) || os(iOS)
+#if os(macOS) || os(iOS)
   threads.append(t!)
 #else
   threads.append(t)

@@ -28,25 +28,21 @@ var SyntaxChildrenAPI = TestSuite("SyntaxChildrenAPI")
 SyntaxChildrenAPI.test("IterateWithAllPresent") {
   let returnStmt = SyntaxFactory.makeReturnStmt(
     returnKeyword: SyntaxFactory.makeReturnKeyword(),
-    expression: SyntaxFactory.makeBlankUnknownExpr(),
-    semicolon: SyntaxFactory.makeSemicolonToken())
+    expression: SyntaxFactory.makeBlankUnknownExpr())
 
   var iterator = returnStmt.children.makeIterator()
   expectNext(&iterator) { ($0 as? TokenSyntax)?.tokenKind == .returnKeyword }
   expectNext(&iterator) { $0 is ExprSyntax }
-  expectNext(&iterator) { ($0 as? TokenSyntax)?.tokenKind == .semicolon }
   expectNextIsNil(&iterator)
 }
 
 SyntaxChildrenAPI.test("IterateWithSomeMissing") {
   let returnStmt = SyntaxFactory.makeReturnStmt(
     returnKeyword: SyntaxFactory.makeReturnKeyword(),
-    expression: nil,
-    semicolon: SyntaxFactory.makeSemicolonToken())
+    expression: nil)
 
   var iterator = returnStmt.children.makeIterator()
   expectNext(&iterator) { ($0 as? TokenSyntax)?.tokenKind == .returnKeyword }
-  expectNext(&iterator) { ($0 as? TokenSyntax)?.tokenKind == .semicolon }
   expectNextIsNil(&iterator)
 }
 

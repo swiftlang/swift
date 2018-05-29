@@ -25,7 +25,7 @@ using namespace swift;
 
 static ModRefInfo getConservativeModRefForKind(const llvm::Instruction &I) {
   switch (classifyInstruction(I)) {
-#define KIND(Name, MemBehavior) case RT_ ## Name: return MRI_ ## MemBehavior;
+#define KIND(Name, MemBehavior) case RT_ ## Name: return ModRefInfo:: MemBehavior;
 #include "LLVMSwift.def"
   }
 
@@ -37,8 +37,9 @@ ModRefInfo SwiftAAResult::getModRefInfo(llvm::ImmutableCallSite CS,
   // We know at compile time that certain entry points do not modify any
   // compiler-visible state ever. Quickly check if we have one of those
   // instructions and return if so.
-  if (MRI_NoModRef == getConservativeModRefForKind(*CS.getInstruction()))
-    return MRI_NoModRef;
+  if (ModRefInfo::NoModRef ==
+      getConservativeModRefForKind(*CS.getInstruction()))
+    return ModRefInfo::NoModRef;
 
   // Otherwise, delegate to the rest of the AA ModRefInfo machinery.
   return AAResultBase::getModRefInfo(CS, Loc);

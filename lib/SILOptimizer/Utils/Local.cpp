@@ -169,7 +169,7 @@ bool swift::isIntermediateRelease(SILInstruction *I,
 }
 
 namespace {
-  using CallbackTy = std::function<void(SILInstruction *)>;
+  using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
 void swift::
@@ -313,28 +313,6 @@ FullApplySite swift::findApplyFromDevirtualizedResult(SILValue V) {
   return FullApplySite();
 }
 
-SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
-  if (PAI->getNumArguments() != 1)
-    return SILValue();
-
-  auto *Fun = PAI->getReferencedFunction();
-  if (!Fun)
-    return SILValue();
-
-  // Make sure we have a reabstraction thunk.
-  if (Fun->isThunk() != IsReabstractionThunk)
-    return SILValue();
-
-  // The argument should be a closure.
-  auto Arg = PAI->getArgument(0);
-  if (!Arg->getType().is<SILFunctionType>() ||
-      !Arg->getType().isReferenceCounted(PAI->getFunction()->getModule()))
-    return SILValue();
-
-  return Arg;
-}
-
-
 // Replace a dead apply with a new instruction that computes the same
 // value, and delete the old apply.
 void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
@@ -342,13 +320,6 @@ void swift::replaceDeadApply(ApplySite Old, ValueBase *New) {
   if (!isa<TryApplyInst>(OldApply))
     cast<SingleValueInstruction>(OldApply)->replaceAllUsesWith(New);
   recursivelyDeleteTriviallyDeadInstructions(OldApply, true);
-}
-
-bool swift::hasArchetypes(SubstitutionList Subs) {
-  // Check whether any of the substitutions are dependent.
-  return llvm::any_of(Subs, [](const Substitution &S) {
-    return S.getReplacement()->hasArchetype();
-  });
 }
 
 bool swift::mayBindDynamicSelf(SILFunction *F) {
@@ -524,8 +495,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   }
 
   // Check if src and dest types are optional.
-  auto OptionalSrcTy = SrcTy.getAnyOptionalObjectType();
-  auto OptionalDestTy = DestTy.getAnyOptionalObjectType();
+  auto OptionalSrcTy = SrcTy.getOptionalObjectType();
+  auto OptionalDestTy = DestTy.getOptionalObjectType();
 
   // Both types are optional.
   if (OptionalDestTy && OptionalSrcTy) {
@@ -574,7 +545,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
 
   // Src is not optional, but dest is optional.
   if (!OptionalSrcTy && OptionalDestTy) {
-    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getSwiftRValueType())
+    auto OptionalSrcCanTy = OptionalType::get(SrcTy.getASTType())
       ->getCanonicalType();
     auto LoweredOptionalSrcType = SILType::getPrimitiveObjectType(
       OptionalSrcCanTy);
@@ -607,6 +578,12 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   // Function types are interchangeable if they're also ABI-compatible.
   if (SrcTy.is<SILFunctionType>()) {
     if (DestTy.is<SILFunctionType>()) {
+      assert(SrcTy.getAs<SILFunctionType>()->isNoEscape() ==
+                 DestTy.getAs<SILFunctionType>()->isNoEscape() ||
+             SrcTy.getAs<SILFunctionType>()->getRepresentation() !=
+                     SILFunctionType::Representation::Thick &&
+                 "Swift thick functions that differ in escapeness are not ABI "
+                 "compatible");
       // Insert convert_function.
       return B->createConvertFunction(Loc, Value, DestTy);
     }
@@ -693,8 +670,6 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (AI->getNumArguments() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
 
-  assert(Fn->getRepresentation() == SILFunctionTypeRepresentation::Method);
-
   // Left and right operands of a string concatenation operation.
   AILeft = dyn_cast<ApplyInst>(AI->getOperand(1));
   AIRight = dyn_cast<ApplyInst>(AI->getOperand(2));
@@ -711,8 +686,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   auto *FRILeftFun = FRILeft->getReferencedFunction();
   auto *FRIRightFun = FRIRight->getReferencedFunction();
 
-  if (FRILeftFun->getEffectsKind() >= EffectsKind::ReadWrite ||
-      FRIRightFun->getEffectsKind() >= EffectsKind::ReadWrite)
+  if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
+      FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)
     return false;
 
   if (!FRILeftFun->hasSemanticsAttrs() || !FRIRightFun->hasSemanticsAttrs())
@@ -734,11 +709,6 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;
-
-  assert(FRILeftFun->getRepresentation() ==
-         SILFunctionTypeRepresentation::Method);
-  assert(FRIRightFun->getRepresentation() ==
-         SILFunctionTypeRepresentation::Method);
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));
   SLIRight = dyn_cast<StringLiteralInst>(AIRight->getOperand(1));
@@ -877,7 +847,7 @@ SingleValueInstruction *StringConcatenationOptimizer::optimize() {
   Arguments.push_back(FuncResultType);
 
   return Builder.createApply(AI->getLoc(), FRIConvertFromBuiltin,
-                             SubstitutionList(), Arguments,
+                             SubstitutionMap(), Arguments,
                              false);
 }
 
@@ -907,9 +877,9 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 }
 
 static bool useHasTransitiveOwnership(const SILInstruction *I) {
-  // convert_function is used to add the @noescape attribute. It does not change
-  // ownership of the function value.
-  return isa<ConvertFunctionInst>(I);
+  // convert_escape_to_noescape is used to convert to a @noescape function type.
+  // It does not change ownership of the function value.
+  return isa<ConvertEscapeToNoEscapeInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(
@@ -1075,6 +1045,7 @@ static bool releaseCapturedArgsOfDeadPartialApply(PartialApplyInst *PAI,
   // point.
   for (auto *FinalRelease : Tracker.getFinalReleases()) {
     Builder.setInsertionPoint(FinalRelease);
+    Builder.setCurrentDebugScope(FinalRelease->getDebugScope());
     for (unsigned i : indices(Args)) {
       SILValue Arg = Args[i];
       SILParameterInfo Param = Params[i];
@@ -1116,11 +1087,10 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *Closure,
   // Then delete all user instructions in reverse so that leaf uses are deleted
   // first.
   for (auto *User : reverse(Tracker.getTrackedUsers())) {
-    assert(User->getResults().empty()
-           || useHasTransitiveOwnership(User)
-                  && "We expect only ARC operations without "
-                     "results. This is true b/c of "
-                     "isARCOperationRemovableIfObjectIsDead");
+    assert(User->getResults().empty() ||
+           useHasTransitiveOwnership(User) &&
+               "We expect only ARC operations without "
+               "results or a cast from escape to noescape without users");
     Callbacks.DeleteInst(User);
   }
 
@@ -1344,8 +1314,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
     if (!S)
       continue;
 
-    SVI->replaceAllUsesWith(S);
-    SVI->eraseFromParent();
+    replaceAllSimplifiedUsesAndErase(SVI, S);
     Changed = true;
   }
 
@@ -1355,11 +1324,11 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
 /// True if a type can be expanded
 /// without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
-  if (EnableExpandAll) {
-    return true;
-  }
   if (Ty.isAddressOnly(Module)) {
     return false;
+  }
+  if (EnableExpandAll) {
+    return true;
   }
   unsigned numFields = Module.Types.countNumberOfFields(Ty);
   if (numFields > 6) {
@@ -1389,48 +1358,40 @@ bool swift::isSimpleType(SILType SILTy, SILModule& Module) {
 /// Check if the value of V is computed by means of a simple initialization.
 /// Store the actual SILValue into Val and the reversed list of instructions
 /// initializing it in Insns.
-/// The check is performed by recursively walking the computation of the
-/// SIL value being analyzed.
-/// TODO: Move into utils.
+///
+/// The check is performed by recursively walking the computation of the SIL
+/// value being analyzed.
 bool
 swift::analyzeStaticInitializer(SILValue V,
-                                SmallVectorImpl<SILInstruction *> &Insns) {
+                                SmallVectorImpl<SILInstruction *> &Insts) {
   // Save every instruction we see.
   // TODO: MultiValueInstruction?
-  if (auto I = dyn_cast<SingleValueInstruction>(V))
-    Insns.push_back(I);
+  if (auto *I = dyn_cast<SingleValueInstruction>(V))
+    Insts.push_back(I);
 
   if (auto *SI = dyn_cast<StructInst>(V)) {
     // If it is not a struct which is a simple type, bail.
     if (!isSimpleType(SI->getType(), SI->getModule()))
       return false;
-    for (auto &Op: SI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
-        return false;
-    }
-    return true;
+    return llvm::all_of(SI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *TI = dyn_cast<TupleInst>(V)) {
     // If it is not a tuple which is a simple type, bail.
     if (!isSimpleType(TI->getType(), TI->getModule()))
       return false;
-    for (auto &Op: TI->getAllOperands()) {
-      // If one of the struct instruction operands is not
-      // a simple initializer, bail.
-      if (!analyzeStaticInitializer(Op.get(), Insns))
-        return false;
-    }
-    return true;
+    return llvm::all_of(TI->getAllOperands(), [&](Operand &Op) -> bool {
+      return analyzeStaticInitializer(Op.get(), Insts);
+    });
   }
 
   if (auto *bi = dyn_cast<BuiltinInst>(V)) {
     switch (bi->getBuiltinInfo().ID) {
     case BuiltinValueKind::FPTrunc:
       if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
-        return analyzeStaticInitializer(LI, Insns);
+        return analyzeStaticInitializer(LI, Insts);
       }
       return false;
     default:
@@ -1438,13 +1399,9 @@ swift::analyzeStaticInitializer(SILValue V,
     }
   }
 
-  if (isa<IntegerLiteralInst>(V)
-      || isa<FloatLiteralInst>(V)
-      || isa<StringLiteralInst>(V)) {
-    return true;
-  }
-
-  return false;
+  return isa<IntegerLiteralInst>(V)
+    || isa<FloatLiteralInst>(V)
+    || isa<StringLiteralInst>(V);
 }
 
 /// Replace load sequence which may contain

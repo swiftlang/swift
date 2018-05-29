@@ -24,7 +24,9 @@
 namespace swift {
 
 enum class ExclusivityFlags : uintptr_t;
-struct ValueBuffer;
+template <typename Runtime> struct TargetValueBuffer;
+struct InProcess;
+using ValueBuffer = TargetValueBuffer<InProcess>;
 
 /// Begin dynamically tracking an access.
 ///
@@ -55,6 +57,19 @@ void swift_endAccess(ValueBuffer *buffer);
 /// buffers on the stack sitting around in the runtime.)
 SWIFT_RUNTIME_EXPORT
 bool _swift_disableExclusivityChecking;
+
+#ifndef NDEBUG
+
+/// Dump all accesses currently tracked by the runtime.
+///
+/// This is a debug routine that is intended to be used from the debugger and is
+/// compiled out when asserts are disabled. The intention is that it allows one
+/// to dump the access state to easily see if/when exclusivity violations will
+/// happen. This eases debugging.
+SWIFT_RUNTIME_EXPORT
+void swift_dumpTrackedAccesses();
+
+#endif
 
 } // end namespace swift
 

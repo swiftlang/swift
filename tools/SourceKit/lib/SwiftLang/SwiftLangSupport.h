@@ -91,7 +91,8 @@ public:
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
-  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang);
+  void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
+             bool BuildSyntaxTree);
   void readSyntaxInfo(EditorConsumer& consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -354,9 +355,9 @@ public:
                                              swift::Type BaseTy,
                                              llvm::raw_ostream &OS);
 
-  static void printFullyAnnotatedSynthesizedDeclaration(
-                                            const swift::ValueDecl *VD,
-                                            swift::NominalTypeDecl *Target,
+  static void
+  printFullyAnnotatedSynthesizedDeclaration(const swift::ValueDecl *VD,
+                                            swift::TypeOrExtensionDecl Target,
                                             llvm::raw_ostream &OS);
 
   /// Tries to resolve the path to the real file-system path. If it fails it
@@ -417,7 +418,7 @@ public:
                                  ArrayRef<const char *> Args,
                                  bool UsingSwiftArgs,
                                  bool SynthesizedExtensions,
-                                 Optional<unsigned> swiftVersion) override;
+                                 StringRef swiftVersion) override;
 
   void editorOpenSwiftSourceInterface(StringRef Name,
                                       StringRef SourceName,
@@ -515,9 +516,9 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-
-  void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                      swift::CompilerInstance &CI);
+  void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                     StringRef InputFile,
+                     ArrayRef<std::string> Args);
 }
 
 /// When we cannot build any more clang modules, close the .pcm / files to

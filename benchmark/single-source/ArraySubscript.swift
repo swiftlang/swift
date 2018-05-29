@@ -30,7 +30,7 @@ public func run_ArraySubscript(_ N: Int) {
   var arrays = [[Int]](repeating: [], count: numArrays)
   for i in 0..<numArrays {
     for _ in 0..<numArrayElements {
-      arrays[i].append(Int(truncatingBitPattern: Random()))
+      arrays[i].append(Int(truncatingIfNeeded: Random()))
     }
   }
 

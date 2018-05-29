@@ -18,12 +18,13 @@
 using namespace swift;
 using namespace Demangle;
 
-NodePointer Demangle::stripGenericArgsFromContextNode(const NodePointer &node,
+NodePointer Demangle::stripGenericArgsFromContextNode(NodePointer node,
                                                       NodeFactory &factory) {
   switch (node->getKind()) {
   case Demangle::Node::Kind::BoundGenericClass:
   case Demangle::Node::Kind::BoundGenericEnum:
   case Demangle::Node::Kind::BoundGenericStructure:
+  case Demangle::Node::Kind::BoundGenericOtherNominalType:
     // Bound generic types have a 'Type' node under them, whose child is
     // the non-generic reference. If we don't see that structure, do nothing.
     if (node->getNumChildren() < 2 ||
@@ -37,7 +38,8 @@ NodePointer Demangle::stripGenericArgsFromContextNode(const NodePointer &node,
 
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
-  case Demangle::Node::Kind::Structure: {
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::OtherNominalType: {
     if (node->getNumChildren() < 2)
       return node;
 
@@ -49,6 +51,23 @@ NodePointer Demangle::stripGenericArgsFromContextNode(const NodePointer &node,
     newNode->addChild(newContext, factory);
     for (unsigned i = 1, n = node->getNumChildren(); i != n; ++i)
       newNode->addChild(node->getChild(i), factory);
+    return newNode;
+  }
+      
+  case Demangle::Node::Kind::Extension: {
+    // Strip generic arguments from the extended type.
+    if (node->getNumChildren() < 2)
+      return node;
+    
+    auto newExtended = stripGenericArgsFromContextNode(node->getChild(1),
+                                                       factory);
+    if (newExtended == node->getChild(1)) return node;
+    
+    auto newNode = factory.createNode(Node::Kind::Extension);
+    newNode->addChild(node->getChild(0), factory);
+    newNode->addChild(newExtended, factory);
+    if (node->getNumChildren() == 3)
+      newNode->addChild(node->getChild(2), factory);
     return newNode;
   }
 

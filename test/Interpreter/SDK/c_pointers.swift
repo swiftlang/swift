@@ -6,7 +6,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
-#if os(OSX)
+#if os(macOS)
 import AppKit
 typealias XXColor = NSColor
 #endif
@@ -28,7 +28,7 @@ let cgRed = CGColor(colorSpace: rgb, components: [1.0, 0.0, 0.0, 1.0])!
 let nsRed = XXColor(cgColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
-#if os(OSX)
+#if os(macOS)
 nsRed!.getRed(&r, green: &g, blue: &b, alpha: &a)
 #else
 nsRed.getRed(&r, green: &g, blue: &b, alpha: &a)

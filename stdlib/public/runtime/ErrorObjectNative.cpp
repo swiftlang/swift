@@ -61,7 +61,7 @@ static SWIFT_CC(swift) void _destroyErrorObject(SWIFT_CONTEXT HeapObject *obj) {
 /// Heap metadata for Error boxes.
 static const FullMetadata<HeapMetadata> ErrorMetadata{
   HeapMetadataHeader{{_destroyErrorObject}, {&VALUE_WITNESS_SYM(Bo)}},
-  Metadata{MetadataKind::ErrorObject},
+  HeapMetadata(MetadataKind::ErrorObject),
 };
 
 BoxPair

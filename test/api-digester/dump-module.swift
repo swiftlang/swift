@@ -5,3 +5,7 @@
 // RUN: %api-digester -dump-sdk -module cake -o %t.dump.json -module-cache-path %t.module-cache -sdk %t.sdk -swift-version 3 -I %t.mod
 // RUN: diff -u %S/Outputs/cake.json %t.dump.json
 // RUN: %api-digester -diagnose-sdk --input-paths %t.dump.json -input-paths %S/Outputs/cake.json
+
+// Round-trip testing:
+// RUN: %api-digester -deserialize-sdk --input-paths %S/Outputs/cake.json -o %t.dump.json
+// RUN: diff -u %S/Outputs/cake.json %t.dump.json

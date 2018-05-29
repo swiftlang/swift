@@ -540,7 +540,7 @@ public:
                                          ArrayRef<const char *> Args,
                                          bool UsingSwiftArgs,
                                          bool SynthesizedExtensions,
-                                         Optional<unsigned> swiftVersion) = 0;
+                                         StringRef swiftVersion) = 0;
 
   virtual void editorOpenSwiftSourceInterface(StringRef Name,
                                               StringRef SourceName,

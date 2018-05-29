@@ -52,7 +52,7 @@ enum /*enum-WithValue:def*/WithValue: Int {
 }
 var _ = /*enum-WithValue*/WithValue . /*case-one*/one
 
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="class-Foo" -is-non-protocol-type -old-name "Foo" -new-name "MoreFoo" >> %t.result/types_class-Foo.swift
 // RUN: diff -u %S/Outputs/types/class-Foo.swift.expected %t.result/types_class-Foo.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="protocol-Proto" -old-name "Proto" -new-name "NextProto" >> %t.result/types_protocol-Proto.swift

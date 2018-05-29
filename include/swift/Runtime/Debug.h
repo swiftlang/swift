@@ -18,6 +18,8 @@
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
 #include <llvm/Support/Compiler.h>
+#include <cstdarg>
+#include <cstdio>
 #include <stdint.h>
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Unreachable.h"
@@ -44,19 +46,19 @@ extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *message) {
+static inline void CRSetCrashLogMessage(const char *message) {
   gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static const char *CRGetCrashLogMessage() {
+static inline const char *CRGetCrashLogMessage() {
   return reinterpret_cast<const char *>(gCRAnnotations.message);
 }
 
 #else
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *) {}
+static inline void CRSetCrashLogMessage(const char *) {}
 
 #endif
 
@@ -78,13 +80,6 @@ static inline void crash(const char *message) {
 
   LLVM_BUILTIN_TRAP;
   swift_runtime_unreachable("Expected compiler to crash.");
-}
-
-/// Report a corrupted type object.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static inline void _failCorruptType(const Metadata *type) {
-  swift::crash("Corrupt Swift type object");
 }
 
 // swift::fatalError() halts with a crash log message, 
@@ -165,7 +160,7 @@ struct RuntimeErrorDetails {
   uintptr_t framesToSkip;
 
   // Address of some associated object (if there's any).
-  void *memoryAddress;
+  const void *memoryAddress;
 
   // A structure describing an extra thread (and its stack) that is related.
   struct Thread {
@@ -221,6 +216,43 @@ void _swift_reportToDebugger(uintptr_t flags, const char *message,
 
 SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_reportFatalErrorsToDebugger;
+
+SWIFT_RUNTIME_STDLIB_SPI
+bool _swift_shouldReportFatalErrorsToDebugger();
+
+
+LLVM_ATTRIBUTE_ALWAYS_INLINE
+inline static int swift_asprintf(char **strp, const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+#if defined(_WIN32)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wuninitialized"
+  int len = _vscprintf(fmt, args);
+#pragma GCC diagnostic pop
+  if (len < 0) {
+    va_end(args);
+    return -1;
+  }
+  char *buffer = static_cast<char *>(malloc(len + 1));
+  if (!buffer) {
+    va_end(args);
+    return -1;
+  }
+  int result = vsprintf(buffer, fmt, args);
+  if (result < 0) {
+    va_end(args);
+    free(buffer);
+    return -1;
+  }
+  *strp = buffer;
+#else
+  int result = vasprintf(strp, fmt, args);
+#endif
+  va_end(args);
+  return result;
+}
+
 
 // namespace swift
 }

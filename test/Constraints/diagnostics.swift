@@ -161,7 +161,8 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.count() == 0 {} // expected-error{{cannot call value of non-function type 'Int'}}{{13-15=}}
+  // SR-7599: This should be `cannot_call_non_function_value`
+  if s.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -210,7 +211,7 @@ class r20201968C {
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(_ a : Int) {
   assert(a != nil, "ASSERT COMPILATION ERROR")
-  // expected-warning @-1 {{comparing non-optional value of type 'Int' to nil always returns true}}
+  // expected-warning @-1 {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
 }
 
 
@@ -335,7 +336,7 @@ f7(1)(b: 1.0)    // expected-error{{extraneous argument label 'b:' in call}}
 
 let f8 = f7(2)
 _ = f8(1)
-f8(10)          // expected-warning {{result of call is unused, but produces 'Int'}}
+f8(10)          // expected-warning {{result of call to function returning 'Int' is unused}}
 f8(1.0)         // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 
@@ -457,8 +458,7 @@ func testTypeSugar(_ a : Int) {
 
 // <rdar://problem/21974772> SegFault in FailureDiagnosis::visitInOutExpr
 func r21974772(_ y : Int) {
-  let x = &(1.0 + y)  // expected-error {{binary operator '+' cannot be applied to operands of type 'Double' and 'Int'}}
-   //expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  let x = &(1.0 + y) // expected-error {{use of extraneous '&'}}
 }
 
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
@@ -487,12 +487,44 @@ class B {
   static func f1(_ a : AOpts) {}
 }
 
+class GenClass<T> {}
+struct GenStruct<T> {}
+enum GenEnum<T> {}
 
 func test(_ a : B) {
-  B.f1(nil)    // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
-  a.function(42, a: nil) //expected-error {{nil is not compatible with expected argument type 'AOpts'}}
-  a.function(42, nil) //expected-error {{missing argument label 'a:' in call}}
-  a.f2(nil)  // expected-error {{nil is not compatible with expected argument type 'AOpts'}}
+  B.f1(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
+  a.function(42, a: nil) // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
+  a.function(42, nil)    // expected-error {{missing argument label 'a:' in call}}
+  a.f2(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
+
+  func foo1(_ arg: Bool) -> Int {return nil}
+  func foo2<T>(_ arg: T) -> GenClass<T> {return nil}
+  func foo3<T>(_ arg: T) -> GenStruct<T> {return nil}
+  func foo4<T>(_ arg: T) -> GenEnum<T> {return nil}
+  // expected-error@-4 {{'nil' is incompatible with return type 'Int'}}
+  // expected-error@-4 {{'nil' is incompatible with return type 'GenClass<T>'}}
+  // expected-error@-4 {{'nil' is incompatible with return type 'GenStruct<T>'}}
+  // expected-error@-4 {{'nil' is incompatible with return type 'GenEnum<T>'}}
+
+  let clsr1: () -> Int = {return nil}
+  let clsr2: () -> GenClass<Bool> = {return nil}
+  let clsr3: () -> GenStruct<String> = {return nil}
+  let clsr4: () -> GenEnum<Double?> = {return nil}
+  // expected-error@-4 {{'nil' is not compatible with closure result type 'Int'}}
+  // expected-error@-4 {{'nil' is not compatible with closure result type 'GenClass<Bool>'}}
+  // expected-error@-4 {{'nil' is not compatible with closure result type 'GenStruct<String>'}}
+  // expected-error@-4 {{'nil' is not compatible with closure result type 'GenEnum<Double?>'}}
+
+  var number = 0
+  var genClassBool = GenClass<Bool>()
+  var funcFoo1 = foo1
+
+  number = nil
+  genClassBool = nil
+  funcFoo1 = nil
+  // expected-error@-3 {{'nil' cannot be assigned to type 'Int'}}
+  // expected-error@-3 {{'nil' cannot be assigned to type 'GenClass<Bool>'}}
+  // expected-error@-3 {{'nil' cannot be assigned to type '(Bool) -> Int'}}
 }
 
 // <rdar://problem/21684487> QoI: invalid operator use inside a closure reported as a problem with the closure
@@ -501,14 +533,14 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions;}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
 func r18397777(_ d : r21447318?) {
   let c = r21447318()
 
-  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to nil always returns true}}
+  if c != nil { // expected-warning {{comparing non-optional value of type 'r21447318' to 'nil' always returns true}}
   }
   
   if d {  // expected-error {{optional type 'r21447318?' cannot be used as a boolean; test for '!= nil' instead}} {{6-6=(}} {{7-7= != nil)}}
@@ -688,18 +720,18 @@ class SR1594 {
   func sr1594(bytes : UnsafeMutablePointer<Int>, _ i : Int?) {
     _ = (i === nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15===}}
     _ = (bytes === nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
+    _ = (self === nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns false}}
     _ = (i !== nil) // expected-error {{value of type 'Int?' cannot be compared by reference; did you mean to compare by value?}} {{12-15=!=}}
     _ = (bytes !== nil) // expected-error {{type 'UnsafeMutablePointer<Int>' is not optional, value can never be nil}}
-    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
+    _ = (self !== nil) // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
   }
 }
 
 func nilComparison(i: Int, o: AnyObject) {
-  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
-  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns false}}
-  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
-  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to nil always returns true}}
+  _ = i == nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns false}}
+  _ = nil == i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns false}}
+  _ = i != nil // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
+  _ = nil != i // expected-warning {{comparing non-optional value of type 'Int' to 'nil' always returns true}}
   
   // FIXME(integers): uncomment these tests once the < is no longer ambiguous
   // _ = i < nil  // _xpected-error {{type 'Int' is not optional, value can never be nil}}
@@ -711,8 +743,8 @@ func nilComparison(i: Int, o: AnyObject) {
   // _ = i >= nil // _xpected-error {{type 'Int' is not optional, value can never be nil}}
   // _ = nil >= i // _xpected-error {{type 'Int' is not optional, value can never be nil}}
 
-  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns false}}
-  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to nil always returns true}}
+  _ = o === nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns false}}
+  _ = o !== nil // expected-warning {{comparing non-optional value of type 'AnyObject' to 'nil' always returns true}}
 }
 
 func secondArgumentNotLabeled(a: Int, _ b: Int) { }
@@ -751,7 +783,7 @@ func rdar27391581(_ a : Int, b : Int) -> Int {
 func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
   var buffer : T 
-  let n = withUnsafePointer(to: &buffer) { (p) in
+  let n = withUnsafeMutablePointer(to: &buffer) { (p) in
     read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
@@ -981,7 +1013,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
 }
 
 func SR_6272_d() {
@@ -1167,7 +1199,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
-    // expected-error@-1 {{type of expression is ambiguous without more context}}
+    // expected-error@-1 {{ambiguous use of operator '+'}}
   }
 }
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -38,7 +38,7 @@ func allToInt<T>(_ x: T) -> Int {
 	// CHECK: [[TYPE_ADDR:%.*]] = bitcast %swift.type* %T to i8***
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[TYPE_ADDR]], i64 -1
   // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+  // CHECK: [[SIZE_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
   // CHECK: [[SIZE_WITNESS:%.*]] = load i8*, i8** [[SIZE_WITNESS_ADDR]]
   // CHECK: [[SIZE:%.*]] = ptrtoint i8* [[SIZE_WITNESS]]
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
@@ -100,7 +100,8 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %T13generic_casts10ObjCProto1P* [[LOCAL]] to %swift.opaque*
-  // CHECK: [[PROTO_TYPE:%.*]] = call %swift.type* @"$S13generic_casts10ObjCProto1_pMa"()
+  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S13generic_casts10ObjCProto1_pMa"(i64 0)
+  // CHECK: [[PROTO_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
 }

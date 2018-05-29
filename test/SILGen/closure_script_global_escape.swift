@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -module-name foo -enable-sil-ownership -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name foo -enable-sil-ownership -emit-sil -verify %s
+// RUN: %target-swift-emit-silgen -module-name foo -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name foo -enable-sil-ownership -verify %s
 
 // CHECK-LABEL: sil @main
 
@@ -18,7 +18,7 @@ func useFlag() { // expected-error{{'flag' used by function definition before be
 _ = { _ = flag } // expected-error{{'flag' captured by a closure before being initialized}}
 
 // CHECK: mark_function_escape [[MARK]]
-// CHECK: [[CLOSURE:%.*]] = function_ref @$S3fooyycfU0_
+// CHECK: [[CLOSURE:%.*]] = function_ref @$S3fooyyXEfU0_
 // CHECK: apply [[CLOSURE]]
 _ = { _ = flag }() // expected-error{{'flag' captured by a closure before being initialized}}
 
@@ -35,6 +35,6 @@ func useFlag2() {
 _ = { _ = flag }
 
 // CHECK: mark_function_escape [[MARK]]
-// CHECK: [[CLOSURE:%.*]] = function_ref @$S3fooyycfU2_
+// CHECK: [[CLOSURE:%.*]] = function_ref @$S3fooyyXEfU2_
 // CHECK: apply [[CLOSURE]]
 _ = { _ = flag }()

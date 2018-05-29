@@ -9,7 +9,9 @@ add_swift_unittest(SwiftSyntaxTests
   TriviaTests.cpp
   TypeSyntaxTests.cpp
   UnknownSyntaxTests.cpp
+  AbsolutePositionTests.cpp
   )
 
 target_link_libraries(SwiftSyntaxTests
+  PRIVATE
   swiftSyntax)

@@ -315,6 +315,21 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
   cacheStdlibType(#SWIFT_TYPE_NAME, clang::BuiltinType::CLANG_BUILTIN_KIND);
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
+  // On 64-bit Windows, no C type is imported as an Int or UInt; CLong is
+  // imported as an Int32 and CLongLong as an Int64. Therefore, manually
+  // add mappings to C for Int and UInt.
+  if (IGM.Triple.isOSWindows() && IGM.Triple.isArch64Bit()) {
+    // Map UInt to uintptr_t
+    auto swiftUIntType = getNamedSwiftType(stdlib, "UInt");
+    auto clangUIntPtrType = ctx.getCanonicalType(ctx.getUIntPtrType());
+    Cache.insert({swiftUIntType, clangUIntPtrType});
+    
+    // Map Int to intptr_t
+    auto swiftIntType = getNamedSwiftType(stdlib, "Int");
+    auto clangIntPtrType = ctx.getCanonicalType(ctx.getIntPtrType());
+    Cache.insert({swiftIntType, clangIntPtrType});
+  }
+
   // The above code sets up a bunch of mappings in the cache; just
   // assume that we hit one of them.
   auto it = Cache.find(type);
@@ -423,10 +438,10 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect *Pointer<T>, ImplicitlyUnwrappedOptional<T>, and Optional<T>.
   // The first two are structs; the last is an enum.
   if (auto underlyingTy =
-        SILType::getPrimitiveObjectType(type).getAnyOptionalObjectType()) {
+          SILType::getPrimitiveObjectType(type).getOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
     // sort of casual assertion here difficult.
-    return Converter.convert(IGM, underlyingTy.getSwiftRValueType());
+    return Converter.convert(IGM, underlyingTy.getASTType());
   }
 
   auto swiftStructDecl = type->getDecl();
@@ -451,7 +466,7 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   auto args = type.getGenericArgs();
   assert(args.size() == 1 &&
          "should have a single generic argument!");
-  auto loweredArgTy = IGM.getLoweredType(args[0]).getSwiftRValueType();
+  auto loweredArgTy = IGM.getLoweredType(args[0]).getASTType();
 
   switch (kind) {
   case StructKind::Invalid:
@@ -741,7 +756,7 @@ clang::CanQualType IRGenModule::getClangType(CanType type) {
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {
-  return getClangType(type.getSwiftRValueType());
+  return getClangType(type.getASTType());
 }
 
 clang::CanQualType IRGenModule::getClangType(SILParameterInfo params) {

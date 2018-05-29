@@ -84,6 +84,18 @@ static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
+static llvm::cl::opt<bool>
+EnableObjCInterop("enable-objc-interop",
+                  llvm::cl::desc("Enable Objective-C interoperability."));
+
+static llvm::cl::opt<bool>
+DisableObjCInterop("disable-objc-interop",
+                   llvm::cl::desc("Disable Objective-C interoperability."));
+
+static llvm::cl::opt<bool>
+VerifyExclusivity("enable-verify-exclusivity",
+                  llvm::cl::desc("Verify the access markers used to enforce exclusivity."));
+
 namespace {
 enum EnforceExclusivityMode {
   Unchecked, // static only
@@ -196,10 +208,11 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
-static llvm::cl::opt<bool>
-EnableGuaranteedNormalArguments(
-    "enable-guaranteed-normal-arguments", llvm::cl::Hidden, llvm::cl::init(false),
-    llvm::cl::desc("Assume that the input module was compiled with -enable-guaranteed-normal-arguments enabled"));
+static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
+    "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
+    llvm::cl::init(false),
+    llvm::cl::desc("Assume that the input module was compiled with "
+                   "-disable-guaranteed-normal-arguments enabled"));
 
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
@@ -260,7 +273,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char **argv) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift SIL optimizer\n");
 
@@ -301,7 +315,8 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
   Invocation.getLangOptions().EnableObjCInterop =
-    llvm::Triple(Target).isOSDarwin();
+    EnableObjCInterop ? true :
+    DisableObjCInterop ? false : llvm::Triple(Target).isOSDarwin();
 
   Invocation.getLangOptions().EnableSILOpaqueValues = EnableSILOpaqueValues;
 
@@ -321,9 +336,9 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
-  SILOpts.EnableGuaranteedNormalArguments =
-    EnableGuaranteedNormalArguments;
+  SILOpts.EnableGuaranteedNormalArguments &= !DisableGuaranteedNormalArguments;
 
+  SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
     switch (EnforceExclusivity) {
     case EnforceExclusivityMode::Unchecked:
@@ -422,7 +437,10 @@ int main(int argc, char **argv) {
   } else {
     auto *SILMod = CI.getSILModule();
     {
-      auto T = irgen::createIRGenModule(SILMod, getGlobalLLVMContext());
+      auto T = irgen::createIRGenModule(
+          SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
+          Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
+          getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }

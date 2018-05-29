@@ -2,14 +2,6 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 
-// This test expects consistent hash code generation. However String instance
-// generate different values on Linux depending on which version of libicu is
-// installed. Therefore we run this test only on non-linux OSes, which is
-// best described as having objc_interop.
-
-// REQUIRES: objc_interop
-
-//
 // This file contains reflection tests that depend on hash values.
 // Don't add other tests here.
 //
@@ -36,46 +28,16 @@ Reflection.test("Dictionary") {
   var output = ""
   dump(dict, to: &output)
 
-#if arch(i386) || arch(arm)
+  // The order of elements in output depends on the hash values of dict's items,
+  // which isn't deterministic. However, iterating over dict will get us the
+  // same elements in the same order.
   var expected = ""
   expected += "▿ 5 key/value pairs\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Four\"\n"
-  expected += "    - value: 4\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"One\"\n"
-  expected += "    - value: 1\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Two\"\n"
-  expected += "    - value: 2\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Five\"\n"
-  expected += "    - value: 5\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Three\"\n"
-  expected += "    - value: 3\n"
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  var expected = ""
-  expected += "▿ 5 key/value pairs\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Three\"\n"
-  expected += "    - value: 3\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Two\"\n"
-  expected += "    - value: 2\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Four\"\n"
-  expected += "    - value: 4\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"One\"\n"
-  expected += "    - value: 1\n"
-  expected += "  ▿ (2 elements)\n"
-  expected += "    - key: \"Five\"\n"
-  expected += "    - value: 5\n"
-#else
-  fatalError("unimplemented")
-#endif
-
+  for (key, value) in dict {
+    expected += "  ▿ (2 elements)\n"
+    expected += "    - key: \"\(key)\"\n"
+    expected += "    - value: \(value)\n"
+  }
   expectEqual(expected, output)
 }
 
@@ -85,25 +47,14 @@ Reflection.test("Set") {
   var output = ""
   dump(s, to: &output)
 
-#if arch(i386) || arch(arm)
+  // The order of elements in output depends on the hash values of dict's items,
+  // which isn't deterministic. However, iterating over dict will get us the
+  // same elements in the same order.
   var expected = ""
   expected += "▿ 5 members\n"
-  expected += "  - 3\n"
-  expected += "  - 1\n"
-  expected += "  - 5\n"
-  expected += "  - 2\n"
-  expected += "  - 4\n"
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  var expected = ""
-  expected += "▿ 5 members\n"
-  expected += "  - 5\n"
-  expected += "  - 2\n"
-  expected += "  - 3\n"
-  expected += "  - 1\n"
-  expected += "  - 4\n"
-#else
-  fatalError("unimplemented")
-#endif
+  for i in s {
+    expected += "  - \(i)\n"
+  }
 
   expectEqual(expected, output)
 }

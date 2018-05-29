@@ -103,3 +103,8 @@
 - (void)doSomething:(double)x celsius:(double)y;
 - (void)doSomething:(double)x fahrenheit:(double)y using:(void (^)(void))block;
 @end
+
+@interface SimpleDoerSubclass : SimpleDoer
+- (void)simplyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
+  NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
+@end

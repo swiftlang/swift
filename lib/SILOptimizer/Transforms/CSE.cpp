@@ -98,6 +98,10 @@ public:
     return llvm::hash_combine(X->getKind(), X->getOperand());
   }
 
+  hash_code visitValueToBridgeObjectInst(ValueToBridgeObjectInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getOperand());
+  }
+
   hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
@@ -737,7 +741,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst, ValueBase *V,
 
       // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          CandidateResult->getType().getSwiftRValueType().findIf(
+          CandidateResult->getType().getASTType().findIf(
               [&OldOpenedArchetype](Type t) -> bool {
                 return (CanType(t) == OldOpenedArchetype);
               });
@@ -778,17 +782,19 @@ bool CSE::processNode(DominanceInfoNode *Node) {
   bool Changed = false;
 
   // See if any instructions in the block can be eliminated.  If so, do it.  If
-  // not, add them to AvailableValues.
-  for (SILBasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
-    SILInstruction *Inst = &*I;
-    ++I;
+  // not, add them to AvailableValues. Assume the block terminator can't be
+  // erased.
+  for (SILBasicBlock::iterator nextI = BB->begin(), E = BB->end();
+       nextI != E;) {
+    SILInstruction *Inst = &*nextI;
+    ++nextI;
 
     DEBUG(llvm::dbgs() << "SILCSE VISITING: " << *Inst << "\n");
 
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      eraseFromParentWithDebugInsts(Inst, I);
+      eraseFromParentWithDebugInsts(Inst, nextI);
       Changed = true;
       ++NumSimplify;
       continue;
@@ -799,8 +805,11 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     if (SILValue V = simplifyInstruction(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE SIMPLIFY: " << *Inst << "  to: " << *V
             << '\n');
-      cast<SingleValueInstruction>(Inst)->replaceAllUsesWith(V);
-      Inst->eraseFromParent();
+      replaceAllSimplifiedUsesAndErase(Inst, V,
+                                       [&nextI](SILInstruction *deleteI) {
+                                         if (nextI == deleteI->getIterator())
+                                           ++nextI;
+                                       });
       Changed = true;
       ++NumSimplify;
       continue;
@@ -824,10 +833,10 @@ bool CSE::processNode(DominanceInfoNode *Node) {
       // Instructions producing a new opened archetype need a special handling,
       // because replacing these instructions may require a replacement
       // of the opened archetype type operands in some of the uses.
-      if (!isa<OpenExistentialRefInst>(Inst) ||
-          processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
-                                    cast<OpenExistentialRefInst>(AvailInst),
-                                    I)) {
+      if (!isa<OpenExistentialRefInst>(Inst)
+          || processOpenExistentialRef(cast<OpenExistentialRefInst>(Inst),
+                                       cast<OpenExistentialRefInst>(AvailInst),
+                                       nextI)) {
         Inst->replaceAllUsesPairwiseWith(AvailInst);
         Inst->eraseFromParent();
         Changed = true;
@@ -865,8 +874,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
     
     // We can CSE function calls which do not read or write memory and don't
     // have any other side effects.
-    SideEffectAnalysis::FunctionEffects Effects;
-    SEA->getEffects(Effects, AI);
+    FunctionSideEffects Effects;
+    SEA->getCalleeEffects(Effects, AI);
 
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which
@@ -935,6 +944,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
+  case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::MarkDependenceInst:
@@ -1033,7 +1043,8 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
          "Invalid number of arguments");
 
   // Don't handle any apply instructions that involve substitutions.
-  if (ToAI->getSubstitutions().size() != 1) return false;
+  if (ToAI->getSubstitutionMap().getReplacementTypes().size() != 1)
+    return false;
 
   // Prepare the Apply args.
   SmallVector<SILValue, 8> Args;
@@ -1042,7 +1053,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   }
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
-                                       ToAI->getSubstitutions(), Args,
+                                       ToAI->getSubstitutionMap(), Args,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();

@@ -205,6 +205,9 @@ bool GuaranteedARCOptsVisitor::visitReleaseValueInst(ReleaseValueInst *RVI) {
 
 namespace {
 
+// Even though this is a mandatory pass, it is rerun after deserialization in
+// case DiagnosticConstantPropagation exposed anything new in this assert
+// configuration.
 struct GuaranteedARCOpts : SILFunctionTransform {
   void run() override {
     GuaranteedARCOptsVisitor Visitor;

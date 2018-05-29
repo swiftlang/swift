@@ -24,6 +24,7 @@
 #include <cassert>
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
+#include "swift/Runtime/Config.h"
 
 namespace llvm {
   class raw_ostream;
@@ -74,7 +75,7 @@ struct DemangleOptions {
 };
 
 class Node;
-typedef Node *NodePointer;
+using NodePointer = Node *;
 
 enum class FunctionSigSpecializationParamKind : unsigned {
   // Option Flags use bits 0-5. This give us 6 bits implying 64 entries to
@@ -93,6 +94,8 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   Dead = 1 << 6,
   OwnedToGuaranteed = 1 << 7,
   SROA = 1 << 8,
+  GuaranteedToOwned = 1 << 9,
+  ExistentialToGeneric = 1 << 10,
 };
 
 /// The pass that caused the specialization to occur. We use this to make sure
@@ -132,7 +135,7 @@ public:
 #include "swift/Demangling/DemangleNodes.def"
   };
 
-  typedef uint64_t IndexType;
+  using IndexType = uint64_t;
 
   friend class NodeFactory;
   
@@ -181,10 +184,10 @@ public:
     assert(hasIndex());
     return IndexPayload;
   }
-  
-  typedef NodePointer *iterator;
-  typedef const NodePointer *const_iterator;
-  typedef size_t size_type;
+
+  using iterator = NodePointer *;
+  using const_iterator = const NodePointer *;
+  using size_type = size_t;
 
   bool hasChildren() const { return NumChildren != 0; }
   size_t getNumChildren() const { return NumChildren; }
@@ -245,6 +248,31 @@ bool isSwiftSymbol(const char *mangledName);
 ///
 /// This does not include the old (<= swift 3.x) mangling prefix "_T".
 llvm::StringRef dropSwiftManglingPrefix(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is an alias type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isAlias(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a class type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isClass(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is an enum type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isEnum(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a protocol type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isProtocol(llvm::StringRef mangledName);
+
+/// Returns true if the mangled name is a structure type name.
+///
+/// \param mangledName A null-terminated string containing a mangled name.
+bool isStruct(llvm::StringRef mangledName);
 
 /// Returns true if the mangled name has the old scheme of function type
 /// mangling where labels are part of the type.
@@ -440,6 +468,14 @@ void mangleIdentifier(const char *data, size_t length,
 /// This should always round-trip perfectly with demangleSymbolAsNode.
 std::string mangleNode(const NodePointer &root);
 
+using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+
+/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+///
+/// This should always round-trip perfectly with demangleSymbolAsNode.
+std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
+
 /// Remangle in the old mangling scheme.
 ///
 /// This is only used for objc-runtime names and should be removed as soon as
@@ -521,7 +557,37 @@ bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
+/// Form a StringRef around the mangled name starting at base, if the name may
+/// contain symbolic references.
+llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
+
 } // end namespace Demangle
 } // end namespace swift
+
+// NB: This function is not used directly in the Swift codebase, but is
+// exported for Xcode support and is used by the sanitizers. Please coordinate
+// before changing.
+//
+/// Demangles a Swift symbol name.
+///
+/// \param mangledName is the symbol name that needs to be demangled.
+/// \param mangledNameLength is the length of the string that should be
+/// demangled.
+/// \param outputBuffer is the user provided buffer where the demangled name
+/// will be placed. If nullptr, a new buffer will be malloced. In that case,
+/// the user of this API is responsible for freeing the returned buffer.
+/// \param outputBufferSize is the size of the output buffer. If the demangled
+/// name does not fit into the outputBuffer, the output will be truncated and
+/// the size will be updated, indicating how large the buffer should be.
+/// \param flags can be used to select the demangling style. TODO: We should
+//// define what these will be.
+/// \returns the demangled name. Returns nullptr if the input String is not a
+/// Swift mangled name.
+SWIFT_RUNTIME_EXPORT
+char *swift_demangle(const char *mangledName,
+                     size_t mangledNameLength,
+                     char *outputBuffer,
+                     size_t *outputBufferSize,
+                     uint32_t flags);
 
 #endif // SWIFT_DEMANGLING_DEMANGLE_H

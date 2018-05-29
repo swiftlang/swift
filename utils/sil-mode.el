@@ -94,6 +94,7 @@
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
                     "is_unique" "is_unique_or_pinned"
+                    "is_escaping_closure"
                     "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
                   'words) . font-lock-keyword-face)
@@ -151,7 +152,7 @@
                     "unchecked_bitwise_cast"
                     "ref_to_raw_pointer" "raw_pointer_to_ref"
                     "unowned_to_ref" "ref_to_unowned"
-                    "convert_function"
+                    "convert_function" "convert_escape_to_noescape"
                     "ref_to_unmanaged" "unmanaged_to_ref"
                     "thin_function_to_pointer" "pointer_to_thin_function"
                     "ref_to_bridge_object"

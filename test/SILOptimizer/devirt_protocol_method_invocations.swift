@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+
+// RUN: %target-swift-frontend -module-name devirt_protocol_method_invocations -O -emit-sil %s | %FileCheck %s
 
 protocol PPP {
     func f()
@@ -90,24 +91,13 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
   return callGetSelf(c)
 }
 
-// CHECK: sil @$S34devirt_protocol_method_invocations12test24114020SiyF
-// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
-// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
-// CHECK:   return [[T1]]
-
-// CHECK: sil @$S34devirt_protocol_method_invocations14testExMetatypeSiyF
-// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
-// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
-// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
-// CHECK:   return [[T2]] : $Int
-
 // Check that calls to f.foo() get devirtualized and are not invoked
 // via the expensive witness_method instruction.
 // To achieve that the information about a concrete type C should
 // be propagated from init_existential_addr into witness_method and 
 // apply instructions.
 
-// CHECK-LABEL: sil shared [noinline] @$S34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCFTf4g_n
+// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations05test_a1_b1_C11_invocationySiAA1CCF
 // CHECK-NOT: witness_method
 // CHECK: checked_cast
 // CHECK-NOT: checked_cast
@@ -125,10 +115,6 @@ public func test_devirt_protocol_extension_method_invocation_with_self_return_ty
 // CHECK: apply
 // CHECK: apply
 // CHECK: br bb1(
-@inline(never)
-public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
-  return callfoo(c)
-}
 
 // Check that calls of a method boo() from the protocol extension
 // get devirtualized and are not invoked via the expensive witness_method instruction
@@ -138,13 +124,30 @@ public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
 // In fact, the call is expected to be inlined and then constant-folded
 // into a single integer constant.
 
-// CHECK-LABEL: sil shared [noinline] @$S34devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocationys5Int32VAA1CCFTf4d_n
+// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations05test_a1_b11_extension_C11_invocationys5Int32VAA1CCF
 // CHECK-NOT: checked_cast
 // CHECK-NOT: open_existential
 // CHECK-NOT: witness_method
 // CHECK-NOT: apply
 // CHECK: integer_literal
 // CHECK: return
+
+// CHECK: sil @$S34devirt_protocol_method_invocations12test24114020SiyF
+// CHECK:   [[T0:%.*]] = integer_literal $Builtin.Int{{.*}}, 1
+// CHECK:   [[T1:%.*]] = struct $Int ([[T0]] : $Builtin.Int{{.*}})
+// CHECK:   return [[T1]]
+
+// CHECK: sil @$S34devirt_protocol_method_invocations14testExMetatypeSiyF
+// CHECK:   [[T0:%.*]] = builtin "sizeof"<Int>
+// CHECK:   [[T1:%.*]] = builtin {{.*}}([[T0]]
+// CHECK:   [[T2:%.*]] = struct $Int ([[T1]] : {{.*}})
+// CHECK:   return [[T2]] : $Int
+
+@inline(never)
+public func test_devirt_protocol_method_invocation(_ c: C) -> Int {
+  return callfoo(c)
+}
+
 @inline(never)
 public func test_devirt_protocol_extension_method_invocation(_ c: C) -> Int32 {
   return callboo(c)
@@ -249,7 +252,7 @@ public final class V {
 }
 
 // Check that all witness_method invocations are devirtualized.
-// CHECK-LABEL: sil shared [noinline] @$S34devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistential1v1xyAA1VC_s5Int32VtFTf4gd_n
+// CHECK-LABEL: sil [noinline] @$S34devirt_protocol_method_invocations44testPropagationOfConcreteTypeIntoExistential1v1xyAA1VC_s5Int32VtF
 // CHECK-NOT: witness_method
 // CHECK-NOT: class_method
 // CHECK: return

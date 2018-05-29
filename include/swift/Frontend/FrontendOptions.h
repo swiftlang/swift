@@ -13,7 +13,6 @@
 #ifndef SWIFT_FRONTEND_FRONTENDOPTIONS_H
 #define SWIFT_FRONTEND_FRONTENDOPTIONS_H
 
-#include "swift/AST/Module.h"
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/InputFile.h"
 #include "llvm/ADT/Hashing.h"
@@ -39,7 +38,7 @@ public:
   InputFileKind InputKind = InputFileKind::IFK_Swift;
 
   void forAllOutputPaths(const InputFile &input,
-                         std::function<void(const std::string &)> fn) const;
+                         llvm::function_ref<void(StringRef)> fn) const;
 
   bool isOutputFileDirectory() const;
 
@@ -52,36 +51,8 @@ public:
   /// The name of the module which the frontend is building.
   std::string ModuleName;
 
-  /// The path to which we should emit a serialized module.
-  std::string ModuleOutputPath;
-
-  /// The path to which we should emit a module documentation file.
-  std::string ModuleDocOutputPath;
-
   /// The name of the library to link against when using this module.
   std::string ModuleLinkName;
-
-  /// The path to which we should emit an Objective-C header for the module.
-  std::string ObjCHeaderOutputPath;
-
-  /// Path to a file which should contain serialized diagnostics for this
-  /// frontend invocation.
-  std::string SerializedDiagnosticsPath;
-
-  /// The path to which we should output a Make-style dependencies file.
-  std::string DependenciesFilePath;
-
-  /// The path to which we should output a Swift reference dependencies file.
-  std::string ReferenceDependenciesFilePath;
-
-  /// The path to which we should output fixits as source edits.
-  std::string FixitsOutputPath;
-
-  /// The path to which we should output a loaded module trace file.
-  std::string LoadedModuleTracePath;
-
-  /// The path to which we should output a TBD file.
-  std::string TBDPath;
 
   /// Arguments which should be passed in immediate mode.
   std::vector<std::string> ImmediateArgv;
@@ -118,6 +89,11 @@ public:
   /// the expression type checker run before we consider an expression
   /// too complex.
   unsigned SolverExpressionTimeThreshold = 0;
+  
+  /// If non-zero, overrides the default threshold for how many times
+  /// the Space::minus function is called before we consider switch statement
+  /// exhaustiveness checking to be too complex.
+  unsigned SwitchCheckingInvocationThreshold = 0;
 
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
@@ -171,6 +147,9 @@ public:
   /// debugger to use.
   bool AlwaysSerializeDebuggingOptions = false;
 
+  /// If set, inserts instrumentation useful for testing the debugger.
+  bool DebuggerTestingTransform = false;
+
   /// If set, dumps wall time taken to check each function body to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
@@ -188,6 +167,13 @@ public:
 
   /// Trace changes to stats to files in StatsOutputDir.
   bool TraceStats = false;
+
+  /// Profile changes to stats to files in StatsOutputDir.
+  bool ProfileEvents = false;
+
+  /// Profile changes to stats to files in StatsOutputDir, grouped by source
+  /// entity.
+  bool ProfileEntities = false;
 
   /// If true, serialization encodes an extra lookup table for use in module-
   /// merging when emitting partial modules (the per-file modules in a non-WMO
@@ -282,13 +268,14 @@ public:
   /// Indicates whether the action will immediately run code.
   static bool isActionImmediate(ActionType);
 
+  /// \return true if action only parses without doing other compilation steps.
+  static bool shouldActionOnlyParse(ActionType);
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     return llvm::hash_value(0);
   }
-
-  StringRef originalPath() const;
 
   StringRef determineFallbackModuleName() const;
 
@@ -297,23 +284,23 @@ public:
            InputsAndOutputs.hasSingleInput();
   }
 
+  const PrimarySpecificPaths &
+  getPrimarySpecificPathsForAtMostOnePrimary() const;
+  const PrimarySpecificPaths &
+      getPrimarySpecificPathsForPrimary(StringRef) const;
+
 private:
-  bool hasUnusedDependenciesFilePath() const;
   static bool canActionEmitDependencies(ActionType);
-  bool hasUnusedObjCHeaderOutputPath() const;
-  static bool canActionEmitHeader(ActionType);
-  bool hasUnusedLoadedModuleTracePath() const;
+  static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
-  bool hasUnusedModuleOutputPath() const;
   static bool canActionEmitModule(ActionType);
-  bool hasUnusedModuleDocOutputPath() const;
   static bool canActionEmitModuleDoc(ActionType);
 
 public:
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);
-  static const char *suffixForPrincipalOutputFileForAction(ActionType);
+  static StringRef suffixForPrincipalOutputFileForAction(ActionType);
 };
 
 }

@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -92,7 +93,7 @@ namespace {
   template <class Impl, class Base>
   class TupleTypeInfoBase
       : public RecordTypeInfo<Impl, Base, TupleFieldInfo> {
-    typedef RecordTypeInfo<Impl, Base, TupleFieldInfo> super;
+    using super = RecordTypeInfo<Impl, Base, TupleFieldInfo>;
 
   protected:
     template <class... As>
@@ -331,23 +332,18 @@ namespace {
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
   public:
-    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *T,
+    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          FieldsAreABIAccessible_t fieldsABIAccessible,
+                          llvm::Type *T,
                           Alignment minAlign, IsPOD_t isPOD,
-                          IsBitwiseTakable_t isBT)
-      : TupleTypeInfoBase(fields, T, minAlign, isPOD, isBT) {}
+                          IsBitwiseTakable_t isBT,
+                          IsABIAccessible_t tupleAccessible)
+      : TupleTypeInfoBase(fields, fieldsABIAccessible,
+                          T, minAlign, isPOD, isBT, tupleAccessible) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
       return TupleNonFixedOffsets(T);
-    }
-
-    void initializeMetadata(IRGenFunction &IGF,
-                            llvm::Value *metadata,
-                            bool isVWTMutable,
-                            SILType T) const override {
-      // Tuple value witness tables are instantiated by the runtime along with
-      // their metadata. We should never try to initialize one in the compiler.
-      llvm_unreachable("initializing value witness table for tuple?!");
     }
   };
 
@@ -383,11 +379,16 @@ namespace {
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
+                                     FieldsAreABIAccessible_t fieldsAccessible,
                                           StructLayout &&layout) {
-      return NonFixedTupleTypeInfo::create(fields, layout.getType(),
+      auto tupleAccessible = IsABIAccessible_t(
+        IGM.getSILModule().isTypeABIAccessible(TheTuple));
+      return NonFixedTupleTypeInfo::create(fields, fieldsAccessible,
+                                           layout.getType(),
                                            layout.getAlignment(),
                                            layout.isPOD(),
-                                           layout.isBitwiseTakable());
+                                           layout.isBitwiseTakable(),
+                                           tupleAccessible);
     }
 
     TupleFieldInfo getFieldInfo(unsigned index,

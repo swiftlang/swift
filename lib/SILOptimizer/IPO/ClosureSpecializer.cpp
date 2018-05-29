@@ -57,6 +57,7 @@
 
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/Basic/Range.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -123,8 +124,10 @@ public:
 
   void populateCloned();
 
-  SILValue cloneCalleeConversion(SILValue calleeValue, SILValue NewClosure,
-                                 SILBuilder &Builder);
+  SILValue
+  cloneCalleeConversion(SILValue calleeValue, SILValue NewClosure,
+                        SILBuilder &Builder,
+                        SmallVectorImpl<PartialApplyInst *> &NeedsRelease);
 
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
   static SILFunction *cloneFunction(const CallSiteDescriptor &CallSiteDesc,
@@ -248,6 +251,12 @@ public:
     return getClosureParameterInfo().isConsumed();
   }
 
+  bool isTrivialNoEscapeParameter() const {
+    auto ClosureParmFnTy =
+        getClosureParameterInfo().getType()->getAs<SILFunctionType>();
+    return ClosureParmFnTy->isTrivialNoEscape();
+  }
+
   SILLocation getLoc() const { return getClosure()->getLoc(); }
 
   SILModule &getModule() const { return AI.getModule(); }
@@ -268,7 +277,7 @@ struct ClosureInfo {
   ValueLifetimeAnalysis::Frontier LifetimeFrontier;
   llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
 
-  ClosureInfo(SingleValueInstruction *Closure): Closure(Closure) {}
+  ClosureInfo(SingleValueInstruction *Closure) : Closure(Closure) {}
 
   ClosureInfo(ClosureInfo &&) =default;
   ClosureInfo &operator=(ClosureInfo &&) =default;
@@ -399,7 +408,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   FullApplySite NewAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI)) {
     NewAI = Builder.createTryApply(AI.getLoc(), FRI,
-                                   SubstitutionList(), NewArgs,
+                                   SubstitutionMap(), NewArgs,
                                    TAI->getNormalBB(), TAI->getErrorBB());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -414,7 +423,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   } else {
     auto oldApply = cast<ApplyInst>(AI);
     auto newApply = Builder.createApply(oldApply->getLoc(), FRI,
-                                        SubstitutionList(),
+                                        SubstitutionMap(),
                                         NewArgs, oldApply->isNonThrowing());
     // If we passed in the original closure as @owned, then insert a release
     // right after NewAI. This is to balance the +1 from being an @owned
@@ -642,18 +651,41 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
 }
 
 // Clone a chain of ConvertFunctionInsts.
-SILValue ClosureSpecCloner::cloneCalleeConversion(SILValue calleeValue,
-                                                  SILValue NewClosure,
-                                                  SILBuilder &Builder) {
+SILValue ClosureSpecCloner::cloneCalleeConversion(
+    SILValue calleeValue, SILValue NewClosure, SILBuilder &Builder,
+    SmallVectorImpl<PartialApplyInst *> &NeedsRelease) {
   if (calleeValue == CallSiteDesc.getClosure())
     return NewClosure;
 
-  auto *CFI = cast<ConvertFunctionInst>(calleeValue);
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(calleeValue)) {
+    calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder,
+                                        NeedsRelease);
+    return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
+                                         CFI->getType());
+  }
 
-  calleeValue = cloneCalleeConversion(CFI->getOperand(), NewClosure, Builder);
+  if (auto *PAI = dyn_cast<PartialApplyInst>(calleeValue)) {
+    assert(isPartialApplyOfReabstractionThunk(PAI) && isSupportedClosure(PAI) &&
+           PAI->getArgument(0)
+               ->getType()
+               .getAs<SILFunctionType>()
+               ->isTrivialNoEscape());
+    calleeValue = cloneCalleeConversion(PAI->getArgument(0), NewClosure,
+                                        Builder, NeedsRelease);
+    auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(),
+                                            PAI->getReferencedFunction());
+    auto NewPA = Builder.createPartialApply(
+        CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
+        PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+    NeedsRelease.push_back(NewPA);
+    return NewPA;
+  }
 
-  return Builder.createConvertFunction(CallSiteDesc.getLoc(), calleeValue,
-                                       CFI->getType());
+  auto *Cvt = cast<ConvertEscapeToNoEscapeInst>(calleeValue);
+  calleeValue = cloneCalleeConversion(Cvt->getOperand(), NewClosure, Builder,
+                                      NeedsRelease);
+  return Builder.createConvertEscapeToNoEscape(
+      CallSiteDesc.getLoc(), calleeValue, Cvt->getType(), false, true);
 }
 
 /// \brief Populate the body of the cloned closure, modifying instructions as
@@ -708,9 +740,17 @@ void ClosureSpecCloner::populateCloned() {
       Builder.createFunctionRef(CallSiteDesc.getLoc(), ClosedOverFun);
   auto *NewClosure = CallSiteDesc.createNewClosure(Builder, FnVal, NewPAIArgs);
 
-  // Clone a chain of ConvertFunctionInsts.
+  // Clone a chain of ConvertFunctionInsts. This can create further
+  // reabstraction partial_apply instructions.
+  SmallVector<PartialApplyInst*, 4> NeedsRelease;
   SILValue ConvertedCallee = cloneCalleeConversion(
-      CallSiteDesc.getClosureCallerArg(), NewClosure, Builder);
+      CallSiteDesc.getClosureCallerArg(), NewClosure, Builder, NeedsRelease);
+
+  // Make sure that we actually emit the releases for reabstraction thunks. We
+  // have guaranteed earlier that we only allow reabstraction thunks if the
+  // closure was passed trivial.
+  assert(NeedsRelease.empty() || CallSiteDesc.isTrivialNoEscapeParameter());
+
   ValueMap.insert(std::make_pair(ClosureArg, ConvertedCallee));
 
   BBMap.insert(std::make_pair(ClosureUserEntryBB, ClonedEntryBB));
@@ -726,21 +766,36 @@ void ClosureSpecCloner::populateCloned() {
 
   // Then insert a release in all non failure exit BBs if our partial apply was
   // guaranteed. This is b/c it was passed at +0 originally and we need to
-  // balance the initial increment of the newly created closure.
-  if (CallSiteDesc.isClosureGuaranteed() &&
-      CallSiteDesc.closureHasRefSemanticContext()) {
+  // balance the initial increment of the newly created closure(s).
+  bool ClosureHasRefSemantics = CallSiteDesc.closureHasRefSemanticContext();
+  if ((CallSiteDesc.isClosureGuaranteed() ||
+       CallSiteDesc.isTrivialNoEscapeParameter()) &&
+      (ClosureHasRefSemantics || !NeedsRelease.empty())) {
     for (SILBasicBlock *BB : CallSiteDesc.getNonFailureExitBBs()) {
       SILBasicBlock *OpBB = BBMap[BB];
 
       TermInst *TI = OpBB->getTerminator();
       auto Loc = CleanupLocation::get(NewClosure->getLoc());
 
-      // If we have a return, we place the release right before it so we know
+      // If we have a return/throw, we place the release right before it so we know
       // that it will be executed at the end of the epilogue.
       if (isa<ReturnInst>(TI)) {
         Builder.setInsertionPoint(TI);
-        Builder.createReleaseValue(Loc, SILValue(NewClosure),
-                                   Builder.getDefaultAtomicity());
+        if (ClosureHasRefSemantics)
+          Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                     Builder.getDefaultAtomicity());
+        for (auto PAI : NeedsRelease)
+          Builder.createReleaseValue(Loc, SILValue(PAI),
+                                     Builder.getDefaultAtomicity());
+        continue;
+      } else if (isa<ThrowInst>(TI)) {
+        Builder.setInsertionPoint(TI);
+        if (ClosureHasRefSemantics)
+          Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                     Builder.getDefaultAtomicity());
+        for (auto PAI : NeedsRelease)
+          Builder.createReleaseValue(Loc, SILValue(PAI),
+                                     Builder.getDefaultAtomicity());
         continue;
       }
 
@@ -756,7 +811,12 @@ void ClosureSpecCloner::populateCloned() {
       // value, we will retain the partial apply before we release it and
       // potentially eliminate it.
       Builder.setInsertionPoint(NoReturnApply.getInstruction());
-      Builder.createReleaseValue(Loc, SILValue(NewClosure), Builder.getDefaultAtomicity());
+      if (ClosureHasRefSemantics)
+        Builder.createReleaseValue(Loc, SILValue(NewClosure),
+                                   Builder.getDefaultAtomicity());
+      for (auto PAI : NeedsRelease)
+        Builder.createReleaseValue(Loc, SILValue(PAI),
+                                   Builder.getDefaultAtomicity());
     }
   }
 }
@@ -823,6 +883,27 @@ void SILClosureSpecializerTransform::run() {
   invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
 }
 
+static void markReabstractionPartialApplyAsUsed(
+    SILValue FirstClosure, SILValue Current,
+    llvm::DenseSet<SingleValueInstruction *> &UsedReabstractionClosure) {
+  if (Current == FirstClosure)
+    return;
+  if (auto PA = dyn_cast<PartialApplyInst>(Current)) {
+    UsedReabstractionClosure.insert(PA);
+    return markReabstractionPartialApplyAsUsed(FirstClosure, PA->getArgument(0),
+                                        UsedReabstractionClosure);
+  }
+  if (auto Cvt = dyn_cast<ConvertFunctionInst>(Current)) {
+    return markReabstractionPartialApplyAsUsed(FirstClosure, Cvt->getOperand(),
+                                               UsedReabstractionClosure);
+  }
+  if (auto Cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(Current)) {
+    return markReabstractionPartialApplyAsUsed(FirstClosure, Cvt->getOperand(),
+                                               UsedReabstractionClosure);
+  }
+  llvm_unreachable("Unexpect instruction");
+}
+
 void SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
@@ -831,6 +912,10 @@ void SILClosureSpecializerTransform::gatherCallSites(
   // A set of apply inst that we have associated with a closure. We use this to
   // make sure that we do not handle call sites with multiple closure arguments.
   llvm::DenseSet<FullApplySite> VisitedAI;
+
+  // We should not look at reabstraction closure twice who we ultimately ended
+  // up using as an argument that we specialize on.
+  llvm::DenseSet<SingleValueInstruction *> UsedReabstractionClosure;
 
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
@@ -841,6 +926,8 @@ void SILClosureSpecializerTransform::gatherCallSites(
       if (!isSupportedClosure(&II))
         continue;
       auto ClosureInst = cast<SingleValueInstruction>(&II);
+      if (UsedReabstractionClosure.count(ClosureInst))
+        continue;
 
       ClosureInfo *CInfo = nullptr;
 
@@ -852,6 +939,7 @@ void SILClosureSpecializerTransform::gatherCallSites(
       // Live range end points.
       SmallVector<SILInstruction *, 8> UsePoints;
 
+      bool HaveUsedReabstraction = false;
       // Uses may grow in this loop.
       for (size_t UseIndex = 0; UseIndex < Uses.size(); ++UseIndex) {
         auto *Use = Uses[UseIndex];
@@ -863,6 +951,30 @@ void SILClosureSpecializerTransform::gatherCallSites(
           Uses.append(CFI->getUses().begin(), CFI->getUses().end());
           continue;
         }
+        if (auto *Cvt= dyn_cast<ConvertEscapeToNoEscapeInst>(Use->getUser())) {
+          Uses.append(Cvt->getUses().begin(), Cvt->getUses().end());
+          continue;
+        }
+
+        // Look through reabstraction thunks.
+        if (auto *PA = dyn_cast<PartialApplyInst>(Use->getUser())) {
+          // Reabstraction can cause series of partial_apply to be emitted. It
+          // is okay to treat these like conversion instructions. Current
+          // restriction: if the partial_apply does not take ownership of its
+          // argument we don't need to analyze which partial_apply to emit
+          // release for (its all of them).
+          if (isPartialApplyOfReabstractionThunk(PA) &&
+              isSupportedClosure(PA) &&
+              PA->getArgument(0)
+                  ->getType()
+                  .getAs<SILFunctionType>()
+                  ->isTrivialNoEscape()) {
+            Uses.append(PA->getUses().begin(), PA->getUses().end());
+            HaveUsedReabstraction = true;
+          }
+          continue;
+        }
+
         // If this use is not an apply inst or an apply inst with
         // substitutions, there is nothing interesting for us to do, so
         // continue...
@@ -941,6 +1053,14 @@ void SILClosureSpecializerTransform::gatherCallSites(
         auto ParamInfo = AI.getSubstCalleeType()->getParameters();
         SILParameterInfo ClosureParamInfo = ParamInfo[ClosureParamIndex];
 
+        // We currently only support copying intermediate reabastraction
+        // closures if the closure is ultimately passed trivially.
+        bool IsClosurePassedTrivially = ClosureParamInfo.getType()
+                                            ->castTo<SILFunctionType>()
+                                            ->isTrivialNoEscape();
+        if (HaveUsedReabstraction &&  !IsClosurePassedTrivially)
+          continue;
+
         // Get all non-failure exit BBs in the Apply Callee if our partial apply
         // is guaranteed. If we do not understand one of the exit BBs, bail.
         //
@@ -949,9 +1069,12 @@ void SILClosureSpecializerTransform::gatherCallSites(
         //
         // However, thin_to_thick_function closures don't have a context and
         // don't need to be released.
+        bool OnlyHaveThinToThickClosure =
+            isa<ThinToThickFunctionInst>(ClosureInst) && !HaveUsedReabstraction;
+
         llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
-        if (ClosureParamInfo.isGuaranteed() &&
-            !isa<ThinToThickFunctionInst>(ClosureInst) &&
+        if ((ClosureParamInfo.isGuaranteed() || IsClosurePassedTrivially) &&
+            !OnlyHaveThinToThickClosure &&
             !findAllNonFailureExitBBs(ApplyCallee, NonFailureExitBBs)) {
           continue;
         }
@@ -961,6 +1084,10 @@ void SILClosureSpecializerTransform::gatherCallSites(
         if (!CInfo)
           CInfo = new ClosureInfo(ClosureInst);
 
+        // Mark the reabstraction closures as used.
+        if (HaveUsedReabstraction)
+          markReabstractionPartialApplyAsUsed(ClosureInst, Use->get(),
+                                              UsedReabstractionClosure);
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
         CInfo->CallSites.push_back(

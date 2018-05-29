@@ -124,6 +124,10 @@ static bool areTypeDeclsVisibleInLookupMode(LookupState LS) {
 static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
                                       const DeclContext *FromContext,
                                       LazyResolver *TypeResolver) {
+  // Accessors are never visible directly in the source language.
+  if (isa<AccessorDecl>(Member))
+    return false;
+
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
     TypeResolver->resolveAccessControl(Member);
@@ -499,6 +503,8 @@ static void lookupVisibleMemberDeclsImpl(
     // The metatype represents an arbitrary named type: dig through to the
     // declared type to see what we're dealing with.
     Type Ty = MTT->getInstanceType();
+    if (Ty->is<AnyMetatypeType>())
+      return;
 
     LookupState subLS = LookupState::makeQualified().withOnMetatype();
     if (LS.isIncludingInstanceMembers()) {
@@ -805,10 +811,10 @@ public:
           OtherSignatureType = CT->getCanonicalType();
       }
 
-      if (conflicting(FoundSignature, OtherSignature, true) &&
-          (FoundSignatureType == OtherSignatureType ||
-           FoundSignature.Name.isCompoundName() !=
-             OtherSignature.Name.isCompoundName())) {
+      if (conflicting(M->getASTContext(), FoundSignature, FoundSignatureType,
+                      OtherSignature, OtherSignatureType,
+                      /*wouldConflictInSwift5*/nullptr,
+                      /*skipProtocolExtensionCheck*/true)) {
         if (VD->getFormalAccess() > OtherVD->getFormalAccess()) {
           PossiblyConflicting.erase(I);
           PossiblyConflicting.insert(VD);
@@ -872,9 +878,23 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       LS = LS.withOnMetatype();
     }
 
-    GenericParamList *GenericParams = DC->getGenericParamsOfContext();
+    // We don't look for generic parameters if we are in the context of a
+    // nominal type: they will be looked up anyways via `lookupVisibleMemberDecls`.
+    if (DC && !isa<NominalTypeDecl>(DC)) {
+      if (auto *decl = DC->getAsDeclOrDeclExtensionContext()) {
+        if (auto GC = decl->getAsGenericContext()) {
+          auto params = GC->getGenericParams();
+          namelookup::FindLocalVal(SM, Loc, Consumer).checkGenericParams(params);
+        }
+      }
+    }
 
-    if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (auto *SE = dyn_cast<SubscriptDecl>(DC)) {
+      ExtendedType = SE->getDeclContext()->getSelfTypeInContext();
+      DC = DC->getParent();
+      BaseDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+
       // Look for local variables; normally, the parser resolves these
       // for us, but it can't do the right thing inside local types.
       // FIXME: when we can parse and typecheck the function body partially for
@@ -917,14 +937,9 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       BaseDecl = ND;
     }
 
-    if (BaseDecl && ExtendedType) {
+    if (BaseDecl && ExtendedType)
       ::lookupVisibleMemberDecls(ExtendedType, Consumer, DC, LS, Reason,
                                  TypeResolver, nullptr);
-    }
-
-    // Check any generic parameters for something with the given name.
-    namelookup::FindLocalVal(SM, Loc, Consumer)
-          .checkGenericParams(GenericParams);
 
     DC = DC->getParent();
     Reason = DeclVisibilityKind::MemberOfOutsideNominal;

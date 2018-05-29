@@ -21,17 +21,15 @@ public struct _ValidUTF8Buffer<Storage: UnsignedInteger & FixedWidthInteger> {
   public typealias Element = Unicode.UTF8.CodeUnit
   internal typealias _Storage = Storage
   
-  @_versioned
+  @usableFromInline
   internal var _biasedBits: Storage
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal init(_biasedBits: Storage) {
     self._biasedBits = _biasedBits
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal init(_containing e: Element) {
     _sanityCheck(
       e != 192 && e != 193 && !(245...255).contains(e), "invalid UTF8 byte")
@@ -45,20 +43,20 @@ extension _ValidUTF8Buffer : Sequence {
 
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator : IteratorProtocol, Sequence {
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public init(_ x: _ValidUTF8Buffer) { _biasedBits = x._biasedBits }
     
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public mutating func next() -> Element? {
       if _biasedBits == 0 { return nil }
       defer { _biasedBits >>= 8 }
       return Element(truncatingIfNeeded: _biasedBits) &- 1
     }
-    @_versioned // FIXME(sil-serialize-all)
+    @usableFromInline // FIXME(sil-serialize-all)
     internal var _biasedBits: Storage
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func makeIterator() -> Iterator {
     return Iterator(self)
   }
@@ -68,57 +66,56 @@ extension _ValidUTF8Buffer : Collection {
   
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index : Comparable {
-    @_versioned
+    @usableFromInline
     internal var _biasedBits: Storage
     
-    @_inlineable // FIXME(sil-serialize-all)
-    @_versioned
+    @inlinable // FIXME(sil-serialize-all)
     internal init(_biasedBits: Storage) { self._biasedBits = _biasedBits }
     
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public static func == (lhs: Index, rhs: Index) -> Bool {
       return lhs._biasedBits == rhs._biasedBits
     }
-    @_inlineable // FIXME(sil-serialize-all)
+    @inlinable // FIXME(sil-serialize-all)
     public static func < (lhs: Index, rhs: Index) -> Bool {
       return lhs._biasedBits > rhs._biasedBits
     }
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var startIndex : Index {
     return Index(_biasedBits: _biasedBits)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var endIndex : Index {
     return Index(_biasedBits: 0)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var count : Int {
     return Storage.bitWidth &>> 3 &- _biasedBits.leadingZeroBitCount &>> 3
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var isEmpty : Bool {
     return _biasedBits == 0
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(after i: Index) -> Index {
     _debugPrecondition(i._biasedBits != 0)
     return Index(_biasedBits: i._biasedBits >> 8)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public subscript(i: Index) -> Element {
     return Element(truncatingIfNeeded: i._biasedBits) &- 1
   }
 }
 
 extension _ValidUTF8Buffer : BidirectionalCollection {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func index(before i: Index) -> Index {
     let offset = _ValidUTF8Buffer(_biasedBits: i._biasedBits).count
     _debugPrecondition(offset != 0)
@@ -129,7 +126,7 @@ extension _ValidUTF8Buffer : BidirectionalCollection {
 extension _ValidUTF8Buffer : RandomAccessCollection {
   public typealias Indices = DefaultIndices<_ValidUTF8Buffer>
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
     _debugPrecondition(_isValid(i))
@@ -139,7 +136,7 @@ extension _ValidUTF8Buffer : RandomAccessCollection {
     ) &>> 3
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     let startOffset = distance(from: startIndex, to: i)
@@ -151,22 +148,22 @@ extension _ValidUTF8Buffer : RandomAccessCollection {
 }
 
 extension _ValidUTF8Buffer : RangeReplaceableCollection {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public init() {
     _biasedBits = 0
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var capacity: Int {
     return _ValidUTF8Buffer.capacity
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static var capacity: Int {
     return Storage.bitWidth / Element.bitWidth
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public mutating func append(_ e: Element) {
     _debugPrecondition(count + 1 <= capacity)
@@ -175,7 +172,7 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
     _biasedBits |= Storage(e &+ 1) &<< (count &<< 3)
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   @discardableResult
   public mutating func removeFirst() -> Element {
@@ -185,13 +182,12 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
     return result
   }
 
-  @_inlineable // FIXME(sil-serialize-all)
-  @_versioned
+  @inlinable // FIXME(sil-serialize-all)
   internal func _isValid(_ i: Index) -> Bool {
     return i == endIndex || indices.contains(i)
   }
   
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
@@ -207,7 +203,7 @@ extension _ValidUTF8Buffer : RangeReplaceableCollection {
 }
 
 extension _ValidUTF8Buffer {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public mutating func append<T>(contentsOf other: _ValidUTF8Buffer<T>) {
     _debugPrecondition(count + other.count <= capacity)
@@ -217,8 +213,16 @@ extension _ValidUTF8Buffer {
 }
 
 extension _ValidUTF8Buffer {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public static var encodedReplacementCharacter : _ValidUTF8Buffer {
     return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
+  }
+
+  @inlinable
+  internal var _bytes: (bytes: UInt64, count: Int) {
+    let count = self.count
+    let mask: UInt64 = 1 &<< (UInt64(truncatingIfNeeded: count) &<< 3) &- 1
+    let unbiased = UInt64(truncatingIfNeeded: _biasedBits) &- 0x0101010101010101
+    return (unbiased & mask, count)
   }
 }

@@ -25,3 +25,7 @@ public protocol P3 {
 public extension P2 where Self : P3 {
   func fooConstraint() {}
 }
+
+public extension Dictionary.Keys {
+  public func foo() {}
+}

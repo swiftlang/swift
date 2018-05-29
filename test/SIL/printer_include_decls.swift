@@ -36,9 +36,18 @@ class Foo {
 
   func m() {}
 // CHECK: func m()
+
+  enum E {}
+// CHECK: enum E
 }
 
 func bar(x: Foo) -> Int {
   return x.x
 }
 // CHECK: func bar(x: Foo) -> Int
+
+extension Foo.E {
+// CHECK: extension Foo.E {
+  func e(x: Foo.E) {}
+// CHECK: func e(x: Foo.E)
+}

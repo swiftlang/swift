@@ -50,7 +50,7 @@ namespace irgen {
   void emitFunctionPartialApplication(
       IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fnPtr,
       llvm::Value *fnContext, Explosion &args,
-      ArrayRef<SILParameterInfo> argTypes, SubstitutionList subs,
+      ArrayRef<SILParameterInfo> argTypes, SubstitutionMap subs,
       CanSILFunctionType origType, CanSILFunctionType substType,
       CanSILFunctionType outType, Explosion &out, bool isOutlined);
 

@@ -42,7 +42,7 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   if (!attrs.empty())
     ty = new (Context) AttributedTypeRepr(attrs, ty);
 
-  // Apply 'inout' or '__shared'
+  // Apply 'inout' or '__shared' or '__owned'
   if (specifierLoc.isValid()) {
     if (auto *fnTR = dyn_cast<FunctionTypeRepr>(ty)) {
       // If the input to the function isn't parenthesized, apply the inout
@@ -64,12 +64,15 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
     }
     switch (specifier) {
     case VarDecl::Specifier::Owned:
+      ty = new (Context) OwnedTypeRepr(ty, specifierLoc);
       break;
     case VarDecl::Specifier::InOut:
       ty = new (Context) InOutTypeRepr(ty, specifierLoc);
       break;
     case VarDecl::Specifier::Shared:
       ty = new (Context) SharedTypeRepr(ty, specifierLoc);
+      break;
+    case VarDecl::Specifier::Default:
       break;
     case VarDecl::Specifier::Var:
       llvm_unreachable("cannot have var as specifier");
@@ -875,16 +878,11 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
         Backtracking->cancelBacktrack();
 
       // Consume a name.
-      if (!Tok.is(tok::kw__))
-        element.Name = Context.getIdentifier(Tok.getText());
-      element.NameLoc = consumeToken();
+      element.NameLoc = consumeArgumentLabel(element.Name);
 
       // If there is a second name, consume it as well.
-      if (Tok.canBeArgumentLabel()) {
-        if (!Tok.is(tok::kw__))
-          element.SecondName = Context.getIdentifier(Tok.getText());
-        element.SecondNameLoc = consumeToken();
-      }
+      if (Tok.canBeArgumentLabel())
+        element.SecondNameLoc = consumeArgumentLabel(element.SecondName);
 
       // Consume the ':'.
       if (!consumeIf(tok::colon, element.ColonLoc))
@@ -904,15 +902,15 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
       return makeParserError();
     element.Type = type.get();
 
-    // Complain obsoleted 'inout' position; (inout name: Ty)
+    // Complain obsoleted 'inout' etc. position; (inout name: Ty)
     if (ObsoletedInOutLoc.isValid()) {
-      if (isa<InOutTypeRepr>(element.Type) ||
-          isa<SharedTypeRepr>(element.Type)) {
+      if (isa<SpecifierTypeRepr>(element.Type)) {
         // If the parsed type is already a inout type et al, just remove it.
         diagnose(Tok, diag::parameter_specifier_repeated)
             .fixItRemove(ObsoletedInOutLoc);
       } else {
-        diagnose(ObsoletedInOutLoc, diag::inout_as_attr_disallowed, "'inout'")
+        diagnose(ObsoletedInOutLoc,
+                 diag::parameter_specifier_as_attr_disallowed, "inout")
             .fixItRemove(ObsoletedInOutLoc)
             .fixItInsert(element.Type->getStartLoc(), "inout ");
         // Build inout type. Note that we bury the inout locator within the

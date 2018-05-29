@@ -226,7 +226,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue S, SILModule &M,
     S = stripCasts(S);
 
     if (isa<AllocRefInst>(S) || isa<MetatypeInst>(S)) {
-      if (S->getType().getSwiftRValueType()->hasDynamicSelfType())
+      if (S->getType().getASTType()->hasDynamicSelfType())
         return SILValue();
       return S;
     }
@@ -407,17 +407,16 @@ swift::getExactDynamicTypeOfUnderlyingObject(SILValue S, SILModule &M,
 // Start with the substitutions from the apply.
 // Try to propagate them to find out the real substitutions required
 // to invoke the method.
-static void
+static SubstitutionMap
 getSubstitutionsForCallee(SILModule &M,
                           CanSILFunctionType baseCalleeType,
                           CanType derivedSelfType,
-                          FullApplySite AI,
-                          SmallVectorImpl<Substitution> &newSubs) {
+                          FullApplySite AI) {
 
   // If the base method is not polymorphic, no substitutions are required,
   // even if we originally had substitutions for calling the derived method.
   if (!baseCalleeType->isPolymorphic())
-    return;
+    return SubstitutionMap();
 
   // Add any generic substitutions for the base class.
   Type baseSelfType = baseCalleeType->getSelfParameter().getType();
@@ -442,9 +441,7 @@ getSubstitutionsForCallee(SILModule &M,
         M.getSwiftModule(), baseClassDecl);
   }
 
-  SubstitutionMap origSubMap;
-  if (auto origCalleeSig = AI.getOrigCalleeType()->getGenericSignature())
-    origSubMap = origCalleeSig->getSubstitutionMap(AI.getSubstitutions());
+  SubstitutionMap origSubMap = AI.getSubstitutionMap();
 
   Type calleeSelfType = AI.getOrigCalleeType()->getSelfParameter().getType();
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
@@ -460,16 +457,13 @@ getSubstitutionsForCallee(SILModule &M,
 
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
 
-  auto subMap =
+  return
     SubstitutionMap::combineSubstitutionMaps(baseSubMap,
                                              origSubMap,
                                              CombineSubstitutionMaps::AtDepth,
                                              baseDepth,
                                              origDepth,
                                              baseCalleeSig);
-
-  // Build the new substitutions using the base method signature.
-  baseCalleeSig->getSubstitutions(subMap, newSubs);
 }
 
 SILFunction *swift::getTargetClassMethod(SILModule &M,
@@ -496,7 +490,8 @@ SILFunction *swift::getTargetClassMethod(SILModule &M,
 /// return true if it is possible to devirtualize, false - otherwise.
 bool swift::canDevirtualizeClassMethod(FullApplySite AI,
                                        SILType ClassOrMetatypeType,
-                                       OptRemark::Emitter *ORE) {
+                                       OptRemark::Emitter *ORE,
+                                       bool isEffectivelyFinalMethod) {
 
   DEBUG(llvm::dbgs() << "    Trying to devirtualize : " << *AI.getInstruction());
 
@@ -516,6 +511,15 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   if (!F) {
     DEBUG(llvm::dbgs() << "        FAIL: Could not find matching VTable or "
                           "vtable method for this class.\n");
+    return false;
+  }
+
+  // We need to disable the  “effectively final” opt if a function is inlinable
+  if (isEffectivelyFinalMethod &&
+      F->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
+                          "it is an effectively-final inlinable: "
+                       << F->getName() << "\n");
     return false;
   }
 
@@ -558,10 +562,10 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
 
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
-  SmallVector<Substitution, 4> Subs;
-  getSubstitutionsForCallee(Mod, GenCalleeType,
-                            ClassOrMetatypeType.getSwiftRValueType(),
-                            AI, Subs);
+  SubstitutionMap Subs =
+    getSubstitutionsForCallee(Mod, GenCalleeType,
+                              ClassOrMetatypeType.getASTType(),
+                              AI);
   CanSILFunctionType SubstCalleeType = GenCalleeType;
   if (GenCalleeType->isPolymorphic())
     SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Subs);
@@ -701,10 +705,12 @@ DevirtualizationResult swift::devirtualizeClassMethod(FullApplySite AI,
   return std::make_pair(ResultValue, NewAI);
 }
 
-DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
-                                                         SILValue ClassInstance,
-                                                         OptRemark::Emitter *ORE) {
-  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE))
+DevirtualizationResult
+swift::tryDevirtualizeClassMethod(FullApplySite AI, SILValue ClassInstance,
+                                  OptRemark::Emitter *ORE,
+                                  bool isEffectivelyFinalMethod) {
+  if (!canDevirtualizeClassMethod(AI, ClassInstance->getType(), ORE,
+                                  isEffectivelyFinalMethod))
     return std::make_pair(nullptr, FullApplySite());
   return devirtualizeClassMethod(AI, ClassInstance, ORE);
 }
@@ -757,7 +763,7 @@ DevirtualizationResult swift::tryDevirtualizeClassMethod(FullApplySite AI,
 /// \param conformanceRef The (possibly-specialized) conformance
 /// \param requirementSig The generic signature of the requirement
 /// \param witnessThunkSig The generic signature of the witness method
-/// \param origSubs The substitutions from the call instruction
+/// \param origSubMap The substitutions from the call instruction
 /// \param isDefaultWitness True if this is a default witness method
 /// \param classWitness The ClassDecl if this is a class witness method
 static SubstitutionMap
@@ -766,14 +772,12 @@ getWitnessMethodSubstitutions(
     ProtocolConformanceRef conformanceRef,
     GenericSignature *requirementSig,
     GenericSignature *witnessThunkSig,
-    SubstitutionList origSubs,
+    SubstitutionMap origSubMap,
     bool isDefaultWitness,
     ClassDecl *classWitness) {
 
   if (witnessThunkSig == nullptr)
     return SubstitutionMap();
-
-  auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 
   if (isDefaultWitness)
     return origSubMap;
@@ -833,7 +837,7 @@ getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
   auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
   auto witnessThunkSig = witnessFnTy->getGenericSignature();
 
-  SubstitutionList origSubs = AI.getSubstitutions();
+  SubstitutionMap origSubs = AI.getSubstitutionMap();
 
   auto *mod = Module.getSwiftModule();
   bool isDefaultWitness =
@@ -893,13 +897,9 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
 
   ApplySite SAI;
 
-  SmallVector<Substitution, 4> NewSubs;
-  if (auto GenericSig = CalleeCanType->getGenericSignature())
-    GenericSig->getSubstitutions(SubMap, NewSubs);
-
   SILValue ResultValue;
   if (auto *A = dyn_cast<ApplyInst>(AI)) {
-    auto *NewAI = Builder.createApply(Loc, FRI, NewSubs, Arguments,
+    auto *NewAI = Builder.createApply(Loc, FRI, SubMap, Arguments,
                                       A->isNonThrowing());
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(&Builder, Loc, NewAI,
@@ -907,15 +907,13 @@ devirtualizeWitnessMethod(ApplySite AI, SILFunction *F,
     SAI = NewAI;
   }
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
-    SAI = Builder.createTryApply(Loc, FRI, NewSubs, Arguments,
+    SAI = Builder.createTryApply(Loc, FRI, SubMap, Arguments,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   if (auto *PAI = dyn_cast<PartialApplyInst>(AI)) {
-    auto PartialApplyConvention = PAI->getType()
-                                      .getSwiftRValueType()
-                                      ->getAs<SILFunctionType>()
+    auto PartialApplyConvention = PAI->getType().getAs<SILFunctionType>()
                                       ->getCalleeConvention();
     auto *NewPAI = Builder.createPartialApply(
-        Loc, FRI, NewSubs, Arguments, PartialApplyConvention);
+        Loc, FRI, SubMap, Arguments, PartialApplyConvention);
     // Check if any casting is required for the return value.
     ResultValue = castValueToABICompatibleType(
         &Builder, Loc, NewPAI, NewPAI->getType(), PAI->getType());
@@ -1025,7 +1023,8 @@ DevirtualizationResult swift::tryDevirtualizeApply(ApplySite AI,
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(FAS, ClassType, CD, CHA))
-      return tryDevirtualizeClassMethod(FAS, Instance, ORE);
+      return tryDevirtualizeClassMethod(FAS, Instance, ORE,
+                                        true /*isEffectivelyFinalMethod*/);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.
@@ -1091,7 +1090,9 @@ bool swift::canDevirtualizeApply(FullApplySite AI, ClassHierarchyAnalysis *CHA) 
     auto *CD = ClassType.getClassOrBoundGenericClass();
 
     if (isEffectivelyFinalMethod(AI, ClassType, CD, CHA))
-      return canDevirtualizeClassMethod(AI, Instance->getType());
+      return canDevirtualizeClassMethod(AI, Instance->getType(),
+                                        nullptr /*ORE*/,
+                                        true /*isEffectivelyFinalMethod*/);
 
     // Try to check if the exact dynamic type of the instance is statically
     // known.

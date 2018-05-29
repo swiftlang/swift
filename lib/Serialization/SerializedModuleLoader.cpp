@@ -15,6 +15,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
@@ -28,7 +29,7 @@
 using namespace swift;
 
 namespace {
-typedef std::pair<Identifier, SourceLoc> AccessPathElem;
+using AccessPathElem = std::pair<Identifier, SourceLoc>;
 } // end unnamed namespace
 
 // Defined out-of-line so that we can see ~ModuleFile.
@@ -316,6 +317,25 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   }
 
+  case serialization::Status::CircularDependency: {
+    auto circularDependencyIter =
+        llvm::find_if(loadedModuleFile->getDependencies(),
+                      [](const ModuleFile::Dependency &next) {
+      return !next.Import.second->hasResolvedImports();
+    });
+    assert(circularDependencyIter != loadedModuleFile->getDependencies().end()
+           && "circular dependency reported, but no module with unresolved "
+              "imports found");
+
+    // FIXME: We should include the path of the circularity as well, but that's
+    // hard because we're discovering this /while/ resolving imports, which
+    // means the problematic modules haven't been recorded yet.
+    Ctx.Diags.diagnose(*diagLoc, diag::serialization_circular_dependency,
+                       circularDependencyIter->getPrettyPrintedPath(),
+                       M.getName());
+    break;
+  }
+
   case serialization::Status::MissingShadowedModule: {
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_missing_shadowed_module,
                        M.getName());
@@ -434,6 +454,7 @@ ModuleDecl *SerializedModuleLoader::loadModule(SourceLoc importLoc,
 
   auto M = ModuleDecl::create(moduleID.first, Ctx);
   Ctx.LoadedModules[moduleID.first] = M;
+  SWIFT_DEFER { M->setHasResolvedImports(); };
 
   if (!loadAST(*M, moduleID.second, std::move(moduleInputBuffer),
                std::move(moduleDocInputBuffer), isFramework)) {

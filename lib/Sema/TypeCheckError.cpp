@@ -41,23 +41,19 @@ private:
   };
   unsigned TheKind : 2;
   unsigned IsRethrows : 1;
-  unsigned IsProtocolMethod : 1;
   unsigned ParamCount : 28;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn)
     : TheKind(kind),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheExpr = fn;
   }
 
-  explicit AbstractFunction(AbstractFunctionDecl *fn,
-                            bool isProtocolMethod)
+  explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      IsProtocolMethod(isProtocolMethod),
       ParamCount(fn->getNumParameterLists()) {
     TheFunction = fn;
   }
@@ -65,7 +61,6 @@ public:
   explicit AbstractFunction(AbstractClosureExpr *closure)
     : TheKind(Kind::Closure),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheClosure = closure;
   }
@@ -73,7 +68,6 @@ public:
   explicit AbstractFunction(ParamDecl *parameter)
     : TheKind(Kind::Parameter),
       IsRethrows(false),
-      IsProtocolMethod(false),
       ParamCount(1) {
     TheParameter = parameter;
   }
@@ -84,7 +78,7 @@ public:
   bool isBodyRethrows() const { return IsRethrows; }
 
   unsigned getNumArgumentsForFullApply() const {
-    return (ParamCount - unsigned(IsProtocolMethod));
+    return ParamCount;
   }
 
   Type getType() const {
@@ -120,10 +114,6 @@ public:
     return TheExpr;
   }
 
-  bool isProtocolMethod() const {
-    return IsProtocolMethod;
-  }
-
   static AbstractFunction decomposeApply(ApplyExpr *apply,
                                          SmallVectorImpl<Expr*> &args) {
     Expr *fn;
@@ -150,6 +140,9 @@ public:
       // Look through base-ignored qualified references (Module.methodName).
       } else if (auto baseIgnored = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
         fn = baseIgnored->getRHS();
+      // Look through closure capture lists.
+      } else if (auto captureList = dyn_cast<CaptureListExpr>(fn)) {
+        fn = captureList->getClosureBody();
       } else {
         break;
       }
@@ -159,16 +152,9 @@ public:
     if (auto declRef = dyn_cast<DeclRefExpr>(fn)) {
       ValueDecl *decl = declRef->getDecl();
       if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-        return AbstractFunction(fn, false);
+        return AbstractFunction(fn);
       } else if (auto param = dyn_cast<ParamDecl>(decl)) {
         return AbstractFunction(param);
-      }
-
-    // Archetype function references.
-    } else if (auto memberRef = dyn_cast<MemberRefExpr>(fn)) {
-      if (auto fn = dyn_cast<AbstractFunctionDecl>(
-                                          memberRef->getMember().getDecl())) {
-        return AbstractFunction(fn, true);
       }
 
     // Closures.
@@ -459,21 +445,15 @@ public:
       Type type = fnRef.getType();
       if (!type) return Classification::forInvalidCode();
 
-      if (fnRef.isProtocolMethod()) {
-        if (auto fnType = type->getAs<AnyFunctionType>()) {
-          type = fnType->getResult();
-        } else {
-          Classification::forInvalidCode();
-        }
-      }
-
       // Use the most significant result from the arguments.
       Classification result;
       for (auto arg : reversed(args)) {
         auto fnType = type->getAs<AnyFunctionType>();
         if (!fnType) return Classification::forInvalidCode();
 
-        result.merge(classifyRethrowsArgument(arg, fnType->getInput()));
+        auto paramType = FunctionType::composeInput(fnType->getASTContext(),
+                                                    fnType->getParams(), false);
+        result.merge(classifyRethrowsArgument(arg, paramType));
         type = fnType->getResult();
       }
       return result;
@@ -520,7 +500,7 @@ private:
 
   Classification classifyThrowingParameterBody(ParamDecl *param,
                                                PotentialReason reason) {
-    assert(param->getType()->lookThroughAllAnyOptionalTypes()->castTo<AnyFunctionType>()->throws());
+    assert(param->getType()->lookThroughAllOptionalTypes()->castTo<AnyFunctionType>()->throws());
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
@@ -706,7 +686,7 @@ private:
 
     // Otherwise, if the original parameter type was not a throwing
     // function type, it does not contribute to 'rethrows'.
-    auto paramFnType = paramType->lookThroughAllAnyOptionalTypes()->getAs<AnyFunctionType>();
+    auto paramFnType = paramType->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
     if (!paramFnType || !paramFnType->throws())
       return Classification();
 

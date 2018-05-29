@@ -19,7 +19,7 @@ import Darwin
 
 #if !os(watchOS)
 
-@available(OSX, introduced: 10.13)
+@available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
 extension VNFaceLandmarkRegion2D {

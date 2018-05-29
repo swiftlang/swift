@@ -116,6 +116,13 @@
 #define NOMINAL_TYPE_DECL(Id, Parent) ITERABLE_GENERIC_VALUE_DECL(Id, Parent)
 #endif
 
+/// ABSTRACT_FUNCTION_DECL(Id, Parent)
+///   Used for subclasses of AbstractFunction. The default behavior is
+///   to do the same as for GENERIC_VALUE_DECL.
+#ifndef ABSTRACT_FUNCTION_DECL
+#define ABSTRACT_FUNCTION_DECL(Id, Parent) GENERIC_VALUE_DECL(Id, Parent)
+#endif
+
 /// VALUE_DECL(Id, Parent)
 ///   Used for subclasses of ValueDecl.  The default behavior is to do
 ///   the same as for Decl.
@@ -159,10 +166,10 @@ ABSTRACT_DECL(Value, Decl)
     GENERIC_VALUE_DECL(Subscript, AbstractStorageDecl)
     DECL_RANGE(AbstractStorage, Var, Subscript)
   ABSTRACT_DECL(AbstractFunction, ValueDecl)
-    GENERIC_VALUE_DECL(Constructor, AbstractFunctionDecl)
-    GENERIC_VALUE_DECL(Destructor, AbstractFunctionDecl)
-    GENERIC_VALUE_DECL(Func, AbstractFunctionDecl)
-      GENERIC_VALUE_DECL(Accessor, FuncDecl)
+    ABSTRACT_FUNCTION_DECL(Constructor, AbstractFunctionDecl)
+    ABSTRACT_FUNCTION_DECL(Destructor, AbstractFunctionDecl)
+    ABSTRACT_FUNCTION_DECL(Func, AbstractFunctionDecl)
+      ABSTRACT_FUNCTION_DECL(Accessor, FuncDecl)
     DECL_RANGE(AbstractFunction, Constructor, Accessor)
   VALUE_DECL(EnumElement, ValueDecl)
   DECL_RANGE(Value, Enum, EnumElement)
@@ -194,8 +201,10 @@ LAST_DECL(PostfixOperator)
 #undef CONTEXT_VALUE_DECL
 #undef GENERIC_VALUE_DECL
 #undef ITERABLE_GENERIC_VALUE_DECL
+#undef ABSTRACT_FUNCTION_DECL
 #undef VALUE_DECL
 #undef DECL_RANGE
 #undef ABSTRACT_DECL
+#undef OPERATOR_DECL
 #undef DECL
 #undef LAST_DECL

@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/SomeObjCModule.swiftmodule -module-name SomeObjCModule -I %t -I %S/Inputs -swift-version 3 %S/Inputs/SomeObjCModuleX.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/SomeSwift3Module.swiftmodule -module-name SomeSwift3Module -I %t -I %S/Inputs -swift-version 3 %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t/SomeSwift4Module.swiftmodule -module-name SomeSwift4Module -I %t -I %S/Inputs -swift-version 4 %S/Inputs/witness_change_swift4.swift

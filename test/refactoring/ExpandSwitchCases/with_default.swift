@@ -10,6 +10,6 @@ func foo(e: E) -> Int {
     default: return 3
    }
 }
-// RUN: rm -rf %t.result && mkdir -p %t.result
+// RUN: %empty-directory(%t.result)
 // RUN: %refactor -expand-switch-cases -source-filename %s -pos=9:8 >> %t.result/L10.swift
 // RUN: diff -u %S/Outputs/with_default/L10.swift.expected %t.result/L10.swift

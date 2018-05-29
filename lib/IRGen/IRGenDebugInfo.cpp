@@ -59,8 +59,8 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-typedef llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>
-    TrackingDIRefMap;
+using TrackingDIRefMap =
+    llvm::DenseMap<const llvm::MDString *, llvm::TrackingMDNodeRef>;
 
 class IRGenDebugInfoImpl : public IRGenDebugInfo {
   friend class IRGenDebugInfoImpl;
@@ -71,7 +71,7 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   IRGenModule &IGM;
 
   /// Used for caching SILDebugScopes without inline information.
-  typedef std::pair<const void *, const void *> LocalScopeHash;
+  using LocalScopeHash = std::pair<const void *, const void *>;
   struct LocalScope : public LocalScopeHash {
     LocalScope(const SILDebugScope *DS)
         : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
@@ -120,11 +120,12 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
 
 public:
   IRGenDebugInfoImpl(const IRGenOptions &Opts, ClangImporter &CI,
-                     IRGenModule &IGM, llvm::Module &M, SourceFile *SF);
+                     IRGenModule &IGM, llvm::Module &M,
+                     StringRef MainOutputFilenameForDebugInfo);
   void finalize();
 
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
-                     Optional<SILLocation> Loc = None);
+                     SILLocation Loc);
   void clearLoc(IRBuilder &Builder);
   void pushLoc();
   void popLoc();
@@ -153,7 +154,7 @@ public:
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit,
+                                     bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         StringRef Name);
@@ -285,6 +286,9 @@ private:
 
     auto L = decodeDebugLoc(CS->Loc);
     auto Scope = getOrCreateScope(CS->Parent.dyn_cast<const SILDebugScope *>());
+    // Pretend transparent functions don't exist.
+    if (!Scope)
+      return createInlinedAt(CS);
     auto InlinedAt =
         llvm::DebugLoc::get(L.Line, L.Column, Scope, createInlinedAt(CS));
     InlinedAtCache.insert(
@@ -467,7 +471,7 @@ private:
   void createParameterType(llvm::SmallVectorImpl<llvm::Metadata *> &Parameters,
                            SILType type, DeclContext *DeclCtx,
                            GenericEnvironment *GE) {
-    auto RealType = type.getSwiftRValueType();
+    auto RealType = type.getASTType();
     if (type.isAddress())
       RealType = CanInOutType::get(RealType);
     auto DbgTy = DebugTypeInfo::getFromTypeInfo(DeclCtx, GE, RealType,
@@ -1181,7 +1185,7 @@ private:
       SmallVector<llvm::Metadata *, 4> Protocols;
       for (auto *ProtocolDecl : Archetype->getConformsTo()) {
         auto PTy = IGM.getLoweredType(ProtocolDecl->getInterfaceType())
-                       .getSwiftRValueType();
+                       .getASTType();
         auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
             DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(),
             ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy));
@@ -1250,14 +1254,15 @@ private:
     case TypeKind::BuiltinVector: {
       (void)MangledName; // FIXME emit the name somewhere.
       auto *BuiltinVectorTy = BaseTy->castTo<BuiltinVectorType>();
-      DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
-                              DbgTy.getGenericEnvironment(),
-                              BuiltinVectorTy->getElementType(),
-                              DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
-      auto Subscripts = nullptr;
-      return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
+      auto ElemTy = BuiltinVectorTy->getElementType();
+      auto ElemDbgTy = DebugTypeInfo::getFromTypeInfo(
+          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), ElemTy,
+          IGM.getTypeInfoForUnlowered(ElemTy));
+      unsigned Count = BuiltinVectorTy->getNumElements();
+      auto Subscript = DBuilder.getOrCreateSubrange(0, Count ? Count : -1);
+      return DBuilder.createVectorType(SizeInBits,
                                        AlignInBits, getOrCreateType(ElemDbgTy),
-                                       Subscripts);
+                                       DBuilder.getOrCreateArray(Subscript));
     }
 
     // Reference storage types.
@@ -1275,7 +1280,6 @@ private:
     // Sugared types.
 
     case TypeKind::NameAlias: {
-
       auto *NameAliasTy = cast<NameAliasType>(BaseTy);
       auto *Decl = NameAliasTy->getDecl();
       auto L = getDebugLoc(*this, Decl);
@@ -1284,8 +1288,8 @@ private:
       // For NameAlias types, the DeclContext for the aliasED type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
-          DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
+         DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
+         DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
       return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                     File, L.Line, File);
     }
@@ -1298,8 +1302,7 @@ private:
     // SyntaxSugarType derivations.
     case TypeKind::Dictionary:
     case TypeKind::ArraySlice:
-    case TypeKind::Optional:
-    case TypeKind::ImplicitlyUnwrappedOptional: {
+    case TypeKind::Optional: {
       auto *SyntaxSugarTy = cast<SyntaxSugarType>(BaseTy);
       auto *CanTy = SyntaxSugarTy->getSinglyDesugaredType();
       return getOrCreateDesugaredType(CanTy, DbgTy);
@@ -1451,14 +1454,14 @@ private:
 
 IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
                                        ClangImporter &CI, IRGenModule &IGM,
-                                       llvm::Module &M, SourceFile *SF)
+                                       llvm::Module &M,
+                                       StringRef MainOutputFilenameForDebugInfo)
     : Opts(Opts), CI(CI), SM(IGM.Context.SourceMgr), DBuilder(M),
       IGM(IGM), MetadataTypeDecl(nullptr), InternalType(nullptr),
       LastDebugLoc({}), LastScope(nullptr) {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None &&
          "no debug info should be generated");
-  StringRef SourceFileName =
-      SF ? SF->getFilename() : StringRef(Opts.MainInputFilename);
+  StringRef SourceFileName = MainOutputFilenameForDebugInfo;
   llvm::SmallString<256> AbsMainFile;
   if (SourceFileName.empty())
     AbsMainFile = "<unknown>";
@@ -1555,7 +1558,7 @@ void IRGenDebugInfoImpl::finalize() {
 
 void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
                                        const SILDebugScope *DS,
-                                       Optional<SILLocation> Loc) {
+                                       SILLocation Loc) {
   assert(DS && "empty scope");
   auto *Scope = getOrCreateScope(DS);
   if (!Scope)
@@ -1563,9 +1566,9 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
 
   SILLocation::DebugLoc L;
   SILFunction *Fn = DS->getInlinedFunction();
-  if (Fn && Fn->isThunk()) {
+  if (Fn && (Fn->isThunk() || Fn->isTransparent())) {
     L = SILLocation::getCompilerGeneratedDebugLoc();
-  } else if (DS == LastScope && Loc && Loc->isAutoGenerated()) {
+  } else if (DS == LastScope && Loc.isAutoGenerated()) {
     // Reuse the last source location if we are still in the same
     // scope to get a more contiguous line table.
     L = LastDebugLoc;
@@ -1574,7 +1577,7 @@ void IRGenDebugInfoImpl::setCurrentLoc(IRBuilder &Builder,
     L = getDebugLocation(Loc);
     // Otherwise use a line 0 artificial location, but the file from the
     // location.
-    if (Loc && Loc->isAutoGenerated()) {
+    if (Loc.isAutoGenerated()) {
       L.Line = 0;
       L.Column = 0;
     }
@@ -1735,6 +1738,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   // Some IRGen-generated helper functions don't have a corresponding
   // SIL function, hence the dyn_cast.
   auto *SILFn = DS ? DS->Parent.dyn_cast<SILFunction *>() : nullptr;
+
   StringRef LinkageName;
   if (Fn)
     LinkageName = Fn->getName();
@@ -1754,17 +1758,18 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   /// The source line used for the function prologue.
   unsigned ScopeLine = 0;
   SILLocation::DebugLoc L;
-  if (DS && (!SILFn || (!SILFn->isBare() && !SILFn->isThunk()))) {
+  if (!DS || (SILFn && (SILFn->isBare() || SILFn->isThunk() ||
+                        SILFn->isTransparent()))) {
     // Bare functions and thunks should not have any line numbers. This
     // is especially important for shared functions like reabstraction
     // thunk helpers, where DS->Loc is an arbitrary location of whichever use
     // was emitted first.
+    L = SILLocation::getCompilerGeneratedDebugLoc();
+  } else {
     L = decodeDebugLoc(DS->Loc);
     ScopeLine = L.Line;
     if (!DS->Loc.isDebugInfoLoc())
       L = decodeSourceLoc(DS->Loc.getSourceLoc());
-  } else {
-    L = SILLocation::getCompilerGeneratedDebugLoc();
   }
 
   auto Line = L.Line;
@@ -1882,7 +1887,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DbgTy.size)
     DbgTy.size = getStorageSize(IGM.DataLayout, Storage);
 
-  auto *Scope = dyn_cast<llvm::DILocalScope>(getOrCreateScope(DS));
+  auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
   auto Loc = getDebugLoc(*this, VarDecl);
 
@@ -1951,7 +1956,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
-  if (Storage.size() == 0)
+  if (Storage.empty())
     emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                      DBuilder.createExpression(), Line, Loc.Column, Scope, DS);
 }
@@ -1989,7 +1994,8 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
 void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Var, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DbgTy, bool IsLocalToUnit, Optional<SILLocation> Loc) {
+    DebugTypeInfo DbgTy, bool IsLocalToUnit, bool InFixedBuffer,
+    Optional<SILLocation> Loc) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
@@ -2005,7 +2011,16 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   auto File = getOrCreateFile(L.Filename);
 
   // Emit it as global variable of the current module.
-  auto *Expr = Var ? nullptr : DBuilder.createConstantValueExpression(0);
+  llvm::DIExpression *Expr = nullptr;
+  if (!Var)
+    Expr = DBuilder.createConstantValueExpression(0);
+  else if (InFixedBuffer)
+    // FIXME: This is *not* generally correct, but LLDB at the moment cannot
+    // poke to runtime to figure out whether a resilient value has inline
+    // storage, so this is assuming that it doesn't to get the majority of
+    // resilient Foundation types.
+    Expr =
+        DBuilder.createExpression(ArrayRef<uint64_t>(llvm::dwarf::DW_OP_deref));
   auto *GV = DBuilder.createGlobalVariableExpression(
       MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
   if (Var)
@@ -2018,13 +2033,17 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
+  // Don't emit debug info in transparent functions.
+  auto *DS = IGF.getDebugScope();
+  if (!DS || DS->getInlinedFunction()->isTransparent())
+    return;
+
   auto TName = BumpAllocatedString(("$swift.type." + Name).str());
   auto DbgTy = DebugTypeInfo::getMetadata(
       getMetadataType()->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          nullptr, TName, 0,
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, DS, nullptr, TName, 0,
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2040,12 +2059,11 @@ SILLocation::DebugLoc IRGenDebugInfoImpl::decodeSourceLoc(SourceLoc SL) {
 
 } // anonymous namespace
 
-IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(const IRGenOptions &Opts,
-                                                     ClangImporter &CI,
-                                                     IRGenModule &IGM,
-                                                     llvm::Module &M,
-                                                     SourceFile *SF) {
-  return new IRGenDebugInfoImpl(Opts, CI, IGM, M, SF);
+IRGenDebugInfo *IRGenDebugInfo::createIRGenDebugInfo(
+    const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
+    llvm::Module &M, StringRef MainOutputFilenameForDebugInfo) {
+  return new IRGenDebugInfoImpl(Opts, CI, IGM, M,
+                                MainOutputFilenameForDebugInfo);
 }
 
 
@@ -2057,7 +2075,7 @@ void IRGenDebugInfo::finalize() {
 }
 
 void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
-                                   Optional<SILLocation> Loc) {
+                                   SILLocation Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->setCurrentLoc(Builder, DS, Loc);
 }
 
@@ -2130,9 +2148,10 @@ void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
 
 void IRGenDebugInfo::emitGlobalVariableDeclaration(
     llvm::GlobalVariable *Storage, StringRef Name, StringRef LinkageName,
-    DebugTypeInfo DebugType, bool IsLocalToUnit, Optional<SILLocation> Loc) {
+    DebugTypeInfo DebugType, bool IsLocalToUnit, bool InFixedBuffer,
+    Optional<SILLocation> Loc) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitGlobalVariableDeclaration(
-      Storage, Name, LinkageName, DebugType, IsLocalToUnit, Loc);
+      Storage, Name, LinkageName, DebugType, IsLocalToUnit, InFixedBuffer, Loc);
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,

@@ -240,7 +240,7 @@ class ExistentialTypeInfoBuilder {
     }
 
     for (auto *P : Protocols) {
-      const std::pair<const FieldDescriptor *, uintptr_t> FD =
+      std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
           TC.getBuilder().getFieldTypeInfo(P);
       if (FD.first == nullptr) {
         DEBUG(std::cerr << "No field descriptor: "; P->dump())
@@ -921,7 +921,7 @@ public:
 
   const TypeInfo *
   build(const TypeRef *TR,
-        const std::pair<const FieldDescriptor *, uintptr_t> &FD) {
+        const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD) {
     // Sort enum into payload and no-payload cases.
     unsigned NoPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
@@ -1057,7 +1057,7 @@ public:
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
     const auto &FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD.first == nullptr) {
+    if (FD.first == nullptr || FD.first->isStruct()) {
       // Maybe this type is opaque -- look for a builtin
       // descriptor to see if we at least know its size
       // and alignment.
@@ -1065,8 +1065,10 @@ public:
         return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
 
       // Otherwise, we're out of luck.
-      DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
-      return nullptr;
+      if (FD.first == nullptr) {
+        DEBUG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
+        return nullptr;
+      }
     }
 
     switch (FD.first->Kind) {
@@ -1302,7 +1304,7 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
-  const std::pair<const FieldDescriptor *, uintptr_t> &FD =
+  std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
       getBuilder().getFieldTypeInfo(TR);
   if (FD.first == nullptr) {
     DEBUG(std::cerr << "No field descriptor: "; TR->dump());

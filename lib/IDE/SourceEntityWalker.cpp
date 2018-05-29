@@ -197,7 +197,8 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
     ExtDecls.pop_back();
   }
 
-  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D))
+  if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D) && !isa<ImportDecl>(D) &&
+      !isa<IfConfigDecl>(D))
     return true;
 
   bool Continue = SEWalker.walkToDeclPost(D);
@@ -210,11 +211,18 @@ std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
   if (TraverseChildren) {
     if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+      // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually
+      // walk into the body.
       if (auto *FD = DeferS->getTempDecl()) {
         auto *RetS = FD->getBody()->walk(*this);
-        // Already walked children.
-        return { false, RetS };
+        assert(RetS == FD->getBody());
+        (void)RetS;
       }
+      bool Continue = SEWalker.walkToStmtPost(DeferS);
+      if (!Continue)
+        Cancelled = true;
+      // Already walked children.
+      return { false, Continue ? DeferS : nullptr };
     }
   }
   return { TraverseChildren, S };

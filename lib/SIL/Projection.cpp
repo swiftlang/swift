@@ -73,8 +73,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Struct, SEAI->getFieldNo());
     assert(getKind() == ProjectionKind::Struct);
     assert(getIndex() == SEAI->getFieldNo());
-    assert(getType(SEAI->getOperand()->getType(), SEAI->getModule()) ==
-           SEAI->getType());
     break;
   }
   case SILInstructionKind::StructExtractInst: {
@@ -82,8 +80,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Struct, SEI->getFieldNo());
     assert(getKind() == ProjectionKind::Struct);
     assert(getIndex() == SEI->getFieldNo());
-    assert(getType(SEI->getOperand()->getType(), SEI->getModule()) ==
-           SEI->getType());
     break;
   }
   case SILInstructionKind::RefElementAddrInst: {
@@ -91,13 +87,11 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Class, REAI->getFieldNo());
     assert(getKind() == ProjectionKind::Class);
     assert(getIndex() == REAI->getFieldNo());
-    assert(getType(REAI->getOperand()->getType(), REAI->getModule()) ==
-           REAI->getType());
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
     auto *RTAI = cast<RefTailAddrInst>(I);
-    auto *Ty = RTAI->getTailType().getSwiftRValueType().getPointer();
+    auto *Ty = RTAI->getTailType().getASTType().getPointer();
     Value = ValueTy(ProjectionKind::TailElems, Ty);
     assert(getKind() == ProjectionKind::TailElems);
     break;
@@ -107,8 +101,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Box, static_cast<uintptr_t>(0));
     assert(getKind() == ProjectionKind::Box);
     assert(getIndex() == 0);
-    assert(getType(PBI->getOperand()->getType(), PBI->getModule()) ==
-           PBI->getType());
     (void) PBI;
     break;
   }
@@ -117,8 +109,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Tuple, TEI->getFieldNo());
     assert(getKind() == ProjectionKind::Tuple);
     assert(getIndex() == TEI->getFieldNo());
-    assert(getType(TEI->getOperand()->getType(), TEI->getModule()) ==
-           TEI->getType());
     break;
   }
   case SILInstructionKind::TupleElementAddrInst: {
@@ -126,8 +116,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Tuple, TEAI->getFieldNo());
     assert(getKind() == ProjectionKind::Tuple);
     assert(getIndex() == TEAI->getFieldNo());
-    assert(getType(TEAI->getOperand()->getType(), TEAI->getModule()) ==
-           TEAI->getType());
     break;
   }
   case SILInstructionKind::UncheckedEnumDataInst: {
@@ -135,8 +123,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Enum, UEDI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
     assert(getIndex() == UEDI->getElementNo());
-    assert(getType(UEDI->getOperand()->getType(), UEDI->getModule()) ==
-           UEDI->getType());
     break;
   }
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
@@ -144,8 +130,6 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     Value = ValueTy(ProjectionKind::Enum, UTEDAI->getElementNo());
     assert(getKind() == ProjectionKind::Enum);
     assert(getIndex() == UTEDAI->getElementNo());
-    assert(getType(UTEDAI->getOperand()->getType(), UTEDAI->getModule()) ==
-           UTEDAI->getType());
     break;
   }
   case SILInstructionKind::IndexAddrInst: {
@@ -164,31 +148,25 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     break;
   }
   case SILInstructionKind::UpcastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::Upcast, Ty);
     assert(getKind() == ProjectionKind::Upcast);
-    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
-           I->getType());
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::RefCast, Ty);
     assert(getKind() == ProjectionKind::RefCast);
-    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
-           I->getType());
     break;
   }
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedAddrCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::BitwiseCast, Ty);
     assert(getKind() == ProjectionKind::BitwiseCast);
-    assert(getType(I->getOperand(0)->getType(), I->getModule()) ==
-           I->getType());
     break;
   }
   }
@@ -530,7 +508,46 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   return P;
 }
 
-raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
+void Projection::print(raw_ostream &os, SILType baseType) const {
+  if (isNominalKind()) {
+    auto *Decl = getVarDecl(baseType);
+    os << "Field: ";
+    Decl->print(os);
+    return;
+  }
+
+  if (getKind() == ProjectionKind::Tuple) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::BitwiseCast) {
+    os << "BitwiseCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Index) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::Upcast) {
+    os << "UpCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::RefCast) {
+    os << "RefCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Box) {
+    os << " Box over";
+    return;
+  }
+  if (getKind() == ProjectionKind::TailElems) {
+    os << " TailElems";
+    return;
+  }
+  os << "<unexpected projection>";
+}
+
+raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) const {
   os << "Projection Path [";
   SILType IterType = getBaseType();
   for (const Projection &IterProj : Path) {
@@ -539,50 +556,14 @@ raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
 
     os << BaseType.getAddressType() << "\n  ";
 
-    if (IterProj.isNominalKind()) {
-      auto *Decl = IterProj.getVarDecl(BaseType);
-      os << "Field: ";
-      Decl->print(os);
-      os << " of: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::Tuple) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::BitwiseCast) {
-      os << "BitwiseCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Index) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Upcast) {
-      os << "UpCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::RefCast) {
-      os << "RefCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Box) {
-      os << " Box over: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::TailElems) {
-      os << " TailElems of: ";
-      continue;
-    }
-    os << "<unexpected projection> into: ";
+    IterProj.print(os, BaseType);
+    os << " in: ";
   }
   os << IterType.getAddressType() << "]\n";
   return os;
 }
 
-void ProjectionPath::dump(SILModule &M) {
+void ProjectionPath::dump(SILModule &M) const {
   print(llvm::dbgs(), M);
 }
 
@@ -1124,7 +1105,8 @@ public:
 
 ProjectionTree::
 ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
+                     << "\n");
 
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);
@@ -1262,7 +1244,7 @@ computeUsesAndLiveness(SILValue Base) {
 #ifndef NDEBUG
   DEBUG(llvm::dbgs() << "Final Leafs: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
-  getLeafTypes(LeafTypes);
+  getLiveLeafTypes(LeafTypes);
   for (SILType Leafs : LeafTypes) {
     DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
   }

@@ -14,7 +14,6 @@
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Substitution.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -22,6 +21,7 @@
 #include "Linker.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -112,6 +112,17 @@ SILModule::~SILModule() {
     F.dropAllReferences();
 }
 
+std::unique_ptr<SILModule>
+SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+                             bool WholeModule) {
+  return std::unique_ptr<SILModule>(
+      new SILModule(M, Options, M, WholeModule));
+}
+
+ASTContext &SILModule::getASTContext() const {
+  return TheSwiftModule->getASTContext();
+}
+
 void *SILModule::allocate(unsigned Size, unsigned Align) const {
   if (getASTContext().LangOpts.UseMalloc)
     return AlignedAlloc(Size, Align);
@@ -184,6 +195,18 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   // If we have a definition, return it.
   if (wtable->isDefinition())
     return wtable;
+
+  // If the module is at or past the Lowered stage, then we can't do any
+  // further deserialization, since pre-IRGen SIL lowering changes the types
+  // of definitions to make them incompatible with canonical serialized SIL.
+  switch (getStage()) {
+  case SILStage::Canonical:
+  case SILStage::Raw:
+    break;
+    
+  case SILStage::Lowered:
+    return wtable;
+  }
 
   // Otherwise try to deserialize it. If we succeed return the deserialized
   // function.
@@ -310,6 +333,9 @@ static void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
   if (Attrs.hasAttribute<SILGenNameAttr>() ||
       Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
+
+  if (Attrs.hasAttribute<WeakLinkedAttr>())
+    F->setWeakLinked();
 }
 
 SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
@@ -455,11 +481,10 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
     Info.ID = BuiltinValueKind::AllocWithTailElems;
   else {
     // Switch through the rest of builtins.
-    Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
-#define BUILTIN(ID, Name, Attrs) \
-      .Case(Name, BuiltinValueKind::ID)
+#define BUILTIN(Id, Name, Attrs) \
+    if (OperationName == Name) { Info.ID = BuiltinValueKind::Id; } else
 #include "swift/AST/Builtins.def"
-      .Default(BuiltinValueKind::None);
+    /* final "else" */ { Info.ID = BuiltinValueKind::None; }
   }
 
   return Info;
@@ -470,12 +495,17 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
   return lookUpFunction(name);
 }
 
-bool SILModule::linkFunction(SILFunction *Fun, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Fun);
+bool SILModule::loadFunction(SILFunction *F) {
+  SILFunction *NewF = getSILLoader()->lookupSILFunction(F);
+  if (!NewF)
+    return false;
+
+  assert(F == NewF);
+  return true;
 }
 
-bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
-  return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
+bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
+  return SILLinkerVisitor(*this, Mode).processFunction(F);
 }
 
 SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
@@ -500,14 +530,12 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   }
 
   if (!F) {
-    SILLinkerVisitor Visitor(*this, getSILLoader(),
-                             SILModule::LinkingMode::LinkNormal);
     if (CurF) {
       // Perform this lookup only if a function with a given
       // name is present in the current module.
       // This is done to reduce the amount of IO from the
       // swift module file.
-      if (!Visitor.hasFunction(Name, Linkage))
+      if (!getSILLoader()->hasSILFunction(Name, Linkage))
         return nullptr;
       // The function in the current module will be changed.
       F = CurF;
@@ -517,7 +545,8 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
     // or if it is known to exist, perform a lookup.
     if (!F) {
       // Try to load the function from other modules.
-      F = Visitor.lookupFunction(Name, Linkage);
+      F = getSILLoader()->lookupSILFunction(Name, /*declarationOnly*/ true,
+                                            Linkage);
       // Bail if nothing was found and we are not sure if
       // this function exists elsewhere.
       if (!F)
@@ -543,22 +572,12 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
 bool SILModule::hasFunction(StringRef Name) {
   if (lookUpFunction(Name))
     return true;
-  SILLinkerVisitor Visitor(*this, getSILLoader(),
-                           SILModule::LinkingMode::LinkNormal);
-  return Visitor.hasFunction(Name);
+  return getSILLoader()->hasSILFunction(Name);
 }
 
 void SILModule::linkAllFromCurrentModule() {
   getSILLoader()->getAllForModule(getSwiftModule()->getName(),
                                   /*PrimaryFile=*/nullptr);
-}
-
-void SILModule::linkAllWitnessTables() {
-  getSILLoader()->getAllWitnessTables();
-}
-
-void SILModule::linkAllVTables() {
-  getSILLoader()->getAllVTables();
 }
 
 void SILModule::invalidateSILLoaderCaches() {
@@ -614,9 +633,7 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
     return R->second;
 
   // If that fails, try to deserialize it. If that fails, return nullptr.
-  SILVTable *Vtbl =
-      SILLinkerVisitor(*this, getSILLoader(), SILModule::LinkingMode::LinkAll)
-          .processClassDecl(C);
+  SILVTable *Vtbl = getSILLoader()->lookupVTable(C);
   if (!Vtbl)
     return nullptr;
 
@@ -779,6 +796,23 @@ bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   }
 }
 
+bool SILModule::
+shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const {
+  // Serialize entities associated with this module's associated context.
+  if (DC->isChildContextOf(getAssociatedContext())) {
+    return true;
+  }
+  
+  // Serialize entities associated with clang modules, since other entities
+  // may depend on them, and someone who deserializes those entities may not
+  // have their own copy.
+  if (isa<ClangModuleUnit>(DC->getModuleScopeContext())) {
+    return true;
+  }
+  
+  return false;
+}
+
 /// Returns true if it is the OnoneSupport module.
 bool SILModule::isOnoneSupportModule() const {
   return getSwiftModule()->getName().str() == SWIFT_ONONE_SUPPORT;
@@ -811,3 +845,13 @@ void SILModule::setOptRecordStream(
   OptRecordStream = std::move(Stream);
   OptRecordRawStream = std::move(RawStream);
 }
+
+SILProperty *SILProperty::create(SILModule &M,
+                                 bool Serialized,
+                                 AbstractStorageDecl *Decl,
+                                 KeyPathPatternComponent Component) {
+  auto prop = new (M) SILProperty(Serialized, Decl, Component);
+  M.properties.push_back(prop);
+  return prop;
+}
+

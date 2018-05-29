@@ -1,6 +1,5 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
-// RUN: rm -rfv %t
-// RUN: mkdir %t
+// RUN: %empty-directory(%t)
 // RUN: %target-sil-opt -enable-sil-ownership %s -emit-sib -o %t/tmp.sib -module-name borrow
 // RUN: %target-sil-opt -enable-sil-ownership %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
 // RUN: %target-sil-opt -enable-sil-ownership %t/tmp.2.sib -module-name borrow | %FileCheck %s

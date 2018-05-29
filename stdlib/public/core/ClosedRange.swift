@@ -13,7 +13,7 @@
 // FIXME: swift-3-indexing-model: Generalize all tests to check both
 // [Closed]Range.
 
-/// A closed range that forms a collection of consecutive values.
+/// An interval from a lower bound up to, and including, an upper bound.
 ///
 /// You create a `ClosedRange` instance by using the closed range
 /// operator (`...`).
@@ -23,41 +23,42 @@
 /// A `ClosedRange` instance contains both its lower bound and its
 /// upper bound.
 ///
-///     print(throughFive.contains(3))      // Prints "true"
-///     print(throughFive.contains(10))     // Prints "false"
-///     print(throughFive.contains(5))      // Prints "true"
+///     throughFive.contains(3)
+///     // true
+///     throughFive.contains(10)
+///     // false
+///     throughFive.contains(5)
+///     // true
 ///
 /// Because a closed range includes its upper bound, a closed range whose lower
-/// bound is equal to the upper bound contains one element. Therefore, a
+/// bound is equal to the upper bound contains that value. Therefore, a
 /// `ClosedRange` instance cannot represent an empty range.
 ///
 ///     let zeroInclusive = 0...0
-///     print(zeroInclusive.isEmpty)
-///     // Prints "false"
-///     print(zeroInclusive.count)
-///     // Prints "1"
+///     zeroInclusive.contains(0)
+///     // true
+///     zeroInclusive.isEmpty
+///     // false
 ///
-/// You can use a `for`-`in` loop or any sequence or collection method with a
-/// countable range. The elements of the range are the consecutive values from
-/// its lower bound up to, and including, its upper bound.
+/// Using a Closed Range as a Collection of Consecutive Values
+/// ----------------------------------------------------------
 ///
-///     for n in throughFive.suffix(3) {
+/// When a closed range uses integers as its lower and upper bounds, or any
+/// other type that conforms to the `Strideable` protocol with an integer
+/// stride, you can use that range in a `for`-`in` loop or with any sequence or
+/// collection method. The elements of the range are the consecutive values
+/// from its lower bound up to, and including, its upper bound.
+///
+///     for n in 3...5 {
 ///         print(n)
 ///     }
 ///     // Prints "3"
 ///     // Prints "4"
 ///     // Prints "5"
 ///
-/// You can create a countable range over any type that conforms to the
-/// `Strideable` protocol and uses an integer as its associated `Stride` type.
-/// By default, Swift's integer and pointer types are usable as the bounds of
-/// a countable range.
-///
 /// Because floating-point types such as `Float` and `Double` are their own
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
-/// you need to test whether values are contained within a closed interval
-/// bound by floating-point values, see the `ClosedRange` type. If you need to
-/// iterate over consecutive floating-point values, see the
+/// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
 @_fixed_layout
 public struct ClosedRange<Bound: Comparable> {
@@ -65,9 +66,6 @@ public struct ClosedRange<Bound: Comparable> {
   public let lowerBound: Bound
 
   /// The range's upper bound.
-  ///
-  /// `upperBound` is always reachable from `lowerBound` by zero or
-  /// more applications of `index(after:)`.
   public let upperBound: Bound
 
   /// Creates an instance with the given bounds.
@@ -78,7 +76,7 @@ public struct ClosedRange<Bound: Comparable> {
   /// to form `ClosedRange` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @_inlineable
+  @inlinable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -91,14 +89,14 @@ extension ClosedRange {
   ///
   /// Because a closed range cannot represent an empty range, this property is
   /// always `false`.
-  @_inlineable
+  @inlinable
   public var isEmpty: Bool {
     return false
   }
 }
 
 extension ClosedRange: RangeExpression {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return Range(
@@ -116,7 +114,7 @@ extension ClosedRange: RangeExpression {
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
-  @_inlineable
+  @inlinable
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
@@ -129,6 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
+  @_frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
@@ -136,7 +135,7 @@ extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
 }
 
 extension ClosedRange.Index : Comparable {
-  @_inlineable
+  @inlinable
   public static func == (
     lhs: ClosedRange<Bound>.Index,
     rhs: ClosedRange<Bound>.Index
@@ -151,7 +150,7 @@ extension ClosedRange.Index : Comparable {
     }
   }
 
-  @_inlineable
+  @inlinable
   public static func < (
     lhs: ClosedRange<Bound>.Index,
     rhs: ClosedRange<Bound>.Index
@@ -167,14 +166,21 @@ extension ClosedRange.Index : Comparable {
   }
 }
 
-extension ClosedRange.Index: Hashable 
+extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
-  public var hashValue: Int {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
-      return value.hashValue
+      hasher.combine(0 as Int8)
+      hasher.combine(value)
     case .pastEnd:
-      return .max
+      hasher.combine(1 as Int8)
     }
   }
 }
@@ -189,19 +195,19 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   public typealias SubSequence = Slice<ClosedRange<Bound>>
 
   /// The position of the first element in the range.
-  @_inlineable
+  @inlinable
   public var startIndex: Index {
     return .inRange(lowerBound)
   }
 
   /// The range's "past the end" position---that is, the position one greater
   /// than the last valid subscript argument.
-  @_inlineable
+  @inlinable
   public var endIndex: Index {
     return .pastEnd
   }
 
-  @_inlineable
+  @inlinable
   public func index(after i: Index) -> Index {
     switch i {
     case .inRange(let x):
@@ -213,7 +219,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     }
   }
 
-  @_inlineable
+  @inlinable
   public func index(before i: Index) -> Index {
     switch i {
     case .inRange(let x):
@@ -225,7 +231,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     }
   }
 
-  @_inlineable
+  @inlinable
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     switch i {
     case .inRange(let x):
@@ -249,7 +255,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     }
   }
 
-  @_inlineable
+  @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
     switch (start, end) {
     case let (.inRange(left), .inRange(right)):
@@ -277,7 +283,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the range, and must not equal the range's end
   ///   index.
-  @_inlineable
+  @inlinable
   public subscript(position: Index) -> Bound {
     // FIXME: swift-3-indexing-model: range checks and tests.
     switch position {
@@ -286,15 +292,27 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     }
   }
 
-  @_inlineable
+  @inlinable
   public subscript(bounds: Range<Index>)
     -> Slice<ClosedRange<Bound>> {
     return Slice(base: self, bounds: bounds)
   }
 
-  @_inlineable
+  @inlinable
   public func _customContainsEquatableElement(_ element: Bound) -> Bool? {
-    return element >= self.lowerBound && element <= self.upperBound
+    return lowerBound <= element && element <= upperBound
+  }
+
+  @inlinable
+  public func _customIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    return lowerBound <= element && element <= upperBound
+              ? .inRange(element) : nil
+  }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
   }
 }
 
@@ -312,7 +330,7 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
@@ -344,7 +362,7 @@ extension Strideable where Stride: SignedInteger {
   /// - Parameters:)`.
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.
@@ -368,7 +386,7 @@ extension ClosedRange: Equatable {
   /// - Parameters:
   ///   - lhs: A range to compare.
   ///   - rhs: Another range to compare.
-  @_inlineable
+  @inlinable
   public static func == (
     lhs: ClosedRange<Bound>, rhs: ClosedRange<Bound>
   ) -> Bool {
@@ -376,9 +394,17 @@ extension ClosedRange: Equatable {
   }
 }
 
+extension ClosedRange: Hashable where Bound: Hashable {
+  @inlinable // FIXME(sil-serialize-all)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
+  }
+}
+
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @_inlineable // FIXME(sil-serialize-all)...\(
+  @inlinable // FIXME(sil-serialize-all)...
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }
@@ -386,7 +412,7 @@ extension ClosedRange : CustomStringConvertible {
 
 extension ClosedRange : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
     + "...\(String(reflecting: upperBound)))"
@@ -394,7 +420,7 @@ extension ClosedRange : CustomDebugStringConvertible {
 }
 
 extension ClosedRange : CustomReflectable {
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -420,7 +446,7 @@ extension ClosedRange {
   ///
   /// - Parameter limits: The range to clamp the bounds of this range.
   /// - Returns: A new range clamped to the bounds of `limits`.
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public func clamped(to limits: ClosedRange) -> ClosedRange {
     let lower =         
@@ -460,12 +486,12 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
 }
 
 extension ClosedRange {
-  @_inlineable
+  @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
     return self.contains(other.lowerBound) || other.contains(lowerBound)
   }
 
-  @_inlineable
+  @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
     return other.overlaps(self)
   }
@@ -473,5 +499,6 @@ extension ClosedRange {
 
 @available(*, deprecated, renamed: "ClosedRange.Index")
 public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
-@available(*, deprecated, renamed: "ClosedRange")
-public typealias CountableClosedRange<T: Comparable> = ClosedRange<T>
+
+public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
+  where Bound.Stride : SignedInteger

@@ -197,10 +197,10 @@ public enum SyntaxFactory {
 
   public static func makeVariableExpr(_ text: String,
     leadingTrivia: Trivia = [],
-    trailingTrivia: Trivia = []) -> SymbolicReferenceExprSyntax {
+    trailingTrivia: Trivia = []) -> IdentifierExprSyntax {
     let string = makeIdentifier(text,
       leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia)
-    return makeSymbolicReferenceExpr(identifier: string,
-                                     genericArgumentClause: nil)
+    return makeIdentifierExpr(identifier: string,
+                              declNameArguments: nil)
   }
 }

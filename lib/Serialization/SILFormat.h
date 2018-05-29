@@ -84,6 +84,7 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
+  External,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   Property,
@@ -116,7 +117,8 @@ namespace sil_index_block {
     SIL_WITNESS_TABLE_NAMES,
     SIL_WITNESS_TABLE_OFFSETS,
     SIL_DEFAULT_WITNESS_TABLE_NAMES,
-    SIL_DEFAULT_WITNESS_TABLE_OFFSETS
+    SIL_DEFAULT_WITNESS_TABLE_OFFSETS,
+    SIL_PROPERTY_OFFSETS,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -138,8 +140,7 @@ namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
-    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
-    SIL_FUNCTION = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
+    SIL_FUNCTION = 1,
     SIL_BASIC_BLOCK,
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
@@ -166,10 +167,12 @@ namespace sil_block {
     SIL_DEFAULT_WITNESS_TABLE_NO_ENTRY,
     SIL_INST_WITNESS_METHOD,
     SIL_SPECIALIZE_ATTR,
+    SIL_PROPERTY,
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
-    BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
     ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
     NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
     SPECIALIZED_PROTOCOL_CONFORMANCE
@@ -198,6 +201,15 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
+  >;
+  
+  using PropertyLayout = BCRecordLayout<
+    SIL_PROPERTY,
+    DeclIDField,          // Property decl
+    BCFixed<1>,           // Is serialized
+    BCArray<ValueIDField> // Encoded key path component
+    // Any substitutions or conformances required for the key path component
+    // follow.
   >;
 
   using WitnessTableLayout = BCRecordLayout<
@@ -277,9 +289,10 @@ namespace sil_block {
                      BCFixed<1>,  // global_init
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
-                     BCFixed<2>,  // side effect info.
+                     BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
                      BCFixed<1>,  // has qualified ownership
+                     BCFixed<1>,  // must be weakly referenced
                      TypeIDField, // SILFunctionType
                      GenericEnvironmentIDField,
                      DeclIDField, // ClangNode owner
@@ -372,7 +385,7 @@ namespace sil_block {
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
-    BCFixed<32>,          // num substitutions
+    SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
@@ -391,17 +404,36 @@ namespace sil_block {
   using SILOneOperandLayout = BCRecordLayout<
     SIL_ONE_OPERAND,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField
+  >;
+
+  using SILOneOperandExtraAttributeLayout = BCRecordLayout<
+    SIL_ONE_OPERAND_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<6>, // Optional attributes
+    TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
   // SIL instructions with two typed values.
   using SILTwoOperandsLayout = BCRecordLayout<
     SIL_TWO_OPERANDS,
     SILInstOpCodeField,
-    BCFixed<4>,          // Optional attributes
+    BCFixed<2>,          // Optional attributes
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField
+  >;
+
+  using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
+    SIL_TWO_OPERANDS_EXTRA_ATTR,
+    SILInstOpCodeField,
+    BCFixed<6>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

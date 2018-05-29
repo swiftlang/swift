@@ -262,25 +262,18 @@ public:
   }
   
   /// isModuleContext - Return true if this is a subclass of Module.
-  bool isModuleContext() const {
-    return getContextKind() == DeclContextKind::Module;
-  }
+  bool isModuleContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a context with module-wide scope, e.g. a module
   /// or a source file.
-  bool isModuleScopeContext() const {
-    return getContextKind() == DeclContextKind::Module ||
-           getContextKind() == DeclContextKind::FileUnit;
-  }
+  bool isModuleScopeContext() const; // see swift/AST/Module.h
 
   /// \returns true if this is a type context, e.g., a struct, a class, an
   /// enum, a protocol, or an extension.
   bool isTypeContext() const;
 
   /// \brief Determine whether this is an extension context.
-  bool isExtensionContext() const {
-    return getContextKind() == DeclContextKind::ExtensionDecl;
-  }
+  bool isExtensionContext() const; // see swift/AST/Decl.h
 
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
@@ -414,10 +407,6 @@ public:
         return true;
     return false;
   }
-
-  /// Compute a context C such that C is a parent context of A and B.
-  /// If no such context exists, return \c nullptr.
-  static DeclContext *getCommonParentContext(DeclContext *A, DeclContext *B);
 
   /// Returns the module context that contains this context.
   ModuleDecl *getParentModule() const;

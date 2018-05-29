@@ -28,7 +28,7 @@ public protocol _UTFParser {
 extension _UTFParser
 where Encoding.EncodedScalar : RangeReplaceableCollection {
 
-  @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public mutating func parseScalar<I : IteratorProtocol>(
     from input: inout I

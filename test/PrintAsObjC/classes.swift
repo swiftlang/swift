@@ -23,12 +23,13 @@
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
 // CHECK-NOT: Swift;
-// CHECK-LABEL: @import Foundation;
-// CHECK-NEXT: @import CoreGraphics;
+// CHECK-LABEL: @import CompatibilityAlias;
 // CHECK-NEXT: @import CoreFoundation;
-// CHECK-NEXT: @import objc_generics;
-// CHECK-NEXT: @import CompatibilityAlias;
+// CHECK-NEXT: @import CoreGraphics;
+// CHECK-NEXT: @import Foundation;
+// CHECK-NEXT: @import ObjectiveC;
 // CHECK-NEXT: @import SingleGenericClass;
+// CHECK-NEXT: @import objc_generics;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
 import Foundation
@@ -226,6 +227,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)initAllTheThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initTheOtherThings SWIFT_METHOD_FAMILY(none);
 // CHECK-NEXT: - (void)initializeEvenMoreThings;
+// CHECK-NEXT: + (Methods * _Nonnull)newWithFoo:(NSInteger)foo SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -286,6 +288,8 @@ class NotObjC {}
   @objc func initAllTheThings() {}
   @objc(initTheOtherThings) func setUpOtherThings() {}
   @objc func initializeEvenMoreThings() {}
+
+  @objc(newWithFoo:) class func make(foo: Int) -> Methods { return Methods() }
 }
 
 typealias AliasForNSRect = NSRect

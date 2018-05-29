@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT
@@ -15,9 +15,6 @@ func useFoo(_ x: Foo) -> Int32 {
   // CHECK-DAG: i32 2, label %[[CASE_C:.+]]
   // CHECK-DAG: i32 0, label %[[CASE_A:.+]]
   // CHECK: ]
-
-  // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: unreachable
 
   switch x {
     // CHECK: <label>:[[CASE_B]]
@@ -36,6 +33,10 @@ func useFoo(_ x: Foo) -> Int32 {
     return 10
   }
 
+  // CHECK: <label>:[[DEFAULT]]
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
+  // CHECK-NEXT: unreachable
+
   // CHECK: <label>:[[FINAL]]
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]
   // CHECK: ret i32 %[[RETVAL]]
@@ -48,9 +49,6 @@ func useBar(_ x: Bar) -> Int32 {
   // CHECK-DAG: i32 7, label %[[CASE_C:.+]]
   // CHECK-DAG: i32 5, label %[[CASE_A:.+]]
   // CHECK: ]
-
-  // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: unreachable
 
   switch x {
   // CHECK: <label>:[[CASE_B]]
@@ -68,6 +66,10 @@ func useBar(_ x: Bar) -> Int32 {
   case .A:
     return 10
   }
+
+  // CHECK: <label>:[[DEFAULT]]
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
+  // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
   // CHECK: %[[RETVAL:.+]] = phi i32 [ 10, %[[CASE_A]] ], [ 15, %[[CASE_C]] ], [ 11, %[[CASE_B]] ]

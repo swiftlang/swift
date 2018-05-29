@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
 
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
@@ -41,7 +41,7 @@ func pointers_to_swift_functions(_ x: Int) {
   // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls(local, x)
 
-  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @$S19c_function_pointers0B19_to_swift_functionsyySiFS2icfU_To
+  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @$S19c_function_pointers0B19_to_swift_functionsyySiFS2iXEfU_To
   // CHECK:   [[CVT:%.*]] = convert_function [[CLOSURE_C]]
   // CHECK:   apply {{.*}}([[CVT]], [[X]])
   calls({ $0 + 1 }, x)

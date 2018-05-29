@@ -65,8 +65,8 @@ namespace {
 class InlineTree {
   struct Node;
 
-  typedef DenseMap<StringRef, Node *> NodeMap;
-  typedef SmallVector<Node *, 8> NodeList;
+  using NodeMap = DenseMap<StringRef, Node *>;
+  using NodeList = SmallVector<Node *, 8>;
 
   /// Defines a unique inline location.
   /// Used to distinguish between different instances of an inlined function.
@@ -117,7 +117,7 @@ class InlineTree {
     bool isTopLevel = false;
 
     const NodeList &getChildren() {
-      if (SortedChildren.size() == 0 && UnsortedChildren.size() > 0)
+      if (SortedChildren.empty() && !UnsortedChildren.empty())
         sortNodes(UnsortedChildren, SortedChildren);
       return SortedChildren;
     }
@@ -274,7 +274,7 @@ void InlineTree::printNode(Node *Nd, int indent, raw_ostream &os) {
 void InlineTree::build(Module *M) {
   // Build the trees for all top-level functions.
   for (Function &F : *M) {
-    if (F.size() == 0)
+    if (F.empty())
       continue;
     buildTree(&F);
   }

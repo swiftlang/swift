@@ -22,8 +22,8 @@ public func run_MonteCarloPi(scale: Int) {
   let r = 10000
   let N = 500000*scale
   for _ in 1...N {
-    let x = Int(truncatingBitPattern: Random())%r
-    let y = Int(truncatingBitPattern: Random())%r
+    let x = Int(truncatingIfNeeded: Random())%r
+    let y = Int(truncatingIfNeeded: Random())%r
     if x*x + y*y < r*r {
       pointsInside += 1
     }

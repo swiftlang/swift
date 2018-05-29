@@ -267,6 +267,7 @@ private:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericOtherNominalType:
+    case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
     case Node::Kind::Class:
     case Node::Kind::DependentGenericType:
@@ -292,6 +293,8 @@ private:
     case Node::Kind::TypeAlias:
     case Node::Kind::TypeList:
     case Node::Kind::LabelList:
+    case Node::Kind::SymbolicReference:
+    case Node::Kind::UnresolvedSymbolicReference:
       return true;
 
     case Node::Kind::ProtocolList:
@@ -327,8 +330,11 @@ private:
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
+    case Node::Kind::EscapingAutoClosureType:
+    case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
+    case Node::Kind::EnumCase:
     case Node::Kind::FieldOffset:
     case Node::Kind::FullTypeMetadata:
     case Node::Kind::Function:
@@ -382,6 +388,7 @@ private:
     case Node::Kind::Number:
     case Node::Kind::ObjCAttribute:
     case Node::Kind::ObjCBlock:
+    case Node::Kind::Owned:
     case Node::Kind::OwningAddressor:
     case Node::Kind::OwningMutableAddressor:
     case Node::Kind::PartialApplyForwarder:
@@ -389,12 +396,15 @@ private:
     case Node::Kind::PostfixOperator:
     case Node::Kind::PrefixOperator:
     case Node::Kind::PrivateDeclName:
+    case Node::Kind::PropertyDescriptor:
     case Node::Kind::ProtocolConformance:
     case Node::Kind::ProtocolConformanceDescriptor:
     case Node::Kind::ProtocolDescriptor:
+    case Node::Kind::ProtocolRequirementArray:
     case Node::Kind::ProtocolWitness:
     case Node::Kind::ProtocolWitnessTable:
     case Node::Kind::ProtocolWitnessTableAccessor:
+    case Node::Kind::ProtocolWitnessTablePattern:
     case Node::Kind::ReabstractionThunk:
     case Node::Kind::ReabstractionThunkHelper:
     case Node::Kind::RelatedEntityDeclName:
@@ -414,6 +424,9 @@ private:
     case Node::Kind::TypeMangling:
     case Node::Kind::TypeMetadata:
     case Node::Kind::TypeMetadataAccessFunction:
+    case Node::Kind::TypeMetadataCompletionFunction:
+    case Node::Kind::TypeMetadataInstantiationCache:
+    case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::Unmanaged:
@@ -431,6 +444,7 @@ private:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
     case Node::Kind::ReflectionMetadataSuperclassDescriptor:
+    case Node::Kind::ResilientProtocolWitnessTable:
     case Node::Kind::GenericTypeParamDecl:
     case Node::Kind::ThrowsAnnotation:
     case Node::Kind::EmptyList:
@@ -800,8 +814,11 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer Node,
 
   assert(
       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned)) ||
        (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::Dead))) &&
+       (V & unsigned(FunctionSigSpecializationParamKind::Dead))||
+       (V & unsigned(
+                FunctionSigSpecializationParamKind::ExistentialToGeneric))) &&
       "Invalid OptionSet");
   print(Node->getChild(Idx++));
   return Idx;
@@ -854,6 +871,7 @@ static bool needSpaceBeforeType(NodePointer Type) {
     case Node::Kind::Type:
       return needSpaceBeforeType(Type->getFirstChild());
     case Node::Kind::FunctionType:
+    case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::UncurriedFunctionType:
     case Node::Kind::DependentGenericType:
       return false;
@@ -882,10 +900,14 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::OutlinedCopy:
     Printer << "outlined copy of ";
     print(Node->getChild(0));
+    if (Node->getNumChildren() > 1)
+      print(Node->getChild(1));
     return nullptr;
   case Node::Kind::OutlinedConsume:
     Printer << "outlined consume of ";
     print(Node->getChild(0));
+    if (Node->getNumChildren() > 1)
+      print(Node->getChild(1));
     return nullptr;
   case Node::Kind::OutlinedRetain:
     Printer << "outlined retain of ";
@@ -1039,6 +1061,13 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Index:
     Printer << Node->getIndex();
     return nullptr;
+  case Node::Kind::NoEscapeFunctionType:
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  case Node::Kind::EscapingAutoClosureType:
+    Printer << "@autoclosure ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
     printFunctionType(nullptr, Node);
@@ -1110,6 +1139,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::Shared:
     Printer << "__shared ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::Owned:
+    Printer << "__owned ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::NonObjCAttribute:
@@ -1184,16 +1217,30 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     uint64_t raw = Node->getIndex();
 
     bool printedOptionSet = false;
+    if (raw &
+        uint64_t(FunctionSigSpecializationParamKind::ExistentialToGeneric)) {
+      printedOptionSet = true;
+      Printer << "Existential To Protocol Constrained Generic";
+    }
+
     if (raw & uint64_t(FunctionSigSpecializationParamKind::Dead)) {
+      if (printedOptionSet)
+        Printer << " and ";
       printedOptionSet = true;
       Printer << "Dead";
     }
-
     if (raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
       if (printedOptionSet)
         Printer << " and ";
       printedOptionSet = true;
       Printer << "Owned To Guaranteed";
+    }
+
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::GuaranteedToOwned)) {
+      if (printedOptionSet)
+        Printer << " and ";
+      printedOptionSet = true;
+      Printer << "Guaranteed To Owned";
     }
 
     if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
@@ -1231,8 +1278,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
+    case FunctionSigSpecializationParamKind::GuaranteedToOwned:
     case FunctionSigSpecializationParamKind::SROA:
       printer_unreachable("option sets should have been handled earlier");
     }
@@ -1276,12 +1325,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
+  case Node::Kind::ProtocolWitnessTablePattern:
+    Printer << "protocol witness table pattern for ";
+    print(Node->getFirstChild());
+    return nullptr;
   case Node::Kind::GenericProtocolWitnessTable:
     Printer << "generic protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
     Printer << "instantiation function for generic protocol witness table for ";
+    print(Node->getFirstChild());
+    return nullptr;
+  case Node::Kind::ResilientProtocolWitnessTable:
+    Printer << "resilient protocol witness table for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::VTableThunk: {
@@ -1372,6 +1429,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(entity, /*asContext*/ false);
     return nullptr;
   }
+  case Node::Kind::EnumCase: {
+    Printer << "enum case for ";
+    auto entity = Node->getChild(0);
+    print(entity, /*asContext*/ false);
+    return nullptr;
+  }
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
     if (Options.ShortenThunk) {
@@ -1399,6 +1462,12 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
       Printer << "merged ";
     }
     return nullptr;
+  case Node::Kind::SymbolicReference:
+    Printer << "symbolic reference " << Node->getIndex();
+    return nullptr;
+  case Node::Kind::UnresolvedSymbolicReference:
+    Printer << "$" << Node->getIndex();
+    return nullptr;
   case Node::Kind::GenericTypeMetadataPattern:
     Printer << "generic type metadata pattern for ";
     print(Node->getChild(0));
@@ -1415,6 +1484,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "protocol descriptor for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::ProtocolRequirementArray:
+    Printer << "protocol requirement array for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::FullTypeMetadata:
     Printer << "full type metadata for ";
     print(Node->getChild(0));
@@ -1425,6 +1498,18 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::TypeMetadataAccessFunction:
     Printer << "type metadata accessor for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::TypeMetadataInstantiationCache:
+    Printer << "type metadata instantiation cache for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::TypeMetadataInstantiationFunction:
+    Printer << "type metadata instantiation function for ";
+    print(Node->getChild(0));
+    return nullptr;
+  case Node::Kind::TypeMetadataCompletionFunction:
+    Printer << "type metadata completion function for ";
     print(Node->getChild(0));
     return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
@@ -1449,6 +1534,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "class metadata base offset for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::PropertyDescriptor:
+    Printer << "property descriptor for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::NominalTypeDescriptor:
     Printer << "nominal type descriptor for ";
     print(Node->getChild(0));
@@ -1471,6 +1560,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
   case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);
     return nullptr;
   case Node::Kind::DynamicSelf:
@@ -2013,6 +2103,7 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
       while (t->getKind() == Node::Kind::DependentGenericType)
         t = t->getChild(1)->getChild(0);
       if (t->getKind() != Node::Kind::FunctionType &&
+          t->getKind() != Node::Kind::NoEscapeFunctionType &&
           t->getKind() != Node::Kind::UncurriedFunctionType &&
           t->getKind() != Node::Kind::CFunctionPointer &&
           t->getKind() != Node::Kind::ThinFunctionType) {

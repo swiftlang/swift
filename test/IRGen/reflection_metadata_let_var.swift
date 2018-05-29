@@ -1,9 +1,9 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
-// CHECK: [[INT:@.*]] = private constant [3 x i8] c"Si\00"
-// CHECK: [[X:@.*]] = private constant [2 x i8] c"x\00"
-// CHECK: [[STRING:@.*]] = private constant [3 x i8] c"SS\00"
-// CHECK: [[Y:@.*]] = private constant [2 x i8] c"y\00"
+// CHECK: [[INT:@.*]] = linkonce_odr hidden constant {{.*}} c"Si"
+// CHECK: [[X:@.*]] = private constant {{.*}} c"x\00"
+// CHECK: [[STRING:@.*]] = linkonce_odr hidden constant {{.*}} c"SS"
+// CHECK: [[Y:@.*]] = private constant {{.*}} c"y\00"
 
 // CHECK-LABEL: @"$S27reflection_metadata_let_var6StruccVMF" = internal constant
 struct Strucc {

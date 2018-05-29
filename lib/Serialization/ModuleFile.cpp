@@ -429,7 +429,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -447,7 +447,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +456,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -852,6 +850,10 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         GenericEnvironments.assign(scratch.begin(), scratch.end());
         break;
+      case index_block::SUBSTITUTION_MAP_OFFSETS:
+        assert(blobData.empty());
+        SubstitutionMaps.assign(scratch.begin(), scratch.end());
+        break;
       case index_block::NORMAL_CONFORMANCE_OFFSETS:
         assert(blobData.empty());
         NormalConformances.assign(scratch.begin(), scratch.end());
@@ -1115,6 +1117,7 @@ ModuleFile::ModuleFile(
       Name = info.name;
       TargetTriple = info.targetTriple;
       CompatibilityVersion = info.compatibilityVersion;
+      IsSIB = extInfo->isSIB();
 
       hasValidControlBlock = true;
       break;
@@ -1127,7 +1130,6 @@ ModuleFile::ModuleFile(
       }
 
       cursor.EnterSubBlock(INPUT_BLOCK_ID);
-      bool seenFlags = false;
 
       auto next = cursor.advance();
       while (next.Kind == llvm::BitstreamEntry::Record) {
@@ -1166,15 +1168,6 @@ ModuleFile::ModuleFile(
           assert(importedHeaderInfo.contents.empty() &&
                  "contents seen already");
           importedHeaderInfo.contents = blobData;
-          break;
-        }
-        case input_block::MODULE_FLAGS: {
-          assert(!seenFlags && "only one flags record allowed");
-          seenFlags = true;
-          bool hasUnderlyingModule;
-          input_block::ModuleFlagsLayout::readRecord(scratch,
-                                                     hasUnderlyingModule);
-          Bits.HasUnderlyingModule = hasUnderlyingModule;
           break;
         }
         case input_block::SEARCH_PATH: {
@@ -1432,11 +1425,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
-    // This is for backwards-compatibility with modules that still rely on the
-    // "HasUnderlyingModule" flag.
-    if (Bits.HasUnderlyingModule && module == ShadowedModule)
-      dependency.forceExported();
-
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1446,6 +1434,13 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       std::pair<Identifier, SourceLoc> accessPathElem(scopeID, SourceLoc());
       dependency.Import = {ctx.AllocateCopy(llvm::makeArrayRef(accessPathElem)),
                            module};
+    }
+
+    if (!module->hasResolvedImports()) {
+      // Notice that we check this condition /after/ recording the module that
+      // caused the problem. Clients need to be able to track down what the
+      // cycle was.
+      return error(Status::CircularDependency);
     }
   }
 
@@ -1519,7 +1514,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -1590,9 +1585,26 @@ void ModuleFile::getImportedModules(
   PrettyStackTraceModuleFile stackEntry(*this);
 
   for (auto &dep : Dependencies) {
-    if (filter != ModuleDecl::ImportFilter::All &&
-        (filter == ModuleDecl::ImportFilter::Public) ^ dep.isExported())
-      continue;
+    switch (filter) {
+    case ModuleDecl::ImportFilter::All:
+      // We're including all imports.
+      break;
+
+    case ModuleDecl::ImportFilter::Private:
+      // Skip @_exported imports.
+      if (dep.isExported())
+        continue;
+
+      break;
+
+    case ModuleDecl::ImportFilter::Public:
+      // Only include @_exported imports.
+      if (!dep.isExported())
+        continue;
+
+      break;
+    }
+
     assert(dep.isLoaded());
     results.push_back(dep.Import);
   }
@@ -2007,10 +2019,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }

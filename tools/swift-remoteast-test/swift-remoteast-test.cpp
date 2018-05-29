@@ -19,9 +19,18 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cassert>
+
+#if defined(__ELF__)
+#define SWIFT_REMOTEAST_TEST_ABI __attribute__((__visibility__("default")))
+#elif defined(__MACH__)
+#define SWIFT_REMOTEAST_TEST_ABI __attribute__((__visibility__("default")))
+#else
+#define SWIFT_REMOTEAST_TEST_ABI __declspec(dllexport)
+#endif
 
 using namespace swift;
 using namespace swift::remote;
@@ -32,7 +41,7 @@ static ASTContext *Context = nullptr;
 
 // FIXME: swiftcall
 /// func printType(forMetadata: Any.Type)
-LLVM_ATTRIBUTE_USED
+LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
 extern "C" void printMetadataType(const Metadata *typeMetadata) {
   assert(Context && "context was not set");
 
@@ -54,7 +63,7 @@ extern "C" void printMetadataType(const Metadata *typeMetadata) {
 
 // FIXME: swiftcall
 /// func printDynamicType(_: AnyObject)
-LLVM_ATTRIBUTE_USED
+LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
 extern "C" void printHeapMetadataType(void *object) {
   assert(Context && "context was not set");
 
@@ -117,7 +126,7 @@ static void printMemberOffset(const Metadata *typeMetadata,
 
 // FIXME: swiftcall
 /// func printTypeMemberOffset(forType: Any.Type, memberName: StaticString)
-LLVM_ATTRIBUTE_USED
+LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
 extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
                                       const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ false);
@@ -126,7 +135,7 @@ extern "C" void printTypeMemberOffset(const Metadata *typeMetadata,
 // FIXME: swiftcall
 /// func printTypeMetadataMemberOffset(forType: Any.Type,
 ///                                    memberName: StaticString)
-LLVM_ATTRIBUTE_USED
+LLVM_ATTRIBUTE_USED SWIFT_REMOTEAST_TEST_ABI
 extern "C" void printTypeMetadataMemberOffset(const Metadata *typeMetadata,
                                               const char *memberName) {
   printMemberOffset(typeMetadata, memberName, /*pass metadata*/ true);
@@ -143,6 +152,8 @@ struct Observer : public FrontendObserver {
 } // end anonymous namespace
 
 int main(int argc, const char *argv[]) {
+  PROGRAM_START(argc, argv);
+
   unsigned numForwardedArgs = argc
       - 1  // we drop argv[0]
       + 1; // -interpret

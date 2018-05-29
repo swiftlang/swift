@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s | %FileCheck %s
 
 class C {}
 

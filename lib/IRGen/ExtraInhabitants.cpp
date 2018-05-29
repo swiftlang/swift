@@ -24,6 +24,9 @@ using namespace swift;
 using namespace irgen;
 
 static unsigned getNumLowObjCReservedBits(IRGenModule &IGM) {
+  if (!IGM.ObjCInterop)
+    return 0;
+
   // Get the index of the first non-reserved bit.
   SpareBitVector ObjCMask = IGM.TargetInfo.ObjCPointerReservedBits;
   ObjCMask.flipAll();

@@ -463,7 +463,7 @@ unsigned OpaqueStorageAllocation::insertIndirectReturnArgs() {
         ParamDecl(VarDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
                   ctx.getIdentifier("$return_value"), SourceLoc(),
                   ctx.getIdentifier("$return_value"),
-                  bodyResultTy.getSwiftRValueType(), pass.F->getDeclContext());
+                  bodyResultTy.getASTType(), pass.F->getDeclContext());
 
     pass.F->begin()->insertFunctionArgument(argIdx,
                                             bodyResultTy.getAddressType(),
@@ -981,7 +981,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   switch (origCallInst->getKind()) {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
-        loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
+        loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
         cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
     break;
   case SILInstructionKind::TryApplyInst:
@@ -1221,7 +1221,8 @@ protected:
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = debugInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-    B.createDebugValueAddr(debugInst->getLoc(), srcAddr);
+    B.createDebugValueAddr(debugInst->getLoc(), srcAddr,
+                           *debugInst->getVarInfo());
     pass.markDead(debugInst);
   }
   

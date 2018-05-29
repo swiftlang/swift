@@ -22,23 +22,15 @@ public let StringMatch = BenchmarkInfo(
   runFunction: run_StringMatch,
   tags: [.validation, .api, .String])
 
-extension String {
-  @inline(__always)
-  func dropFirst(_ n: Int = 1) -> String {
-    let startIndex = self.index(self.startIndex, offsetBy: n)
-    return self[startIndex ..< self.endIndex]
-  }
-}
-
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {
-    return matchHere(regexp.dropFirst(), text)
+    return matchHere(regexp.dropFirst(), text[...])
   }
   
   var idx = text.startIndex
   while true {  // must look even if string is empty
-    if matchHere(regexp, text[idx..<text.endIndex]) {
+    if matchHere(regexp[...], text[idx..<text.endIndex]) {
       return true
     }
     guard idx != text.endIndex else { break }
@@ -50,7 +42,7 @@ func match(regexp: String, text: String) -> Bool {
 }
 
 /* matchhere: search for regexp at beginning of text */
-func matchHere(_ regexp: String, _ text: String) -> Bool {
+func matchHere(_ regexp: Substring, _ text: Substring) -> Bool {
   if regexp.isEmpty {
     return true
   }
@@ -71,7 +63,7 @@ func matchHere(_ regexp: String, _ text: String) -> Bool {
 }
 
 /* matchstar: search for c*regexp at beginning of text */
-func matchStar(_ c: Character, _ regexp: String, _ text: String) -> Bool {
+func matchStar(_ c: Character, _ regexp: Substring, _ text: Substring) -> Bool {
   var idx = text.startIndex
   while true {   /* a * matches zero or more instances */
     if matchHere(regexp, text[idx..<text.endIndex]) {

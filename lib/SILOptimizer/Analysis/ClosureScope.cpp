@@ -91,6 +91,15 @@ public:
     auto scopeFunc = PAI->getFunction();
     int scopeIdx = lookupScopeIndex(scopeFunc);
 
+    // Passes may assume that a deserialized function can only refer to
+    // deserialized closures. For example, AccessEnforcementSelection skips
+    // deserialized functions but assumes all a closure's parent scope have been
+    // processed.
+    assert(scopeFunc->wasDeserializedCanonical()
+           == closureFunc->wasDeserializedCanonical() &&
+           "A closure cannot be serialized in a different module than its "
+           "parent context");
+
     auto &indices = closureToScopesMap[closureFunc];
     if (std::find(indices.begin(), indices.end(), scopeIdx) != indices.end())
       return;
@@ -158,7 +167,7 @@ SILAnalysis *createClosureScopeAnalysis(SILModule *M) {
 }
 
 void TopDownClosureFunctionOrder::visitFunctions(
-    std::function<void(SILFunction *)> visitor) {
+    llvm::function_ref<void(SILFunction *)> visitor) {
   auto markVisited = [&](SILFunction *F) {
     bool visitOnce = visited.insert(F).second;
     assert(visitOnce);

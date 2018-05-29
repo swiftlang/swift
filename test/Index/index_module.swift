@@ -1,5 +1,4 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-swift-frontend -emit-module -o %t %s
 // RUN: %target-swift-ide-test -print-indexed-symbols -module-name index_module -source-filename %s > %t.out

@@ -11,3 +11,14 @@ print(test[test.start])
 
 func useSigned<T: SpecialProto>(_: T) {}
 useSigned(5 as Int)
+
+protocol P { }
+
+class SubclassSubclassConformsToPrivateProto
+  : SubclassConformsToPrivateProto, P { }
+
+func useP<T: P>(_: T) { }
+func mentionSubclassConformsToPrivateProto(
+  ssc: SubclassSubclassConformsToPrivateProto) {
+  useP(ssc)
+}

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
 
 import macros
 
@@ -83,7 +83,7 @@ class GenericClass {
 
 // CHECK: [[@LINE+1]]:10 s:14swift_ide_test4ProtP{{$}}
 protocol Prot {
-  // CHECK: [[@LINE+1]]:18 s:14swift_ide_test4ProtP5Blarg{{$}}
+  // CHECK: [[@LINE+1]]:18 s:14swift_ide_test4ProtP5BlargQa{{$}}
   associatedtype Blarg
   // CHECK: [[@LINE+1]]:8 s:14swift_ide_test4ProtP8protMethy5BlargQzAFF{{$}}
   func protMeth(_ x: Blarg) -> Blarg

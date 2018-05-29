@@ -19,40 +19,40 @@ private protocol PrivateProto {
 }
 
 public struct PublicStruct: PublicProto, InternalProto, FilePrivateProto, PrivateProto {
-  private func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-10=public}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
-  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{none}} expected-note {{mark the instance method as 'public' to satisfy the requirement}} {{3-10=public}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{none}} expected-note {{mark the instance method as 'internal' to satisfy the requirement}} {{3-10=internal}}
+  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
 internal struct InternalStruct: PublicProto, InternalProto, FilePrivateProto, PrivateProto {
-  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
-  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{none}} expected-note {{mark the instance method as 'internal' to satisfy the requirement}} {{3-10=internal}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{none}} expected-note {{mark the instance method as 'internal' to satisfy the requirement}} {{3-10=internal}}
+  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
 fileprivate struct FilePrivateStruct: PublicProto, InternalProto, FilePrivateProto, PrivateProto {
-  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
-  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
 
 // expected-note@+1 * {{type declared here}}
 private struct PrivateStruct: PublicProto, InternalProto, FilePrivateProto, PrivateProto {
-  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=fileprivate}}
-  private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{3-10=fileprivate}}
-  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{3-10=fileprivate}}
-  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{3-10=fileprivate}}
+  private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func internalReq() {} // expected-error {{method 'internalReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'InternalProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func filePrivateReq() {} // expected-error {{method 'filePrivateReq()' must be declared fileprivate because it matches a requirement in fileprivate protocol 'FilePrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
+  private func privateReq() {} // expected-error {{method 'privateReq()' must be declared fileprivate because it matches a requirement in private protocol 'PrivateProto'}} {{none}} expected-note {{mark the instance method as 'fileprivate' to satisfy the requirement}} {{3-10=fileprivate}}
 
   public var publicVar = 0
 }
@@ -140,7 +140,7 @@ private extension PrivateStruct {
 
 
 public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivateProto {
-  func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{3-3=public }}
+  func publicReq() {} // expected-error {{method 'publicReq()' must be declared public because it matches a requirement in public protocol 'PublicProto'}} {{none}} expected-note {{mark the instance method as 'public' to satisfy the requirement}} {{3-3=public }}
   func internalReq() {}
   func privateReq() {}
 }
@@ -165,7 +165,7 @@ internal extension Base {
 }
 
 public class PublicSub: Base {
-  required init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-12=public }}
+  private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
   override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
   override var bar: Int { // expected-error {{overriding var must be as accessible as the declaration it overrides}} {{12-12=public }}
     get { return 0 }
@@ -174,8 +174,12 @@ public class PublicSub: Base {
   override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
 }
 
+public class PublicSubGood: Base {
+  required init() {} // okay
+}
+
 internal class InternalSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=internal}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'InternalSub' can be subclassed}} {{12-19=internal}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=internal}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=internal}}
     get { return 0 }
@@ -207,7 +211,7 @@ internal class InternalSubPrivateSet: Base {
 }
 
 fileprivate class FilePrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'FilePrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -249,7 +253,7 @@ fileprivate class FilePrivateSubPrivateSet: Base {
 }
 
 private class PrivateSub: Base {
-  required private init() {} // expected-error {{'required' initializer must be as accessible as its enclosing type}} {{12-19=fileprivate}}
+  required private init() {} // expected-error {{'required' initializer must be accessible wherever class 'PrivateSub' can be subclassed}} {{12-19=fileprivate}}
   private override func foo() {} // expected-error {{overriding instance method must be as accessible as its enclosing type}} {{3-10=fileprivate}}
   private override var bar: Int { // expected-error {{overriding var must be as accessible as its enclosing type}} {{3-10=fileprivate}}
     get { return 0 }
@@ -426,6 +430,7 @@ class DefaultSubclassPublic : PublicClass {}
 class DefaultSubclassInternal : InternalClass {}
 class DefaultSubclassPrivate : PrivateClass {} // expected-error {{class must be declared private or fileprivate because its superclass is private}}
 
+// expected-note@+1 * {{superclass is declared here}}
 public class PublicGenericClass<T> {}
 // expected-note@+2 * {{type declared here}}
 // expected-note@+1 * {{superclass is declared here}}
@@ -437,7 +442,10 @@ open class OpenConcreteSubclassInternal : InternalGenericClass<Int> {} // expect
 public class PublicConcreteSubclassPublic : PublicGenericClass<Int> {}
 public class PublicConcreteSubclassInternal : InternalGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is internal}}
 public class PublicConcreteSubclassPrivate : PrivateGenericClass<Int> {} // expected-error {{class cannot be declared public because its superclass is private}}
-public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass is private}}
+public class PublicConcreteSubclassPublicPrivateArg : PublicGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared public because its superclass uses a private type as a generic parameter}}
+public class PublicConcreteSubclassPublicInternalArg : PublicGenericClass<InternalStruct> {} // expected-error {{class cannot be declared public because its superclass uses an internal type as a generic parameter}}
+open class OpenConcreteSubclassPublicFilePrivateArg : PublicGenericClass<FilePrivateStruct> {} // expected-error {{class cannot be declared open because its superclass uses a fileprivate type as a generic parameter}} expected-error {{superclass 'PublicGenericClass<FilePrivateStruct>' of open class must be open}}
+internal class InternalConcreteSubclassPublicFilePrivateArg : InternalGenericClass<PrivateStruct> {} // expected-error {{class cannot be declared internal because its superclass uses a private type as a generic parameter}}
 
 open class OpenGenericSubclassInternal<T> : InternalGenericClass<T> {} // expected-error {{class cannot be declared open because its superclass is internal}} expected-error {{superclass 'InternalGenericClass<T>' of open class must be open}}
 public class PublicGenericSubclassPublic<T> : PublicGenericClass<T> {}
@@ -454,8 +462,8 @@ enum DefaultEnumPrivate {
 }
 public enum PublicEnumPI {
   case A(InternalStruct) // expected-error {{enum case in a public enum uses an internal type}}
-  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}}
-  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses a private type}}
+  case B(PrivateStruct, InternalStruct) // expected-error {{enum case in a public enum uses a private type}} expected-error {{enum case in a public enum uses an internal type}}
+  case C(InternalStruct, PrivateStruct) // expected-error {{enum case in a public enum uses an internal type}} expected-error {{enum case in a public enum uses a private type}}
 }
 enum DefaultEnumPublic {
   case A(PublicStruct) // no-warning
@@ -498,8 +506,8 @@ internal protocol InternalMutationOperations {
 }
 
 public struct AccessorsControl : InternalMutationOperations {
-  private var size = 0 // expected-error {{property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{3-10=internal}}
-  private subscript (_: Int) -> Int { // expected-error {{subscript must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{3-10=internal}}
+  private var size = 0 // expected-error {{property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{3-10=internal}}
+  private subscript (_: Int) -> Int { // expected-error {{subscript must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{3-10=internal}}
     get { return 42 }
     set {}
   }
@@ -507,8 +515,8 @@ public struct AccessorsControl : InternalMutationOperations {
 
 public struct PrivateSettersPublic : InternalMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
-  public private(set) var size = 0 // expected-error {{setter for property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
-  public private(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{10-17=internal}}
+  public private(set) var size = 0 // expected-error {{setter for property 'size' must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{10-17=internal}}
+  public private(set) subscript (_: Int) -> Int { // expected-error {{subscript setter must be declared internal because it matches a requirement in internal protocol 'InternalMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{10-17=internal}}
     get { return 42 }
     set {}
   }
@@ -516,9 +524,9 @@ public struct PrivateSettersPublic : InternalMutationOperations {
 
 internal struct PrivateSettersInternal : PublicMutationOperations {
   // Please don't change the formatting here; it's a precise fix-it test.
-  private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{3-15=}}
+  private(set)var size = 0 // expected-error {{setter for property 'size' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the var as 'internal' to satisfy the requirement}} {{3-15=}}
 
-  internal private(set)subscript (_: Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{12-24=}}
+  internal private(set)subscript (_: Int) -> Int { // expected-error {{subscript setter must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicMutationOperations'}} {{none}} expected-note {{mark the subscript as 'internal' to satisfy the requirement}} {{12-24=}}
     get { return 42 }
     set {}
   }
@@ -539,7 +547,7 @@ internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
 
 public struct PrivateSettersForReadOnlyPublic : PublicReadOnlyOperations {
   public private(set) var size = 0 // no-warning
-  internal private(set) subscript (_: Int) -> Int { // expected-error {{subscript must be declared public because it matches a requirement in public protocol 'PublicReadOnlyOperations'}} {{3-11=public}}
+  internal private(set) subscript (_: Int) -> Int { // expected-error {{subscript must be declared public because it matches a requirement in public protocol 'PublicReadOnlyOperations'}} {{none}} expected-note {{mark the subscript as 'public' to satisfy the requirement}} {{3-11=public}}
     get { return 42 }
     set {}
   }
@@ -563,10 +571,11 @@ private protocol PrivateOperatorProto {
 }
 
 public struct PublicOperatorAdopter : PublicOperatorProto {
+  // expected-error@-1 {{method '!' must be declared public because it matches a requirement in public protocol 'PublicOperatorProto'}}
   fileprivate struct Inner : PublicOperatorProto {
   }
 }
-private prefix func !(input: PublicOperatorAdopter) -> PublicOperatorAdopter { // expected-error {{method '!' must be declared public because it matches a requirement in public protocol 'PublicOperatorProto'}} {{1-8=public}}
+private prefix func !(input: PublicOperatorAdopter) -> PublicOperatorAdopter { // expected-note {{mark the operator function as 'public' to satisfy the requirement}} {{1-8=public}}
   return input
 }
 private prefix func !(input: PublicOperatorAdopter.Inner) -> PublicOperatorAdopter.Inner {
@@ -574,10 +583,11 @@ private prefix func !(input: PublicOperatorAdopter.Inner) -> PublicOperatorAdopt
 }
 
 public struct InternalOperatorAdopter : InternalOperatorProto {
+  // expected-error@-1 {{method '!' must be declared internal because it matches a requirement in internal protocol 'InternalOperatorProto'}}
   fileprivate struct Inner : InternalOperatorProto {
   }
 }
-private prefix func !(input: InternalOperatorAdopter) -> InternalOperatorAdopter { // expected-error {{method '!' must be declared internal because it matches a requirement in internal protocol 'InternalOperatorProto'}} {{1-8=internal}}
+private prefix func !(input: InternalOperatorAdopter) -> InternalOperatorAdopter { // expected-note {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
   return input
 }
 private prefix func !(input: InternalOperatorAdopter.Inner) -> InternalOperatorAdopter.Inner {
@@ -632,17 +642,19 @@ fileprivate struct EquatablishOuterProblem {
 
 internal struct EquatablishOuterProblem2 {
   public struct Inner : Equatablish {
-    fileprivate static func ==(lhs: Inner, rhs: Inner) {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{5-16=internal}}
-    // expected-note@-1 {{candidate has non-matching type}}
+    fileprivate static func ==(lhs: Inner, rhs: Inner) {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
+    // expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{5-16=internal}}
+    // expected-note@-2 {{candidate has non-matching type}}
   }
 }
 
 internal struct EquatablishOuterProblem3 {
-  public struct Inner : Equatablish {
+  public struct Inner : Equatablish { // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{none}}
   }
 }
-private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {} // expected-error {{method '==' must be as accessible as its enclosing type because it matches a requirement in protocol 'Equatablish'}} {{1-8=internal}}
-// expected-note@-1 {{candidate has non-matching type}}
+private func ==(lhs: EquatablishOuterProblem3.Inner, rhs: EquatablishOuterProblem3.Inner) {}
+// expected-note@-1 {{mark the operator function as 'internal' to satisfy the requirement}} {{1-8=internal}}
+// expected-note@-2 {{candidate has non-matching type}}
 
 
 public protocol AssocTypeProto {
@@ -657,13 +669,13 @@ fileprivate struct AssocTypeOuter {
 
 fileprivate struct AssocTypeOuterProblem {
   internal struct Inner : AssocTypeProto {
-    private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{5-12=fileprivate}}
+    private typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}} expected-note {{mark the type alias as 'fileprivate' to satisfy the requirement}} {{5-12=fileprivate}}
   }
 }
 
 internal struct AssocTypeOuterProblem2 {
   public struct Inner : AssocTypeProto {
-    fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{5-16=internal}}
+    fileprivate typealias Assoc = Int // expected-error {{type alias 'Assoc' must be as accessible as its enclosing type because it matches a requirement in protocol 'AssocTypeProto'}} {{none}} expected-note {{mark the type alias as 'internal' to satisfy the requirement}} {{5-16=internal}}
   }
 }
 

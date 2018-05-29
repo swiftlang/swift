@@ -647,25 +647,106 @@ compilers on hand while you're working.
     ...
     ```
 
-Finally, in an attempt to unify collection and reporting of these options,
-recent versions of the compiler support a partly redundant command
-`-stats-output-dir <directory>` that writes _all_ driver and primary frontend
-counters and timers (though not per-function timers) to JSON files in
-`<directory>`. This option also provides _some_ high-level counters that are
-"always available" regardless of whether you're using an assert or release
-build, though assert builds still get _more_ counters (all of those available
-thorugh `-print-stats`). If you are using a new-enough compiler,
-`-stats-output-dir` often simplifies analysis, since its output is
-machine-readable and aggregates all the jobs in a multi-job compilation, and
-there's a post-processing script `utils/process-stats-dir.py` to work with these
-files in aggregate.
+##### Unified stats reporter
+
+In an attempt to unify collection and reporting of the various
+statistic-gathering options, recent versions of the compiler support a partly
+redundant command `-stats-output-dir <directory>` that writes _all_ driver and
+primary frontend counters and timers (though not per-function timers) to JSON
+files in `<directory>`.
+
+This option also provides _some_ high-level counters that are "always available"
+regardless of whether you're using an assert or release build, though assert
+builds still get _more_ counters (all of those available thorugh
+`-print-stats`). If you are using a new-enough compiler, `-stats-output-dir`
+often simplifies analysis, since its output is machine-readable and aggregates
+all the jobs in a multi-job compilation, and there's a post-processing script
+`utils/process-stats-dir.py` to work with these files in aggregate.
+
+For example, to compile a file with the unified stats reporter enabled, first
+make a directory in which to output the stats, then compile with the
+`-stats-output-dir` flag:
+
+```
+$ mkdir /tmp/stats
+$ swiftc -c test.swift -stats-output-dir /tmp/stats
+$ ls /tmp/stats
+stats-1518219149045080-swift-frontend-test-test.swift-x86_64_apple_macosx10.13-o-Onone-531621672.json
+$ cat /tmp/stats/*.json
+{
+  "AST.NumSourceBuffers": 1,
+  "AST.NumSourceLines": 1,
+  "AST.NumSourceLinesPerSecond": 3,
+  "AST.NumLinkLibraries": 0,
+  "AST.NumLoadedModules": 4,
+  "AST.NumImportedExternalDefinitions": 0,
+  "AST.NumTotalClangImportedEntities": 0,
+  ...
+  "time.swift.Parsing.wall": 5.038023e-03,
+  "time.swift.Parsing.user": 7.200000e-05,
+  "time.swift.Parsing.sys": 4.794000e-03,
+  "time.swift-frontend.test-test.swift-x86_64_apple_macosx10.13-o-Onone.wall": 3.239949e-01,
+  "time.swift-frontend.test-test.swift-x86_64_apple_macosx10.13-o-Onone.user": 2.152100e-02,
+  "time.swift-frontend.test-test.swift-x86_64_apple_macosx10.13-o-Onone.sys": 2.897520e-01
+}
+```
+
+###### Tracing stats events
+
+Furthermore, recent versions `-stats-output-dir` have a secondary, experimental
+(and much more voluminous mode) called `-trace-stats-events`, that writes _trace
+files_ in CSV to the stats output directory. These trace files show -- in quite
+verbose detail, declaration and expression at a time -- the costs incurred by
+various phases of the compiler, both in terms of absolute time and in terms of
+any changers to statistics being tracked by the unified stats reporter.
+
+For example, to compile a small file with `-trace-stats-events`, pass it as an
+extra argument to a compilation already using `-stats-output-dir`:
+
+```
+$ mkdir /tmp/stats
+$ swiftc -c test.swift -stats-output-dir /tmp/stats -trace-stats-events
+$ ls /tmp/stats
+stats-1518219460129565-swift-frontend-test-test.swift-x86_64_apple_macosx10.13-o-Onone-1576107381.json
+trace-1518219460129597-swift-frontend-test-test.swift-x86_64_apple_macosx10.13-o-Onone-1471252712.csv
+$ head /tmp/stats/trace-1518219460129597-swift-frontend-test-test.swift-x86_64_apple_macosx10.13-o-Onone-1471252712.csv
+Time,Live,IsEntry,EventName,CounterName,CounterDelta,CounterValue,EntityName,EntityRange
+40032,0,"entry","typecheck-decl","Sema.NumDeclsDeserialized",91,91,"foo","[test.swift:1:1 - line:1:32]"
+40032,0,"entry","typecheck-decl","Sema.NumLazyGenericEnvironments",40,40,"foo","[test.swift:1:1 - line:1:32]"
+40032,0,"entry","typecheck-decl","Sema.NumLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
+40032,0,"entry","typecheck-decl","Sema.NumTypesDeserialized",106,106,"foo","[test.swift:1:1 - line:1:32]"
+40032,0,"entry","typecheck-decl","Sema.NumUnloadedLazyIterableDeclContexts",40,40,"foo","[test.swift:1:1 - line:1:32]"
+40135,0,"entry","typecheck-decl","Sema.NumDeclsValidated",1,1,"","[test.swift:1:13 - line:1:29]"
+...
+```
+
+The data volume in these trace files can be quite overwhelming, and the contents
+a little hard to read without formatting; for extraction and analysis it can be
+helpful to load them into a separate tool such as
+an [SQLite database](https://www.sqlite.org) or a command line CSV processor
+such as [`xsv`](https://github.com/BurntSushi/xsv).
+
+```
+$ cat /tmp/stats/trace-1518219460129597-swift-frontend-test-test.swift-x86_64_apple_macosx10.13-o-Onone-1471252712.csv \
+   | xsv search --select CounterName DeclsDeserialized \
+   | xsv sort --reverse --numeric --select CounterDelta \
+   | xsv table
+Time   Live  IsEntry  EventName       CounterName                CounterDelta  CounterValue  EntityName  EntityRange
+43279  0     entry    emit-SIL        Sema.NumDeclsDeserialized  360           517           _           [test.swift:1:17 - line:1:17]
+40032  0     entry    typecheck-decl  Sema.NumDeclsDeserialized  91            91            foo         [test.swift:1:1 - line:1:32]
+41324  735   exit     typecheck-decl  Sema.NumDeclsDeserialized  40            156                       [test.swift:1:13 - line:1:29]
+40432  0     entry    typecheck-decl  Sema.NumDeclsDeserialized  25            116           _           [test.swift:1:17 - line:1:17]
+43712  206   exit     emit-SIL        Sema.NumDeclsDeserialized  18            535           _           [test.swift:1:17 - line:1:17]
+41448  97    exit     typecheck-fn    Sema.NumDeclsDeserialized  1             157           _           [test.swift:1:17 - line:1:17]
+```
 
 #### Post-processing tools for diagnostics
 
 If you dump diagnostic output using `-stats-output-dir <dir>`, the resulting
 files in `<dir>` will be simple JSON files that can be processed with any
-JSON-reading program or library, such as `jq`. Alternatively, a bulk-analysis
-script also exists in `utils/process-stats-dir.py`, which permits a variety of
+JSON-reading program or library, such
+as [`jq`](https://stedolan.github.io/jq/). Alternatively, a bulk-analysis script
+also exists in `utils/process-stats-dir.py`, which permits a variety of
 aggregation and analysis tasks.
 
 Here is an example of how to use `-stats-output-dir` together with

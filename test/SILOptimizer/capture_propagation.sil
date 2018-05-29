@@ -450,3 +450,23 @@ bb0:
   %2 = partial_apply %1<Int32>(%0) : $@convention(method) <T>(@in T, @in T, @thin T.Type) -> Bool
   return %2 : $@callee_owned (@in Int32, @in Int32) -> Bool
 }
+
+sil @cfunc : $@convention(c) (Int32, Int32) -> Bool
+
+sil @call_cfunc : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool {
+bb0(%0 : $Int32, %1 : $Int32, %2 : $@thin Int32.Type):
+  %3 = function_ref @cfunc : $@convention(c) (Int32, Int32) -> Bool
+  %4 = apply %3(%0, %1) : $@convention(c) (Int32, Int32) -> Bool
+  return %4 : $Bool
+}
+// CHECK-LABEL: sil @test_cfunc
+// CHECK: function_ref
+// CHECK: partial_apply
+// CHECK: return
+sil @test_cfunc : $@convention(thin) () -> @owned @callee_owned (Int32, Int32) -> Bool {
+bb0:
+  %0 = metatype $@thin Int32.Type
+  %1 = function_ref @call_cfunc : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  %2 = partial_apply %1(%0) : $@convention(method) (Int32, Int32, @thin Int32.Type) -> Bool
+  return %2 : $@callee_owned (Int32, Int32) -> Bool
+}

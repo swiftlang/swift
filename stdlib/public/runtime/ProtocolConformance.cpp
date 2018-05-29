@@ -21,8 +21,8 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/Unreachable.h"
+#include "CompatibilityOverride.h"
 #include "ImageInspection.h"
 #include "Private.h"
 
@@ -217,7 +217,9 @@ namespace {
     const ProtocolDescriptor *Proto;
 
     ConformanceCacheKey(const void *type, const ProtocolDescriptor *proto)
-      : Type(type), Proto(proto) {}
+        : Type(type), Proto(proto) {
+      assert(type);
+    }
   };
 
   struct ConformanceCacheEntry {
@@ -225,12 +227,12 @@ namespace {
     const void *Type; 
     const ProtocolDescriptor *Proto;
     std::atomic<const WitnessTable *> Table;
-    std::atomic<uintptr_t> FailureGeneration;
+    std::atomic<size_t> FailureGeneration;
 
   public:
     ConformanceCacheEntry(ConformanceCacheKey key,
                           const WitnessTable *table,
-                          uintptr_t failureGeneration)
+                          size_t failureGeneration)
       : Type(key.Type), Proto(key.Proto), Table(table),
         FailureGeneration(failureGeneration) {
     }
@@ -258,7 +260,7 @@ namespace {
       Table.store(table, std::memory_order_release);
     }
 
-    void updateFailureGeneration(uintptr_t failureGeneration) {
+    void updateFailureGeneration(size_t failureGeneration) {
       assert(!isSuccessful());
       FailureGeneration.store(failureGeneration, std::memory_order_relaxed);
     }
@@ -269,8 +271,8 @@ namespace {
       return Table.load(std::memory_order_acquire);
     }
     
-    /// Get the generation number under which this lookup failed.
-    unsigned getFailureGeneration() const {
+    /// Get the generation in which this lookup failed.
+    size_t getFailureGeneration() const {
       assert(!isSuccessful());
       return FailureGeneration.load(std::memory_order_relaxed);
     }
@@ -280,18 +282,16 @@ namespace {
 // Conformance Cache.
 struct ConformanceState {
   ConcurrentMap<ConformanceCacheEntry> Cache;
-  std::vector<ConformanceSection> SectionsToScan;
-  Mutex SectionsToScanLock;
+  ConcurrentReadableArray<ConformanceSection> SectionsToScan;
   
   ConformanceState() {
-    SectionsToScan.reserve(16);
     initializeProtocolConformanceLookup();
   }
 
   void cacheSuccess(const void *type, const ProtocolDescriptor *proto,
                     const WitnessTable *witness) {
     auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
-                                    witness, uintptr_t(0));
+                                    witness, 0);
 
     // If the entry was already present, we may need to update it.
     if (!result.second) {
@@ -299,8 +299,8 @@ struct ConformanceState {
     }
   }
 
-  void cacheFailure(const void *type, const ProtocolDescriptor *proto) {
-    uintptr_t failureGeneration = SectionsToScan.size();
+  void cacheFailure(const void *type, const ProtocolDescriptor *proto,
+                    size_t failureGeneration) {
     auto result = Cache.getOrInsert(ConformanceCacheKey(type, proto),
                                     (const WitnessTable *) nullptr,
                                     failureGeneration);
@@ -326,9 +326,7 @@ void ConformanceState::verify() const {
   // Iterate over all of the sections and verify all of the protocol
   // descriptors.
   auto &Self = const_cast<ConformanceState &>(*this);
-  ScopedLock guard(Self.SectionsToScanLock);
-
-  for (const auto &Section : SectionsToScan) {
+  for (const auto &Section : Self.SectionsToScan.snapshot()) {
     for (const auto &Record : Section) {
       Record.get()->verify();
     }
@@ -342,7 +340,6 @@ static void
 _registerProtocolConformances(ConformanceState &C,
                               const ProtocolConformanceRecord *begin,
                               const ProtocolConformanceRecord *end) {
-  ScopedLock guard(C.SectionsToScanLock);
   C.SectionsToScan.push_back(ConformanceSection{begin, end});
 }
 
@@ -401,6 +398,15 @@ struct ConformanceCacheResult {
   }
 };
 
+/// Retrieve the type key from the given metadata, to be used when looking
+/// into the conformance cache.
+static const void *getConformanceCacheTypeKey(const Metadata *type) {
+  if (auto description = type->getTypeContextDescriptor())
+    return description;
+
+  return type;
+}
+
 /// Search for a witness table in the ConformanceCache.
 static
 ConformanceCacheResult
@@ -436,9 +442,7 @@ recur:
       }
 
       // Check if the negative cache entry is up-to-date.
-      // FIXME: Using SectionsToScan.size() outside SectionsToScanLock
-      // is undefined.
-      if (Value->getFailureGeneration() == C.SectionsToScan.size()) {
+      if (Value->getFailureGeneration() == C.SectionsToScan.snapshot().count()) {
         // Negative cache entry is up-to-date. Return failure along with
         // the original query type's own cache entry, if we found one.
         // (That entry may be out of date but the caller still has use for it.)
@@ -455,10 +459,10 @@ recur:
     // For generic and resilient types, nondependent conformances
     // are keyed by the nominal type descriptor rather than the
     // metadata, so try that.
-    const auto *description = type->getTypeContextDescriptor();
+    auto typeKey = getConformanceCacheTypeKey(type);
 
     // Hash and lookup the type-protocol pair in the cache.
-    if (auto *Value = C.findCached(description, protocol)) {
+    if (auto *Value = C.findCached(typeKey, protocol)) {
       if (Value->isSuccessful())
         return ConformanceCacheResult::cachedSuccess(Value->getWitnessTable());
 
@@ -470,7 +474,7 @@ recur:
   // If the type is a class, try its superclass.
   if (const ClassMetadata *classType = type->getClassObject()) {
     if (classHasSuperclass(classType)) {
-      type = getMetadataForClass(classType->SuperClass);
+      type = getMetadataForClass(classType->Superclass);
       goto recur;
     }
   }
@@ -505,7 +509,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     if (!candidateIsMetadata) {
       const auto *description = type->getTypeContextDescriptor();
       auto candidateDescription =
-      static_cast<const TypeContextDescriptor *>(candidate);
+        static_cast<const TypeContextDescriptor *>(candidate);
       if (description && equalContexts(description, candidateDescription))
         return true;
     }
@@ -513,7 +517,7 @@ bool isRelatedType(const Metadata *type, const void *candidate,
     // If the type is a class, try its superclass.
     if (const ClassMetadata *classType = type->getClassObject()) {
       if (classHasSuperclass(classType)) {
-        type = getMetadataForClass(classType->SuperClass);
+        type = getMetadataForClass(classType->Superclass);
         continue;
       }
     }
@@ -524,15 +528,13 @@ bool isRelatedType(const Metadata *type, const void *candidate,
   return false;
 }
 
-const WitnessTable *
-swift::swift_conformsToProtocol(const Metadata * const type,
-                                const ProtocolDescriptor *protocol) {
+static const WitnessTable *
+swift_conformsToProtocolImpl(const Metadata * const type,
+                             const ProtocolDescriptor *protocol) {
   auto &C = Conformances.get();
 
   // See if we have a cached conformance. The ConcurrentMap data structure
   // allows us to insert and search the map concurrently without locking.
-  // We do lock the slow path because the SectionsToScan data structure is not
-  // concurrent.
   auto FoundConformance = searchInConformanceCache(type, protocol);
   // If the result (positive or negative) is authoritative, return it.
   if (FoundConformance.isAuthoritative)
@@ -540,48 +542,19 @@ swift::swift_conformsToProtocol(const Metadata * const type,
 
   auto failureEntry = FoundConformance.failureEntry;
 
-  // No up-to-date cache entry found.
-  // Acquire the lock so we can scan conformance records.
-  ScopedLock guard(C.SectionsToScanLock);
-
-  // The world may have changed while we waited for the lock.
-  // If we found an out-of-date negative cache entry before
-  // acquiring the lock, make sure the entry is still negative and out of date.
-  // If we found no entry before acquiring the lock, search the cache again.
-  if (failureEntry) {
-    if (failureEntry->isSuccessful()) {
-      // Somebody else found a conformance.
-      return failureEntry->getWitnessTable();
-    }
-    if (failureEntry->getFailureGeneration() == C.SectionsToScan.size()) {
-      // Somebody else brought the negative cache entry up to date.
-      return nullptr;
-    }
-  }
-  else {
-    FoundConformance = searchInConformanceCache(type, protocol);
-    if (FoundConformance.isAuthoritative) {
-      // Somebody else found a conformance or cached an up-to-date failure.
-      return FoundConformance.witnessTable;
-    }
-    failureEntry = FoundConformance.failureEntry;
-  }
-
-  // We are now caught up after acquiring the lock.
   // Prepare to scan conformance records.
-
+  auto snapshot = C.SectionsToScan.snapshot();
+  
   // Scan only sections that were not scanned yet.
   // If we found an out-of-date negative cache entry,
   // we need not to re-scan the sections that it covers.
-  unsigned startSectionIdx =
-    failureEntry ? failureEntry->getFailureGeneration() : 0;
-
-  unsigned endSectionIdx = C.SectionsToScan.size();
+  auto startIndex = failureEntry ? failureEntry->getFailureGeneration() : 0;
+  auto endIndex = snapshot.count();
 
   // If there are no unscanned sections outstanding
   // then we can cache failure and give up now.
-  if (startSectionIdx == endSectionIdx) {
-    C.cacheFailure(type, protocol);
+  if (startIndex == endIndex) {
+    C.cacheFailure(type, protocol, snapshot.count());
     return nullptr;
   }
 
@@ -602,31 +575,23 @@ swift::swift_conformsToProtocol(const Metadata * const type,
       return;
 
     case ConformanceFlags::ConformanceKind::ConditionalWitnessTableAccessor: {
-      // Note: we might end up doing more scanning for other conformances
-      // when checking the conditional requirements, so do a gross unlock/lock.
-      // FIXME: Don't do this :)
-      C.SectionsToScanLock.unlock();
       auto witnessTable = descriptor.getWitnessTable(type);
-      C.SectionsToScanLock.lock();
       if (witnessTable)
         C.cacheSuccess(type, protocol, witnessTable);
       else
-        C.cacheFailure(type, protocol);
+        C.cacheFailure(type, protocol, snapshot.count());
       return;
     }
     }
 
     // Always fail, because we cannot interpret a future conformance
     // kind.
-    C.cacheFailure(type, protocol);
+    C.cacheFailure(type, protocol, snapshot.count());
   };
 
   // Really scan conformance records.
-
-  for (unsigned sectionIdx = startSectionIdx;
-       sectionIdx < endSectionIdx;
-       ++sectionIdx) {
-    auto &section = C.SectionsToScan[sectionIdx];
+  for (size_t i = startIndex; i < endIndex; i++) {
+    auto &section = snapshot.Start[i];
     // Eagerly pull records for nondependent witnesses into our cache.
     for (const auto &record : section) {
       auto &descriptor = *record.get();
@@ -666,7 +631,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
       }
     }
   }
-
+  
   // Conformance scan is complete.
   // Search the cache once more, and this time update the cache if necessary.
 
@@ -674,7 +639,7 @@ swift::swift_conformsToProtocol(const Metadata * const type,
   if (FoundConformance.isAuthoritative) {
     return FoundConformance.witnessTable;
   } else {
-    C.cacheFailure(type, protocol);
+    C.cacheFailure(type, protocol, snapshot.count());
     return nullptr;
   }
 }
@@ -683,13 +648,7 @@ const TypeContextDescriptor *
 swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
   auto &C = Conformances.get();
 
-  ScopedLock guard(C.SectionsToScanLock);
-
-  unsigned sectionIdx = 0;
-  unsigned endSectionIdx = C.SectionsToScan.size();
-
-  for (; sectionIdx < endSectionIdx; ++sectionIdx) {
-    auto &section = C.SectionsToScan[sectionIdx];
+  for (auto &section : C.SectionsToScan.snapshot()) {
     for (const auto &record : section) {
       if (auto ntd = record->getTypeContextDescriptor()) {
         if (_contextDescriptorMatchesMangling(ntd, node))
@@ -697,7 +656,6 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
       }
     }
   }
-
   return nullptr;
 }
 
@@ -747,15 +705,16 @@ bool swift::_checkGenericRequirements(
     // Check the requirement.
     switch (req.getKind()) {
     case GenericRequirementKind::Protocol: {
-      // Look for a witness table to satisfy this conformance.
-      auto witnessTable =
-        swift_conformsToProtocol(subjectType, req.getProtocol());
-      if (!witnessTable) return true;
+      const WitnessTable *witnessTable = nullptr;
+      if (!_conformsToProtocol(nullptr, subjectType, req.getProtocol(),
+                               &witnessTable))
+        return true;
 
-      // If this requirement provides an extra argument, add the witness table
-      // as that argument.
-      if (req.getFlags().hasExtraArgument())
+      // If we need a witness table, add it.
+      if (req.getProtocol()->Flags.needsWitnessTable()) {
+        assert(witnessTable);
         extraArguments.push_back(witnessTable);
+      }
 
       continue;
     }
@@ -777,8 +736,8 @@ bool swift::_checkGenericRequirements(
     case GenericRequirementKind::Layout: {
       switch (req.getLayout()) {
       case GenericRequirementLayoutKind::Class:
-        // Check whether the subject type is a class.
-        if (!subjectType->isAnyClass()) return true;
+        if (!subjectType->satisfiesClassConstraint())
+          return true;
         continue;
       }
 
@@ -812,3 +771,6 @@ bool swift::_checkGenericRequirements(
   // Success!
   return false;
 }
+
+#define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
+#include "CompatibilityOverride.def"

@@ -106,9 +106,9 @@ do {
 }
 
 // CHECK:      dictionary bridges to {
-// CHECK-NEXT:   2 = World;
-// CHECK-NEXT:   1 = Hello;
-// CHECK-NEXT: }
+// CHECK-DAG:   1 = Hello;
+// CHECK-DAG:   2 = World;
+// CHECK: }
 do {
   var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
   let obj = _bridgeAnythingToObjectiveC(dict)
@@ -116,9 +116,9 @@ do {
 }
 
 // CHECK:      dictionary bridges to {
-// CHECK-NEXT:   2 = World;
-// CHECK-NEXT:   1 = Hello;
-// CHECK-NEXT: }
+// CHECK-DAG:   1 = Hello;
+// CHECK-DAG:   2 = World;
+// CHECK: }
 do {
   var dict2 = [1: "Hello", 2: "World"]
   let obj = _bridgeAnythingToObjectiveC(dict2)
@@ -126,9 +126,9 @@ do {
 }
 
 // CHECK: dictionary bridges to {
-// CHECK-NEXT:   2 = "(\"World\", 2)";
-// CHECK-NEXT:   1 = "(\"Hello\", 1)";
-// CHECK-NEXT: }
+// CHECK-DAG:   1 = "(\"Hello\", 1)";
+// CHECK-DAG:   2 = "(\"World\", 2)";
+// CHECK: }
 do {
   var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
   let obj = _bridgeAnythingToObjectiveC(dict3)
@@ -141,11 +141,11 @@ var dict4 = propListStr.propertyListFromStringsFileFormat()!
 var hello: NSString = "Hello"
 var world: NSString = "World"
 
-// Print out the keys. We only check one of these because the order is
-// nondeterministic.
-// CHECK: Hello
+// Print out the keys.
+// CHECK-DAG: Bridged key: Hello
+// CHECK-DAG: Bridged key: World
 for key in dict4.keys {
-  print(key.description)
+  print("Bridged key: \(key.description)")
 }
 
 // CHECK: Hello: 1

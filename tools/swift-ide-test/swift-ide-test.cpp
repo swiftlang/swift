@@ -897,6 +897,7 @@ public:
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::AttributeId: Id = "attr-id"; break;
     case SyntaxNodeKind::AttributeBuiltin: Id = "attr-builtin"; break;
     case SyntaxNodeKind::EditorPlaceholder: Id = "placeholder"; break;
@@ -927,6 +928,7 @@ public:
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::BuildConfigId: Col = llvm::raw_ostream::YELLOW; break;
+    case SyntaxNodeKind::PoundDirectiveKeyword: Col = llvm::raw_ostream::YELLOW; break;
     case SyntaxNodeKind::AttributeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::AttributeBuiltin: Col = llvm::raw_ostream::MAGENTA; break;
     case SyntaxNodeKind::EditorPlaceholder: Col = llvm::raw_ostream::YELLOW; break;
@@ -965,7 +967,8 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   Invocation.getLangOptions().Playground = Playground;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
   if (CI.setup(Invocation))
     return 1;
   if (!RunTypeChecker)
@@ -1178,7 +1181,8 @@ private:
 static int doStructureAnnotation(const CompilerInvocation &InitInvok,
                                  StringRef SourceFilename) {
   CompilerInvocation Invocation(InitInvok);
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFilename);
 
   CompilerInstance CI;
@@ -1486,11 +1490,18 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
     AccessPath.push_back(
         { Context.getIdentifier(SubModuleName), SourceLoc() });
   }
-  return Context.getModule(AccessPath);
+  ModuleDecl *Result = Context.getModule(AccessPath);
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  return Context.getModule(std::make_pair(ModuleName, SourceLoc()));
+  ModuleDecl *Result = Context.getModule(std::make_pair(ModuleName,
+                                                        SourceLoc()));
+  if (!Result || Result->failedToLoad())
+    return nullptr;
+  return Result;
 }
 
 static int doPrintAST(const CompilerInvocation &InitInvok,
@@ -1609,18 +1620,21 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       case NodeKind::Structure:
       case NodeKind::Class:
       case NodeKind::Enum:
+      case NodeKind::OtherNominalType:
         break;
 
       case NodeKind::BoundGenericStructure:
       case NodeKind::BoundGenericClass:
       case NodeKind::BoundGenericEnum:
+      case NodeKind::BoundGenericOtherNominalType:
         // Base type
         typeNode = node->getFirstChild();
         // Nominal type
         node = typeNode->getFirstChild();
         assert(node->getKind() == NodeKind::Structure ||
                node->getKind() == NodeKind::Class ||
-               node->getKind() == NodeKind::Enum);
+               node->getKind() == NodeKind::Enum ||
+               node->getKind() == NodeKind::OtherNominalType);
         break;
 
       default:
@@ -1700,18 +1714,18 @@ public:
       printDeclPost(D, None);
   }
 
-
   void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    const NominalTypeDecl *NTD,
+                                    TypeOrExtensionDecl Target,
                                     Optional<BracketOptions> Bracket) override {
     if (Bracket.hasValue() && !Bracket.getValue().shouldOpenExtension(ED))
       return;
     OS << "<synthesized>";
   }
 
-  void printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                     const NominalTypeDecl *NTD,
-                                     Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPost(const ExtensionDecl *ED,
+                                TypeOrExtensionDecl Target,
+                                Optional<BracketOptions> Bracket) override {
     if (Bracket.hasValue() && !Bracket.getValue().shouldCloseExtension(ED))
       return;
     OS << "</synthesized>";
@@ -2695,7 +2709,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(SourceFileName);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
 
   CompilerInstance CI;
 
@@ -2920,7 +2935,8 @@ static int doTestCompilerInvocationFromModule(StringRef ModuleFilePath) {
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
 
   if (argc > 1) {
     // Handle integrated test tools which do not use
@@ -3017,7 +3033,8 @@ int main(int argc, char *argv[]) {
   InitInvok.setModuleName(options::ModuleName);
 
   InitInvok.setSDKPath(options::SDK);
-  InitInvok.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  InitInvok.getLangOptions().CollectParsedToken = true;
+  InitInvok.getLangOptions().BuildSyntaxTree = true;
   if (options::DisableObjCInterop) {
     InitInvok.getLangOptions().EnableObjCInterop = false;
   } else if (options::EnableObjCInterop) {

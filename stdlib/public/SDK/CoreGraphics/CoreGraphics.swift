@@ -29,7 +29,7 @@ extension CGAffineTransform: Equatable {
 //===----------------------------------------------------------------------===//
 
 extension CGColor {
-  @available(OSX 10.3, iOS 2.0, *)
+  @available(macOS 10.3, iOS 2.0, *)
   public var components: [CGFloat]? {
     guard let pointer = self.__unsafeComponents else { return nil }
     let buffer = UnsafeBufferPointer(start: pointer, count: self.numberOfComponents)
@@ -69,7 +69,8 @@ extension CGColor : _CGColorInitTrampoline, _ExpressibleByColorLiteral { }
 extension CGColorSpace {
   public var colorTable: [UInt8]? {
     guard self.model == .indexed else { return nil }
-    var table = [UInt8](repeating: 0, count: self.__colorTableCount)
+    let components = self.baseColorSpace?.numberOfComponents ?? 1
+    var table = [UInt8](repeating: 0, count: self.__colorTableCount * components)
     self.__unsafeGetColorTable(&table)
     return table
   }
@@ -232,6 +233,7 @@ extension CGPoint : CustomReflectable, CustomPlaygroundQuickLookable {
     return Mirror(self, children: ["x": x, "y": y], displayStyle: .`struct`)
   }
 
+  @available(*, deprecated, message: "CGPoint.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .point(Double(x), Double(y))
   }
@@ -299,6 +301,7 @@ extension CGSize : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
+  @available(*, deprecated, message: "CGSize.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .size(Double(width), Double(height))
   }
@@ -436,6 +439,7 @@ extension CGRect : CustomReflectable, CustomPlaygroundQuickLookable {
       displayStyle: .`struct`)
   }
 
+  @available(*, deprecated, message: "CGRect.customPlaygroundQuickLook will be removed in a future Swift version")
   public var customPlaygroundQuickLook: PlaygroundQuickLook {
     return .rectangle(
       Double(origin.x), Double(origin.y),

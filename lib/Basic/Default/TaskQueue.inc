@@ -99,7 +99,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
     bool ExecutionFailed = false;
     ProcessInfo PI = ExecuteNoWait(T->ExecPath, Argv.data(),
                                    (const char **)envp,
-                                   /*redirects*/nullptr, /*memoryLimit*/0,
+                                   /*redirects*/None, /*memoryLimit*/0,
                                    /*ErrMsg*/nullptr, &ExecutionFailed);
     if (ExecutionFailed) {
       return true;
@@ -117,7 +117,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // a signal during execution.
       if (Signalled) {
         TaskFinishedResponse Response =
-            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None);
+            Signalled(PI.Pid, ErrMsg, StringRef(), StringRef(), T->Context, None, TaskProcessInformation(PI.Pid));
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else {
         // If we don't have a Signalled callback, unconditionally stop.
@@ -128,7 +128,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
       // finished.
       if (Finished) {
         TaskFinishedResponse Response = Finished(PI.Pid, PI.ReturnCode,
-        StringRef(), StringRef(), T->Context);
+        StringRef(), StringRef(), TaskProcessInformation(PI.Pid), T->Context);
         ContinueExecution = Response != TaskFinishedResponse::StopExecution;
       } else if (PI.ReturnCode != 0) {
         ContinueExecution = false;

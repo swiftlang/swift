@@ -382,22 +382,49 @@ public:
   }
 
   Pattern *convertBindingsToOptionalSome(Expr *E) {
-    auto *Bind = dyn_cast<BindOptionalExpr>(E->getSemanticsProvidingExpr());
-    if (!Bind) return getSubExprPattern(E);
+    auto *expr = E->getSemanticsProvidingExpr();
+    auto *bindExpr = dyn_cast<BindOptionalExpr>(expr);
+    if (!bindExpr) {
+      // Let's see if this expression prefixed with any number of '?'
+      // has any other disjoint 'BindOptionalExpr' inside of it, if so,
+      // we need to wrap such sub-expression into `OptionalEvaluationExpr`.
+      bool hasDisjointChaining = false;
+      expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+        // If there is `OptionalEvaluationExpr` in the AST
+        // it means that all of possible `BindOptionalExpr`
+        // which follow are covered by it.
+        if (isa<OptionalEvaluationExpr>(subExpr))
+          return nullptr;
 
-    auto sub = convertBindingsToOptionalSome(Bind->getSubExpr());
-    return new (TC.Context) OptionalSomePattern(sub, Bind->getQuestionLoc());
+        if (isa<BindOptionalExpr>(subExpr)) {
+          hasDisjointChaining = true;
+          return nullptr;
+        }
+
+        return subExpr;
+      });
+
+      if (hasDisjointChaining)
+        E = new (TC.Context) OptionalEvaluationExpr(E);
+
+      return getSubExprPattern(E);
+    }
+
+    auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
+    return new (TC.Context) OptionalSomePattern(subExpr,
+                                                bindExpr->getQuestionLoc());
   }
 
   // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
   // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
   Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
+    auto *subExpr = E->getSubExpr();
     // We only handle the case where one or more bind expressions are subexprs
     // of the optional evaluation.  Other cases are not simple postfix ?'s.
-    if (!isa<BindOptionalExpr>(E->getSubExpr()->getSemanticsProvidingExpr()))
+    if (!isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
       return nullptr;
 
-    return convertBindingsToOptionalSome(E->getSubExpr());
+    return convertBindingsToOptionalSome(subExpr);
   }
 
 
@@ -410,6 +437,9 @@ public:
       subPattern = getSubExprPattern(arg);
     }
     
+    if (ume->getName().getBaseName().isSpecial())
+      return nullptr;
+
     // FIXME: Compound names.
     return new (TC.Context) EnumElementPattern(
                               ume->getDotLoc(),
@@ -760,10 +790,8 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     // If the param is not a 'let' and it is not an 'inout'.
     // It must be a 'var'. Provide helpful diagnostics like a shadow copy
     // in the function body to fix the 'var' attribute.
-    if (!decl->isLet() &&
-        !decl->isImplicit() &&
-        (Ty.isNull() || !Ty->is<InOutType>()) &&
-        !hadError) {
+    if (!decl->isImmutable() && !decl->isImplicit() &&
+        (Ty.isNull() || !Ty->is<InOutType>()) && !hadError) {
       decl->setInvalid();
       hadError = true;
     }
@@ -773,6 +801,25 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
     TL.setType(ErrorType::get(TC.Context), /*validated*/true);
 
   return hadError;
+}
+
+/// Request nominal layout for any types that could be sources of typemetadata
+/// or conformances.
+void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
+    ParameterList *PL) {
+  for (auto param : *PL) {
+    if (!param->hasType())
+      continue;
+
+    // Generic types are sources for typemetadata and conformances. If a
+    // parameter is of dependent type then the body of a function with said
+    // parameter could potentially require the generic type's layout to
+    // recover them.
+    if (auto *nominalDecl = dyn_cast_or_null<NominalTypeDecl>(
+            param->getType()->getAnyGeneric())) {
+      requestNominalLayout(nominalDecl);
+    }
+  }
 }
 
 /// Type check a parameter list.
@@ -820,6 +867,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
         param->setSpecifier(VarDecl::Specifier::InOut);
       } else if (isa<SharedTypeRepr>(typeRepr)) {
         param->setSpecifier(VarDecl::Specifier::Shared);
+      } else if (isa<OwnedTypeRepr>(typeRepr)) {
+        param->setSpecifier(VarDecl::Specifier::Owned);
       }
     }
   }
@@ -827,6 +876,17 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   return hadError;
 }
 
+bool TypeChecker::typeCheckParameterLists(AbstractFunctionDecl *fd,
+                                          GenericTypeResolver &resolver) {
+  bool hadError = false;
+  for (auto paramList : fd->getParameterLists()) {
+    hadError |= typeCheckParameterList(paramList, fd,
+                                       TypeResolutionOptions(),
+                                       resolver);
+  }
+
+  return hadError;
+}
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
@@ -1053,7 +1113,7 @@ recur:
       var->setInterfaceType(type->mapTypeOutOfContext());
 
     checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<OwnershipAttr>())
+    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
       type = var->getType()->getReferenceStorageReferent();
     else if (!var->isInvalid())
       type = var->getType();
@@ -1067,7 +1127,7 @@ recur:
     // case, they probably didn't mean to bind to a variable, or there is some
     // other bug.  We always tell them that they can silence the warning with an
     // explicit type annotation (and provide a fixit) as a note.
-    Type diagTy = type->getAnyOptionalObjectType();
+    Type diagTy = type->getOptionalObjectType();
     if (!diagTy) diagTy = type;
     
     bool shouldRequireType = false;
@@ -1190,11 +1250,10 @@ recur:
     }
 
     // case nil is equivalent to .none when switching on Optionals.
-    OptionalTypeKind Kind;
-    if (type->getAnyOptionalObjectType(Kind)) {
+    if (type->getOptionalObjectType()) {
       auto EP = cast<ExprPattern>(P);
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
-        auto *NoneEnumElement = Context.getOptionalNoneDecl(Kind);
+        auto *NoneEnumElement = Context.getOptionalNoneDecl();
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
                                              NLE->getLoc(), NLE->getLoc(),
                                              NoneEnumElement->getName(),
@@ -1221,9 +1280,9 @@ recur:
 
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
-    type->lookThroughAllAnyOptionalTypes(inputTypeOptionals);
+    type->lookThroughAllOptionalTypes(inputTypeOptionals);
     SmallVector<Type, 2> castTypeOptionals;
-    castType->lookThroughAllAnyOptionalTypes(castTypeOptionals);
+    castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
     // If we have extra optionals on the input type. Create ".Some" patterns
     // wrapping the isa pattern to balance out the optionals.
@@ -1324,9 +1383,10 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(EEP->getLoc(), diag::availability_decl_unavailable_rename,
-                          EEP->getName(), /*replaced*/false,
-                          /*special kind*/0, Rename.str())
+              diagnose(EEP->getLoc(),
+                       diag::availability_decl_unavailable_rename,
+                       /*"getter" prefix*/2, EEP->getName(), /*replaced*/false,
+                       /*special kind*/0, Rename.str())
                 .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;
@@ -1482,8 +1542,7 @@ recur:
 
   case PatternKind::OptionalSome: {
     auto *OP = cast<OptionalSomePattern>(P);
-    OptionalTypeKind optionalKind;
-    Type elementType = type->getAnyOptionalObjectType(optionalKind);
+    Type elementType = type->getOptionalObjectType();
 
     if (elementType.isNull()) {
       auto diagID = diag::optional_element_pattern_not_valid_type;
@@ -1498,7 +1557,7 @@ recur:
       return true;
     }
 
-    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl(optionalKind);
+    EnumElementDecl *elementDecl = Context.getOptionalSomeDecl();
     if (!elementDecl)
       return true;
 
@@ -1533,8 +1592,14 @@ recur:
 ///
 bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
                                             AnyFunctionType *FN) {
-  Type paramListType = FN->getInput();
-  bool hadError = paramListType->hasError();
+  llvm::SmallVector<AnyFunctionType::Param, 4> params;
+  params.reserve(FN->getNumParams());
+
+  bool hadError = false;
+  for (const auto &param : FN->getParams()) {
+    params.push_back(param);
+    hadError |= param.getType()->hasError();
+  }
 
   // Local function to check if the given type is valid e.g. doesn't have
   // errors, type variables or unresolved types related to it.
@@ -1572,7 +1637,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       // Coerce explicitly specified argument type to contextual type
       // only if both types are valid and do not match.
       if (!hadError && isValidType(ty) && !ty->isEqual(paramType)) {
-        assert(!param->isLet() || !ty->is<InOutType>());
+        assert(!param->isImmutable() || !ty->is<InOutType>());
         param->setType(ty->getInOutObjectType());
         param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
       }
@@ -1592,7 +1657,7 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      assert(!param->isLet() || !ty->is<InOutType>());
+      assert(!param->isImmutable() || !ty->is<InOutType>());
       param->setType(ty->getInOutObjectType());
       param->setInterfaceType(ty->mapTypeOutOfContext()->getInOutObjectType());
     }
@@ -1601,45 +1666,66 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     return hadError;
   };
 
-  // Check if paramListType only contains one single tuple.
-  // If it is, then paramListType would be sugared ParenType
+  auto hasParenSugar = [](ArrayRef<AnyFunctionType::Param> params) -> bool {
+    if (params.size() == 1) {
+      const auto &param = params.front();
+      return !param.hasLabel() && !param.isVariadic();
+    }
+
+    return false;
+  };
+
+  auto getType = [](const AnyFunctionType::Param &param) -> Type {
+    auto type = param.getPlainType();
+
+    if (param.isInOut())
+      return InOutType::get(type);
+
+    if (param.isVariadic())
+      return ArraySliceType::get(type);
+
+    return type;
+  };
+
+  // Check if parameter list only contains one single tuple.
+  // If it is, then parameter type would be sugared ParenType
   // with a single underlying TupleType. In that case, check if
   // the closure argument is also one to avoid the tuple splat
   // from happening.
-  if (!hadError && paramListType->hasParenSugar()) {
-    auto underlyingTy = cast<ParenType>(paramListType.getPointer())
-      ->getUnderlyingType();
-    
+  if (!hadError && hasParenSugar(params)) {
+    auto underlyingTy = params.front().getType();
+
     if (underlyingTy->is<TupleType>() &&
         !underlyingTy->castTo<TupleType>()->getVarArgsBaseType()) {
       if (P->size() == 1)
         return handleParameter(P->get(0), underlyingTy, /*mutable*/false);
     }
-    
-    //pass
+
+    // pass (strip paren sugar)
+    params.clear();
+    FunctionType::decomposeInput(underlyingTy, params);
   }
-  
+
   // The context type must be a tuple.
-  TupleType *tupleTy = paramListType->getAs<TupleType>();
-  if (!tupleTy && !hadError) {
+  if (hasParenSugar(params) && !hadError) {
+    const auto &param = params.front();
     if (P->size() == 1) {
-      assert(P->size() == FN->getParams().size());
-      return handleParameter(P->get(0), paramListType,
-                             /*mutable*/FN->getParams().front().isInOut());
+      assert(P->size() == params.size());
+      return handleParameter(P->get(0), getType(param),
+                             /*mutable*/ param.isInOut());
     }
     diagnose(P->getStartLoc(), diag::tuple_pattern_in_non_tuple_context,
-             paramListType);
+             param.getType());
     hadError = true;
   }
   
   // The number of elements must match exactly.
   // TODO: incomplete tuple patterns, with some syntax.
-  if (!hadError && tupleTy->getNumElements() != P->size()) {
-    auto fnType = FunctionType::get(paramListType->getDesugaredType(),
-                                    FN->getResult());
-    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple,
-             fnType, tupleTy->getNumElements(),
-             P->size(), (P->size() == 1));
+  if (!hadError && params.size() != P->size()) {
+    auto fnType =
+        FunctionType::get(params, FN->getResult(), FunctionType::ExtInfo());
+    diagnose(P->getStartLoc(), diag::closure_argument_list_tuple, fnType,
+             params.size(), P->size(), (P->size() == 1));
     hadError = true;
   }
 
@@ -1652,8 +1738,8 @@ bool TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (hadError) {
       CoercionType = ErrorType::get(Context);
     } else {
-      CoercionType = tupleTy->getElement(i).getType();
-      isMutableParam = tupleTy->getElement(i).isInOut();
+      CoercionType = getType(params[i]);
+      isMutableParam = params[i].isInOut();
     }
     
     assert(param->getArgumentName().empty() &&

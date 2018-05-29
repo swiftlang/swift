@@ -41,7 +41,7 @@ String(4.0)  // CHECK: String = "4.0"
 
 123 .
 hashValue
-// CHECK: Int = 123{{$}}
+// CHECK: Int = {{-?[0-9]+$}}
 
 // Check that we handle unmatched parentheses in REPL.
 1+1)

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 import Builtin
 import Swift
@@ -27,7 +27,7 @@ struct Big<T: SomeClass> {
 
 sil @make_big : $<T: SomeClass> () -> (@owned Big<T>)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %T14yield_once_big3BigV* } @test_simple
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %T14yield_once_big3BigV* } @test_simple
 // CHECK-32-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:16]]), %swift.type* %C)
 // CHECK-64-SAME:  (i8* noalias dereferenceable([[BUFFER_SIZE:32]]), %swift.type* %C)
 sil @test_simple : $@yield_once <C: SomeClass> () -> (@yields @owned Big<C>) {
@@ -85,10 +85,10 @@ unwind:
   // CHECK-NEXT:    unreachable
 }
 
-// CHECK-LABEL:     declare{{( protected)?}} swiftcc void @"$S14yield_once_big9SomeClassCRbzlIet_TC"
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$S14yield_once_big9SomeClassCRbzlIet_TC"
 // CHECK-SAME:      (i8* noalias dereferenceable([[BUFFER_SIZE]]), i1)
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @test_simple_call(i1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1)
 sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
@@ -96,7 +96,8 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], {{\[}}[[BUFFER_SIZE]] x i8]* [[T0]], i32 0, i32 0
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0i8(i64 [[BUFFER_SIZE]], i8* [[BUFFER]])
 
-  // CHECK-NEXT:    [[SUBCLASS:%.*]] = call %swift.type* @"$S14yield_once_big12SomeSubclassCMa"()
+  // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S14yield_once_big12SomeSubclassCMa"([[INT]] 0)
+  // CHECK-NEXT:    [[SUBCLASS:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 
   //   Prepare the continuation function pointer to block analysis.
   // CHECK-NEXT:    [[T0:%.*]] = call i8* @llvm.coro.prepare.retcon(i8* bitcast ([[ORIG_CORO_T:.*]] @test_simple to i8*))

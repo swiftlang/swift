@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -100,15 +101,24 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
         Kind = SyntaxNodeKind::Keyword;
         break;
 
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg) \
-      case tok::pound_##Name:
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
         LiteralStartLoc = Loc;
         continue;
 
+#define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
+#include "swift/Syntax/TokenKinds.def"
+        Kind = SyntaxNodeKind::BuildConfigKeyword;
+        break;
+
+#define POUND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
+#define POUND_COND_DIRECTIVE_KEYWORD(Name)
+#include "swift/Syntax/TokenKinds.def"
+        Kind = SyntaxNodeKind::PoundDirectiveKeyword;
+        break;
+
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)
-#define POUND_OLD_OBJECT_LITERAL(Name, NewName, OldArg, NewArg)
+#define POUND_DIRECTIVE_KEYWORD(Name)
 #define POUND_KEYWORD(Name) case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
         Kind = SyntaxNodeKind::Keyword;
@@ -196,7 +206,7 @@ SyntaxModelContext::~SyntaxModelContext() {
 
 namespace {
 
-typedef ASTWalker::ParentTy ASTNodeType;
+using ASTNodeType = ASTWalker::ParentTy;
 
 struct StructureElement {
   SyntaxStructureNode StructureNode;
@@ -277,7 +287,7 @@ private:
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
 
-  typedef std::pair<const DeclAttribute *, SourceRange> DeclAttributeAndRange;
+  using DeclAttributeAndRange = std::pair<const DeclAttribute *, SourceRange>;
 
   bool handleSpecialDeclAttribute(const DeclAttribute *Decl,
                                   ArrayRef<Token> Toks);
@@ -668,11 +678,16 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
     }
 
   } else if (auto *DeferS = dyn_cast<DeferStmt>(S)) {
+    // Since 'DeferStmt::getTempDecl()' is marked as implicit, we manually walk
+    // into the body.
     if (auto *FD = DeferS->getTempDecl()) {
       auto *RetS = FD->getBody()->walk(*this);
-      // Already walked children.
-      return { false, RetS };
+      assert(RetS == FD->getBody());
+      (void)RetS;
+      walkToStmtPost(DeferS);
     }
+    // Already walked children.
+    return { false, DeferS };
   }
 
   return { true, S };
@@ -816,17 +831,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
 
   } else if (auto *ConfigD = dyn_cast<IfConfigDecl>(D)) {
     for (auto &Clause : ConfigD->getClauses()) {
-      unsigned TokLen;
-      if (&Clause == &*ConfigD->getClauses().begin())
-        TokLen = 3; // '#if'
-      else if (Clause.Cond == nullptr)
-        TokLen = 5; // '#else'
-      else
-        TokLen = 7; // '#elseif'
-      if (!passNonTokenNode({SyntaxNodeKind::BuildConfigKeyword,
-                            CharSourceRange(Clause.Loc, TokLen) }))
-        return false;
-      
       if (Clause.Cond && !annotateIfConfigConditionIdentifiers(Clause.Cond))
         return false;
 
@@ -841,11 +845,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         VisitedNodesInsideIfConfig.insert(Element);
       }
     }
-    
-    if (!ConfigD->hadMissingEnd())
-      if (!passNonTokenNode({ SyntaxNodeKind::BuildConfigKeyword,
-            CharSourceRange(ConfigD->getEndLoc(), 6/*'#endif'*/) }))
-        return false;
 
   } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
     SyntaxStructureNode SN;
@@ -877,8 +876,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
         SN.Kind = SyntaxStructureKind::EnumElement;
         SN.Range = charSourceRangeFromSourceRange(SM,
                                                   EnumElemD->getSourceRange());
-        SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
-                                       EnumElemD->getName().getLength());
+        if (auto ParamList = EnumElemD->getParameterList()) {
+          SourceRange NameRange = SourceRange(EnumElemD->getNameLoc(),
+                                              ParamList->getSourceRange().End);
+          SN.NameRange = charSourceRangeFromSourceRange(SM, NameRange);
+        } else {
+          SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+                                         EnumElemD->getName().getLength());
+        }
+
         if (auto *E = EnumElemD->getRawValueExpr()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,

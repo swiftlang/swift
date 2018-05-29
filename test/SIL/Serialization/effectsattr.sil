@@ -27,3 +27,9 @@ bb0:
   return %0 : $()
 }
 
+//CHECK: [releasenone] @function4
+sil [releasenone] @function4 : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

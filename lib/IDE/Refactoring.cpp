@@ -30,6 +30,7 @@
 #include "swift/Subsystems.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -195,7 +196,8 @@ private:
     size_t Colon = Content.find(':'); // FIXME: leading whitespace?
     if (Colon == StringRef::npos) {
       assert(Content.empty());
-      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined, NameIndex);
+      doRenameLabel(Range, RefactoringRangeKind::CallArgumentCombined,
+                    NameIndex);
       return;
     }
 
@@ -313,6 +315,14 @@ public:
     bool IsSubscript = Old.base() == "subscript" && Config.IsFunctionLike;
     bool IsInit = Old.base() == "init" && Config.IsFunctionLike;
     bool IsKeywordBase = IsInit || IsSubscript;
+    
+    // Filter out non-semantic keyword basename locations with no labels.
+    // We've already filtered out those in active code, so these are
+    // any appearance of just 'init' or 'subscript' in strings, comments, and
+    // inactive code.
+    if (IsKeywordBase && (Config.Usage == NameUsage::Unknown &&
+                           Resolved.LabelType == LabelRangeType::None))
+      return RegionType::Unmatched;
 
     if (!Config.IsFunctionLike || !IsKeywordBase) {
       if (renameBase(Resolved.Range, RefactoringRangeKind::BaseName))
@@ -352,7 +362,8 @@ public:
                         Resolved.LabelType == LabelRangeType::CallArg;
 
       if (renameLabels(Resolved.LabelRanges, Resolved.LabelType, isCallSite))
-        return RegionType::Mismatch;
+        return Config.Usage == NameUsage::Unknown ?
+            RegionType::Unmatched : RegionType::Mismatch;
     }
 
     return RegionKind;
@@ -895,6 +906,15 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
   if (llvm::any_of(RangeInfo.ContainedNodes,
                   [](ASTNode N) { return N.isStmt(StmtKind::Guard); })) {
     return ExtractCheckResult();
+  }
+
+  // Disallow extracting certain kinds of statements.
+  if (RangeInfo.Kind == RangeKind::SingleStatement) {
+    Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
+
+    // These aren't independent statement.
+    if (isa<BraceStmt>(S) || isa<CatchStmt>(S) || isa<CaseStmt>(S))
+      return ExtractCheckResult();
   }
 
   // Disallow extracting literals.
@@ -1501,37 +1521,36 @@ bool RefactoringActionExtractRepeatedExpr::performChange() {
                                           EditConsumer).performChange();
 }
 
-// Compute a decl context that is the parent context for all decls in
-// \c DeclaredDecls. Return \c nullptr if no such context exists.
-DeclContext *getCommonDeclContext(ArrayRef<DeclaredDecl> DeclaredDecls) {
-  if (DeclaredDecls.empty())
-    return nullptr;
-
-  DeclContext *CommonDC = DeclaredDecls.front().VD->getDeclContext();
-  for (auto DD : DeclaredDecls) {
-    auto OtherDC = DD.VD->getDeclContext();
-    CommonDC = DeclContext::getCommonParentContext(CommonDC, OtherDC);
-  }
-  return CommonDC;
-}
 
 bool RefactoringActionMoveMembersToExtension::isApplicable(
     ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
   switch (Info.Kind) {
   case RangeKind::SingleDecl:
   case RangeKind::MultiTypeMemberDecl: {
-    DeclContext *CommonDC = getCommonDeclContext(Info.DeclaredDecls);
+    DeclContext *DC = Info.RangeContext;
 
     // The the common decl context is not a nomial type, we cannot create an
     // extension for it
-    if (!CommonDC || !CommonDC->getInnermostDeclarationDeclContext() ||
-        !isa<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext()))
+    if (!DC || !DC->getInnermostDeclarationDeclContext() ||
+        !isa<NominalTypeDecl>(DC->getInnermostDeclarationDeclContext()))
       return false;
+
 
     // Members of types not declared at top file level cannot be extracted
     // to an extension at top file level
-    if (CommonDC->getParent()->getContextKind() != DeclContextKind::FileUnit)
+    if (DC->getParent()->getContextKind() != DeclContextKind::FileUnit)
       return false;
+
+    // Check if contained nodes are all allowed decls.
+    for (auto Node : Info.ContainedNodes) {
+      Decl *D = Node.dyn_cast<Decl*>();
+      if (!D)
+        return false;
+
+      if (isa<AccessorDecl>(D) || isa<DestructorDecl>(D) ||
+          isa<EnumCaseDecl>(D) || isa<EnumElementDecl>(D))
+        return false;
+    }
 
     // We should not move instance variables with storage into the extension
     // because they are not allowed to be declared there
@@ -1539,7 +1558,7 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
       if (auto ASD = dyn_cast<AbstractStorageDecl>(DD.VD)) {
         // Only disallow storages in the common decl context, allow them in
         // any subtypes
-        if (ASD->hasStorage() && ASD->getDeclContext() == CommonDC) {
+        if (ASD->hasStorage() && ASD->getDeclContext() == DC) {
           return false;
         }
       }
@@ -1557,10 +1576,10 @@ bool RefactoringActionMoveMembersToExtension::isApplicable(
 }
 
 bool RefactoringActionMoveMembersToExtension::performChange() {
-  DeclContext *CommonDC = getCommonDeclContext(RangeInfo.DeclaredDecls);
+  DeclContext *DC = RangeInfo.RangeContext;
 
   auto CommonTypeDecl =
-      dyn_cast<NominalTypeDecl>(CommonDC->getInnermostDeclarationDeclContext());
+      dyn_cast<NominalTypeDecl>(DC->getInnermostDeclarationDeclContext());
   assert(CommonTypeDecl && "Not applicable if common parent is no nomial type");
 
   SmallString<64> Buffer;
@@ -1577,109 +1596,141 @@ bool RefactoringActionMoveMembersToExtension::performChange() {
   return false;
 }
 
-struct CollapsibleNestedIfInfo {
-  IfStmt *OuterIf;
-  IfStmt *InnerIf;
-  bool FinishedOuterIf;
-  bool FoundNonCollapsibleItem;
-  CollapsibleNestedIfInfo():
-    OuterIf(nullptr), InnerIf(nullptr),
-    FinishedOuterIf(false), FoundNonCollapsibleItem(false) {}
-  bool isValid() {
-    return OuterIf && InnerIf && FinishedOuterIf && !FoundNonCollapsibleItem;
+namespace {
+// A SingleDecl range may not include all decls actually declared in that range:
+// a var decl has accessors that aren't included. This will find those missing
+// decls.
+class FindAllSubDecls : public SourceEntityWalker {
+  llvm::SmallPtrSetImpl<Decl *> &Found;
+  public:
+  FindAllSubDecls(llvm::SmallPtrSetImpl<Decl *> &found)
+    : Found(found) {}
+
+  bool walkToDeclPre(Decl *D, CharSourceRange range) {
+    // Record this Decl, and skip its contents if we've already touched it.
+    if (!Found.insert(D).second)
+      return false;
+
+    if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
+      llvm::SmallVector<Decl *, 6> accessors;
+      ASD->getAllAccessorFunctions(accessors);
+      Found.insert(accessors.begin(), accessors.end());
+    }
+    return true;
   }
 };
+}
+bool RefactoringActionReplaceBodiesWithFatalError::isApplicable(
+  ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  switch (Info.Kind) {
+  case RangeKind::SingleDecl:
+  case RangeKind::MultiTypeMemberDecl: {
+    llvm::SmallPtrSet<Decl *, 16> Found;
+    for (auto decl : Info.DeclaredDecls) {
+      FindAllSubDecls(Found).walk(decl.VD);
+    }
+    for (auto decl : Found) {
+      auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+      if (AFD && !AFD->isImplicit())
+        return true;
+    }
 
-static CollapsibleNestedIfInfo findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
+    return false;
+ }
+  case RangeKind::SingleExpression:
+  case RangeKind::PartOfExpression:
+  case RangeKind::SingleStatement:
+  case RangeKind::MultiStatement:
+  case RangeKind::Invalid:
+    return false;
+  }
+}
+
+bool RefactoringActionReplaceBodiesWithFatalError::performChange() {
+  const StringRef replacement = "{\nfatalError()\n}";
+  llvm::SmallPtrSet<Decl *, 16> Found;
+  for (auto decl : RangeInfo.DeclaredDecls) {
+    FindAllSubDecls(Found).walk(decl.VD);
+  }
+  for (auto decl : Found) {
+    auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || AFD->isImplicit())
+      continue;
+
+    auto range = AFD->getBodySourceRange();
+    // If we're in replacement mode (i.e. have an edit consumer), we can
+    // rewrite the function body.
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+    EditConsumer.accept(SM, charRange, replacement);
+
+  }
+  return false;
+}
+
+static std::pair<IfStmt *, IfStmt *>
+findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
   if (CursorInfo.Kind != CursorInfoKind::StmtStart)
-    return CollapsibleNestedIfInfo();
-  struct IfStmtFinder: public SourceEntityWalker {
-    SourceLoc StartLoc;
-    CollapsibleNestedIfInfo IfInfo;
-    IfStmtFinder(SourceLoc StartLoc): StartLoc(StartLoc), IfInfo() {}
-    bool finishedInnerIfButNotFinishedOuterIf() {
-      return IfInfo.InnerIf && !IfInfo.FinishedOuterIf;
-    }
-    bool walkToStmtPre(Stmt *S) {
-      if (finishedInnerIfButNotFinishedOuterIf()) {
-        IfInfo.FoundNonCollapsibleItem = true;
-        return false;
-      }
+    return {};
 
-      bool StmtIsOuterIfBrace =
-        IfInfo.OuterIf && !IfInfo.InnerIf && S->getKind() == StmtKind::Brace;
-      if (StmtIsOuterIfBrace) {
-        return true;
-      }
+  // Ensure the statement is 'if' statement. It must not have 'else' clause.
+  IfStmt *OuterIf = dyn_cast<IfStmt>(CursorInfo.TrailingStmt);
+  if (!OuterIf)
+    return {};
+  if (OuterIf->getElseStmt())
+    return {};
 
-      auto *IFS = dyn_cast<IfStmt>(S);
-      if (!IFS) {
-        return false;
-      }
-      if (!IfInfo.OuterIf) {
-        IfInfo.OuterIf = IFS;
-        return true;
-      } else {
-        IfInfo.InnerIf = IFS;
-        return false;
-      }
-    }
-    bool walkToStmtPost(Stmt *S) {
-      assert(S != IfInfo.InnerIf && "Should not traverse inner if statement");
-      if (S == IfInfo.OuterIf) {
-        IfInfo.FinishedOuterIf = true;
-      }
-      return true;
-    }
-    bool walkToDeclPre(Decl *D, CharSourceRange Range) {
-      if (finishedInnerIfButNotFinishedOuterIf()) {
-        IfInfo.FoundNonCollapsibleItem = true;
-        return false;
-      }
-      return true;
-    }
-    bool walkToExprPre(Expr *E) {
-      if (finishedInnerIfButNotFinishedOuterIf()) {
-        IfInfo.FoundNonCollapsibleItem = true;
-        return false;
-      }
-      return true;
-    }
+  // The body must contain a sole inner 'if' statement.
+  auto Body = dyn_cast_or_null<BraceStmt>(OuterIf->getThenStmt());
+  if (!Body || Body->getNumElements() != 1)
+    return {};
 
-  } Walker(CursorInfo.TrailingStmt->getStartLoc());
-  Walker.walk(CursorInfo.TrailingStmt);
-  return Walker.IfInfo;
+  IfStmt *InnerIf =
+      dyn_cast_or_null<IfStmt>(Body->getElement(0).dyn_cast<Stmt *>());
+  if (!InnerIf)
+    return {};
+
+  // Inner 'if' statement also cannot have 'else' clause.
+  if (InnerIf->getElseStmt())
+    return {};
+
+  return {OuterIf, InnerIf};
 }
 
-bool RefactoringActionCollapseNestedIfExpr::
-isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
-  return findCollapseNestedIfTarget(Tok).isValid();
+bool RefactoringActionCollapseNestedIfStmt::
+isApplicable(ResolvedCursorInfo CursorInfo, DiagnosticEngine &Diag) {
+  return findCollapseNestedIfTarget(CursorInfo).first;
 }
 
-bool RefactoringActionCollapseNestedIfExpr::performChange() {
+bool RefactoringActionCollapseNestedIfStmt::performChange() {
   auto Target = findCollapseNestedIfTarget(CursorInfo);
-  if (!Target.isValid())
+  if (!Target.first)
     return true;
-  auto OuterIfConds = Target.OuterIf->getCond().vec();
-  auto InnerIfConds = Target.InnerIf->getCond().vec();
+  auto OuterIf = Target.first;
+  auto InnerIf = Target.second;
 
-  EditorConsumerInsertStream OS(EditConsumer, SM,
-    Lexer::getCharSourceRangeFromSourceRange(
-    SM, Target.OuterIf->getSourceRange()));
+  EditorConsumerInsertStream OS(
+      EditConsumer, SM,
+      Lexer::getCharSourceRangeFromSourceRange(SM, OuterIf->getSourceRange()));
 
-  OS << tok::kw_if << " ";
-  for (auto CI = OuterIfConds.begin(); CI != OuterIfConds.end(); ++CI) {
-    OS << (CI != OuterIfConds.begin() ? ", " : "");
-    OS << Lexer::getCharSourceRangeFromSourceRange(
-      SM, CI->getSourceRange()).str();
+  OS << tok::kw_if << " "; 
+
+  // Emit conditions.
+  bool first = true;
+  for (auto &C : llvm::concat<StmtConditionElement>(OuterIf->getCond(),
+                                                    InnerIf->getCond())) {
+    if (first)
+      first = false;
+    else
+      OS << ", ";
+    OS << Lexer::getCharSourceRangeFromSourceRange(SM, C.getSourceRange())
+              .str();
   }
-  for (auto CI = InnerIfConds.begin(); CI != InnerIfConds.end(); ++CI) {
-    OS << ", " << Lexer::getCharSourceRangeFromSourceRange(
-      SM, CI->getSourceRange()).str();
-  }
-  auto ThenStatementText = Lexer::getCharSourceRangeFromSourceRange(
-    SM, Target.InnerIf->getThenStmt()->getSourceRange()).str();
-  OS << " " << ThenStatementText;
+
+  // Emit body.
+  OS << " ";
+  OS << Lexer::getCharSourceRangeFromSourceRange(
+            SM, InnerIf->getThenStmt()->getSourceRange())
+            .str();
   return false;
 }
 
@@ -1884,8 +1935,11 @@ public:
   Binding(Binding) {}
 
   IfExpr *getIf() {
-    if (Binding && Binding->getNumPatternEntries() == 1)
-      return dyn_cast<IfExpr>(Binding->getInit(0));
+    if (Binding && Binding->getNumPatternEntries() == 1) {
+      if (auto *Init = Binding->getInit(0)) {
+        return dyn_cast<IfExpr>(Init);
+      }
+    }
 
     return nullptr;
   }
@@ -2097,7 +2151,7 @@ findConvertToTernaryExpression(ResolvedRangeInfo Info) {
       && Info.Kind != RangeKind::MultiStatement)
     return notFound;
 
-  if (Info.ContainedNodes.size() == 0)
+  if (Info.ContainedNodes.empty())
     return notFound;
 
   struct AssignExprFinder: public SourceEntityWalker {
@@ -2529,7 +2583,7 @@ static CharSourceRange
   ContextFinder Finder(*TheFile, Node, NodeChecker);
   Finder.resolve();
   auto Contexts = Finder.getContexts();
-  if (Contexts.size() == 0)
+  if (Contexts.empty())
     return CharSourceRange();
   auto TargetNode = Contexts.back();
   BraceStmt *BStmt = dyn_cast<BraceStmt>(TargetNode.dyn_cast<Stmt*>());
@@ -2681,6 +2735,10 @@ static CallExpr *findTrailingClosureTarget(SourceManager &SM,
       || !Finder.getContexts().back().is<Expr*>())
     return nullptr;
   CallExpr *CE = cast<CallExpr>(Finder.getContexts().back().get<Expr*>());
+
+  if (CE->hasTrailingClosure())
+    // Call expression already has a trailing closure.
+    return nullptr;
 
   // The last arugment is a closure?
   Expr *Args = CE->getArg();
@@ -2892,6 +2950,8 @@ swift::ide::FindRenameRangesAnnotatingConsumer::~FindRenameRangesAnnotatingConsu
 void swift::ide::FindRenameRangesAnnotatingConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<RenameRangeDetail> Ranges) {
+  if (RegionType == RegionType::Mismatch || RegionType == RegionType::Unmatched)
+    return;
   for (const auto &Range : Ranges) {
     Impl.accept(SM, Range);
   }
@@ -2920,6 +2980,12 @@ swift::ide::collectRenameAvailabilityInfo(const ValueDecl *VD,
     // Disallow renaming deinit.
     if (isa<DestructorDecl>(VD))
       return Scratch;
+    
+    // Disallow renaming init with no arguments.
+    if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
+      if (!CD->getParameters()->size())
+        return Scratch;
+    }
   }
 
   // Always return local rename for parameters.
@@ -3002,9 +3068,14 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
                          Range.getEnd(SF->getASTContext().SourceMgr));
   ResolvedRangeInfo Result = Resolver.resolve();
 
+  bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
+
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
   if (RefactoringAction##KIND::isApplicable(Result, DiagEngine))              \
     Scratch.push_back(RefactoringKind::KIND);
+#define INTERNAL_RANGE_REFACTORING(KIND, NAME, ID)                            \
+  if (enableInternalRefactoring)                                              \
+    RANGE_REFACTORING(KIND, NAME, ID)
 #include "swift/IDE/RefactoringKinds.def"
 
   RangeStartMayNeedRename = rangeStartMayNeedRename(Result);

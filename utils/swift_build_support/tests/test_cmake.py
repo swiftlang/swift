@@ -30,10 +30,12 @@ class CMakeTestCase(unittest.TestCase):
         """
         return Namespace(host_cc="/path/to/clang",
                          host_cxx="/path/to/clang++",
+                         host_libtool="/path/to/libtool",
                          enable_asan=False,
                          enable_ubsan=False,
                          enable_tsan=False,
                          enable_lsan=False,
+                         enable_sanitize_coverage=False,
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
@@ -58,6 +60,7 @@ class CMakeTestCase(unittest.TestCase):
         toolchain = host_toolchain()
         toolchain.cc = args.host_cc
         toolchain.cxx = args.host_cxx
+        toolchain.libtool = args.host_libtool
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
         toolchain.ninja = self.which_ninja(args)
@@ -71,6 +74,7 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan(self):
@@ -83,6 +87,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Address",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan(self):
@@ -95,6 +100,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Undefined",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_tsan(self):
@@ -107,6 +113,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Thread",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan(self):
@@ -120,6 +127,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan_tsan(self):
@@ -133,6 +141,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Undefined;Thread",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan_tsan(self):
@@ -147,6 +156,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Address;Undefined;Thread",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_lsan(self):
@@ -159,6 +169,20 @@ class CMakeTestCase(unittest.TestCase):
              "-DLLVM_USE_SANITIZER=Leaks",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_coverage_sanitizer(self):
+        args = self.default_args()
+        args.enable_sanitize_coverage = True
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DLLVM_USE_SANITIZE_COVERAGE=ON",
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_export_compile_commands(self):
@@ -171,6 +195,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_distcc(self):
@@ -195,6 +220,7 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo"])
 
@@ -209,6 +235,7 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_clang_user_visible_version(self):
@@ -222,6 +249,7 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DLLVM_VERSION_MAJOR:STRING=9",
              "-DLLVM_VERSION_MINOR:STRING=0",
              "-DLLVM_VERSION_PATCH:STRING=0",
@@ -239,6 +267,7 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Ninja",
              "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
              "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_full(self):

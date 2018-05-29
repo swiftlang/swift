@@ -65,7 +65,7 @@ private:
     using type = Pattern;
   };
 
-  typedef llvm::PointerUnion4<Stmt*, Expr*, Decl*, Pattern*> ASTNodeTy;
+  using ASTNodeTy = llvm::PointerUnion4<Stmt *, Expr *, Decl *, Pattern *>;
 
 public:
   enum LocationKind : unsigned {
@@ -419,7 +419,7 @@ public:
   }
 
   /// Fingerprint a DebugLoc for use in a DenseMap.
-  typedef std::pair<std::pair<unsigned, unsigned>, StringRef> DebugLocKey;
+  using DebugLocKey = std::pair<std::pair<unsigned, unsigned>, StringRef>;
   struct DebugLocHash : public DebugLocKey {
     DebugLocHash(DebugLoc L) : DebugLocKey({{L.Line, L.Column}, L.Filename}) {}
   };
@@ -428,7 +428,7 @@ public:
   static DebugLoc decode(SourceLoc Loc, const SourceManager &SM);
 
   /// Return the decoded debug location.
-  DebugLoc decodeDebugLoc(const SourceManager &SM) const {
+  LLVM_NODISCARD DebugLoc decodeDebugLoc(const SourceManager &SM) const {
     return isDebugInfoLoc() ? Loc.DebugInfoLoc
                             : decode(getDebugSourceLoc(), SM);
   }

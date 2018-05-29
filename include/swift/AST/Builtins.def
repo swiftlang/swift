@@ -225,6 +225,18 @@ BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
 /// or else undefined behavior will ensue.
 BUILTIN_SIL_OPERATION(CastToBridgeObject, "castToBridgeObject", Special)
 
+/// ValueToBridgeObject has type (T) -> Builtin.BridgeObject.
+/// It sets the BridgeObject to a tagged pointer representation holding its
+//  operands by tagging and shifting the operand if needed.
+///
+/// valueToBridgeObject(x) === (x << _swift_abi_ObjCReservedLowBits) |
+///     _swift_BridgeObject_TaggedPointerBits
+///
+/// x thus must not be using any high bits shifted away (via _swift_abi_ObjCReservedLowBits)
+/// or the tag bits post-shift.
+/// ARC operations on such tagged values are NOPs.
+BUILTIN_SIL_OPERATION(ValueToBridgeObject, "valueToBridgeObject", Special)
+
 /// CastReferenceFromBridgeObject has type (Builtin.BridgeObject) -> T.
 /// It recovers the heap object reference by masking spare bits from the
 /// BridgeObject.
@@ -260,10 +272,15 @@ BUILTIN_SIL_OPERATION(CastReference, "castReference", Special)
 /// reinterpretCast has type T -> U.
 BUILTIN_SIL_OPERATION(ReinterpretCast, "reinterpretCast", Special)
 
-/// addressof ([inout] T) -> Builtin.RawPointer
-/// Returns a RawPointer pointing to an lvalue. The returned pointer is only
-/// valid within the scope of the statement for logical lvalues.
+/// addressof (inout T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a physical lvalue. The returned pointer is
+/// only valid for the duration of the original binding.
 BUILTIN_SIL_OPERATION(AddressOf, "addressof", Special)
+
+/// addressOfBorrow (__shared T) -> Builtin.RawPointer
+/// Returns a RawPointer pointing to a borrowed rvalue. The returned pointer is only
+/// valid within the scope of the borrow.
+BUILTIN_SIL_OPERATION(AddressOfBorrow, "addressOfBorrow", Special)
 
 /// GepRaw(Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 ///
@@ -281,6 +298,27 @@ BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 /// Like the Gep-builtin, but rounds up the resulting address to a tail-
 /// allocated element type 'E'.
 BUILTIN_SIL_OPERATION(GetTailAddr, "getTailAddr", Integer)
+
+/// performInstantaneousReadAccess(Builtin.RawPointer, T.Type) -> ()
+/// Begin and then immediately end a read access to the given raw pointer,
+/// which will be treated as an address of type 'T'.
+BUILTIN_SIL_OPERATION(PerformInstantaneousReadAccess,
+                      "performInstantaneousReadAccess", Special)
+
+/// beginUnpairedModifyAccess(Builtin.RawPointer, Builtin.RawPointer,
+///                           T.Type) -> ()
+/// Begins but does not end a 'modify' access to the first raw pointer argument.
+/// The second raw pointer must be a pointer to an UnsafeValueBuffer, which
+/// will be used by the runtime to record the access. The lifetime of the
+/// value buffer must be longer than that of the access itself. The accessed
+/// address will be treated as having type 'T'.
+BUILTIN_SIL_OPERATION(BeginUnpairedModifyAccess, "beginUnpairedModifyAccess",
+                      Special)
+
+/// endUnpairedAccess(Builtin.RawPointer) -> ()
+/// Ends an in-progress unpaired access. The raw pointer argument must be
+/// be a pointer to an UnsafeValueBuffer that records an in progress access.
+BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
@@ -436,6 +474,8 @@ BUILTIN_MISC_OPERATION(StaticReport, "staticReport", "", Special)
 /// Returns the selected assertion configuration.
 BUILTIN_MISC_OPERATION(AssertConf, "assert_configuration", "n", Special)
 
+/// StringObjectOr has type (T,T) -> T.
+BUILTIN_MISC_OPERATION(StringObjectOr,     "stringObjectOr",      "n", Integer)
 
 /// Special truncation builtins that check for sign and overflow errors. These
 /// take an integer as an input and return a tuple of the truncated result and

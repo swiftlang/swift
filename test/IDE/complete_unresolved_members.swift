@@ -50,6 +50,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_2 | %FileCheck %s -check-prefix=NON_OPT_SET_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NON_OPT_SET_3 | %FileCheck %s -check-prefix=NON_OPT_SET_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERPOLATION_1 | %FileCheck %s -check-prefix=STRING_INTERPOLATION_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRING_INTERPOLATION_INVALID
 enum SomeEnum1 {
   case South
   case North
@@ -366,3 +368,14 @@ func testNonOptSet() {
 func testNonOptSet() -> NonOptSet {
   return .#^NON_OPT_SET_3^#
 }
+
+func testInStringInterpolation() {
+  enum MyEnum { case foo, bar }
+  func takeEnum(_ e: MyEnum) -> MyEnum { return e }
+  let x = "enum: \(takeEnum(.#^STRING_INTERPOLATION_1^#))"
+  let y = "enum: \(.#^STRING_INTERPOLATION_INVALID^#)" // Dont'crash.
+}
+// STRING_INTERPOLATION_1: Begin completions
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     foo[#MyEnum#];
+// STRING_INTERPOLATION_1-DAG: Decl[EnumElement]/ExprSpecific:     bar[#MyEnum#];
+// STRING_INTERPOLATION_1: End completions

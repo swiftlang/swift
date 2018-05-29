@@ -20,18 +20,7 @@
 using namespace swift;
 using namespace importer;
 
-/// The maximum length of any particular string in the list of known CF types.
-const size_t MaxCFTypeNameLength = 38;
 namespace {
-  // FIXME: This is only needed because llvm::StringRef doesn't have a constexpr
-  // constructor.
-  struct CFTypeListEntry {
-    unsigned char Length;
-    char Data[MaxCFTypeNameLength + 1];
-
-    operator StringRef() const { return StringRef(Data, Length); }
-  };
-
   // Quasi-lexicographic order: string length first, then string data.
   // Since we don't care about the actual length, we can use this, which
   // lets us ignore the string data a larger proportion of the time.
@@ -43,16 +32,11 @@ namespace {
   };
 } // end anonymous namespace
 
-template <size_t Len>
-static constexpr size_t string_lengthof(const char (&data)[Len]) {
-  return Len - 1;
-}
-
 /// The list of known CF types.  We use 'constexpr' to verify that this is
 /// emitted as a constant.  Note that this is expected to be sorted in
 /// quasi-lexicographic order.
-static constexpr const CFTypeListEntry KnownCFTypes[] = {
-#define CF_TYPE(NAME) { string_lengthof(#NAME), #NAME },
+static constexpr const llvm::StringLiteral KnownCFTypes[] = {
+#define CF_TYPE(NAME) #NAME,
 #define NON_CF_TYPE(NAME)
 #include "SortedCFDatabase.def"
 };

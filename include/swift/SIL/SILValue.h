@@ -146,6 +146,23 @@ struct ValueOwnershipKind {
   /// ownership kind otherwise.
   ValueOwnershipKind getProjectedOwnershipKind(SILModule &M,
                                                SILType Proj) const;
+
+  /// Returns true if \p Other can be merged successfully with this, implying
+  /// that the two ownership kinds are "compatibile".
+  ///
+  /// The reason why we do not compare directy is to allow for
+  /// ValueOwnershipKind::Any to merge into other forms of ValueOwnershipKind.
+  bool isCompatibleWith(ValueOwnershipKind other) const {
+    return merge(other).hasValue();
+  }
+
+  /// Returns true if \p Other is compatible with ValueOwnershipKind::Trivial or
+  /// this. See isCompatibleWith for more information on what "compatibility"
+  /// means.
+  bool isTrivialOrCompatibleWith(ValueOwnershipKind other) const {
+    return isCompatibleWith(ValueOwnershipKind::Trivial) ||
+           isCompatibleWith(other);
+  }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
@@ -255,7 +272,7 @@ namespace llvm {
 /// ValueBase * is always at least eight-byte aligned; make the three tag bits
 /// available through PointerLikeTypeTraits.
 template<>
-class PointerLikeTypeTraits<swift::ValueBase *> {
+struct PointerLikeTypeTraits<swift::ValueBase *> {
 public:
   static inline void *getAsVoidPointer(swift::ValueBase *I) {
     return (void*)I;
@@ -423,7 +440,7 @@ private:
 inline SILValue getSILValueType(const Operand &op) {
   return op.get();
 }
-typedef ArrayRefView<Operand,SILValue,getSILValueType> OperandValueArrayRef;
+using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 
 /// An iterator over all uses of a ValueBase.
 class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
@@ -583,7 +600,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 namespace llvm {
   /// A SILValue casts like a ValueBase *.
   template<> struct simplify_type<const ::swift::SILValue> {
-    typedef ::swift::ValueBase *SimpleType;
+    using SimpleType = ::swift::ValueBase *;
     static SimpleType getSimplifiedValue(::swift::SILValue Val) {
       return Val;
     }
@@ -610,7 +627,7 @@ namespace llvm {
   };
 
   /// SILValue is a PointerLikeType.
-  template<> class PointerLikeTypeTraits<::swift::SILValue> {
+  template<> struct PointerLikeTypeTraits<::swift::SILValue> {
     using SILValue = ::swift::SILValue;
   public:
     static void *getAsVoidPointer(SILValue v) {

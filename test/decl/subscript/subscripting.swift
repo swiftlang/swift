@@ -246,33 +246,82 @@ struct MutableSubscriptInGetter {
   }
 }
 
+protocol Protocol {}
+protocol RefinedProtocol: Protocol {}
+class SuperClass {}
+class SubClass: SuperClass {}
+class SubSubClass: SubClass {}
+class ClassConformingToProtocol: Protocol {}
+class ClassConformingToRefinedProtocol: RefinedProtocol {}
+
+struct GenSubscriptFixitTest {
+  subscript<T>(_ arg: T) -> Bool { return true } // expected-note {{declared here}}
+}
+
+func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
+
+  _ = s0.subscript("hello")
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+}
+
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
   subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
+
+  subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
+  subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
+
+  subscript(arg: (foo: Bool, bar: (Int, baz: SubClass)), arg2: String) -> Bool { return true }
+  // expected-note@-1 2 {{declared here}}
 }
 
 func testSubscript1(_ s1 : SubscriptTest1) {
   let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
-  
+
   if s1["hello"] {}
-  
-  
-  let _ = s1["hello"]  // expected-error {{ambiguous use of 'subscript'}}
+
+  _ = s1.subscript((true, (5, SubClass())), "hello")
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{52-53=]}}
+  _ = s1.subscript((true, (5, baz: SubSubClass())), "hello")
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
+  _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  _ = s1.subscript(SubSubClass())
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
+  _ = s1.subscript(ClassConformingToProtocol())
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{47-48=]}}
+  _ = s1.subscript(ClassConformingToRefinedProtocol())
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
+  _ = s1.subscript(true)
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  _ = s1.subscript(SuperClass())
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  _ = s1.subscript("hello")
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+  _ = s1.subscript("hello"
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-27=]}}
+  // expected-note@-2 {{to match this opening '('}}
+
+  let _ = s1["hello"]
+  // expected-error@-1 {{ambiguous use of 'subscript'}}
+  // expected-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {
   subscript(a : String, b : Int) -> Int { return 0 }
+  // expected-note@-1 {{declared here}}
   subscript(a : String, b : String) -> Int { return 0 }
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
+
   let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
-  
-  
+
+  _ = s2.subscript("hello", 6)
+  // expected-error@-1 {{value of type 'SubscriptTest2' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}
   let b = s2[1, "foo"] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
   // rdar://problem/27449208
@@ -313,9 +362,10 @@ struct S4 {
 
 // SR-2575
 struct SR2575 {
-  subscript() -> Int {
+  subscript() -> Int { // expected-note {{declared here}}
     return 1
   }
 }
 
-SR2575().subscript() // expected-error{{type 'SR2575' has no member 'subscript'}}
+SR2575().subscript()
+// expected-error@-1 {{value of type 'SR2575' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}

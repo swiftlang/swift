@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/CommandLine.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/Refactoring.h"
 #include "swift/IDE/Utils.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 
 #include <regex>
 
@@ -40,7 +41,7 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "expand-switch-cases", "Perform switch cases expand refactoring"),
            clEnumValN(RefactoringKind::LocalizeString,
                       "localize-string", "Perform string localization refactoring"),
-           clEnumValN(RefactoringKind::CollapseNestedIfExpr,
+           clEnumValN(RefactoringKind::CollapseNestedIfStmt,
                       "collapse-nested-if", "Perform collapse nested if statements"),
            clEnumValN(RefactoringKind::ConvertToDoCatch,
                       "convert-to-do-catch", "Perform force try to do try catch refactoring"),
@@ -63,7 +64,9 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::FindLocalRenameRanges,
                       "find-local-rename-ranges", "Find detailed ranges for local rename"),
            clEnumValN(RefactoringKind::TrailingClosure,
-                      "trailingclosure", "Perform trailing closure refactoring")));
+                      "trailingclosure", "Perform trailing closure refactoring"),
+           clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
+                      "replace-bodies-with-fatalError", "Perform trailing closure refactoring")));
 
 
 static llvm::cl::opt<std::string>
@@ -218,7 +221,8 @@ RangeConfig getRange(unsigned BufferID, SourceManager &SM,
 void anchorForGetMainExecutable() {}
 
 int main(int argc, char *argv[]) {
-  INITIALIZE_LLVM(argc, argv);
+  PROGRAM_START(argc, argv);
+  INITIALIZE_LLVM();
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift refactor\n");
   if (options::SourceFilename.empty()) {
     llvm::errs() << "cannot find source filename\n";
@@ -236,7 +240,8 @@ int main(int argc, char *argv[]) {
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
       options::SourceFilename);
   Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().KeepSyntaxInfoInSourceFile = true;
+  Invocation.getLangOptions().CollectParsedToken = true;
+  Invocation.getLangOptions().BuildSyntaxTree = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -274,7 +279,7 @@ int main(int argc, char *argv[]) {
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
   if (Start.empty()) {
-    llvm::errs() << "cannot parse position pair.";
+    llvm::errs() << "cannot parse position pair.\n";
     return 1;
   }
 

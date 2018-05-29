@@ -29,7 +29,7 @@ namespace Demangle {
 
 /// Strip generic arguments from the "spine" of a context node, producing a
 /// bare context to be used in (e.g.) forming nominal type descriptors.
-NodePointer stripGenericArgsFromContextNode(const NodePointer &node,
+NodePointer stripGenericArgsFromContextNode(NodePointer node,
                                             NodeFactory &factory);
 
 /// Describe a function parameter, parameterized on the type
@@ -56,8 +56,9 @@ public:
   void setType(BuiltType type) { Type = type; }
 
   void setVariadic() { Flags = Flags.withVariadic(true); }
-  void setShared() { Flags = Flags.withShared(true); }
-  void setInOut() { Flags = Flags.withInOut(true); }
+  void setValueOwnership(ValueOwnership ownership) {
+    Flags = Flags.withValueOwnership(ownership);
+  }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -113,6 +114,7 @@ class TypeDecoder {
     case NodeKind::Enum:
     case NodeKind::Structure:
     case NodeKind::TypeAlias: // This can show up for imported Clang decls.
+    case NodeKind::SymbolicReference:
     {
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
       BuiltType parent = BuiltType();
@@ -123,8 +125,9 @@ class TypeDecoder {
     }
     case NodeKind::BoundGenericClass:
     case NodeKind::BoundGenericEnum:
-    case NodeKind::BoundGenericStructure: {
-      if (Node->getNumChildren() != 2)
+    case NodeKind::BoundGenericStructure:
+    case NodeKind::BoundGenericOtherNominalType: {
+      if (Node->getNumChildren() < 2)
         return BuiltType();
 
       BuiltNominalTypeDecl typeDecl = BuiltNominalTypeDecl();
@@ -158,7 +161,7 @@ class TypeDecoder {
       // Handle lowered metatypes in a hackish way. If the representation
       // was not thin, force the resulting typeref to have a non-empty
       // representation.
-      if (Node->getNumChildren() == 2) {
+      if (Node->getNumChildren() >= 2) {
         auto repr = Node->getChild(i++);
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
@@ -242,6 +245,7 @@ class TypeDecoder {
     case NodeKind::ObjCBlock:
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
+    case NodeKind::NoEscapeFunctionType:
     case NodeKind::FunctionType: {
       if (Node->getNumChildren() < 2)
         return BuiltType();
@@ -268,8 +272,10 @@ class TypeDecoder {
       if (!decodeMangledFunctionInputType(Node->getChild(isThrow ? 1 : 0),
                                           parameters, hasParamFlags))
         return BuiltType();
-      flags = flags.withNumParameters(parameters.size())
-          .withParameterFlags(hasParamFlags);
+      flags =
+          flags.withNumParameters(parameters.size())
+              .withParameterFlags(hasParamFlags)
+              .withEscaping(Node->getKind() == NodeKind::FunctionType);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
@@ -306,6 +312,8 @@ class TypeDecoder {
             flags =
               flags.withConvention(FunctionMetadataConvention::Block);
           }
+        } else if (child->getKind() == NodeKind::ImplEscaping) {
+          flags = flags.withEscaping(true);
         }
       }
 
@@ -466,27 +474,40 @@ private:
     if (node->getKind() == NodeKind::Type)
       return decodeMangledNominalType(node->getChild(0), typeDecl, parent);
 
-    if (node->getNumChildren() < 2)
-      return false;
+    Demangle::NodePointer nominalNode;
+    if (node->getKind() == NodeKind::SymbolicReference) {
+      // A symbolic reference can be directly resolved to a nominal type.
+      nominalNode = node;
+    } else {
+      if (node->getNumChildren() < 2)
+        return false;
 
-    auto moduleOrParentType = node->getChild(0);
+      auto parentContext = node->getChild(0);
 
-    // Nested types are handled a bit funny here because a
-    // nominal typeref always stores its full mangled name,
-    // in addition to a reference to the parent type. The
-    // mangled name already includes the module and parent
-    // types, if any.
-    Demangle::NodePointer nominalNode = node;
-    if (moduleOrParentType->getKind() != NodeKind::Module) {
-      parent = decodeMangledType(moduleOrParentType);
-      if (!parent) return false;
-
-      // Remove any generic arguments from the context node, producing a
-      // node that reference the nominal type declaration.
-      nominalNode =
-        stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+      // Nested types are handled a bit funny here because a
+      // nominal typeref always stores its full mangled name,
+      // in addition to a reference to the parent type. The
+      // mangled name already includes the module and parent
+      // types, if any.
+      nominalNode = node;
+      switch (parentContext->getKind()) {
+      case Node::Kind::Module:
+        break;
+      case Node::Kind::Extension:
+        // Decode the type being extended.
+        if (parentContext->getNumChildren() < 2)
+          return false;
+        parentContext = parentContext->getChild(1);
+        LLVM_FALLTHROUGH;
+      default:
+        parent = decodeMangledType(parentContext);
+        // Remove any generic arguments from the context node, producing a
+        // node that references the nominal type declaration.
+        nominalNode =
+          stripGenericArgsFromContextNode(node, Builder.getNodeFactory());
+        break;
+      }
     }
-
     typeDecl = Builder.createNominalTypeDecl(nominalNode);
     if (!typeDecl) return false;
 
@@ -494,7 +515,7 @@ private:
   }
 
   BuiltProtocolDecl decodeMangledProtocolType(
-                                           const Demangle::NodePointer &node) {
+                                            const Demangle::NodePointer &node) {
     if (node->getKind() == NodeKind::Type)
       return decodeMangledProtocolType(node->getChild(0));
 
@@ -519,17 +540,23 @@ private:
         [&](const Demangle::NodePointer &typeNode,
             FunctionParam<BuiltType> &param) -> bool {
       Demangle::NodePointer node = typeNode;
-      switch (node->getKind()) {
-      case NodeKind::InOut:
-        param.setInOut();
+
+      auto setOwnership = [&](ValueOwnership ownership) {
+        param.setValueOwnership(ownership);
         node = node->getFirstChild();
         hasParamFlags = true;
+      };
+      switch (node->getKind()) {
+      case NodeKind::InOut:
+        setOwnership(ValueOwnership::InOut);
         break;
 
       case NodeKind::Shared:
-        param.setShared();
-        hasParamFlags = true;
-        node = node->getFirstChild();
+        setOwnership(ValueOwnership::Shared);
+        break;
+
+      case NodeKind::Owned:
+        setOwnership(ValueOwnership::Owned);
         break;
 
       default:

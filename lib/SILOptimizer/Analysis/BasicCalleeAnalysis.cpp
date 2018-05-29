@@ -31,6 +31,15 @@ bool CalleeList::allCalleesVisible() {
   for (SILFunction *Callee : *this) {
     if (Callee->isExternalDeclaration())
       return false;
+    // Do not consider functions in other modules (libraries) because of library
+    // evolution: such function may behave differently in future/past versions
+    // of the library.
+    // TODO: exclude functions which are deserialized from modules in the same
+    // resilience domain.
+    if (Callee->isAvailableExternally() &&
+        // shared_external functions are always emitted in the client.
+        Callee->getLinkage() != SILLinkage::SharedExternal)
+      return false;
   }
   return true;
 }
@@ -142,12 +151,28 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
       continue;
     }
 
-    auto Witness = WT.getConformance()->getWitness(Requirement.getDecl(),
-                                                   nullptr);
-    auto DeclRef = SILDeclRef(Witness.getDecl());
+    bool canCallUnknown = false;
 
-    bool canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
-
+    auto Conf = WT.getConformance();
+    switch (Conf->getProtocol()->getEffectiveAccess()) {
+      case AccessLevel::Open:
+        llvm_unreachable("protocols cannot have open access level");
+      case AccessLevel::Public:
+        canCallUnknown = true;
+        break;
+      case AccessLevel::Internal:
+        if (!M.isWholeModule()) {
+          canCallUnknown = true;
+          break;
+        }
+        LLVM_FALLTHROUGH;
+      case AccessLevel::FilePrivate:
+      case AccessLevel::Private: {
+        auto Witness = Conf->getWitness(Requirement.getDecl(), nullptr);
+        auto DeclRef = SILDeclRef(Witness.getDecl());
+        canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
+      }
+    }
     if (canCallUnknown)
       TheCallees.setInt(true);
   }
@@ -213,10 +238,6 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
            "Unhandled method instruction in callee determination!");
     return CalleeList();
 
-  case ValueKind::ThinToThickFunctionInst:
-    return getCalleeListForCalleeKind(
-        cast<ThinToThickFunctionInst>(Callee)->getOperand());
-
   case ValueKind::FunctionRefInst:
     return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
 
@@ -240,7 +261,7 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
 // Return the list of functions that can be called via the given apply
 // site.
 CalleeList CalleeCache::getCalleeList(FullApplySite FAS) const {
-  return getCalleeListForCalleeKind(FAS.getCallee());
+  return getCalleeListForCalleeKind(FAS.getCalleeOrigin());
 }
 
 // Return the list of functions that can be called via the given instruction.
@@ -249,7 +270,7 @@ CalleeList CalleeCache::getCalleeList(SILInstruction *I) const {
   assert((isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I)) &&
          "A deallocation instruction expected");
   auto Ty = I->getOperand(0)->getType();
-  while (auto payloadTy = Ty.getAnyOptionalObjectType())
+  while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
   if (!Class || Class->hasClangNode() || !Class->hasDestructor())
