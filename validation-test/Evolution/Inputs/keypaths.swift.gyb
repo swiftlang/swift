@@ -1,0 +1,99 @@
+
+%{
+from keypaths_gyb import testCases
+}%
+
+public var globalSink: Int = 0
+
+public enum AnEnum {
+
+  case unset, set(Int)
+
+  init() { self = .unset }
+
+  public var sink: Int {
+    get {
+      switch self {
+      case .unset:
+        return 0
+      case .set(let x):
+        return x
+      }
+    }
+    set {
+      self = .set(newValue)
+    }
+  }
+
+% for (name, kind, before, after) in testCases:
+
+%   if kind == "mutating" or kind == "nonmutating":
+
+    #if BEFORE
+      ${before.format(name=name, nonmutating="nonmutating")}
+    #else
+      ${after.format(name=name, nonmutating="nonmutating")}
+    #endif
+
+    public static var keyPath_${name}: PartialKeyPath<AnEnum> { return \AnEnum.${name} }
+      
+%   elif kind == "stored":
+
+%   else:
+      %{ raise ValueError("improper test case kind") }%
+%   end
+
+% end
+
+}
+
+public struct AStruct {
+
+  public var sink: Int = 0
+
+% for (name, kind, before, after) in testCases:
+
+%   if kind == "mutating" or kind == "nonmutating" or kind == "stored":
+
+    #if BEFORE
+      ${before.format(name=name, nonmutating="nonmutating")}
+    #else
+      ${after.format(name=name, nonmutating="nonmutating")}
+    #endif
+
+    public static var keyPath_${name}: PartialKeyPath<AStruct> { return \AStruct.${name} }
+
+%   else:
+      %{ raise ValueError("improper test case kind") }%
+%   end
+
+% end
+
+}
+
+public class AClass {
+
+  public var sink: Int = 0
+
+% for (name, kind, before, after) in testCases:
+
+%   if kind == "nonmutating" or kind == "stored":
+
+    #if BEFORE
+      ${before.format(name=name, nonmutating="")}
+    #else
+      ${after.format(name=name, nonmutating="")}
+    #endif
+
+    public static var keyPath_${name}: PartialKeyPath<AClass> { return \AClass.${name} }
+
+%   elif kind == "mutating":
+
+%   else:
+      %{ raise ValueError("improper test case kind") }%
+%   end
+
+% end
+
+}
+
