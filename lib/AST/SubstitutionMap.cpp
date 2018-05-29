@@ -620,7 +620,7 @@ void SubstitutionMap::verify() const {
         substType->dump();
         llvm::dbgs() << "SubstitutionMap:\n";
         dump(llvm::dbgs());
-        llvm::errs() << "\n";
+        llvm::dbgs() << "\n";
       }
 
       assert(proto->isObjC() &&
@@ -634,7 +634,7 @@ void SubstitutionMap::verify() const {
       substType->dump(llvm::dbgs());
       llvm::dbgs() << "SubstitutionMap:\n";
       dump(llvm::dbgs());
-      llvm::errs() << "\n";
+      llvm::dbgs() << "\n";
     }
     assert(conformance.isConcrete() && "Conformance should be concrete");
 
