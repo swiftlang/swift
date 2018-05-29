@@ -3505,3 +3505,16 @@ bb0:
   %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
   return %4 : $Builtin.Int32
 }
+
+// CHECK-LABEL: sil @optimize_arc_with_value_to_bridge_object
+// CHECK:      bb0(%0 : $Builtin.Int64):
+// CHECK-NEXT: struct $UInt64
+// CHECK-NEXT: value_to_bridge_object
+// CHECK-NEXT: return
+sil @optimize_arc_with_value_to_bridge_object : $@convention(thin) (Builtin.Int64) -> Builtin.BridgeObject {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $UInt64 (%0 : $Builtin.Int64)
+  %2 = value_to_bridge_object %1 : $UInt64
+  strong_retain %2 : $Builtin.BridgeObject
+  return %2 : $Builtin.BridgeObject
+}
