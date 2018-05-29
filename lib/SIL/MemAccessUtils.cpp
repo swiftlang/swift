@@ -260,22 +260,26 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     // Load a box from an indirect payload of an opaque enum.
     // We must have peeked past the project_box earlier in this loop.
     // (the indirectness makes it a box, the load is for address-only).
-    // 
+    //
     // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
     // %box = load [take] %payload_adr : $*{ var Enum }
     //
     // FIXME: this case should go away with opaque values.
+    //
+    // Otherwise return invalid AccessedStorage.
     case ValueKind::LoadInst: {
-      assert(address->getType().is<SILBoxType>());
-      address = cast<LoadInst>(address)->getOperand();
-      assert(isa<UncheckedTakeEnumDataAddrInst>(address));
-      continue;
+      if (address->getType().is<SILBoxType>()) {
+        address = cast<LoadInst>(address)->getOperand();
+        assert(isa<UncheckedTakeEnumDataAddrInst>(address));
+        continue;
+      }
+      return AccessedStorage();
     }
+
     // Inductive cases:
     // Look through address casts to find the source address.
     case ValueKind::MarkUninitializedInst:
     case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::PointerToAddressInst:
     case ValueKind::UncheckedAddrCastInst:
     // Inductive cases that apply to any type.
     case ValueKind::CopyValueInst:
@@ -289,6 +293,30 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
     case ValueKind::ProjectBlockStorageInst:
     // Look through begin_borrow in case a local box is borrowed.
     case ValueKind::BeginBorrowInst:
+      address = cast<SingleValueInstruction>(address)->getOperand(0);
+      continue;
+
+    // Access to a Builtin.RawPointer. Treat this like the inductive cases
+    // above because some RawPointer's originate from identified locations. See
+    // the special case for global addressors, which return RawPointer above.
+    //
+    // If the inductive search does not find a valid addressor, it will
+    // eventually reach the default case that returns in invalid location. This
+    // is correct for RawPointer because, although accessing a RawPointer is
+    // legal SIL, there is no way to guarantee that it doesn't access class or
+    // global storage, so returning a valid unidentified storage object would be
+    // incorrect. It is the caller's responsibility to know that formal access
+    // to such a location can be safely ignored.
+    //
+    // For example:
+    //
+    // - KeyPath Builtins access RawPointer. However, the caller can check
+    // that the access `isFromBuilin` and ignore the storage.
+    //
+    // - lldb generates RawPointer access for debugger variables, but SILGen
+    // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
+    // AccessedStorage for 'Unsafe' access.
+    case ValueKind::PointerToAddressInst:
       address = cast<SingleValueInstruction>(address)->getOperand(0);
       continue;
 

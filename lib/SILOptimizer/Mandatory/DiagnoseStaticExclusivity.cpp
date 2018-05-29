@@ -811,6 +811,9 @@ static void checkForViolationAtApply(ApplySite Apply, AccessState &State) {
 static void checkForViolationsAtInstruction(SILInstruction &I,
                                             AccessState &State) {
   if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     SILAccessKind Kind = BAI->getAccessKind();
     const AccessedStorage &Storage =
       findValidAccessedStorage(BAI->getSource());
@@ -826,6 +829,9 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
   }
 
   if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
+    if (EAI->getBeginAccess()->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     auto It =
       State.Accesses->find(findValidAccessedStorage(EAI->getSource()));
     AccessInfo &Info = It->getSecond();
@@ -1080,6 +1086,9 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   // Otherwise, the address base should be an in-scope begin_access.
   if (storage.getKind() == AccessedStorage::Nested) {
     auto *BAI = cast<BeginAccessInst>(storage.getValue());
+    if (BAI->getEnforcement() == SILAccessEnforcement::Unsafe)
+      return;
+
     const AccessedStorage &Storage = findValidAccessedStorage(BAI->getSource());
     AccessInfo &Info = Accesses[Storage];
     if (!Info.hasAccessesInProgress())
