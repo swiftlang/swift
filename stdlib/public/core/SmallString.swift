@@ -127,7 +127,9 @@ extension _SmallUTF8String {
 #endif
   }
 
+  @inline(__always)
   @inlinable
+  @effects(readonly)
   public // @testable
   init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
 #if arch(i386) || arch(arm)
@@ -135,17 +137,20 @@ extension _SmallUTF8String {
 #else
     let count = codeUnits.count
     guard count <= _SmallUTF8String.capacity else { return nil }
-    self.init()
-    self._withAllUnsafeMutableBytes { rawBufPtr in
-      let rawDst = rawBufPtr.baseAddress._unsafelyUnwrappedUnchecked
-      memcpy_(
-        dst: rawDst.assumingMemoryBound(to: UInt8.self),
-        src: codeUnits.baseAddress._unsafelyUnwrappedUnchecked,
-        count: count
-      )
+
+    let addr = codeUnits.baseAddress._unsafelyUnwrappedUnchecked
+    var high: UInt
+    let lowCount: Int
+    if count > 8 {
+      lowCount = 8
+      high = _bytesToUInt(addr + 8, count &- 8)
+    } else {
+      lowCount = count
+      high = 0
     }
-    _sanityCheck(self.count == 0, "overwrote count early?")
-    self.count = count
+    high |= (UInt(count) &<< (8*15))
+    let low = _bytesToUInt(addr, lowCount)
+    _storage = (low, high)
 
     // FIXME: support transcoding
     if !self.isASCII { return nil }
@@ -167,6 +172,18 @@ extension _SmallUTF8String {
     self[0] = UInt8(truncatingIfNeeded: scalar.value)
 #endif
   }
+}
+
+@inline(__always)
+@inlinable
+func _bytesToUInt(_ input: UnsafePointer<UInt8>, _ c: Int) -> UInt {
+  var r: UInt = 0
+  var shift: Int = 0
+  for idx in 0..<c {
+    r = r | (UInt(input[idx]) &<< shift)
+    shift = shift &+ 8
+  }
+  return r
 }
 
 //

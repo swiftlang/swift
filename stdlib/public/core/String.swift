@@ -734,6 +734,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
 }
 
 extension String : _ExpressibleByBuiltinStringLiteral {
+  @inline(__always)
   @inlinable
   @effects(readonly)
   @_semantics("string.makeUTF8")
