@@ -522,6 +522,9 @@ namespace {
                                             SGFContext C);
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    RValue visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5840,6 +5843,12 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
 RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                                    SGFContext C) {
   llvm_unreachable("unevaluated_instance expression can never be evaluated");
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
+  // TODO(marcrasi): Generate the real SIL for this.
+  return RValue(SGF.getASTContext().TheEmptyTupleType);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

@@ -164,6 +164,15 @@ void constraints::simplifyLocator(Expr *&anchor,
         path = path.slice(1);
         continue;
       }
+
+      if (auto *poundAssertExpr = dyn_cast<PoundAssertExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+
+        anchor = poundAssertExpr->getCondition();
+        path = path.slice(1);
+        continue;
+      }
       break;
 
     case ConstraintLocator::ApplyFunction:
@@ -1021,6 +1030,7 @@ private:
   // SWIFT_ENABLE_TENSORFLOW
   bool visitGradientExpr(GradientExpr *GE);
   bool visitValueAndGradientExpr(ValueAndGradientExpr *GE);
+  bool visitPoundAssertExpr(PoundAssertExpr *PAE);
 };
 } // end anonymous namespace
 
@@ -7073,6 +7083,12 @@ bool FailureDiagnosis::visitGradientExpr(GradientExpr *GE) {
 
 bool FailureDiagnosis::visitValueAndGradientExpr(ValueAndGradientExpr *GE) {
   return diagnoseReverseAutoDiffExpr(GE, /*preservingPrimalResult=*/true);
+}
+
+bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
+  auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
+  return !typeCheckChildIndependently(PAE->getCondition(), boolType,
+                                      CTP_CallArgument);
 }
 
 static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,

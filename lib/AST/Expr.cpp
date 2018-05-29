@@ -377,6 +377,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     // SWIFT_ENABLE_TENSORFLOW
     NON_LVALUE_EXPR(Gradient)
     NON_LVALUE_EXPR(ValueAndGradient)
+    NON_LVALUE_EXPR(PoundAssert)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -528,6 +529,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   // SWIFT_ENABLE_TENSORFLOW
   NO_REFERENCE(Gradient);
   NO_REFERENCE(ValueAndGradient);
+  NO_REFERENCE(PoundAssert);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -824,6 +826,8 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnresolvedPattern:
   case ExprKind::EditorPlaceholder:
   case ExprKind::KeyPathDot:
+  // SWIFT_ENABLE_TENSORFLOW
+  case ExprKind::PoundAssert:
     return false;
   }
 
