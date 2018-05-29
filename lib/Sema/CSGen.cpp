@@ -1440,6 +1440,18 @@ namespace {
       return handleReverseAutoDiffExpr(VGE, /*preservingOriginalResult=*/true);
     }
 
+    Type visitPoundAssertExpr(PoundAssertExpr *PAE) {
+      // Constrain the condition argument to be Bool.
+      auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
+      CS.addConstraint(
+          ConstraintKind::ArgumentConversion, CS.getType(PAE->getCondition()),
+          boolType,
+          CS.getConstraintLocator(PAE, ConstraintLocator::ApplyArgument));
+
+      // #assert(...) has type Void.
+      return CS.getASTContext().TheEmptyTupleType;
+    }
+
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())

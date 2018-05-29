@@ -1351,6 +1351,9 @@ public:
   ParserResult<Expr> parseExprDictionary(SourceLoc LSquareLoc);
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  ParserResult<Expr> parseExprPoundAssert();
+
   UnresolvedDeclRefExpr *parseExprOperator();
 
   //===--------------------------------------------------------------------===//

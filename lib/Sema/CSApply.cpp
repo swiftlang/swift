@@ -4769,6 +4769,12 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    Expr *visitPoundAssertExpr(PoundAssertExpr *E) {
+      // CSGen already set this expression's type to Void.
+      return E;
+    }
+
     /// Interface for ExprWalker
     void walkToExprPre(Expr *expr) {
       ExprStack.push_back(expr);
