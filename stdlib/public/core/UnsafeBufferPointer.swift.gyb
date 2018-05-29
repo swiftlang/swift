@@ -34,8 +34,15 @@
 // struct A { struct B { let x: UnsafeMutableBufferPointer<...> } let b: B }
 @_fixed_layout
 public struct Unsafe${Mutable}BufferPointer<Element> {
+
   @usableFromInline
-  let _position, _end: Unsafe${Mutable}Pointer<Element>?
+  let _position: Unsafe${Mutable}Pointer<Element>?
+
+  /// The number of elements in the buffer.
+  ///
+  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
+  /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  public let count: Int
 }
 
 %if not mutable:
@@ -62,10 +69,15 @@ extension UnsafeBufferPointer.Iterator: IteratorProtocol {
   /// Once `nil` has been returned, all subsequent calls return `nil`.
   @inlinable
   public mutating func next() -> Element? {
-    if _position == _end { return nil }
+    guard let start = _position else {
+      return nil
+    }
+    _sanityCheck(_end != nil, "inconsistent _position, _end pointers")
 
-    let result = _position!.pointee
-    _position! += 1
+    if start == _end._unsafelyUnwrappedUnchecked { return nil }
+
+    let result = start.pointee
+    _position  = start + 1
     return result
   }
 }
@@ -81,7 +93,10 @@ extension Unsafe${Mutable}BufferPointer: Sequence {
   /// - Returns: An iterator over the elements of this buffer.
   @inlinable
   public func makeIterator() -> Iterator {
-    return Iterator(_position: _position, _end: _end)
+    guard let start = _position else {
+      return Iterator(_position: nil, _end: nil)
+    }
+    return Iterator(_position: start, _end: start + count)
   }
 
   /// Initializes the memory at `destination.baseAddress` with elements of `self`,
@@ -98,7 +113,7 @@ extension Unsafe${Mutable}BufferPointer: Sequence {
     let d = destination.baseAddress._unsafelyUnwrappedUnchecked
     let n = Swift.min(destination.count, self.count)
     d.initialize(from: s, count: n)
-    return (Iterator(_position: s + n, _end: _end), n)
+    return (Iterator(_position: s + n, _end: s + count), n)
   }
 }
 
@@ -212,19 +227,6 @@ extension Unsafe${Mutable}BufferPointer: ${Mutable}Collection, RandomAccessColle
   @inlinable
   public var indices: Indices {
     return startIndex..<endIndex
-  }
-
-  /// The number of elements in the buffer.
-  ///
-  /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
-  /// a buffer can have a `count` of zero even with a non-`nil` base address.
-  @inlinable
-  public var count: Int {
-    guard let start = _position, let end = _end else {
-      return 0
-    }
-    
-    return end - start
   }
 
   /// Accesses the element at the specified position.
@@ -385,21 +387,13 @@ extension Unsafe${Mutable}BufferPointer {
       count == 0 || start != nil,
       "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     _position = start
-    _end = start.map { $0 + count }
-  }
-
-  /// Creates a buffer pointer starting at `start` and extending up to the last
-  /// addressable pointer to `Element` in the memory space
-  @inlinable
-  public init(_unboundedStartingAt start: Unsafe${Mutable}Pointer<Element>) {
-    _position = start
-    _end = type(of: start)._max
+    self.count = count
   }
 
   @inlinable
   public init(_empty: ()) {
-    _position = Unsafe${Mutable}Pointer._max
-    _end = _position
+    _position = nil
+    count = 0
   }
 
 %  if Mutable:
@@ -411,7 +405,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   public init(mutating other: UnsafeBufferPointer<Element>) {
     _position = UnsafeMutablePointer<Element>(mutating: other._position)
-    _end = UnsafeMutablePointer<Element>(mutating: other._end)
+    count = other.count
   }
 
 %  else:
@@ -423,7 +417,7 @@ extension Unsafe${Mutable}BufferPointer {
   @inlinable
   public init(_ other: UnsafeMutableBufferPointer<Element>) {
     _position = UnsafePointer<Element>(other._position)
-    _end = UnsafePointer<Element>(other._end)
+    count = other.count
   }
 
 %  end
@@ -543,7 +537,7 @@ extension Unsafe${Mutable}BufferPointer {
       return
     }
 
-    dstBase.initialize(repeating: repeatedValue, count: _end! - dstBase)
+    dstBase.initialize(repeating: repeatedValue, count: count)
   }
   
   /// Assigns every element in this buffer's memory to a copy of the given value.
@@ -563,7 +557,7 @@ extension Unsafe${Mutable}BufferPointer {
       return
     }
 
-    dstBase.assign(repeating: repeatedValue, count: _end! - dstBase)
+    dstBase.assign(repeating: repeatedValue, count: count)
   }
   
 % end
