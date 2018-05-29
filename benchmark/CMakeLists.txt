@@ -26,6 +26,10 @@ endif()
 
 include(AddSwiftBenchmarkSuite)
 
+#===-----------------------------------------------------------------------===#
+# Declarative Description of Benchmarks
+#===-----------------------------------------------------------------------===#
+
 set(SWIFT_BENCH_MODULES
     single-source/Ackermann
     single-source/AngryPhonebook
@@ -191,6 +195,10 @@ set(BENCH_DRIVER_LIBRARY_MODULES
     utils/DriverUtils
 )
 
+#===-----------------------------------------------------------------------===#
+# Build Configuration
+#===-----------------------------------------------------------------------===#
+
 add_definitions(-DSWIFT_EXEC -DSWIFT_LIBRARY_PATH -DONLY_PLATFORMS
                 -DSWIFT_OPTIMIZATION_LEVELS -DSWIFT_BENCHMARK_EMIT_SIB)
 
@@ -278,6 +286,10 @@ set(BENCHOPTS_MULTITHREADED
     "-whole-module-optimization" "-num-threads" "4")
 set(BENCHOPTS_SINGLEFILE "")
 
+#===-----------------------------------------------------------------------===#
+# SDK Configuration
+#===-----------------------------------------------------------------------===#
+
 set(macosx_arch "x86_64")
 set(iphoneos_arch "arm64" "armv7")
 set(appletvos_arch "arm64")
@@ -307,6 +319,10 @@ foreach(platform ${ONLY_PLATFORMS})
   endif()
 endforeach()
 
+#===---------------------------------------------------------------------===#
+# Statement of Configuration for Build Users
+#===---------------------------------------------------------------------===#
+
 message("--")
 message("-- Swift Benchmark Suite:")
 message("--   SWIFT_BENCHMARK_BUILT_STANDALONE = ${SWIFT_BENCHMARK_BUILT_STANDALONE}")
@@ -322,6 +338,10 @@ message("--   found sdks:")
 foreach(sdk ${sdks})
   message("--     ${sdk}")
 endforeach()
+
+#===---------------------------------------------------------------------===#
+# Build Rule Generation
+#===---------------------------------------------------------------------===#
 
 set(executable_targets)
 
