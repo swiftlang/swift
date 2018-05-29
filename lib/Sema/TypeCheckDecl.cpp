@@ -1828,8 +1828,8 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 
 static void checkRequirementAccess(TypeChecker &TC,
                                    ArrayRef<RequirementRepr> requirements,
-                                   const DeclContext *useDC,
                                    AccessScope accessScope,
+                                   const DeclContext *useDC,
                                    llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   for (auto &requirement : requirements) {
     switch (requirement.getKind()) {
@@ -1897,7 +1897,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
   callbackACEK = ACEK::Requirement;
 
   checkRequirementAccess(TC, params->getRequirements(),
-                         owner->getDeclContext(), accessScope,
+                         accessScope, owner->getDeclContext(),
                          callback);
 
   if (minAccessScope.isPublic())
@@ -2113,6 +2113,29 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
       }
     });
 
+    if (auto *trailingWhereClause = assocType->getTrailingWhereClause()) {
+      checkRequirementAccess(TC, trailingWhereClause->getRequirements(),
+                             assocType->getFormalAccessScope(),
+                             assocType->getDeclContext(),
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *thisComplainRepr,
+                                 DowngradeToWarning downgradeDiag) {
+        if (typeAccessScope.isChildOf(minAccessScope) ||
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+          minAccessScope = typeAccessScope;
+          complainRepr = thisComplainRepr;
+          accessControlErrorKind = ACEK_Requirement;
+          downgradeToWarning = downgradeDiag;
+
+          // Swift versions before 5.0 did not check requirements on the
+          // protocol's where clause, so emit a warning.
+          if (!TC.Context.isSwiftVersionAtLeast(5))
+            downgradeToWarning = DowngradeToWarning::Yes;
+        }
+      });
+    }
+
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       auto diagID = diag::associated_type_access;
@@ -2232,6 +2255,12 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
 
+    // This must stay in sync with diag::protocol_access.
+    enum {
+      PCEK_Refine = 0,
+      PCEK_Requirement
+    } protocolControlErrorKind;
+
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
@@ -2248,19 +2277,47 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
+          protocolControlErrorKind = PCEK_Refine;
           downgradeToWarning = downgradeDiag;
         }
       });
     });
 
+    if (auto *trailingWhereClause = proto->getTrailingWhereClause()) {
+      checkRequirementAccess(TC, trailingWhereClause->getRequirements(),
+                             proto->getFormalAccessScope(),
+                             proto->getDeclContext(),
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *thisComplainRepr,
+                                 DowngradeToWarning downgradeDiag) {
+        if (typeAccessScope.isChildOf(minAccessScope) ||
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+          minAccessScope = typeAccessScope;
+          complainRepr = thisComplainRepr;
+          protocolControlErrorKind = PCEK_Requirement;
+          downgradeToWarning = downgradeDiag;
+
+          // Swift versions before 5.0 did not check requirements on the
+          // protocol's where clause, so emit a warning.
+          if (!TC.Context.isSwiftVersionAtLeast(5))
+            downgradeToWarning = DowngradeToWarning::Yes;
+        }
+      });
+    }
+
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       bool isExplicit = proto->getAttrs().hasAttribute<AccessControlAttr>();
-      auto diagID = diag::protocol_refine_access;
+      auto protoAccess = isExplicit
+          ? proto->getFormalAccess()
+          : minAccessScope.requiredAccessForDiagnostics();
+      auto diagID = diag::protocol_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
-        diagID = diag::protocol_refine_access_warn;
+        diagID = diag::protocol_access_warn;
       auto diag = TC.diagnose(proto, diagID,
-                              isExplicit, proto->getFormalAccess(), minAccess,
+                              isExplicit, protoAccess,
+                              protocolControlErrorKind, minAccess,
                               isa<FileUnit>(proto->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     }
