@@ -74,10 +74,11 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
             // Compute substitutions for the specialized function. These
             // substitutions may be different from the original ones, e.g.
             // there can be less substitutions.
-            RecursiveSubs = AI.getFunction()
-                               ->getLoweredFunctionType()
-                               ->getGenericSignature()
-                               ->getSubstitutionMap(Subs);
+            RecursiveSubs = SubstitutionMap::get(
+              AI.getFunction()
+                ->getLoweredFunctionType()
+                ->getGenericSignature(),
+              Subs);
 
             // Use the new set of substitutions to compute the new
             // substituted callee type.

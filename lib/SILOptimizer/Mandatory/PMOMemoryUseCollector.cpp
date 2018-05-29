@@ -1,4 +1,4 @@
-//===--- DIMemoryUseCollector.cpp - Memory use analysis for DI ------------===//
+//===--- PMOMemoryUseCollector.cpp - Memory use analysis for PMO ----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,22 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollector.h"
+#include "PMOMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "llvm/ADT/StringExtras.h"
 
-#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_PMOMEMORYUSECOLLECTOROWNERSHIP_H
 #error "Included ownership header?!"
 #endif
 
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
-//                  DIMemoryObjectInfo Implementation
+//                  PMOMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
 static unsigned getElementCountRec(SILModule &Module, SILType T) {
@@ -42,17 +42,15 @@ static unsigned getElementCountRec(SILModule &Module, SILType T) {
   return 1;
 }
 
-
-DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI) {
+PMOMemoryObjectInfo::PMOMemoryObjectInfo(SingleValueInstruction *MI) {
   auto &Module = MI->getModule();
 
   MemoryInst = MI;
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
-           && "analyzing multi-field boxes not implemented");
-    MemorySILType =
-      ABI->getBoxType()->getFieldType(Module, 0);
+    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
+           "analyzing multi-field boxes not implemented");
+    MemorySILType = ABI->getBoxType()->getFieldType(Module, 0);
   } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
     MemorySILType = ASI->getElementType();
   } else {
@@ -64,7 +62,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI) {
   NumElements = getElementCountRec(Module, MemorySILType);
 }
 
-SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
+SILInstruction *PMOMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
 }
 
@@ -90,7 +88,7 @@ static SILType getElementTypeRec(SILModule &Module, SILType T, unsigned EltNo) {
 }
 
 /// getElementTypeRec - Return the swift type of the specified element.
-SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
+SILType PMOMemoryObjectInfo::getElementType(unsigned EltNo) const {
   auto &Module = MemoryInst->getModule();
   return getElementTypeRec(Module, MemorySILType, EltNo);
 }
@@ -114,9 +112,9 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
           Result += llvm::utostr(FieldNo);
         return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
       }
-      
+
       EltNo -= NumFieldElements;
-      
+
       ++FieldNo;
     }
     llvm_unreachable("Element number is out of range for this type!");
@@ -126,8 +124,9 @@ static void getPathStringToElementRec(SILModule &Module, SILType T,
   assert(EltNo == 0 && "Element count problem");
 }
 
-ValueDecl *DIMemoryObjectInfo::
-getPathStringToElement(unsigned Element, std::string &Result) const {
+ValueDecl *
+PMOMemoryObjectInfo::getPathStringToElement(unsigned Element,
+                                            std::string &Result) const {
   auto &Module = MemoryInst->getModule();
 
   if (auto *VD = dyn_cast_or_null<ValueDecl>(getLoc().getAsASTNode<Decl>()))
@@ -143,24 +142,23 @@ getPathStringToElement(unsigned Element, std::string &Result) const {
 }
 
 /// If the specified value is a 'let' property in an initializer, return true.
-bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
+bool PMOMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // If we aren't representing 'self' in a non-delegating initializer, then we
   // can't have 'let' properties.
   return IsLet;
 }
 
 //===----------------------------------------------------------------------===//
-//                        DIMemoryUse Implementation
+//                        PMOMemoryUse Implementation
 //===----------------------------------------------------------------------===//
-
 
 /// onlyTouchesTrivialElements - Return true if all of the accessed elements
 /// have trivial type.
-bool DIMemoryUse::
-onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
+bool PMOMemoryUse::onlyTouchesTrivialElements(
+    const PMOMemoryObjectInfo &MI) const {
   auto &Module = Inst->getModule();
-  
-  for (unsigned i = FirstElement, e = i+NumElements; i != e; ++i) {
+
+  for (unsigned i = FirstElement, e = i + NumElements; i != e; ++i) {
     // Skip 'super.init' bit
     if (i == MI.getNumMemoryElements())
       return false;
@@ -172,16 +170,15 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
   return true;
 }
 
-
 //===----------------------------------------------------------------------===//
 //                          Scalarization Logic
 //===----------------------------------------------------------------------===//
 
 /// Given a pointer to a tuple type, compute the addresses of each element and
 /// add them to the ElementAddrs vector.
-static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
-                                          SILLocation Loc,
-                                      SmallVectorImpl<SILValue> &ElementAddrs) {
+static void
+getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B, SILLocation Loc,
+                              SmallVectorImpl<SILValue> &ElementAddrs) {
   TupleType *TT = Pointer->getType().castTo<TupleType>();
   for (auto Index : indices(TT->getElements())) {
     ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer, Index));
@@ -199,20 +196,19 @@ static void getScalarizedElements(SILValue V,
   }
 }
 
-
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
 /// can return the newly generated sub-element loads.
 static SILValue scalarizeLoad(LoadInst *LI,
                               SmallVectorImpl<SILValue> &ElementAddrs) {
   SILBuilderWithScope B(LI);
   SmallVector<SILValue, 4> ElementTmps;
-  
+
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
     auto *SubLI = B.createLoad(LI->getLoc(), ElementAddrs[i],
                                LoadOwnershipQualifier::Unqualified);
     ElementTmps.push_back(SubLI);
   }
-  
+
   if (LI->getType().is<TupleType>())
     return B.createTuple(LI->getLoc(), LI->getType(), ElementTmps);
   return B.createStruct(LI->getLoc(), LI->getType(), ElementTmps);
@@ -223,42 +219,42 @@ static SILValue scalarizeLoad(LoadInst *LI,
 //===----------------------------------------------------------------------===//
 
 namespace {
-  class ElementUseCollector {
-    SILModule &Module;
-    const DIMemoryObjectInfo &TheMemory;
-    SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<SILInstruction*> &Releases;
+class ElementUseCollector {
+  SILModule &Module;
+  const PMOMemoryObjectInfo &TheMemory;
+  SmallVectorImpl<PMOMemoryUse> &Uses;
+  SmallVectorImpl<SILInstruction *> &Releases;
 
-    /// When walking the use list, if we index into a struct element, keep track
-    /// of this, so that any indexes into tuple subelements don't affect the
-    /// element we attribute an access to.
-    bool InStructSubElement = false;
+  /// When walking the use list, if we index into a struct element, keep track
+  /// of this, so that any indexes into tuple subelements don't affect the
+  /// element we attribute an access to.
+  bool InStructSubElement = false;
 
-    /// When walking the use list, if we index into an enum slice, keep track
-    /// of this.
-    bool InEnumSubElement = false;
+  /// When walking the use list, if we index into an enum slice, keep track
+  /// of this.
+  bool InEnumSubElement = false;
 
-  public:
-    ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                        SmallVectorImpl<DIMemoryUse> &Uses,
-                        SmallVectorImpl<SILInstruction *> &Releases)
-        : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-          Uses(Uses), Releases(Releases) {}
+public:
+  ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
+                      SmallVectorImpl<PMOMemoryUse> &Uses,
+                      SmallVectorImpl<SILInstruction *> &Releases)
+      : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
+        Uses(Uses), Releases(Releases) {}
 
-    /// This is the main entry point for the use walker.  It collects uses from
-    /// the address and the refcount result of the allocation.
-    LLVM_NODISCARD bool collectFrom();
+  /// This is the main entry point for the use walker.  It collects uses from
+  /// the address and the refcount result of the allocation.
+  LLVM_NODISCARD bool collectFrom();
 
-  private:
-    LLVM_NODISCARD bool collectUses(SILValue Pointer, unsigned BaseEltNo);
-    LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
-    void addElementUses(unsigned BaseEltNo, SILType UseTy,
-                        SILInstruction *User, DIUseKind Kind);
-    LLVM_NODISCARD bool collectTupleElementUses(TupleElementAddrInst *TEAI,
-                                                unsigned BaseEltNo);
-    LLVM_NODISCARD bool collectStructElementUses(StructElementAddrInst *SEAI,
-                                                 unsigned BaseEltNo);
-  };
+private:
+  LLVM_NODISCARD bool collectUses(SILValue Pointer, unsigned BaseEltNo);
+  LLVM_NODISCARD bool collectContainerUses(AllocBoxInst *ABI);
+  void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
+                      PMOUseKind Kind);
+  LLVM_NODISCARD bool collectTupleElementUses(TupleElementAddrInst *TEAI,
+                                              unsigned BaseEltNo);
+  LLVM_NODISCARD bool collectStructElementUses(StructElementAddrInst *SEAI,
+                                               unsigned BaseEltNo);
+};
 } // end anonymous namespace
 
 bool ElementUseCollector::collectFrom() {
@@ -292,14 +288,15 @@ bool ElementUseCollector::collectFrom() {
 /// of $*(Int,Int) is a use of both Int elements of the tuple.  This is a helper
 /// to keep the Uses data structure up to date for aggregate uses.
 void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
-                                         SILInstruction *User, DIUseKind Kind) {
+                                         SILInstruction *User,
+                                         PMOUseKind Kind) {
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
   if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
     NumElements = getElementCountRec(Module, UseTy);
 
-  Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, NumElements));
+  Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, NumElements));
 }
 
 /// Given a tuple_element_addr or struct_element_addr, compute the new
@@ -360,7 +357,7 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
          indices(ABI->getBoxType()->getLayout()->getFields())) {
       addElementUses(field,
                      ABI->getBoxType()->getFieldType(ABI->getModule(), field),
-                     User, DIUseKind::Escape);
+                     User, PMOUseKind::Escape);
     }
   }
 
@@ -391,7 +388,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   /// elements and should be scalarized.  This is done as a second phase to
   /// avoid invalidating the use iterator.
   ///
-  SmallVector<SILInstruction*, 4> UsesToScalarize;
+  SmallVector<SILInstruction *, 4> UsesToScalarize;
 
   for (auto *UI : Pointer->getUses()) {
     auto *User = UI->getUser();
@@ -421,18 +418,18 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     if (isa<EndAccessInst>(User)) {
       continue;
     }
-    
+
     // Loads are a use of the value.
     if (isa<LoadInst>(User)) {
       if (PointeeType.is<TupleType>())
         UsesToScalarize.push_back(User);
       else
-        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
+        addElementUses(BaseEltNo, PointeeType, User, PMOUseKind::Load);
       continue;
     }
 
     if (isa<LoadWeakInst>(User)) {
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Load, BaseEltNo, 1));
       continue;
     }
 
@@ -442,45 +439,45 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         UsesToScalarize.push_back(User);
         continue;
       }
-      
+
       // Coming out of SILGen, we assume that raw stores are initializations,
       // unless they have trivial type (which we classify as InitOrAssign).
-      DIUseKind Kind;
+      PMOUseKind Kind;
       if (InStructSubElement)
-        Kind = DIUseKind::PartialStore;
+        Kind = PMOUseKind::PartialStore;
       else if (PointeeType.isTrivial(User->getModule()))
-        Kind = DIUseKind::InitOrAssign;
+        Kind = PMOUseKind::InitOrAssign;
       else
-        Kind = DIUseKind::Initialization;
-      
+        Kind = PMOUseKind::Initialization;
+
       addElementUses(BaseEltNo, PointeeType, User, Kind);
       continue;
     }
 
     if (auto *SWI = dyn_cast<StoreWeakInst>(User)) {
       if (UI->getOperandNumber() == 1) {
-        DIUseKind Kind;
+        PMOUseKind Kind;
         if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
+          Kind = PMOUseKind::PartialStore;
         else if (SWI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
+          Kind = PMOUseKind::Initialization;
         else
-          Kind = DIUseKind::Assign;
-        Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
+          Kind = PMOUseKind::Assign;
+        Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
     }
 
     if (auto *SUI = dyn_cast<StoreUnownedInst>(User)) {
       if (UI->getOperandNumber() == 1) {
-        DIUseKind Kind;
+        PMOUseKind Kind;
         if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
+          Kind = PMOUseKind::PartialStore;
         else if (SUI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
+          Kind = PMOUseKind::Initialization;
         else
-          Kind = DIUseKind::Assign;
-        Uses.push_back(DIMemoryUse(User, Kind, BaseEltNo, 1));
+          Kind = PMOUseKind::Assign;
+        Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, 1));
         continue;
       }
     }
@@ -492,25 +489,25 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         UsesToScalarize.push_back(CAI);
         continue;
       }
-      
+
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load
       // and store to the same aggregate.
-      DIUseKind Kind;
+      PMOUseKind Kind;
       if (UI->getOperandNumber() == 0)
-        Kind = DIUseKind::Load;
+        Kind = PMOUseKind::Load;
       else if (InStructSubElement)
-        Kind = DIUseKind::PartialStore;
+        Kind = PMOUseKind::PartialStore;
       else if (CAI->isInitializationOfDest())
-        Kind = DIUseKind::Initialization;
+        Kind = PMOUseKind::Initialization;
       else
-        Kind = DIUseKind::Assign;
+        Kind = PMOUseKind::Assign;
 
       addElementUses(BaseEltNo, PointeeType, User, Kind);
       continue;
     }
-    
+
     // The apply instruction does not capture the pointer when it is passed
     // through 'inout' arguments or for indirect returns.  InOut arguments are
     // treated as uses and may-store's, but an indirect return is treated as a
@@ -520,7 +517,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     //
     if (auto *Apply = dyn_cast<ApplyInst>(User)) {
       auto substConv = Apply->getSubstCalleeConv();
-      unsigned ArgumentNumber = UI->getOperandNumber()-1;
+      unsigned ArgumentNumber = UI->getOperandNumber() - 1;
 
       // If this is an out-parameter, it is like a store.
       unsigned NumIndirectResults = substConv.getNumIndirectSILResults();
@@ -533,10 +530,10 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
           return false;
         }
         addElementUses(BaseEltNo, PointeeType, User,
-                       DIUseKind::Initialization);
+                       PMOUseKind::Initialization);
         continue;
 
-      // Otherwise, adjust the argument index.      
+        // Otherwise, adjust the argument index.
       } else {
         ArgumentNumber -= NumIndirectResults;
       }
@@ -554,7 +551,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Constant:
       case ParameterConvention::Indirect_In_Guaranteed:
-        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
+        addElementUses(BaseEltNo, PointeeType, User, PMOUseKind::IndirectIn);
         continue;
 
       // If this is an @inout parameter, it is like both a load and store.
@@ -564,17 +561,17 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
-        addElementUses(BaseEltNo, PointeeType, User, DIUseKind::InOutUse);
+        addElementUses(BaseEltNo, PointeeType, User, PMOUseKind::InOutUse);
         continue;
       }
       }
       llvm_unreachable("bad parameter convention");
     }
-    
-    // init_enum_data_addr is treated like a tuple_element_addr or other instruction
-    // that is looking into the memory object (i.e., the memory object needs to
-    // be explicitly initialized by a copy_addr or some other use of the
-    // projected address).
+
+    // init_enum_data_addr is treated like a tuple_element_addr or other
+    // instruction that is looking into the memory object (i.e., the memory
+    // object needs to be explicitly initialized by a copy_addr or some other
+    // use of the projected address).
     if (auto I = dyn_cast<InitEnumDataAddrInst>(User)) {
       // If we are in a struct already, bail. With proper analysis, we should be
       // able to do this optimization.
@@ -597,26 +594,26 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       if (InStructSubElement) {
         return false;
       }
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
-                                 BaseEltNo, 1));
+      Uses.push_back(
+          PMOMemoryUse(User, PMOUseKind::Initialization, BaseEltNo, 1));
       continue;
     }
-    
+
     // inject_enum_addr is modeled as an initialization store.
     if (isa<InjectEnumAddrInst>(User)) {
       // inject_enum_addr the subelement of a struct unless in a ctor.
       if (InStructSubElement) {
         return false;
       }
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Initialization,
-                                 BaseEltNo, 1));
+      Uses.push_back(
+          PMOMemoryUse(User, PMOUseKind::Initialization, BaseEltNo, 1));
       continue;
     }
 
     // open_existential_addr is a use of the protocol value,
     // so it is modeled as a load.
     if (isa<OpenExistentialAddrInst>(User)) {
-      Uses.push_back(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Load, BaseEltNo, 1));
       // TODO: Is it safe to ignore all uses of the open_existential_addr?
       continue;
     }
@@ -637,7 +634,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
 
     // Otherwise, the use is something complicated, it escapes.
-    addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
+    addElementUses(BaseEltNo, PointeeType, User, PMOUseKind::Escape);
   }
 
   // Now that we've walked all of the immediate uses, scalarize any operations
@@ -649,7 +646,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
                                     PointerInst);
     getScalarizedElementAddresses(Pointer, AddrBuilder, PointerInst->getLoc(),
                                   ElementAddrs);
-    
+
     SmallVector<SILValue, 4> ElementTmps;
     for (auto *User : UsesToScalarize) {
       ElementTmps.clear();
@@ -668,14 +665,14 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       if (auto *SI = dyn_cast<StoreInst>(User)) {
         SILBuilderWithScope B(User, SI);
         getScalarizedElements(SI->getOperand(0), ElementTmps, SI->getLoc(), B);
-        
+
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createStore(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
                         StoreOwnershipQualifier::Unqualified);
         SI->eraseFromParent();
         continue;
       }
-      
+
       // Scalarize CopyAddrInst.
       auto *CAI = cast<CopyAddrInst>(User);
       SILBuilderWithScope B(User, CAI);
@@ -688,7 +685,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createCopyAddr(CAI->getLoc(), ElementAddrs[i], ElementTmps[i],
                            CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
-        
+
       } else {
         getScalarizedElementAddresses(CAI->getSrc(), B, CAI->getLoc(),
                                       ElementTmps);
@@ -698,7 +695,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       }
       CAI->eraseFromParent();
     }
-    
+
     // Now that we've scalarized some stuff, recurse down into the newly created
     // element address computations to recursively process it.  This can cause
     // further scalarization.
@@ -713,11 +710,11 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   return true;
 }
 
-/// collectDIElementUsesFrom - Analyze all uses of the specified allocation
+/// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-bool swift::collectDIElementUsesFrom(
-    const DIMemoryObjectInfo &MemoryInfo, SmallVectorImpl<DIMemoryUse> &Uses,
+bool swift::collectPMOElementUsesFrom(
+    const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses,
     SmallVectorImpl<SILInstruction *> &Releases) {
   return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
 }

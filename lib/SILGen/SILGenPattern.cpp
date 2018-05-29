@@ -2589,7 +2589,8 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   auto materializedRawValue = rawValue.materialize(SGF, loc);
 
   auto genericSig = diagnoseFailure->getGenericSignature();
-  auto subs = genericSig->getSubstitutionMap(
+  auto subs = SubstitutionMap::get(
+      genericSig,
       [&](SubstitutableType *type) -> Type {
         auto genericParam = cast<GenericTypeParamType>(type);
         assert(genericParam->getDepth() == 0);
@@ -2631,7 +2632,8 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
   auto diagnoseSignature = diagnoseFailure->getGenericSignature();
-  auto genericArgsMap = diagnoseSignature->getSubstitutionMap(
+  auto genericArgsMap = SubstitutionMap::get(
+      diagnoseSignature,
       [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
       LookUpConformanceInSignature(*diagnoseSignature));
 

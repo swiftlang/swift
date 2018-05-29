@@ -175,16 +175,6 @@ public:
     return Mem;
   }
 
-  /// Build a substitution map for this generic signature by looking up
-  /// substitutions in the given substitution map.
-  SubstitutionMap getSubstitutionMap(SubstitutionMap subs) const;
-
-  /// Build an interface type substitution map from a type substitution function
-  /// and conformance lookup function.
-  SubstitutionMap
-  getSubstitutionMap(TypeSubstitutionFn subs,
-                     LookupConformanceFn lookupConformance) const;
-
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.

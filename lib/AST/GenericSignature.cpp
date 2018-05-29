@@ -375,20 +375,6 @@ GenericSignature::lookupConformance(CanType type, ProtocolDecl *proto) const {
   return M->lookupConformance(type, proto);
 }
 
-SubstitutionMap
-GenericSignature::getSubstitutionMap(SubstitutionMap subs) const {
-  return SubstitutionMap::get(const_cast<GenericSignature *>(this), subs);
-}
-
-SubstitutionMap
-GenericSignature::
-getSubstitutionMap(TypeSubstitutionFn subs,
-                   LookupConformanceFn lookupConformance) const {
-  return SubstitutionMap::get(const_cast<GenericSignature *>(this),
-                              subs, lookupConformance);
-}
-
-
 bool GenericSignature::requiresClass(Type type) {
   if (!type->isTypeParameter()) return false;
 
