@@ -18,6 +18,8 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Timer.h"
 
+#include <thread>
+
 #define SWIFT_FUNC_STAT                                                 \
   do {                                                                  \
     static llvm::Statistic FStat =                                      \
@@ -129,6 +131,7 @@ private:
   SmallString<128> TraceFilename;
   SmallString<128> ProfileDirname;
   llvm::TimeRecord StartedTime;
+  std::thread::id MainThreadID;
 
   // This is unique_ptr because NamedRegionTimer is non-copy-constructable.
   std::unique_ptr<llvm::NamedRegionTimer> Timer;
