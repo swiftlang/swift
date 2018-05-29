@@ -2611,6 +2611,9 @@ void processParameters(ArrayRef<const ParameterList *> allParamsList,
   for (auto paramLists : allParamsList) {
     auto paramDecls = paramLists->getArray();
     for (auto paramDecl : paramDecls) {
+      if (paramDecl->isSelfParameter())
+        continue;
+      
       allParamDecls.push_back(paramDecl);
     }
   }
@@ -2641,7 +2644,8 @@ void processReturn(Type returnType, swift::SourceLoc startLocation,
                    SourceEditConsumer &EditConsumer,
                    SourceManager &SM) {
     
-  if (returnType.isNull()) return;
+  if (returnType.isNull())
+    return;
   
   EditConsumer.accept(SM, startLocation, "///\n///  - Returns: <#");
   EditConsumer.accept(SM, startLocation, returnType.getString());
@@ -2659,8 +2663,6 @@ void generateDocCommentForFunction(FuncDecl *funcDecl,
                                    swift::SourceLoc startLocation,
                                    SourceEditConsumer &EditConsumer,
                                    SourceManager &SM) {
-    
-  if (funcDecl == nullptr) return;
   
   EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
   
@@ -2681,17 +2683,10 @@ void generateDocCommentForConstructor(ConstructorDecl *constructorDecl,
                                       swift::SourceLoc startLocation,
                                       SourceEditConsumer &EditConsumer,
                                       SourceManager &SM) {
-    
-  if (constructorDecl == nullptr) return;
   
   EditConsumer.accept(SM, startLocation, "/// <#Initializer Summary#>\n");
   
-  //This extra step is needed for initializers to ensure the param
-  //self is not added to the documentation
-  ParameterList * allParams = constructorDecl->getParameters();
-  ArrayRef<const ParameterList *> allParamsList(allParams);
-  
-  processParameters(allParamsList, startLocation, EditConsumer, SM);
+  processParameters(constructorDecl->getParameterLists(), startLocation, EditConsumer, SM);
   
   if (constructorDecl->hasThrows()) {
     processThrows(startLocation, EditConsumer, SM);
@@ -2705,8 +2700,6 @@ void generateDocCommentForSubscript(SubscriptDecl *subscriptDecl,
                                     SourceEditConsumer &EditConsumer,
                                     SourceManager &SM) {
   
-  if (subscriptDecl == nullptr) return;
-  
   EditConsumer.accept(SM, startLocation, "/// <#Subscript Summary#>\n");
   
   processParameters(subscriptDecl->getIndices(), startLocation,
@@ -2719,9 +2712,8 @@ void generateDocCommentForSubscript(SubscriptDecl *subscriptDecl,
 }
    
 bool canGenerateDocComment(DeclKind kind) {
-  return kind == DeclKind::Func ||
-  kind == DeclKind::Constructor ||
-  kind == DeclKind::Subscript;
+  return kind == DeclKind::Func || kind == DeclKind::Constructor ||
+    kind == DeclKind::Subscript;
 }
     
 bool RefactoringActionDocCommentBoilerplate::
@@ -2734,31 +2726,26 @@ bool RefactoringActionDocCommentBoilerplate::
 }
     
 bool RefactoringActionDocCommentBoilerplate::performChange() {
-  DeclKind tokenKind = CursorInfo.ValueD->getKind();
-  if (!canGenerateDocComment(tokenKind)) return true;
+  
+  if (!CursorInfo.ValueD)
+    return true;
   
   swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
   
   if (auto funcDecl = dyn_cast<FuncDecl>(CursorInfo.ValueD)) {
-    funcDecl = (FuncDecl *)CursorInfo.ValueD;
     generateDocCommentForFunction(funcDecl, startLocation,
                                   EditConsumer, SM);
-  }
-  else if (auto constructorDecl =
+  } else if (auto constructorDecl =
            dyn_cast<ConstructorDecl>(CursorInfo.ValueD)) {
-    
     constructorDecl = (ConstructorDecl *)CursorInfo.ValueD;
     generateDocCommentForConstructor(constructorDecl, startLocation,
                                      EditConsumer, SM);
-  }
-  else if (auto subscriptDecl =
+  } else if (auto subscriptDecl =
            dyn_cast<SubscriptDecl>(CursorInfo.ValueD)) {
-    
     subscriptDecl = (SubscriptDecl *)CursorInfo.ValueD;
     generateDocCommentForSubscript(subscriptDecl, startLocation,
                                    EditConsumer, SM);
-  }
-  else {
+  } else {
     return true;
   }
   
