@@ -1777,6 +1777,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     Result = parseExprGradientBody(/*isValueAndGradient=*/true);
     break;
 
+  case tok::pound_assert:
+    return parseExprPoundAssert();
+    break;
+
   case tok::pound_available: {
     // For better error recovery, parse but reject #available in an expr
     // context.
@@ -3724,4 +3728,57 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
     : (Expr *)GradientExpr::create(Context, poundGradLoc, lParenLoc,
                                    originalFnParseResult.get(), params, rParenLoc);
   return makeParserResult<Expr>(result);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// expr-pound-assert:
+//   '#assert' '(' expr ',' string_literal ')'
+ParserResult<Expr> Parser::parseExprPoundAssert() {
+  SourceLoc startLoc = consumeToken(tok::pound_assert);
+  SourceLoc endLoc;
+
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren)) {
+      endLoc = consumeToken();
+    } else {
+      endLoc = PreviousLoc;
+    }
+    return makeParserResult<Expr>(new (Context)
+                                      ErrorExpr(SourceRange(startLoc, endLoc)));
+  };
+
+  if (parseToken(tok::l_paren, diag::pound_assert_expected, "(")) {
+    return errorAndSkipToEnd();
+  }
+
+  auto conditionExprResult = parseExpr(diag::pound_assert_expected_expression);
+  if (conditionExprResult.isParseError()) {
+    return errorAndSkipToEnd();
+  }
+
+  Optional<StringRef> message;
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Tok.getLoc(), diag::pound_assert_expected_string_literal);
+      return errorAndSkipToEnd();
+    }
+
+    auto *messageExpr = parseExprStringLiteral().get();
+    if (messageExpr->getKind() == ExprKind::InterpolatedStringLiteral) {
+      diagnose(messageExpr->getStartLoc(),
+               diag::pound_assert_string_interpolation)
+          .highlight(messageExpr->getSourceRange());
+      return errorAndSkipToEnd();
+    }
+
+    message = cast<StringLiteralExpr>(messageExpr)->getValue();
+  }
+
+  if (parseToken(tok::r_paren, endLoc, diag::pound_assert_expected, ")")) {
+    return errorAndSkipToEnd();
+  }
+
+  return makeParserResult<Expr>(new (Context) PoundAssertExpr(
+      startLoc, endLoc, conditionExprResult.get(), message));
 }

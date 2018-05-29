@@ -1513,6 +1513,16 @@ ERROR(sil_gradient_invalid_seed_type,PointsToFirstBadToken,
 ERROR(sil_gradient_expected_source_index,PointsToFirstBadToken,
       "expected the index of the result to specify the differentiation source", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(pound_assert_expected,PointsToFirstBadToken,
+      "expected '%0' in #assert directive", (StringRef))
+ERROR(pound_assert_expected_expression,PointsToFirstBadToken,
+      "expected a condition expression", ())
+ERROR(pound_assert_expected_string_literal,PointsToFirstBadToken,
+      "expected a string literal", ())
+ERROR(pound_assert_string_interpolation,PointsToFirstBadToken,
+      "interpolated strings not allowed as #assert messages", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

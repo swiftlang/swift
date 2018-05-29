@@ -5221,6 +5221,36 @@ public:
   }
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+/// PoundAssertExpr - Asserts that a condition is true, at compile time.
+class PoundAssertExpr : public Expr {
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+  Expr *Condition;
+  Optional<StringRef> Message;
+
+ public:
+  PoundAssertExpr(SourceLoc startLoc, SourceLoc endLoc, Expr *condition,
+                  Optional<StringRef> message)
+      : Expr(ExprKind::PoundAssert, /*Implicit=*/false),
+        StartLoc(startLoc),
+        EndLoc(endLoc),
+        Condition(condition),
+        Message(message) {}
+
+  SourceLoc getStartLoc() const { return StartLoc; }
+  SourceLoc getEndLoc() const { return EndLoc; }
+
+  Expr *getCondition() const { return Condition; }
+  Optional<StringRef> getMessage() const { return Message; }
+
+  void setCondition(Expr *condition) { Condition = condition; }
+
+  static bool classof(const Expr *S) {
+    return S->getKind() == ExprKind::PoundAssert;
+  }
+};
+
 inline bool Expr::isInfixOperator() const {
   return isa<BinaryExpr>(this) || isa<IfExpr>(this) ||
          isa<AssignExpr>(this) || isa<ExplicitCastExpr>(this);
