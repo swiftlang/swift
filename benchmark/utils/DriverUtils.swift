@@ -147,7 +147,7 @@ struct TestConfig {
 
     filters = benchArgs.positionalArgs
 
-    if benchArgs.optionalArgsMap["--help"] == nil {
+    if benchArgs.optionalArgsMap["--help"] != nil {
       return .help(validOptions)
     }
 
