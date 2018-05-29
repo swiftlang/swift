@@ -175,7 +175,7 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Complexity: O(1) on average, over many additions to the same
   ///   collection.
-  mutating func append(_ newElement: Element)
+  mutating func append(_ newElement: __owned Element)
 
   /// Adds the elements of a sequence or collection to the end of this
   /// collection.
@@ -197,7 +197,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   collection.
   // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
   // suggestion in SE-91
-  mutating func append<S : Sequence>(contentsOf newElements: S)
+  mutating func append<S : Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element
 
   /// Inserts a new element into the collection at the specified position.
@@ -222,7 +222,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   `index` must be a valid index into the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func insert(_ newElement: Element, at i: Index)
+  mutating func insert(_ newElement: __owned Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
   /// position.
@@ -250,7 +250,7 @@ public protocol RangeReplaceableCollection : Collection
   ///   and `newElements`. If `i` is equal to the collection's `endIndex`
   ///   property, the complexity is O(*n*), where *n* is the length of
   ///   `newElements`.
-  mutating func insert<S : Collection>(contentsOf newElements: S, at i: Index)
+  mutating func insert<S : Collection>(contentsOf newElements: __owned S, at i: Index)
     where S.Element == Element
 
   /// Removes and returns the element at the specified position.
