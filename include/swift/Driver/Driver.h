@@ -43,6 +43,9 @@ namespace opt {
 }
 
 namespace swift {
+  namespace sys {
+    class TaskQueue;
+  }
   class DiagnosticEngine;
 namespace driver {
   class Action;
@@ -212,6 +215,13 @@ public:
   /// because ToolChain has virtual methods.
   std::unique_ptr<ToolChain>
   buildToolChain(const llvm::opt::InputArgList &ArgList);
+
+  /// Compute the task queue for this compilation and command line argument
+  /// vector.
+  ///
+  /// \return A TaskQueue, or nullptr if an invalid number of parallel jobs is
+  /// specified.  This condition is signalled by a diagnostic.
+  std::unique_ptr<sys::TaskQueue> buildTaskQueue(const Compilation &C);
 
   /// Construct a compilation object for a given ToolChain and command line
   /// argument vector.
