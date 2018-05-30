@@ -139,6 +139,12 @@ struct NotificationBuffer {
 };
 static NotificationBuffer notificationBuffer;
 
+static void printBufferedNotifications() {
+  notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
+    sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
+  });
+}
+
 static int skt_main(int argc, const char **argv);
 
 int main(int argc, const char **argv) {
@@ -173,12 +179,6 @@ static int skt_main(int argc, const char **argv) {
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
 
-  auto printBufferedNotifications = []{
-    notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
-      sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
-    });
-  };
-
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
   TestOptions InitOpts;
@@ -196,7 +196,6 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_shutdown();
       return ret;
     }
-    printBufferedNotifications();
     Args = Args.slice(i+1);
   }
 
@@ -343,7 +342,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
-    if (int ret = handleTestInvocation(Opts, InitOpts)) {
+    int ret = handleTestInvocation(Opts, InitOpts);
+    printBufferedNotifications();
+    if (ret) {
       return ret;
     }
   }
