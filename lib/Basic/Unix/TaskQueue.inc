@@ -49,18 +49,6 @@ extern "C" {
 namespace swift {
 namespace sys {
 
-void TaskProcessInformation::ResourceUsage::provideMapping(json::Output &out) {
-    out.mapRequired("utime", Utime);
-    out.mapRequired("stime", Stime);
-    out.mapRequired("maxrss", Maxrss);
-}
-
-void TaskProcessInformation::provideMapping(json::Output &out) {
-    out.mapRequired("real_pid", OSPid);
-    if (ProcessUsage.hasValue())
-    out.mapRequired("usage", ProcessUsage.getValue());
-}
-
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
 TaskProcessInformation::TaskProcessInformation(ProcessId Pid, struct rusage Usage)
     : TaskProcessInformation(Pid,
