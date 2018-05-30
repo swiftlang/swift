@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -472,8 +472,6 @@ ConstraintSystem::SolverState::~SolverState() {
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs), CGScope(cs.CG)
 {
-  ++cs.solverState->depth;
-
   resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
@@ -485,16 +483,15 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numCheckedConformances = cs.CheckedConformances.size();
   PreviousScore = cs.CurrentScore;
+  if (cs.Timer) {
+    startTime = cs.Timer->getElapsedProcessTimeInFractionalSeconds();
+  }
 
   cs.solverState->registerScope(this);
   assert(!cs.failedConstraint && "Unexpected failed constraint!");
-
-  ++cs.solverState->NumStatesExplored;
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
-  --cs.solverState->depth;
-
   // Erase the end of various lists.
   cs.resolvedOverloadSets = resolvedOverloadSets;
   truncate(cs.TypeVariables, numTypeVariables);
