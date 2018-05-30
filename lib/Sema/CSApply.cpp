@@ -371,16 +371,6 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
         return cs.getType(expr);
       });
 
-  // 'super.' is always OK
-  if (isa<SuperRefExpr>(base))
-    return true;
-
-  // 'self.' reference with concrete type is OK
-  if (isa<DeclRefExpr>(base) &&
-      cast<DeclRefExpr>(base)->getDecl()->getBaseName() == tc.Context.Id_self &&
-      !baseTy->is<ArchetypeType>())
-    return true;
-
   // FIXME: The "hasClangNode" check here is a complete hack.
   if (isNonFinalClass(instanceTy) &&
       !isStaticallyDerived &&
@@ -2724,12 +2714,6 @@ namespace {
 
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
-      // If the member is a constructor, verify that it can be legally
-      // referenced from this base.
-      if (!diagnoseInvalidDynamicConstructorReferences(cs, base, nameLoc,
-                                                       ctor, SuppressDiagnostics))
-        return nullptr;
-
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
@@ -2751,6 +2735,17 @@ namespace {
           if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
+
+            // Special case -- in a protocol extension initializer with a class
+            // constrainted Self type, 'self' has archetype type, and only
+            // required initializers can be called.
+            if (cs.getType(dre)->getRValueType()->is<ArchetypeType>()) {
+              if (!diagnoseInvalidDynamicConstructorReferences(cs, base,
+                                                               nameLoc,
+                                                               ctor,
+                                                               SuppressDiagnostics))
+                return nullptr;
+            }
 
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
