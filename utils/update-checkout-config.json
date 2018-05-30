@@ -31,7 +31,9 @@
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
         "tensorflow": {
-            "remote": { "id": "tensorflow/tensorflow" } }
+            "remote": { "id": "tensorflow/tensorflow" } },
+        "tensorflow-swift-bindings": {
+            "remote": { "id": "tensorflow/swift-bindings" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -245,7 +247,8 @@
                 "swift-integration-tests": "01eecd5a83279635823e78101a538132784bc628",
                 "swift-xcode-playground-support": "4cca45ecd5050ef579bbb55076cd5d6ca4e60fbc",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
-                "tensorflow": "master"
+                "tensorflow": "master",
+                "tensorflow-swift-bindings": "master"
             }
         }
     }

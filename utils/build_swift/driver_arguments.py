@@ -941,6 +941,10 @@ def create_argument_parser():
            default=None,
            help='Path to a directory containing TensorFlow headers. '
                 'Used for linking Swift programs.')
+    option('--tensorflow-swift-bindings', store_path,
+           default=None,
+           help='Path to a TensorFlow Swift bindings file '
+                '(RawOpsGenerated.swift).')
     option('--tensorflow-bazel-options', append,
            type=argparse.ShellSplitType(),
            default=[],
