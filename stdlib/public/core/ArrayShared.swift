@@ -110,7 +110,7 @@ internal struct _InitializeMemoryFromCollection<
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable
+  @inlinable // FIXME @useableFromInline https://bugs.swift.org/browse/SR-7588
   @inline(never)
   internal mutating func _arrayOutOfPlaceReplace<C: Collection>(
     _ bounds: Range<Int>,
@@ -155,8 +155,8 @@ extension _ArrayBufferProtocol {
   /// The formula used to compute the new buffers capacity is:
   ///   max(requiredCapacity, source.capacity)  if newCount <= source.capacity
   ///   max(requiredCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     newCount: Int, requiredCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -171,8 +171,8 @@ extension _ArrayBufferProtocol {
   /// The formula used to compute the new buffers capacity is:
   ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal func _forceCreateUniqueMutableBuffer(
     countForNewBuffer: Int, minNewCapacity: Int
   ) -> _ContiguousArrayBuffer<Element> {
@@ -220,8 +220,8 @@ extension _ArrayBufferProtocol {
   ///
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
@@ -304,8 +304,8 @@ internal struct _IgnorePointer<T>: _PointerFunction {
 }
 
 extension _ArrayBufferProtocol {
-  @inlinable
   @inline(never)
+  @usableFromInline
   internal mutating func _outlinedMakeUniqueBuffer(bufferCount: Int) {
 
     if _fastPath(

@@ -847,8 +847,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     }
   }
 
-  @inlinable
   @inline(never)
+  @usableFromInline
   internal static func _allocateBufferUninitialized(
     minimumCapacity: Int
   ) -> _Buffer {
@@ -1059,8 +1059,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
