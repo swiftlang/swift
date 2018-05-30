@@ -21,7 +21,7 @@ enum E {
 }
 
 class C {
-  init(i: Int) { } // expected-note 3{{selected non-required initializer 'init(i:)'}}
+  init(i: Int) { } // expected-note 4{{selected non-required initializer 'init(i:)'}}
 
   required init(d: Double) { }
 
@@ -49,7 +49,7 @@ class C {
 
   static func makeSelfImplicitBaseBad() -> Self {
     return .init(i: 0)
-    // FIXME
+    // expected-error@-1 {{constructing an object of class type 'Self' with a metatype value must use a 'required' initializer}}
   }
 
   static func makeSelfImplicitBaseGood() -> Self {
