@@ -34,6 +34,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
+    # SWIFT_ENABLE_TENSORFLOW
+    AutoDiff.cpp
     CompatibilityOverride.cpp
     Concurrent.cpp
     Exclusivity.cpp
