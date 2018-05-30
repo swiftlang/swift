@@ -299,6 +299,12 @@ class BuildScriptInvocation(object):
                     "--tensorflow-host-include-dir (to use custom TensorFlow "
                     "headers/libraries); please pick one")
 
+            if args.tensorflow_swift_bindings is not None and \
+               not os.path.isfile(args.tensorflow_swift_bindings):
+                diagnostics.fatal(
+                    "invalid file specified for --tensorflow-swift-bindings "
+                    "(was '{}')".format(args.tensorflow_swift_bindings))
+
 
     @staticmethod
     def apply_default_arguments(toolchain, args):

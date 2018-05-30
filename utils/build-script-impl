@@ -263,11 +263,13 @@ KNOWN_SETTINGS=(
     coverage-db                        ""        "If set, coverage database to use when prioritizing testing"
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
+    # SWIFT_ENABLE_TENSORFLOW
     enable-tensorflow                  ""        "If true, enable compiling with TensorFlow"
     tensorflow-host-lib-dir            ""        "Path to host TensorFlow libraries"
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
+    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings file"
 )
 
 # Centralized access point for traced command invocation.
@@ -1190,6 +1192,7 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
+TENSORFLOW_SWIFT_BINDINGS_DIR="${WORKSPACE}/tensorflow-swift-bindings"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
@@ -1199,6 +1202,10 @@ fi
 if [[ "${ENABLE_TENSORFLOW}" ]]; then
     if [[ ! "${SKIP_BUILD_TENSORFLOW}" && ! -d "${TENSORFLOW_SOURCE_DIR}" ]]; then
         echo "Couldn't find TensorFlow source directory."
+        exit 1
+    fi
+    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -f "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
+        echo "Invalid TensorFlow Swift bindings file specified."
         exit 1
     fi
 fi
@@ -2321,6 +2328,17 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_TENSORFLOW_TARGET_LIB_DIR:PATH="${TENSORFLOW_TARGET_LIB_DIR}"
                         -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
                     )
+
+                    # Handle TensorFlow Swfit bindings file.
+                    if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
+                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}/RawOpsGenerated.swift"
+                    fi
+                    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DTENSORFLOW_SWIFT_BINDINGS:PATH="${TENSORFLOW_SWIFT_BINDINGS}"
+                        )
+                    fi
                 fi
 
                 if contains_product "lldb" ; then
