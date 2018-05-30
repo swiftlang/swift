@@ -26,7 +26,7 @@ extension CodingUserInfoKey {
 
 /// A ID that uniquely identifies a syntax node and stays stable across multiple
 /// incremental parses
-struct SyntaxNodeId: Hashable, Codable {
+public struct SyntaxNodeId: Hashable, Codable {
   private let rawValue: UInt
 
   // Start creating fresh node IDs for user generated nodes on in the upper
@@ -43,11 +43,11 @@ struct SyntaxNodeId: Hashable, Codable {
     self.rawValue = rawValue
   }
 
-  init(from decoder: Decoder) throws {
+  public init(from decoder: Decoder) throws {
     self.rawValue = try decoder.singleValueContainer().decode(UInt.self)
   }
 
-  func encode(to encoder: Encoder) throws {
+  public func encode(to encoder: Encoder) throws {
     var container = encoder.singleValueContainer()
     try container.encode(rawValue)
   }
