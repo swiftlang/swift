@@ -108,7 +108,6 @@ set(SWIFTLIB_ESSENTIAL
   Runtime.swift.gyb
   RuntimeFunctionCounters.swift
   SipHash.swift
-  SentinelCollection.swift
   Sequence.swift
   SequenceAlgorithms.swift
   SequenceWrapper.swift
