@@ -1374,6 +1374,31 @@ FUNCTION(VerifyTypeLayoutAttribute, _swift_debug_verifyTypeLayoutAttribute,
          ARGS(TypeMetadataPtrTy, Int8PtrTy, Int8PtrTy, SizeTy, Int8PtrTy),
          ATTRS(NoUnwind))
 
+// SWIFT_ENABLE_TENSORFLOW
+// OpaqueValue *swift_autodiffCreateTape();
+FUNCTION(AutoDiffCreateTape, swift_autodiffCreateTape, C_CC,
+         RETURNS(OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_autodiffDestroyTape(OpaqueValue *tape);
+FUNCTION(AutoDiffDestroyTape, swift_autodiffDestroyTape, C_CC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_autodiffPushToTape(OpaqueValue *tape, OpaqueValue *value);
+FUNCTION(AutoDiffPushToTape, swift_autodiffPushToTape, C_CC,
+         RETURNS(VoidTy),
+         ARGS(OpaquePtrTy, OpaquePtrTy),
+         ATTRS(NoUnwind))
+
+// OpaqueValue *swift_autodiffPopFromTape(OpaqueValue *tape);
+FUNCTION(AutoDiffPopFromTape, swift_autodiffPopFromTape, C_CC,
+         RETURNS(OpaquePtrTy),
+         ARGS(OpaquePtrTy),
+         ATTRS(NoUnwind))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

@@ -981,6 +981,64 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  // OpaqueValue *swift_autoDiffCreateTape(Metadata *type);
+  if (Builtin.ID == BuiltinValueKind::AutoDiffCreateTape) {
+    auto valueTy =
+      getLoweredTypeAndTypeInfo(IGF.IGM, substitutions[0].getReplacement());
+    auto *metadata =
+      IGF.emitTypeMetadataRef(valueTy.first.getSwiftRValueType());
+    out.add(IGF.Builder.CreateCall(IGF.IGM.getAutoDiffCreateTapeFn(),
+                                   { metadata }));
+    return;
+  }
+
+  // void swift_autoDiffDestroyTape(OpaqueValue *tape);
+  if (Builtin.ID == BuiltinValueKind::AutoDiffDestroyTape) {
+    auto tape = args.claimNext();
+    IGF.Builder.CreateCall(IGF.IGM.getAutoDiffDestroyTapeFn(), { tape });
+    return;
+  }
+
+  // void swift_autoDiffPushToTape(OpaqueValue *tape, OpaqueValue *value);
+  if (Builtin.ID == BuiltinValueKind::AutoDiffPushToTape) {
+    auto tape = args.claimNext();
+    auto value = args.claimNext();
+    // `id` argument may be discarded. It is used as a marker in SIL.
+    (void)args.claimAll();
+
+    // Create stack allocation and store value in it.
+    auto alloca = IGF.createAlloca(value->getType(),
+                                   IGF.IGM.getPointerAlignment());
+    IGF.Builder.CreateStore(value, alloca);
+    // Cast alloca to OpaqueValue * and call builtin.
+    auto pointer = IGF.Builder.CreatePointerCast(alloca.getAddress(),
+                                                 IGF.IGM.OpaquePtrTy);
+    IGF.Builder.CreateCall(IGF.IGM.getAutoDiffPushToTapeFn(),
+                           { tape, pointer });
+    return;
+  }
+
+  // OpaqueValue *swift_autoDiffPopFromTape(OpaqueValue *tape);
+  if (Builtin.ID == BuiltinValueKind::AutoDiffPopFromTape) {
+    auto tape = args.claimNext();
+    // `id` argument may be discarded. It is used as a marker in SIL.
+    (void)args.claimAll();
+
+    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
+                                             substitutions[0].getReplacement());
+    auto pointerTy = valueTy.second.getStorageType()->getPointerTo();
+
+    // Pop alloca from tape and cast to pointer type.
+    auto alloca = IGF.Builder.CreateCall(IGF.IGM.getAutoDiffPopFromTapeFn(),
+                                         { tape });
+    auto pointer = IGF.Builder.CreatePointerCast(alloca, pointerTy);
+    // Load value from pointer.
+    auto value = IGF.Builder.CreateLoad(pointer, IGF.IGM.getPointerAlignment());
+    out.add(value);
+    return;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
   if (FnId.str().startswith("__tfop")) {
 
     // TFOp builtins are never actually used at runtime: they are always
