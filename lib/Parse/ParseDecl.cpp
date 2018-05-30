@@ -2603,10 +2603,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     return makeParserErrorResult<Decl>();
   }
 
-  if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
-      Tok.is(tok::code_complete)) {
-    DeclResult = makeParserCodeCompletionStatus();
-    if (CodeCompletion) {
+  if (DeclResult.isParseError() && Tok.is(tok::code_complete)) {
+    if (MayNeedOverrideCompletion && CodeCompletion) {
       // If we need to complete an override, collect the keywords already
       // specified so that we do not duplicate them in code completion
       // strings.
@@ -2628,6 +2626,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       CodeCompletion->completeNominalMemberBeginning(Keywords);
     }
+
+    DeclResult = makeParserCodeCompletionStatus();
+    consumeToken(tok::code_complete);
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
