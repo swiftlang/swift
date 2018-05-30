@@ -639,15 +639,24 @@ bool Expr::isTypeReference(
 
 bool Expr::isStaticallyDerivedMetatype(
     llvm::function_ref<Type(const Expr *)> getType) const {
-  // The type must first be a type reference.
+  // The expression must first be a type reference.
   if (!isTypeReference(getType))
     return false;
 
+  auto type = getType(this)
+    ->castTo<AnyMetatypeType>()
+    ->getInstanceType();
+
   // Archetypes are never statically derived.
-  return !getType(this)
-              ->getAs<AnyMetatypeType>()
-              ->getInstanceType()
-              ->is<ArchetypeType>();
+  if (type->is<ArchetypeType>())
+    return false;
+
+  // Dynamic Self is never statically derived.
+  if (type->is<DynamicSelfType>())
+    return false;
+
+  // Everything else is statically derived.
+  return true;
 }
 
 bool Expr::isSuperExpr() const {
