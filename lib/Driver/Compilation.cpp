@@ -108,12 +108,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          llvm::sys::TimePoint<> StartTime,
                          llvm::sys::TimePoint<> LastBuildTime,
                          size_t FilelistThreshold,
-                         unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
                          bool ForceOneBatchRepartition,
-                         bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
@@ -127,8 +125,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     LastBuildTime(LastBuildTime),
-    NumberOfParallelCommands(NumberOfParallelCommands),
-    SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     OutputCompilationRecordForModuleOnlyBuild(
         OutputCompilationRecordForModuleOnlyBuild),
@@ -619,14 +615,9 @@ namespace driver {
     }
 
   public:
-    PerformJobsState(Compilation &Comp)
-      : Comp(Comp),
-        ActualIncrementalTracer(Comp.Stats.get()) {
-      if (Comp.SkipTaskExecution)
-        TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
-      else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands,
-                               Comp.Stats.get()));
+    PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
+      : Comp(Comp), ActualIncrementalTracer(Comp.Stats.get()),
+        TQ(std::move(TaskQueue)) {
       if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
@@ -889,7 +880,7 @@ namespace driver {
         return;
       }
 
-      size_t NumPartitions = Comp.NumberOfParallelCommands;
+      size_t NumPartitions = TQ->getNumberOfParallelTasks();
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
       bool PretendTheCommandLineIsTooLongOnce =
@@ -1220,8 +1211,9 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
   return ok;
 }
 
-int Compilation::performJobsImpl(bool &abnormalExit) {
-  PerformJobsState State(*this);
+int Compilation::performJobsImpl(bool &abnormalExit,
+                                 std::unique_ptr<TaskQueue> &&TQ) {
+  PerformJobsState State(*this, std::move(TQ));
 
   State.scheduleInitialJobs();
   State.scheduleAdditionalJobs();
@@ -1229,7 +1221,7 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
   State.runTaskQueueToCompletion();
   State.checkUnfinishedJobs();
 
-  if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
+  if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
     State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);
@@ -1320,7 +1312,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   return true;
 }
 
-int Compilation::performJobs() {
+int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   if (AllSourceFilesPath)
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
       return EXIT_FAILURE;
@@ -1334,12 +1326,12 @@ int Compilation::performJobs() {
     return performSingleCommand(Jobs.front().get());
   }
 
-  if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
+  if (!TaskQueue::supportsParallelExecution() && TQ->getNumberOfParallelTasks() > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
   bool abnormalExit;
-  int result = performJobsImpl(abnormalExit);
+  int result = performJobsImpl(abnormalExit, std::move(TQ));
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
