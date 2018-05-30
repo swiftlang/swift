@@ -2606,10 +2606,15 @@ public:
       assert(isa<ConstructorDecl>(CurrDeclContext) &&
              "can call super.init only inside a constructor");
       needInit = true;
-    } else if (addName.empty() && HaveDot) {
-      if (Reason == DeclVisibilityKind::MemberOfCurrentNominal ||
-          Reason == DeclVisibilityKind::MemberOfSuper ||
-          Reason == DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal) {
+    } else if (addName.empty()) {
+      auto ReasonIsValid =
+        Reason == DeclVisibilityKind::MemberOfCurrentNominal ||
+        Reason == DeclVisibilityKind::MemberOfSuper ||
+        Reason == DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
+      auto instTy = ExprType->castTo<AnyMetatypeType>()->getInstanceType();
+
+      if (ReasonIsValid && (HaveDot ||
+          !(instTy->is<ArchetypeType>() || IsStaticMetatype))) {
         // This case is querying the init function as member
         needInit = true;
       }
@@ -2641,7 +2646,6 @@ public:
         addTypeAnnotation(Builder, MemberType);
         return;
       }
-      assert(ConstructorType);
 
       if (!HaveLParen)
         Builder.addLeftParen();
@@ -2959,8 +2963,11 @@ public:
                 CD->getResultInterfaceType().getPointer()) {
             Result = Ty;
           }
-          if (IsStaticMetatype || CD->isRequired() || !Ty->is<ClassType>())
+          if (IsStaticMetatype || CD->isRequired() || IsSelfRefExpr ||
+              Ty->is<ArchetypeType>() ||
+              !(Ty->is<ClassType>() || HaveLParen))
             addConstructorCall(CD, Reason, None, Result);
+          return;
         }
         if (IsSuperRefExpr || IsSelfRefExpr) {
           if (!isa<ConstructorDecl>(CurrDeclContext))

@@ -13,6 +13,10 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_SELECTOR_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_SELECTOR_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_2 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_2
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_NODOT | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
@@ -147,6 +151,17 @@ func testExplicitConstructorsSelector1() {
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Decl[Constructor]/CurrNominal: ({#int: Int#}, {#andFloat: Float#})[#ExplicitConstructorsSelector1#]{{; name=.+$}}
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1-DAG: Keyword[self]/CurrNominal:     .self[#ExplicitConstructorsSelector1.Type#]; name=self
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1: End completions
+}
+
+func testExplicitConstructorsValueMetatype() {
+  var SS = ExplicitConstructorsSelector1.self
+  SS#^EXPLICIT_CONSTRUCTORS_VAL_META_1^#
+  SS(#^EXPLICIT_CONSTRUCTORS_VAL_META_2^#
+
+// EXPLICIT_CONSTRUCTORS_VAL_META_1: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#ExplicitConstructorsSelector1#]
+// EXPLICIT_CONSTRUCTORS_VAL_META_1: Decl[Constructor]/CurrNominal: .init({#int: Int#}, {#andFloat: Float#})[#ExplicitConstructorsSelector1#]
+
+// EXPLICIT_CONSTRUCTORS_VAL_META_2-NOT: Decl[Constructor]
 }
 
 struct ExplicitConstructorsSelector2 {
