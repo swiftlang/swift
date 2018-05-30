@@ -1748,16 +1748,34 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-                Src->getType().getClassOrBoundGenericClass() ||
-                Src->getType().getAs<SILBoxType>(),
+            Src->getType().getClassOrBoundGenericClass() ||
+            Src->getType().getAs<SILBoxType>(),
             "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
     // FIXME: When the work to force MUI to be on Allocations/SILArguments
     // complete, turn on this assertion.
-#if 0
-    require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
-            "Mark Uninitialized should always be on the storage location");
-#endif
+    require(isa<AllocationInst>(Src)
+            || isa<GlobalAddrInst>(Src)
+            // TODO: Should we support SILUndef on mark_uninitialized? We
+            // currently have a test that verifies this behavior, but it seems
+            // like this would always be a bug due to the implications around
+            // the code in DI. This just bakes in the current behavior.
+            || isa<SILUndef>(Src)
+            // We allow SILArguments to support the case of initializing
+            // initializers. In such a case, the underlying case is allocated
+            // outside by the allocating initializer and we pass in the to be
+            // initialized value as a SILArgument.
+            || isa<SILArgument>(Src)
+            // FIXME: Once the MarkUninitializedFixup pass is eliminated,
+            // mark_uninitialized should never be applied to a project_box. So
+            // at that point, this should be eliminated.
+            || isa<ProjectBoxInst>(Src)
+            // FIXME: We only support pointer to address here to not break LLDB. It is
+            // important that long term we get rid of this since this is a situation
+            // where LLDB is breaking SILGen/DI invariants by not creating a new
+            // independent stack location for the pointer to address.
+            || isa<PointerToAddressInst>(Src),
+            "Mark Uninitialized must be applied to a storage location");
   }
   
   void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {

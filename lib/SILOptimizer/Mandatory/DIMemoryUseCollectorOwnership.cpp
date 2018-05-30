@@ -28,7 +28,42 @@ using namespace swift;
 using namespace ownership;
 
 //===----------------------------------------------------------------------===//
-//                  DIMemoryObjectInfo Implementation
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
+                                      DIElementUseInfo &UseInfo) {
+  // The MUI must be used on an alloc_box, alloc_stack, or global_addr. If we
+  // have an alloc_stack or a global_addr, there is nothing further to do.
+  if (isa<AllocStackInst>(MUI->getOperand()) ||
+      isa<GlobalAddrInst>(MUI->getOperand()) ||
+      isa<SILArgument>(MUI->getOperand()) ||
+      // FIXME: We only support pointer to address here to not break LLDB. It is
+      // important that long term we get rid of this since this is a situation
+      // where LLDB is breaking SILGen/DI invariants by not creating a new
+      // independent stack location for the pointer to address.
+      isa<PointerToAddressInst>(MUI->getOperand()))
+    return;
+
+  // Otherwise, we assume that we have a project_box. This is a hard cast to
+  // ensure that we catch any new patterns emitted by SILGen and assert.
+  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
+  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
+
+  // Treat destroys of the container as load+destroys of the original value.
+  //
+  // TODO: This should really be tracked separately from other destroys so that
+  // we distinguish the lifetime of the container from the value itself.
+  for (auto *Op : ABI->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+      UseInfo.trackDestroy(User);
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                     DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
 static unsigned getElementCountRec(SILModule &Module, SILType T,
@@ -511,6 +546,7 @@ public:
     }
 
     collectUses(TheMemory.MemoryInst, 0);
+    gatherDestroysOfContainer(TheMemory.MemoryInst, UseInfo);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -1610,20 +1646,8 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   assert(StoresOfArgumentToSelf == 1 &&
          "The 'self' argument should have been stored into the box exactly once");
 
-  // The MUI must be used on an alloc_box or alloc_stack instruction. If we have
-  // an alloc_stack, there is nothing further to do.
-  if (isa<AllocStackInst>(MUI->getOperand()))
-    return;
-
-  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
-  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
-
-  for (auto Op : ABI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
-      UseInfo.trackDestroy(User);
-    }
-  }
+  // Gather the uses of the
+  gatherDestroysOfContainer(MUI, UseInfo);
 }
 
 void DelegatingClassInitElementUseCollector::

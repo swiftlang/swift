@@ -496,6 +496,10 @@ namespace {
     void processUninitializedRelease(SILInstruction *Release,
                                      bool consumed,
                                      SILBasicBlock::iterator InsertPt);
+    void processUninitializedReleaseOfBox(AllocBoxInst *ABI,
+                                          SILInstruction *Release,
+                                          bool consumed,
+                                          SILBasicBlock::iterator InsertPt);
     void deleteDeadRelease(unsigned ReleaseID);
 
     void processNonTrivialRelease(unsigned ReleaseID);
@@ -1857,56 +1861,68 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
   assert(isa<StoreInst>(Inst) && "Unknown store instruction!");
 }
 
+void LifetimeChecker::processUninitializedReleaseOfBox(
+    AllocBoxInst *ABI, SILInstruction *Release, bool consumed,
+    SILBasicBlock::iterator InsertPt) {
+  assert(ABI == Release->getOperand(0));
+  SILBuilderWithScope B(Release);
+  B.setInsertionPoint(InsertPt);
+  Destroys.push_back(B.createDeallocBox(Release->getLoc(), ABI));
+}
+
 void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
                                                   bool consumed,
                                              SILBasicBlock::iterator InsertPt) {
   // If this is an early release of a class instance, we need to emit a
   // dealloc_partial_ref to free the memory.  If this is a derived class, we
   // may have to do a load of the 'self' box to get the class reference.
-  if (TheMemory.isClassInitSelf()) {
-    auto Loc = Release->getLoc();
-    
-    SILBuilderWithScope B(Release);
-    B.setInsertionPoint(InsertPt);
-
-    SILValue Pointer = Release->getOperand(0);
-
-    // If we see an alloc_box as the pointer, then we're deallocating a 'box'
-    // for self.  Make sure we're using its address result, not its refcount
-    // result, and make sure that the box gets deallocated (not released)
-    // since the pointer it contains will be manually cleaned up.
-    auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
-    if (ABI)
-      Pointer = getOrCreateProjectBox(ABI, 0);
-
-    if (!consumed) {
-      if (Pointer->getType().isAddress())
-        Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
-
-      auto MetatypeTy = CanMetatypeType::get(
-          TheMemory.MemorySILType.getASTType(),
-          MetatypeRepresentation::Thick);
-      auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
-      SILValue Metatype;
-
-      // In an inherited convenience initializer, we must use the dynamic
-      // type of the object since nothing is initialized yet.
-      if (TheMemory.isDelegatingInit())
-        Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
-      else
-        Metatype = B.createMetatype(Loc, SILMetatypeTy);
-
-      // We've already destroyed any instance variables initialized by this
-      // constructor, now destroy instance variables initialized by subclass
-      // constructors that delegated to us, and finally free the memory.
-      B.createDeallocPartialRef(Loc, Pointer, Metatype);
+  if (!TheMemory.isClassInitSelf()) {
+    if (auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0))) {
+      return processUninitializedReleaseOfBox(ABI, Release, consumed, InsertPt);
     }
-    
-    // dealloc_box the self box if necessary.
-    if (ABI) {
-      auto DB = B.createDeallocBox(Loc, ABI);
-      Destroys.push_back(DB);
-    }
+    return;
+  }
+
+  auto Loc = Release->getLoc();
+
+  SILBuilderWithScope B(Release);
+  B.setInsertionPoint(InsertPt);
+
+  SILValue Pointer = Release->getOperand(0);
+
+  // If we see an alloc_box as the pointer, then we're deallocating a 'box' for
+  // self. Make sure that the box gets deallocated (not released) since the
+  // pointer it contains will be manually cleaned up.
+  auto *ABI = dyn_cast<AllocBoxInst>(Release->getOperand(0));
+  if (ABI)
+    Pointer = getOrCreateProjectBox(ABI, 0);
+
+  if (!consumed) {
+    if (Pointer->getType().isAddress())
+      Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
+
+    auto MetatypeTy = CanMetatypeType::get(TheMemory.MemorySILType.getASTType(),
+                                           MetatypeRepresentation::Thick);
+    auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
+    SILValue Metatype;
+
+    // In an inherited convenience initializer, we must use the dynamic
+    // type of the object since nothing is initialized yet.
+    if (TheMemory.isDelegatingInit())
+      Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
+    else
+      Metatype = B.createMetatype(Loc, SILMetatypeTy);
+
+    // We've already destroyed any instance variables initialized by this
+    // constructor, now destroy instance variables initialized by subclass
+    // constructors that delegated to us, and finally free the memory.
+    B.createDeallocPartialRef(Loc, Pointer, Metatype);
+  }
+
+  // dealloc_box the self box if necessary.
+  if (ABI) {
+    auto DB = B.createDeallocBox(Loc, ABI);
+    Destroys.push_back(DB);
   }
 }
 
