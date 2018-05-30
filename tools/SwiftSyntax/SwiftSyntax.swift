@@ -53,6 +53,10 @@ public final class SyntaxTreeDeserializer {
   /// they were omitted in an incremental syntax tree transfer
   private var nodeLookupTable: [SyntaxNodeId: RawSyntax] = [:]
 
+  /// The IDs of the nodes that were reused as part of incremental syntax
+  /// parsing during the last deserialization
+  public var reusedNodeIds: Set<SyntaxNodeId> = []
+
   public init() {
   }
 
@@ -61,6 +65,7 @@ public final class SyntaxTreeDeserializer {
   /// - Returns: A top-level Syntax node representing the contents of the tree,
   ///            if the parse was successful.
   public func deserialize(_ data: Data) throws -> SourceFileSyntax {
+    reusedNodeIds = []
     let decoder = JSONDecoder()
     decoder.userInfo[.rawSyntaxDecodedCallback] = self.addToLookupTable
     decoder.userInfo[.omittedNodeLookupFunction] = self.lookupNode
@@ -74,6 +79,7 @@ public final class SyntaxTreeDeserializer {
   // MARK: Incremental deserialization helper functions
 
   private func lookupNode(id: SyntaxNodeId) -> RawSyntax? {
+    reusedNodeIds.insert(id)
     return nodeLookupTable[id]
   }
 
