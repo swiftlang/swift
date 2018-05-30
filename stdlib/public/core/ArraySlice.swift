@@ -1410,7 +1410,13 @@ extension ArraySlice: Hashable where Element: Hashable {
   public var hashValue: Int {
     return _hashValue(for: self)
   }
-
+  
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable // FIXME(sil-ser
   @inlinable // FIXME(sil-serialize-all)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
