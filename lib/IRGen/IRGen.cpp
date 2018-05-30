@@ -660,7 +660,7 @@ static void embedBitcode(llvm::Module *M, const IRGenOptions &Opts)
   NewUsed->setSection("llvm.metadata");
 }
 
-static void initLLVMModule(const IRGenModule &IGM) {
+static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
   auto *Module = IGM.getModule();
   assert(Module && "Expected llvm:Module for IR generation!");
   
@@ -668,6 +668,15 @@ static void initLLVMModule(const IRGenModule &IGM) {
 
   // Set the module's string representation.
   Module->setDataLayout(IGM.DataLayout.getStringRepresentation());
+
+  auto *MDNode = IGM.getModule()->getOrInsertNamedMetadata("swift.module.flags");
+  auto &Context = IGM.getModule()->getContext();
+  auto *Value = M.isStdlibModule() ? llvm::ConstantInt::getTrue(Context)
+                                   : llvm::ConstantInt::getFalse(Context);
+  MDNode->addOperand(llvm::MDTuple::get(Context,
+                                        {llvm::MDString::get(Context,
+                                                             "standard-library"),
+                                         llvm::ConstantAsMetadata::get(Value)}));
 }
 
 std::pair<IRGenerator *, IRGenModule *>
@@ -686,7 +695,7 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
                       "", OutputFilename, MainInputFilenameForDebugInfo);
 
-  initLLVMModule(*IGM);
+  initLLVMModule(*IGM, *SILMod->getSwiftModule());
 
   return std::pair<IRGenerator *, IRGenModule *>(irgen, IGM);
 }
@@ -741,7 +750,7 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
                   ModuleName, PSPs.OutputFilename,
                   PSPs.MainInputFilenameForDebugInfo);
 
-  initLLVMModule(IGM);
+  initLLVMModule(IGM, *SILMod->getSwiftModule());
 
   // Run SIL level IRGen preparation passes.
   runIRGenPreparePasses(*SILMod, IGM);
@@ -907,7 +916,7 @@ static void performParallelIRGeneration(
                         ModuleName, *OutputIter++, nextSF->getFilename());
     IGMcreated = true;
 
-    initLLVMModule(*IGM);
+    initLLVMModule(*IGM, *SILMod->getSwiftModule());
     if (!DidRunSILCodeGenPreparePasses) {
       // Run SIL level IRGen preparation passes on the module the first time
       // around.
@@ -1097,7 +1106,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
                   OutputPath, OutputPath, "");
-  initLLVMModule(IGM);
+  initLLVMModule(IGM, *SILMod.getSwiftModule());
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =
       llvm::ConstantDataArray::getString(VMContext, Buffer, /*AddNull=*/false);

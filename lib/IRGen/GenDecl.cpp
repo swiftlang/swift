@@ -1854,11 +1854,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        ModuleDecl *swiftModule, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
+  // FIXME: For anything in the standard library, we assume is locally defined.
+  // The only two ways imported interfaces are currently created is via a shims
+  // interface where the ClangImporter will correctly give us the proper DLL
+  // storage for the declaration.  Otherwise, it is from a `@_silgen_name`
+  // attributed declaration, which we explicitly handle elsewhere.  So, in the
+  // case of a standard library build, just assume everything is locally
+  // defined.  Ideally, we would integrate the linkage calculation properly to
+  // avoid this special casing.
+  ForDefinition_t isStdlibOrDefinition =
+      ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition), isDefinition,
-                   entity.isWeakImported(swiftModule));
+      getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
+                   isDefinition, entity.isWeakImported(swiftModule));
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2336,6 +2346,14 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   }
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode());
+
+  // If `hasCReferences` is true, then the function is either marked with
+  // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
+  // associated with it.  The combination of the two allows us to identify the
+  // @_silgen_name functions.  These are locally defined function thunks used in
+  // the standard library.  Do not give them DLLImport DLL Storage.
+  if (useDllStorage() && f->hasCReferences() && !forDefinition)
+    fn->setDLLStorageClass(llvm::GlobalValue::DefaultStorageClass);
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
