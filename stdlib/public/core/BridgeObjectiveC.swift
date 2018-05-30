@@ -725,8 +725,7 @@ public func swift_unboxFromSwiftValueWithType<T>(
 // Internal stdlib SPI
 @_silgen_name("swift_swiftValueConformsTo")
 public func _swiftValueConformsTo<T>(_ type: T.Type) -> Bool {
-  _assertSwiftValueFlavorIsConsistent()
-  if let foundationType = _typeByName("Foundation._SwiftValue") {
+  if let foundationType = _foundationSwiftValueType {
     return foundationType is T.Type
   } else {
     return _SwiftValue.self is T.Type
@@ -750,38 +749,11 @@ extension Optional: _Unwrappable {
   }
 }
 
-// This is a best-effort tripmine for detecting the situation
-// (which should never happen) of Swift._SwiftValue and
-// Foundation._SwiftValue/Foundation.NSNull being used 
-// in the same process.
-
-@usableFromInline
-internal enum _SwiftValueFlavor: Equatable {
-  case stdlib
-  case foundation
-}
-
-@usableFromInline
-func _currentSwiftValueFlavor() -> _SwiftValueFlavor {
-  if _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type != nil {
-    return .foundation
-  } else {
-    return .stdlib
-  }
-}
-
-@usableFromInline
-internal var _selectedSwiftValueFlavor: _SwiftValueFlavor = _currentSwiftValueFlavor()
-
-@usableFromInline
-internal func _assertSwiftValueFlavorIsConsistent() {
-  assert(_selectedSwiftValueFlavor == _currentSwiftValueFlavor())
-}
+private let _foundationSwiftValueType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type
 
 @usableFromInline
 internal var _nullPlaceholder: AnyObject {
-  _assertSwiftValueFlavorIsConsistent()
-  if let foundationType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type {
+  if let foundationType = _foundationSwiftValueType {
     return foundationType.null
   } else {
     return _SwiftValue.null
@@ -790,8 +762,7 @@ internal var _nullPlaceholder: AnyObject {
 
 @usableFromInline
 func _makeSwiftValue(_ value: Any) -> AnyObject {
-  _assertSwiftValueFlavorIsConsistent()
-  if let foundationType = _typeByName("Foundation._SwiftValue") as? _NSSwiftValue.Type {
+  if let foundationType = _foundationSwiftValueType {
     return foundationType.init(value)
   } else {
     return _SwiftValue(value)
