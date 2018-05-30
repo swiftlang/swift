@@ -308,7 +308,8 @@ PipeMemoryReader_receiveImages(SwiftReflectionContextRef RC,
   
   free(Images);
 }
-#endif
+
+#else
 
 static void
 PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
@@ -366,6 +367,7 @@ PipeMemoryReader_receiveReflectionInfo(SwiftReflectionContextRef RC,
 
   free(RemoteInfos);
 }
+#endif
 
 uint64_t PipeMemoryReader_getStringLength(void *Context, swift_addr_t Address) {
   const PipeMemoryReader *Reader = (const PipeMemoryReader *)Context;
