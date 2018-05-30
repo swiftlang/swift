@@ -486,6 +486,32 @@ Type ConstraintSystem::openUnboundGenericType(
        ConstraintLocatorBuilder locator) {
   assert(!type->hasTypeParameter());
 
+  // If this is a generic typealias defined inside of constrainted extension,
+  // let's add all of the generic requirements to the constraint system to
+  // make sure that it's something we can use.
+  if (auto *NAT = dyn_cast<NameAliasType>(type.getPointer())) {
+    auto *decl = NAT->getDecl();
+    auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
+    auto parentTy = NAT->getParent();
+
+    if (parentTy && extension && extension->isConstrainedExtension()) {
+      auto subMap = NAT->getSubstitutionMap();
+      auto contextSubMap = parentTy->getContextSubstitutionMap(
+          extension->getParentModule(),
+          extension->getAsNominalTypeOrNominalTypeExtensionContext());
+
+      if (auto *signature = NAT->getGenericSignature()) {
+        openGenericRequirements(
+            extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
+            [&](Type type) {
+              return type.subst(QuerySubstitutionMap{contextSubMap},
+                                LookUpConformanceInSubstitutionMap(subMap),
+                                SubstFlags::UseErrorType);
+            });
+      }
+    }
+  }
+
   if (!type->hasUnboundGenericType())
     return type;
 
@@ -1133,41 +1159,48 @@ void ConstraintSystem::openGeneric(
   bindArchetypesFromContext(*this, outerDC, locatorPtr, replacements);
 
   // Add the requirements as constraints.
-  auto requirements = sig->getRequirements();
+  openGenericRequirements(
+      outerDC, sig, skipProtocolSelfConstraint, locator,
+      [&](Type type) { return openType(type, replacements); });
+}
+
+void ConstraintSystem::openGenericRequirements(
+    DeclContext *outerDC, GenericSignature *signature,
+    bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
+    llvm::function_ref<Type(Type)> substFn) {
+  auto requirements = signature->getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     const auto &req = requirements[pos];
 
-    Optional<Requirement> openedReq;
-    auto openedFirst = openType(req.getFirstType(), replacements);
+    auto firstType = substFn(req.getFirstType());
 
     auto kind = req.getKind();
+    auto requirementLoc =
+        locator.withPathElement(ConstraintLocator::OpenedGeneric)
+            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos));
+
     switch (kind) {
     case RequirementKind::Conformance: {
       auto proto = req.getSecondType()->castTo<ProtocolType>();
       auto protoDecl = proto->getDecl();
       // Determine whether this is the protocol 'Self' constraint we should
       // skip.
-      if (skipProtocolSelfConstraint &&
-          protoDecl == outerDC &&
+      if (skipProtocolSelfConstraint && protoDecl == outerDC &&
           protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
         continue;
-      openedReq = Requirement(kind, openedFirst, proto);
+      addConstraint(Requirement(kind, firstType, proto), requirementLoc);
       break;
     }
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-      openedReq = Requirement(kind, openedFirst,
-                              openType(req.getSecondType(), replacements));
+      addConstraint(Requirement(kind, firstType, substFn(req.getSecondType())),
+                    requirementLoc);
       break;
     case RequirementKind::Layout:
-      openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
+      addConstraint(Requirement(kind, firstType, req.getLayoutConstraint()),
+                    requirementLoc);
       break;
     }
-
-    addConstraint(
-        *openedReq,
-        locator.withPathElement(ConstraintLocator::OpenedGeneric)
-            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
   }
 }
 
@@ -1246,7 +1279,6 @@ ConstraintSystem::getTypeOfMemberReference(
 
     auto memberTy = TC.substMemberTypeWithBase(DC->getParentModule(),
                                                typeDecl, baseObjTy);
-
     // Open the type if it was a reference to a generic type.
     memberTy = openUnboundGenericType(memberTy, locator);
 
