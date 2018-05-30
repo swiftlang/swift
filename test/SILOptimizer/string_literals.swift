@@ -7,28 +7,32 @@
 
 // CHECK-LABEL: define {{.*}}test_create_verysmallstring
 // CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}} inttoptr
+// CHECK-NEXT:   ret {{.*}}
+// CHECK-NEXT: }
 public func test_create_verysmallstring() -> String {
   return "a"
 }
 
 // CHECK-LABEL: define {{.*}}test_create_smallstring
 // CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}} inttoptr
+// CHECK-NEXT:   ret {{.*}}
+// CHECK-NEXT: }
 public func test_create_smallstring() -> String {
   return "abcdefghijkl012"
 }
 
 // CHECK-LABEL: define {{.*}}test_create_largestring
 // CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}} inttoptr
+// CHECK-NEXT:   ret {{.*}}
+// CHECK-NEXT: }
 public func test_create_largestring() -> String {
   return "abcdefghijkl012qwerqwer"
 }
 
 // CHECK-LABEL: define {{.*}}test_create_unicode
 // CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}} inttoptr
+// CHECK-NEXT:   ret {{.*}}
+// CHECK-NEXT: }
 public func test_create_unicode() -> String {
   return "❄️gastroperiodyni"
 }
