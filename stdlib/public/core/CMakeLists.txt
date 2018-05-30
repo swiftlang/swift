@@ -23,7 +23,9 @@ set(SWIFTLIB_ESSENTIAL
   ArrayBuffer.swift
   ArrayBufferProtocol.swift
   ArrayCast.swift
-  Arrays.swift.gyb
+  Array.swift
+  ArrayShared.swift
+  ArraySlice.swift
   ArrayType.swift
   ASCII.swift
   Assert.swift
@@ -42,6 +44,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift
   Comparable.swift
   CompilerProtocols.swift
+  ContiguousArray.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
