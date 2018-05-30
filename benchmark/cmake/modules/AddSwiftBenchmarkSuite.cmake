@@ -678,7 +678,7 @@ function(swift_benchmark_compile)
           COMMAND
             "mv" ${platform_executables} "${swift-bin-dir}")
 
-      add_custom_target("check-${executable_target}"
+      add_custom_target("run-${executable_target}"
           COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
                   "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
                   "--swift-repo" "${SWIFT_SOURCE_DIR}"

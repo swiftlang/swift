@@ -165,12 +165,13 @@ class HostSpecificConfiguration(object):
                 else:
                     self.swift_stdlib_build_targets.append(
                         "swift-test-stdlib-" + name)
+
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
                 if args.benchmark:
                     self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-" + name)
+                        "run-swift-benchmark-" + name)
 
             if build_external_benchmarks:
                 # Add support for the external benchmarks.
@@ -178,7 +179,8 @@ class HostSpecificConfiguration(object):
                     "swift-benchmark-{}-external".format(name))
                 if args.benchmark:
                     self.swift_benchmark_run_targets.append(
-                        "check-swift-benchmark-{}-external".format(name))
+                        "run-swift-benchmark-{}-external".format(name))
+
             if test:
                 if test_host_only:
                     suffix = "-non-executable"
