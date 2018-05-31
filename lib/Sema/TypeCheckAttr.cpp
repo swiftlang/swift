@@ -1017,15 +1017,6 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
     error = true;
     return false;
   }
-  // If candidate is generic, emit error.
-  // TODO: Add support for generic @dynamicCallable methods.
-  if (candidate->isGeneric()) {
-    TC.diagnose(candidate->getLoc(),
-                diag::generic_dynamic_callable_method,
-                candidate->getFullName());
-    error = true;
-    return false;
-  }
   // Otherwise, there is a single valid method.
   return true;
 }
