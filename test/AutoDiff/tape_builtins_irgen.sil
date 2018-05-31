@@ -18,7 +18,7 @@ bb0(%0 : $Float, %1 : $Float):
 // CHECK: %TSf = type <{ float }>
 // CHECK: @"$SSfN" = external global %swift.type, align 8
 
-// CHECK-LABEL: define protected swiftcc float @foo(float, float) #0 {
+// CHECK-LABEL: float @foo(float, float) #0 {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   %2 = alloca float, align 8
 // CHECK-NEXT:   %.coercion.coerced = alloca %TSf, align 4
