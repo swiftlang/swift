@@ -377,6 +377,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     // SWIFT_ENABLE_TENSORFLOW
     NON_LVALUE_EXPR(Gradient)
     NON_LVALUE_EXPR(ValueAndGradient)
+    NON_LVALUE_EXPR(Adjoint)
     NON_LVALUE_EXPR(PoundAssert)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
@@ -529,6 +530,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   // SWIFT_ENABLE_TENSORFLOW
   NO_REFERENCE(Gradient);
   NO_REFERENCE(ValueAndGradient);
+  NO_REFERENCE(Adjoint);
   NO_REFERENCE(PoundAssert);
 
 #undef SIMPLE_REFERENCE
@@ -692,6 +694,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   // SWIFT_ENABLE_TENSORFLOW
   case ExprKind::Gradient:
   case ExprKind::ValueAndGradient:
+  case ExprKind::Adjoint:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -1299,6 +1302,12 @@ ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
   void *memory = ctx.Allocate(size, alignof(ValueAndGradientExpr));
   return new (memory) ValueAndGradientExpr(loc, lParenLoc, originalExpr,
                                            parameters, rParenLoc);
+}
+
+AdjointExpr *
+AdjointExpr::create(ASTContext &ctx, SourceLoc loc, SourceLoc lParenLoc,
+                    Expr *originalExpr, SourceLoc rParenLoc) {
+  return new (ctx) AdjointExpr(loc, lParenLoc, originalExpr, rParenLoc);
 }
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,

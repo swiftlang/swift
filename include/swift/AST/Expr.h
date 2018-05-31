@@ -3928,6 +3928,41 @@ private:
                           originalExpr, params, rParenLoc) {}
 };
 
+/// The `#adjoint(...)` expression for the manual retrival of basic adjoints of
+/// functions that are marked `@differentiable(reverse, ...)`.
+class AdjointExpr : public Expr {
+private:
+  SourceLoc Loc, LParenLoc;
+  Expr *OriginalExpr;
+  SourceLoc RParenLoc;
+
+  explicit AdjointExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *originalExpr,
+                       SourceLoc rParenLoc)
+    : Expr(ExprKind::Adjoint, /*implicit*/ false), Loc(loc),
+      LParenLoc(lParenLoc), OriginalExpr(originalExpr), RParenLoc(rParenLoc) {}
+
+public:
+  static AdjointExpr *create(ASTContext &ctx, SourceLoc loc,
+                             SourceLoc lParenLoc, Expr *originalExpr,
+                             SourceLoc rParenLoc);
+
+  Expr *getOriginalExpr() const {
+    return OriginalExpr;
+  }
+
+  void setOriginalExpr(Expr *newOriginal) {
+    OriginalExpr = newOriginal;
+  }
+
+  SourceRange getSourceRange() const {
+    return SourceRange(Loc, RParenLoc);
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::Adjoint;
+  }
+};
+
 /// An expression referring to an opaque object of a fixed type.
 /// /// Opaque value expressions occur when a particular value within the AST
 /// needs to be re-used without being re-evaluated or for a value that is
