@@ -479,6 +479,7 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     RValue visitGradientExpr(GradientExpr *E, SGFContext C);
     RValue visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C);
+    RValue visitAdjointExpr(AdjointExpr *E, SGFContext C);
     RValue visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C);
     RValue visitEditorPlaceholderExpr(EditorPlaceholderExpr *E, SGFContext C);
     RValue visitObjCSelectorExpr(ObjCSelectorExpr *E, SGFContext C);
@@ -3012,6 +3013,11 @@ visitGradientExpr(GradientExpr *E, SGFContext C) {
 RValue RValueEmitter::
 visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
   return emitGradientInst(*this, C, E, /*isValueAndGrad*/ true);
+}
+
+RValue RValueEmitter::
+visitAdjointExpr(AdjointExpr *E, SGFContext C) {
+  llvm_unreachable("handle #adjoint");
 }
 
 RValue RValueEmitter::

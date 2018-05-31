@@ -2507,6 +2507,11 @@ namespace {
       return handleReverseAutoDiffExpr(expr, /*preservingOriginalResult=*/true);
     }
 
+    Expr *visitAdjointExpr(AdjointExpr *expr) {
+      // FIXME
+      llvm_unreachable("Handle #adjoint");
+    }
+
     // SWIFT_ENABLE_TENSORFLOW
     /// When we've type checked a #tfop expression, we do some adjustment to
     /// the argument and result types.  Specifically, if something is a type
