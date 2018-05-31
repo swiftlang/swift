@@ -677,21 +677,21 @@ function(swift_benchmark_compile)
           POST_BUILD
           COMMAND
             "mv" ${platform_executables} "${swift-bin-dir}")
-
-      add_custom_target("run-${executable_target}"
-          COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
-                  "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
-                  "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
-          COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
-                  "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
-                  "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--iterations" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
-          COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
-                  "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
-                  "--swift-repo" "${SWIFT_SOURCE_DIR}"
-                  "--compare-script"
-                  "${SWIFT_SOURCE_DIR}/benchmark/scripts/compare_perf_tests.py")
     endif()
+
+    add_custom_target("run-${executable_target}"
+        COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
+                "-o" "O" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                "--iterations" "${SWIFT_BENCHMARK_NUM_O_ITERATIONS}"
+        COMMAND "${swift-bin-dir}/Benchmark_Driver" "run"
+                "-o" "Onone" "--output-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                "--iterations" "${SWIFT_BENCHMARK_NUM_ONONE_ITERATIONS}"
+        COMMAND "${swift-bin-dir}/Benchmark_Driver" "compare"
+                "--log-dir" "${CMAKE_CURRENT_BINARY_DIR}/logs"
+                "--swift-repo" "${SWIFT_SOURCE_DIR}"
+                "--compare-script"
+                "${SWIFT_SOURCE_DIR}/benchmark/scripts/compare_perf_tests.py")
   endforeach()
 endfunction()

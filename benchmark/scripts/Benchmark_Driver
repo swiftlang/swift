@@ -18,6 +18,7 @@ import datetime
 import glob
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -82,13 +83,21 @@ def submit_to_lnt(data, url):
 def instrument_test(driver_path, test, num_samples):
     """Run a test and instrument its peak memory use"""
     test_outputs = []
+    peak_memory_regex = None
+    time_flags = ['-p']
+
+    if platform.system() == "Darwin":
+        peak_memory_regex = re.compile('\s*(\d+)\s*maximum resident set size')
+        time_flags += ['-l']
     for _ in range(num_samples):
         test_output_raw = subprocess.check_output(
-            ['time', '-lp', driver_path, test],
+            ['time'] + time_flags + [driver_path, test],
             stderr=subprocess.STDOUT
         )
-        peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
-                               test_output_raw.split('\n')[-15]).group(1)
+        peak_memory = "1"
+        if peak_memory_regex:
+            peak_memory_str = test_output_raw.split('\n')[-15]
+            peak_memory = peak_memory_regex.match(peak_memory_str).group(1)
         test_outputs.append(test_output_raw.split()[1].split(',') +
                             [peak_memory])
 
@@ -125,7 +134,7 @@ def get_tests(driver_path, args):
     """Return a list of available performance tests"""
     driver = ([driver_path, '--list'])
     if args.benchmarks or args.filters:
-        driver.append('--run-all')
+        driver.append('--skip-tags=')
     tests = []
     for l in subprocess.check_output(driver).split("\n")[1:]:
         m = BENCHMARK_OUTPUT_RE.match(l)

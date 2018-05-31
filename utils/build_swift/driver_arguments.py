@@ -317,6 +317,11 @@ def create_argument_parser():
                 '(like bin, lib, and include) will be installed.')
     option('--install-symroot', store_path,
            help='the path to install debug symbols into')
+    option('--install-destdir', store_path,
+           help='the root installation directory')
+    option('--install-foundation', toggle_true,
+           help='Should foundation be installed into the installation '
+                'directory')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),

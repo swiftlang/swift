@@ -97,7 +97,7 @@ Using the Benchmark Driver
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
 The regular `--list` option does not provide these, but you can run:
-* `$ ./Benchmark_O --list --run-all | tail -n +2 | nl`
+* `$ ./Benchmark_O --list --skip-tags= | tail -n +2 | nl`
 You can use ordinal numbers instead of test names like this:
 * `$ ./Benchmark_O 1 42`
 * `$ ./Benchmark_Driver run 1 42`

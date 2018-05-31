@@ -437,6 +437,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--verbose-build'),
     EnableOption('--watchos'),
     EnableOption('--xctest', dest='build_xctest'),
+    EnableOption('--install-foundation'),
 
     DisableOption('--skip-build-android', dest='build_android'),
     DisableOption('--skip-build-benchmarks', dest='build_benchmarks'),
@@ -511,6 +512,7 @@ EXPECTED_OPTIONS = [
     PathOption('--host-lipo'),
     PathOption('--install-prefix'),
     PathOption('--install-symroot'),
+    PathOption('--install-destdir'),
     PathOption('--symbols-package'),
 
     IntOption('--benchmark-num-o-iterations'),

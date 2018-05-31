@@ -194,6 +194,10 @@ set(BENCH_DRIVER_LIBRARY_MODULES
 # Build Configuration
 #===-----------------------------------------------------------------------===#
 
+if (SWIFT_BENCHMARK_BUILT_STANDALONE)
+  set (SWIFT_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
+endif()
+
 # You have to delete CMakeCache.txt in the swift build to force a
 # reconfiguration.
 set(SWIFT_EXTRA_BENCH_CONFIGS CACHE STRING

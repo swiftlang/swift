@@ -458,8 +458,10 @@ func runBenchmarks(_ c: TestConfig) {
 
   for t in c.tests {
     guard let results = runBench(t, c) else {
-      print("\(t.index)\(c.delim)\(t.name)\(c.delim)Unsupported")
-      fflush(stdout)
+      if c.verbose {
+        print("\(t.index)\(c.delim)\(t.name)\(c.delim)Unsupported")
+        fflush(stdout)
+      }
       continue
     }
     print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")

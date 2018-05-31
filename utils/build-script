@@ -582,6 +582,12 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--install-symroot", os.path.abspath(args.install_symroot)
             ]
+        if args.install_destdir:
+            impl_args += [
+                "--install-destdir", os.path.abspath(args.install_destdir)
+            ]
+        if args.install_foundation:
+            impl_args += ["--install-foundation"]
 
         if args.skip_build:
             impl_args += ["--skip-build-cmark",
