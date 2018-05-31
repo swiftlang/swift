@@ -214,6 +214,19 @@ static void emitProvidesTopLevelNames(
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
 }
 
+static void emitProvidesExtensionDecl(const ExtensionDecl *ED,
+                                      llvm::raw_fd_ostream &out,
+                                      llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                      llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
+                                      llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+
+static void emitProvidesNominalTypeDecl(const NominalTypeDecl *NTD,
+                                        llvm::raw_fd_ostream &out,
+                                        llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                        llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls);
+
+static void emitProvidesValueDecl(const ValueDecl *VD, llvm::raw_fd_ostream &out);
+
 static void emitProvidesTopLevelDecl(
     const Decl *const D, llvm::raw_fd_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
@@ -227,34 +240,9 @@ static void emitProvidesTopLevelDecl(
     // FIXME: Handle re-exported decls.
     break;
 
-  case DeclKind::Extension: {
-    auto *ED = cast<ExtensionDecl>(D);
-    auto *NTD = ED->getExtendedType()->getAnyNominal();
-    if (!NTD)
-      break;
-    if (NTD->hasAccess() &&
-        NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
-      break;
-    }
-
-    // Check if the extension is just adding members, or if it is
-    // introducing a conformance to a public protocol.
-    bool justMembers =
-        std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
-                    extendedTypeIsPrivate);
-    if (justMembers) {
-      if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                      declIsPrivate)) {
-        break;
-      } else {
-        extensionsWithJustMembers.push_back(ED);
-      }
-    }
-    extendedNominals[NTD] |= !justMembers;
-    findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                             ED->getMembers());
+  case DeclKind::Extension:
+    emitProvidesExtensionDecl(cast<ExtensionDecl>(D), out, extendedNominals, memberOperatorDecls, extensionsWithJustMembers);
     break;
-  }
 
   case DeclKind::InfixOperator:
   case DeclKind::PrefixOperator:
@@ -269,34 +257,16 @@ static void emitProvidesTopLevelDecl(
   case DeclKind::Enum:
   case DeclKind::Struct:
   case DeclKind::Class:
-  case DeclKind::Protocol: {
-    auto *NTD = cast<NominalTypeDecl>(D);
-    if (!NTD->hasName())
+  case DeclKind::Protocol:
+      emitProvidesNominalTypeDecl(cast<NominalTypeDecl>(D), out, extendedNominals, memberOperatorDecls);
       break;
-    if (NTD->hasAccess() &&
-        NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
-      break;
-    }
-    out << "- \"" << escape(NTD->getName()) << "\"\n";
-    extendedNominals[NTD] |= true;
-    findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                             NTD->getMembers());
-    break;
-  }
 
   case DeclKind::TypeAlias:
   case DeclKind::Var:
   case DeclKind::Func:
-  case DeclKind::Accessor: {
-    auto *VD = cast<ValueDecl>(D);
-    if (!VD->hasName())
+  case DeclKind::Accessor:
+      emitProvidesValueDecl(cast<ValueDecl>(D), out);
       break;
-    if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
-      break;
-    }
-    out << "- \"" << escape(VD->getBaseName()) << "\"\n";
-    break;
-  }
 
   case DeclKind::PatternBinding:
   case DeclKind::TopLevelCode:
@@ -317,82 +287,138 @@ static void emitProvidesTopLevelDecl(
     // These can occur in malformed ASTs.
     break;
   }
-  }
+}
 
-  static void emitProvidesNominalTypes(
-      const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-      llvm::raw_fd_ostream &out) {
-    out << "provides-nominal:\n";
-    for (auto entry : extendedNominals) {
-      if (!entry.second)
+static void emitProvidesExtensionDecl(const ExtensionDecl *const ED,
+                                      llvm::raw_fd_ostream &out,
+                                      llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                      llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
+                                      llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
+  auto *NTD = ED->getExtendedType()->getAnyNominal();
+  if (!NTD)
+    return;
+  if (NTD->hasAccess() &&
+      NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+    return;
+  }
+  
+  // Check if the extension is just adding members, or if it is
+  // introducing a conformance to a public protocol.
+  bool justMembers =
+  std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
+              extendedTypeIsPrivate);
+  if (justMembers) {
+    if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
+                    declIsPrivate)) {
+      return;
+    }
+    extensionsWithJustMembers.push_back(ED);
+  }
+  extendedNominals[NTD] |= !justMembers;
+  findNominalsAndOperators(extendedNominals, memberOperatorDecls,
+                           ED->getMembers());
+}
+
+static void emitProvidesNominalTypeDecl(const NominalTypeDecl *const NTD,
+                                        llvm::raw_fd_ostream &out,
+                                        llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                        llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls) {
+  if (!NTD->hasName())
+    return;
+  if (NTD->hasAccess() &&
+      NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
+    return;
+  }
+  out << "- \"" << escape(NTD->getName()) << "\"\n";
+  extendedNominals[NTD] |= true;
+  findNominalsAndOperators(extendedNominals, memberOperatorDecls,
+                           NTD->getMembers());
+}
+
+static void emitProvidesValueDecl(const ValueDecl *const VD, llvm::raw_fd_ostream &out) {
+  if (!VD->hasName())
+    return;
+  if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+    return;
+  }
+  out << "- \"" << escape(VD->getBaseName()) << "\"\n";
+}
+
+
+static void emitProvidesNominalTypes(
+                                     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                     llvm::raw_fd_ostream &out) {
+  out << "provides-nominal:\n";
+  for (auto entry : extendedNominals) {
+    if (!entry.second)
+      continue;
+    out << "- \"";
+    out << mangleTypeAsContext(entry.first);
+    out << "\"\n";
+  }
+}
+
+static void emitProvidesMembers(
+                                const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                const llvm::SmallVectorImpl<const ExtensionDecl *>
+                                &extensionsWithJustMembers,
+                                llvm::raw_fd_ostream &out) {
+  out << "provides-member:\n";
+  for (auto entry : extendedNominals) {
+    out << "- [\"";
+    out << mangleTypeAsContext(entry.first);
+    out << "\", \"\"]\n";
+  }
+  
+  // This is also part of "provides-member".
+  for (auto *ED : extensionsWithJustMembers) {
+    auto mangledName =
+    mangleTypeAsContext(ED->getExtendedType()->getAnyNominal());
+    
+    for (auto *member : ED->getMembers()) {
+      auto *VD = dyn_cast<ValueDecl>(member);
+      if (!VD || !VD->hasName() ||
+          VD->getFormalAccess() <= AccessLevel::FilePrivate) {
         continue;
-      out << "- \"";
-      out << mangleTypeAsContext(entry.first);
-      out << "\"\n";
+      }
+      out << "- [\"" << mangledName << "\", \"" << escape(VD->getBaseName())
+      << "\"]\n";
     }
   }
+}
 
-  static void emitProvidesMembers(
-      const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-      const llvm::SmallVectorImpl<const ExtensionDecl *>
-          &extensionsWithJustMembers,
-      llvm::raw_fd_ostream &out) {
-    out << "provides-member:\n";
-    for (auto entry : extendedNominals) {
-      out << "- [\"";
-      out << mangleTypeAsContext(entry.first);
-      out << "\", \"\"]\n";
-    }
-
-    // This is also part of "provides-member".
-    for (auto *ED : extensionsWithJustMembers) {
-      auto mangledName =
-          mangleTypeAsContext(ED->getExtendedType()->getAnyNominal());
-
-      for (auto *member : ED->getMembers()) {
-        auto *VD = dyn_cast<ValueDecl>(member);
-        if (!VD || !VD->hasName() ||
-            VD->getFormalAccess() <= AccessLevel::FilePrivate) {
-          continue;
-        }
-        out << "- [\"" << mangledName << "\", \"" << escape(VD->getBaseName())
-            << "\"]\n";
+static void emitProvidesDynamicLookupMembers(const SourceFile *const SF,
+                                             llvm::raw_fd_ostream &out) {
+  if (SF->getASTContext().LangOpts.EnableObjCInterop) {
+    // FIXME: This requires a traversal of the whole file to compute.
+    // We should (a) see if there's a cheaper way to keep it up to date,
+    // and/or (b) see if we can fast-path cases where there's no ObjC
+    // involved.
+    out << "provides-dynamic-lookup:\n";
+    class NameCollector : public VisibleDeclConsumer {
+    private:
+      SmallVector<DeclBaseName, 16> names;
+      
+    public:
+      void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+        names.push_back(VD->getBaseName());
       }
+      ArrayRef<DeclBaseName> getNames() {
+        llvm::array_pod_sort(
+                             names.begin(), names.end(),
+                             [](const DeclBaseName *lhs, const DeclBaseName *rhs) {
+                               return lhs->compare(*rhs);
+                             });
+        names.erase(std::unique(names.begin(), names.end()), names.end());
+        return names;
+      }
+    };
+    NameCollector collector;
+    SF->lookupClassMembers({}, collector);
+    for (DeclBaseName name : collector.getNames()) {
+      out << "- \"" << escape(name) << "\"\n";
     }
   }
-
-  static void emitProvidesDynamicLookupMembers(const SourceFile *const SF,
-                                               llvm::raw_fd_ostream &out) {
-    if (SF->getASTContext().LangOpts.EnableObjCInterop) {
-      // FIXME: This requires a traversal of the whole file to compute.
-      // We should (a) see if there's a cheaper way to keep it up to date,
-      // and/or (b) see if we can fast-path cases where there's no ObjC
-      // involved.
-      out << "provides-dynamic-lookup:\n";
-      class NameCollector : public VisibleDeclConsumer {
-      private:
-        SmallVector<DeclBaseName, 16> names;
-
-      public:
-        void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-          names.push_back(VD->getBaseName());
-        }
-        ArrayRef<DeclBaseName> getNames() {
-          llvm::array_pod_sort(
-              names.begin(), names.end(),
-              [](const DeclBaseName *lhs, const DeclBaseName *rhs) {
-                return lhs->compare(*rhs);
-              });
-          names.erase(std::unique(names.begin(), names.end()), names.end());
-          return names;
-        }
-      };
-      NameCollector collector;
-      SF->lookupClassMembers({}, collector);
-      for (DeclBaseName name : collector.getNames()) {
-        out << "- \"" << escape(name) << "\"\n";
-      }
-    }
 }
 
 static SmallVector<std::pair<DeclBaseName, bool>, 16>
