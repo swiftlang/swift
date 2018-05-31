@@ -158,6 +158,11 @@ public:
     return SILType(getSwiftRValueType(), SILValueCategory::Object);
   }
 
+  /// Returns the canonical AST type referenced by this SIL type.
+  CanType getASTType() const {
+    return getSwiftRValueType();
+  }
+
   /// Returns the Swift type referenced by this SIL type.
   CanType getSwiftRValueType() const {
     return CanType(value.getPointer());
