@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Metadata.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 
@@ -135,6 +136,22 @@ void _bridgeNonVerbatimFromObjectiveCToAny(HeapObject *sourceValue,
   abort();
 }
 
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
+                                       OpaqueValue *result,
+                                       const Metadata *destinationType) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool swift_swiftValueConformsTo(const Metadata *destinationType) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+HeapObject *$Ss27_bridgeAnythingToObjectiveCyyXlxlF(OpaqueValue *src, const Metadata *srcType) {
+  abort();
+}
 
 // ErrorObject
 
