@@ -2591,7 +2591,7 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           Optional<Type> BaseType, Optional<Type> Result,
-                          bool IsOnMetatype = true,
+                          bool IsOnType = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD, BaseType);
@@ -2601,23 +2601,11 @@ public:
                                       ->castTo<AnyFunctionType>();
 
     bool needInit = false;
-    if (!IsOnMetatype) {
+    if (!IsOnType) {
       assert(addName.empty());
-      assert(isa<ConstructorDecl>(CurrDeclContext) &&
-             "can call super.init only inside a constructor");
       needInit = true;
-    } else if (addName.empty()) {
-      auto ReasonIsValid =
-        Reason == DeclVisibilityKind::MemberOfCurrentNominal ||
-        Reason == DeclVisibilityKind::MemberOfSuper ||
-        Reason == DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal;
-      auto instTy = ExprType->castTo<AnyMetatypeType>()->getInstanceType();
-
-      if (ReasonIsValid && (HaveDot ||
-          !(instTy->is<ArchetypeType>() || IsStaticMetatype))) {
-        // This case is querying the init function as member
-        needInit = true;
-      }
+    } else if (addName.empty() && HaveDot) {
+      needInit = true;
     }
 
     // If we won't be able to provide a result, bail out.
@@ -2699,7 +2687,7 @@ public:
         if (shouldHideDeclFromCompletionResults(init))
           continue;
         addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
-                           /*IsOnMetatype=*/true, name);
+                           /*IsOnType=*/true, name);
       }
     }
   }
@@ -2963,16 +2951,27 @@ public:
                 CD->getResultInterfaceType().getPointer()) {
             Result = Ty;
           }
-          if (IsStaticMetatype || CD->isRequired() || IsSelfRefExpr ||
-              Ty->is<ArchetypeType>() ||
-              !(Ty->is<ClassType>() || HaveLParen))
-            addConstructorCall(CD, Reason, None, Result);
+          // If the expression type is not a static metatype or an archetype, the base
+          // is not a type. Direct call syntax is illegal on values, so we only add
+          // initializer completions if we do not have a left parenthesis and either
+          // the initializer is required, the base type's instance type is not a class,
+          // or this is a 'self' or 'super' reference.
+          if (IsStaticMetatype || Ty->is<ArchetypeType>())
+            addConstructorCall(CD, Reason, None, Result, /*isOnType*/true);
+          else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
+                    CD->isRequired()) && !HaveLParen)
+            addConstructorCall(CD, Reason, None, Result, /*isOnType*/false);
           return;
         }
-        if (IsSuperRefExpr || IsSelfRefExpr) {
-          if (!isa<ConstructorDecl>(CurrDeclContext))
+        if (!HaveLParen) {
+          auto CDC = dyn_cast<ConstructorDecl>(CurrDeclContext);
+          if (!CDC)
             return;
-          addConstructorCall(CD, Reason, None, None, /*IsOnMetatype=*/false);
+          // We do not want 'init' completions for 'self' in non-convenience
+          // initializers and for 'super' in convenience initializers.
+          if ((IsSelfRefExpr && CDC->isConvenienceInit()) ||
+              ((IsSuperRefExpr && !CDC->isConvenienceInit())))
+            addConstructorCall(CD, Reason, None, None, /*IsOnType=*/false);
         }
         return;
       }
