@@ -1,4 +1,3 @@
-// old run %target-sil-opt -sil-print-all -verify %s | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir -o - | %FileCheck %s
 
 sil_stage raw
@@ -9,9 +8,9 @@ import Builtin
 sil @foo : $@convention(thin) (Float, Float) -> Float {
 bb0(%0 : $Float, %1 : $Float):
   %tape = builtin "autodiffCreateTape"<Float>() : $_AutoDiffTape<Float>
-  %id = integer_literal $Builtin.Int64, 0
-  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Int64) : $()
-  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Int64) : $Float
+  %id = integer_literal $Builtin.Word, 0
+  builtin "autodiffPushToTape"<Float>(%tape : $_AutoDiffTape<Float>, %0 : $Float, %id : $Builtin.Word) : $()
+  %val = builtin "autodiffPopFromTape"<Float>(%tape : $_AutoDiffTape<Float>, %id : $Builtin.Word) : $Float
   builtin "autodiffDestroyTape"<Float>(%tape : $_AutoDiffTape<Float>) : $()
   return %val : $Float
 }
