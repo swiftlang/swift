@@ -16,7 +16,7 @@ open class Cities {
 
 public protocol ExtraCities {
   func coolum(x: [String : [Int : [(((String))?)]]])
-  func blibli(x: (String?, String) -> String!)
+  func blibli(x: (String?, String) -> String?)
   func currimundi(x: (Int, (Int, Int))!)
 }
 
