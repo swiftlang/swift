@@ -140,22 +140,21 @@ extension TensorBuffer {
 }
 
 //===----------------------------------------------------------------------===//
-// ShapedArrayProtocol, the protocol that all shaped array types, including
-// ShapedArray, Array, Array2D, etc, will conform to.
+// ShapedArrayProtocol, the protocol unifying ShapedArray and ShapedArraySlice.
 //===----------------------------------------------------------------------===//
 
 public protocol _ShapedArrayProtocol
   : RandomAccessCollection, MutableCollection {
   associatedtype Scalar
 
-  /// Number of dimensions in this array.
+  /// The number of dimensions of the array.
   var rank: Int { get }
-  /// Shape of this array.
+  /// The dimensions of the array.
   var shape: [Int] { get }
-  /// The total number of scalars in this array.
+  /// The total number of scalars in the array.
   var scalarCount: Int { get }
 
-  /// Creates an array with the specificied shape and contiguous scalars in
+  /// Creates an array with the specified shape and contiguous scalars in
   /// row-major order.
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
@@ -192,7 +191,7 @@ public protocol _ShapedArrayProtocol
 }
 
 public extension _ShapedArrayProtocol {
-  /// The scalars of the `ShapedArray` in row-major order.
+  /// The scalars of the array in row-major order.
   var scalars: [Scalar] {
     get {
       return withUnsafeBufferPointer(Array.init)
@@ -205,13 +204,13 @@ public extension _ShapedArrayProtocol {
     }
   }
 
-  /// Returns true if the `ShapedArray` has rank 0.
+  /// Returns `true` if the array has rank 0.
   var isScalar: Bool {
     return rank == 0
   }
 
-  /// Returns the underlying scalar from a 0-ranked `ShapedArray`.
-  /// - Precondition: The `ShapedArray` is 0-ranked.
+  /// Returns the single scalar element if the array has rank 0 and `nil`
+  /// otherwise.
   var scalar: Scalar? {
     guard rank == 0 else { return nil }
     return scalars.first
@@ -226,8 +225,8 @@ public extension _ShapedArrayProtocol where Scalar : Equatable {
 }
 
 public extension _ShapedArrayProtocol {
-  /// Returns the number of element arrays in a `ShapedArray` (equivalent to the
-  /// first dimension).
+  /// Returns the number of element arrays in an array (equivalent to the first
+  /// dimension).
   /// - Note: `count` is distinct from `scalarCount`, which represents the total
   ///   number of scalars.
   var count: Int {
@@ -236,19 +235,19 @@ public extension _ShapedArrayProtocol {
 }
 
 internal extension _ShapedArrayProtocol {
-  /// Returns the scalar count for an element of a `ShapedArray`.
+  /// Returns the scalar count for an element of the array.
   var scalarCountPerElement: Int {
     return shape.isEmpty ? 0 : shape.dropFirst().reduce(1, *)
   }
 
   /// Returns the scalar index corresponding to an index in the leading
-  /// dimension of a `ShapedArray`.
+  /// dimension of the array.
   func scalarIndex(fromIndex index: Int) -> Int {
     return scalarCountPerElement * index
   }
 
   /// Returns the range of scalars corresponding to a range in the leading
-  /// dimension of a `ShapedArray`.
+  /// dimension of the array.
   func scalarSubrange(
     from arraySubrange: Range<Int>
   ) -> Range<Int> {
@@ -636,7 +635,7 @@ public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   @_versioned internal var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
   @_versioned internal var baseIndices: [Int]
-  /// The subtensor bounds of a slice.
+  /// The subarray bounds of a slice.
   @_versioned internal var bounds: Range<Int>?
 
   /// Creates a `ShapedArraySlice` from a base `ShapedArray`, with the specified

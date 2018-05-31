@@ -25,23 +25,23 @@ public struct TensorShape : ExpressibleByArrayLiteral {
 
   /// Initialize with an array of dimensions. The rank of the tensor is the
   /// length of the array.
-  /// - Parameter dimensions: the shape dimensions.
+  /// - Parameter dimensions: The shape dimensions.
   @_inlineable @inline(__always)
   public init(_ dimensions: [Int32]) {
     self.dimensions = dimensions
   }
 
   /// Initialize with an array literal representing the shape dimensions. The rank
-  /// of the tensor is the length of the dimensions.
-  /// - Parameter dimensions: the shape dimensions.
+  /// of the tensor is the number of dimensions.
+  /// - Parameter dimensions: The shape dimensions.
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: Int32...) {
     self.init(elements)
   }
 
   /// Initialize with variadic elements representing the shape dimensions. The rank
-  /// of the tensor is the length of the elements.
-  /// - Parameter dimensions: the shape dimensions.
+  /// of the tensor is the number of elements.
+  /// - Parameter dimensions: The shape dimensions.
   @_inlineable @inline(__always)
   public init(_ elements: Int32...) {
     self.init(elements)
@@ -101,7 +101,7 @@ public extension TensorShape {
   }
 
   /// Access the size of the i-th dimension.
-  /// - Parameter index: the index of a dimension.
+  /// - Parameter index: The index of a dimension.
   @_inlineable
   subscript(index: Int32) -> Int32 {
     @inline(__always)
@@ -115,7 +115,7 @@ public extension TensorShape {
   }
 
   /// Access the size of the i-th dimension.
-  /// - Parameter index: the index of a dimension.
+  /// - Parameter index: The index of a dimension.
   @_inlineable
   subscript(bounds: Range<Int32>) -> TensorShape {
     @inline(__always)
