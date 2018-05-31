@@ -1429,10 +1429,80 @@ public:
     }
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  static bool isAutoDiffBuiltinInst(BuiltinInst *BI) {
+    auto id = BI->getBuiltinInfo().ID;
+    return id == BuiltinValueKind::AutoDiffCreateTape ||
+      id == BuiltinValueKind::AutoDiffDestroyTape ||
+      id == BuiltinValueKind::AutoDiffPushToTape ||
+      id == BuiltinValueKind::AutoDiffPopFromTape;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void checkAutoDiffBuiltinInst(BuiltinInst *BI) {
+    auto &ctx = M->getASTContext();
+    auto id = BI->getBuiltinInfo().ID;
+    require(BI->getSubstitutions().size() == 1,
+            "autodiff builtin should have a single type parameter");
+
+    auto name = getBuiltinName(id);
+    auto resultErrorMsg = "unexpected result type for '" + name + "'";
+    auto operandErrorMsg = "unexpected operand type for '" + name + "'";
+
+    auto canGenericParam = BI->getSubstitutions()[0].getReplacement()
+      ->getCanonicalType();
+    auto tapeType = SILType::getPrimitiveObjectType(
+      BoundGenericType::get(ctx.get_AutoDiffTapeDecl(), Type(), canGenericParam)
+        ->getCanonicalType());
+    if (id == BuiltinValueKind::AutoDiffCreateTape) {
+      require(BI->getNumOperands() == 0,
+              "'" + name + "' should have no arguments");
+      requireSameType(BI->getType(), tapeType, resultErrorMsg);
+      return;
+    }
+
+    auto voidType = SILType::getPrimitiveObjectType(TupleType::getEmpty(ctx));
+    if (id == BuiltinValueKind::AutoDiffDestroyTape) {
+      require(BI->getNumOperands() == 1,
+              "'" + name + "' should have one argument");
+      requireSameType(BI->getType(), voidType, resultErrorMsg);
+      requireSameType(BI->getOperand(0)->getType(), tapeType, operandErrorMsg);
+      return;
+    }
+
+    auto genericParam = SILType::getPrimitiveObjectType(canGenericParam);
+    auto wordType = SILType::getPrimitiveObjectType(
+      BuiltinIntegerType::getWordType(ctx)->getCanonicalType());
+    if (id == BuiltinValueKind::AutoDiffPushToTape) {
+      require(BI->getNumOperands() == 3,
+              "'" + name + "' should have three arguments");
+      requireSameType(BI->getType(), voidType, resultErrorMsg);
+      requireSameType(BI->getOperand(0)->getType(), tapeType, operandErrorMsg);
+      requireSameType(BI->getOperand(1)->getType(), genericParam,
+                      operandErrorMsg);
+      requireSameType(BI->getOperand(2)->getType(), wordType, operandErrorMsg);
+      return;
+    }
+    if (id == BuiltinValueKind::AutoDiffPopFromTape) {
+      require(BI->getNumOperands() == 2,
+              "'" + name + "' should have two arguments");
+      requireSameType(BI->getType(), genericParam, resultErrorMsg);
+      requireSameType(BI->getOperand(0)->getType(), tapeType, operandErrorMsg);
+      requireSameType(BI->getOperand(1)->getType(), wordType, operandErrorMsg);
+      return;
+    }
+  }
+
+
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
     if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Verify autodiff builtins.
+    if (isAutoDiffBuiltinInst(BI))
+      checkAutoDiffBuiltinInst(BI);
   }
   
   void checkFunctionRefInst(FunctionRefInst *FRI) {
