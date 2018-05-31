@@ -1,0 +1,12 @@
+class Person {
+    /// <#Initializer Summary#>
+///  - Parameters
+///    - firstName: <#Parameter firstName#>
+///    - lastName: <#Parameter lastName#>
+///    - age: <#Parameter age#>
+///
+init(firstName: String, lastName: String, age: Int) {
+        
+    }
+}
+

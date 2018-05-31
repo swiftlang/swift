@@ -1,0 +1,12 @@
+/// <#Function Summary#>
+///  - Parameters
+///    - a: <#Parameter a#>
+///    - b: <#Parameter b#>
+///    - c: <#Parameter c#>
+///
+///  - Returns: <#(a: Int, b: String)#>
+///
+func funcWithParamsReturnNoThrow(_ a: Int, b: Int, c: String) -> (a: Int, b: String) {
+    
+}
+

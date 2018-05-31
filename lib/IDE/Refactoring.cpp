@@ -2571,6 +2571,154 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+void processParameters(ArrayRef<const ParameterList *> allParamsList,
+                       swift::SourceLoc startLocation,
+                       SourceEditConsumer &EditConsumer,
+                       SourceManager &SM) {
+    
+  SmallVector<ParamDecl *, 5> allParamDecls;
+  for (auto paramLists : allParamsList) {
+    auto paramDecls = paramLists->getArray();
+    for (auto paramDecl : paramDecls) {
+      if (paramDecl->isSelfParameter())
+        continue;
+      
+      allParamDecls.push_back(paramDecl);
+    }
+  }
+  
+  if (allParamDecls.size() > 1) {
+    EditConsumer.accept(SM, startLocation, "///  - Parameters\n");
+  }
+  
+  for (auto paramDecl : allParamDecls) {
+    const char *parameterName = paramDecl->getName().get();
+    
+    if (allParamDecls.size() == 1) {
+      EditConsumer.accept(SM, startLocation, "///  - Parameter ");
+    }
+    
+    if (allParamDecls.size() > 1) {
+      EditConsumer.accept(SM, startLocation, "///    - ");
+    }
+    
+    EditConsumer.accept(SM, startLocation, parameterName);
+    EditConsumer.accept(SM, startLocation, ": <#Parameter ");
+    EditConsumer.accept(SM, startLocation, parameterName);
+    EditConsumer.accept(SM, startLocation, "#>\n");
+  }
+}
+
+void processReturn(Type returnType, swift::SourceLoc startLocation,
+                   SourceEditConsumer &EditConsumer,
+                   SourceManager &SM) {
+    
+  if (returnType.isNull())
+    return;
+  
+  EditConsumer.accept(SM, startLocation, "///\n///  - Returns: <#");
+  EditConsumer.accept(SM, startLocation, returnType.getString());
+  EditConsumer.accept(SM, startLocation, "#>\n");
+}
+    
+void processThrows(swift::SourceLoc startLocation,
+                   SourceEditConsumer &EditConsumer,
+                   SourceManager &SM) {
+    
+  EditConsumer.accept(SM, startLocation, "///\n///  - Throws: <#Throws#>\n");
+}
+
+void generateDocCommentForFunction(FuncDecl *funcDecl,
+                                   swift::SourceLoc startLocation,
+                                   SourceEditConsumer &EditConsumer,
+                                   SourceManager &SM) {
+  
+  EditConsumer.accept(SM, startLocation, "/// <#Function Summary#>\n");
+  
+  processParameters(funcDecl->getParameterLists(), startLocation,
+                    EditConsumer, SM);
+  
+  if (funcDecl->hasThrows()) {
+    processThrows(startLocation, EditConsumer, SM);
+  }
+  
+  Type returnType = funcDecl->getReturnTypeLoc().getType();
+  processReturn(returnType, startLocation, EditConsumer, SM);
+  
+  EditConsumer.accept(SM, startLocation,"///\n");
+}
+    
+void generateDocCommentForConstructor(ConstructorDecl *constructorDecl,
+                                      swift::SourceLoc startLocation,
+                                      SourceEditConsumer &EditConsumer,
+                                      SourceManager &SM) {
+  
+  EditConsumer.accept(SM, startLocation, "/// <#Initializer Summary#>\n");
+  
+  processParameters(constructorDecl->getParameterLists(), startLocation, EditConsumer, SM);
+  
+  if (constructorDecl->hasThrows()) {
+    processThrows(startLocation, EditConsumer, SM);
+  }
+  
+  EditConsumer.accept(SM, startLocation,"///\n");
+}
+    
+void generateDocCommentForSubscript(SubscriptDecl *subscriptDecl,
+                                    swift::SourceLoc startLocation,
+                                    SourceEditConsumer &EditConsumer,
+                                    SourceManager &SM) {
+  
+  EditConsumer.accept(SM, startLocation, "/// <#Subscript Summary#>\n");
+  
+  processParameters(subscriptDecl->getIndices(), startLocation,
+                    EditConsumer, SM);
+  
+  Type returnType = subscriptDecl->getElementTypeLoc().getType();
+  processReturn(returnType, startLocation, EditConsumer, SM);
+  
+  EditConsumer.accept(SM, startLocation,"///\n");
+}
+   
+bool canGenerateDocComment(DeclKind kind) {
+  return kind == DeclKind::Func || kind == DeclKind::Constructor ||
+    kind == DeclKind::Subscript;
+}
+    
+bool RefactoringActionDocCommentBoilerplate::
+  isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
+  if (Tok.Kind != CursorInfoKind::ValueRef)
+    return false;
+  
+  DeclKind tokenKind = Tok.ValueD->getKind();
+  return canGenerateDocComment(tokenKind);
+}
+    
+bool RefactoringActionDocCommentBoilerplate::performChange() {
+  
+  if (!CursorInfo.ValueD)
+    return true;
+  
+  swift::SourceLoc startLocation = CursorInfo.ValueD->getStartLoc();
+  
+  if (auto funcDecl = dyn_cast<FuncDecl>(CursorInfo.ValueD)) {
+    generateDocCommentForFunction(funcDecl, startLocation,
+                                  EditConsumer, SM);
+  } else if (auto constructorDecl =
+           dyn_cast<ConstructorDecl>(CursorInfo.ValueD)) {
+    generateDocCommentForConstructor(constructorDecl, startLocation,
+                                     EditConsumer, SM);
+  } else if (auto subscriptDecl =
+           dyn_cast<SubscriptDecl>(CursorInfo.ValueD)) {
+    generateDocCommentForSubscript(subscriptDecl, startLocation,
+                                   EditConsumer, SM);
+  } else {
+    return true;
+  }
+  
+  return false;
+}
+
 static CharSourceRange
   findSourceRangeToWrapInCatch(ResolvedCursorInfo CursorInfo,
                                SourceFile *TheFile,

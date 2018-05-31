@@ -1,0 +1,8 @@
+class Person {
+    /// <#Initializer Summary#>
+///
+init() {
+        
+    }
+}
+

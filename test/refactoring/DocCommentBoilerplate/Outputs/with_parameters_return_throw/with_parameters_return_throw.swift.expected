@@ -1,0 +1,14 @@
+/// <#Function Summary#>
+///  - Parameters
+///    - a: <#Parameter a#>
+///    - b: <#Parameter b#>
+///    - c: <#Parameter c#>
+///
+///  - Throws: <#Throws#>
+///
+///  - Returns: <#(a: Int, b: String)#>
+///
+func funcWithParamsReturnThrow(_ a: Int, b: Int, c: String)throws -> (a: Int, b: String) {
+    
+}
+

@@ -1,0 +1,8 @@
+/// <#Function Summary#>
+///
+///  - Throws: <#Throws#>
+///
+func funcWithNoReturnNoParamsThrow() throws{
+    
+}
+

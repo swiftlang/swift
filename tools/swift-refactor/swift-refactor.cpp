@@ -66,7 +66,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
            clEnumValN(RefactoringKind::TrailingClosure,
                       "trailingclosure", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
-                      "replace-bodies-with-fatalError", "Perform trailing closure refactoring")));
+                      "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
+           clEnumValN(RefactoringKind::DocCommentBoilerplate, "doc-comment-boilerplate", "Generate documentation comment for function")));
 
 
 static llvm::cl::opt<std::string>

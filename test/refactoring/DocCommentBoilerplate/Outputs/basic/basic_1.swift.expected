@@ -1,0 +1,6 @@
+/// <#Function Summary#>
+///
+func funcWithNoParamsNoReturnNoThrow() {
+    
+}
+

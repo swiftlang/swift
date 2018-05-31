@@ -1,0 +1,10 @@
+class Person {
+    /// <#Initializer Summary#>
+///
+///  - Throws: <#Throws#>
+///
+init() throws{
+        
+    }
+}
+

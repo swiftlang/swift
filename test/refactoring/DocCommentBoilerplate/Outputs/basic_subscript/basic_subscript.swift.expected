@@ -1,0 +1,15 @@
+class Person {
+    init() {
+        
+    }
+    
+    /// <#Subscript Summary#>
+///  - Parameter int: <#Parameter int#>
+///
+///  - Returns: <#Double#>
+///
+subscript(int: Int) -> Double {
+        return 0.0
+    }
+}
+
