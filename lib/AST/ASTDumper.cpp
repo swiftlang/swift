@@ -1857,9 +1857,9 @@ public:
       }, [&]{
         OS << ", ";
       });
-      OS << ")";
+      OS << ')';
     }
-    OS << ")";
+    OS << ')';
   }
 
   void visitGradientExpr(GradientExpr *E) {
@@ -1870,6 +1870,13 @@ public:
   void visitValueAndGradientExpr(ValueAndGradientExpr *E) {
     printCommon(E, "value_and_gradient_expr");
     printReverseAutoDiffExpr(E);
+  }
+
+  void visitAdjointExpr(AdjointExpr *E) {
+    printCommon(E, "adjoint_expr");
+    OS << " original=";
+    E->getOriginalExpr()->dump(OS);
+    OS << ')';
   }
 
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
