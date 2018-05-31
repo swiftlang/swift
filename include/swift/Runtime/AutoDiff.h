@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// SWIFT_ENABLE_TENSORFLOW
+//
+//===----------------------------------------------------------------------===//
 
 #include <stack>
 #include "swift/Runtime/Config.h"
@@ -20,7 +24,7 @@ namespace swift {
 struct AutoDiffTape {
   /// Element type of the tape.
   Metadata *type;
-  std::stack<OpaqueValue *> elements;
+  std::vector<OpaqueValue *> elements;
 
   AutoDiffTape(Metadata *type) : type(type) {}
 };
