@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -770,7 +770,7 @@ private:
 
     auto mapping = shuffle->getElementMapping();
     for (unsigned destIndex = 0; destIndex != mapping.size(); ++destIndex) {
-      auto srcIndex = shuffle->getElementMapping()[destIndex];
+      auto srcIndex = mapping[destIndex];
       if (srcIndex >= 0) {
         origSrcElts[srcIndex] = origParamTupleType->getElement(destIndex);
       } else if (srcIndex == TupleShuffleExpr::DefaultInitialize ||
@@ -785,9 +785,6 @@ private:
           origSrcElts[srcIndex] =
             origParamTupleType->getASTContext().TheRawPointerType;
         }
-
-        // We're done iterating these elements.
-        break;
       } else {
         llvm_unreachable("bad source-element mapping!");
       }
