@@ -545,6 +545,13 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   HelpText<"API migration data is from <path>">,
   MetaVarName<"<path>">;
 
+def api_diff_data_dir: Separate<["-"], "api-diff-data-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  HelpText<"Load platform and version specific API migration data files from <path>. "
+      "Ignored if -api-diff-data-file is specified.">,
+  MetaVarName<"<path>">;
+
 def dump_usr: Flag<["-"], "dump-usr">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Dump USR for each declaration reference">;
