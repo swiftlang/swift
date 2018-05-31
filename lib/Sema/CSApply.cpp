@@ -7847,8 +7847,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         : methods.argumentsMethod;
       assert(method && "Dynamic call method should exist");
 
-      auto methodType = method->getMethodInterfaceType()
-        ->castTo<AnyFunctionType>();
+      auto memberType =
+        cs.getTypeOfMemberReference(cs.getType(fn), method, cs.DC,
+                                    /*isDynamicResult*/ false,
+                                    FunctionRefKind::DoubleApply,
+                                    locator).second;
+      auto methodType = memberType->castTo<AnyFunctionType>();
 
       // Construct expression referencing the `dynamicallyCall` method.
       Expr *member =

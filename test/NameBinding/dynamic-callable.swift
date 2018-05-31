@@ -104,8 +104,15 @@ struct Invalid2 {
 class Invalid3 {
   func dynamicallyCall(withArguments arguments: [Int]) -> Int { return 1 }
 }
-func testInvalidKeywordCall(x: Invalid3) {
+@dynamicCallable
+// expected-error @+1 {{@dynamicCallable type 'InvalidProtocol & AnyObject' cannot be applied with keyword arguments; missing `dynamicCall(withKeywordArguments:)` method}}
+protocol InvalidProtocol {}
+extension InvalidProtocol {
+  func dynamicallyCall(withArguments arguments: [Int]) -> Int { return 1 }
+}
+func testInvalidKeywordCall(x: Invalid3, y: InvalidProtocol & AnyObject) {
   x(a: 1, b: 2) // expected-error {{cannot invoke 'x' with an argument list of type '(a: Int, b: Int)'}}
+  y(a: 1, b: 2) // expected-error {{cannot invoke 'y' with an argument list of type '(a: Int, b: Int)'}}
 }
 
 // References to overloads are currently not supported.
@@ -159,17 +166,29 @@ extension CallableProtocol {
   }
 }
 
-extension String : CallableProtocol {}
+@dynamicCallable
+protocol KeywordCallableProtocol {}
+extension KeywordCallableProtocol {
+  func dynamicallyCall(
+    withKeywordArguments arguments: DictionaryLiteral<String, Double>
+  ) -> Int {
+    return arguments.count
+  }
+}
+
+extension String : CallableProtocol, KeywordCallableProtocol {}
 
 func testProtoExtension() -> Int {
   let str = "test"
-  return str(1, 2, 3)
+  return str(1, 2, 3) + str(label1: 1, 2, label2: 3)
 }
 
 struct CallableStruct : CallableProtocol {}
 
-func testExistential(a: CallableProtocol, b: CallableStruct) -> Int {
-  return a(1, 2, 3) + b(1, 2, 3)
+func testExistential(
+  a: CallableProtocol, b: KeywordCallableProtocol, c: CallableStruct
+) -> Int {
+  return a(1, 2, 3) + b(label1: 1, 2, label2: 3) + c(1, 2, 3)
 }
 
 // Verify protocol compositions and refinements work.
@@ -179,10 +198,12 @@ typealias ProtocolComp = AnyObject & CallableProtocol
 
 func testExistential2(a: AnyObject & CallableProtocol,
                       b: SubProtocol,
-                      c: ProtocolComp & AnyObject) {
+                      c: ProtocolComp & AnyObject,
+                      d: CallableProtocol & KeywordCallableProtocol) {
   print(a(1, 2, 3))
   print(b(1, 2, 3))
   print(c(1, 2, 3))
+  print(d() + d(label1: 1, 2, label2: 3))
 }
 
 //===----------------------------------------------------------------------===//
@@ -222,12 +243,12 @@ func testDerivedClass(
 //===----------------------------------------------------------------------===//
 
 @dynamicCallable
-enum BinaryOperation {
+enum BinaryOperation<T : Numeric> {
   case add
   case subtract
   case multiply
 
-  func dynamicallyCall(withArguments arguments: [Int]) -> Int {
+  func dynamicallyCall(withArguments arguments: [T]) -> T {
     precondition(arguments.count == 2, "Must have 2 arguments")
     let x = arguments[0]
     let y = arguments[1]
@@ -243,7 +264,7 @@ enum BinaryOperation {
 }
 
 func testEnum() {
-  let ops: [BinaryOperation] = [.add, .subtract, .multiply]
+  let ops: [BinaryOperation<Int>] = [.add, .subtract, .multiply]
   for op in ops {
     print(op(3, 4))
   }
@@ -319,15 +340,34 @@ func testConcreteGenericType3(a: CallableGeneric3<Int>) -> Int {
   return a() + a(x1: 123, 1, 2, x2: 123)
 }
 
-// NOTE: `dynamicallyCall` methods with generic signatures are not yet supported.
-// expected-error @+1 {{@dynamicCallable attribute requires 'CallableGeneric4' to have either a valid, non-generic 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 struct CallableGeneric4<T> {
-  // expected-error @+1 {{@dynamicCallable attribute does not support generic method 'dynamicallyCall(withArguments:)'}}
   func dynamicallyCall<U>(withArguments arguments: [U]) -> Int {
+    return arguments.count
+  }
+
+  func dynamicallyCall<U>(
+    withKeywordArguments arguments: DictionaryLiteral<StaticString, U>
+  ) -> Int {
     return arguments.count
   }
 }
 func testGenericType4<T>(a: CallableGeneric4<T>) -> Int {
-  return a() + a(1, 2, 3) // expected-error {{cannot call value of non-function type 'CallableGeneric4<T>'}}
+  return a() + a(1, 2, 3) + a(x1: 1, 2, x3: 3)
+}
+
+@dynamicCallable
+struct CallableGeneric5<T> {
+  func dynamicallyCall<U>(withArguments arguments: [U]) -> U {
+    return arguments[0]
+  }
+
+  func dynamicallyCall<U>(
+    withKeywordArguments arguments: DictionaryLiteral<StaticString, U>
+  ) -> U {
+    return arguments[0].1
+  }
+}
+func testGenericType5<T>(a: CallableGeneric5<T>) -> Double {
+  return a(1, 2, 3) + a(x1: 1, 2, x3: 3)
 }
