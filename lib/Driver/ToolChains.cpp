@@ -267,6 +267,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-api-diff-data-file");
     Arguments.push_back(DataPath->getValue());
   }
+  if (auto DataDir = context.Args.getLastArg(options::OPT_api_diff_data_dir)) {
+    Arguments.push_back("-api-diff-data-dir");
+    Arguments.push_back(DataDir->getValue());
+  }
   if (context.Args.hasArg(options::OPT_dump_usr)) {
     Arguments.push_back("-dump-usr");
   }
