@@ -123,8 +123,9 @@ private:
   /// The set of marked nodes.
   llvm::SmallPtrSet<const void *, 16> Marked;
 
-  /// A list of all "external" dependencies that cannot be resolved just from
-  /// this dependency graph.
+  /// A list of all external dependencies that cannot be resolved
+  /// just from this dependency graph. They must be resolved from definitions
+  /// outside of this module.
   llvm::StringSet<> ExternalDependencies;
 
   /// The interface hash for each node. This determines if the interface of
