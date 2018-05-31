@@ -1660,16 +1660,16 @@ ERROR(unknown_syntax_entity, PointsToFirstBadToken,
 
 // SWIFT_ENABLE_TENSORFLOW
 //------------------------------------------------------------------------------
-// #gradient expression parsing diagnostics
+// AD-related expression parsing diagnostics
 //------------------------------------------------------------------------------
-ERROR(gradient_expr_expected_lparen,none,
-      "expected '(' in '#gradient' expression", ())
-ERROR(gradient_expr_expected_rparen,none,
-      "expected ')' in '#gradient' expression", ())
-ERROR(gradient_expr_expected_label,none,
-      "expected label '%0' in '#gradient' expression", (StringRef))
-ERROR(gradient_expr_expected_expression,none,
-      "expected an expression representing the function to be differentiated", ())
+ERROR(expr_expected_lparen,none,
+      "expected '(' in '%0' expression", (StringRef))
+ERROR(expr_expected_rparen,none,
+      "expected ')' in '%0' expression", (StringRef))
+ERROR(expr_expected_label,none,
+      "expected label '%1' in '%0' expression", (StringRef, StringRef))
+ERROR(expr_expected_function_to_differentiate,none,
+      "expected a function to be differentiated", ())
 ERROR(gradient_expr_expected_parameter,none,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 

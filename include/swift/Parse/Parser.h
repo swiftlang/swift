@@ -1243,7 +1243,8 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
   /// SWIFT_ENABLE_TENSORFLOW
-  ParserResult<Expr> parseExprGradientBody(bool isValueAndGradient);
+  ParserResult<Expr> parseExprGradientBody(ExprKind kind);
+  ParserResult<Expr> parseExprAdjoint();
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    SmallVectorImpl<Expr*> &Exprs,

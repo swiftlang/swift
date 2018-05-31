@@ -11,3 +11,6 @@
 
 #valueAndGradient(foo, wrt:) // expected-error {{expected label 'of:'}}
 #valueAndGradient(of: foo, withRespectTo: .0, .1) // okay
+
+#adjoint(foo(_:_:)) // okay
+#adjoint() // expected-error {{expected a function to be differentiated}}

@@ -1750,11 +1750,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case tok::pound_gradient:
-    Result = parseExprGradientBody(/*isValueAndGradient=*/false);
+    return parseExprGradientBody(ExprKind::Gradient);
     break;
 
   case tok::pound_valueAndGradient:
-    Result = parseExprGradientBody(/*isValueAndGradient=*/true);
+    return parseExprGradientBody(ExprKind::ValueAndGradient);
+    break;
+
+  case tok::pound_adjoint:
+    return parseExprAdjoint();
     break;
 
   case tok::pound_assert:
@@ -3643,29 +3647,42 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-param-index:
 ///     'self' | '.' [0-9]+
 ///
-ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
+ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
   auto poundGradLoc = consumeToken();
   SourceLoc lParenLoc;
   SourceLoc rParenLoc;
 
+  StringRef exprName;
+  switch (kind) {
+  case ExprKind::Gradient:
+    exprName = "#gradient";
+    break;
+  case ExprKind::ValueAndGradient:
+    exprName = "#valueAndGradient";
+    break;
+  default:
+    llvm_unreachable("Not a reverse AD expression");
+  }
+
   auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserResult<Expr> {
-    for (int i = 0; i < parenDepth; i++) {
+    for (unsigned i : range(parenDepth)) {
       skipUntilDeclStmtRBrace(tok::r_paren);
-      parseToken(tok::r_paren, rParenLoc, diag::gradient_expr_expected_rparen);
+      parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName);
     }
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
   };
 
   // Parse '(' 'of' ':'.
-  if (parseToken(tok::l_paren, lParenLoc, diag::gradient_expr_expected_lparen)
-   || parseSpecificIdentifier("of", diag::gradient_expr_expected_label, "of:")
+  if (parseToken(tok::l_paren, lParenLoc, diag::expr_expected_lparen, exprName)
+   || parseSpecificIdentifier("of", diag::expr_expected_label, exprName, "of:")
    || parseToken(tok::colon, diag::expected_parameter_colon)) {
     return errorAndSkipToEnd();
   }
   // Parse an expression that represents the function to be differentiated.
-  auto originalFnParseResult = parseExpr(diag::gradient_expr_expected_expression);
+  auto originalFnParseResult =
+    parseExpr(diag::expr_expected_function_to_differentiate);
   if (originalFnParseResult.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (originalFnParseResult.isParseError())
@@ -3675,8 +3692,8 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
   if (consumeIf(tok::comma)) {
     // Parse 'withRespectTo' ':'.
     if (parseSpecificIdentifier("withRespectTo",
-                                diag::gradient_expr_expected_label,
-                                "withRespectTo:") ||
+                                diag::expr_expected_label,
+                                exprName, "withRespectTo:") ||
         parseToken(tok::colon, diag::expected_parameter_colon))
       return errorAndSkipToEnd();
     // Function that parses one parameter.
@@ -3711,23 +3728,61 @@ ParserResult<Expr> Parser::parseExprGradientBody(bool isValueAndGradient) {
         return errorAndSkipToEnd();
   }
   // Parse the closing ')'.
-  if (parseToken(tok::r_paren, rParenLoc, diag::gradient_expr_expected_rparen))
+  if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName))
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
 
-  // Successfully parsed a #gradient expression.
-  Expr *result = isValueAndGradient
-    ? (Expr *)ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                           originalFnParseResult.get(), params,
-                                           rParenLoc)
-    : (Expr *)GradientExpr::create(Context, poundGradLoc, lParenLoc,
-                                   originalFnParseResult.get(), params, rParenLoc);
+  // Successfully parsed a reverse autodiff expression.
+  Expr *result = nullptr;
+  switch (kind) {
+  case ExprKind::Gradient:
+    result = GradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                  originalFnParseResult.get(), params,
+                                  rParenLoc);
+    break;
+  case ExprKind::ValueAndGradient:
+    result = ValueAndGradientExpr::create(Context, poundGradLoc, lParenLoc,
+                                          originalFnParseResult.get(), params,
+                                          rParenLoc);
+    break;
+  default:
+    llvm_unreachable("Not a reverse AD expression");
+  }
   return makeParserResult<Expr>(result);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// expr-pound-assert:
-//   '#assert' '(' expr ',' string_literal ')'
+/// SWIFT_ENABLE_TENSORFLOW
+/// parseExprAdjoint
+///   expr-adjoint: '#adjoint' '(' expr ')'
+ParserResult<Expr> Parser::parseExprAdjoint() {
+  SourceLoc poundLoc = consumeToken(tok::pound_adjoint);
+  SourceLoc lParenLoc, rParenLoc;
+
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    rParenLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
+    return makeParserResult<Expr>(new (Context)
+                                  ErrorExpr(SourceRange(poundLoc, rParenLoc)));
+  };
+
+  if (parseToken(tok::l_paren, lParenLoc, diag::expr_expected_lparen,
+                 "#adjoint"))
+    return errorAndSkipToEnd();
+  auto exprResult = parseExpr(diag::expr_expected_function_to_differentiate);
+  if (exprResult.isParseError())
+    return errorAndSkipToEnd();
+  if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen,
+                 "#adjoint"))
+    return errorAndSkipToEnd();
+
+  return makeParserResult<Expr>(
+    AdjointExpr::create(Context, poundLoc, lParenLoc, exprResult.get(),
+                        rParenLoc));
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// expr-pound-assert:
+///   '#assert' '(' expr ',' string_literal ')'
 ParserResult<Expr> Parser::parseExprPoundAssert() {
   SourceLoc startLoc = consumeToken(tok::pound_assert);
   SourceLoc endLoc;

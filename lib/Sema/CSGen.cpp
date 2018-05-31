@@ -1440,6 +1440,11 @@ namespace {
       return handleReverseAutoDiffExpr(VGE, /*preservingOriginalResult=*/true);
     }
 
+    Type visitAdjointExpr(AdjointExpr *AE) {
+      // FIXME
+      llvm_unreachable("Handle #adjoint");
+    }
+
     Type visitPoundAssertExpr(PoundAssertExpr *PAE) {
       // Constrain the condition argument to be Bool.
       auto boolType = CS.getASTContext().getBoolDecl()->getDeclaredType();
