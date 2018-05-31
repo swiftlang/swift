@@ -1180,7 +1180,7 @@ public enum EncodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .invalidValue(_, let c): context = c
@@ -1290,7 +1290,7 @@ public enum DecodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .keyNotFound(_,   let c): context = c
