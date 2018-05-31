@@ -35,6 +35,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -2991,13 +2992,13 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 SmallVector<AnyFunctionType::Param, 4>
 decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
-/// Break the parameter list into an array of booleans describing whether
+/// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-void computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                       const ValueDecl *paramOwner, unsigned level,
-                       SmallVectorImpl<bool> &outDefaultMap);
-  
+llvm::SmallBitVector
+computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                  const ValueDecl *paramOwner, unsigned level);
+
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
 std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);

@@ -3226,7 +3226,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallVectorImpl<bool> &defaultMap,
+                        const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
