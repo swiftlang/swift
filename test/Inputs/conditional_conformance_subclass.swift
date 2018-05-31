@@ -49,8 +49,8 @@ public func subclassgeneric_generic<T: P2>(_: T.Type) {
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S32conditional_conformance_subclass23subclassgeneric_genericyyxmAA2P2RzlF"(%swift.type*, %swift.type* %T, i8** %T.P2)
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S32conditional_conformance_subclass15SubclassGenericCMa"(i64 0, %swift.type* %T)
+// CHECK:         %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S32conditional_conformance_subclass15SubclassGenericCMa"(i64 0, %swift.type* %T)
 // CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[T_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0

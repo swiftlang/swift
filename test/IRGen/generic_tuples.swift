@@ -62,7 +62,7 @@ func dupC<T : C>(_ x: T) -> (T, T) { return (x, x) }
 func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden swiftcc void @"$S14generic_tuples8callDupCyyAA1CCF"(%T14generic_tuples1CC*)
 // CHECK-NEXT: entry:
-// CHECK-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_tuples1CCMa"(i64 0)
+// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S14generic_tuples1CCMa"(i64 0)
 // CHECK-NEXT: [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT: [[TUPLE:%.*]] = call swiftcc { %T14generic_tuples1CC*, %T14generic_tuples1CC* } @"$S14generic_tuples4dupCyx_xtxAA1CCRbzlF"(%T14generic_tuples1CC* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 0
