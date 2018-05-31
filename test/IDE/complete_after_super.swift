@@ -80,8 +80,10 @@
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_FUNC_SUPER_NODOT > %t.super.txt
-// RUN: %FileCheck %s -check-prefix=CLASS_FUNC_SUPER_NODOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_FUNC_SUPER < %t.super.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_FUNC_SUPER_DOT > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_FUNC_SUPER < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 > %t.super.txt
 // RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 < %t.super.txt
@@ -440,11 +442,16 @@ class SuperDerivedB : SuperBaseB {
 
   class func test3() {
     super#^CLASS_FUNC_SUPER_NODOT^#
+  }
+  class func test4() {
+    super.#^CLASS_FUNC_SUPER_DOT^#
+  }
+  class func test5() {
     super(#^CLASS_FUNC_SUPER_PAREN^#
-
-// CLASS_FUNC_SUPER_NODOT: Decl[Constructor]/CurrNominal: .init()[#SuperBaseB#]
-// CLASS_FUNC_SUPER_NODOT: Decl[Constructor]/CurrNominal: .init({#a: Double#})[#SuperBaseB#]
-// CLASS_FUNC_SUPER_NODOT: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#SuperBaseB#]
+  }
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}()[#SuperBaseB#]
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#a: Double#})[#SuperBaseB#]
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#int: Int#})[#SuperBaseB#]
   }
 }
 
