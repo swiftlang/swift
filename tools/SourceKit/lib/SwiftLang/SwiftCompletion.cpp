@@ -119,6 +119,12 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
       UnresolvedInputFile->getBuffer(),
       Lang.resolvePathSymlinks(UnresolvedInputFile->getBufferIdentifier()));
 
+  auto origBuffSize = InputFile->getBufferSize();
+  unsigned CodeCompletionOffset = Offset;
+  if (CodeCompletionOffset > origBuffSize) {
+    CodeCompletionOffset = origBuffSize;
+  }
+
   CompilerInstance CI;
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
@@ -128,6 +134,16 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   trace::TracedOperation TracedOp(trace::OperationKind::CodeCompletion);
   if (TracedOp.enabled()) {
     CI.addDiagnosticConsumer(&TraceDiags);
+    trace::SwiftInvocation SwiftArgs;
+    trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
+    TracedOp.setDiagnosticProvider(
+        [&TraceDiags](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          TraceDiags.getAllDiagnostics(diags);
+        });
+    TracedOp.start(SwiftArgs,
+                   {std::make_pair("OriginalOffset", std::to_string(Offset)),
+                    std::make_pair("Offset",
+                      std::to_string(CodeCompletionOffset))});
   }
 
   CompilerInvocation Invocation;
@@ -139,12 +155,6 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
   if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
     Error = "no input filenames specified";
     return false;
-  }
-
-  auto origBuffSize = InputFile->getBufferSize();
-  unsigned CodeCompletionOffset = Offset;
-  if (CodeCompletionOffset > origBuffSize) {
-    CodeCompletionOffset = origBuffSize;
   }
 
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
@@ -178,27 +188,12 @@ static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
     return true;
   }
 
-  if (TracedOp.enabled()) {
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, InputFile->getBufferIdentifier(), Args);
-    TracedOp.start(SwiftArgs,
-                   {std::make_pair("OriginalOffset", std::to_string(Offset)),
-                    std::make_pair("Offset",
-                      std::to_string(CodeCompletionOffset))});
-  }
-
   CloseClangModuleFiles scopedCloseFiles(
       *CI.getASTContext().getClangModuleLoader());
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   CI.performSema();
   SwiftConsumer.clearContext();
-
-  if (TracedOp.enabled()) {
-    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
-    TraceDiags.getAllDiagnostics(Diagnostics);
-    TracedOp.finish(Diagnostics);
-  }
 
   return true;
 }
