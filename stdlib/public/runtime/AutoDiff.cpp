@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// SWIFT_ENABLE_TENSORFLOW
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/AutoDiff.h"
 
@@ -29,13 +33,13 @@ void swift_autodiffDestroyTape(OpaqueValue *tape) {
 SWIFT_RUNTIME_EXPORT
 void swift_autodiffPushToTape(OpaqueValue *tape, OpaqueValue *value) {
   auto tapePtr = reinterpret_cast<AutoDiffTape *>(tape);
-  tapePtr->elements.push(value);
+  tapePtr->elements.push_back(value);
 }
 
 SWIFT_RUNTIME_EXPORT
 OpaqueValue *swift_autodiffPopFromTape(OpaqueValue *tape) {
   auto tapePtr = reinterpret_cast<AutoDiffTape *>(tape);
-  auto value = tapePtr->elements.top();
-  tapePtr->elements.pop();
+  auto value = tapePtr->elements.back();
+  tapePtr->elements.pop_back();
   return value;
 }
