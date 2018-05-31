@@ -29,6 +29,22 @@ using namespace swift::sys;
 #include "Default/TaskQueue.inc"
 #endif
 
+namespace swift {
+namespace sys {
+void TaskProcessInformation::ResourceUsage::provideMapping(json::Output &out) {
+  out.mapRequired("utime", Utime);
+  out.mapRequired("stime", Stime);
+  out.mapRequired("maxrss", Maxrss);
+}
+
+void TaskProcessInformation::provideMapping(json::Output &out) {
+  out.mapRequired("real_pid", OSPid);
+  if (ProcessUsage.hasValue())
+    out.mapRequired("usage", ProcessUsage.getValue());
+}
+}
+}
+
 TaskQueue::TaskQueue(unsigned NumberOfParallelTasks,
                      UnifiedStatsReporter *USR)
   : NumberOfParallelTasks(NumberOfParallelTasks),
