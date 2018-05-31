@@ -22,6 +22,7 @@ from build_swift import defaults
 from build_swift import driver_arguments
 from build_swift import presets
 from build_swift.migration import migrate_swift_sdks
+import build_swift.postbuild_steps as postbuild_steps
 
 from swift_build_support.swift_build_support import (
     arguments,
@@ -1043,8 +1044,8 @@ def main_preset():
         return 0
 
     call_without_sleeping(build_script_args)
-    return 0
 
+    return 0
 
 # Main entry point for the normal mode.
 def main_normal():
@@ -1119,22 +1120,8 @@ def main_normal():
     # Execute the underlying build script implementation.
     invocation.execute()
 
-    if args.symbols_package:
-        print('--- Creating symbols package ---')
-        print('-- Package file: {} --'.format(args.symbols_package))
-
-        if platform.system() == 'Darwin':
-            prefix = targets.darwin_toolchain_prefix(args.install_prefix)
-        else:
-            prefix = args.install_prefix
-
-        # As a security measure, `tar` normally strips leading '/' from paths
-        # it is archiving. To stay safe, we change working directories, then
-        # run `tar` without the leading '/' (we remove it ourselves to keep
-        # `tar` from emitting a warning).
-        with shell.pushd(args.install_symroot):
-            tar.tar(source=prefix.lstrip('/'),
-                    destination=args.symbols_package)
+    # Run postbuild steps.
+    postbuild_steps.execute(invocation)
 
     return 0
 
