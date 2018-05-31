@@ -123,8 +123,19 @@ swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
   return tmp;
 }
 
-bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
-                                      DependencyTracker &depTracker,
+static std::string escape(DeclBaseName name) {
+  return llvm::yaml::escape(name.userFacingName());
+}
+
+static void emitProvides(const SourceFile *SF, llvm::raw_fd_ostream &out);
+static void emitDepends(const SourceFile *SF,
+                        const DependencyTracker &depTracker,
+                        llvm::raw_fd_ostream &out);
+static void emitInterfaceHash(SourceFile *SF, llvm::raw_fd_ostream &out);
+
+bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
+                                      SourceFile *const SF,
+                                      const DependencyTracker &depTracker,
                                       StringRef outputPath) {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
   
@@ -143,11 +154,17 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
     return true;
   }
 
-  auto escape = [](DeclBaseName name) -> std::string {
-    return llvm::yaml::escape(name.userFacingName());
-  };
-
   out << "### Swift dependencies file v0 ###\n";
+
+  emitProvides(SF, out);
+  emitDepends(SF, depTracker, out);
+  emitInterfaceHash(SF, out);
+
+  return false;
+}
+
+static void emitProvides(const SourceFile *const SF,
+                         llvm::raw_fd_ostream &out) {
 
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
   llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
@@ -320,6 +337,11 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
       out << "- \"" << escape(name) << "\"\n";
     }
   }
+}
+
+static void emitDepends(const SourceFile *const SF,
+                        const DependencyTracker &depTracker,
+                        llvm::raw_fd_ostream &out) {
 
   auto sortedByName =
       [](const llvm::DenseMap<DeclBaseName, bool> map) ->
@@ -416,10 +438,10 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
+}
 
+static void emitInterfaceHash(SourceFile *const SF, llvm::raw_fd_ostream &out) {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
   out << "interface-hash: \"" << interfaceHash << "\"\n";
-
-  return false;
 }
