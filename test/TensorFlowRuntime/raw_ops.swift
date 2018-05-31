@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: swift_test_mode_optimize
+// REQUIRES: tensorflow_swift_bindings
 //
 // TensorFlow Raw Ops API tests.
 
