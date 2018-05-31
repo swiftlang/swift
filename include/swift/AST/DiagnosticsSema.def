@@ -1037,10 +1037,6 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 ERROR(ambiguous_dynamic_callable_method,none,
       "@dynamicCallable attribute does not support ambiguous method %0",
       (DeclName))
-// TODO: Add support for generic @dynamicCallable methods.
-ERROR(generic_dynamic_callable_method,none,
-      "@dynamicCallable attribute does not support generic method %0",
-      (DeclName))
 
 ERROR(type_invalid_dml,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
