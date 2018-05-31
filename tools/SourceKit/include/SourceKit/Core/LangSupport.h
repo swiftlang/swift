@@ -22,10 +22,18 @@
 #include "swift/AST/Type.h"
 #include <functional>
 #include <memory>
+#include <unordered_set>
 
 namespace llvm {
   class MemoryBuffer;
 }
+
+namespace swift {
+namespace syntax {
+class SourceFileSyntax;
+} // namespace syntax
+} // namespace swift
+
 namespace SourceKit {
 
 struct EntityInfo {
@@ -256,7 +264,9 @@ public:
 
   virtual bool handleSourceText(StringRef Text) = 0;
 
-  virtual bool handleSerializedSyntaxTree(StringRef Text) = 0;
+  virtual bool
+  handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                   std::unordered_set<unsigned> ReusedNodeIds) = 0;
   virtual bool syntaxTreeEnabled() {
     return syntaxTreeTransferMode() != SyntaxTreeTransferMode::Off;
   }

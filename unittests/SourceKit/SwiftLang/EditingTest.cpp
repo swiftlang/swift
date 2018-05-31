@@ -101,7 +101,10 @@ private:
   }
 
   bool handleSourceText(StringRef Text) override { return false; }
-  bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
+  bool handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree,
+                        std::unordered_set<unsigned> ReusedNodeIds) override {
+    return false;
+  }
 
   SyntaxTreeTransferMode syntaxTreeTransferMode() override {
     return SyntaxTreeTransferMode::Off;
