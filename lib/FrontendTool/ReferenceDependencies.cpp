@@ -163,15 +163,56 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   return false;
 }
 
+static void emitProvidesTopLevelNames(
+                                      const SourceFile * SF,
+                                      llvm::raw_fd_ostream &out,
+                                      llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                      llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+
+static void emitProvidesNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals, llvm::raw_fd_ostream &out);
+
+static void emitProvidesMembers(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                const llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers,
+                                llvm::raw_fd_ostream &out);
+
+static void emitProvidesDynamicLookupMembers(const SourceFile * SF,
+                                             llvm::raw_fd_ostream &out);
+
 static void emitProvides(const SourceFile *const SF,
                          llvm::raw_fd_ostream &out) {
-
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
   llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
-
+  
   out << "provides-top-level:\n";
-  for (const Decl *D : SF->Decls) {
+
+  emitProvidesTopLevelNames(SF, out, extendedNominals, extensionsWithJustMembers);
+  emitProvidesNominalTypes(extendedNominals, out);
+  emitProvidesMembers(extendedNominals, extensionsWithJustMembers, out);
+  emitProvidesDynamicLookupMembers(SF, out);
+}
+
+static void emitProvidesTopLevelDecl(const Decl * const D, llvm::raw_fd_ostream &out,
+                                     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
+                                     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+
+static void emitProvidesTopLevelNames(
+                                      const SourceFile *const SF, llvm::raw_fd_ostream &out,
+                                      llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                      llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
+  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
+
+  for (const Decl *D : SF->Decls)
+    emitProvidesTopLevelDecl(D, out, extendedNominals, memberOperatorDecls, extensionsWithJustMembers);
+  for (auto *operatorFunction : memberOperatorDecls)
+    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+}
+
+
+static void emitProvidesTopLevelDecl(const Decl * const D, llvm::raw_fd_ostream &out,
+                                     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
+                                     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
     switch (D->getKind()) {
     case DeclKind::Module:
       break;
@@ -273,10 +314,7 @@ static void emitProvides(const SourceFile *const SF,
     }
   }
 
-  // This is also part of "provides-top-level".
-  for (auto *operatorFunction : memberOperatorDecls)
-    out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
-
+static void emitProvidesNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals, llvm::raw_fd_ostream &out) {
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
@@ -285,7 +323,11 @@ static void emitProvides(const SourceFile *const SF,
     out << mangleTypeAsContext(entry.first);
     out << "\"\n";
   }
-
+}
+  
+static void emitProvidesMembers(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
+                                const llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers,
+                                llvm::raw_fd_ostream &out) {
   out << "provides-member:\n";
   for (auto entry : extendedNominals) {
     out << "- [\"";
@@ -308,7 +350,10 @@ static void emitProvides(const SourceFile *const SF,
           << escape(VD->getBaseName()) << "\"]\n";
     }
   }
+}
 
+static void emitProvidesDynamicLookupMembers(const SourceFile *const SF,
+                                              llvm::raw_fd_ostream &out) {
   if (SF->getASTContext().LangOpts.EnableObjCInterop) {
     // FIXME: This requires a traversal of the whole file to compute.
     // We should (a) see if there's a cheaper way to keep it up to date,
@@ -339,37 +384,43 @@ static void emitProvides(const SourceFile *const SF,
   }
 }
 
+static SmallVector<std::pair<DeclBaseName, bool>, 16> sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
+  SmallVector<std::pair<DeclBaseName,bool>, 16> pairs{map.begin(), map.end()};
+  llvm::array_pod_sort(pairs.begin(), pairs.end(),
+                       [](const std::pair<DeclBaseName, bool> *first,
+                          const std::pair<DeclBaseName, bool> *second) -> int{
+                         return first->first.compare(second->first);
+                       });
+  return pairs;
+}
+
+static void emitDependsTopLevelNames(  const ReferencedNameTracker * tracker,
+                                     llvm::raw_fd_ostream &out);
+
+using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
+
+static void emitDependsMember(
+                              ArrayRef<TableEntryTy> sortedMembers,
+                              llvm::raw_fd_ostream &out);
+
+static void emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers, llvm::raw_fd_ostream &out);
+
+static void emitDependsDynamicLookup(  const ReferencedNameTracker * tracker,
+                                     llvm::raw_fd_ostream &out);
+
+static void emitDependsExternal(  const DependencyTracker &depTracker,
+                                llvm::raw_fd_ostream &out);
+
 static void emitDepends(const SourceFile *const SF,
                         const DependencyTracker &depTracker,
                         llvm::raw_fd_ostream &out) {
 
-  auto sortedByName =
-      [](const llvm::DenseMap<DeclBaseName, bool> map) ->
-        SmallVector<std::pair<DeclBaseName, bool>, 16> {
-    SmallVector<std::pair<DeclBaseName,bool>, 16> pairs{map.begin(), map.end()};
-    llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                         [](const std::pair<DeclBaseName, bool> *first,
-                            const std::pair<DeclBaseName, bool> *second) -> int{
-      return first->first.compare(second->first);
-    });
-    return pairs;
-  };
-
   const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
   assert(tracker && "Cannot emit reference dependencies without a tracker");
 
-  out << "depends-top-level:\n";
-  for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
-    assert(!entry.first.empty());
-    out << "- ";
-    if (!entry.second)
-      out << "!private ";
-    out << "\"" << escape(entry.first) << "\"\n";
-  }
+  emitDependsTopLevelNames(tracker, out);
 
-  out << "depends-member:\n";
   auto &memberLookupTable = tracker->getUsedMembers();
-  using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
   std::vector<TableEntryTy> sortedMembers{
     memberLookupTable.begin(), memberLookupTable.end()
   };
@@ -393,12 +444,34 @@ static void emitDepends(const SourceFile *const SF,
     return lhsMangledName.compare(rhsMangledName);
   });
 
+  emitDependsMember(sortedMembers, out);
+  emitDependsNominal(sortedMembers, out);
+  emitDependsDynamicLookup(tracker, out);
+  emitDependsExternal(depTracker, out);
+}
+
+static void emitDependsTopLevelNames(  const ReferencedNameTracker *const tracker,
+                                     llvm::raw_fd_ostream &out) {
+  out << "depends-top-level:\n";
+  for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
+    assert(!entry.first.empty());
+    out << "- ";
+    if (!entry.second)
+      out << "!private ";
+    out << "\"" << escape(entry.first) << "\"\n";
+  }
+}
+
+static void emitDependsMember(
+                              ArrayRef<TableEntryTy> sortedMembers,
+                              llvm::raw_fd_ostream &out) {
+  out << "depends-member:\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccess() &&
         entry.first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
-
+    
     out << "- ";
     if (!entry.second)
       out << "!private ";
@@ -409,7 +482,9 @@ static void emitDepends(const SourceFile *const SF,
       out << escape(entry.first.second);
     out << "\"]\n";
   }
+}
 
+static void emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers, llvm::raw_fd_ostream &out) {
   out << "depends-nominal:\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
@@ -417,11 +492,11 @@ static void emitDepends(const SourceFile *const SF,
       ++i;
       isCascading |= i->second;
     }
-
+    
     if (i->first.first->hasAccess() &&
         i->first.first->getFormalAccess() <= AccessLevel::FilePrivate)
       continue;
-
+    
     out << "- ";
     if (!isCascading)
       out << "!private ";
@@ -429,7 +504,10 @@ static void emitDepends(const SourceFile *const SF,
     out <<  mangleTypeAsContext(i->first.first);
     out << "\"\n";
   }
+}
 
+static void emitDependsDynamicLookup(  const ReferencedNameTracker *const tracker,
+                                     llvm::raw_fd_ostream &out) {
   out << "depends-dynamic-lookup:\n";
   for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
@@ -438,7 +516,10 @@ static void emitDepends(const SourceFile *const SF,
       out << "!private ";
     out << "\"" << escape(entry.first) << "\"\n";
   }
+}
 
+static void emitDependsExternal(  const DependencyTracker &depTracker,
+                                llvm::raw_fd_ostream &out) {
   out << "depends-external:\n";
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
