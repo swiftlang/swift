@@ -543,7 +543,7 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
   /// Computes the operation `dot(input, weight) + bias`.
   @_inlineable @inline(__always)
   public func primal(for input: Tensor<Scalar>) -> DifferentiationPrimalValues {
-    let dot = input.dot(weight)
+    let dot = matmul(input, weight)
     let add = dot + bias
     return DifferentiationPrimalValues(dot: dot, result: add)
   }
@@ -560,8 +560,9 @@ public struct FullyConnectedLayer<Scalar> : DifferentiableModule
     let (dDot, dBias) = Tensor._adjointAdd(primalValues.dot, bias,
                                            originalValue: primalValues.result,
                                            seed: adjoint)
-    let (dInput, dWeight) = input._adjointDot(weight, originalValue: primalValues.dot,
-                                              seed: dDot)
+    let (dInput, dWeight) = _adjointMatmul(
+      input, weight, originalValue: primalValues.dot, seed: dDot
+    )
     return (dInput, Parameters(weight: dWeight, bias: dBias))
   }
 }

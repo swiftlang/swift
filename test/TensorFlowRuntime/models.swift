@@ -49,17 +49,17 @@ ModelTests.testAllBackends("StraightLineXORTraining") {
   var i = 0
   repeat {
     // Forward pass
-    let z1 = x.dot(w1) + b1
+    let z1 = matmul(x, w1) + b1
     let h1 = sigmoid(z1)
-    let z2 = h1.dot(w2) + b2
+    let z2 = matmul(h1, w2) + b2
     let pred = sigmoid(z2)
 
     // Backward pass
     let dz2 = pred - y
-    let dw2 = h1.transposed(withPermutations: 1, 0).dot(dz2)
+    let dw2 = matmul(h1.transposed(withPermutations: 1, 0), dz2)
     let db2 = dz2.sum(squeezingAxes: 0)
-    let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
-    let dw1 = x.transposed(withPermutations: 1, 0).dot(dz1)
+    let dz1 = matmul(dz2, w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+    let dw1 = matmul(x.transposed(withPermutations: 1, 0), dz1)
     let db1 = dz1.sum(squeezingAxes: 0)
 
     // Gradient descent
@@ -103,8 +103,8 @@ ModelTests.testAllBackends("XORClassifierTraining") {
     }
 
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
-      let o1 = sigmoid(x ⊗ w1 + b1)
-      return sigmoid(o1 ⊗ w2 + b2)
+      let o1 = sigmoid(matmul(x, w1) + b1)
+      return sigmoid(matmul(o1, w2) + b2)
     }
 
     func prediction(for x: Bool, _ y: Bool) -> Bool {
@@ -125,16 +125,16 @@ ModelTests.testAllBackends("XORClassifierTraining") {
       // FIXME: Loop crasher b/73088003
       var i = 0
       repeat {
-        let z1 = x ⊗ w1 + b1
+        let z1 = matmul(x, w1) + b1
         let h1 = sigmoid(z1)
-        let z2 = h1 ⊗ w2 + b2
+        let z2 = matmul(h1, w2) + b2
         let pred = sigmoid(z2)
 
         let dz2 = pred - y
-        let dw2 = h1.transposed(withPermutations: 1, 0) ⊗ dz2
+        let dw2 = matmul(h1.transposed(withPermutations: 1, 0), dz2)
         let db2 = dz2.sum(squeezingAxes: 0)
-        let dz1 = dz2 ⊗ w2.transposed(withPermutations: 1, 0) * h1 * (1 - h1)
-        let dw1 = x.transposed(withPermutations: 1, 0) ⊗ dz1
+        let dz1 = matmul(dz2, w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+        let dw1 = matmul(x.transposed(withPermutations: 1, 0), dz1)
         let db1 = dz1.sum(squeezingAxes: 0)
 
         // Gradient descent
