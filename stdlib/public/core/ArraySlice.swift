@@ -1406,11 +1406,6 @@ extension ArraySlice: Equatable where Element: Equatable {
 }
 
 extension ArraySlice: Hashable where Element: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-  
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
