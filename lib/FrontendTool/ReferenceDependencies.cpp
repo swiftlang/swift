@@ -127,13 +127,33 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
-static void emitProvides(const SourceFile *SF, llvm::raw_ostream &out);
-static void emitDepends(const SourceFile *SF,
-                        const DependencyTracker &depTracker,
-                        llvm::raw_ostream &out);
-static void emitInterfaceHash(SourceFile *SF, llvm::raw_ostream &out);
+namespace {
+  class ReferenceDependenciesEmitter {
+    SourceFile * const SF;
+    const DependencyTracker &depTracker;
+    llvm::raw_ostream &out;
+    
+    ReferenceDependenciesEmitter(SourceFile *const SF, const DependencyTracker &depTracker, llvm::raw_ostream &out) :
+    SF(SF), depTracker(depTracker), out(out) {}
+    
+  public:
+    /// \return true on error
+    static bool emit(DiagnosticEngine &diags, SourceFile *const SF,
+                     const DependencyTracker &depTracker,
+                     StringRef outputPath);
+    static void emit(SourceFile *const SF, const DependencyTracker &depTracker, llvm::raw_ostream &out);
+    
+  private:
+    static std::unique_ptr<llvm::raw_fd_ostream> openFile(DiagnosticEngine &diags,
+                                                          StringRef OutputPath);
+    void emit();
+    void emitProvides();
+    void emitDepends();
+    void emitInterfaceHash();
+  };
+} // end anon namespace
 
-static std::unique_ptr<llvm::raw_fd_ostream>openFile(DiagnosticEngine &diags, StringRef outputPath) {
+std::unique_ptr<llvm::raw_fd_ostream>ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags, StringRef outputPath) {
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
@@ -151,32 +171,36 @@ static std::unique_ptr<llvm::raw_fd_ostream>openFile(DiagnosticEngine &diags, St
   return out;
 }
 
-static void emitReferenceDependencies(SourceFile *const SF,
-                                      const DependencyTracker &depTracker,
-                                      llvm::raw_ostream &out);
+bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
+                                        SourceFile *const SF,
+                                        const DependencyTracker &depTracker,
+                                        StringRef outputPath) {
+  std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
+  if (!out.get())
+    return true;
+  ReferenceDependenciesEmitter::emit(SF, depTracker, *out);
+  return false;
+}
+
+void ReferenceDependenciesEmitter::emit(SourceFile *const SF,
+                                        const DependencyTracker &depTracker,
+                                        llvm::raw_ostream &out) {
+  ReferenceDependenciesEmitter(SF, depTracker, out).emit();
+}
+
+void ReferenceDependenciesEmitter::emit() {
+  assert(SF && "Cannot emit reference dependencies without a SourceFile");
+  out << "### Swift dependencies file v0 ###\n";
+  emitProvides();
+  emitDepends();
+  emitInterfaceHash();
+}
 
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *const SF,
                                       const DependencyTracker &depTracker,
                                       StringRef outputPath) {
-  std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
-  if (!out.get())
-    return true;
-  ::emitReferenceDependencies( SF, depTracker, *out);
-  
-  return false;
-}
-
-static void emitReferenceDependencies(SourceFile *const SF,
-                                      const DependencyTracker &depTracker,
-                                      llvm::raw_ostream &out) {
-  assert(SF && "Cannot emit reference dependencies without a SourceFile");
-
-  out << "### Swift dependencies file v0 ###\n";
-  
-  emitProvides(SF, out);
-  emitDepends(SF, depTracker, out);
-  emitInterfaceHash(SF, out);
+  return ReferenceDependenciesEmitter::emit(diags, SF, depTracker, outputPath);
 }
 
 static void emitProvidesTopLevelNames(
@@ -197,8 +221,7 @@ static void emitProvidesMembers(
 static void emitProvidesDynamicLookupMembers(const SourceFile *SF,
                                              llvm::raw_ostream &out);
 
-static void emitProvides(const SourceFile *const SF,
-                         llvm::raw_ostream &out) {
+void ReferenceDependenciesEmitter::emitProvides() {
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
   llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
 
@@ -466,9 +489,7 @@ static void emitDependsDynamicLookup(const ReferencedNameTracker *tracker,
 static void emitDependsExternal(const DependencyTracker &depTracker,
                                 llvm::raw_ostream &out);
 
-static void emitDepends(const SourceFile *const SF,
-                        const DependencyTracker &depTracker,
-                        llvm::raw_ostream &out) {
+void ReferenceDependenciesEmitter::emitDepends() {
 
   const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
   assert(tracker && "Cannot emit reference dependencies without a tracker");
@@ -581,7 +602,7 @@ static void emitDependsExternal(const DependencyTracker &depTracker,
   }
 }
 
-static void emitInterfaceHash(SourceFile *const SF, llvm::raw_ostream &out) {
+void ReferenceDependenciesEmitter::emitInterfaceHash() {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
   out << "interface-hash: \"" << interfaceHash << "\"\n";
