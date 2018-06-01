@@ -133,33 +133,39 @@ static void emitDepends(const SourceFile *SF,
                         llvm::raw_ostream &out);
 static void emitInterfaceHash(SourceFile *SF, llvm::raw_ostream &out);
 
+static std::unique_ptr<llvm::raw_fd_ostream>openFile(DiagnosticEngine &diags, StringRef outputPath) {
+  // Before writing to the dependencies file path, preserve any previous file
+  // that may have been there. No error handling -- this is just a nicety, it
+  // doesn't matter if it fails.
+  llvm::sys::fs::rename(outputPath, outputPath + "~");
+  
+  std::error_code EC;
+  auto out = llvm::make_unique<llvm::raw_fd_ostream>(outputPath, EC, llvm::sys::fs::F_None);
+  
+  if (out->has_error() || EC) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
+                   EC.message());
+    out->clear_error();
+    return nullptr;
+  }
+  return out;
+}
+
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *const SF,
                                       const DependencyTracker &depTracker,
                                       StringRef outputPath) {
   assert(SF && "Cannot emit reference dependencies without a SourceFile");
-  
-  // Before writing to the dependencies file path, preserve any previous file
-  // that may have been there. No error handling -- this is just a nicety, it
-  // doesn't matter if it fails.
-  llvm::sys::fs::rename(outputPath, outputPath + "~");
-
-  std::error_code EC;
-  llvm::raw_fd_ostream out(outputPath, EC, llvm::sys::fs::F_None);
-
-  if (out.has_error() || EC) {
-    diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
-                   EC.message());
-    out.clear_error();
+  std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
+  if (!out.get())
     return true;
-  }
-
-  out << "### Swift dependencies file v0 ###\n";
-
-  emitProvides(SF, out);
-  emitDepends(SF, depTracker, out);
-  emitInterfaceHash(SF, out);
-
+  
+  *out << "### Swift dependencies file v0 ###\n";
+  
+  emitProvides(SF, *out);
+  emitDepends(SF, depTracker, *out);
+  emitInterfaceHash(SF, *out);
+  
   return false;
 }
 
