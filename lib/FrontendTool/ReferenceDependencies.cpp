@@ -468,11 +468,11 @@ namespace {
     
   private:
     void emit() const;
-    void emitDependsTopLevelNames(const ReferencedNameTracker *const tracker) const;
-    void emitDependsMember(const ArrayRef<TableEntryTy> sortedMembers) const;
-    void emitDependsNominal(const ArrayRef<TableEntryTy> sortedMembers) const;
-    void emitDependsDynamicLookup(const ReferencedNameTracker *const tracker) const;
-    void emitDependsExternal(const DependencyTracker &depTracker) const;
+    void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
+    void emitMember(const ArrayRef<TableEntryTy> sortedMembers) const;
+    void emitNominal(const ArrayRef<TableEntryTy> sortedMembers) const;
+    void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
+    void emitExternal(const DependencyTracker &depTracker) const;
   };
 } // end anon namespace
 
@@ -489,7 +489,7 @@ void DependsEmitter::emit() const {
   const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
   assert(tracker && "Cannot emit reference dependencies without a tracker");
 
-  emitDependsTopLevelNames(tracker);
+  emitTopLevelNames(tracker);
 
   auto &memberLookupTable = tracker->getUsedMembers();
   std::vector<TableEntryTy> sortedMembers{
@@ -510,13 +510,13 @@ void DependsEmitter::emit() const {
     return lhsMangledName.compare(rhsMangledName);
   });
 
-  emitDependsMember(sortedMembers);
-  emitDependsNominal(sortedMembers);
-  emitDependsDynamicLookup(tracker);
-  emitDependsExternal(depTracker);
+  emitMember(sortedMembers);
+  emitNominal(sortedMembers);
+  emitDynamicLookup(tracker);
+  emitExternal(depTracker);
 }
 
-void DependsEmitter::emitDependsTopLevelNames(const ReferencedNameTracker *const tracker) const {
+void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracker) const {
   out << "depends-top-level:\n";
   for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
@@ -527,7 +527,7 @@ void DependsEmitter::emitDependsTopLevelNames(const ReferencedNameTracker *const
   }
 }
 
-void DependsEmitter::emitDependsMember(ArrayRef<TableEntryTy> sortedMembers) const {
+void DependsEmitter::emitMember(ArrayRef<TableEntryTy> sortedMembers) const {
   out << "depends-member:\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
@@ -547,7 +547,7 @@ void DependsEmitter::emitDependsMember(ArrayRef<TableEntryTy> sortedMembers) con
   }
 }
 
-void DependsEmitter::emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers) const {
+void DependsEmitter::emitNominal(ArrayRef<TableEntryTy> sortedMembers) const {
   out << "depends-nominal:\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
@@ -569,7 +569,7 @@ void DependsEmitter::emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers) co
   }
 }
 
-void DependsEmitter::emitDependsDynamicLookup(const ReferencedNameTracker *const tracker) const {
+void DependsEmitter::emitDynamicLookup(const ReferencedNameTracker *const tracker) const {
   out << "depends-dynamic-lookup:\n";
   for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
@@ -580,7 +580,7 @@ void DependsEmitter::emitDependsDynamicLookup(const ReferencedNameTracker *const
   }
 }
 
-void DependsEmitter::emitDependsExternal(const DependencyTracker &depTracker) const {
+void DependsEmitter::emitExternal(const DependencyTracker &depTracker) const {
   out << "depends-external:\n";
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
