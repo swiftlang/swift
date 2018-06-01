@@ -1,8 +1,17 @@
+// Swift 3:
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
 // Swift 4:
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -swift-version 4
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -swift-version 4
+
+// With -enable-testing:
+// Swift 3:
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+// Swift 4:
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -swift-version 4 -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -swift-version 4 -enable-testing
 
 public protocol P {}
 

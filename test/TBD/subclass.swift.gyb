@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s > %t/main.swift
 
-// Same-module superclass, both resilient and not:
+// Same-module superclass, both resilient and not, and enable-testing and not:
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing
 
 
 // Other-module superclass is not resilient:
@@ -11,12 +13,16 @@
 // RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
 
 // Other-module superclass is resilient:
 // RUN: %empty-directory(%t/super)
 // RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension -Xfrontend -enable-resilience
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
 
 #if SAME_MODULE
 open class Super {

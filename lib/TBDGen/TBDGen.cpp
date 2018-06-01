@@ -131,11 +131,15 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(SILDeclRef(AFD).asForeign());
   }
 
-  if (!SwiftModule->getASTContext().isSwiftVersion3())
+  auto publicDefaultArgGenerators =
+      SwiftModule->getASTContext().isSwiftVersion3() ||
+      SwiftModule->isTestingEnabled();
+  if (!publicDefaultArgGenerators)
     return;
 
-  // In Swift 3, default arguments (of public functions) are public symbols,
-  // as the default values are computed at the call site.
+  // In Swift 3 (or under -enable-testing), default arguments (of public
+  // functions) are public symbols, as the default values are computed at the
+  // call site.
   auto index = 0;
   auto paramLists = AFD->getParameterLists();
   // Skip the first arguments, which contains Self (etc.), can't be defaulted,
