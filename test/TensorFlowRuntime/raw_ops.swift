@@ -15,34 +15,75 @@ import StdlibUnittest
 
 var RawOpsTests = TestSuite("RawOps")
 
-RawOpsTests.testAllBackends("ArithmeticOps") {
-  let lhsScalars: [Float] = [3, 1, 4, 1, 5, 9, 2, 6]
-  let rhsScalars: [Float] = [2, 7, 1, 8, 2, 8, 1, 8]
+@_inlineable @inline(__always)
+public func testPointwiseBinaryOp<T : AccelerableByTensorFlow & Equatable>(
+  tfOp: (Tensor<Float>, Tensor<Float>) -> Tensor<T>,
+  swiftOp: (Float, Float) -> T) {
+  let lhsScalars: [Float] = [3, 1, 4, 1, 5, 9, 2, 7]
+  let rhsScalars: [Float] = [2, 7, 1, 8, 2, 8, 1, 7]
   let shape = [2, 4]
   let tensorShape: TensorShape = TensorShape(shape.map { Int32($0) })
   let lhs = Tensor<Float>(shape: tensorShape, scalars: lhsScalars)
   let rhs = Tensor<Float>(shape: tensorShape, scalars: rhsScalars)
 
-  let add = Raw.add(x: lhs, y: rhs)
-  let sub = Raw.sub(x: lhs, y: rhs)
-  let mul = Raw.mul(x: lhs, y: rhs)
-  let div = Raw.div(x: lhs, y: rhs)
-
+  let tfResult = tfOp(lhs, rhs)
   expectEqual(ShapedArray(shape: shape,
-                          scalars: zip(lhsScalars, rhsScalars).map { $0 + $1 }),
-              add.array)
+                          scalars: zip(lhsScalars, rhsScalars).map(swiftOp)),
+              tfResult.array)
+}
 
-  expectEqual(ShapedArray(shape: shape,
-                          scalars: zip(lhsScalars, rhsScalars).map { $0 - $1 }),
-              sub.array)
+// TODO(mazare): group all these tests in a single function once this does
+// not cause an XLA compilation error anymore.
+RawOpsTests.testAllBackends("AddOp") {
+  testPointwiseBinaryOp(tfOp: Raw.add, swiftOp: { $0 + $1 })
+}
 
-  expectEqual(ShapedArray(shape: shape,
-                          scalars: zip(lhsScalars, rhsScalars).map { $0 * $1 }),
-              mul.array)
+RawOpsTests.testAllBackends("SubOp") {
+  testPointwiseBinaryOp(tfOp: Raw.sub, swiftOp: { $0 - $1 })
+}
 
-  expectEqual(ShapedArray(shape: shape,
-                          scalars: zip(lhsScalars, rhsScalars).map { $0 / $1 }),
-              div.array)
+RawOpsTests.testAllBackends("MulOp") {
+  testPointwiseBinaryOp(tfOp: Raw.mul, swiftOp: { $0 * $1 })
+}
+
+RawOpsTests.testAllBackends("DivOp") {
+  testPointwiseBinaryOp(tfOp: Raw.div, swiftOp: { $0 / $1 })
+}
+
+RawOpsTests.testAllBackends("FloorDivOp") {
+  testPointwiseBinaryOp(tfOp: Raw.floorDiv, swiftOp: { ($0 / $1).rounded(.down) })
+}
+
+RawOpsTests.testAllBackends("MinimumOp") {
+  testPointwiseBinaryOp(tfOp: Raw.minimum, swiftOp: min)
+}
+
+RawOpsTests.testAllBackends("MaximumOp") {
+  testPointwiseBinaryOp(tfOp: Raw.maximum, swiftOp: max)
+}
+
+RawOpsTests.testAllBackends("MaximumOp") {
+  testPointwiseBinaryOp(tfOp: Raw.maximum, swiftOp: max)
+}
+
+RawOpsTests.testAllBackends("EqualOp") {
+  testPointwiseBinaryOp(tfOp: Raw.equal, swiftOp: { $0 == $1 })
+}
+
+RawOpsTests.testAllBackends("LessOp") {
+  testPointwiseBinaryOp(tfOp: Raw.less, swiftOp: { $0 < $1 })
+}
+
+RawOpsTests.testAllBackends("LessEqualOp") {
+  testPointwiseBinaryOp(tfOp: Raw.lessEqual, swiftOp: { $0 <= $1 })
+}
+
+RawOpsTests.testAllBackends("GreaterOp") {
+  testPointwiseBinaryOp(tfOp: Raw.greater, swiftOp: { $0 > $1 })
+}
+
+RawOpsTests.testAllBackends("GreaterEqualOp") {
+  testPointwiseBinaryOp(tfOp: Raw.greaterEqual, swiftOp: { $0 >= $1 })
 }
 
 #if CPU && !CUDA
