@@ -32,10 +32,18 @@
 
 using namespace swift;
 
-static void findNominalsAndOperators(
-    llvm::MapVector<const NominalTypeDecl *, bool> &foundNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &foundOperators,
-    DeclRange members) {
+namespace {
+/// Collected and later written information.
+struct CollectedProvidedDeclarations {
+  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
+  llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
+  
+  void findNominalsAndOperators(DeclRange members);
+};
+} // end anon namespace
+
+void CollectedProvidedDeclarations::findNominalsAndOperators(DeclRange members) {
   for (const Decl *D : members) {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -47,16 +55,15 @@ static void findNominalsAndOperators(
     }
 
     if (VD->getFullName().isOperator()) {
-      foundOperators.push_back(cast<FuncDecl>(VD));
+      memberOperatorDecls.push_back(cast<FuncDecl>(VD));
       continue;
     }
 
     auto nominal = dyn_cast<NominalTypeDecl>(D);
     if (!nominal)
       continue;
-    foundNominals[nominal] |= true;
-    findNominalsAndOperators(foundNominals, foundOperators,
-                             nominal->getMembers());
+    extendedNominals[nominal] |= true;
+    findNominalsAndOperators(nominal->getMembers());
   }
 }
 
@@ -203,75 +210,58 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   return ReferenceDependenciesEmitter::emit(diags, SF, depTracker, outputPath);
 }
 
-static void emitProvidesTopLevelNames(
-    const SourceFile *SF, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+static CollectedProvidedDeclarations emitProvidesTopLevelNames(
+    const SourceFile *SF, llvm::raw_ostream &out);
 
 static void emitProvidesNominalTypes(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::raw_ostream &out);
 
 static void emitProvidesMembers(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    const llvm::SmallVectorImpl<const ExtensionDecl *>
-        &extensionsWithJustMembers,
+    const CollectedProvidedDeclarations &cpd,
     llvm::raw_ostream &out);
 
 static void emitProvidesDynamicLookupMembers(const SourceFile *SF,
                                              llvm::raw_ostream &out);
 
 void ReferenceDependenciesEmitter::emitProvides() {
-  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-  llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
-
   out << "provides-top-level:\n";
 
-  emitProvidesTopLevelNames(SF, out, extendedNominals,
-                            extensionsWithJustMembers);
-  emitProvidesNominalTypes(extendedNominals, out);
-  emitProvidesMembers(extendedNominals, extensionsWithJustMembers, out);
+  CollectedProvidedDeclarations cpd = emitProvidesTopLevelNames(SF, out);
+  emitProvidesNominalTypes(cpd.extendedNominals, out);
+  emitProvidesMembers(cpd, out);
   emitProvidesDynamicLookupMembers(SF, out);
 }
 
 static void emitProvidesTopLevelDecl(
-    const Decl *const D, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+    const Decl *const D, llvm::raw_ostream &out, CollectedProvidedDeclarations &cpd);
 
-static void emitProvidesTopLevelNames(
-    const SourceFile *const SF, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
-  llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
-
+static CollectedProvidedDeclarations emitProvidesTopLevelNames(
+    const SourceFile *const SF, llvm::raw_ostream &out) {
+    CollectedProvidedDeclarations cpd;
+ 
   for (const Decl *D : SF->Decls)
-    emitProvidesTopLevelDecl(D, out, extendedNominals, memberOperatorDecls,
-                             extensionsWithJustMembers);
-  for (auto *operatorFunction : memberOperatorDecls)
+    emitProvidesTopLevelDecl(D, out, cpd);
+  for (auto *operatorFunction : cpd.memberOperatorDecls)
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
+  return cpd;
 }
 
 static void emitProvidesExtensionDecl(
     const ExtensionDecl *ED, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
+    CollectedProvidedDeclarations &cpd);
+
 
 static void emitProvidesNominalTypeDecl(
     const NominalTypeDecl *NTD, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls);
+    CollectedProvidedDeclarations &cpd);
 
 static void emitProvidesValueDecl(const ValueDecl *VD,
                                   llvm::raw_ostream &out);
 
 static void emitProvidesTopLevelDecl(
     const Decl *const D, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
+    CollectedProvidedDeclarations &cpd) {
   switch (D->getKind()) {
   case DeclKind::Module:
     break;
@@ -281,8 +271,7 @@ static void emitProvidesTopLevelDecl(
     break;
 
   case DeclKind::Extension:
-    emitProvidesExtensionDecl(cast<ExtensionDecl>(D), out, extendedNominals,
-                              memberOperatorDecls, extensionsWithJustMembers);
+    emitProvidesExtensionDecl(cast<ExtensionDecl>(D), out, cpd);
     break;
 
   case DeclKind::InfixOperator:
@@ -299,8 +288,7 @@ static void emitProvidesTopLevelDecl(
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
-    emitProvidesNominalTypeDecl(cast<NominalTypeDecl>(D), out, extendedNominals,
-                                memberOperatorDecls);
+    emitProvidesNominalTypeDecl(cast<NominalTypeDecl>(D), out, cpd);
     break;
 
   case DeclKind::TypeAlias:
@@ -333,9 +321,7 @@ static void emitProvidesTopLevelDecl(
 
 static void emitProvidesExtensionDecl(
     const ExtensionDecl *const ED, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
-    llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
+    CollectedProvidedDeclarations &cpd) {
   auto *NTD = ED->getExtendedType()->getAnyNominal();
   if (!NTD)
     return;
@@ -353,26 +339,23 @@ static void emitProvidesExtensionDecl(
                     declIsPrivate)) {
       return;
     }
-    extensionsWithJustMembers.push_back(ED);
+    cpd.extensionsWithJustMembers.push_back(ED);
   }
-  extendedNominals[NTD] |= !justMembers;
-  findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                           ED->getMembers());
+  cpd.extendedNominals[NTD] |= !justMembers;
+  cpd.findNominalsAndOperators(ED->getMembers());
 }
 
 static void emitProvidesNominalTypeDecl(
     const NominalTypeDecl *const NTD, llvm::raw_ostream &out,
-    llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls) {
+    CollectedProvidedDeclarations &cpd) {
   if (!NTD->hasName())
     return;
   if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
     return;
   }
   out << "- \"" << escape(NTD->getName()) << "\"\n";
-  extendedNominals[NTD] |= true;
-  findNominalsAndOperators(extendedNominals, memberOperatorDecls,
-                           NTD->getMembers());
+  cpd.extendedNominals[NTD] |= true;
+  cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
 static void emitProvidesValueDecl(const ValueDecl *const VD,
@@ -399,19 +382,17 @@ static void emitProvidesNominalTypes(
 }
 
 static void emitProvidesMembers(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    const llvm::SmallVectorImpl<const ExtensionDecl *>
-        &extensionsWithJustMembers,
+    const CollectedProvidedDeclarations &cpd,
     llvm::raw_ostream &out) {
   out << "provides-member:\n";
-  for (auto entry : extendedNominals) {
+  for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
     out << mangleTypeAsContext(entry.first);
     out << "\", \"\"]\n";
   }
 
   // This is also part of "provides-member".
-  for (auto *ED : extensionsWithJustMembers) {
+  for (auto *ED : cpd.extensionsWithJustMembers) {
     auto mangledName =
         mangleTypeAsContext(ED->getExtendedType()->getAnyNominal());
 
