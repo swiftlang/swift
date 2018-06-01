@@ -194,14 +194,13 @@ func _adjointSquared<T : BinaryFloatingPoint>(
 // Linear algebra
 //===----------------------------------------------------------------------===//
 
-extension Tensor where Scalar : Numeric {
-  @_inlineable @_versioned
-  func _adjointDot(
-    _ other: Tensor, originalValue: Tensor, seed: Tensor
-  ) -> (Tensor, Tensor) {
-    let bcSeed = seed.broadcast(like: originalValue)
-    return (bcSeed.dot(other.transposed()), transposed().dot(bcSeed))
-  }
+@_inlineable @_versioned
+func _adjointMatmul<Scalar : Numeric>(
+  _ left: Tensor<Scalar>, _ right: Tensor<Scalar>,
+  originalValue: Tensor<Scalar>, seed: Tensor<Scalar>
+) -> (Tensor<Scalar>, Tensor<Scalar>) {
+  let bcSeed = seed.broadcast(like: originalValue)
+  return (matmul(bcSeed, right.transposed()), matmul(left.transposed(), bcSeed))
 }
 
 extension Tensor {
