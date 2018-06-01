@@ -661,7 +661,6 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
 
   SILFunction *Callee = AI.getReferencedFunction();
-  SILFunction *EligibleCallee = nullptr;
 
   if (!Callee) {
     return nullptr;
@@ -776,8 +775,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  EligibleCallee = Callee;
-  return EligibleCallee;
+  return Callee;
 }
 
 /// Returns true if the instruction \I has any interesting side effects which
