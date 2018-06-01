@@ -127,11 +127,11 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
-static void emitProvides(const SourceFile *SF, llvm::raw_fd_ostream &out);
+static void emitProvides(const SourceFile *SF, llvm::raw_ostream &out);
 static void emitDepends(const SourceFile *SF,
                         const DependencyTracker &depTracker,
-                        llvm::raw_fd_ostream &out);
-static void emitInterfaceHash(SourceFile *SF, llvm::raw_fd_ostream &out);
+                        llvm::raw_ostream &out);
+static void emitInterfaceHash(SourceFile *SF, llvm::raw_ostream &out);
 
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *const SF,
@@ -164,25 +164,25 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 }
 
 static void emitProvidesTopLevelNames(
-    const SourceFile *SF, llvm::raw_fd_ostream &out,
+    const SourceFile *SF, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
 
 static void emitProvidesNominalTypes(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::raw_fd_ostream &out);
+    llvm::raw_ostream &out);
 
 static void emitProvidesMembers(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     const llvm::SmallVectorImpl<const ExtensionDecl *>
         &extensionsWithJustMembers,
-    llvm::raw_fd_ostream &out);
+    llvm::raw_ostream &out);
 
 static void emitProvidesDynamicLookupMembers(const SourceFile *SF,
-                                             llvm::raw_fd_ostream &out);
+                                             llvm::raw_ostream &out);
 
 static void emitProvides(const SourceFile *const SF,
-                         llvm::raw_fd_ostream &out) {
+                         llvm::raw_ostream &out) {
   llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
   llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
 
@@ -196,13 +196,13 @@ static void emitProvides(const SourceFile *const SF,
 }
 
 static void emitProvidesTopLevelDecl(
-    const Decl *const D, llvm::raw_fd_ostream &out,
+    const Decl *const D, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
 
 static void emitProvidesTopLevelNames(
-    const SourceFile *const SF, llvm::raw_fd_ostream &out,
+    const SourceFile *const SF, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
   llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
@@ -215,21 +215,21 @@ static void emitProvidesTopLevelNames(
 }
 
 static void emitProvidesExtensionDecl(
-    const ExtensionDecl *ED, llvm::raw_fd_ostream &out,
+    const ExtensionDecl *ED, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers);
 
 static void emitProvidesNominalTypeDecl(
-    const NominalTypeDecl *NTD, llvm::raw_fd_ostream &out,
+    const NominalTypeDecl *NTD, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls);
 
 static void emitProvidesValueDecl(const ValueDecl *VD,
-                                  llvm::raw_fd_ostream &out);
+                                  llvm::raw_ostream &out);
 
 static void emitProvidesTopLevelDecl(
-    const Decl *const D, llvm::raw_fd_ostream &out,
+    const Decl *const D, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
@@ -293,7 +293,7 @@ static void emitProvidesTopLevelDecl(
 }
 
 static void emitProvidesExtensionDecl(
-    const ExtensionDecl *const ED, llvm::raw_fd_ostream &out,
+    const ExtensionDecl *const ED, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls,
     llvm::SmallVectorImpl<const ExtensionDecl *> &extensionsWithJustMembers) {
@@ -322,7 +322,7 @@ static void emitProvidesExtensionDecl(
 }
 
 static void emitProvidesNominalTypeDecl(
-    const NominalTypeDecl *const NTD, llvm::raw_fd_ostream &out,
+    const NominalTypeDecl *const NTD, llvm::raw_ostream &out,
     llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     llvm::SmallVectorImpl<const FuncDecl *> &memberOperatorDecls) {
   if (!NTD->hasName())
@@ -337,7 +337,7 @@ static void emitProvidesNominalTypeDecl(
 }
 
 static void emitProvidesValueDecl(const ValueDecl *const VD,
-                                  llvm::raw_fd_ostream &out) {
+                                  llvm::raw_ostream &out) {
   if (!VD->hasName())
     return;
   if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
@@ -348,7 +348,7 @@ static void emitProvidesValueDecl(const ValueDecl *const VD,
 
 static void emitProvidesNominalTypes(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::raw_fd_ostream &out) {
+    llvm::raw_ostream &out) {
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
@@ -363,7 +363,7 @@ static void emitProvidesMembers(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
     const llvm::SmallVectorImpl<const ExtensionDecl *>
         &extensionsWithJustMembers,
-    llvm::raw_fd_ostream &out) {
+    llvm::raw_ostream &out) {
   out << "provides-member:\n";
   for (auto entry : extendedNominals) {
     out << "- [\"";
@@ -389,7 +389,7 @@ static void emitProvidesMembers(
 }
 
 static void emitProvidesDynamicLookupMembers(const SourceFile *const SF,
-                                             llvm::raw_fd_ostream &out) {
+                                             llvm::raw_ostream &out) {
   if (SF->getASTContext().LangOpts.EnableObjCInterop) {
     // FIXME: This requires a traversal of the whole file to compute.
     // We should (a) see if there's a cheaper way to keep it up to date,
@@ -434,25 +434,25 @@ sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
 }
 
 static void emitDependsTopLevelNames(const ReferencedNameTracker *tracker,
-                                     llvm::raw_fd_ostream &out);
+                                     llvm::raw_ostream &out);
 
 using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
 
 static void emitDependsMember(ArrayRef<TableEntryTy> sortedMembers,
-                              llvm::raw_fd_ostream &out);
+                              llvm::raw_ostream &out);
 
 static void emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers,
-                               llvm::raw_fd_ostream &out);
+                               llvm::raw_ostream &out);
 
 static void emitDependsDynamicLookup(const ReferencedNameTracker *tracker,
-                                     llvm::raw_fd_ostream &out);
+                                     llvm::raw_ostream &out);
 
 static void emitDependsExternal(const DependencyTracker &depTracker,
-                                llvm::raw_fd_ostream &out);
+                                llvm::raw_ostream &out);
 
 static void emitDepends(const SourceFile *const SF,
                         const DependencyTracker &depTracker,
-                        llvm::raw_fd_ostream &out) {
+                        llvm::raw_ostream &out) {
 
   const ReferencedNameTracker *const tracker = SF->getReferencedNameTracker();
   assert(tracker && "Cannot emit reference dependencies without a tracker");
@@ -485,7 +485,7 @@ static void emitDepends(const SourceFile *const SF,
 }
 
 static void emitDependsTopLevelNames(const ReferencedNameTracker *const tracker,
-                                     llvm::raw_fd_ostream &out) {
+                                     llvm::raw_ostream &out) {
   out << "depends-top-level:\n";
   for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
@@ -497,7 +497,7 @@ static void emitDependsTopLevelNames(const ReferencedNameTracker *const tracker,
 }
 
 static void emitDependsMember(ArrayRef<TableEntryTy> sortedMembers,
-                              llvm::raw_fd_ostream &out) {
+                              llvm::raw_ostream &out) {
   out << "depends-member:\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
@@ -518,7 +518,7 @@ static void emitDependsMember(ArrayRef<TableEntryTy> sortedMembers,
 }
 
 static void emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers,
-                               llvm::raw_fd_ostream &out) {
+                               llvm::raw_ostream &out) {
   out << "depends-nominal:\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
@@ -541,7 +541,7 @@ static void emitDependsNominal(ArrayRef<TableEntryTy> sortedMembers,
 }
 
 static void emitDependsDynamicLookup(const ReferencedNameTracker *const tracker,
-                                     llvm::raw_fd_ostream &out) {
+                                     llvm::raw_ostream &out) {
   out << "depends-dynamic-lookup:\n";
   for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
@@ -553,14 +553,14 @@ static void emitDependsDynamicLookup(const ReferencedNameTracker *const tracker,
 }
 
 static void emitDependsExternal(const DependencyTracker &depTracker,
-                                llvm::raw_fd_ostream &out) {
+                                llvm::raw_ostream &out) {
   out << "depends-external:\n";
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
 }
 
-static void emitInterfaceHash(SourceFile *const SF, llvm::raw_fd_ostream &out) {
+static void emitInterfaceHash(SourceFile *const SF, llvm::raw_ostream &out) {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
   out << "interface-hash: \"" << interfaceHash << "\"\n";
