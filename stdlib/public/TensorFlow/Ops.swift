@@ -39,12 +39,6 @@
 // type.  These are magic types known to the compiler.
 //
 
-// Python PEP 465 makes a compelling argument that matrix multiplication should
-// not be spelled with the standard * operator, so we need a new one.  We'll use
-// this operator, though it is defensible to use a variety of other ones as
-// well.
-infix operator ⊗ : MultiplicationPrecedence
-
 infix operator ++ : AdditionPrecedence
 
 // TODO:
@@ -140,7 +134,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
     return lhs * Tensor(handle: _TFMakeScalarTensor(rhs))
   }
 }
-  
+
 public extension Tensor where Scalar : Numeric {
   /// Adds two tensors and stores the result in the left-hand-side variable.
   /// - Note: `+=` supports broadcasting.
@@ -148,14 +142,14 @@ public extension Tensor where Scalar : Numeric {
   static func += (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs + rhs
   }
-  
+
   /// Adds the scalar to every scalar of the tensor and stores the result in the
   /// left-hand-side variable.
   @_inlineable @inline(__always)
   static func += (lhs: inout Tensor, rhs: Scalar) {
     lhs = lhs + rhs
   }
-  
+
   /// Subtracts the second tensor from the first and stores the result in the
   /// left-hand-side variable.
   /// - Note: `-=` supports broadcasting.
@@ -163,7 +157,7 @@ public extension Tensor where Scalar : Numeric {
   static func -= (lhs: inout Tensor, rhs: Tensor) {
     lhs = lhs - rhs
   }
-  
+
   /// Subtracts the scalar from every scalar of the tensor and stores the result
   /// in the left-hand-side variable.
   @_inlineable @inline(__always)
@@ -262,21 +256,29 @@ public extension Tensor where Scalar : Numeric {
 // Linear algebra
 //===----------------------------------------------------------------------===//
 
+/// Performs matrix multiplication with another tensor and produces the
+/// result.
+@_inlineable @inline(__always)
+@differentiable(reverse, adjoint: _adjointMatmul(_:_:originalValue:seed:))
+public func matmul<Scalar : Numeric>(
+  _ left: Tensor<Scalar>, _ right: Tensor<Scalar>
+) -> Tensor<Scalar> {
+  return #tfop("MatMul", left, right)
+}
+
+infix operator ⊗ : MultiplicationPrecedence
+
 public extension Tensor where Scalar : Numeric {
-  /// Performs matrix multiplication with another tensor and produces the
-  /// result.
   @_inlineable @inline(__always)
-  @differentiable(
-    reverse, withRespectTo: (self, .0),
-    adjoint: _adjointDot(_:originalValue:seed:)
-  )
+  @available(*, renamed: "matmul(_:_:)")
   func dot(_ other: Tensor) -> Tensor {
-    return #tfop("MatMul", self, other)
+    return matmul(self, other)
   }
 
   /// Performs matrix multiplication between two tensors and produces the
   /// result.
   @_inlineable @inline(__always)
+  @available(*, renamed: "matmul(_:_:)")
   static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
     return lhs.dot(rhs)
   }
