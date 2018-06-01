@@ -14,9 +14,11 @@
 //  to define new request kinds.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_BASIC_SIMPLEREQUEST_H
-#define SWIFT_BASIC_SIMPLEREQUEST_H
+#ifndef SWIFT_AST_SIMPLEREQUEST_H
+#define SWIFT_AST_SIMPLEREQUEST_H
 
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/SimpleDisplay.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
@@ -30,6 +32,41 @@ class Evaluator;
 /// CRTP base class that describes a request operation that takes values
 /// with the given input types (\c Inputs...) and produces an output of
 /// the given type.
+///
+/// \tparam Derived The final, derived class type for the request.
+/// \tparam Output The type of the result produced by evaluating this request.
+/// \tparam Inputs The types of the inputs to this request, i.e., the values
+/// that comprise the request itself. These will determine the uniqueness of
+/// the request.
+///
+/// The Derived class needs to implement several operations. The most important
+/// one takes an evaluator and the input values, then computes the final
+/// result:
+/// \code
+///   Output operator()(Evaluator &evaluator, Inputs...) const;
+/// \endcode
+///
+/// The Derived class will also need to implement an operation to break a
+/// cycle if one is found, i.e.,
+/// \code
+///   OutputType breakCycle() const;
+/// \endcode
+///
+/// Cycle diagnostics can be handled in one of two ways. Either the Derived
+/// class can implement the two cycle-diagnosing operations directly:
+/// \code
+///   void diagnoseCycle(DiagnosticEngine &diags) const;
+///   void noteCycleStep(DiagnosticEngine &diags) const;
+/// \endcode
+///
+/// Or the Derived class can provide a "diagnostic location" operation and
+/// diagnostic values for the main cycle diagnostic and a "note" describing a
+/// step within the chain of diagnostics:
+/// \code
+///   T getCycleDiagnosticLoc(Inputs...) const;
+///   static constexpr Diag<Inputs...> cycleDiagnostic = ...;
+///   static constexpr Diag<Inputs...> cycleStepDiagnostic = ...;
+/// \endcode
 template<typename Derived, typename Output, typename ...Inputs>
 class SimpleRequest {
   std::tuple<Inputs...> storage;
@@ -49,6 +86,14 @@ class SimpleRequest {
     return asDerived()(evaluator, std::get<Indices>(storage)...);
   }
 
+  template<size_t ...Indices>
+  void diagnoseImpl(DiagnosticEngine &diags, Diag<Inputs...> diag,
+                    llvm::index_sequence<Indices...>) const {
+    diags.diagnose(
+      asDerived().getCycleDiagnosticLoc(std::get<Indices>(storage)...),
+      diag, std::get<Indices>(storage)...);
+  }
+
 protected:
   /// Retrieve the storage value directly.
   const std::tuple<Inputs...> &getStorage() const { return storage; }
@@ -62,7 +107,17 @@ public:
   OutputType operator()(Evaluator &evaluator) const {
     return callDerived(evaluator, llvm::index_sequence_for<Inputs...>());
   }
-  
+
+  void diagnoseCycle(DiagnosticEngine &diags) const {
+    diagnoseImpl(diags, Derived::cycleDiagnostic,
+                 llvm::index_sequence_for<Inputs...>());
+  }
+
+  void noteCycleStep(DiagnosticEngine &diags) const {
+    diagnoseImpl(diags, Derived::cycleStepDiagnostic,
+                 llvm::index_sequence_for<Inputs...>());
+  }
+
   friend bool operator==(const SimpleRequest &lhs, const SimpleRequest &rhs) {
     return lhs.storage == rhs.storage;
   }

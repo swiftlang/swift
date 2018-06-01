@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Evaluator.h"
-#include "swift/Basic/SimpleRequest.h"
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/SourceManager.h"
 #include "gtest/gtest.h"
 #include <cmath>
