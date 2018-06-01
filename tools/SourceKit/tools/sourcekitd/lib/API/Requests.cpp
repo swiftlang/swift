@@ -2423,9 +2423,14 @@ void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
     std::unordered_set<unsigned> ReusedNodeIds,
     ResponseBuilder::Dictionary &Dict) {
+  // 4096 is a heuristic buffer size that appears to usually be able to fit an
+  // incremental syntax tree
+  size_t ReserveBufferSize = 4096;
   std::string SyntaxTreeString;
+  SyntaxTreeString.reserve(ReserveBufferSize);
   {
     llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
+    SyntaxTreeStream.SetBufferSize(ReserveBufferSize);
     swift::json::Output::UserInfoMap JsonUserInfo;
     JsonUserInfo[swift::json::OmitNodesUserInfoKey] = &ReusedNodeIds;
     swift::json::Output SyntaxTreeOutput(SyntaxTreeStream, JsonUserInfo,
