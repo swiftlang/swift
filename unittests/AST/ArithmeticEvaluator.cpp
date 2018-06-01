@@ -82,12 +82,12 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
 }
 
 /// Rule to evaluate the value of the expression.
-template<typename Derived>
+template<typename Derived, CacheKind Caching>
 struct EvaluationRule
-  : public SimpleRequest<Derived, double, ArithmeticExpr *>
+  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
 {
-  using SimpleRequest<Derived, double, ArithmeticExpr *>::SimpleRequest;
-  using SimpleRequest<Derived, double, ArithmeticExpr *>::operator();
+  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::operator();
 
   double operator()(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
@@ -122,15 +122,12 @@ struct EvaluationRule
   void noteCycleStep(DiagnosticEngine &diags) const { }
 };
 
-template<typename Derived>
-bool EvaluationRule<Derived>::brokeCycle = false;
+template<typename Derived, CacheKind Caching>
+bool EvaluationRule<Derived, Caching>::brokeCycle = false;
 
 struct InternallyCachedEvaluationRule :
-  EvaluationRule<InternallyCachedEvaluationRule>
+EvaluationRule<InternallyCachedEvaluationRule, CacheKind::Cached>
 {
-  static const bool isEverCached = true;
-  static const bool hasExternalCache = false;
-
   using EvaluationRule::EvaluationRule;
 
   bool isCached() const {
@@ -145,17 +142,14 @@ struct InternallyCachedEvaluationRule :
   }
 };
 
-struct UncachedEvaluationRule : EvaluationRule<UncachedEvaluationRule> {
-  static const bool isEverCached = false;
-
+struct UncachedEvaluationRule
+    : EvaluationRule<UncachedEvaluationRule, CacheKind::Uncached> {
   using EvaluationRule::EvaluationRule;
 };
 
-struct ExternallyCachedEvaluationRule :
-  EvaluationRule<ExternallyCachedEvaluationRule> {
-  static const bool isEverCached = true;
-  static const bool hasExternalCache = true;
-
+struct ExternallyCachedEvaluationRule
+    : EvaluationRule<ExternallyCachedEvaluationRule,
+                     CacheKind::SeparatelyCached> {
   using EvaluationRule::EvaluationRule;
 
   bool isCached() const {
