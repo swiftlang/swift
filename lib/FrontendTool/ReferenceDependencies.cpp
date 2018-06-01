@@ -115,30 +115,6 @@ private:
 };
 } // end anon namespace
 
-void ProvidesEmitter::CollectedProvidedDeclarations::findNominalsAndOperators(DeclRange members) {
-  for (const Decl *D : members) {
-    auto *VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      continue;
-
-    if (VD->hasAccess() &&
-        VD->getFormalAccess() <= AccessLevel::FilePrivate) {
-      continue;
-    }
-
-    if (VD->getFullName().isOperator()) {
-      memberOperatorDecls.push_back(cast<FuncDecl>(VD));
-      continue;
-    }
-
-    auto nominal = dyn_cast<NominalTypeDecl>(D);
-    if (!nominal)
-      continue;
-    extendedNominals[nominal] |= true;
-    findNominalsAndOperators(nominal->getMembers());
-  }
-}
-
 static bool declIsPrivate(const Decl *member) {
   auto *VD = dyn_cast<ValueDecl>(member);
   if (!VD) {
@@ -206,6 +182,17 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
+static SmallVector<std::pair<DeclBaseName, bool>, 16>
+sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
+  SmallVector<std::pair<DeclBaseName, bool>, 16> pairs{map.begin(), map.end()};
+  llvm::array_pod_sort(pairs.begin(), pairs.end(),
+                       [](const std::pair<DeclBaseName, bool> *first,
+                          const std::pair<DeclBaseName, bool> *second) -> int {
+                         return first->first.compare(second->first);
+                       });
+  return pairs;
+}
+
 std::unique_ptr<llvm::raw_fd_ostream>ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags, StringRef outputPath) {
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
@@ -271,6 +258,16 @@ void ProvidesEmitter::emit(const SourceFile *SF, llvm::raw_ostream &out) {
 
 void ReferenceDependenciesEmitter::emitProvides() {
   ProvidesEmitter::emit(SF, out);
+}
+
+void ReferenceDependenciesEmitter::emitDepends() {
+  DependsEmitter::emit(SF, depTracker, out);
+}
+
+void ReferenceDependenciesEmitter::emitInterfaceHash() {
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  out << "interface-hash: \"" << interfaceHash << "\"\n";
 }
 
 ProvidesEmitter::CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelNames() {
@@ -381,6 +378,30 @@ void ProvidesEmitter::emitNominalTypeDecl(
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
+void ProvidesEmitter::CollectedProvidedDeclarations::findNominalsAndOperators(DeclRange members) {
+  for (const Decl *D : members) {
+    auto *VD = dyn_cast<ValueDecl>(D);
+    if (!VD)
+      continue;
+    
+    if (VD->hasAccess() &&
+        VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+      continue;
+    }
+    
+    if (VD->getFullName().isOperator()) {
+      memberOperatorDecls.push_back(cast<FuncDecl>(VD));
+      continue;
+    }
+    
+    auto nominal = dyn_cast<NominalTypeDecl>(D);
+    if (!nominal)
+      continue;
+    extendedNominals[nominal] |= true;
+    findNominalsAndOperators(nominal->getMembers());
+  }
+}
+
 void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) {
   if (!VD->hasName())
     return;
@@ -459,21 +480,6 @@ void ProvidesEmitter::emitDynamicLookupMembers() {
       out << "- \"" << escape(name) << "\"\n";
     }
   }
-}
-
-static SmallVector<std::pair<DeclBaseName, bool>, 16>
-sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
-  SmallVector<std::pair<DeclBaseName, bool>, 16> pairs{map.begin(), map.end()};
-  llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                       [](const std::pair<DeclBaseName, bool> *first,
-                          const std::pair<DeclBaseName, bool> *second) -> int {
-                         return first->first.compare(second->first);
-                       });
-  return pairs;
-}
-
-void ReferenceDependenciesEmitter::emitDepends() {
-  DependsEmitter::emit(SF, depTracker, out);
 }
 
 void DependsEmitter::emit(const SourceFile *SF, const DependencyTracker &depTracker,
@@ -581,10 +587,4 @@ void DependsEmitter::emitExternal(const DependencyTracker &depTracker) const {
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
-}
-
-void ReferenceDependenciesEmitter::emitInterfaceHash() {
-  llvm::SmallString<32> interfaceHash;
-  SF->getInterfaceHash(interfaceHash);
-  out << "interface-hash: \"" << interfaceHash << "\"\n";
 }
