@@ -231,18 +231,17 @@ void Output::indent() {
 //  traits for built-in types
 //===----------------------------------------------------------------------===//
 
-void ScalarTraits<bool>::output(const bool &Val, raw_ostream &Out) {
-  Out << (Val ? "true" : "false");
+StringRef ScalarReferenceTraits<bool>::stringRef(const bool &Val) {
+  return (Val ? "true" : "false");
 }
 
-void ScalarTraits<StringRef>::output(const StringRef &Val,
-                                     raw_ostream &Out) {
-  Out << Val;
+StringRef ScalarReferenceTraits<StringRef>::stringRef(const StringRef &Val) {
+  return Val;
 }
 
-void ScalarTraits<std::string>::output(const std::string &Val,
-                                       raw_ostream &Out) {
-  Out << Val;
+StringRef
+ScalarReferenceTraits<std::string>::stringRef(const std::string &Val) {
+  return Val;
 }
 
 void ScalarTraits<uint8_t>::output(const uint8_t &Val,
