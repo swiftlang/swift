@@ -1790,12 +1790,6 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
 
-  if (Consumer.syntaxTreeEnabled()) {
-    std::unordered_set<unsigned> ReusedNodeIds;
-    Consumer.handleSyntaxTree(Impl.SyntaxInfo->getSourceFile().getSyntaxRoot(),
-                              ReusedNodeIds);
-  }
-
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
   if (Consumer.syntaxTreeEnabled()) {
@@ -2101,6 +2095,12 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 
   EditorDoc->readSyntaxInfo(Consumer);
   EditorDoc->readSemanticInfo(Snapshot, Consumer);
+
+  if (Consumer.syntaxTreeEnabled()) {
+    assert(EditorDoc->getSyntaxTree().hasValue());
+    Consumer.handleSyntaxTree(EditorDoc->getSyntaxTree().getValue(),
+                              /*ReusedNodeIds=*/{});
+  }
 }
 
 
