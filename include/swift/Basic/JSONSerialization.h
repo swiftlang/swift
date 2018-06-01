@@ -420,7 +420,7 @@ public:
 
   void beginObject();
   void endObject();
-  bool preflightKey(const char*, bool, bool, bool &, void *&);
+  bool preflightKey(StringRef, bool, bool, bool &, void *&);
   void postflightKey(void*);
 
   void beginEnumScalar();
@@ -462,13 +462,13 @@ public:
   }
 
   template <typename T>
-  void mapRequired(const char* Key, T& Val) {
+  void mapRequired(StringRef Key, T& Val) {
     this->processKey(Key, Val, true);
   }
 
   template <typename T>
   typename std::enable_if<has_ArrayTraits<T>::value,void>::type
-  mapOptional(const char* Key, T& Val) {
+  mapOptional(StringRef Key, T& Val) {
     // omit key/value instead of outputting empty array
     if (this->canElideEmptyArray() && !(Val.begin() != Val.end()))
       return;
@@ -476,24 +476,24 @@ public:
   }
 
   template <typename T>
-  void mapOptional(const char* Key, Optional<T> &Val) {
+  void mapOptional(StringRef Key, Optional<T> &Val) {
     processKeyWithDefault(Key, Val, Optional<T>(), /*Required=*/false);
   }
 
   template <typename T>
   typename std::enable_if<!has_ArrayTraits<T>::value,void>::type
-  mapOptional(const char* Key, T& Val) {
+  mapOptional(StringRef Key, T& Val) {
     this->processKey(Key, Val, false);
   }
 
   template <typename T>
-  void mapOptional(const char* Key, T& Val, const T& Default) {
+  void mapOptional(StringRef Key, T& Val, const T& Default) {
     this->processKeyWithDefault(Key, Val, Default, false);
   }
 
 private:
   template <typename T>
-  void processKeyWithDefault(const char *Key, Optional<T> &Val,
+  void processKeyWithDefault(StringRef Key, Optional<T> &Val,
                              const Optional<T> &DefaultValue, bool Required) {
     assert(!DefaultValue.hasValue() &&
            "Optional<T> shouldn't have a value!");
@@ -513,7 +513,7 @@ private:
   }
 
   template <typename T>
-  void processKeyWithDefault(const char *Key, T &Val, const T& DefaultValue,
+  void processKeyWithDefault(StringRef Key, T &Val, const T &DefaultValue,
                              bool Required) {
     void *SaveInfo;
     bool UseDefault;
@@ -529,7 +529,7 @@ private:
   }
 
   template <typename T>
-  void processKey(const char *Key, T &Val, bool Required) {
+  void processKey(StringRef Key, T &Val, bool Required) {
     void *SaveInfo;
     bool UseDefault;
     if (this->preflightKey(Key, Required, false, UseDefault, SaveInfo)) {

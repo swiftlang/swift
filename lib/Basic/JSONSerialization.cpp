@@ -76,7 +76,7 @@ void Output::endObject() {
   Stream << "}";
 }
 
-bool Output::preflightKey(const char *Key, bool Required, bool SameAsDefault,
+bool Output::preflightKey(StringRef Key, bool Required, bool SameAsDefault,
                           bool &UseDefault, void *&) {
   UseDefault = false;
   if (Required || !SameAsDefault) {
