@@ -446,20 +446,18 @@ public:
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = version::Version::getCurrentCompilerVersion();
       return thisVersion >= Val;
-    } else if (KindName == "swift") {
+    } else if ((KindName == "swift") || (KindName == "compiler")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-      return thisVersion >= Val;
-    } else if (KindName == "compiler") {
-      auto PUE = cast<PrefixUnaryExpr>(Arg);
-      auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
-      auto Val = version::Version::parseVersionString(
-          Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = version::Version::getCurrentLanguageVersion();
-      return thisVersion >= Val;
+      if (KindName == "swift") {
+        return Ctx.LangOpts.EffectiveLanguageVersion >= Val;  
+      } else if (KindName == "compiler") {
+        return version::Version::getCurrentLanguageVersion() >= Val;
+      } else {
+        llvm_unreachable("unsupported version conditional");
+      }
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
