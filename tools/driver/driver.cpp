@@ -71,7 +71,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 /// \returns True if running as a subcommand.
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
-                                  const SmallVectorImpl<const char *> &Args,
+                                  const ArrayRef<const char *> &Args,
                                   bool &isRepl) {
   assert(!Args.empty());
 
@@ -99,7 +99,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
   if (Subcommand == "repl") {
-    isRepl=true;
+    isRepl = true;
     return false;
   }
 
@@ -113,7 +113,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 static int run_driver(StringRef ExecName,
-                       const SmallVectorImpl<const char *> &argv) {
+                       const ArrayRef<const char *> &argv) {
   // Handle integrated tools.
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
@@ -207,7 +207,7 @@ int main(int argc_, const char **argv_) {
   SmallString<256> SubcommandName;
   bool isRepl = false;
   if (shouldRunAsSubcommand(ExecName, SubcommandName, argv, isRepl)) {
-    // Preserve argv for stack trace
+    // Preserve argv for the stack trace.
     SmallVector<const char *, 256> subCommandArgs(argv.begin(), argv.end());
     subCommandArgs.erase(&subCommandArgs[1]);
     // We are running as a subcommand, try to find the subcommand adjacent to
@@ -240,7 +240,7 @@ int main(int argc_, const char **argv_) {
   }
 
   if (isRepl) {
-    // Preserve argv for stack trace
+    // Preserve argv for the stack trace.
     SmallVector<const char *, 256> replArgs(argv.begin(), argv.end());
     replArgs.erase(&replArgs[1]);
     return run_driver(ExecName, replArgs);
