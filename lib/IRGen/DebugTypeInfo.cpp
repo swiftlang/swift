@@ -66,10 +66,8 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
                                               const TypeInfo &Info,
                                               bool Unwrap) {
 
-  auto DeclType = (Decl->hasType()
-                   ? Decl->getType()
-                   : Decl->getDeclContext()->mapTypeIntoContext(
-                     Decl->getInterfaceType()));
+  auto DeclType =
+      Decl->hasInterfaceType() ? Decl->getInterfaceType() : Decl->getType();
   auto RealType = Ty;
   if (Unwrap) {
     DeclType = DeclType->getInOutObjectType();
@@ -118,7 +116,7 @@ DebugTypeInfo DebugTypeInfo::getGlobal(SILGlobalVariable *GV,
                       hasDefaultAlignment(Type));
   assert(StorageTy && "StorageType is a nullptr");
   assert(!DbgTy.isArchetype() &&
-         "type of a global var cannot contain an archetype");
+         "type of global variable cannot be an archetype");
   assert(align.getValue() != 0);
   return DbgTy;
 }
@@ -129,8 +127,7 @@ DebugTypeInfo DebugTypeInfo::getObjCClass(ClassDecl *theClass,
   DebugTypeInfo DbgTy(nullptr, nullptr,
                       theClass->getInterfaceType().getPointer(), StorageType,
                       size, align, true);
-  assert(!DbgTy.isArchetype() &&
-         "type of an objc class cannot contain an archetype");
+  assert(!DbgTy.isArchetype() && "type of objc class cannot be an archetype");
   return DbgTy;
 }
 

@@ -889,7 +889,7 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Archetype: {
       auto *archetype = cast<ArchetypeType>(tybase);
 
-      assert(DWARFMangling && "Cannot mangle free-standing archetypes");
+      assert(false && DWARFMangling && "Cannot mangle free-standing archetypes");
 
       // Mangle the associated type of a parent archetype.
       if (auto parent = archetype->getParent()) {
