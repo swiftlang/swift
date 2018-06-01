@@ -461,7 +461,7 @@ namespace {
     : SF(SF), depTracker(depTracker), out(out) {}
     
   public:
-    using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
+    using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
     
     static void emit(const SourceFile *SF, const DependencyTracker &depTracker,
                      llvm::raw_ostream &out);
@@ -469,8 +469,8 @@ namespace {
   private:
     void emit() const;
     void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
-    void emitMember(const ArrayRef<TableEntryTy> sortedMembers) const;
-    void emitNominal(const ArrayRef<TableEntryTy> sortedMembers) const;
+    void emitMember(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
+    void emitNominal(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
     void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
     void emitExternal(const DependencyTracker &depTracker) const;
   };
@@ -492,12 +492,12 @@ void DependsEmitter::emit() const {
   emitTopLevelNames(tracker);
 
   auto &memberLookupTable = tracker->getUsedMembers();
-  std::vector<TableEntryTy> sortedMembers{
+  std::vector<MemberTableEntryTy> sortedMembers{
     memberLookupTable.begin(), memberLookupTable.end()
   };
   llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
-                       [](const TableEntryTy *lhs,
-                          const TableEntryTy *rhs) -> int {
+                       [](const MemberTableEntryTy *lhs,
+                          const MemberTableEntryTy *rhs) -> int {
     if (lhs->first.first == rhs->first.first)
       return lhs->first.second.compare(rhs->first.second);
 
@@ -527,7 +527,7 @@ void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracke
   }
 }
 
-void DependsEmitter::emitMember(ArrayRef<TableEntryTy> sortedMembers) const {
+void DependsEmitter::emitMember(ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << "depends-member:\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
@@ -547,7 +547,7 @@ void DependsEmitter::emitMember(ArrayRef<TableEntryTy> sortedMembers) const {
   }
 }
 
-void DependsEmitter::emitNominal(ArrayRef<TableEntryTy> sortedMembers) const {
+void DependsEmitter::emitNominal(ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << "depends-nominal:\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
