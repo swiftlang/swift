@@ -1616,15 +1616,14 @@ class NameAliasType final
     return Bits.NameAliasType.HasSubstitutionMap ? 1 : 0;
   }
 
+public:
   /// Retrieve the generic signature used for substitutions.
   GenericSignature *getGenericSignature() const {
     return getSubstitutionMap().getGenericSignature();
   }
 
-public:
   static NameAliasType *get(TypeAliasDecl *typealias, Type parent,
-                                 SubstitutionMap substitutions,
-                                 Type underlying);
+                            SubstitutionMap substitutions, Type underlying);
 
   /// \brief Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
