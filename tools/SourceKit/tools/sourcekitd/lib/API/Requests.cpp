@@ -2419,12 +2419,10 @@ void SKEditorConsumer::handleSourceText(StringRef Text) {
   Dict.set(KeySourceText, Text);
 }
 
-void SKEditorConsumer::handleSyntaxTree(
+void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
-    std::unordered_set<unsigned> ReusedNodeIds) {
-  if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
-    return;
-
+    std::unordered_set<unsigned> ReusedNodeIds,
+    ResponseBuilder::Dictionary &Dict) {
   std::string SyntaxTreeString;
   {
     llvm::raw_string_ostream SyntaxTreeStream(SyntaxTreeString);
@@ -2435,6 +2433,15 @@ void SKEditorConsumer::handleSyntaxTree(
     SyntaxTreeOutput << *SyntaxTree.getRaw();
   }
   Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
+}
+
+void SKEditorConsumer::handleSyntaxTree(
+    const swift::syntax::SourceFileSyntax &SyntaxTree,
+    std::unordered_set<unsigned> ReusedNodeIds) {
+  if (Opts.SyntaxTransferMode == SyntaxTreeTransferMode::Off)
+    return;
+
+  serializeSyntaxTreeAsJson(SyntaxTree, ReusedNodeIds, Dict);
 }
 
 void SKEditorConsumer::handleSyntaxReuseRegions(
