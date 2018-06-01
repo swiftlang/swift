@@ -1172,13 +1172,10 @@ void ConstraintSystem::openGenericRequirements(
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     const auto &req = requirements[pos];
 
-    auto firstType = substFn(req.getFirstType());
+    Optional<Requirement> openedReq;
+    auto openedFirst = substFn(req.getFirstType());
 
     auto kind = req.getKind();
-    auto requirementLoc =
-        locator.withPathElement(ConstraintLocator::OpenedGeneric)
-            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos));
-
     switch (kind) {
     case RequirementKind::Conformance: {
       auto proto = req.getSecondType()->castTo<ProtocolType>();
@@ -1188,19 +1185,22 @@ void ConstraintSystem::openGenericRequirements(
       if (skipProtocolSelfConstraint && protoDecl == outerDC &&
           protoDecl->getSelfInterfaceType()->isEqual(req.getFirstType()))
         continue;
-      addConstraint(Requirement(kind, firstType, proto), requirementLoc);
+      openedReq = Requirement(kind, openedFirst, proto);
       break;
     }
     case RequirementKind::Superclass:
     case RequirementKind::SameType:
-      addConstraint(Requirement(kind, firstType, substFn(req.getSecondType())),
-                    requirementLoc);
+      openedReq = Requirement(kind, openedFirst, substFn(req.getSecondType()));
       break;
     case RequirementKind::Layout:
-      addConstraint(Requirement(kind, firstType, req.getLayoutConstraint()),
-                    requirementLoc);
+      openedReq = Requirement(kind, openedFirst, req.getLayoutConstraint());
       break;
     }
+
+    addConstraint(
+        *openedReq,
+        locator.withPathElement(ConstraintLocator::OpenedGeneric)
+            .withPathElement(LocatorPathElt::getTypeRequirementComponent(pos)));
   }
 }
 
