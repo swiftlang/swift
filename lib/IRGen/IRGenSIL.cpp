@@ -862,6 +862,18 @@ public:
     return VarDecl->getInterfaceType()->hasTypeParameter();
   }
 
+  /// Force all archetypes referenced by the type to be bound by this point.
+  /// TODO: just make sure that we have a path to them that the debug info
+  ///       can follow.
+  void bindArchetypes(swift::Type Ty) {
+    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
+      runtimeTy.visit([&](CanType t) {
+        if (auto archetype = dyn_cast<ArchetypeType>(t))
+          emitTypeMetadataRef(archetype);
+      });
+  }
+  
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(StorageType Storage,
@@ -872,22 +884,10 @@ public:
                                     StringRef Name,
                                     unsigned ArgNo = 0,
                                     IndirectionKind Indirection = DirectValue) {
-    // Force all archetypes referenced by the type to be bound by this point.
-    // TODO: just make sure that we have a path to them that the debug info
-    //       can follow.
-
     // FIXME: The debug info type of all inlined instances of a variable must be
     // the same as the type of the abstract variable.
     if (isInlinedGeneric(VarDecl, DS))
       return;
-
-    auto runtimeTy = getRuntimeReifiedType(IGM,
-                                           Ty.getType()->getCanonicalType());
-    if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
-      runtimeTy.visit([&](CanType t) {
-        if (auto archetype = dyn_cast<ArchetypeType>(t))
-          emitTypeMetadataRef(archetype);
-       });
 
     assert(IGM.DebugInfo && "debug info not enabled");
     if (ArgNo) {
@@ -3636,6 +3636,8 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
   auto Storage =
       emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(), getDebugScope(),
                              Var->Name, Var->ArgNo, false);
+  if (!IGM.DebugInfo)
+    return;
   DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
                     ErrorResultSlot->getType(), IGM.getPointerSize(),
                     IGM.getPointerAlignment(), true);
@@ -3645,9 +3647,6 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
-  if (!IGM.DebugInfo)
-    return;
-
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
   
@@ -3686,14 +3685,15 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   llvm::SmallVector<llvm::Value *, 8> Copy;
   emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), Name, VarInfo->ArgNo,
                          IsAnonymous, Copy);
+  bindArchetypes(DbgTy.getType());
+  if (!IGM.DebugInfo)
+    return;
+
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
                                i->getDecl(), Name, VarInfo->ArgNo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
-  if (!IGM.DebugInfo)
-    return;
-
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
@@ -3723,6 +3723,10 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
       RealType, getTypeInfo(SILVal->getType()), Unwrap);
+  bindArchetypes(DbgTy.getType());
+  if (!IGM.DebugInfo)
+    return;
+
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
   emitDebugVariableDeclaration(
@@ -3994,26 +3998,29 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
         Indirection = IndirectValue;
       }
 
-  if (IGM.DebugInfo && Decl) {
-    // Ignore compiler-generated patterns but not optional bindings.
-    if (auto *Pattern = Decl->getParentPattern())
-      if (Pattern->isImplicit() &&
-          Pattern->getKind() != PatternKind::OptionalSome)
-        return;
+  if (!Decl)
+    return;
 
-    SILType SILTy = i->getType();
-    auto RealType = SILTy.getASTType();
-    auto DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-        RealType, type, false);
+  // Ignore compiler-generated patterns but not optional bindings.
+  if (auto *Pattern = Decl->getParentPattern())
+    if (Pattern->isImplicit() &&
+        Pattern->getKind() != PatternKind::OptionalSome)
+      return;
 
-    // FIXME: This is working around the inverse special case in LLDB.
-    if (DbgTy.isImplicitlyIndirect())
-      Indirection = DirectValue;
+  SILType SILTy = i->getType();
+  auto RealType = SILTy.getASTType();
+  auto DbgTy = DebugTypeInfo::getLocalVariable(
+      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
+      RealType, type, false);
 
+  // FIXME: This is working around the inverse special case in LLDB.
+  if (DbgTy.isImplicitlyIndirect())
+    Indirection = DirectValue;
+
+  bindArchetypes(DbgTy.getType());
+  if (IGM.DebugInfo)
     emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
                                  VarInfo->ArgNo, Indirection);
-  }
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
@@ -4184,34 +4191,39 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
-  
-  if (IGM.DebugInfo && Decl) {
-    // FIXME: This is a workaround to not produce local variables for
-    // capture list arguments like "[weak self]". The better solution
-    // would be to require all variables to be described with a
-    // SILDebugValue(Addr) and then not describe capture list
-    // arguments.
-    if (Name == IGM.Context.Id_self.str())
-      return;
 
-    assert(i->getBoxType()->getLayout()->getFields().size() == 1
-           && "box for a local variable should only have one field");
-    auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
-    auto RealType = SILTy.getASTType();
-    auto DbgTy = DebugTypeInfo::getLocalVariable(
-        CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-        RealType, type, /*Unwrap=*/false);
+  if (!Decl)
+    return;
+  // FIXME: This is a workaround to not produce local variables for
+  // capture list arguments like "[weak self]". The better solution
+  // would be to require all variables to be described with a
+  // SILDebugValue(Addr) and then not describe capture list
+  // arguments.
+  if (Name == IGM.Context.Id_self.str())
+    return;
 
-    if (isInlinedGeneric(Decl, i->getDebugScope()))
-      return;
+  assert(i->getBoxType()->getLayout()->getFields().size() == 1 &&
+         "box for a local variable should only have one field");
+  auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
+  auto RealType = SILTy.getASTType();
+  auto DbgTy = DebugTypeInfo::getLocalVariable(
+      CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
+      RealType, type, /*Unwrap=*/false);
 
-    IGM.DebugInfo->emitVariableDeclaration(
-        Builder,
-        emitShadowCopyIfNeeded(boxWithAddr.getAddress(), i->getDebugScope(),
-                               Name, 0, IsAnonymous),
-        DbgTy, i->getDebugScope(), Decl, Name, 0,
-        DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
-  }
+  if (isInlinedGeneric(Decl, i->getDebugScope()))
+    return;
+
+  auto Storage = emitShadowCopyIfNeeded(
+      boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);
+
+  if (!IGM.DebugInfo)
+    return;
+
+  IGM.DebugInfo->emitVariableDeclaration(
+      Builder,
+      Storage,
+      DbgTy, i->getDebugScope(), Decl, Name, 0,
+      DbgTy.isImplicitlyIndirect() ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
@@ -4773,6 +4785,7 @@ void IRGenSILFunction::visitObjCExistentialMetatypeToObjectInst(
   to.add(value);
   setLoweredExplosion(i, to);
 }
+
 void IRGenSILFunction::visitObjCProtocolInst(ObjCProtocolInst *i) {
   // Get the protocol reference.
   llvm::Value *protoRef = emitReferenceToObjCProtocol(*this, i->getProtocol());

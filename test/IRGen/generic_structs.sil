@@ -217,7 +217,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 //   initializeBufferWithCopyOfBuffer
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
-// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: %T.valueWitnesses = load i8**, i8*** [[T1]]
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** %T.valueWitnesses,
