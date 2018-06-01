@@ -304,7 +304,7 @@ TensorTests.testAllBackends("XWPlusB") {
   // Shape: 2
   let b = Tensor<Float>([0.5, 0.5])
   // Shape: 1 x 2 (broadcasted)
-  let result = x ⊗ w + b
+  let result = matmul(x, w) + b
   expectEqual([1, 2], result.shape)
   expectEqual([12.5, 6.5], result.scalars)
 }
@@ -350,8 +350,8 @@ func testXORInference() {
     // 1 x 1
     let b2 = Tensor<Float>([[-0.74635993]])
 
-    let o1 = tanh(x ⊗ w1 + b1)
-    let y = tanh(o1 ⊗ w2 + b2)
+    let o1 = tanh(matmul(x, w1) + b1)
+    let y = tanh(matmul(o1, w2) + b2)
     return y.array.scalars[0] // TODO: use better scalar getter
   }
   expectNearlyEqual(0.0, xor(0.0, 0.0), byError: 0.1)
@@ -372,8 +372,8 @@ TensorTests.testAllBackends("MLPClassifierStruct") {
     var b2 = Tensor<Float>(zeros: [1, 1])
 
     func prediction(for x: Tensor<Float>) -> Tensor<Float> {
-      let o1 = tanh(x ⊗ w1 + b1)
-      return tanh(o1 ⊗ w2 + b2)
+      let o1 = tanh(matmul(x, w1) + b1)
+      return tanh(matmul(o1, w2) + b2)
     }
   }
   let input = Tensor<Float>([[1, 0.5]])
