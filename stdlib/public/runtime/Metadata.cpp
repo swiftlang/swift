@@ -3940,3 +3940,13 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
                    metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif
+
+#if !SWIFT_OBJC_INTEROP
+
+// SPI for swift-corelibs-foundation
+ConstTargetMetadataPointer<swift::InProcess, TargetTypeContextDescriptor>
+swift::_swift_getTypeContextDescriptor(const Metadata *type) {
+    return type->getTypeContextDescriptor();
+}
+
+#endif // !SWIFT_OBJC_INTEROP

@@ -4377,6 +4377,14 @@ void swift_getFieldAt(
 void verifyMangledNameRoundtrip(const Metadata *metadata);
 #endif
 
+#if !SWIFT_OBJC_INTEROP
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI // SPI for swift-corelibs-foundation
+ConstTargetMetadataPointer<swift::InProcess, TargetTypeContextDescriptor>
+_swift_getTypeContextDescriptor(const Metadata *type);
+
+#endif // !SWIFT_OBJC_INTEROP
+
 } // end namespace swift
 
 #pragma clang diagnostic pop
