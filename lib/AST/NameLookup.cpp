@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
@@ -26,6 +26,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -281,20 +282,35 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // module.
         // FIXME: This is a hack. We should query a (lazily-built, cached)
         // module graph to determine shadowing.
-        if ((firstModule == curModule) == (secondModule == curModule))
-          continue;
+        if ((firstModule == curModule) != (secondModule == curModule)) {
+          // If the first module is the current module, the second declaration
+          // is shadowed by the first.
+          if (firstModule == curModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
 
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
-          shadowed.insert(secondDecl);
-          continue;
+          // Otherwise, the first declaration is shadowed by the second. There is
+          // no point in continuing to compare the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
         }
 
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
+        // Prefer declarations in an overlay to similar declarations in
+        // the Clang module it customizes.
+        if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
+          if (isInOverlayModuleForImportedModule(firstDecl->getDeclContext(),
+                                                 secondDecl->getDeclContext())){
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          if (isInOverlayModuleForImportedModule(secondDecl->getDeclContext(),
+                                                 firstDecl->getDeclContext())) {
+            shadowed.insert(firstDecl);
+            break;
+          }
+        }
       }
     }
   }
