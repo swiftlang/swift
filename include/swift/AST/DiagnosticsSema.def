@@ -1850,6 +1850,22 @@ WARNING(typealias_override_associated_type,none,
 WARNING(associated_type_override_typealias,none,
         "associated type %0 is redundant with type %0 declared in inherited "
         "%1 %2", (DeclName, DescriptiveDeclKind, Type))
+WARNING(swift4_typealias_in_protocol_warn,none,
+        "typealias should not be declared within a protocol; "
+        "move to an extension or use 'associatedtype' to define an associated "
+        "type requirement", ())
+ERROR(swift5_typealias_in_protocol_error,none,
+      "typealias must not be declared within a protocol; "
+      "move to an extension or use 'associatedtype' to define an associated "
+      "type requirement", ())
+ERROR(swift5_typealias_in_protocol_short,none,
+      "typealias must not be declared within a protocol", ())
+NOTE(swift5_typealias_to_associated_type_fixit,none,
+     "use 'associatedtype' to specify a default value for %0 from protocol %1",
+     (DeclName, Type))
+NOTE(swift5_typealias_to_same_type_constr_fixit,none,
+     "use a same-type constraint on the protocol", ())
+
 
 ERROR(associated_type_objc,none,
       "associated type %0 cannot be declared inside '@objc' protocol %1",

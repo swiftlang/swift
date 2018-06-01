@@ -4324,6 +4324,20 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   // Add requirements for each of the associated types.
   for (auto Member : proto->getMembers()) {
+    if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
+      if (inheritedTypeDecls.find(TAD->getFullName()) !=
+          inheritedTypeDecls.end() ||
+          source->kind != RequirementSource::RequirementSignatureSelf)
+        continue;
+
+      if (TAD->getASTContext().isSwiftVersionAtLeast(5))
+        Diags.diagnose(TAD->getStartLoc(), diag::swift5_typealias_in_protocol_error)
+          .fixItReplace(TAD->getStartLoc(), getTokenText(tok::kw_associatedtype));
+      else if (TAD->getASTContext().isSwiftVersionAtLeast(4))
+        Diags.diagnose(TAD->getStartLoc(), diag::swift4_typealias_in_protocol_warn)
+          .fixItReplace(TAD->getStartLoc(), getTokenText(tok::kw_associatedtype));
+      continue;
+    }
     if (auto assocTypeDecl = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
       Type assocType =
@@ -4385,28 +4399,23 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
             shouldWarnAboutRedeclaration = false;
           }
-
           continue;
         }
-
         // We inherited a type; this associated type will be identical
         // to that typealias.
-        if (source->kind == RequirementSource::RequirementSignatureSelf) {
-          auto inheritedOwningDecl =
-            inheritedType->getDeclContext()
-              ->getAsNominalTypeOrNominalTypeExtensionContext();
+        if (source->kind == RequirementSource::RequirementSignatureSelf &&
+            !assocTypeDecl->getASTContext().isSwiftVersionAtLeast(4)) {
+          auto inheritedOwningDecl = inheritedType->getDeclContext()
+            ->getAsNominalTypeOrNominalTypeExtensionContext();
           Diags.diagnose(assocTypeDecl,
                          diag::associated_type_override_typealias,
                          assocTypeDecl->getFullName(),
                          inheritedOwningDecl->getDescriptiveKind(),
                          inheritedOwningDecl->getDeclaredInterfaceType());
         }
-
         addInferredSameTypeReq(assocTypeDecl, inheritedType);
       }
-
       inheritedTypeDecls.erase(knownInherited);
-      continue;
     }
   }
 
@@ -4431,45 +4440,55 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         }
 
         // We found something.
-        bool shouldWarnAboutRedeclaration =
+        bool shouldShowDiagnostic =
           source->kind == RequirementSource::RequirementSignatureSelf;
 
         for (auto inheritedType : inherited.second) {
           // If we have inherited associated type...
-          if (auto inheritedAssocTypeDecl =
-                dyn_cast<AssociatedTypeDecl>(inheritedType)) {
-            // Infer a same-type requirement between the typealias' underlying
-            // type and the inherited associated type.
-            addInferredSameTypeReq(inheritedAssocTypeDecl, type);
-
-            // Warn that one should use where clauses for this.
-            if (shouldWarnAboutRedeclaration) {
-              auto inheritedFromProto = inheritedAssocTypeDecl->getProtocol();
-              auto fixItWhere = getProtocolWhereLoc();
-              Diags.diagnose(type,
-                             diag::typealias_override_associated_type,
-                             name,
-                             inheritedFromProto->getDeclaredInterfaceType())
-                .fixItInsertAfter(fixItWhere.first,
-                                  getConcreteTypeReq(type, fixItWhere.second))
-                .fixItRemove(type->getSourceRange());
-              Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
-                             inheritedAssocTypeDecl->getFullName());
-
-              shouldWarnAboutRedeclaration = false;
-            }
-
+          auto inheritedATD = dyn_cast<AssociatedTypeDecl>(inheritedType);
+          if (!inheritedATD) {
+            // Two typealiases that should be the same.
+            addInferredSameTypeReq(inheritedType, type);
             continue;
           }
+          bool shouldShowError =
+            inheritedATD->getASTContext().isSwiftVersionAtLeast(5);
+          // Infer a same-type requirement between the typealias' underlying
+          // type and the inherited associated type if there is no error.
+          if (!shouldShowError)
+            addInferredSameTypeReq(inheritedATD, type);
 
-          // Two typealiases that should be the same.
-          addInferredSameTypeReq(inheritedType, type);
+          // Warn that one should use where clauses for this.
+          if (shouldShowDiagnostic) {
+            auto fromProto = inheritedATD->getProtocol();
+            auto fixItWhere = getProtocolWhereLoc();
+            auto constraintStr = getConcreteTypeReq(type, fixItWhere.second);
+
+            if (shouldShowError) {
+              Diags.diagnose(type, diag::swift5_typealias_in_protocol_short);
+              Diags.diagnose(type,
+                             diag::swift5_typealias_to_associated_type_fixit,
+                             name, fromProto->getDeclaredInterfaceType())
+                .fixItReplace(type->getStartLoc(),
+                              getTokenText(tok::kw_associatedtype));
+              Diags.diagnose(type,
+                             diag::swift5_typealias_to_same_type_constr_fixit)
+                .fixItInsertAfter(fixItWhere.first, constraintStr)
+                .fixItRemove(type->getSourceRange());
+            } else {
+              Diags.diagnose(type, diag::typealias_override_associated_type,
+                             name, fromProto->getDeclaredInterfaceType())
+                .fixItInsertAfter(fixItWhere.first, constraintStr)
+                .fixItRemove(type->getSourceRange());
+            }
+            Diags.diagnose(inheritedATD, diag::decl_declared_here,
+                           inheritedATD->getFullName());
+            shouldShowDiagnostic = false;
+          }
         }
-
         // We can remove this entry.
         return true;
       }
-
       return false;
   });
 
