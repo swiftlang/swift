@@ -406,6 +406,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T0]], i32 0, i32 1
 // CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
 // CHECK-NEXT: %T = load %swift.type*, %swift.type** [[BUFFER]], align 8
+// CHECK-NEXT: store %swift.type*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
 // CHECK-NEXT: %T.P2 = load i8**, i8*** [[T1]], align 8

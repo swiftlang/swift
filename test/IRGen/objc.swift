@@ -89,6 +89,10 @@ func test0(_ arg: id) -> id {
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden swiftcc void @"$S4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
 // CHECK-NEXT:    entry
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    store
+// CHECK-NEXT:    store
 // CHECK-NEXT:    ret void
 
 
