@@ -21,6 +21,7 @@
 #define SWIFT_BASIC_JSONSERIALIZATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -110,6 +111,27 @@ struct ScalarTraits {
   //static bool mustQuote(StringRef);
 };
 
+/// This is an optimized form of ScalarTraits in case the scalar value is
+/// already present in a memory buffer.  For example:
+///
+///    template<>
+///    struct ScalarReferenceTraits<MyType> {
+///      static StringRef stringRef(const MyType &val) {
+///        // Retrieve scalar value from memory
+///        return value.stringValue;
+///      }
+///      static bool mustQuote(StringRef) { return true; }
+///    };
+template<typename T>
+struct ScalarReferenceTraits {
+  // Must provide:
+  //
+  // Function to return a string representation of the value.
+  // static StringRef stringRef(const T &value);
+  //
+  // Function to determine if the value should be quoted.
+  // static bool mustQuote(StringRef);
+};
 
 /// This class should be specialized by any type that can be 'null' in JSON.
 /// For example:
@@ -218,6 +240,24 @@ public:
   (sizeof(test<ScalarTraits<T>>(nullptr, nullptr)) == 1);
 };
 
+// Test if ScalarReferenceTraits<T> is defined on type T.
+template <class T>
+struct has_ScalarReferenceTraits
+{
+  using Signature_stringRef = StringRef (*)(const T &);
+  using Signature_mustQuote = bool (*)(StringRef);
+
+  template <typename U>
+  static char test(SameType<Signature_stringRef, &U::stringRef> *,
+                   SameType<Signature_mustQuote, &U::mustQuote> *);
+
+  template <typename U>
+  static double test(...);
+
+public:
+  static bool const value =
+  (sizeof(test<ScalarReferenceTraits<T>>(nullptr, nullptr)) == 1);
+};
 
 // Test if ObjectTraits<T> is defined on type T.
 template <class T>
@@ -327,6 +367,7 @@ struct missingTraits : public std::integral_constant<bool,
     !has_ScalarEnumerationTraits<T>::value
  && !has_ScalarBitSetTraits<T>::value
  && !has_ScalarTraits<T>::value
+ && !has_ScalarReferenceTraits<T>::value
  && !has_NullableTraits<T>::value
  && !has_ObjectTraits<T>::value
  && !has_ArrayTraits<T>::value> {};
@@ -512,20 +553,20 @@ template <typename T> struct ArrayTraits<std::vector<T>> {
 };
 
 template<>
-struct ScalarTraits<bool> {
-  static void output(const bool &, llvm::raw_ostream &);
+struct ScalarReferenceTraits<bool> {
+  static StringRef stringRef(const bool &);
   static bool mustQuote(StringRef) { return false; }
 };
 
 template<>
-struct ScalarTraits<StringRef> {
-  static void output(const StringRef &, llvm::raw_ostream &);
+struct ScalarReferenceTraits<StringRef> {
+  static StringRef stringRef(const StringRef &);
   static bool mustQuote(StringRef S) { return true; }
 };
 
 template<>
-struct ScalarTraits<std::string> {
-  static void output(const std::string &, llvm::raw_ostream &);
+struct ScalarReferenceTraits<std::string> {
+  static StringRef stringRef(const std::string &);
   static bool mustQuote(StringRef S) { return true; }
 };
 
@@ -624,14 +665,21 @@ template<typename T>
 typename std::enable_if<has_ScalarTraits<T>::value,void>::type
 jsonize(Output &out, T &Val, bool) {
   {
-    std::string Storage;
-    llvm::raw_string_ostream Buffer(Storage);
+    SmallString<64> Storage;
+    llvm::raw_svector_ostream Buffer(Storage);
+    Buffer.SetUnbuffered();
     ScalarTraits<T>::output(Val, Buffer);
     StringRef Str = Buffer.str();
     out.scalarString(Str, ScalarTraits<T>::mustQuote(Str));
   }
 }
 
+template <typename T>
+typename std::enable_if<has_ScalarReferenceTraits<T>::value, void>::type
+jsonize(Output &out, T &Val, bool) {
+  StringRef Str = ScalarReferenceTraits<T>::stringRef(Val);
+  out.scalarString(Str, ScalarReferenceTraits<T>::mustQuote(Str));
+}
 
 template<typename T>
 typename std::enable_if<has_NullableTraits<T>::value,void>::type
