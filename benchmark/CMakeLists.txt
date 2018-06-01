@@ -125,6 +125,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
+    single-source/Radix2CooleyTukey
     single-source/RandomShuffle
     single-source/RandomValues
     single-source/RangeAssignment
