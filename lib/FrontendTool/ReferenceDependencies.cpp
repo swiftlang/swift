@@ -151,22 +151,32 @@ static std::unique_ptr<llvm::raw_fd_ostream>openFile(DiagnosticEngine &diags, St
   return out;
 }
 
+static void emitReferenceDependencies(SourceFile *const SF,
+                                      const DependencyTracker &depTracker,
+                                      llvm::raw_ostream &out);
+
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *const SF,
                                       const DependencyTracker &depTracker,
                                       StringRef outputPath) {
-  assert(SF && "Cannot emit reference dependencies without a SourceFile");
   std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
   if (!out.get())
     return true;
-  
-  *out << "### Swift dependencies file v0 ###\n";
-  
-  emitProvides(SF, *out);
-  emitDepends(SF, depTracker, *out);
-  emitInterfaceHash(SF, *out);
+  ::emitReferenceDependencies( SF, depTracker, *out);
   
   return false;
+}
+
+static void emitReferenceDependencies(SourceFile *const SF,
+                                      const DependencyTracker &depTracker,
+                                      llvm::raw_ostream &out) {
+  assert(SF && "Cannot emit reference dependencies without a SourceFile");
+
+  out << "### Swift dependencies file v0 ###\n";
+  
+  emitProvides(SF, out);
+  emitDepends(SF, depTracker, out);
+  emitInterfaceHash(SF, out);
 }
 
 static void emitProvidesTopLevelNames(
