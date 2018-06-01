@@ -903,9 +903,7 @@ static FunctionRefInst *findReferenceToVisibleFunction(SILValue value) {
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
-  if (module.linkFunction(name, SILOptions::LinkingMode::LinkAll))
-    return module.lookUpFunction(name);
-  return nullptr;
+  return module.findFunction(name, SILLinkage::PublicExternal);
 }
 
 /// Mangles a positional AD config, i.e. a source index and a parameter index
