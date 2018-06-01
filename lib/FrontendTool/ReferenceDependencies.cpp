@@ -87,6 +87,9 @@ private:
   void emitExtensionDecl(const ExtensionDecl *D, CollectedProvidedDeclarations &cpd);
   void emitNominalTypeDecl(const NominalTypeDecl *NTD, CollectedProvidedDeclarations &cpd);
   void emitValueDecl(const ValueDecl *VD);
+  
+  static bool extendedTypeIsPrivate(TypeLoc inheritedType);
+  static bool declIsPrivate(const Decl *member);
 };
 
   
@@ -112,55 +115,12 @@ private:
   void emitNominal(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
   void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
   void emitExternal(const DependencyTracker &depTracker) const;
+  
+  
+  static SmallVector<std::pair<DeclBaseName, bool>, 16>
+  sortedByName(const llvm::DenseMap<DeclBaseName, bool> map);
 };
 } // end anon namespace
-
-static bool declIsPrivate(const Decl *member) {
-  auto *VD = dyn_cast<ValueDecl>(member);
-  if (!VD) {
-    switch (member->getKind()) {
-    case DeclKind::Import:
-    case DeclKind::PatternBinding:
-    case DeclKind::EnumCase:
-    case DeclKind::TopLevelCode:
-    case DeclKind::IfConfig:
-    case DeclKind::PoundDiagnostic:
-      return true;
-
-    case DeclKind::Extension:
-    case DeclKind::InfixOperator:
-    case DeclKind::PrefixOperator:
-    case DeclKind::PostfixOperator:
-      return false;
-
-    default:
-      llvm_unreachable("everything else is a ValueDecl");
-    }
-  }
-
-  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
-}
-
-static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
-  auto type = inheritedType.getType();
-  if (!type)
-    return true;
-
-  if (!type->isExistentialType()) {
-    // Be conservative. We don't know how to deal with other extended types.
-    return false;
-  }
-
-  auto layout = type->getExistentialLayout();
-  assert(!layout.superclass && "Should not have a subclass existential "
-         "in the inheritance clause of an extension");
-  for (auto protoTy : layout.getProtocols()) {
-    if (!declIsPrivate(protoTy->getDecl()))
-      return false;
-  }
-
-  return true;
-}
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::ASTMangler Mangler;
@@ -180,17 +140,6 @@ swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
 
 static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
-}
-
-static SmallVector<std::pair<DeclBaseName, bool>, 16>
-sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
-  SmallVector<std::pair<DeclBaseName, bool>, 16> pairs{map.begin(), map.end()};
-  llvm::array_pod_sort(pairs.begin(), pairs.end(),
-                       [](const std::pair<DeclBaseName, bool> *first,
-                          const std::pair<DeclBaseName, bool> *second) -> int {
-                         return first->first.compare(second->first);
-                       });
-  return pairs;
 }
 
 std::unique_ptr<llvm::raw_fd_ostream>ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags, StringRef outputPath) {
@@ -482,6 +431,53 @@ void ProvidesEmitter::emitDynamicLookupMembers() {
   }
 }
 
+bool ProvidesEmitter::extendedTypeIsPrivate(TypeLoc inheritedType) {
+  auto type = inheritedType.getType();
+  if (!type)
+    return true;
+  
+  if (!type->isExistentialType()) {
+    // Be conservative. We don't know how to deal with other extended types.
+    return false;
+  }
+  
+  auto layout = type->getExistentialLayout();
+  assert(!layout.superclass && "Should not have a subclass existential "
+         "in the inheritance clause of an extension");
+  for (auto protoTy : layout.getProtocols()) {
+    if (!declIsPrivate(protoTy->getDecl()))
+      return false;
+  }
+  
+  return true;
+}
+
+bool ProvidesEmitter::declIsPrivate(const Decl *member) {
+  auto *VD = dyn_cast<ValueDecl>(member);
+  if (!VD) {
+    switch (member->getKind()) {
+      case DeclKind::Import:
+      case DeclKind::PatternBinding:
+      case DeclKind::EnumCase:
+      case DeclKind::TopLevelCode:
+      case DeclKind::IfConfig:
+      case DeclKind::PoundDiagnostic:
+        return true;
+        
+      case DeclKind::Extension:
+      case DeclKind::InfixOperator:
+      case DeclKind::PrefixOperator:
+      case DeclKind::PostfixOperator:
+        return false;
+        
+      default:
+        llvm_unreachable("everything else is a ValueDecl");
+    }
+  }
+  
+  return VD->getFormalAccess() <= AccessLevel::FilePrivate;
+}
+
 void DependsEmitter::emit(const SourceFile *SF, const DependencyTracker &depTracker,
                           llvm::raw_ostream &out) {
   DependsEmitter(SF, depTracker, out).emit();
@@ -592,4 +588,15 @@ void DependsEmitter::emitExternal(const DependencyTracker &depTracker) const {
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
+}
+
+SmallVector<std::pair<DeclBaseName, bool>, 16>
+DependsEmitter::sortedByName(const llvm::DenseMap<DeclBaseName, bool> map) {
+  SmallVector<std::pair<DeclBaseName, bool>, 16> pairs{map.begin(), map.end()};
+  llvm::array_pod_sort(pairs.begin(), pairs.end(),
+                       [](const std::pair<DeclBaseName, bool> *first,
+                          const std::pair<DeclBaseName, bool> *second) -> int {
+                         return first->first.compare(second->first);
+                       });
+  return pairs;
 }
