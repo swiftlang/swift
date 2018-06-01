@@ -3883,7 +3883,7 @@ extension ${Self} : Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
@@ -3903,7 +3903,7 @@ extension ${Self} : Hashable {
     % end
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     // FIXME(hasher): Note that the AnyHashable concern applies here too,
     // because hashValue uses top-level hashing.

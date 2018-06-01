@@ -288,7 +288,7 @@ extension AnyHashable : Equatable {
 
 extension AnyHashable : Hashable {
   /// The hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return _box._hashValue
   }
@@ -298,7 +298,7 @@ extension AnyHashable : Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     _box._hash(into: &hasher)
   }

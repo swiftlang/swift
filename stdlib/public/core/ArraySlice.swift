@@ -1416,7 +1416,7 @@ extension ArraySlice: Hashable where Element: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
     for element in self {
