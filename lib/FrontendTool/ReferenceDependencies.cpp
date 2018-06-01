@@ -210,57 +210,58 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   return ReferenceDependenciesEmitter::emit(diags, SF, depTracker, outputPath);
 }
 
-static CollectedProvidedDeclarations emitProvidesTopLevelNames(
-    const SourceFile *SF, llvm::raw_ostream &out);
+namespace {
+class ProvidesEmitter {
+  const SourceFile * const SF;
+  llvm::raw_ostream &out;
+  
+  ProvidesEmitter(const SourceFile * const SF, llvm::raw_ostream &out)
+  : SF(SF), out(out) {}
+  
+public:
+  static void emit(const SourceFile * const SF, llvm::raw_ostream &out);
+private:
+  void emit();
+  CollectedProvidedDeclarations emitTopLevelNames();
+  void emitNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals);
+  void emitMembers(const CollectedProvidedDeclarations &cpd);
+  void emitDynamicLookupMembers();
+  
+  void emitTopLevelDecl(const Decl *D, CollectedProvidedDeclarations &cpd);
+  void emitExtensionDecl(const ExtensionDecl *D, CollectedProvidedDeclarations &cpd);
+  void emitNominalTypeDecl(const NominalTypeDecl *NTD, CollectedProvidedDeclarations &cpd);
+  void emitValueDecl(const ValueDecl *VD);
+};
+} // end anon namespace
 
-static void emitProvidesNominalTypes(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::raw_ostream &out);
-
-static void emitProvidesMembers(
-    const CollectedProvidedDeclarations &cpd,
-    llvm::raw_ostream &out);
-
-static void emitProvidesDynamicLookupMembers(const SourceFile *SF,
-                                             llvm::raw_ostream &out);
-
-void ReferenceDependenciesEmitter::emitProvides() {
+void ProvidesEmitter::emit() {
   out << "provides-top-level:\n";
 
-  CollectedProvidedDeclarations cpd = emitProvidesTopLevelNames(SF, out);
-  emitProvidesNominalTypes(cpd.extendedNominals, out);
-  emitProvidesMembers(cpd, out);
-  emitProvidesDynamicLookupMembers(SF, out);
+  CollectedProvidedDeclarations cpd = emitTopLevelNames();
+  emitNominalTypes(cpd.extendedNominals);
+  emitMembers(cpd);
+  emitDynamicLookupMembers();
 }
 
-static void emitProvidesTopLevelDecl(
-    const Decl *const D, llvm::raw_ostream &out, CollectedProvidedDeclarations &cpd);
+void ProvidesEmitter::emit(const SourceFile *SF, llvm::raw_ostream &out) {
+  ProvidesEmitter(SF, out).emit();
+}
 
-static CollectedProvidedDeclarations emitProvidesTopLevelNames(
-    const SourceFile *const SF, llvm::raw_ostream &out) {
+void ReferenceDependenciesEmitter::emitProvides() {
+  ProvidesEmitter::emit(SF, out);
+}
+
+CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelNames() {
     CollectedProvidedDeclarations cpd;
- 
   for (const Decl *D : SF->Decls)
-    emitProvidesTopLevelDecl(D, out, cpd);
+    emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
     out << "- \"" << escape(operatorFunction->getName()) << "\"\n";
   return cpd;
 }
 
-static void emitProvidesExtensionDecl(
-    const ExtensionDecl *ED, llvm::raw_ostream &out,
-    CollectedProvidedDeclarations &cpd);
-
-
-static void emitProvidesNominalTypeDecl(
-    const NominalTypeDecl *NTD, llvm::raw_ostream &out,
-    CollectedProvidedDeclarations &cpd);
-
-static void emitProvidesValueDecl(const ValueDecl *VD,
-                                  llvm::raw_ostream &out);
-
-static void emitProvidesTopLevelDecl(
-    const Decl *const D, llvm::raw_ostream &out,
+void ProvidesEmitter::emitTopLevelDecl(
+    const Decl *const D,
     CollectedProvidedDeclarations &cpd) {
   switch (D->getKind()) {
   case DeclKind::Module:
@@ -271,7 +272,7 @@ static void emitProvidesTopLevelDecl(
     break;
 
   case DeclKind::Extension:
-    emitProvidesExtensionDecl(cast<ExtensionDecl>(D), out, cpd);
+    emitExtensionDecl(cast<ExtensionDecl>(D), cpd);
     break;
 
   case DeclKind::InfixOperator:
@@ -288,14 +289,14 @@ static void emitProvidesTopLevelDecl(
   case DeclKind::Struct:
   case DeclKind::Class:
   case DeclKind::Protocol:
-    emitProvidesNominalTypeDecl(cast<NominalTypeDecl>(D), out, cpd);
+    emitNominalTypeDecl(cast<NominalTypeDecl>(D), cpd);
     break;
 
   case DeclKind::TypeAlias:
   case DeclKind::Var:
   case DeclKind::Func:
   case DeclKind::Accessor:
-    emitProvidesValueDecl(cast<ValueDecl>(D), out);
+    emitValueDecl(cast<ValueDecl>(D));
     break;
 
   case DeclKind::PatternBinding:
@@ -319,8 +320,8 @@ static void emitProvidesTopLevelDecl(
   }
 }
 
-static void emitProvidesExtensionDecl(
-    const ExtensionDecl *const ED, llvm::raw_ostream &out,
+void ProvidesEmitter::emitExtensionDecl(
+    const ExtensionDecl *const ED,
     CollectedProvidedDeclarations &cpd) {
   auto *NTD = ED->getExtendedType()->getAnyNominal();
   if (!NTD)
@@ -345,8 +346,8 @@ static void emitProvidesExtensionDecl(
   cpd.findNominalsAndOperators(ED->getMembers());
 }
 
-static void emitProvidesNominalTypeDecl(
-    const NominalTypeDecl *const NTD, llvm::raw_ostream &out,
+void ProvidesEmitter::emitNominalTypeDecl(
+    const NominalTypeDecl *const NTD,
     CollectedProvidedDeclarations &cpd) {
   if (!NTD->hasName())
     return;
@@ -358,8 +359,7 @@ static void emitProvidesNominalTypeDecl(
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
-static void emitProvidesValueDecl(const ValueDecl *const VD,
-                                  llvm::raw_ostream &out) {
+void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) {
   if (!VD->hasName())
     return;
   if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
@@ -368,9 +368,8 @@ static void emitProvidesValueDecl(const ValueDecl *const VD,
   out << "- \"" << escape(VD->getBaseName()) << "\"\n";
 }
 
-static void emitProvidesNominalTypes(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals,
-    llvm::raw_ostream &out) {
+void ProvidesEmitter::emitNominalTypes(
+    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) {
   out << "provides-nominal:\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
@@ -381,9 +380,8 @@ static void emitProvidesNominalTypes(
   }
 }
 
-static void emitProvidesMembers(
-    const CollectedProvidedDeclarations &cpd,
-    llvm::raw_ostream &out) {
+void ProvidesEmitter::emitMembers(
+    const CollectedProvidedDeclarations &cpd) {
   out << "provides-member:\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
@@ -408,8 +406,7 @@ static void emitProvidesMembers(
   }
 }
 
-static void emitProvidesDynamicLookupMembers(const SourceFile *const SF,
-                                             llvm::raw_ostream &out) {
+void ProvidesEmitter::emitDynamicLookupMembers() {
   if (SF->getASTContext().LangOpts.EnableObjCInterop) {
     // FIXME: This requires a traversal of the whole file to compute.
     // We should (a) see if there's a cheaper way to keep it up to date,
