@@ -43,7 +43,7 @@ class ReferenceDependenciesEmitter {
   
 public:
   /// \return true on error
-  static bool emit(DiagnosticEngine &diags, SourceFile *const SF,
+  static bool emit(DiagnosticEngine &diags, SourceFile *SF,
                    const DependencyTracker &depTracker,
                    StringRef outputPath);
   static void emit(SourceFile *const SF, const DependencyTracker &depTracker, llvm::raw_ostream &out);
@@ -164,7 +164,7 @@ bool ReferenceDependenciesEmitter::emit(DiagnosticEngine &diags,
                                         SourceFile *const SF,
                                         const DependencyTracker &depTracker,
                                         StringRef outputPath) {
-  std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
+  const std::unique_ptr<llvm::raw_ostream> out = openFile(diags, outputPath);
   if (!out.get())
     return true;
   ReferenceDependenciesEmitter::emit(SF, depTracker, *out);
