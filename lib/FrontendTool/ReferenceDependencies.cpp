@@ -193,8 +193,6 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 }
 
 void ProvidesEmitter::emit() const {
-  out << "provides-top-level" << ":\n";
-
   CollectedProvidedDeclarations cpd = emitTopLevelNames();
   emitNominalTypes(cpd.extendedNominals);
   emitMembers(cpd);
@@ -220,7 +218,9 @@ void ReferenceDependenciesEmitter::emitInterfaceHash() const {
 }
 
 ProvidesEmitter::CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelNames() const {
-    CollectedProvidedDeclarations cpd;
+  out << "provides-top-level" << ":\n";
+  
+  CollectedProvidedDeclarations cpd;
   for (const Decl *D : SF->Decls)
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
