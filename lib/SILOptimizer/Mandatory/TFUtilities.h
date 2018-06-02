@@ -23,6 +23,35 @@
 
 namespace swift {
 namespace tf {
+
+enum class DeviceType { CPU, GPU, TPU };
+
+static const char DEFAULT_CPU_DEVICE[] = "/device:CPU:0";
+static const char DEFAULT_GPU_DEVICE[] = "/device:GPU:0";
+static const char DEFAULT_TPU_DEVICE[] = "TPU_SYSTEM";
+static const char DEVICE_ATTR[] = "device";
+
+/// This struct holds information about the global configuration of the graph
+/// we are generating.  This can be different between distinct graphs in the
+/// same program though.
+struct GraphGlobalConfiguration {
+  DeviceType deviceType = DeviceType::CPU;
+  bool isTPUInfeedEnabled = false;
+
+  bool isTPUEnabled() const { return deviceType == DeviceType::TPU; }
+
+  std::string getDeviceString() const {
+    switch (deviceType) {
+      case DeviceType::CPU:
+        return DEFAULT_CPU_DEVICE;
+      case DeviceType::GPU:
+        return DEFAULT_GPU_DEVICE;
+      case DeviceType::TPU:
+        return DEFAULT_TPU_DEVICE;
+    }
+  }
+};
+
   /// If the -tf-dump-intermediates flag has been passed, return a pointer to
   /// the stream that we should print debug dump information to.  Otherwise,
   /// return null.  This is used for integration unit tests and debugging.
@@ -139,8 +168,12 @@ namespace tf {
     /// Replace any indirect memory operands with direct references to the
     /// scalars they reference.  This potentially replaces the builtin
     /// instruction, so it returns the right one to use.
+    ///
+    /// When `configuration` is non-NULL, also use it to set the TF device for
+    /// the output instruction.
     // TODO(clattner): Remove this when deabstraction exists.
-    SILInstruction *canonicalizeOperands();
+    SILInstruction *canonicalizeOperands(
+        const GraphGlobalConfiguration *configuration);
 
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
@@ -233,7 +266,8 @@ namespace tf {
   /// Lower the specified SIL function (which was formed by the partitioner)
   /// into a TensorFlow graph, and encode into a vector of bytes.
   ///
-  std::vector<char> lowerTFGraph(SILFunction *fn);
+  std::vector<char> lowerTFGraph(SILFunction *fn,
+                                 const GraphGlobalConfiguration &configuration);
 } // end namespace tf
 } // end namespace swift
 #endif
