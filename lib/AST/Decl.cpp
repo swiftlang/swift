@@ -5686,6 +5686,15 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   return {};
 }
 
+Type ClassDecl::getSuperclass() const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getSuperclass(this);
+  }
+
+  return LazySemanticInfo.Superclass.getPointer();
+}
+
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   if (auto superclass = getSuperclass())
     return superclass->getClassOrBoundGenericClass();

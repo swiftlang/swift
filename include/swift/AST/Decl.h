@@ -3413,6 +3413,8 @@ class ClassDecl final : public NominalTypeDecl {
   } LazySemanticInfo;
 
   friend class IterativeTypeChecker;
+  friend class SuperclassTypeRequest;
+  friend class TypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3428,7 +3430,7 @@ public:
   bool hasSuperclass() const { return (bool)getSuperclass(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
-  Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
+  Type getSuperclass() const;
 
   /// Retrieve the ClassDecl for the superclass of this class, or null if there
   /// is no superclass.

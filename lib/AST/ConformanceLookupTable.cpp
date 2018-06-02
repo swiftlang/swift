@@ -315,9 +315,6 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     // because an implied conformance in the superclass is considered
     // "fixed" in the subclass.
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-      if (resolver)
-        resolver->resolveSuperclass(classDecl);
-
       if (auto superclassDecl = classDecl->getSuperclassDecl()) {
         // Break infinite recursion when visiting ill-formed classes
         // with circular inheritance.

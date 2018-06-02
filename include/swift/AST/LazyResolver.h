@@ -77,8 +77,8 @@ public:
   virtual void resolveInheritanceClause(
                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) = 0;
 
-  /// Resolve the superclass of the given class.
-  virtual void resolveSuperclass(ClassDecl *classDecl) = 0;
+  /// Retrieve the superclass of the given class.
+  virtual Type getSuperclass(const ClassDecl *classDecl) = 0;
 
   /// Resolve the raw type of the given enum.
   virtual void resolveRawType(EnumDecl *enumDecl) = 0;

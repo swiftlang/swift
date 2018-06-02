@@ -40,6 +40,7 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/Sema/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -232,9 +233,9 @@ static void addImplicitConformances(
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
-void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestTypeCheckSuperclass(classDecl));
+Type TypeChecker::getSuperclass(const ClassDecl *classDecl) {
+  return Context.evaluator(
+           SuperclassTypeRequest(const_cast<ClassDecl *>(classDecl)));
 }
 
 void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
@@ -644,7 +645,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   }
   // Set the superclass.
   else if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    classDecl->setSuperclass(superclassTy);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
     enumDecl->setRawType(superclassTy);
   } else {

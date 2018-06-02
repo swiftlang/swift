@@ -1,7 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-
-// rdar://26498438
-// REQUIRES: no_asan
+// RUN: not %target-swift-frontend %s -typecheck
 
 class C { }
 

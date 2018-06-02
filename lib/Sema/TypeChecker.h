@@ -1565,8 +1565,8 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Resolve the superclass of the given class.
-  void resolveSuperclass(ClassDecl *classDecl) override;
+  /// Get the superclass of the given class.
+  Type getSuperclass(const ClassDecl *classDecl) override;
 
   /// Resolve the raw type of the given enum.
   void resolveRawType(EnumDecl *enumDecl) override;

@@ -13,11 +13,12 @@ class Automorphism : Automorphism { } // expected-error{{circular class inherita
 // FIXME: Useless error
 let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}
 
-class Left : Right.Hand {
+// FIXME: Not technically a circular dependency.
+class Left : Right.Hand { // expected-error{{circular class inheritance 'Left'}}
   class Hand {}
 }
 
-class Right : Left.Hand {
+class Right : Left.Hand { // expected-note{{through reference here}}
   class Hand {}
 }
 
@@ -25,10 +26,10 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 : Outer2.Inner {
+class Outer2 : Outer2.Inner { // expected-error{{circular class inheritance 'Outer2'}}
   class Inner {}
 }
 
-class Outer3 : Outer3.Inner<Int> {
+class Outer3 : Outer3.Inner<Int> { // expected-error{{circular class inheritance 'Outer3'}}
   class Inner<T> {}
 }
