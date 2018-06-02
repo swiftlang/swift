@@ -40,7 +40,6 @@ set(SOURCES
   DataTypes.swift
   Dataset.swift
   Gradients.swift
-  HighLevel.swift
   OpaqueHandles.swift
   Ops.swift
   ShapedArray.swift
