@@ -116,6 +116,8 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME(ABI): Associated type inference requires this.
@@ -215,7 +217,7 @@ extension BidirectionalCollection where SubSequence == Self {
   /// - Returns: The last element of the collection if the collection has one
   ///   or more elements; otherwise, `nil`.
   ///
-  /// - Complexity: O(1).
+  /// - Complexity: O(1)
   @inlinable // protocol-only
   public mutating func popLast() -> Element? {
     guard !isEmpty else { return nil }
@@ -247,8 +249,8 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
-  ///   of the collection.
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   elements to remove.
   @inlinable // protocol-only
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
@@ -278,7 +280,9 @@ extension BidirectionalCollection {
   ///   collection. `n` must be greater than or equal to zero.
   /// - Returns: A subsequence that leaves off `n` elements from the end.
   ///
-  /// - Complexity: O(*n*), where *n* is the number of elements to drop.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   elements to drop.
   @inlinable // protocol-only
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
@@ -309,7 +313,9 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence terminating at the end of the collection with at
   ///   most `maxLength` elements.
   ///
-  /// - Complexity: O(*n*), where *n* is equal to `maxLength`.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is equal to
+  ///   `maxLength`.
   @inlinable // protocol-only
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(

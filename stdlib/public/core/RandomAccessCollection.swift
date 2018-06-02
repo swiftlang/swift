@@ -85,6 +85,8 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
+  ///
+  /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence { get }
 
   // FIXME(ABI): Associated type inference requires this.
@@ -96,9 +98,6 @@ where SubSequence: RandomAccessCollection, Indices: RandomAccessCollection
   // FIXME(ABI): Associated type inference requires this.
   var endIndex: Index { get }
 }
-
-// TODO: swift-3-indexing-model - Make sure RandomAccessCollection has
-// documented complexity guarantees, e.g. for index(_:offsetBy:).
 
 // TODO: swift-3-indexing-model - (By creating an ambiguity?), try to
 // make sure RandomAccessCollection models implement

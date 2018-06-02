@@ -103,10 +103,10 @@ public protocol RangeReplaceableCollection : Collection
   ///     the range must be valid indices of the collection.
   ///   - newElements: The new elements to add to the collection.
   ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
-  ///   contents of `newElements` to the collection, the complexity is O(*n*),
-  ///   where *n* is the length of `newElements`.
+  /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the collection, the complexity
+  ///   is O(*m*).
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
@@ -184,12 +184,11 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Parameter newElements: The elements to append to the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting
-  ///   collection.
-  // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
-  // suggestion in SE-91
+  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   mutating func append<S : Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element
+  // FIXME(ABI)#166 (Evolution): Consider replacing .append(contentsOf) with +=
+  // suggestion in SE-91
 
   /// Inserts a new element into the collection at the specified position.
   ///
@@ -212,7 +211,10 @@ public protocol RangeReplaceableCollection : Collection
   /// - Parameter i: The position at which to insert the new element.
   ///   `index` must be a valid index into the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection. If the
+  ///   call to this method appends `newElement` to the collection, the
+  ///   complexity is O(1) on average, over many additions to the same
+  ///   collection.
   mutating func insert(_ newElement: __owned Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
@@ -237,10 +239,10 @@ public protocol RangeReplaceableCollection : Collection
   /// - Parameter i: The position at which to insert the new elements. `index`
   ///   must be a valid index of the collection.
   ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If `i` is equal to the collection's `endIndex`
-  ///   property, the complexity is O(*n*), where *n* is the length of
-  ///   `newElements`.
+  /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the collection, the complexity
+  ///   is O(*m*).
   mutating func insert<S : Collection>(contentsOf newElements: __owned S, at i: Index)
     where S.Element == Element
 
@@ -437,8 +439,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter newElements: The elements to append to the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting
-  ///   collection.
+  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @inlinable
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Element == Element {
@@ -472,7 +473,10 @@ extension RangeReplaceableCollection {
   /// - Parameter i: The position at which to insert the new element.
   ///   `index` must be a valid index into the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection. If the
+  ///   call to this method appends `newElement` to the collection, the
+  ///   complexity is O(1) on average, over many additions to the same
+  ///   collection.
   @inlinable
   public mutating func insert(
     _ newElement: Element, at i: Index
@@ -502,10 +506,10 @@ extension RangeReplaceableCollection {
   /// - Parameter i: The position at which to insert the new elements. `index`
   ///   must be a valid index of the collection.
   ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If `i` is equal to the collection's `endIndex`
-  ///   property, the complexity is O(*n*), where *n* is the length of
-  ///   `newElements`.
+  /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the collection, the complexity
+  ///   is O(*m*).
   @inlinable
   public mutating func insert<C : Collection>(
     contentsOf newElements: C, at i: Index
@@ -663,7 +667,6 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// - Returns: The first element of the collection.
   ///
   /// - Complexity: O(1)
-  /// - Precondition: `!self.isEmpty`.
   @inlinable
   @discardableResult
   public mutating func removeFirst() -> Element {
@@ -731,10 +734,10 @@ extension RangeReplaceableCollection {
   ///     the range must be valid indices of the collection.
   ///   - newElements: The new elements to add to the collection.
   ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the collection
-  ///   and `newElements`. If the call to `replaceSubrange` simply appends the
-  ///   contents of `newElements` to the collection, the complexity is O(*n*),
-  ///   where *n* is the length of `newElements`.
+  /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the collection, the complexity
+  ///   is O(*m*).
   @inlinable
   public mutating func replaceSubrange<C: Collection, R: RangeExpression>(
     _ subrange: R,
@@ -852,7 +855,7 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   ///   `n` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the specified number of elements.
+  /// - Complexity: O(*k*), where *k* is the specified number of elements.
   @inlinable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
@@ -922,7 +925,7 @@ where Self : BidirectionalCollection, SubSequence == Self {
   ///   `n` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the specified number of elements.
+  /// - Complexity: O(*k*), where *k* is the specified number of elements.
   @inlinable
   public mutating func removeLast(_ n: Int) {
     if n == 0 { return }
@@ -1012,7 +1015,7 @@ extension RangeReplaceableCollection {
   ///   - lhs: The array to append to.
   ///   - rhs: A collection or finite sequence.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  /// - Complexity: O(*m*), where *m* is the length of the right-hand-side argument.
   @inlinable
   public static func += <
     Other : Sequence
@@ -1066,8 +1069,10 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter isIncluded: A closure that takes an element of the
   ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `isIncluded` allowed.
+  ///   whether the element should be included in the returned collection.
+  /// - Returns: A collection of the elements that `isIncluded` allowed.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   @available(swift, introduced: 4.0)
   public func filter(

@@ -1139,9 +1139,9 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: Amortized O(1) over many additions. If the array uses a
-  ///   bridged `NSArray` instance as its storage, the efficiency is
-  ///   unspecified.
+  /// - Complexity: O(1) on average, over many additions to the same array.
+  ///   If the array uses a bridged `NSArray` instance as its storage, the
+  ///   complexity is unspecified.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -1164,7 +1164,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -1269,7 +1269,10 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If the
+  ///   call to this method appends `newElement` to the array, the
+  ///   complexity is O(1) on average, over many additions to the same
+  ///   array.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)
@@ -1578,9 +1581,10 @@ extension Array {
   ///     a subrange must be valid indices of the array.
   ///   - newElements: The new elements to add to the array.
   ///
-  /// - Complexity: O(`subrange.count`) if you are replacing a suffix of the
-  ///   array with an empty collection; otherwise, O(*n*), where *n* is the
-  ///   length of the array.
+  /// - Complexity: O(*n* + *m*), where *n* is length of the array and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the array, the complexity
+  ///   is O(*m*).
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(

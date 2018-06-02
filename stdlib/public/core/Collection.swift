@@ -617,7 +617,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// or `Optional(nil)` if an element was determined to be missing;
   /// otherwise, `nil`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   func _customIndexOfEquatableElement(_ element: Element) -> Index??
 
   /// Customization point for `Collection.lastIndex(of:)`.
@@ -1022,6 +1022,10 @@ extension Collection {
   ///   a random element.
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
@@ -1049,6 +1053,10 @@ extension Collection {
   ///
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func randomElement() -> Element? {
     var g = SystemRandomNumberGenerator()
@@ -1328,8 +1336,9 @@ extension Collection {
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
-  /// - Complexity: O(*n*), where *n* is the number of elements to drop from
-  ///   the beginning of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   elements to drop from the beginning of the collection.
   @inlinable
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
@@ -1355,7 +1364,9 @@ extension Collection {
   /// - Returns: A subsequence that leaves off the specified number of elements
   ///   at the end.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   elements to drop from the beginning of the collection.
   @inlinable
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
@@ -1402,6 +1413,10 @@ extension Collection {
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this collection
   ///   with at most `maxLength` elements.
+  ///
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   elements to select from the beginning of the collection.
   @inlinable
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -1449,7 +1464,9 @@ extension Collection {
   /// - Returns: A subsequence terminating at the end of the collection with at
   ///   most `maxLength` elements.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
@@ -1618,6 +1635,8 @@ extension Collection {
   ///     split at that element.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func split(
     maxSplits: Int = Int.max,
@@ -1711,6 +1730,8 @@ extension Collection where Element : Equatable {
   ///     subsequences are returned. The default value is `true`.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
   public func split(
     separator: Element,
@@ -1751,7 +1772,8 @@ extension Collection where SubSequence == Self {
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*).
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
