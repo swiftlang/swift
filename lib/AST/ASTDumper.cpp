@@ -2654,10 +2654,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitPoundAssertExpr(PoundAssertExpr *E) {
     printCommon(E, "pound_assert");
-    if (E->getMessage()) {
-      OS << " message=" << QuotedString(E->getMessage().getValue());
-    }
-    OS << "\n";
+    OS << " message=" << QuotedString(E->getMessage()) << "\n";
     printRec(E->getCondition());
     OS << ")";
   }

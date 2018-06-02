@@ -568,6 +568,9 @@ BUILTIN_MISC_OPERATION(AutoDiffPopFromTape, "autodiffPopFromTape", "", Special)
 /// autodiffDestroyTape has type <T> (Builtin.AutoDiffTape<T>) -> ().
 BUILTIN_MISC_OPERATION(AutoDiffDestroyTape, "autodiffDestroyTape", "", Special)
 
+/// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
+BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
