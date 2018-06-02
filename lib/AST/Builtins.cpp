@@ -1049,6 +1049,14 @@ static ValueDecl *getAutoDiffDestroyTape(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
+  auto int1Type = BuiltinIntegerType::get(1, Context);
+  auto optionalRawPointerType = BoundGenericEnumType::get(
+      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
+  return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
+                            Context.TheEmptyTupleType);
+}
+
 static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
   // <T> T -> ()
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1982,6 +1990,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAutoDiffPopFromTape(Context, Id);
   case BuiltinValueKind::AutoDiffDestroyTape:
     return getAutoDiffDestroyTape(Context, Id);
+  case BuiltinValueKind::PoundAssert:
+    return getPoundAssert(Context, Id);
 
   case BuiltinValueKind::OnFastPath:
     return getOnFastPath(Context, Id);
