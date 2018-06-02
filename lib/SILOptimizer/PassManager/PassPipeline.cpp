@@ -71,6 +71,14 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.addOwnershipModelEliminator();
 }
 
+/// Passes for performing definite initialization. Must be run together in this
+/// order.
+static void addDefiniteInitialization(SILPassPipelinePlan &P) {
+  P.addMarkUninitializedFixup();
+  P.addDefiniteInitialization();
+  P.addRawSILInstLowering();
+}
+
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
                                     const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
@@ -86,8 +94,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
-  P.addMarkUninitializedFixup();
-  P.addDefiniteInitialization();
+  addDefiniteInitialization(P);
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
