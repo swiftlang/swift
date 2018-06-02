@@ -1851,7 +1851,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       // are passed through memory, promote them to being simple arguments to
       // make all subsequent analyses and promotion of the tensor operations
       // simpler.
-      opInfo->canonicalizeOperands();
+      opInfo->canonicalizeOperands(/*configuration*/ nullptr);
     }
   }
 }

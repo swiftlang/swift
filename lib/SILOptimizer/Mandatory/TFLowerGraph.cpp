@@ -39,10 +39,6 @@ static llvm::cl::opt<bool>
 TFDumpGraph("tf-dump-graph", llvm::cl::init(false),
             llvm::cl::desc("Dump generated tensorflow graphs to /tmp"));
 
-static llvm::cl::opt<bool>
-TFTargetTPU("tf-target-tpu", llvm::cl::init(false),
-            llvm::cl::desc("If true, target TPU in the generated TF graph"));
-
 #ifdef SWIFT_ENABLE_TENSORFLOW
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -51,17 +47,7 @@ diagnose(SILFunction &fn, SILLocation loc, Diag<T...> diag, U &&...args) {
   return diags.diagnose(loc.getSourceLoc(), diag, std::forward<U>(args)...);
 }
 
-
-/// This struct holds information about the global configuration of the graph
-/// we are generating.  This can be different between distinct graphs in the
-/// same program though.
-struct GraphGlobalConfiguration {
-  bool isTPUEnabled = false;
-  bool isTPUInfeedEnabled = false;
-};
-
 static const char DEVICE_TPU_REPLICATED_CORE[] = "TPU_REPLICATED_CORE";
-static const char DEVICE_TPU_SYSTEM[] = "TPU_SYSTEM";
 static const char TPU_CLUSTER_ATTR_VALUE[] = "TPUReplicate/cluster";
 // Set a small number to exercise the bounded queue capacity more, increasing
 // test coverage.
@@ -169,7 +155,7 @@ namespace {
         TF_AddControlInput(desc, controlDependenceValue);
 
       // If this node should be put onto TPU, mark it with an attribute.
-      if (configuration.isTPUEnabled && isEligibleForTPU) {
+      if (configuration.isTPUEnabled() && isEligibleForTPU) {
         markNodeAsTPUReplicated(desc);
       }
 
@@ -684,7 +670,8 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
           "__tfop_tfc.makeIteratorGetNextWithDatasets"))
     return visitTFDataset(inst);
   // This is a marker that doesn't actually directly generate graph logic.
-  if (inst->getName().str().startswith("__tfop_tfc.configureTPU"))
+  if (inst->getName().str().startswith("__tfop_tfc.configureTPU") ||
+      inst->getName().str().startswith("__tfop_tfc.configureGPU"))
     return;
   if (inst->getName().str().startswith("__tfop_"))
     return visitTFOpInst(inst);
@@ -718,7 +705,7 @@ bool TFGraphLowering::createDatasetIteratorNodesWithInfeedEnqueue() {
       infeedInputs.push_back({getnextOp, i});
     }
     TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "device_ordinal", 0);
     datasetCreationContext->setInfeedTypeAndShapeList(desc);
     /*TF_Operation* enqueue =*/ TF_FinishOperation(desc, status);
@@ -822,7 +809,7 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
@@ -838,7 +825,7 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
         TF_NewOperation(graphFn.getGraph(), "QueueEnqueueV2", opName.c_str());
     TF_AddInput(desc, {queueOp, 0});
     TF_AddInputList(desc, &inputOp, 1);
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "Tcomponents", &inputType, 1);
 
     graphFn.finishOp(desc, /*hasSideEffects*/ true,
@@ -860,7 +847,7 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
   {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     // FIXME: Revisit whether to populate "shared_name".
@@ -874,7 +861,7 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
     auto opName = "fifo_queue_dequeue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "QueueDequeueV2", opName.c_str());
     TF_AddInput(desc, {globalQueueOp, 0});
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &inputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
@@ -913,7 +900,7 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
     TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
@@ -928,7 +915,7 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
     auto *desc =
         TF_NewOperation(graphFn.getGraph(), "QueueDequeueV2", opName.c_str());
     TF_AddInput(desc, {queueOp, 0});
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
 
     auto dequeueOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
@@ -951,7 +938,7 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
   {
     auto opName = "fifo_queue_" + llvm::itostr(tensorId);
     auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
     TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
     // FIXME: Revisit whether to populate "shared_name".
@@ -978,7 +965,7 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
     TF_AddInput(desc, {globalQueueOp, 0});
     TF_Output inputTensor{inputTensorPlaceholder, 0};
     TF_AddInputList(desc, &inputTensor, 1);
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrTypeList(desc, "Tcomponents", &outputType, 1);
     TF_FinishOperation(desc, status);
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
@@ -988,7 +975,7 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
 
 void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   // FIXME: Also support dataset/iterator outside of TPU context.
-  if(!configuration.isTPUEnabled || !configuration.isTPUInfeedEnabled) {
+  if(!configuration.isTPUEnabled() || !configuration.isTPUInfeedEnabled) {
     internalError(
         getUserSourceLocation(inst->getDebugLocation()),
         "Builtin tfc.makeIteratorGetNextWithDatasets can only be used when "
@@ -1118,6 +1105,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   // insufficient.  It would be much nicer to have a TensorFlow C function that
   // returns the "SetIsStateful" bit from a TF_OperationDescription.
   bool hasSideEffects = false;
+  bool hasDevice = false;
 
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
@@ -1205,7 +1193,17 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
                "only byte encodings are supported");
         auto value = sli->getValue();
-        TF_SetAttrString(op, name.c_str(), value.data(), value.size());
+        if (name != DEVICE_ATTR) {
+          TF_SetAttrString(op, name.c_str(), value.data(), value.size());
+        } else {
+          if (value.str() != DEFAULT_TPU_DEVICE) {
+            TF_SetDevice(op, value.str().c_str());
+          } else {
+            // TPU device placement is not done via TF_SetDevice().
+            markNodeAsTPUReplicated(op);
+          }
+          hasDevice = true;
+        }
       } else if (auto *mti = dyn_cast<MetatypeInst>(operand)) {
         auto ty = mti->getType().castTo<AnyMetatypeType>()->getInstanceType();
         auto dtype = convertSwiftTypeToTF(ty);
@@ -1341,6 +1339,11 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       llvm_unreachable("Array elements are handled by the array that "
                        "precedes them");
     }
+  }
+
+  if (!hasDevice) {
+    inst->print(llvm::errs());
+    llvm_unreachable("The above tensor op has no device set");
   }
 
   auto *result =
@@ -1510,6 +1513,8 @@ static TF_Output createNotOp(TF_Output input, SILDebugLocation loc,
                              opLocString.c_str());
   TF_AddInput(op, input);
 
+  // For this synthesized op, let TF figure out the best device placement.
+  // FIXME: Revisit this.
   auto *result = graphFn.finishOp(op, /*side effects*/ false,
                                   /*isEligibleForTPU*/ true, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
@@ -1528,6 +1533,8 @@ static TF_Output castBoolToInt32(TF_Output input, SILDebugLocation loc,
   TF_SetAttrType(op, "SrcT", TF_BOOL);
   TF_SetAttrType(op, "DstT", TF_INT32);
 
+  // For this synthesized op, let TF figure out the best device placement.
+  // FIXME: Revisit this.
   auto *result = graphFn.finishOp(op, /*side effects*/ false,
                                   /*isEligibleForTPU*/ true, lowering.status);
   if (lowering.checkStatus(loc.getLocation()))
@@ -1672,7 +1679,7 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
 
     // For non TPU/XLA case, cast the boolean value to int32, a workaround as
     // needed to get while loop to run on GPU (b/65752372).
-    if (!configuration.isTPUEnabled) {
+    if (!configuration.isTPUEnabled()) {
       // FIXME: this added cast may not work for XlaWhile. Revisit whether/how
       // to support loops in XLA GPU.
       condValue =
@@ -2039,7 +2046,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
   {
     auto *desc = TF_NewOperation(resultGraph, "ConfigureDistributedTPU",
                                  "ConfigureDistributedTPU");
-    TF_SetDevice(desc, DEVICE_TPU_SYSTEM);
+    TF_SetDevice(desc, DEFAULT_TPU_DEVICE);
     TF_SetAttrBool(desc, "is_global_init", true);
     TF_FinishOperation(desc, status);
     if (checkStatus(SILFn.getLocation()))
@@ -2049,7 +2056,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
   {
     auto *desc = TF_NewOperation(resultGraph, "TPUCompilationResult",
                                  "TPUCompilationResult");
-    TF_SetDevice(desc, "/device:CPU:0");
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
     TF_SetAttrString(desc, "_tpu_compilation_status", TPU_CLUSTER_ATTR_VALUE,
                      strlen(TPU_CLUSTER_ATTR_VALUE));
     TF_AddControlInput(desc, *metadataNode);
@@ -2064,7 +2071,7 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
 bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     StringRef funcName, ArrayRef<TF_Output> inputs, unsigned numOutputs) {
   TF_Operation *metadataNode = nullptr;
-  if (configuration.isTPUEnabled) {
+  if (configuration.isTPUEnabled()) {
     if (addTopLevelTPUConfigLogic(&metadataNode)) {
       // An error has occurred. Abort graph generation.
       return true;
@@ -2099,7 +2106,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   TF_OperationDescription *funcDesc =
       TF_NewOperation(resultGraph, /*op_type*/ funcNameStr.c_str(),
                       /*op_name*/ funcNodeName.c_str());
-  if (configuration.isTPUEnabled)
+  if (configuration.isTPUEnabled())
     markNodeAsTPUReplicated(funcDesc);
 
   // FIXME: Revisit how to enable infeed outside the context of dataset /
@@ -2131,7 +2138,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
     if (checkStatus(SILFn.getLocation())) return true;
     TF_Output inputNode{placeholder, 0};
-    if (!configuration.isTPUEnabled) {
+    if (!configuration.isTPUEnabled()) {
       // Feed I directly into F.
       TF_AddInput(funcDesc, inputNode);
     } else if (!addTPUInfeedNodes) {
@@ -2189,7 +2196,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
       auto *desc = TF_NewOperation(resultGraph, "InfeedEnqueueTuple",
                                    "InfeedEnqueueTuple");
       TF_AddInputList(desc, infeedInputs.data(), infeedInputs.size());
-      TF_SetDevice(desc, "/device:CPU:0");
+      TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
       TF_SetAttrInt(desc, "device_ordinal", 0);
       TF_SetAttrTypeList(desc, "dtypes", infeedInputDtypes.data(),
                          infeedInputDtypes.size());
@@ -2229,7 +2236,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     TF_OperationDescription *outputDesc =
         TF_NewOperation(resultGraph, "Identity", outputNodeName.c_str());
     TF_Output funcOutputNode{funcNode, static_cast<int>(i)};
-    if (!configuration.isTPUEnabled) {
+    if (!configuration.isTPUEnabled()) {
       // Feed F directly into O.
       TF_AddInput(outputDesc, funcOutputNode);
     } else {
@@ -2381,62 +2388,14 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
 }
 
-/// Scan the specified function, looking for logic that configures the current
-/// graph.
-GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
-  GraphGlobalConfiguration result;
-
-  SILInstruction *alreadyFound = nullptr;
-  for (auto &bb : fn)
-    for (auto &inst : bb) {
-      // Scan for the device configuration ops if present.
-      auto tfopInfo = SILTensorOpInfo::decode(&inst);
-      if (!tfopInfo ||
-          tfopInfo->opName != "tfc.configureTPU")
-        continue;
-
-      // If we found one, make sure we don't have more than one.
-      if (alreadyFound) {
-        diagnose(fn, inst.getLoc(), diag::tf_lowering_multiple_device);
-        diagnose(fn, alreadyFound->getLoc(),
-                 diag::tf_lowering_multiple_device_prev);
-        continue;
-      }
-
-      // Otherwise, remember this one and decode it.
-      alreadyFound = &inst;
-
-      // Eventually we'll support multiple different configuration ops, so
-      // we recheck the opcode here.
-      if (tfopInfo->opName == "tfc.configureTPU") {
-        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
-        result.isTPUEnabled = true;
-        auto infeedEnabled =
-          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
-        result.isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-
-      } else {
-        llvm_unreachable("unknown device configuration op");
-      }
-    }
-
-
-  // If the program didn't specify, fall back to the command line option.
-  // FIXME: We should remove this command line flag and convert the testsuite
-  // over to using the new mechanism directly.
-  if (!alreadyFound)
-    result.isTPUEnabled = TFTargetTPU;
-
-  return result;
-}
-
 #endif // SWIFT_ENABLE_TENSORFLOW
 
 
 /// Lower the specified SIL function (which was formed by the partitioner)
 /// into a TensorFlow graph, and encode into a vector of bytes.
 ///
-std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
+std::vector<char> tf::lowerTFGraph(
+    SILFunction *fn, const GraphGlobalConfiguration &configuration) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -2461,8 +2420,6 @@ std::vector<char> tf::lowerTFGraph(SILFunction *fn) {
   // TODO: is there a better way to silence this?  We could forcibly change
   // the file descriptor mapping...
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
-
-  GraphGlobalConfiguration configuration = findConfiguration(*fn);
 
   TFGraphLowering graphGen(*fn, configuration);
   auto graphFnBody = graphGen.lowerToFunction([&]() {

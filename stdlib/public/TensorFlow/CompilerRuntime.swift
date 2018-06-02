@@ -50,6 +50,13 @@ public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
   #tfop("tfc.configureTPU", enableInfeed: infeed) as Void
 }
 
+// FIXME: Extend the interface to support multiple GPU devices, and unify it
+// with enableTPU() above.
+@_transparent
+public func enableGPU() {
+  _RuntimeConfig.executionMode = .gpu
+  #tfop("tfc.configureGPU") as Void
+}
 
 @_fixed_layout
 public enum _ExecutionMode : Equatable {
