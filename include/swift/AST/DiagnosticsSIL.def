@@ -339,6 +339,9 @@ ERROR(static_report_error, none,
       "static report error", ())
 
 // SWIFT_ENABLE_TENSORFLOW
+WARNING(pound_assert_not_implemented,none,
+        "#assert doesn't actually do anything yet", ())
+
 // Automatic differentiation diagnostics
 
 ERROR(autodiff_opaque_function_unsupported,none,
