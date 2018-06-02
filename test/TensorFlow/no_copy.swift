@@ -26,10 +26,10 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
- CHECK-NEXT:  %3 = builtin "__tfop_Add,$in,$in"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT:  %4 = builtin "__tfop_Select,$in,$in,$in"(%1 : $TensorHandle<Bool>, %3 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT: %5 = builtin "__tfop_Mul,$in,$in"(%4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>) : $TensorHandle<Float>
- CHECK-NEXT:  return %5 : $TensorHandle<Float>
+ CHECK:       %4 = builtin "__tfop_Add,$in,$in,device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
+ CHECK:       %6 = builtin "__tfop_Select,$in,$in,$in,device"(%1 : $TensorHandle<Bool>, %4 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:       %8 = builtin "__tfop_Mul,$in,$in,device"(%6 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK-NEXT:  return %8 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
 
@@ -45,8 +45,8 @@ public func testEmptyScalarsArray() {
  CHECK: integer_literal $Builtin.Int32, 0
  CHECK: integer_literal $Builtin.Int32, 20
  CHECK: integer_literal $Builtin.Int32, 30
- CHECK:  builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type) : $TensorHandle<Int32>
- CHECK:  builtin "__tfop_Add,$in,$in"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>) : $TensorHandle<Int32>
+ CHECK: builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype,device"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type
+ CHECK: builtin "__tfop_Add,$in,$in,device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
 
@@ -65,8 +65,8 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int32, 3
 // CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 4
 // CHECK-NEXT:  %7 = string_literal utf8 "SAME"
-// CHECK-NEXT:  %8 = builtin "__tfop_Conv2D,$in,$in,strides$array,$elt,$elt,$elt,$elt,padding"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int32.Type, %3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK-NEXT:  return %8 : $TensorHandle<Float>
+// CHECK:       %9 = builtin "__tfop_Conv2D,$in,$in,strides$array,$elt,$elt,$elt,$elt,padding,device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int32.Type, %3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.RawPointer
+// CHECK-NEXT:  return %9 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 
@@ -85,8 +85,8 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %3 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
 // CHECK-NEXT:  %4 = metatype $@thin Int.Type
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
-// CHECK-NEXT:  %6 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64) : $TensorHandle<Float>
-// CHECK-NEXT:  return %6 : $TensorHandle<Float>
+// CHECK:       %7 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt,device"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64
+// CHECK-NEXT:  return %7 : $TensorHandle<Float>
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
