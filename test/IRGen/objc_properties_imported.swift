@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -enable-source-import -emit-ir -o - -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 // FIXME: This test uses IRGen with -enable-source-import; it may fail with -g.
 
