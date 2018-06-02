@@ -1045,37 +1045,47 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
 // Standard operators and conformances
 //===----------------------------------------------------------------------===//
 
+private typealias PythonBinaryOp =
+  (OwnedPyObjectPointer?, OwnedPyObjectPointer?) -> OwnedPyObjectPointer?
+
+private func performBinaryOp(
+  _ op: PythonBinaryOp, lhs: PythonObject, rhs: PythonObject
+) -> PythonObject {
+  let result = op(lhs.ownedPyObject, rhs.ownedPyObject)
+  return PythonObject(owning: result!)
+}
+
 public extension PythonObject {
   static func + (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__add__(rhs)
+    return performBinaryOp(PyNumber_Add, lhs: lhs, rhs: rhs)
   }
 
   static func - (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__sub__(rhs)
+    return performBinaryOp(PyNumber_Subtract, lhs: lhs, rhs: rhs)
   }
 
   static func * (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__mul__(rhs)
+    return performBinaryOp(PyNumber_Multiply, lhs: lhs, rhs: rhs)
   }
 
   static func / (lhs: PythonObject, rhs: PythonObject) -> PythonObject {
-    return lhs.__truediv__(rhs)
+    return performBinaryOp(PyNumber_TrueDivide, lhs: lhs, rhs: rhs)
   }
 
   static func += (lhs: inout PythonObject, rhs: PythonObject) {
-    lhs = lhs + rhs
+    lhs = performBinaryOp(PyNumber_InPlaceAdd, lhs: lhs, rhs: rhs)
   }
 
   static func -= (lhs: inout PythonObject, rhs: PythonObject) {
-    lhs = lhs - rhs
+    lhs = performBinaryOp(PyNumber_InPlaceSubtract, lhs: lhs, rhs: rhs)
   }
 
   static func *= (lhs: inout PythonObject, rhs: PythonObject) {
-    lhs = lhs * rhs
+    lhs = performBinaryOp(PyNumber_InPlaceMultiply, lhs: lhs, rhs: rhs)
   }
 
   static func /= (lhs: inout PythonObject, rhs: PythonObject) {
-    lhs = lhs / rhs
+    lhs = performBinaryOp(PyNumber_InPlaceTrueDivide, lhs: lhs, rhs: rhs)
   }
 }
 
