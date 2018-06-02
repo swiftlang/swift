@@ -519,19 +519,25 @@ private func flattenedSubscriptIndices(
 }
 
 public extension PythonObject {
-  subscript(dynamicMember member: String) -> PythonObject {
+  subscript(dynamicMember memberName: String) -> PythonObject {
     get {
-      return checking[dynamicMember: member]!
+      guard let member = checking[dynamicMember: memberName] else {
+        fatalError("Could not access PythonObject member '\(memberName)'")
+      }
+      return member
     }
     nonmutating set {
-      let selfObject = self.ownedPyObject
+      let selfObject = ownedPyObject
       defer { Py_DecRef(selfObject) }
       let valueObject = newValue.ownedPyObject
       defer { Py_DecRef(valueObject) }
 
-      if PyObject_SetAttrString(selfObject, member, valueObject) == -1 {
+      if PyObject_SetAttrString(selfObject, memberName, valueObject) == -1 {
         try! throwPythonErrorIfPresent()
-        fatalError("setting an invalid Python member \(member)")
+        fatalError("""
+          Could not set PythonObject member '\(memberName)' to the specified \
+          value
+          """)
       }
     }
   }
@@ -541,26 +547,41 @@ public extension PythonObject {
   /// - Note: This is equivalent to `object[key]` in Python.
   subscript(key: PythonConvertible...) -> PythonObject {
     get {
-      return self.checking[key]!
+      guard let item = checking[key] else {
+        fatalError("""
+          Could not access PythonObject element corresponding to the specified \
+          key values
+          """)
+      }
+      return item
     }
     nonmutating set {
-      self.checking[key] = newValue
+      checking[key] = newValue
     }
   }
 
   /// Converts to a 2-tuple.
   var tuple2: (PythonObject, PythonObject) {
-    return (self[0], self[1])
+    guard let result = checking.tuple2 else {
+      fatalError("Could not convert PythonObject to a 2-element tuple")
+    }
+    return result
   }
 
   /// Converts to a 3-tuple.
   var tuple3: (PythonObject, PythonObject, PythonObject) {
-    return (self[0], self[1], self[2])
+    guard let result = checking.tuple3 else {
+      fatalError("Could not convert PythonObject to a 3-element tuple")
+    }
+    return result
   }
 
   /// Converts to a 4-tuple.
   var tuple4: (PythonObject, PythonObject, PythonObject, PythonObject) {
-    return (self[0], self[1], self[2], self[3])
+    guard let result = checking.tuple4 else {
+      fatalError("Could not convert PythonObject to a 4-element tuple")
+    }
+    return result
   }
 
   /// Call `self` with the specified positional arguments.
@@ -570,7 +591,7 @@ public extension PythonObject {
   func dynamicallyCall(
     withArguments args: [PythonConvertible] = []
   ) -> PythonObject {
-    return try! self.throwing.dynamicallyCall(withArguments: args)
+    return try! throwing.dynamicallyCall(withArguments: args)
   }
 
   /// Call `self` with the specified arguments.
@@ -581,7 +602,7 @@ public extension PythonObject {
     withKeywordArguments args:
       DictionaryLiteral<String, PythonConvertible> = [:]
   ) -> PythonObject {
-    return try! self.throwing.dynamicallyCall(withKeywordArguments: args)
+    return try! throwing.dynamicallyCall(withKeywordArguments: args)
   }
 }
 
@@ -772,7 +793,7 @@ extension String : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
-    let v = self.utf8CString.withUnsafeBufferPointer {
+    let v = utf8CString.withUnsafeBufferPointer {
       // 1 is subtracted from the C string length to trim the trailing null
       // character (`\0`).
       PyString_FromStringAndSize($0.baseAddress, $0.count - 1)!
@@ -982,9 +1003,7 @@ extension Range : PythonConvertible where Bound : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
-    return PythonObject(sliceStart: self.lowerBound,
-                        stop: self.upperBound,
-                        step: nil)
+    return PythonObject(sliceStart: lowerBound, stop: upperBound, step: nil)
   }
 }
 
@@ -1001,7 +1020,7 @@ extension PartialRangeFrom : PythonConvertible where Bound : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
-    return PythonObject(sliceStart: self.lowerBound, stop: nil, step: nil)
+    return PythonObject(sliceStart: lowerBound, stop: nil, step: nil)
   }
 }
 
@@ -1018,7 +1037,7 @@ extension PartialRangeUpTo : PythonConvertible where Bound : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
-    return PythonObject(sliceStart: nil, stop: self.upperBound, step: nil)
+    return PythonObject(sliceStart: nil, stop: upperBound, step: nil)
   }
 }
 
@@ -1076,7 +1095,7 @@ extension PythonObject : Equatable, Comparable, Hashable {
   // `Equatable` and `Comparable` are implemented using rich comparison.
   // This is consistent with how Python handles comparisons.
   private func compared(to other: PythonObject, byOp: Int32) -> Bool {
-    let lhsObject = self.ownedPyObject
+    let lhsObject = ownedPyObject
     let rhsObject = other.ownedPyObject
     defer {
       Py_DecRef(lhsObject)
