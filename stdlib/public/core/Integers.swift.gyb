@@ -977,6 +977,10 @@ def unsafeOperationComment(operator):
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
   ///
+  /// This method is not a synonym for the masking addition operator (`&+`).
+  /// Use that operator instead of this method when you want to discard any
+  /// overflow that results from an addition operation.
+  ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: The sum of this value and `rhs`.
 """,
@@ -993,6 +997,10 @@ def unsafeOperationComment(operator):
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
   ///
+  /// This method is not a synonym for the masking subtraction operator (`&-`).
+  /// Use that operator instead of this method when you want to discard any
+  /// overflow that results from a subtraction operation.
+  ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: The result of subtracting `rhs` from this value.
 """,
@@ -1008,6 +1016,10 @@ def unsafeOperationComment(operator):
   ///
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
+  ///
+  /// This method is not a synonym for the masking multiplication operator
+  /// (`&*`). Use that operator instead of this method when you want to discard
+  /// any overflow that results from an addition operation.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: The product of this value and `rhs`.
@@ -2417,22 +2429,6 @@ ${assignmentOperatorComment(x.operator, False)}
 
 extension FixedWidthInteger {
   /// The empty bitset.
-  ///
-  /// The `allZeros` static property is the [identity element][] for bitwise OR
-  /// and XOR operations and the [fixed point][] for bitwise AND operations.
-  /// For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///
-  ///     // Identity
-  ///     x | .allZeros           // 0b00000101
-  ///     x ^ .allZeros           // 0b00000101
-  ///
-  ///     // Fixed point
-  ///     x & .allZeros           // 0b00000000
-  ///
-  /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
-  /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
