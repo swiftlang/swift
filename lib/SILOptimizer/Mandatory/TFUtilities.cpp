@@ -1298,8 +1298,8 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Move this into deabstraction when it exists.
-SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
-
+SILInstruction *SILTensorOpInfo::canonicalizeOperands(
+    const GraphGlobalConfiguration *configuration) {
   // TODO: Canonicalize metatypes into constants!
 
   SmallVector<SILValue, 8> operands;
@@ -1308,10 +1308,11 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
   SILBuilder B(inst);
 
   SmallVector<SILValue, 4> arrayOperands;
-
+  bool hasDevice = false;
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto opInfo = operandClasses[i];
+    hasDevice |= opInfo.first == DEVICE_ATTR;
     std::string opName =
       "," + opInfo.first.str() + getOperandClassSuffix(opInfo.second);
 
@@ -1401,6 +1402,22 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands() {
                  operands.size() != inst->getNumOperands();
   for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
     changed |= operands[i] != inst->getOperand(i);
+
+  if (!hasDevice && configuration && opName != "tfc.scalarToTensor") {
+    // Place this inst on the device given by `configuration`.
+    //
+    // Example output SIL:
+    // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
+    // %3 = builtin "__tfop_Const,dtype,value$tensor,device"(%0 : $@thin
+    // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
+    // %$TensorHandle<Float> // user: %4
+    auto deviceStrInst = B.createStringLiteral(
+        inst->getLoc(), StringRef(configuration->getDeviceString()),
+        StringLiteralInst::Encoding::UTF8);
+    operands.push_back(deviceStrInst);
+    name += ",device";
+    changed = true;
+  }
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)

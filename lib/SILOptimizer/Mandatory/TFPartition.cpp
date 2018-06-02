@@ -39,6 +39,15 @@ using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
 
+static llvm::cl::opt<bool> TFTargetTPU(
+    "tf-target-tpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+static llvm::cl::opt<bool> TFTargetGPU(
+    "tf-target-gpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+
 template<typename...T, typename...U>
 static InFlightDiagnostic
 diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
@@ -599,10 +608,66 @@ static const char *markingStr[]{
     "Copy", "Move", "Send", "Arg", "Delete",
 };
 
+/// Scan the specified function, looking for logic that configures the current
+/// graph.
+static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
+  GraphGlobalConfiguration result;
+
+  SILInstruction *alreadyFound = nullptr;
+  for (auto &bb : fn)
+    for (auto &inst : bb) {
+      // Scan for the device configuration ops if present.
+      auto tfopInfo = SILTensorOpInfo::decode(&inst);
+      if (!tfopInfo) continue;
+      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
+                        tfopInfo->opName == "tfc.configureGPU";
+      if (!isConfigOp) continue;
+
+      // If we found one, make sure we don't have more than one.
+      if (alreadyFound) {
+        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
+                 diag::tf_multiple_device);
+        diagnose(fn.getASTContext(), alreadyFound->getLoc().getSourceLoc(),
+                 diag::tf_multiple_device_prev);
+        continue;
+      }
+
+      // Otherwise, remember this one and decode it.
+      alreadyFound = &inst;
+
+      // Eventually we'll support multiple different configuration ops, so
+      // we recheck the opcode here.
+      if (tfopInfo->opName == "tfc.configureTPU") {
+        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
+        result.deviceType = DeviceType::TPU;
+        auto infeedEnabled =
+          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        result.isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+      } else if (tfopInfo->opName == "tfc.configureGPU") {
+        result.deviceType = DeviceType::GPU;
+      } else {
+        llvm_unreachable("unknown device configuration op");
+      }
+    }
+
+
+  // If the program didn't specify, fall back to the command line option.
+  if (!alreadyFound) {
+    // At most one of these test-only flags should be set.
+    assert (!TFTargetTPU || !TFTargetGPU);
+    if (TFTargetTPU)
+      result.deviceType = DeviceType::TPU;
+    if (TFTargetGPU)
+      result.deviceType = DeviceType::GPU;
+  }
+  return result;
+}
+
 class TFFunctionPartition {
 public:
   SILFunction &fn;
   ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
+  const GraphGlobalConfiguration configuration; // Device placement info.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -667,6 +732,7 @@ public:
                       ModuleDecl &tensorFlowModule)
       : fn(Fn),
         tensorFlowModule(tensorFlowModule),
+        configuration(findConfiguration(fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
@@ -1762,7 +1828,7 @@ bool TFFunctionPartition::markFunction() {
       // partitioning pass and data flow analysis code doesn't have to reason
       // about it.
       // TODO(clattner): Remove this when deabstraction subsumes it.
-      inst = opInfo->canonicalizeOperands();
+      inst = opInfo->canonicalizeOperands(&configuration);
 
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
@@ -2240,6 +2306,11 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     break;
   }
   }
+  auto deviceStrInst =
+      B.createStringLiteral(loc, StringRef(FP.configuration.getDeviceString()),
+                            StringLiteralInst::Encoding::UTF8);
+  operands.push_back(deviceStrInst);
+  opName += ",device";
 
   auto result =
     B.createBuiltin(loc, B.getASTContext().getIdentifier(opName),
@@ -3712,9 +3783,8 @@ public:
       return;
     }
 
-
     // Next translate it to a graph and emit it as a global symbol.
-    auto bytes = lowerTFGraph(tensorProgram.fn);
+    auto bytes = lowerTFGraph(tensorProgram.fn, partitioner.configuration);
 
     // Now that we know what the tensor program actually is, we can replace the
     // placeholder instructions for the data + length with the actual bits we
