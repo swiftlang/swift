@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // Cleanup SIL to make it suitable for IRGen. Specifically, removes the calls to
-// Builtin.staticReport(), which are not needed post SIL.
+// Builtin.poundAssert() and Builtin.staticReport(), which are not needed post
+// SIL.
 //
 // FIXME: This pass is mandatory so should probably be in
 // SILOptimizer/Mandatory.
@@ -36,10 +37,12 @@ static void cleanFunction(SILFunction &Fn) {
       SILInstruction *Inst = &*I;
       ++I;
 
-      // Remove calls to Builtin.staticReport().
+      // SWIFT_ENABLE_TENSORFLOW
+      // Remove calls to Builtin.poundAssert() and Builtin.staticReport().
       if (auto *BI = dyn_cast<BuiltinInst>(Inst)) {
         const BuiltinInfo &B = BI->getBuiltinInfo();
-        if (B.ID == BuiltinValueKind::StaticReport) {
+        if (B.ID == BuiltinValueKind::PoundAssert ||
+            B.ID == BuiltinValueKind::StaticReport) {
           // The call to the builtin should get removed before we reach
           // IRGen.
           recursivelyDeleteTriviallyDeadInstructions(BI, /* Force */true);

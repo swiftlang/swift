@@ -599,6 +599,13 @@ func pinUnpin(_ object : Builtin.NativeObject) {
 // CHECK-NEXT:    return [[T0]] : $()
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// CHECK-LABEL: sil hidden @$S8builtins11poundAssert{{[_0-9a-zA-Z]*}}
+func poundAssert(_ condition: Builtin.Int1, _ message: Builtin.RawPointer) {
+  Builtin.poundAssert(condition, message)
+  // CHECK: builtin "poundAssert"
+}
+
 // ----------------------------------------------------------------------------
 // isUnique variants
 // ----------------------------------------------------------------------------

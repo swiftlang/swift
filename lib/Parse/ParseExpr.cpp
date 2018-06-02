@@ -3835,7 +3835,7 @@ ParserResult<Expr> Parser::parseExprPoundAssert() {
     return errorAndSkipToEnd();
   }
 
-  Optional<StringRef> message;
+  StringRef message = "assertion failed";
   if (consumeIf(tok::comma)) {
     if (Tok.isNot(tok::string_literal)) {
       diagnose(Tok.getLoc(), diag::pound_assert_expected_string_literal);

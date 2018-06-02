@@ -5853,8 +5853,25 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 
 // SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::visitPoundAssertExpr(PoundAssertExpr *E, SGFContext C) {
-  // TODO(marcrasi): Generate the real SIL for this.
-  return RValue(SGF.getASTContext().TheEmptyTupleType);
+  SILValue condition;
+  {
+    FullExpr scope(SGF.Cleanups, CleanupLocation(E));
+    condition =
+        SGF.emitRValueAsSingleValue(E->getCondition()).getUnmanagedValue();
+  }
+
+  // Sema forces conditions to have Builtin.i1 type.
+  assert(condition->getType().castTo<BuiltinIntegerType>()->isFixedWidth(1));
+
+  SILValue message = SGF.B.createStringLiteral(
+      E, E->getMessage(), StringLiteralInst::Encoding::UTF8);
+
+  auto resultType = SGF.getASTContext().TheEmptyTupleType;
+  SILValue result = SGF.B.createBuiltin(
+      E, SGF.getASTContext().getIdentifier("poundAssert"),
+      SGF.getLoweredType(resultType), {}, {condition, message});
+
+  return RValue(SGF, E, ManagedValue::forUnmanaged(result));
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

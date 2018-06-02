@@ -5246,11 +5246,11 @@ class PoundAssertExpr : public Expr {
   SourceLoc StartLoc;
   SourceLoc EndLoc;
   Expr *Condition;
-  Optional<StringRef> Message;
+  StringRef Message;
 
  public:
   PoundAssertExpr(SourceLoc startLoc, SourceLoc endLoc, Expr *condition,
-                  Optional<StringRef> message)
+                  StringRef message)
       : Expr(ExprKind::PoundAssert, /*Implicit=*/false),
         StartLoc(startLoc),
         EndLoc(endLoc),
@@ -5261,7 +5261,7 @@ class PoundAssertExpr : public Expr {
   SourceLoc getEndLoc() const { return EndLoc; }
 
   Expr *getCondition() const { return Condition; }
-  Optional<StringRef> getMessage() const { return Message; }
+  StringRef getMessage() const { return Message; }
 
   void setCondition(Expr *condition) { Condition = condition; }
 

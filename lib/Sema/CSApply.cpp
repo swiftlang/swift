@@ -4698,6 +4698,17 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     Expr *visitPoundAssertExpr(PoundAssertExpr *E) {
+      // Convert the condition to a logic value.
+      auto condition = solution.convertBooleanTypeToBuiltinI1(
+          E->getCondition(), cs.getConstraintLocator(E));
+      // TODO(marcrasi): Once we pull in commit 754e8e27, `condition` can no
+      // longer be null so we don't need this check.
+      if (!condition) {
+        cs.setType(E->getCondition(), ErrorType::get(cs.getType(E)));
+      } else {
+        E->setCondition(condition);
+      }
+
       // CSGen already set this expression's type to Void.
       return E;
     }

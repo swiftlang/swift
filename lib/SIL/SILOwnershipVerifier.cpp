@@ -1397,6 +1397,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffCreateTape)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPushToTape)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffPopFromTape)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, AutoDiffDestroyTape)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, MustBeLive, PoundAssert)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

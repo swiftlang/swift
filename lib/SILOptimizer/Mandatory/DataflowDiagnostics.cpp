@@ -114,6 +114,19 @@ static void diagnoseStaticReports(const SILInstruction *I,
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
+/// false or whose condition cannot be evaluated.
+/// TODO(clattner / marcrasi): Implement this for real.
+static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
+  if (auto *builtinInst = dyn_cast<BuiltinInst>(I)) {
+    if (builtinInst->getBuiltinKind() == BuiltinValueKind::PoundAssert) {
+      diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+               diag::pound_assert_not_implemented);
+    }
+  }
+}
+
 namespace {
 class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
@@ -129,6 +142,9 @@ class EmitDFDiagnostics : public SILFunctionTransform {
       for (auto &I : BB) {
         diagnoseUnreachable(&I, M.getASTContext());
         diagnoseStaticReports(&I, M);
+
+        // SWIFT_ENABLE_TENSORFLOW
+        diagnosePoundAssert(&I, M);
       }
   }
 };
