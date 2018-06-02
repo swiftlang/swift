@@ -114,6 +114,7 @@ import ProtocolDispatch2
 import Queue
 import RC4
 import RGBHistogram
+import Radix2CooleyTukey
 import RandomShuffle
 import RandomValues
 import RangeAssignment
@@ -274,6 +275,7 @@ registerBenchmark(QueueGeneric)
 registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
+registerBenchmark(Radix2CooleyTukey)
 registerBenchmark(RandomShuffle)
 registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
