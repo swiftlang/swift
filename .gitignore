@@ -53,3 +53,10 @@ compile_commands.json
 SortedCFDatabase.def
 htmlcov
 .coverage
+
+#==============================================================================#
+# Ignore artifacts from ./utils/build-toolchain
+#==============================================================================#
+/swift-nightly-install/
+/swift-nightly-symroot/
+/swift-LOCAL-*.tar.gz
