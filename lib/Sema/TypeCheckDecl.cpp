@@ -1134,7 +1134,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class)
+          tc.diagnose(binding, diag::class_var_not_in_class, false)
             .fixItReplace(binding->getStaticLoc(), "static");
           tc.diagnose(NTD, diag::extended_type_declared_here);
         }
@@ -7194,7 +7194,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            diagnose(FD, diag::class_func_not_in_class)
+            diagnose(FD, diag::class_func_not_in_class, false)
                 .fixItReplace(FD->getStaticLoc(), "static");
             diagnose(NTD, diag::extended_type_declared_here);
           }
