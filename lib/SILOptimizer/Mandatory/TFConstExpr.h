@@ -17,17 +17,7 @@
 // Constant expressions are functions without side effects that take constant
 // values and return constant values.  These constants may be integer, floating
 // point, and string values, or arrays thereof (up to 1024 elements).  We allow
-// abstractions to be built out of structs and tuples.
-//
-// TODO: Consider adding a '@constexpr' attribute.  On public APIs, this would
-// be an API guarantee that the marked function is pure and always produces a
-// constant value when given a constant inputs for its arguments, that ensures
-// that the body of the function is serialized.  On internal APIs, it would
-// provide the same checking without an API guarantee.
-//
-// NOTE: It is highly recommended that you have a strong grasp of the standard
-// "Sparse Conditional Constant Propagation" (SCCP) compiler optimization
-// algorithm in order to understand the implementation logic in this code.
+// abstractions to be built out of fragile structs and tuples.
 //
 //===----------------------------------------------------------------------===//
 
@@ -40,166 +30,228 @@
 namespace swift {
   class SingleValueInstruction;
   class SILValue;
+  class SILBuilder;
+  class SerializedSILLoader;
 
 namespace tf {
+  struct APIntSymbolicValue;
+  struct APFloatSymbolicValue;
+  struct AddressSymbolicValue;
+  struct AggregateSymbolicValue;
 
-  /// Constant expressions are evaluated for symbolic values in the SSA graph
-  /// and SymbolicValue represents a unique identifier for these values that are
-  /// used as keys in hashtables etc.
-  ///
-  /// We track the (recursive) elements of structs and tuples independently as
-  /// in their exploded form, and each tracked element has an associated
-  /// lattice value.  For example, consider a SSA value made out of structs and
-  /// tuple types written graphically as:
-  ///
-  ///   {{(Int, String)}, Float, NSObject}
-  ///
-  /// This SSA value will have four symbolic values associated with it: the
-  /// Int will have index 0, the String will have index 1, the Float will have
-  /// index 2, and the NSObject will have index 3.  In reality, we actually
-  /// track the LLVM internal values inside of each of those.
-  ///
-  /// We notionally explode through fragile structs and tuple values, but treat
-  /// Swift.Array and Swift.String (which are structs) as a special terminal
-  /// values instead of tracking their contents.
-  ///
-  /// We also track SIL addresses (e.g. from an alloc_stack) as its contents.
-  ///
-  struct SymbolicValue {
-    SILValue value;
-    unsigned index;
-
-
-    bool operator==(SymbolicValue rhs) const {
-      return value == rhs.value && index == rhs.index;
-    }
-    bool operator!=(SymbolicValue rhs) const {
-      return !(*this == rhs);
-    }
-    bool operator<(SymbolicValue rhs) const {
-      return value < rhs.value || (value == rhs.value && index < rhs.index);
-    }
-  };
-
-  struct ArrayLatticeValue;
-
-  /// This is the lattice value tracked for each SymbolicValue in a scope.  Each
-  /// symbolic value may be multiple states as defined by the standard SCCP
-  /// algorithm.  We support multiple representational forms for the constant
-  /// node in order to avoid pointless memory bloat + copying.  This is intended
-  /// to be a light-weight POD type we can put in hashtables.
-  class LatticeValue {
+  /// This is the symbolic value tracked for each SILValue in a scope.  We
+  /// support multiple representational forms for the constant node in order to
+  /// avoid pointless memory bloat + copying.  This is intended to be a
+  /// light-weight POD type we can put in hashtables.
+  class SymbolicValue {
     enum ValueKind {
-      /// This value is not reachable.
-      Undefined,
-
-      /// This value is a constant, and tracked by the "inst" member of the
-      /// value union.
-      ConstantInst,
-
-      /// This value is an array of constants, and is tracked by the "array"
-      /// member of the value union.
-      ConstantArray,
+      /// This value is an alloc stack that is has not (yet) been initialized
+      /// by flow-sensitive analysis.
+      UninitMemory,
 
       /// This symbolic value cannot be determined, carries multiple values
-      /// (i.e., varies dynamically), or is of some type that we cannot analyze
-      /// and propagate (e.g. NSObject).
-      Overdefined
+      /// (i.e., varies dynamically at the top level), or is of some type that
+      /// we cannot analyze and propagate (e.g. NSObject).
+      ///
+      /// TODO: include state (e.g. the bad instruction in question) that
+      /// indicates why this was unknown so clients can produce a useful
+      /// diagnostic.
+      Unknown,
+
+      /// This value is known to be a metatype reference.  The type is stored
+      /// in the "metatype" member.
+      Metatype,
+
+      /// This value is known to be a function reference, e.g. through
+      /// function_ref directly, or a devirtualized method reference.
+      Function,
+
+      /// This value is a constant, and tracked by the "inst" member of the
+      /// value union.  This could be an integer, floating point, string, or
+      /// metatype value.
+      Inst,
+
+      /// This value is represented with a bump pointer allocated APInt.
+      /// TODO: We could store small integers into the union inline to avoid
+      /// allocations if it ever matters.
+      Integer,
+
+      /// This value is represented with a bump pointer allocated APFloat.
+      /// TODO: We could store small floats into the union inline to avoid
+      /// allocations if it ever matters.
+      Float,
+
+      /// This value is a pointer to a tracked memory location, along with zero
+      /// or more indices (tuple indices, struct field indices, etc) into the
+      /// value if it is an aggregate.
+      ///
+      Address,
+
+      /// This value is an array, struct, or tuple of constants.  This is
+      /// tracked by the "aggregate" member of the value union.  Note that we
+      /// cheat and represent single-element structs as the value of their
+      /// element (since they are so common).
+      Aggregate,
     } kind;
 
     union {
-      /// When this LatticeValue is of "ConstantInst" kind, this contains a
+      /// When the value is Unknown, this contains the value that was the
+      /// unfoldable part of the computation.
+      ///
+      /// TODO: make this a more rich representation.
+      SILNode *unknown;
+
+      /// This is always a SILType with an object category.  This is the value
+      /// of the underlying instance type, not the MetatypeType.
+      TypeBase *metatype;
+
+      SILFunction *function;
+
+      /// When this SymbolicValue is of "Inst" kind, this contains a
       /// pointer to the instruction whose value this holds.  This is known to
       /// be one of a closed set of constant instructions:
-      ///    IntegerLiteralInst, FloatLiteralInst, or StringLiteralInst
+      ///    IntegerLiteralInst, FloatLiteralInst, StringLiteralInst
       SingleValueInstruction *inst;
 
-      /// When this LatticeValue is of "ConstantArray" kind, this pointer stores
-      /// information about the array elements, count, and element type.
-      ArrayLatticeValue *array;
+      /// When this SymbolicValue is of "Integer" kind, this pointer stores
+      /// information about the APInt value it holds.
+      APIntSymbolicValue *integer;
 
-      /// TODO: Eventually should support bump pointer allocated APInt's and
-      /// APFloat's, and string buffers to represent the product of constant
-      /// folding.
+      /// When this SymbolicValue is of "Float" kind, this pointer stores
+      /// information about the APFloat value it holds.
+      APFloatSymbolicValue *float_;
+
+      /// When this SymbolicValue is of "Address" kind, this pointer stores
+      /// info about the base and the indices for the address.
+      AddressSymbolicValue *address;
+
+      /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
+      /// information about the array elements, count, and element type.
+      AggregateSymbolicValue *aggregate;
     } value;
 
   public:
-    /// LatticeValue constructors.
-    static LatticeValue getUndefined() {
-      LatticeValue result;
-      result.kind = Undefined;
-      return result;
-    }
-    static LatticeValue getOverdefined() {
-      LatticeValue result;
-      result.kind = Overdefined;
-      return result;
-    }
-    static LatticeValue getConstant(SingleValueInstruction *inst) {
-      LatticeValue result;
-      result.kind = ConstantInst;
-      result.value.inst = inst;
-      return result;
-    }
-
-    /// This returns a constant lattice value with the specified elements in it.
-    /// This assumes that the elements lifetime has been managed for this.
-    static LatticeValue getConstantArray(ArrayLatticeValue *array) {
-      LatticeValue result;
-      result.kind = ConstantArray;
-      result.value.array = array;
-      return result;
-    }
-
-    /// Return true if this represents a constant value.
-    bool isConstant() const {
-      return kind != Undefined && kind != Overdefined;
-    }
-
-    SingleValueInstruction *getConstantInstIfPresent() const {
-      return kind == ConstantInst ? value.inst : nullptr;
-    }
 
     /// For constant values, this enum is used to discriminate across the kinds
     /// of constant this holds, which allows use of the accessors.
     enum TypeKind {
-       Integer, Float, String, Array
+      TKMetatype, TKFunction, TKInteger, TKFloat, TKString, TKAddress,
+      TKAggregate
     };
 
     /// For constant values, return the type classification of this value.
     TypeKind getTypeKind() const;
 
-    ArrayLatticeValue &getArrayValue() const {
-      assert(getTypeKind() == Array);
-      return *value.array;
+    /// Return true if this represents a constant value.
+    bool isConstant() const {
+      return kind != UninitMemory && kind != Unknown;
     }
+
+    static SymbolicValue getUnknown(SILNode *node) {
+      assert(node && "node must be present");
+      SymbolicValue result;
+      result.kind = Unknown;
+      result.value.unknown = node;
+      return result;
+    }
+
+    static SymbolicValue getUninitMemory() {
+      SymbolicValue result;
+      result.kind = UninitMemory;
+      return result;
+    }
+
+    // Return true if this is an uninitialized memory buffer.
+    bool isUninitMemory() const {
+      return kind == UninitMemory;
+    }
+
+    static SymbolicValue getMetatype(CanType type) {
+      SymbolicValue result;
+      result.kind = Metatype;
+      result.value.metatype = type.getPointer();
+      return result;
+    }
+
+    CanType getMetatypeValue() const {
+      assert(kind == Metatype);
+      return CanType(value.metatype);
+    }
+
+    static SymbolicValue getFunction(SILFunction *fn) {
+      assert(fn && "Function cannot be null");
+      SymbolicValue result;
+      result.kind = Function;
+      result.value.function = fn;
+      return result;
+    }
+
+    bool isFunction() const { return kind == Function; }
+
+    SILFunction *getFunctionValue() const {
+      assert(isFunction());
+      return value.function;
+    }
+
+    static SymbolicValue getConstantInst(SingleValueInstruction *inst) {
+      assert(inst && "inst value must be present");
+      SymbolicValue result;
+      result.kind = Inst;
+      result.value.inst = inst;
+      return result;
+    }
+
+    SingleValueInstruction *getConstantInstIfPresent() const {
+      return kind == Inst ? value.inst : nullptr;
+    }
+
+    static SymbolicValue getInteger(const APInt &value,
+                                    llvm::BumpPtrAllocator &allocator);
 
     APInt getIntegerValue() const;
+
+    static SymbolicValue getFloat(const APFloat &value,
+                                  llvm::BumpPtrAllocator &allocator);
+
     APFloat getFloatValue() const;
+
+    /// Get a SymbolicValue corresponding to a memory object with an optional
+    /// list of indices into it.  This is used by (e.g.) a struct_element_addr
+    /// of a stack_alloc.
+    static SymbolicValue getAddress(SILValue base,
+                                    ArrayRef<unsigned> indices,
+                                    llvm::BumpPtrAllocator &allocator);
+
+    /// Accessors for Address SymbolicValue's.
+    bool isAddress() const {
+      return kind == Address;
+    }
+
+    SILValue getAddressBase() const;
+    ArrayRef<unsigned> getAddressIndices() const;
+
+
+    /// This returns an aggregate value with the specified elements in it.  This
+    /// copies the elements into the specified allocator.
+    static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
+                                      llvm::BumpPtrAllocator &allocator);
+
+
+    bool isAggregate() const {
+      return kind == Aggregate;
+    }
+    ArrayRef<SymbolicValue> getAggregateValue() const;
+
+
     // TODO: getStringValue.
 
-  };
+    /// Create and return a new constant literal instruction for the specified
+    /// scalar constant value.
+    SingleValueInstruction *
+    emitConstantInst(SILBuilder &B, SILType type, SILLocation loc) const;
 
-  /// This is the representation of a constant array value.  It maintains the
-  /// elements as a trailing array of LatticeValue's.
-  /// FIXME: Finish implementing this.
-  struct ArrayLatticeValue {
-    /// This is the element type of the array.  We store this even though it can
-    /// be derived from the elements, because we may have an empty array with no
-    /// elements.
-    const Type elementType;
-
-    /// This is the number of elements in the array.  We only support up to
-    /// 1024 elements in our model to avoid the possibility of compile time
-    /// explosion.
-    const unsigned numElements;
-
-    /// Return the element constants for this array constant.  These are known
-    /// to all be constants.
-    ArrayRef<LatticeValue> getElements() const {
-      // TODO: Implement.
-      return {};
-    }
+    void print(llvm::raw_ostream &os, unsigned indent = 0) const;
+    void dump() const;
   };
 
   /// This class is the main entrypoint for evaluating constant expressions.  It
@@ -209,30 +261,42 @@ namespace tf {
     /// result values for the cached constexpr calls we have already analyzed.
     llvm::BumpPtrAllocator allocator;
 
+    /// This is a handle to a loader for serialized code.
+    const std::unique_ptr<SerializedSILLoader> silLoader;
+
     ConstExprEvaluator(const ConstExprEvaluator &) = delete;
     void operator=(const ConstExprEvaluator &) = delete;
   public:
-    ConstExprEvaluator() {}
+    explicit ConstExprEvaluator(SILModule &m);
+    ~ConstExprEvaluator();
 
-    /// Analyze the body of the specified function (which itself may not be a
-    /// constexpr).  Determine whether the specified SymbolicValue's are
-    /// constants, and return their LatticeValue's.
+    llvm::BumpPtrAllocator &getAllocator() { return allocator; }
+    SerializedSILLoader &getSILLoader() const { return *silLoader; }
+
+    /// Analyze the specified values to determine if they are constant values.
+    /// This is done in code that is not necessarily itself a constexpr
+    /// function.  The results are added to the results list which is a parallel
+    /// structure to the input values.
     ///
     /// TODO: Return information about which callees were found to be
     /// constexprs, which would allow the caller to delete dead calls to them
-    /// that occur after
-    void computeConstantValues(SILFunction &fn,
-                               ArrayRef<SymbolicValue> values,
-                               SmallVectorImpl<LatticeValue> &results);
+    /// that occur after after folding them.
+    void computeConstantValues(ArrayRef<SILValue> values,
+                               SmallVectorImpl<SymbolicValue> &results);
 
-  private:
     // Evaluate a call to the specified function as if it were a constant
-    // expression.
-    // bool evaluateAndCacheCall(SILFunction &fn,
-    //   SmallVectorImpl<SILFunction*> &callStack,
-    //   ArrayRef<??> substitutions,
-    //   ArrayRef<SymbolicValue> arguments,
-    //   SmallVectorImpl<LatticeValue> &results);
+    // expression, returning false and filling in `results` on success, or
+    // returning true on failure.
+    //
+    // TODO: propagate a *good* error up, handling cases like "called a
+    // non-constexpr", "constant expr is infinite or too complex", and
+    // eventually things like "overflow detected for add with overflow traps".
+    // This should include the full call stack for the failure, and should
+    // specify the arguments passed to each call level.
+    //
+    bool evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+                              ArrayRef<SymbolicValue> arguments,
+                              SmallVectorImpl<SymbolicValue> &results);
   };
 } // end namespace tf
 } // end namespace swift
