@@ -181,6 +181,7 @@ set(SWIFTLIB_SOURCES
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
+  RelativeOffsetRange.swift
   SliceBuffer.swift
   Tuple.swift.gyb
   UnfoldSequence.swift

@@ -63,6 +63,7 @@
     "Repeat.swift",
     "Sort.swift",
     "Range.swift",
+    "RelativeOffsetRange.swift",
     "ClosedRange.swift",
     "CollectionOfOne.swift",
     "HeapBuffer.swift",
