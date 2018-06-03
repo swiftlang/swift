@@ -47,6 +47,26 @@ void LookupResult::filter(
                 Results.end());
 }
 
+void LookupResult::shiftDownResults() {
+  // Remove inner results.
+  Results.erase(Results.begin(), Results.begin() + IndexOfFirstOuterResult);
+  IndexOfFirstOuterResult = 0;
+
+  if (Results.empty())
+    return;
+
+  // Compute IndexOfFirstOuterResult.
+  const DeclContext *dcInner = Results.front().getValueDecl()->getDeclContext();
+  for (auto &&result : Results) {
+    const DeclContext *dc = result.getValueDecl()->getDeclContext();
+    if (dc == dcInner ||
+        (dc->isModuleScopeContext() && dcInner->isModuleScopeContext()))
+      ++IndexOfFirstOuterResult;
+    else
+      break;
+  }
+}
+
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
