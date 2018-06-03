@@ -18,7 +18,10 @@
 #ifndef SWIFT_SILOPTIMIZER_TENSORFLOW_H
 #define SWIFT_SILOPTIMIZER_TENSORFLOW_H
 
+#include <unordered_set>
+
 #include "swift/AST/TensorFlow.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
@@ -31,6 +34,40 @@ static const char DEFAULT_GPU_DEVICE[] = "/device:GPU:0";
 static const char DEFAULT_TPU_DEVICE[] = "TPU_SYSTEM";
 static const char DEVICE_ATTR[] = "device";
 
+static DeviceType OpDeviceType(StringRef device) {
+  if (device.str() == DEFAULT_CPU_DEVICE) return DeviceType::CPU;
+  if (device.str() == DEFAULT_GPU_DEVICE) return DeviceType::GPU;
+  if (device.str() == DEFAULT_TPU_DEVICE) return DeviceType::TPU;
+
+  // FIXME: Consider also supporting variants of the device string, such as
+  // "CPU:0".
+  llvm_unreachable("Unknown device type");
+}
+
+/// The returned string is compatible with TF device name used in TF graphs.
+static std::string getDeviceString(DeviceType deviceType) {
+  switch (deviceType) {
+    case DeviceType::CPU:
+      return DEFAULT_CPU_DEVICE;
+    case DeviceType::GPU:
+      return DEFAULT_GPU_DEVICE;
+    case DeviceType::TPU:
+      return DEFAULT_TPU_DEVICE;
+  }
+}
+
+/// The returned string can be used to construct SIL function names.
+static std::string getDeviceShortName(DeviceType deviceType) {
+  switch (deviceType) {
+    case DeviceType::CPU:
+      return "CPU";
+    case DeviceType::GPU:
+      return "GPU";
+    case DeviceType::TPU:
+      return "TPU";
+  }
+}
+
 /// This struct holds information about the global configuration of the graph
 /// we are generating.  This can be different between distinct graphs in the
 /// same program though.
@@ -38,17 +75,65 @@ struct GraphGlobalConfiguration {
   DeviceType deviceType = DeviceType::CPU;
   bool isTPUInfeedEnabled = false;
 
+  // TF devices involved in the tensor computation.
+  std::unordered_set<DeviceType> usedDeviceTypes;
+
   bool isTPUEnabled() const { return deviceType == DeviceType::TPU; }
 
-  std::string getDeviceString() const {
-    switch (deviceType) {
-      case DeviceType::CPU:
-        return DEFAULT_CPU_DEVICE;
-      case DeviceType::GPU:
-        return DEFAULT_GPU_DEVICE;
-      case DeviceType::TPU:
-        return DEFAULT_TPU_DEVICE;
+  // Chooses a device for this op, extends `operands` and `newInstName`
+  // accordingly with the device attribute, and tracks the chosen device in
+  // `usedDeviceTypes`.
+  //
+  // If `opDevice` is already set, respects that device choice, and returns
+  // false, indicating no change to the input tensor op instruction.
+  // Otherwise, choses a device based on this configuration and op kernel
+  // device availability, and returns true, indicating a change.
+  bool handleDevicePlacement(StringRef opType, StringRef opDevice,
+                             /*SILInstruction *inst,*/ SILBuilder &B,
+                             SILLocation loc,
+                             SmallVectorImpl<SILValue> &operands,
+                             std::string &newInstName) {
+    // No device placement for this special-case "pseudo-op" for
+    // scalar-to-tensor promotion. It will later be translated by compiler (in
+    // PartitionCloner) into real TF ops, where device placement is handled at
+    // that time.
+    if (opType == "tfc.scalarToTensor") {
+      assert(opDevice.empty());
+      return false;
     }
+
+    auto chosenDevice = chooseDevice(opType, opDevice);
+    usedDeviceTypes.insert(chosenDevice);
+
+    // Example output SIL:
+    // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
+    // %3 = builtin "__tfop_Const,dtype,value$tensor,device"(%0 : $@thin
+    // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
+    // %$TensorHandle<Float> // user: %4
+    //
+    // Note we generate the StringLiteral inst for op device even when the input
+    // `opDevice` is not empty. This is redundant but keeps the code simple, and
+    // we expect the original StringLiteral inst for the op device to get DCE'd
+    // in a later compiler pass.
+    auto deviceString = getDeviceString(chosenDevice);
+    auto deviceStrInst =
+        B.createStringLiteral(loc, StringRef(deviceString),
+                              StringLiteralInst::Encoding::UTF8);
+    operands.push_back(deviceStrInst);
+    newInstName += ",device";
+
+    return opDevice.empty();
+  }
+
+ private:
+  DeviceType chooseDevice(StringRef opType, StringRef opDevice) const {
+    if (!opDevice.empty()) return OpDeviceType(opDevice);
+
+    // Place this inst on the device given by this configuration.
+    // FIXME: Use the op kernel device availability info to select a device for
+    // `opType` -- if that op has no available kernel on `deviceType`, a
+    // different device should be returned.
+    return deviceType;
   }
 };
 
@@ -173,7 +258,7 @@ struct GraphGlobalConfiguration {
     /// the output instruction.
     // TODO(clattner): Remove this when deabstraction exists.
     SILInstruction *canonicalizeOperands(
-        const GraphGlobalConfiguration *configuration);
+        GraphGlobalConfiguration *configuration);
 
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
@@ -193,7 +278,11 @@ struct GraphGlobalConfiguration {
     static void removeOrDestroyArrayValue(SILValue array, SILLocation loc,
                                           SILBuilder &B);
 
-  private:
+    /// Return the device string associated with `inst`, which is required to
+    /// exist.
+    StringRef getDeviceString() const;
+
+   private:
     SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
     bool decodeBuiltin();
     static SILInstruction *decodeTensorFromScalars(ApplyInst *inst);
@@ -264,10 +353,13 @@ struct GraphGlobalConfiguration {
   };
 
   /// Lower the specified SIL function (which was formed by the partitioner)
-  /// into a TensorFlow graph, and encode into a vector of bytes.
+  /// into a TensorFlow graph, encode into a vector of bytes, and sets
+  /// `entryFnName` accordingly for the runtime to call as a TF graph
+  /// function.
   ///
   std::vector<char> lowerTFGraph(SILFunction *fn,
-                                 const GraphGlobalConfiguration &configuration);
+                                 const GraphGlobalConfiguration &configuration,
+                                 std::string &entryFnName);
 } // end namespace tf
 } // end namespace swift
 #endif

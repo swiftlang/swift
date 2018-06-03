@@ -660,6 +660,27 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
   return None;
 }
 
+StringRef SILTensorOpInfo::getDeviceString() const {
+  // FIXME: consider switching to the following coding style consistently
+  // for (auto [op, idx] : enumerate(inst->getAllOperands())) {
+  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+    auto operand = inst->getOperand(i);
+    auto opInfo = operandClasses[i];
+    if (isInput(i)) continue;
+
+    // Handle attributes.
+    auto attrOperand = getAttrOperand(operand);
+
+    // If it's a device attribute, get the device value.
+    if (opInfo.first != DEVICE_ATTR) continue;
+    auto *sli = cast<StringLiteralInst>(attrOperand);
+    assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+           "only byte encodings are supported");
+    return sli->getValue();
+  }
+  llvm_unreachable("Tensor op instruction has no device string.");
+}
+
 typedef std::pair<StringRef, OperandClass> AttributeEntry;
 
 /// Given a builtin name that refer to a tensorflow op function, this returns
@@ -1299,7 +1320,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Move this into deabstraction when it exists.
 SILInstruction *SILTensorOpInfo::canonicalizeOperands(
-    const GraphGlobalConfiguration *configuration) {
+    GraphGlobalConfiguration *configuration) {
   // TODO: Canonicalize metatypes into constants!
 
   SmallVector<SILValue, 8> operands;
@@ -1308,11 +1329,10 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   SILBuilder B(inst);
 
   SmallVector<SILValue, 4> arrayOperands;
-  bool hasDevice = false;
+  std::string opDevice;
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto opInfo = operandClasses[i];
-    hasDevice |= opInfo.first == DEVICE_ATTR;
     std::string opName =
       "," + opInfo.first.str() + getOperandClassSuffix(opInfo.second);
 
@@ -1379,6 +1399,15 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
     // Handle attributes.
     auto attrOperand = getAttrOperand(operand);
 
+    // If it's a device attribute, get the device value.
+    if (opInfo.first == DEVICE_ATTR) {
+      auto *sli = cast<StringLiteralInst>(attrOperand);
+      assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8 &&
+             "only byte encodings are supported");
+      opDevice = sli->getValue();
+      continue;
+    }
+
     // If this is a normal operand, just add it.
     auto *si = dyn_cast<StructInst>(attrOperand);
     if (!si) {
@@ -1403,20 +1432,9 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
     changed |= operands[i] != inst->getOperand(i);
 
-  if (!hasDevice && configuration && opName != "tfc.scalarToTensor") {
-    // Place this inst on the device given by `configuration`.
-    //
-    // Example output SIL:
-    // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
-    // %3 = builtin "__tfop_Const,dtype,value$tensor,device"(%0 : $@thin
-    // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
-    // %$TensorHandle<Float> // user: %4
-    auto deviceStrInst = B.createStringLiteral(
-        inst->getLoc(), StringRef(configuration->getDeviceString()),
-        StringLiteralInst::Encoding::UTF8);
-    operands.push_back(deviceStrInst);
-    name += ",device";
-    changed = true;
+  if (configuration) {
+    changed |= configuration->handleDevicePlacement(
+        opName, opDevice, /*inst,*/ B, inst->getLoc(), operands, name);
   }
 
   // If everything is already copasetic, just return our existing instruction.
@@ -1449,7 +1467,6 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   *this = newResult.getValue();
   return newInst;
 }
-
 
 //===----------------------------------------------------------------------===//
 // Source Location Manipulation Helpers

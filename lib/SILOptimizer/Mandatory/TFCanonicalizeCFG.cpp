@@ -353,6 +353,8 @@ namespace {
       region->print(llvm::outs());
       llvm::outs() << "\n--- XLA CFG Canonicalize end\n";
       fn->print(llvm::outs());
+      llvm::outs() << "----\n";
+      llvm::outs().flush();
     }
   };
 } // end anonymous namespace.

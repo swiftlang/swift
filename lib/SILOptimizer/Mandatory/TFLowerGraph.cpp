@@ -190,9 +190,11 @@ namespace {
 namespace {
 struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   SILFunction &SILFn;
-  GraphGlobalConfiguration configuration;
-  TF_Graph *resultGraph = TF_NewGraph();
-  TF_Status *status = TF_NewStatus();
+  // The TF device to which the generated graph is targeting.
+  DeviceType targetDeviceType;
+  const GraphGlobalConfiguration &configuration;
+  TF_Graph *resultGraph;
+  TF_Status *status;
 
   /// This is a stack of the currently active TF_Function's that are being
   /// constructed.  Nodes that are created are added to the innermost function,
@@ -214,23 +216,25 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   /// error and emits a diagnostic.  This tells us to stop lowering and give up
   /// gracefully.
   bool errorOccurred = false;
-public:
-  TFGraphLowering(SILFunction &fn, GraphGlobalConfiguration configuration)
-    : SILFn(fn), configuration(configuration) {}
+
+ public:
+  /// Generate one or more TF graph functions from `fn` targeting
+  /// `targetDeviceType`, and add them to `resultGraph`.
+  TFGraphLowering(SILFunction &fn, DeviceType targetDeviceType,
+                  const GraphGlobalConfiguration &configuration,
+                  TF_Graph *resultGraph, TF_Status *status)
+      : SILFn(fn),
+        targetDeviceType(targetDeviceType),
+        configuration(configuration),
+        resultGraph(resultGraph),
+        status(status) {}
 
   /// Return the current graph function that is being set up.
   GraphFunctionBody &getCurrentGraphFunction() {
     return functionStack.back();
   }
 
-  /// Serialize our resultGraph into a binary protobuf and return its bytes.  On
-  /// error, this emits a diagnostic, and returns an empty buffer.
-  std::vector<char> serializeGraphProtoBuf();
-
-  ~TFGraphLowering() {
-    TF_DeleteStatus(status);
-    TF_DeleteGraph(resultGraph);
-  }
+  ~TFGraphLowering() {}
 
   /// Check whether the specified TensorFlow status object is valid or not.  If
   /// valid return false.  If invalid, emit a diagnostic and return true.
@@ -251,6 +255,9 @@ public:
   /// necessary to represent a tensorflow TF_Function, perform the final steps
   /// to generate the TF_Function itself and put it into the resultGraph.
   ///
+  /// Also populate `inputTypes` and `outputTypes` based on the input and result
+  /// parameters of the function, if they are non-NULL.
+  ///
   /// When `isTopLevelFunction` is true, also adds a set of graph nodes to
   /// support calling that function.
   ///
@@ -263,9 +270,31 @@ public:
   ///
   /// This emits an error and returns true on error.
   bool buildGraphFunction(const GraphFunctionBody &graphBody, StringRef name,
-                          bool &hasSideEffects,bool isTopLevelFunction = false);
+                          bool &hasSideEffects,
+                          SmallVectorImpl<TF_DataType> *inputTypes,
+                          SmallVectorImpl<TF_DataType> *outputTypes);
 
-private:  // Helpers to create TensorFlow graph nodes.
+  /// Builds TF graph nodes for the top level TF function call, where `funcName`
+  /// is the function name. `inputs` and `outputs` respectively specify the
+  /// inputs and outputs to the function.
+  ///
+  /// The created nodes follow this naming convention shared with the runtime:
+  /// - The graph node for the function call has op type set <funcName>, and
+  ///   name set to tfc_func_<funcName>.
+  /// - The i-th input node is named tfc_input_<i>_<funcName>
+  /// - The j-th output node is named tfc_output_<j>_<funcName>
+  /// - If TPU infeed is enabled, the graph contains an 'InfeedEnqueueTuple'
+  ///   node for caller feed input tensors.
+  ///
+  /// Additional graph nodes may be added for TPU graph creation, but they are
+  /// implementation details that runtime need not be aware of.
+  ///
+  /// This emits an error and returns true on error.
+  bool buildGraphNodesForTopLevelFunctionCall(
+      StringRef funcName,
+      ArrayRef<TF_DataType> inputTypes, ArrayRef<TF_DataType> outputTypes);
+
+ private:  // Helpers to create TensorFlow graph nodes.
   unsigned OpID = 0;
   llvm::StringSet<> usedOpNames;
 
@@ -353,26 +382,6 @@ private:  // Helpers to create TensorFlow graph nodes.
   /// (in other words, the generated TF graph should require 0 input from other
   /// Placeholders, etc).
   std::unique_ptr<DatasetCreationContext> datasetCreationContext;
-
-  /// Builds TF graph nodes for the top level TF function call, where `funcName`
-  /// is the function name. `inputs` specifies the inputs to the function, and
-  /// `numOutputs` specifies the number of outputs.
-  ///
-  /// The created nodes follow this naming convention shared with the runtime:
-  /// - The graph node for the function call has op type set <funcName>, and
-  ///   name set to tfc_func_<funcName>.
-  /// - The i-th input node is named tfc_input_<i>_<funcName>
-  /// - The j-th output node is named tfc_output_<j>_<funcName>
-  /// - If TPU infeed is enabled, the graph contains an 'InfeedEnqueueTuple'
-  ///   node for caller feed input tensors.
-  ///
-  /// Additional graph nodes may be added for TPU graph creation, but they are
-  /// implementation details that runtime need not be aware of.
-  ///
-  /// This emits an error and returns true on error.
-  bool buildGraphNodesForTopLevelFunctionCall(StringRef funcName,
-                                              ArrayRef<TF_Output> inputs,
-                                              unsigned numOutputs);
 
   /// Adds TPU config-related nodes to the graph, and sets `*metadataNode` to
   /// the created TPUReplicateMetadata node.
@@ -669,10 +678,6 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
   if (inst->getName().str().startswith(
           "__tfop_tfc.makeIteratorGetNextWithDatasets"))
     return visitTFDataset(inst);
-  // This is a marker that doesn't actually directly generate graph logic.
-  if (inst->getName().str().startswith("__tfop_tfc.configureTPU") ||
-      inst->getName().str().startswith("__tfop_tfc.configureGPU"))
-    return;
   if (inst->getName().str().startswith("__tfop_"))
     return visitTFOpInst(inst);
 
@@ -1696,11 +1701,8 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // We are going to need the input values and types for the op creation: build
   // these lists now.
   SmallVector<TF_Output, 4> inputs;
-  SmallVector<TF_DataType, 4> inputTypes;
   for (auto &input : loopBodyFn.inputs) {
     inputs.push_back(input.passedValue);
-    auto ty = getOpResultType(input.value);
-    inputTypes.push_back(getTensorFlowDataType(ty, input.value.first.getLoc()));
   }
 
   bool hasSideEffects = false;
@@ -1708,10 +1710,13 @@ void TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // Create TF_Function's for our condition and body.
   auto loc = headerBr->getDebugLocation();
   auto loopBodyFnName = getUniqueName(loc, "whilebody");
-  if (buildGraphFunction(loopBodyFn, loopBodyFnName, hasSideEffects))
+  SmallVector<TF_DataType, 4> inputTypes, outputTypes;
+  if (buildGraphFunction(loopBodyFn, loopBodyFnName, hasSideEffects,
+                         &inputTypes, &outputTypes))
     return;
   auto condFnName = getUniqueName(loc, "whilecond");
-  if (buildGraphFunction(condFn, condFnName, hasSideEffects))
+  if (buildGraphFunction(condFn, condFnName, hasSideEffects,
+                         /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -1837,13 +1842,10 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // Since we're walking the canonical list, also collect the info we need to
   // create the op node later.
   SmallVector<TF_Output, 4> inputs;
-  SmallVector<TF_DataType, 4> inputTypes;
 
   for (auto &input : trueCodeFn.inputs) {
     // Build info we need to create the op node later.
     inputs.push_back(input.passedValue);
-    auto ty = getOpResultType(input.value);
-    inputTypes.push_back(getTensorFlowDataType(ty, loc.getLocation()));
 
     // Figure out where the false node parameter should come from.
     auto entry = falseInputIndex[input.value];
@@ -1865,13 +1867,8 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // region, and keep track of the output types for later consumption.
   assert(trueCodeFn.outputs.size() == falseCodeFn.outputs.size() &&
          "True and false region should produce same set of result values");
-  SmallVector<TF_DataType, 4> outputTypes;
   for (unsigned i = 0, e = trueCodeFn.outputs.size(); i != e; ++i) {
     auto arg = trueCodeFn.outputs[i].first;
-
-    // Remember the result type for later when we're building the op node.
-    outputTypes.push_back(getTensorFlowDataType(arg->getType(),
-                                                SILFn.getLocation()));
 
     // If the false code function has the results in the wrong order, reorder
     // them.  This isn't an efficient algorithm, but should suffice for now.
@@ -1893,10 +1890,13 @@ void TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
   // Create the graph functions for the true/false code.
   auto trueFnName = getUniqueName(loc, "true");
-  if (buildGraphFunction(trueCodeFn, trueFnName, hasSideEffects))
+  SmallVector<TF_DataType, 4> inputTypes, outputTypes;
+  if (buildGraphFunction(trueCodeFn, trueFnName, hasSideEffects, &inputTypes,
+                         &outputTypes))
     return;
   auto falseFnName = getUniqueName(loc, "false");
-  if (buildGraphFunction(falseCodeFn, falseFnName, hasSideEffects))
+  if (buildGraphFunction(falseCodeFn, falseFnName, hasSideEffects,
+                         /*inputTypes*/ nullptr, /*outputTypes*/ nullptr))
     return;
 
   auto &graphFn = getCurrentGraphFunction();
@@ -2069,7 +2069,8 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
 }
 
 bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
-    StringRef funcName, ArrayRef<TF_Output> inputs, unsigned numOutputs) {
+    StringRef funcName,
+    ArrayRef<TF_DataType> inputTypes, ArrayRef<TF_DataType> outputTypes) {
   TF_Operation *metadataNode = nullptr;
   if (configuration.isTPUEnabled()) {
     if (addTopLevelTPUConfigLogic(&metadataNode)) {
@@ -2106,8 +2107,15 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   TF_OperationDescription *funcDesc =
       TF_NewOperation(resultGraph, /*op_type*/ funcNameStr.c_str(),
                       /*op_name*/ funcNodeName.c_str());
-  if (configuration.isTPUEnabled())
+  if (configuration.isTPUEnabled()) {
+    // FIXME: When we support TPU outside compilation, where there can be TF
+    // graph functions on non-TPU devices even when configuration.isTPUEnabled()
+    // is true, replace the if check here with checking on `targetDeviceType`.
+    assert(targetDeviceType == DeviceType::TPU);
     markNodeAsTPUReplicated(funcDesc);
+  } else {
+    TF_SetDevice(funcDesc, getDeviceString(targetDeviceType).c_str());
+  }
 
   // FIXME: Revisit how to enable infeed outside the context of dataset /
   // iterators.
@@ -2117,24 +2125,24 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
 
   // These vectors are only used when addTPUInfeedNodes is true.
   std::vector<TF_Output> infeedInputs;
-  infeedInputs.reserve(inputs.size());
-  std::vector<TF_DataType> infeedInputDtypes;
-  infeedInputDtypes.reserve(inputs.size());
+  infeedInputs.reserve(inputTypes.size());
+  SmallVector<TF_DataType, 4> infeedInputDtypes;
+  infeedInputDtypes.reserve(inputTypes.size());
   std::vector<TF_Buffer *> infeedInputShapes;
-  infeedInputShapes.reserve(inputs.size());
+  infeedInputShapes.reserve(inputTypes.size());
   SWIFT_DEFER {
     for (auto *shape : infeedInputShapes) {
       TF_DeleteBuffer(shape);
     }
   };
 
-  // Handle inputs and finish constructing the function node.
-  for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+  // Handle inputs.
+  for (unsigned i = 0, e = inputTypes.size(); i != e; ++i) {
     std::string inputNodeName =
         "tfc_input_" + std::to_string(i) + "_" + funcNameStr;
     TF_OperationDescription *inputDesc =
         TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
-    TF_SetAttrType(inputDesc, "dtype", TF_OperationOutputType(inputs[i]));
+    TF_SetAttrType(inputDesc, "dtype", inputTypes[i]);
     TF_Operation *placeholder = TF_FinishOperation(inputDesc, status);
     if (checkStatus(SILFn.getLocation())) return true;
     TF_Output inputNode{placeholder, 0};
@@ -2169,7 +2177,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     } else {
       // Collect the input tensors' metadata, to be used for infeed node
       // construction later.
-      assert(!inputs.empty());
+      assert(!inputTypes.empty());
       TF_Output inputPlaceholder = {placeholder, 0};
       infeedInputs.push_back(inputPlaceholder);
       infeedInputDtypes.push_back(TF_OperationOutputType(inputPlaceholder));
@@ -2184,10 +2192,13 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   if (addTPUInfeedNodes) {
     // Create infeed enqueue and dequeue nodes.
     std::vector<const void *> shapeProtos;
-    shapeProtos.reserve(inputs.size());
+    shapeProtos.reserve(inputTypes.size());
     std::vector<size_t> shapeProtoLens;
-    shapeProtoLens.reserve(inputs.size());
-    for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+    // FIXME: consider using LLVM collection helpers such as the one below
+    // throughout this source file.
+    // for (auto i : indices(inputTypes)) { ... }
+    shapeProtoLens.reserve(inputTypes.size());
+    for (unsigned i = 0, e = inputTypes.size(); i != e; ++i) {
       shapeProtos.push_back(infeedInputShapes[i]->data);
       shapeProtoLens.push_back(infeedInputShapes[i]->length);
     }
@@ -2221,16 +2232,17 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
       if (checkStatus(SILFn.getLocation())) return true;
       auto *dequeue = TF_FinishOperation(desc, status);
       if (checkStatus(SILFn.getLocation())) return true;
-      for (unsigned i = 0, e = inputs.size(); i != e; ++i) {
+      for (unsigned i = 0, e = inputTypes.size(); i != e; ++i) {
         TF_AddInput(funcDesc, {dequeue, static_cast<int>(i)});
       }
     }
   }
+  // Finish constructing the function node.
   TF_Operation *funcNode = TF_FinishOperation(funcDesc, status);
   if (checkStatus(SILFn.getLocation())) return true;
 
   // Now handle outputs.
-  for (unsigned i = 0; i != numOutputs; ++i) {
+  for (unsigned i = 0, e = outputTypes.size(); i != e; ++i) {
     std::string outputNodeName =
         "tfc_output_" + std::to_string(i) + "_" + funcNameStr;
     TF_OperationDescription *outputDesc =
@@ -2277,14 +2289,10 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   return false;
 }
 
-/// Given a GraphFunctionBody, which encapsulates all the information
-/// necessary to represent a tensorflow TF_Function, perform the final steps
-/// to generate the TF_Function itself and put it into the resultGraph.
-///
-/// This emits an error and returns true on error.
-bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
-                                         StringRef name, bool &hasSideEffects,
-                                         bool isTopLevelFunction) {
+bool TFGraphLowering::buildGraphFunction(
+    const GraphFunctionBody &graphBody, StringRef funcName,
+    bool &hasSideEffects, SmallVectorImpl<TF_DataType> *inputTypes,
+    SmallVectorImpl<TF_DataType> *outputTypes) {
   if (errorOccurred)
     return true;
 
@@ -2293,22 +2301,35 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
 
   SmallVector<TF_Output, 4> ins, outs;
   ins.reserve(graphBody.inputs.size());
-  for (auto &elt : graphBody.inputs)
-    ins.push_back(elt.parameter);
+  if (inputTypes) {
+    inputTypes->clear();
+    inputTypes->reserve(graphBody.inputs.size());
+  }
+  for (unsigned i = 0, e = graphBody.inputs.size(); i != e; ++i) {
+    ins.push_back(graphBody.inputs[i].parameter);
+    if (inputTypes) inputTypes->push_back(TF_OperationOutputType(ins[i]));
+  }
   outs.reserve(graphBody.outputs.size());
-  for (auto &elt : graphBody.outputs)
-    outs.push_back(elt.second);
+  if (outputTypes) {
+    outputTypes->clear();
+    outputTypes->reserve(graphBody.outputs.size());
+  }
+  for (unsigned i = 0, e = graphBody.outputs.size(); i != e; ++i) {
+    outs.push_back(graphBody.outputs[i].second);
+    if (outputTypes) outputTypes->push_back(TF_OperationOutputType(outs[i]));
+  }
 
-  auto resultFn = TF_GraphToFunction(graphBody.getGraph(), name.str().c_str(),
-                                     /*append_hash_to_fn_name*/ false,
-                                     /*num_opers*/ -1,
-                                     /*opers*/ nullptr,
-                                     /*numinputs*/ ins.size(),
-                                     /*inputs*/ ins.data(),
-                                     /*noutputs*/ outs.size(),
-                                     /*outputs*/ outs.data(),
-                                     /*outputnames*/ nullptr,
-                                     /*functionoptions*/ nullptr, "", status);
+  auto resultFn =
+      TF_GraphToFunction(graphBody.getGraph(), funcName.str().c_str(),
+                         /*append_hash_to_fn_name*/ false,
+                         /*num_opers*/ -1,
+                         /*opers*/ nullptr,
+                         /*numinputs*/ ins.size(),
+                         /*inputs*/ ins.data(),
+                         /*noutputs*/ outs.size(),
+                         /*outputs*/ outs.data(),
+                         /*outputnames*/ nullptr,
+                         /*functionoptions*/ nullptr, "", status);
   // Diagnose any error that occurred if it happened building the graph.
   if (checkStatus(SILFn.getLocation()))
     return true;
@@ -2322,26 +2343,26 @@ bool TFGraphLowering::buildGraphFunction(const GraphFunctionBody &graphBody,
   if (checkStatus(SILFn.getLocation()))
     return true;
 
-  if (isTopLevelFunction) {
-    return buildGraphNodesForTopLevelFunctionCall(name.str(), ins,
-                                                  outs.size());
-  }
-
   // Everything is good!
   return false;
 }
 
-
 /// Serialize our resultGraph into a binary protobuf and return its bytes.  On
 /// error, this emits a diagnostic, and returns an empty buffer.
-std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
+static std::vector<char> serializeGraphProtoBuf(SILFunction &SILFn,
+                                                TF_Graph *resultGraph,
+                                                TF_Status *status) {
   // Create a buffer to hold the result.
   auto buffer = TF_NewBuffer();
   SWIFT_DEFER { TF_DeleteBuffer(buffer); };
 
   // Serialize the graph into the buffer.
   TF_GraphToGraphDef(resultGraph, buffer, status);
-  if (checkStatus(SILFn.getLocation())) return {};
+  if (TF_GetCode(status) != TF_OK)  {
+    diagnose(SILFn, SILFn.getLocation(), diag::tf_lowering_error,
+             TF_Message(status));
+    return {};
+  }
 
   // If the user wants a copy of the graph in /tmp, emit it now.
   if (TFDumpGraph) {
@@ -2353,7 +2374,7 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
       llvm::errs() << "error opening '" << resultPath.str()
                    << "' for -tf-dump-graph emission!\n";
     } else {
-      llvm::errs() << "wrote binary graph of " << buffer->length
+      llvm::outs() << "wrote binary graph of " << buffer->length
                    << " bytes to '" << resultPath.str() << "'\n";
       llvm::raw_fd_ostream file(resultFD, /*shouldClose*/ true,
                                 /*unbuffered*/ false);
@@ -2370,7 +2391,7 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
     } else {
       size_t len;
       const char *content = TF_GraphDebugString(resultGraph, &len);
-      llvm::errs() << "wrote textual graph of " << len << " bytes to '"
+      llvm::outs() << "wrote textual graph of " << len << " bytes to '"
                    << resultPath.str() << "'\n";
       llvm::raw_fd_ostream file(resultFD, /*shouldClose*/ true,
                                 /*unbuffered*/ false);
@@ -2378,8 +2399,8 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
 
       // For debugging convenience, also write the graph proto to STDERR. If it
       // gets too large, we can flag-protect this mode.
-      llvm::errs() << "The graph proto is: \n";
-      llvm::errs() << content << "\n";
+      llvm::outs() << "The graph proto is: \n";
+      llvm::outs() << content << "\n";
       free((void*)content);
     }
   }
@@ -2388,14 +2409,32 @@ std::vector<char> TFGraphLowering::serializeGraphProtoBuf() {
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
 }
 
-#endif // SWIFT_ENABLE_TENSORFLOW
+namespace {
+class GraphPartitioner : public SILInstructionVisitor<GraphPartitioner> {
+  SILFunction &srcFn;
+  const GraphGlobalConfiguration &configuration;
 
+ public:
+  GraphPartitioner(SILFunction &srcFn,
+                   const GraphGlobalConfiguration &configuration)
+      : srcFn(srcFn), configuration(configuration) {}
+
+  /// Returns a function extracted from `fn`, specialized on `deviceType`.
+  SILFunction *extractFunctionForDevice(DeviceType deviceType) {
+    // FIXME: Add real impl.
+    return &srcFn;
+  }
+};
+} // end anonymous namespace
+
+#endif // SWIFT_ENABLE_TENSORFLOW
 
 /// Lower the specified SIL function (which was formed by the partitioner)
 /// into a TensorFlow graph, and encode into a vector of bytes.
 ///
 std::vector<char> tf::lowerTFGraph(
-    SILFunction *fn, const GraphGlobalConfiguration &configuration) {
+    SILFunction *fn, const GraphGlobalConfiguration &configuration,
+    std::string &entryFnName) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -2410,6 +2449,7 @@ std::vector<char> tf::lowerTFGraph(
     *outs << "--- XLA CFG Canonicalize: " << fn->getName() << "\n";
     structure->print(*outs);
     *outs << "\n--- XLA CFG Canonicalize end\n";
+    *outs << "----\n";
     outs->flush();
   }
 
@@ -2421,29 +2461,51 @@ std::vector<char> tf::lowerTFGraph(
   // the file descriptor mapping...
   setenv("TF_CPP_MIN_LOG_LEVEL", "2", 1);
 
-  TFGraphLowering graphGen(*fn, configuration);
-  auto graphFnBody = graphGen.lowerToFunction([&]() {
-    // This is the top level of the function, add its formal arguments.
-    graphGen.lowerArgumentsToParams(fn->getArguments(), {}, fn->getLocation());
-    if (graphGen.errorOccurred)
-      return;
+  TF_Graph *resultGraph = TF_NewGraph();
+  TF_Status *status = TF_NewStatus();
 
-    // Lower all of the code inside the function body (which can of course
-    // recursively creates functions and call them as ops.
-    graphGen.lowerRegion(structure.get());
-  });
+  SWIFT_DEFER {
+    TF_DeleteStatus(status);
+    TF_DeleteGraph(resultGraph);
+  };
 
-  // Create the graph function for the top level code.
-  auto fnName = graphGen.SILFn.getName();
-  if (fnName.startswith("$"))
-    fnName = fnName.substr(1);
+  GraphPartitioner partitioner(*fn, configuration);
+  for (const auto deviceType : configuration.usedDeviceTypes) {
+    auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
+    bool isPrimaryFn = deviceType == configuration.deviceType;
 
-  bool hasSideEffects = false;
-  if (graphGen.buildGraphFunction(graphFnBody, fnName, hasSideEffects,
-                                  /*isTopLevelFunction*/true))
-    return {};
+    TFGraphLowering graphGen(*perDeviceFn, deviceType, configuration,
+                             resultGraph, status);
+    auto graphFnBody = graphGen.lowerToFunction([&]() {
+      // This is the top level of the function, add its formal arguments.
+      graphGen.lowerArgumentsToParams(fn->getArguments(), {},
+                                      fn->getLocation());
+      if (graphGen.errorOccurred) return;
+
+      // Lower all of the code inside the function body (which can of course
+      // recursively creates functions and call them as ops.
+      graphGen.lowerRegion(structure.get());
+    });
+
+    auto fnName = perDeviceFn->getName();
+    if (fnName.startswith("$")) fnName = fnName.substr(1);
+
+    bool hasSideEffects = false;
+    SmallVector<TF_DataType, 4> inputTypes, outputTypes;
+    if (graphGen.buildGraphFunction(graphFnBody, fnName, hasSideEffects,
+                                    &inputTypes, &outputTypes))
+      return {};
+
+    // Create the graph function for the top level code.
+    if (isPrimaryFn) {
+      if (graphGen.buildGraphNodesForTopLevelFunctionCall(
+              fnName.str(), inputTypes, outputTypes))
+        return {};
+      entryFnName = fnName.str();
+    }
+  }
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.
-  return graphGen.serializeGraphProtoBuf();
+  return serializeGraphProtoBuf(*fn, resultGraph, status);
 #endif
 }
