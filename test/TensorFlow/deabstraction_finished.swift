@@ -12,22 +12,18 @@ func one() -> Int {
   return 1
 }
 
-// FIXME: We should be able to constant propagate "1" through the constexpr function.
 public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
-  // expected-error @+1 {{attribute 'axis' requires a constant argument}}
   return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: one())
 }
 
 
 
-// FIXME: We should be able to constant propagate 1 through the Wrapper struct.
 struct Wrapper {
   let v : Int
 }
 
 public func f(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
   let w = Wrapper(v: 1)
-  // expected-error @+1 {{attribute 'axis' requires a constant argument}}
   return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: w.v)
 }
 

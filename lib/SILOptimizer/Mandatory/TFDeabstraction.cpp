@@ -1027,7 +1027,11 @@ bool PromotableMemoryFinder::canAddressRootBeReliablyPromoted(SILValue root) {
       // when the user specifies @noinline on a method, for example.
       //
       if (auto *apply = dyn_cast<ApplyInst>(user)) {
+        // FIXME: This seems wrong, because it is not counting indirect results.
+        // See DIMemoryUseCollector's use of getSubstCalleeConv for an example.
         auto conventions = apply->getSubstCalleeConv();
+        assert(conventions.getNumIndirectSILResults() == 0 &&
+               "FIXME: Handle this");
 
         unsigned opIdx = use->getOperandNumber();
         if (auto argIndex = apply->getArgumentIndexForOperandIndex(opIdx)) {
@@ -1477,7 +1481,9 @@ void TFDeabstraction::propagateTensorValues() {
 /// Decode the specified array constant value (which should be an
 /// array of constant integer or fp values) and add it as an expanded operand
 /// to the specified op that is being built up.
-static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
+static void expandArrayConstant(ArrayRef<SymbolicValue> arrayElements,
+                                SILType arrayEltType,
+                                StringRef attrName,
                                 SILTensorOpInfo::OperandClass attrKind,
                                 std::string &name,
                                 SmallVectorImpl<SILValue> &operands,
@@ -1492,11 +1498,9 @@ static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
   name += ","+attrName.str();
   name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
 
-  auto eltType =
-    SILType::getPrimitiveObjectType(arrayVal.elementType->getCanonicalType());
-
   auto metatypeType =
-    MetatypeType::get(arrayVal.elementType, MetatypeRepresentation::Thin)
+    MetatypeType::get(arrayEltType.getSwiftRValueType(),
+                      MetatypeRepresentation::Thin)
       ->getCanonicalType();
   operands.push_back(B.createMetatype(forInst->getLoc(),
                               SILType::getPrimitiveObjectType(metatypeType)));
@@ -1504,26 +1508,12 @@ static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
   // Add all of the operands as explicit values.  If the instructions came
   // from an out of line array initializer, make sure to clone them over to
   // our function.
-  for (auto eltVal : arrayVal.getElements()) {
+  for (auto eltVal : arrayElements) {
     auto elt = eltVal.getConstantInstIfPresent();
 
     if (!elt || elt->getFunction() != forInst->getFunction()) {
       // Make a copy of the value, it may be computed.
-      switch (eltVal.getTypeKind()) {
-      case LatticeValue::Array:
-      case LatticeValue::String:
-        llvm_unreachable("unknown type to initialize array");
-
-      case LatticeValue::Integer:
-        elt = B.createIntegerLiteral(forInst->getLoc(), eltType,
-                                     eltVal.getIntegerValue());
-        break;
-      case LatticeValue::Float:
-        elt = B.createFloatLiteral(forInst->getLoc(), eltType,
-                                   eltVal.getFloatValue());
-        break;
-      }
-
+      elt = eltVal.emitConstantInst(B, arrayEltType, forInst->getLoc());
       elt->setDebugLocation(B.getSILDebugLocation(forInst->getLoc()));
     }
 
@@ -1533,6 +1523,20 @@ static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
     name += SILTensorOpInfo::getOperandClassSuffix(eltKind);
   }
 }
+
+/// If the specified type is a Swift.Array or some element type, then return the
+/// element type.  Otherwise, return a null Type.
+static SILType getArrayElementType(SILType ty) {
+  assert(0 && "FIXME: Implement when array constant prop is up and running");
+  abort();
+#if 0
+  if (auto bgst = ty->getAs<BoundGenericStructType>())
+    if (bgst->getDecl() == bgst->getASTContext().getArrayDecl())
+      return bgst->getGenericArgs()[0];
+  return Type();
+#endif
+}
+
 
 /// If all the operands to a call to __tf_tensor_from_scalars are constants, we
 /// can promote this to a 'Const' node with an attached TF_Tensor attribute.
@@ -1546,7 +1550,7 @@ static void expandArrayConstant(ArrayLatticeValue &arrayVal, StringRef attrName,
 /// done, we should remove the logic in SILTensorOpInfo.
 static BuiltinInst *
 tryToPromoteTensorFromScalars(ApplyInst *inst,
-                            const DenseMap<SILValue, LatticeValue> &constants) {
+                            const DenseMap<SILValue, SymbolicValue> &constants) {
   assert(inst->getNumOperands() == 3 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars");
 
@@ -1566,11 +1570,15 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   std::string name = "__tfop_Const";
 
   // Try to expand the array and the shape into their scalars.
-  expandArrayConstant(scalarIt->second.getArrayValue(), "value",
+  expandArrayConstant(scalarIt->second.getAggregateValue(),
+                      getArrayElementType(inst->getOperand(1)->getType()),
+                      "value",
                       SILTensorOpInfo::OperandClass::Tensor,
                       name, operands, inst);
   unsigned numElements = operands.size()-1;
-  expandArrayConstant(shapeIt->second.getArrayValue(), "value",
+  expandArrayConstant(shapeIt->second.getAggregateValue(),
+                      getArrayElementType(inst->getOperand(2)->getType()),
+                      "value",
                       SILTensorOpInfo::OperandClass::Shape,
                       name, operands, inst);
 
@@ -1638,7 +1646,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 /// done, we should remove the logic in SILTensorOpInfo.
 static BuiltinInst *
 tryToPromoteTensorFromScalars1D(ApplyInst *inst,
-                            const DenseMap<SILValue, LatticeValue> &constants) {
+                          const DenseMap<SILValue, SymbolicValue> &constants) {
   assert(inst->getNumOperands() == 2 && isTensorHandle(inst->getType()) &&
          "Unexpected type signature for __tf_tensor_from_scalars_1d");
 
@@ -1653,7 +1661,9 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   std::string name = "__tfop_Const";
 
   // Try to expand the array into its scalars.
-  expandArrayConstant(scalarIt->second.getArrayValue(), "value",
+  expandArrayConstant(scalarIt->second.getAggregateValue(),
+                      getArrayElementType(inst->getOperand(1)->getType()),
+                      "value",
                       SILTensorOpInfo::OperandClass::Tensor,
                       name, operands, inst);
 
@@ -1718,7 +1728,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
 
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
-  SmallVector<SymbolicValue, 32> valuesToCheck;
+  SmallVector<SILValue, 32> valuesToCheck;
 
   for (auto *op : tensorOps) {
     for (auto &operand : op->getAllOperands()) {
@@ -1728,7 +1738,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       // things we over-query on.
       auto value = operand.get();
       if (!isTensorFlowValue(value->getType()))
-        valuesToCheck.push_back({value, 0});
+        valuesToCheck.push_back(value);
     }
   }
 
@@ -1738,13 +1748,16 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
   valuesToCheck.erase(std::unique(valuesToCheck.begin(), valuesToCheck.end()),
                       valuesToCheck.end());
 
-  SmallVector<LatticeValue, 32> results;
-  constantEvaluator.computeConstantValues(fn, valuesToCheck, results);
+  // Determine whether each value is a constant or not.
+  // TODO: Capture information about *WHY* values are not constants, e.g. the
+  // first SIL instruction that could not be folded.
+  SmallVector<SymbolicValue, 32> results;
+  constantEvaluator.computeConstantValues(valuesToCheck, results);
 
   // Transform the returned information about constants into a map that we can
   // query.  The results list should correspond directly to the values we asked
   // about.
-  DenseMap<SILValue, LatticeValue> constants;
+  DenseMap<SILValue, SymbolicValue> constants;
 
   assert(valuesToCheck.size() == results.size() && "incorrect values returned");
   for (unsigned i = 0, e = valuesToCheck.size(); i != e; ++i) {
@@ -1753,8 +1766,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       continue;
 
     // Otherwise, add the information about it to our map.
-    assert(valuesToCheck[i].index == 0 && "we only query for index #0");
-    constants.insert({valuesToCheck[i].value, results[i]});
+    constants.insert({valuesToCheck[i], results[i]});
   }
 
 
@@ -1818,10 +1830,6 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       if (!opInfo)
         continue;
 
-      // Use the constants we just computed to substitute into parameter values.
-
-
-
       // TODO: Deabstraction isn't fully handling all constant expressions and
       // other canonicalizations that we expect, so for now we depend on the
       // performance optimizer.  When deabstraction is done, we will run the
@@ -1832,6 +1840,60 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       if (!TFStrictDeabstraction)
         continue;
 
+      // Use the constants we just computed to substitute into parameter values
+      // if we don't already have them.
+      // TODO: this should eventually create a new SILInstruction to represent
+      // the graph operation instead of using SIL instructions to represent the
+      // constants.
+      bool isError = false;
+      SILBuilder B(opInfo->inst);
+      for (unsigned i = 0, e = opInfo->operandClasses.size(); i != e; ++i) {
+        // Ignore input operands.
+        if (opInfo->isInput(i))
+          continue;
+
+        // Ok, we have an attribute operand.  If it is already trivially a
+        // constant, just leave it alone.
+        auto operand = inst->getOperand(i);
+        if (isa<FloatLiteralInst>(operand) ||
+            isa<IntegerLiteralInst>(operand) ||
+            isa<StringLiteralInst>(operand) ||
+            isa<MetatypeInst>(operand))
+          continue;
+
+        // Otherwise, we should have been able to fold it through our constexpr
+        // evaluation logic.
+        SILValue newVal;
+        auto it = constants.find(operand);
+
+        // Given that we found a constant, materialize it as an instruction and
+        // swap it in for our variable argument.
+        if (it != constants.end())
+          newVal = it->second.emitConstantInst(B, operand->getType(),
+                                               opInfo->inst->getLoc());
+
+        if (!newVal) {
+          auto opClass = opInfo->operandClasses[i];
+          auto error = "attribute '" + opClass.first.str() +
+                       "' requires a constant argument";
+
+          // TODO: improve the diagnostic to talk about the parameter label in
+          // the user code, not the internal op attribute.  The bookkeeping for
+          // this isn't obvious though.
+          auto loc = getUserSourceLocation(inst);
+          diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+                   diag::tf_op_misuse, error)
+            .highlight(loc.getSourceRange());
+          isError = true;
+          break;
+        }
+
+        inst->setOperand(i, newVal);
+      }
+
+      // Don't emit a second error for this op if we already emitted one.
+      if (isError)
+        continue;
 
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
@@ -1957,7 +2019,7 @@ void TFDeabstractionPass::run() {
     return;
 
   TensorFunctionClassifier tfc;
-  ConstExprEvaluator constantEvaluator;
+  ConstExprEvaluator constantEvaluator(*module);
 
   // Loop over all of the functions in the current module processing them -
   // iff they look like they could be the top level of a deabstraction
