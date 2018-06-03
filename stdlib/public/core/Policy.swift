@@ -627,6 +627,8 @@ prefix operator +
 prefix operator -
 prefix operator ...
 prefix operator ..<
+prefix operator ...-
+prefix operator ..<-
 
 // Standard infix operators.
 
@@ -655,8 +657,10 @@ infix operator   | : AdditionPrecedence
 infix operator   ^ : AdditionPrecedence
 
 // FIXME: is this the right precedence level for "..." ?
-infix operator  ... : RangeFormationPrecedence
-infix operator  ..< : RangeFormationPrecedence
+infix operator  ...  : RangeFormationPrecedence
+infix operator  ..<  : RangeFormationPrecedence
+infix operator  ...- : RangeFormationPrecedence
+infix operator  ..<- : RangeFormationPrecedence
 
 // The cast operators 'as' and 'is' are hardcoded as if they had the
 // following attributes:
