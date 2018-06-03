@@ -20,6 +20,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -613,7 +614,8 @@ static const char *markingStr[]{
 static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
   GraphGlobalConfiguration result;
 
-  SILInstruction *alreadyFound = nullptr;
+  SILInstruction *firstFound = nullptr;
+  SmallVector<SILInstruction *, 4> configureInsts;
   for (auto &bb : fn)
     for (auto &inst : bb) {
       // Scan for the device configuration ops if present.
@@ -623,17 +625,18 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
                         tfopInfo->opName == "tfc.configureGPU";
       if (!isConfigOp) continue;
 
+      configureInsts.push_back(&inst);
       // If we found one, make sure we don't have more than one.
-      if (alreadyFound) {
+      if (firstFound) {
         diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
                  diag::tf_multiple_device);
-        diagnose(fn.getASTContext(), alreadyFound->getLoc().getSourceLoc(),
+        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
                  diag::tf_multiple_device_prev);
         continue;
       }
 
       // Otherwise, remember this one and decode it.
-      alreadyFound = &inst;
+      firstFound = &inst;
 
       // Eventually we'll support multiple different configuration ops, so
       // we recheck the opcode here.
@@ -652,7 +655,7 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
 
 
   // If the program didn't specify, fall back to the command line option.
-  if (!alreadyFound) {
+  if (!firstFound) {
     // At most one of these test-only flags should be set.
     assert (!TFTargetTPU || !TFTargetGPU);
     if (TFTargetTPU)
@@ -660,6 +663,24 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
     if (TFTargetGPU)
       result.deviceType = DeviceType::GPU;
   }
+  result.usedDeviceTypes.insert(result.deviceType);
+
+  if (firstFound) {
+    if (auto *outs = getTFDumpIntermediateStream()) {
+      *outs << "Targeting device " << getDeviceString(result.deviceType)
+            << " for accelerator program, based on config: \n";
+      firstFound->print(*outs);
+    }
+  }
+
+  // These instructions are not relevant to later compiler passes in TFPartition
+  // and TFLowerGraph. Removing them so that the later passes need not deal with
+  // this special builtin type.
+  for (auto *configureInst : configureInsts) {
+    assert(!configureInst->hasUsesOfAnyResult());
+    recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+  }
+
   return result;
 }
 
@@ -667,7 +688,7 @@ class TFFunctionPartition {
 public:
   SILFunction &fn;
   ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
-  const GraphGlobalConfiguration configuration; // Device placement info.
+  GraphGlobalConfiguration configuration; // Device placement info.
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
@@ -2243,7 +2264,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     ValueMap[inst] = remapValue(inst->getOperand(1));
     return;
   }
-  
+
   std::string opName = "__tfop_" + std::string(opInfo.first);
 
   // Start remapping the operand list.
@@ -2306,11 +2327,9 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     break;
   }
   }
-  auto deviceStrInst =
-      B.createStringLiteral(loc, StringRef(FP.configuration.getDeviceString()),
-                            StringLiteralInst::Encoding::UTF8);
-  operands.push_back(deviceStrInst);
-  opName += ",device";
+  bool devicePlaced = FP.configuration.handleDevicePlacement(
+      opInfo.first, /*opDevice*/"", /*inst,*/ B, loc, operands, opName);
+  assert(devicePlaced);
 
   auto result =
     B.createBuiltin(loc, B.getASTContext().getIdentifier(opName),
@@ -2639,7 +2658,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   // If `value` is not receivable on Swift host from TensorFlow (e.g. it is a
   // tensor resource handle), reject the program.
   if (!receiveFn) return false;
-  
+
   // Diagnose implicit data transfers if they are implicit.
   FP.diagnoseUsesFromHost(value, loc);
 
@@ -3614,12 +3633,10 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                          /*interfaceYields*/{},
                          results, /*interfaceErrorResult*/None,
                          fn.getModule().getASTContext());
-  auto resultFn =
-    fn.getModule().getOrCreateFunction(fn.getLocation(),
-                                       fn.getName().str()+".tf_partition",
-                                       SILLinkage::Private, newFnType,
-                                       /*What's this*/IsBare, IsNotTransparent,
-                                       IsNotSerialized);
+  auto resultFn = fn.getModule().getOrCreateFunction(
+      fn.getLocation(), fn.getName().str() + ".tf_partition",
+      SILLinkage::Private, newFnType,
+      /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 
   PartitionCloner PC(*this, *resultFn, result.theTensorComputation,
                      tensorFlowModule);
@@ -3784,7 +3801,10 @@ public:
     }
 
     // Next translate it to a graph and emit it as a global symbol.
-    auto bytes = lowerTFGraph(tensorProgram.fn, partitioner.configuration);
+    std::string entryFnName;
+    auto bytes = lowerTFGraph(tensorProgram.fn, partitioner.configuration,
+                              entryFnName);
+    assert(!StringRef(entryFnName).startswith("$"));
 
     // Now that we know what the tensor program actually is, we can replace the
     // placeholder instructions for the data + length with the actual bits we
@@ -3798,14 +3818,9 @@ public:
                               tensorProgram.programLengthPlaceholder->getType(),
                                         bytes.size());
 
-      // Strip off the $ from the start of a function name if present.
-      // FIXME: Factor this out somewhere common.
-      auto fnName = tensorProgram.fn->getName();
-      if (fnName.startswith("$"))
-        fnName = fnName.substr(1);
-
-      auto name = B.createStringLiteral(fn->getLocation(), fnName,
-                                        StringLiteralInst::Encoding::UTF8);
+      auto name =
+          B.createStringLiteral(fn->getLocation(), StringRef(entryFnName),
+                                StringLiteralInst::Encoding::UTF8);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();
       tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
