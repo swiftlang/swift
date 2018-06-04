@@ -38,7 +38,7 @@ func someLocalFunctionThatShouldBeForceInlined() {
 //someLocalFunctionThatShouldBeForceInlined()
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: main
-// CHECK: sil private @main.tf_partition : $@callee_owned ()
+// CHECK: sil private @main.tf : $@callee_owned ()
 // CHECK:   builtin "__tfop_Const,
 // CHECK:   builtin "__tfop_Add,
 // CHECK:   builtin "__tfop_Sub,

@@ -191,7 +191,7 @@ namespace {
 struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   SILFunction &SILFn;
   // The TF device to which the generated graph is targeting.
-  DeviceType targetDeviceType;
+  DeviceType thisDeviceType;
   const GraphGlobalConfiguration &configuration;
   TF_Graph *resultGraph;
   TF_Status *status;
@@ -219,12 +219,12 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
 
  public:
   /// Generate one or more TF graph functions from `fn` targeting
-  /// `targetDeviceType`, and add them to `resultGraph`.
-  TFGraphLowering(SILFunction &fn, DeviceType targetDeviceType,
+  /// `thisDeviceType`, and add them to `resultGraph`.
+  TFGraphLowering(SILFunction &fn, DeviceType thisDeviceType,
                   const GraphGlobalConfiguration &configuration,
                   TF_Graph *resultGraph, TF_Status *status)
       : SILFn(fn),
-        targetDeviceType(targetDeviceType),
+        thisDeviceType(thisDeviceType),
         configuration(configuration),
         resultGraph(resultGraph),
         status(status) {}
@@ -274,15 +274,28 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
                           SmallVectorImpl<TF_DataType> *inputTypes,
                           SmallVectorImpl<TF_DataType> *outputTypes);
 
-  /// Builds TF graph nodes for the top level TF function call, where `funcName`
-  /// is the function name. `inputs` and `outputs` respectively specify the
-  /// inputs and outputs to the function.
+  /// Builds TF graph nodes for the top level TF function call, where
+  /// `funcOpType` is the TF graph function name, and `funcNodeBaseName` is the
+  /// node base name for calling that function. `inputs` and `outputs`
+  /// respectively specify the inputs and outputs to the function.
+  ///
+  /// Context of `isPrimaryFn`: An accelerator SIL function produced by
+  /// TFPartition is to be partitioned into a set of N SIL functions, one per
+  /// device, if the graph execution involves N TF devices. One of the functions
+  /// is the *primary* function, whose device is specified via a configure stmt
+  /// like Tensorflow.enableGPU() or enableTPU() (defaulting to CPU if there is
+  /// no such stmt), and the other functions are the *helper" functions, which
+  /// will be executed together with the primary one, for cross-device
+  /// sends/recvs. The helper functions do not take input or output tensors, and
+  /// are executed for their side-effects (e.g. sending/receiving tensors across
+  /// devices).
   ///
   /// The created nodes follow this naming convention shared with the runtime:
-  /// - The graph node for the function call has op type set <funcName>, and
-  ///   name set to tfc_func_<funcName>.
-  /// - The i-th input node is named tfc_input_<i>_<funcName>
-  /// - The j-th output node is named tfc_output_<j>_<funcName>
+  /// - The graph node for the function call has op type set <funcOpType>, and
+  ///   name set to tfc_func_<funcNodeBaseName> for the primary function, and
+  ///   tfc_func_<funcNodeBaseName>_helper<i> for the i-th helper function.
+  /// - The i-th input node is named tfc_input_<i>_<funcNodeBaseName>
+  /// - The j-th output node is named tfc_output_<j>_<funcNodeBaseName>
   /// - If TPU infeed is enabled, the graph contains an 'InfeedEnqueueTuple'
   ///   node for caller feed input tensors.
   ///
@@ -291,7 +304,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   ///
   /// This emits an error and returns true on error.
   bool buildGraphNodesForTopLevelFunctionCall(
-      StringRef funcName,
+      StringRef funcOpType, StringRef funcNodeBaseName, bool isPrimaryFn,
       ArrayRef<TF_DataType> inputTypes, ArrayRef<TF_DataType> outputTypes);
 
  private:  // Helpers to create TensorFlow graph nodes.
@@ -2069,10 +2082,10 @@ bool TFGraphLowering::addTopLevelTPUConfigLogic(TF_Operation **metadataNode) {
 }
 
 bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
-    StringRef funcName,
+    StringRef funcOpType, StringRef funcNodeBaseName, bool isPrimaryFn,
     ArrayRef<TF_DataType> inputTypes, ArrayRef<TF_DataType> outputTypes) {
   TF_Operation *metadataNode = nullptr;
-  if (configuration.isTPUEnabled()) {
+  if (isPrimaryFn && configuration.isTPUEnabled()) {
     if (addTopLevelTPUConfigLogic(&metadataNode)) {
       // An error has occurred. Abort graph generation.
       return true;
@@ -2102,19 +2115,19 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   //
   // The above discussion generalizes to multiple inputs and/or outputs.
   // FIXME: Lift the current restriction that the # TPU replicas is always 1.
-  std::string funcNameStr = funcName.str();
-  std::string funcNodeName = "tfc_func_" + funcNameStr;
+  std::string funcOpTypeStr = funcOpType.str();
+  std::string funcNodeName = "tfc_func_" + funcNodeBaseName.str();
   TF_OperationDescription *funcDesc =
-      TF_NewOperation(resultGraph, /*op_type*/ funcNameStr.c_str(),
+      TF_NewOperation(resultGraph, /*op_type*/ funcOpTypeStr.c_str(),
                       /*op_name*/ funcNodeName.c_str());
   if (configuration.isTPUEnabled()) {
     // FIXME: When we support TPU outside compilation, where there can be TF
     // graph functions on non-TPU devices even when configuration.isTPUEnabled()
-    // is true, replace the if check here with checking on `targetDeviceType`.
-    assert(targetDeviceType == DeviceType::TPU);
+    // is true, replace the if check here with checking on `thisDeviceType`.
+    assert(thisDeviceType == DeviceType::TPU);
     markNodeAsTPUReplicated(funcDesc);
   } else {
-    TF_SetDevice(funcDesc, getDeviceString(targetDeviceType).c_str());
+    TF_SetDevice(funcDesc, getDeviceString(thisDeviceType).c_str());
   }
 
   // FIXME: Revisit how to enable infeed outside the context of dataset /
@@ -2139,7 +2152,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   // Handle inputs.
   for (unsigned i = 0, e = inputTypes.size(); i != e; ++i) {
     std::string inputNodeName =
-        "tfc_input_" + std::to_string(i) + "_" + funcNameStr;
+      "tfc_input_" + std::to_string(i) + "_" + funcNodeBaseName.str();
     TF_OperationDescription *inputDesc =
         TF_NewOperation(resultGraph, "Placeholder", inputNodeName.c_str());
     TF_SetAttrType(inputDesc, "dtype", inputTypes[i]);
@@ -2244,7 +2257,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
   // Now handle outputs.
   for (unsigned i = 0, e = outputTypes.size(); i != e; ++i) {
     std::string outputNodeName =
-        "tfc_output_" + std::to_string(i) + "_" + funcNameStr;
+        "tfc_output_" + std::to_string(i) + "_" + funcNodeBaseName.str();
     TF_OperationDescription *outputDesc =
         TF_NewOperation(resultGraph, "Identity", outputNodeName.c_str());
     TF_Output funcOutputNode{funcNode, static_cast<int>(i)};
@@ -2429,12 +2442,19 @@ class GraphPartitioner : public SILInstructionVisitor<GraphPartitioner> {
 
 #endif // SWIFT_ENABLE_TENSORFLOW
 
+/// Gets a function name that can be used as a TF op name.
+StringRef getTFCompatibleFuncName(SILFunction *fn) {
+  auto fnName = fn->getName();
+  if (fnName.startswith("$")) fnName = fnName.substr(1);
+  return fnName;
+}
+
 /// Lower the specified SIL function (which was formed by the partitioner)
 /// into a TensorFlow graph, and encode into a vector of bytes.
 ///
 std::vector<char> tf::lowerTFGraph(
     SILFunction *fn, const GraphGlobalConfiguration &configuration,
-    std::string &entryFnName) {
+    std::string &entryFnBaseName) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -2470,25 +2490,27 @@ std::vector<char> tf::lowerTFGraph(
   };
 
   GraphPartitioner partitioner(*fn, configuration);
+  entryFnBaseName = getTFCompatibleFuncName(fn);
+  unsigned helperFuncId = 0;
   for (const auto deviceType : configuration.usedDeviceTypes) {
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
     bool isPrimaryFn = deviceType == configuration.deviceType;
 
     TFGraphLowering graphGen(*perDeviceFn, deviceType, configuration,
                              resultGraph, status);
-    auto graphFnBody = graphGen.lowerToFunction([&]() {
+    auto graphFnBody = graphGen.lowerToFunction([&graphGen, perDeviceFn]() {
       // This is the top level of the function, add its formal arguments.
-      graphGen.lowerArgumentsToParams(fn->getArguments(), {},
-                                      fn->getLocation());
+      graphGen.lowerArgumentsToParams(perDeviceFn->getArguments(), {},
+                                      perDeviceFn->getLocation());
       if (graphGen.errorOccurred) return;
 
       // Lower all of the code inside the function body (which can of course
       // recursively creates functions and call them as ops.
+      auto structure = canonicalizeCFGForXLA(perDeviceFn);
       graphGen.lowerRegion(structure.get());
     });
 
-    auto fnName = perDeviceFn->getName();
-    if (fnName.startswith("$")) fnName = fnName.substr(1);
+    auto fnName = getTFCompatibleFuncName(perDeviceFn);
 
     bool hasSideEffects = false;
     SmallVector<TF_DataType, 4> inputTypes, outputTypes;
@@ -2496,13 +2518,15 @@ std::vector<char> tf::lowerTFGraph(
                                     &inputTypes, &outputTypes))
       return {};
 
+    // The func op type is `fnName`, with the caller node name being
+    // based on `funcNodeBaseName`.
+    std::string funcNodeBaseName = entryFnBaseName;
+
     // Create the graph function for the top level code.
-    if (isPrimaryFn) {
-      if (graphGen.buildGraphNodesForTopLevelFunctionCall(
-              fnName.str(), inputTypes, outputTypes))
-        return {};
-      entryFnName = fnName.str();
-    }
+    if (graphGen.buildGraphNodesForTopLevelFunctionCall(
+            fnName.str(), funcNodeBaseName, isPrimaryFn, inputTypes,
+            outputTypes))
+      return {};
   }
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.

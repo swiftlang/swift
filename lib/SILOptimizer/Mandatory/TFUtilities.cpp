@@ -660,7 +660,7 @@ SILTensorOpInfo::decode(SILInstruction *inst) {
   return None;
 }
 
-StringRef SILTensorOpInfo::getDeviceString() const {
+std::string SILTensorOpInfo::getDeviceString() const {
   // FIXME: consider switching to the following coding style consistently
   // for (auto [op, idx] : enumerate(inst->getAllOperands())) {
   for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {

@@ -14,7 +14,6 @@ var SendsRecvsTests = TestSuite("SendsRecvs")
 @inline(never)
 func test1Send() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   var a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -29,7 +28,6 @@ SendsRecvsTests.testCPU("test1Send", test1Send)
 @inline(never)
 func test2Sends() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   var a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -47,7 +45,6 @@ SendsRecvsTests.testCPU("test2Sends", test2Sends)
 @inline(never)
 func testSendsInALoop() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   let maxCount = 3
   var count = 0
   var a = Tensor<Float>(0.0)
@@ -68,7 +65,6 @@ SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
 
 func test1RecvFloatScalar() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   let x = Tensor<Float>(1.0)
   let y = x.scalar! + 2.0
 
@@ -81,7 +77,6 @@ SendsRecvsTests.testCPU("test1RecvFloatScalar", test1RecvFloatScalar)
 
 func test1RecvIntScalar() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   let x = Tensor<Int32>(1)
   let y = x.scalar! + 2
 
@@ -99,7 +94,6 @@ func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
 
 func test1RecvFloatTensor() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   let a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -119,7 +113,6 @@ func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
 
 func test1RecvIntTensor() {
 #if !CUDA
-  _RuntimeConfig.usesTFEagerAPI = false
   let a = Tensor<Int64>(1)
   // One send.
   print(a.toHost())

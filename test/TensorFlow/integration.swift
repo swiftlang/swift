@@ -493,14 +493,14 @@ public func testNoInlineUser() {
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testNoInlineUser
 // CHECK: [[X:%.*]] = alloc_ref $TensorHandle<Float>
 // CHECK: [[XS:%.*]] = struct $Tensor<Float> ([[X]] : $TensorHandle<Float>)
-// CHECK:  strong_retain %26 : $TensorHandle<Float>
-// CHECK-NEXT:  strong_release %26 : $TensorHandle<Float>
-// CHECK:  strong_retain %26 : $TensorHandle<Float>
+// CHECK:  strong_retain [[SOME_T:%.*]] : $TensorHandle<Float>
+// CHECK-NEXT:  strong_release [[SOME_T]] : $TensorHandle<Float>
+// CHECK:  strong_retain [[SOME_T]] : $TensorHandle<Float>
 // CHECK:  [[FN:%.*]] = function_ref @${{.*}}noInlineUser
 // CHECK-NEXT: apply [[FN]]([[XS]])
 // CHECK-NEXT: apply [[FN]]([[XS]])
-// CHECK:  strong_release %26 : $TensorHandle<Float>
-// CHECK:  strong_release %26 : $TensorHandle<Float>
+// CHECK:  strong_release [[SOME_T]] : $TensorHandle<Float>
+// CHECK:  strong_release [[SOME_T]] : $TensorHandle<Float>
 // CHECK-LABEL: } // end sil function{{.*}}testNoInlineUser
 
 
