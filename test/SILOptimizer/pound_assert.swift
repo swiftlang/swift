@@ -1,9 +1,17 @@
-// RUN: %target-swift-frontend -emit-sil %s -verify | %target-sil-opt -cleanup | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -verify
 
-// Tests that mandatory SIL passes remove the builtin poundAssert instruction
-// and emit a diagnostic.
-// CHECK-LABEL: sil @$S12pound_assert14builtinRemoved{{[_0-9a-zA-Z]*}}
-public func builtinRemoved() {
-  #assert(true) // expected-warning {{#assert doesn't actually do anything yet}}
-  // CHECK-NOT: builtin "poundAssert"
+func isOne(_ x: Int) -> Bool {
+  return x == 1
+}
+
+func assertionSuccess() {
+  #assert(isOne(1))
+}
+
+func assertionFailure() {
+  #assert(isOne(2)) // expected-error{{assertion failed}}
+}
+
+func nonConstant() {
+  #assert(isOne(Int(readLine()!)!)) // expected-error{{#assert condition not constant}}
 }
