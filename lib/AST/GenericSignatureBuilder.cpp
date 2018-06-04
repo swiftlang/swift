@@ -3944,6 +3944,12 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
                                     bool wantExactPotentialArchetype) {
+  // An error type is best modeled as an unresolved potential archetype, since
+  // there's no way to be sure what it is actually meant to be.
+  if (type->is<ErrorType>()) {
+    return ResolvedType::forUnresolved(nullptr);
+  }
+
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
