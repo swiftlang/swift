@@ -53,7 +53,7 @@ public extension Tensor where Scalar : Numeric {
   /// Perform an element-wise type conversion from a `Bool` tensor.
   @_inlineable @inline(__always)
   init(_ other: Tensor<Bool>) {
-    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
+    self = Raw.cast(other)
   }
 }
 
@@ -1025,21 +1025,19 @@ public extension Tensor {
   }
 }
 
-public extension Tensor {
+public extension Tensor where Scalar : AccelerableByTensorFlow {
   @_inlineable @inline(__always)
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
     let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
-    let ones: Tensor<Int32> = #tfop("Fill", rankDiff, Tensor<Int32>(1))
+    let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
     let paddedShape = ones ++ otherShape
     let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
-    let broadcastIndices = Tensor<Int64>(
-      handle: #tfop("Where", nonEqualIndices, T: Bool.self)
-    ).flattened()
+    let broadcastIndices = Raw.where_(nonEqualIndices).flattened()
     let unbroadcasted: Tensor = #tfop(
       "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
       Tidx: Int32.self
     )
-    return #tfop("Reshape", unbroadcasted, otherShape)
+    return Raw.reshape(unbroadcasted, shape: otherShape)
   }
 
   @_inlineable @inline(__always)
@@ -1194,8 +1192,10 @@ public extension Tensor {
     /// TODO: Precondition `lowerBounds.count == upperBounds.count`,
     /// preferably in graph.
     let lowerBoundsTensor = Tensor<Int32>(lowerBounds)
-    return #tfop("Slice", self, lowerBoundsTensor,
-                 Tensor<Int32>(upperBounds) - lowerBoundsTensor)
+    return Raw.slice(
+      self,
+      begin: lowerBoundsTensor,
+      size: Tensor<Int32>(upperBounds) - lowerBoundsTensor)
   }
 }
 
