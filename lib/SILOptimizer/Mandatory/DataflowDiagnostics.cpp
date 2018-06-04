@@ -119,62 +119,62 @@ static void diagnoseStaticReports(const SILInstruction *I,
 // SWIFT_ENABLE_TENSORFLOW
 /// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
 /// false or whose condition cannot be evaluated.
-static void diagnosePoundAssert(const SILInstruction *I, SILModule &M,
-                                ConstExprEvaluator &constantEvaluator) {
-  if (auto *builtinInst = dyn_cast<BuiltinInst>(I)) {
-    if (builtinInst->getBuiltinKind() == BuiltinValueKind::PoundAssert) {
-      SmallVector<SymbolicValue, 1> values;
-      constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
-                                              values);
-      SymbolicValue value = values[0];
-      if (!value.isConstant()) {
-        // TODO(marcrasi / clattner): Emit more informative error.
-        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-                 diag::pound_assert_condition_not_constant);
-        return;
-      }
-      if (value.getTypeKind() != SymbolicValue::TKInteger) {
-        llvm_unreachable("sema prevents non-integer #assert condition");
-      }
+static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
+  auto *builtinInst = dyn_cast<BuiltinInst>(I);
+  if (!builtinInst ||
+      builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
+    return;
 
-      APInt intValue = value.getIntegerValue();
-      if (!intValue.isSignedIntN(1)) {
-        llvm_unreachable("sema prevents non-int1 #assert condition");
-      }
-      if (intValue.isNullValue()) {
-        // TODO(marcrasi / clattner): Emit the actual #assert message.
-        diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-                 diag::pound_assert_failure);
-        return;
-      }
-    }
+  // TODO(marcrasi / clattner): Instantiate this earlier so that its cache
+  // is useful. We don't right now, because instantiating one for every
+  // function greatly slows down or hangs compilation (e.g. compiling
+  // libswiftStdlibUnicodeUnittest.so slows down from <1min to >1hr).
+  ConstExprEvaluator constantEvaluator(M);
+
+  SmallVector<SymbolicValue, 1> values;
+  constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
+                                          values);
+  SymbolicValue value = values[0];
+  if (!value.isConstant()) {
+    // TODO(marcrasi / clattner): Emit more informative error.
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_condition_not_constant);
+    return;
+  }
+  assert(value.getTypeKind() == SymbolicValue::TKInteger &&
+         "sema prevents non-integer #assert condition");
+
+  APInt intValue = value.getIntegerValue();
+  assert(intValue.getBitWidth() == 1 &&
+         "sema prevents non-int1 #assert condition");
+  if (intValue.isNullValue()) {
+    auto *message = dyn_cast<StringLiteralInst>(builtinInst->getArguments()[1]);
+    assert(message && "argument to #assert must be a string literal");
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_failure, message->getValue());
+    return;
   }
 }
 
 namespace {
-class EmitDFDiagnostics : public SILModuleTransform {
+class EmitDFDiagnostics : public SILFunctionTransform {
   ~EmitDFDiagnostics() override {}
 
   /// The entry point to the transformation.
   void run() override {
-    // SWIFT_ENABLE_TENSORFLOW
-    SILModule *M = getModule();
-    ConstExprEvaluator constantEvaluator(*M);
+    // Don't rerun diagnostics on deserialized functions.
+    if (getFunction()->wasDeserializedCanonical())
+      return;
 
-    for (auto &fn : *M) {
-      // Don't rerun diagnostics on deserialized functions.
-      if (fn.wasDeserializedCanonical())
-        continue;
+    SILModule &M = getFunction()->getModule();
+    for (auto &BB : *getFunction())
+      for (auto &I : BB) {
+        diagnoseUnreachable(&I, M.getASTContext());
+        diagnoseStaticReports(&I, M);
 
-      for (auto &BB : fn) {
-        for (auto &I : BB) {
-          diagnoseUnreachable(&I, M->getASTContext());
-          diagnoseStaticReports(&I, *M);
-
-          diagnosePoundAssert(&I, *M, constantEvaluator);
-        }
+        // SWIFT_ENABLE_TENSORFLOW
+        diagnosePoundAssert(&I, M);
       }
-    }
   }
 };
 } // end anonymous namespace

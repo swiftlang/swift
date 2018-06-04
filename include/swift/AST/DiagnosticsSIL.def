@@ -342,7 +342,7 @@ ERROR(static_report_error, none,
 ERROR(pound_assert_condition_not_constant,none,
        "#assert condition not constant", ())
 ERROR(pound_assert_failure,none,
-       "assertion failed", ())
+       "%0", (StringRef))
 
 // Automatic differentiation diagnostics
 
