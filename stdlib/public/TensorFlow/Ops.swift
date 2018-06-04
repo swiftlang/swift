@@ -75,7 +75,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointAdd(_:_:originalValue:seed:))
   public static func + (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.add(x: lhs, y: rhs)
+    return Raw.add(lhs, rhs)
   }
 
   /// Subtracts one tensor from another and produces their difference.
@@ -83,7 +83,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointSubtract(_:_:originalValue:seed:))
   public static func - (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.sub(x: lhs, y: rhs)
+    return Raw.sub(lhs, rhs)
   }
 
   /// Multiplies two tensors and produces their product.
@@ -91,7 +91,7 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointMultiply(_:_:originalValue:seed:))
   public static func * (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.mul(x: lhs, y: rhs)
+    return Raw.mul(lhs, rhs)
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
@@ -185,7 +185,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointDivide(_:_:originalValue:seed:))
   static func / (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.div(x: lhs, y: rhs)
+    return Raw.div(lhs, rhs)
   }
 
   /// Returns the quotient of dividing the scalar by the tensor, broadcasting
@@ -220,7 +220,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `%` supports broadcasting.
   @_inlineable @inline(__always)
   static func % (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.mod(x: lhs, y: rhs)
+    return Raw.mod(lhs, rhs)
   }
 
   /// Returns the remainder of dividing the tensor by the scalar, broadcasting
@@ -263,7 +263,7 @@ public extension Tensor where Scalar : Numeric {
 public func matmul<Scalar : Numeric>(
   _ left: Tensor<Scalar>, _ right: Tensor<Scalar>
 ) -> Tensor<Scalar> {
-  return Raw.matMul(a: left, b: right)
+  return Raw.matMul(left, right)
 }
 
 infix operator ⊗ : MultiplicationPrecedence
@@ -293,7 +293,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `<` supports broadcasting.
   @_inlineable @inline(__always)
   static func < (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.less(x: lhs, y: rhs)
+    return Raw.less(lhs, rhs)
   }
 
   /// Computes `lhs < rhs`, broadcasting `rhs`.
@@ -312,7 +312,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `<=` supports broadcasting.
   @_inlineable @inline(__always)
   static func <= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.lessEqual(x: lhs, y: rhs)
+    return Raw.lessEqual(lhs, rhs)
   }
 
   /// Computes `lhs <= rhs`, broadcasting `rhs`.
@@ -331,7 +331,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `>` supports broadcasting.
   @_inlineable @inline(__always)
   static func > (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.greater(x: lhs, y: rhs)
+    return Raw.greater(lhs, rhs)
   }
 
   /// Computes `lhs <= rhs`, broadcasting `rhs`.
@@ -350,7 +350,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Note: `>=` supports broadcasting.
   @_inlineable @inline(__always)
   static func >= (lhs: Tensor, rhs: Tensor) -> Tensor<Bool> {
-    return Raw.greaterEqual(x: lhs, y: rhs)
+    return Raw.greaterEqual(lhs, rhs)
   }
 
   /// Computes `lhs >= rhs`, broadcasting `rhs`.
@@ -371,7 +371,7 @@ public extension Tensor where Scalar : Equatable {
   /// - Note: `elementsEqual` supports broadcasting.
   @_inlineable @inline(__always)
   func elementsEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.equal(x: self, y: other)
+    return Raw.equal(self, other)
   }
 
   /// Computes `self == other` element-wise, broadcasting `other`.
@@ -384,7 +384,7 @@ public extension Tensor where Scalar : Equatable {
   /// - Note: `elementsNotEqual` supports broadcasting.
   @_inlineable @inline(__always)
   func elementsNotEqual(_ other: Tensor) -> Tensor<Bool> {
-    return Raw.notEqual(x: self, y: other)
+    return Raw.notEqual(self, other)
   }
 
   /// Computes `self != other` element-wise, broadcasting `other`.
@@ -398,14 +398,14 @@ public extension Tensor where Scalar == Bool {
   /// Performs a logical NOT operation element-wise.
   @_inlineable @inline(__always)
   static prefix func ! (x: Tensor) -> Tensor {
-    return Raw.logicalNot(x: x)
+    return Raw.logicalNot(x)
   }
 
   /// Performs a logical AND operation element-wise.
   /// - Note: `&&` supports broadcasting.
   @_inlineable @inline(__always)
   static func && (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.logicalAnd(x: lhs, y: rhs)
+    return Raw.logicalAnd(lhs, rhs)
   }
 
   /// Performs a logical AND operation element-wise, broadcasting `rhs`.
@@ -424,7 +424,7 @@ public extension Tensor where Scalar == Bool {
   /// - Note: `||` supports broadcasting.
   @_inlineable @inline(__always)
   static func || (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return Raw.logicalOr(x: lhs, y: rhs)
+    return Raw.logicalOr(lhs, rhs)
   }
 
   /// Performs a logical OR operation element-wise, broadcasting `rhs`.
@@ -455,7 +455,7 @@ public extension Tensor {
   func transposed(
     withPermutations permutations: Tensor<Int32>
   ) -> Tensor {
-    return Raw.transpose(x: self, perm: permutations)
+    return Raw.transpose(self, perm: permutations)
   }
 
   /// Returns a transposed tensor, with dimensions permuted in the specified
@@ -555,84 +555,84 @@ public extension Tensor where Scalar : SignedNumeric {
   @_inlineable @inline(__always)
   @differentiable(reverse, adjoint: _adjointNegate(_:originalValue:seed:))
   static prefix func - (rhs: Tensor) -> Tensor {
-    return Raw.neg(x: rhs)
+    return Raw.neg(rhs)
   }
 }
 
 /// Computes the absolute value of the specified tensor element-wise.
 @_inlineable @inline(__always)
 public func abs<T : SignedNumeric>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.abs(x: x)
+  return Raw.abs(x)
 }
 
 /// Computes the natural logarithm of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointLog(_:originalValue:seed:))
 public func log<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.log(x: x)
+  return Raw.log(x)
 }
 
 /// Computes `sin` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointSin(_:originalValue:seed:))
 public func sin<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.sin(x: x)
+  return Raw.sin(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointCos(_:originalValue:seed:))
 public func cos<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.cos(x: x)
+  return Raw.cos(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointTan(_:originalValue:seed:))
 public func tan<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.tan(x: x)
+  return Raw.tan(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointSinh(_:originalValue:seed:))
 public func sinh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.sinh(x: x)
+  return Raw.sinh(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointCosh(_:originalValue:seed:))
 public func cosh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.cosh(x: x)
+  return Raw.cosh(x)
 }
 
 /// Computes `cos` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointTanh(_:originalValue:seed:))
 public func tanh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.tanh(x: x)
+  return Raw.tanh(x)
 }
 
 /// Computes the square root of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointSqrt(_:originalValue:seed:))
 public func sqrt<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.sqrt(x: x)
+  return Raw.sqrt(x)
 }
 
 /// Computes the inverse square root of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointRsqrt(_:originalValue:seed:))
 public func rsqrt<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.rsqrt(x: x)
+  return Raw.rsqrt(x)
 }
 
 /// Computes `exp` of the specified tensor element-wise.
 @_inlineable @inline(__always)
 @differentiable(reverse, adjoint: _adjointExp(_:originalValue:seed:))
 public func exp<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
-  return Raw.exp(x: x)
+  return Raw.exp(x)
 }
 
 /// Computes the power of the first tensor to the second tensor.
@@ -640,7 +640,7 @@ public func exp<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
 @differentiable(reverse, adjoint: _adjointPow(_:_:originalValue:seed:))
 public func pow<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : BinaryFloatingPoint {
-  return Raw.pow(x: lhs, y: rhs)
+  return Raw.pow(lhs, rhs)
 }
 
 /// Computes the power of the scalar to the tensor, broadcasting the scalar.
@@ -663,7 +663,7 @@ public func pow<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 @differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
 public func max<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
-  return Raw.maximum(x: lhs, y: rhs)
+  return Raw.maximum(lhs, rhs)
 }
 
 /// Computes the element-wise maximum of the scalar and the tensor, broadcasting
@@ -688,7 +688,7 @@ public func max<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 @differentiable(reverse, adjoint: _adjointMinMax(_:_:originalValue:seed:))
 public func min<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
-  return Raw.minimum(x: lhs, y: rhs)
+  return Raw.minimum(lhs, rhs)
 }
 
 /// Computes the element-wise minimum of the scalar and the tensor, broadcasting
@@ -711,7 +711,7 @@ public func min<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
 public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func squared() -> Tensor {
-    return Raw.square(x: self)
+    return Raw.square(self)
   }
 }
 
@@ -774,7 +774,7 @@ public extension Tensor where Scalar == Bool {
   @_inlineable @inline(__always)
   func all() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.all(input: self, reductionIndices: axes).scalarized()
+    return Raw.all(self, reductionIndices: axes).scalarized()
   }
 
   /// Returns `true` if any scalars are equal to `true`. Otherwise, returns
@@ -784,7 +784,7 @@ public extension Tensor where Scalar == Bool {
   @_inlineable @inline(__always)
   func any() -> Bool {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.any(input: self, reductionIndices: axes).scalarized()
+    return Raw.any(self, reductionIndices: axes).scalarized()
   }
 
   /// Performs a logical AND operation along the specified axes. The reduced
@@ -793,7 +793,7 @@ public extension Tensor where Scalar == Bool {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func all(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.all(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.all(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Performs a logical AND operation along the specified axes. The reduced
@@ -802,7 +802,7 @@ public extension Tensor where Scalar == Bool {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func any(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.any(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.any(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Performs a logical AND operation along the specified axes. The reduced
@@ -811,7 +811,7 @@ public extension Tensor where Scalar == Bool {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func all(alongAxes axes: Int32...) -> Tensor {
-    return Raw.all(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.all(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Performs a logical OR operation along the specified axes. The reduced
@@ -820,7 +820,7 @@ public extension Tensor where Scalar == Bool {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func any(alongAxes axes: Int32...) -> Tensor {
-    return Raw.any(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.any(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 }
 
@@ -830,7 +830,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @_inlineable @inline(__always)
   func min() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.min(input: self, reductionIndices: axes).scalarized()
+    return Raw.min(self, reductionIndices: axes).scalarized()
   }
 
   // NOTE: This overload is necessary, otherwise `max()` would refer
@@ -838,7 +838,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   @_inlineable @inline(__always)
   func max() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.max(input: self, reductionIndices: axes).scalarized()
+    return Raw.max(self, reductionIndices: axes).scalarized()
   }
 
   /// Returns the maximum values along the specified axes. The reduced
@@ -847,7 +847,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func max(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.max(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the minimum values along the specified axes. The reduced
@@ -856,7 +856,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func min(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.min(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the indices of the maximum values along the specified axes. The
@@ -865,7 +865,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func argmax(squeezingAxis axis: Int32) -> Tensor<Int32> {
-    return Raw.argMax(input: self, dimension: Tensor<Int32>(axis))
+    return Raw.argMax(self, dimension: Tensor<Int32>(axis))
   }
 
   /// Returns the indices of the minimum values along the specified axes. The
@@ -874,7 +874,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func argmin(squeezingAxis axis: Int32) -> Tensor<Int32> {
-    return Raw.argMin(input: self, dimension: Tensor<Int32>(axis))
+    return Raw.argMin(self, dimension: Tensor<Int32>(axis))
   }
 
   /// Returns the minimum along the specified axes. The reduced dimensions are
@@ -883,7 +883,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func min(alongAxes axes: Int32...) -> Tensor {
-    return Raw.min(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.min(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the minimum along the specified axes. The reduced dimensions are
@@ -892,7 +892,7 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func max(alongAxes axes: Int32...) -> Tensor {
-    return Raw.max(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.max(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the index of the maximum value of the flattened scalars.
@@ -914,7 +914,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func mean() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.mean(input: self, reductionIndices: axes).scalarized()
+    return Raw.mean(self, reductionIndices: axes).scalarized()
   }
 
   // NOTE: This overload is necessary, otherwise `sum()` would refer
@@ -922,7 +922,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func sum() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.sum(input: self, reductionIndices: axes).scalarized()
+    return Raw.sum(self, reductionIndices: axes).scalarized()
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -931,7 +931,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @_inlineable @inline(__always)
   func mean(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.mean(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the sum along the specified axes. The reduced dimensions are
@@ -940,7 +940,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank...rank`.
   @_inlineable @inline(__always)
   func sum(squeezingAxes axes: Int32...) -> Tensor {
-    return Raw.sum(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
+    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: false)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -949,7 +949,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func mean(alongAxes axes: Int32...) -> Tensor {
-    return Raw.mean(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.mean(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -958,7 +958,7 @@ public extension Tensor where Scalar : Numeric {
   /// - Precondition: Each value in `axes` must be in the range `-rank..<rank`.
   @_inlineable @inline(__always)
   func sum(alongAxes axes: Int32...) -> Tensor {
-    return Raw.sum(input: self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
+    return Raw.sum(self, reductionIndices: Tensor<Int32>(axes), keepDims: true)
   }
 }
 
@@ -972,7 +972,7 @@ public extension Tensor {
   var rankTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Raw.rank(input: self)
+      return Raw.rank(self)
     }
   }
 
@@ -981,7 +981,7 @@ public extension Tensor {
   var shapeTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Raw.shape(input: self)
+      return Raw.shape(self)
     }
   }
 
@@ -990,7 +990,7 @@ public extension Tensor {
   var scalarCountTensor: Tensor<Int32> {
     @inline(__always)
     get {
-      return Raw.size(input: self)
+      return Raw.size(self)
     }
   }
 }
@@ -1224,7 +1224,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
     epsilon: Scalar = 0.001
   ) -> Tensor {
     let mean = self.mean(alongAxes: axis)
-    let squaredDiff: Tensor = Raw.squaredDifference(x: self, y: mean)
+    let squaredDiff: Tensor = Raw.squaredDifference(self, mean)
     let variance = squaredDiff.mean(alongAxes: axis)
     let inv = rsqrt(variance + epsilon) * scale
     return self * inv + offset - mean * inv
