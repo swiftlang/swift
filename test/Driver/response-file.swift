@@ -2,7 +2,7 @@
 // RUN: %target-build-swift -typecheck @%t.0.resp %s 2>&1 | %FileCheck %s -check-prefix=SHORT
 // SHORT: warning: result of call to 'abs' is unused
 
-// RUN: python -c 'for a in ["A", "B", "C", "D"]: print "-DTEST1" + a' > %t.1.resp
+// RUN: %{python} -c 'for a in ["A", "B", "C", "D"]: print "-DTEST1" + a' > %t.1.resp
 // RUN: %target-build-swift -typecheck @%t.1.resp %s 2>&1 | %FileCheck %s -check-prefix=MULTIPLE
 // MULTIPLE: warning: result of call to 'abs' is unused
 
