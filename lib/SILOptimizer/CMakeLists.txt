@@ -1,5 +1,6 @@
 add_subdirectory(ARC)
 add_subdirectory(Analysis)
+add_subdirectory(FunctionSignatureTransforms)
 add_subdirectory(IPO)
 add_subdirectory(LoopTransforms)
 add_subdirectory(Mandatory)
@@ -19,4 +20,5 @@ add_swift_library(swiftSILOptimizer STATIC
   ${MANDATORY_SOURCES}
   ${TRANSFORMS_SOURCES}
   ${IPO_SOURCES}
+  ${FUNCTIONSIGNATURETRANSFORMS_SOURCES}
   LINK_LIBRARIES swiftSIL)
