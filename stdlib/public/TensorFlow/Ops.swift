@@ -97,41 +97,41 @@ extension Tensor : VectorNumeric where Scalar : Numeric {
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
   public static func + (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(handle: _TFMakeScalarTensor(lhs)) + rhs
+    return Tensor(lhs) + rhs
   }
 
   /// Adds the scalar to every scalar of the tensor and produces the sum.
   @_inlineable @inline(__always)
   public static func + (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs + Tensor(handle: _TFMakeScalarTensor(rhs))
+    return lhs + Tensor(rhs)
   }
 
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @_inlineable @inline(__always)
   public static func - (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(handle: _TFMakeScalarTensor(lhs)) - rhs
+    return Tensor(lhs) - rhs
   }
 
   /// Subtracts the scalar from every scalar of the tensor and produces the
   /// difference.
   @_inlineable @inline(__always)
   public static func - (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs - Tensor(handle: _TFMakeScalarTensor(rhs))
+    return lhs - Tensor(rhs)
   }
 
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @_inlineable @inline(__always)
   public static func * (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(handle: _TFMakeScalarTensor(lhs)) * rhs
+    return Tensor(lhs) * rhs
   }
 
   /// Multiplies the scalar with every scalar of the tensor and produces the
   /// product.
   @_inlineable @inline(__always)
   public static func * (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs * Tensor(handle: _TFMakeScalarTensor(rhs))
+    return lhs * Tensor(rhs)
   }
 }
 
@@ -192,14 +192,14 @@ public extension Tensor where Scalar : Numeric {
   /// the scalar.
   @_inlineable @inline(__always)
   static func / (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return Tensor(handle: _TFMakeScalarTensor(lhs)) / rhs
+    return Tensor(lhs) / rhs
   }
 
   /// Returns the quotient of dividing the tensor by the scalar, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
   static func / (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return lhs / Tensor(handle: _TFMakeScalarTensor(rhs))
+    return lhs / Tensor(rhs)
   }
 
   /// Divides the first tensor by the second and stores the quotient in the
@@ -227,14 +227,14 @@ public extension Tensor where Scalar : Numeric {
   /// the scalar.
   @_inlineable @inline(__always)
   static func % (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return #tfop("Mod", lhs, _TFMakeScalarTensor(rhs))
+    return lhs % Tensor(rhs)
   }
 
   /// Returns the remainder of dividing the scalar by the tensor, broadcasting
   /// the scalar.
   @_inlineable @inline(__always)
   static func % (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return #tfop("Mod", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) % rhs
   }
 
   /// Divides the first tensor by the second and stores the remainder in the
@@ -299,13 +299,13 @@ public extension Tensor where Scalar : Numeric {
   /// Computes `lhs < rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func < (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return #tfop("Less", lhs, _TFMakeScalarTensor(rhs))
+    return lhs < Tensor(rhs)
   }
 
   /// Computes `lhs < rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func < (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return #tfop("Less", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) < rhs
   }
 
   /// Computes `lhs <= rhs` element-wise.
@@ -318,13 +318,13 @@ public extension Tensor where Scalar : Numeric {
   /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func <= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return #tfop("LessEqual", lhs, _TFMakeScalarTensor(rhs))
+    return lhs <= Tensor(rhs)
   }
 
   /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func <= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return #tfop("LessEqual", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) <= rhs
   }
 
   /// Computes `lhs > rhs` element-wise.
@@ -337,13 +337,13 @@ public extension Tensor where Scalar : Numeric {
   /// Computes `lhs <= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func > (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return #tfop("Greater", lhs, _TFMakeScalarTensor(rhs))
+    return lhs > Tensor(rhs)
   }
 
   /// Computes `lhs <= rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func > (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return #tfop("Greater", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) > rhs
   }
 
   /// Computes `lhs >= rhs` element-wise.
@@ -356,13 +356,13 @@ public extension Tensor where Scalar : Numeric {
   /// Computes `lhs >= rhs`, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func >= (lhs: Tensor, rhs: Scalar) -> Tensor<Bool> {
-    return #tfop("GreaterEqual", lhs, _TFMakeScalarTensor(rhs))
+    return lhs >= Tensor(rhs)
   }
 
   /// Computes `lhs >= rhs`, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func >= (lhs: Scalar, rhs: Tensor) -> Tensor<Bool> {
-    return #tfop("GreaterEqual", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) >= rhs
   }
 }
 
@@ -377,7 +377,7 @@ public extension Tensor where Scalar : Equatable {
   /// Computes `self == other` element-wise, broadcasting `other`.
   @_inlineable @inline(__always)
   func elementsEqual(_ other: Scalar) -> Tensor<Bool> {
-    return #tfop("Equal", self, _TFMakeScalarTensor(other))
+    return elementsEqual(Tensor(other))
   }
 
   /// Computes `self != other` element-wise.
@@ -390,7 +390,7 @@ public extension Tensor where Scalar : Equatable {
   /// Computes `self != other` element-wise, broadcasting `other`.
   @_inlineable @inline(__always)
   func elementsNotEqual(_ other: Scalar) -> Tensor<Bool> {
-    return #tfop("NotEqual", self, _TFMakeScalarTensor(other))
+    return elementsNotEqual(Tensor(other))
   }
 }
 
@@ -411,13 +411,13 @@ public extension Tensor where Scalar == Bool {
   /// Performs a logical AND operation element-wise, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func && (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return #tfop("LogicalAnd", lhs, _TFMakeScalarTensor(rhs))
+    return lhs && Tensor(rhs)
   }
 
   /// Performs a logical AND operation element-wise, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func && (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return #tfop("LogicalAnd", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) && rhs
   }
 
   /// Performs a logical OR operation element-wise.
@@ -430,13 +430,13 @@ public extension Tensor where Scalar == Bool {
   /// Performs a logical OR operation element-wise, broadcasting `rhs`.
   @_inlineable @inline(__always)
   static func || (lhs: Tensor, rhs: Scalar) -> Tensor {
-    return #tfop("LogicalOr", lhs, _TFMakeScalarTensor(rhs))
+    return lhs || Tensor(rhs)
   }
 
   /// Performs a logical OR operation element-wise, broadcasting `lhs`.
   @_inlineable @inline(__always)
   static func || (lhs: Scalar, rhs: Tensor) -> Tensor {
-    return #tfop("LogicalOr", _TFMakeScalarTensor(lhs), rhs)
+    return Tensor(lhs) || rhs
   }
 }
 
@@ -647,14 +647,14 @@ public func pow<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 @_inlineable @inline(__always)
 public func pow<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : BinaryFloatingPoint {
-  return pow(Tensor(handle: _TFMakeScalarTensor(lhs)), rhs)
+  return pow(Tensor(lhs), rhs)
 }
 
 /// Computes the power of the tensor to the scalar, broadcasting the scalar.
 @_inlineable @inline(__always)
 public func pow<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : BinaryFloatingPoint {
-  return pow(lhs, Tensor(handle: _TFMakeScalarTensor(rhs)))
+  return pow(lhs, Tensor(rhs))
 }
 
 /// Computes the element-wise maximum of two tensors.
@@ -671,7 +671,7 @@ public func max<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 @_inlineable @inline(__always)
 public func max<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
-  return max(Tensor(handle: _TFMakeScalarTensor(lhs)), rhs)
+  return max(Tensor(lhs), rhs)
 }
 
 /// Computes the element-wise maximum of the scalar and the tensor, broadcasting
@@ -679,7 +679,7 @@ public func max<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
 @_inlineable @inline(__always)
 public func max<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : Numeric & Comparable {
-  return max(lhs, Tensor(handle: _TFMakeScalarTensor(rhs)))
+  return max(lhs, Tensor(rhs))
 }
 
 /// Computes the element-wise minimum of two tensors.
@@ -696,7 +696,7 @@ public func min<T>(_ lhs: Tensor<T>, _ rhs: Tensor<T>) -> Tensor<T>
 @_inlineable @inline(__always)
 public func min<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
   where T : Numeric & Comparable {
-  return min(Tensor(handle: _TFMakeScalarTensor(lhs)), rhs)
+  return min(Tensor(lhs), rhs)
 }
 
 /// Computes the element-wise minimum of the scalar and the tensor, broadcasting
@@ -704,7 +704,7 @@ public func min<T>(_ lhs: T, _ rhs: Tensor<T>) -> Tensor<T>
 @_inlineable @inline(__always)
 public func min<T>(_ lhs: Tensor<T>, _ rhs: T) -> Tensor<T>
   where T : Numeric & Comparable {
-  return min(lhs, Tensor(handle: _TFMakeScalarTensor(rhs)))
+  return min(lhs, Tensor(rhs))
 }
 
 /// Computes the square of the tensor.
@@ -751,14 +751,21 @@ public extension Tensor where Scalar == Bool {
   // have the same shapes. An explicit broadcast must be added.
   @_inlineable @inline(__always)
   public func selecting<T>(_ left: T, _ right: Tensor<T>) -> Tensor<T> {
-    return #tfop("Select", handle, _TFMakeScalarTensor(left), right)
+    return selecting(Tensor<T>(left), right)
   }
 
   // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
   // have the same shapes. An explicit broadcast must be added.
   @_inlineable @inline(__always)
   public func selecting<T>(_ left: Tensor<T>, _ right: T) -> Tensor<T> {
-    return #tfop("Select", handle, left, _TFMakeScalarTensor(right))
+    return selecting(left, Tensor<T>(right))
+  }
+
+  // FIXME: "Select" is non-broadcasting: `left` and `right` are required to
+  // have the same shapes. An explicit broadcast must be added.
+  @_inlineable @inline(__always)
+  public func selecting<T>(_ left: T, _ right: T) -> Tensor<T> {
+    return selecting(Tensor<T>(left), Tensor<T>(right))
   }
 }
 
