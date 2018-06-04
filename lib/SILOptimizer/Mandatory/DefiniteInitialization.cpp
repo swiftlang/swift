@@ -2176,9 +2176,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       continue;
     }
 
-    assert(!TheMemory.isDelegatingInit() &&
-           "re-assignment of self in delegating init?");
-
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the
     // element precise.
