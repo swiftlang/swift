@@ -50,22 +50,9 @@ extension TestSuite {
     testTPU(name, body)
 #endif // TPU && !CUDA
   }
-  // For now, each CPU test will run in both eager and non-eager modes.  We
-  // expect to remove eager mode support due to challenges in full XLA support
-  // there.
   public func testCPU(_ name: String, _ body: @escaping () -> Void) {
 #if CPU
-#if !CUDA
-    // Do not run eager tests under GPU, to save resource and run-time.
-    test(name + "_CPU_eager") {
-      _RuntimeConfig.usesTFEagerAPI = true
-      _RuntimeConfig.executionMode = .cpu
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-#endif // CUDA
     test(name + "_CPU") {
-      _RuntimeConfig.usesTFEagerAPI = false
       _RuntimeConfig.executionMode = .cpu
       _RuntimeConfig.printsDebugLog = false
       body()
@@ -75,8 +62,6 @@ extension TestSuite {
   public func testGPU(_ name: String, _ body: @escaping () -> Void) {
 #if CUDA && !TPU
     test(name + "_GPU") {
-      // To save resources and runtime, do not run GPU tests under eager.
-      _RuntimeConfig.usesTFEagerAPI = false
       _RuntimeConfig.executionMode = .gpu
       _RuntimeConfig.printsDebugLog = false
       body()
@@ -86,7 +71,6 @@ extension TestSuite {
   public func testTPU(_ name: String, _ body: @escaping () -> Void) {
 #if TPU && !CUDA
     test(name + "_TPU") {
-      _RuntimeConfig.usesTFEagerAPI = false
       _RuntimeConfig.executionMode = .tpu
       _RuntimeConfig.printsDebugLog = false
       body()

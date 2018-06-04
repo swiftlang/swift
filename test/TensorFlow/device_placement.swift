@@ -33,13 +33,13 @@ public func explicitDeviceConfig() {
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.
 //
-// CHECK:      op: "{{.*}}explicitDeviceConfig{{.*}}.tf_partition"
+// CHECK:      op: "{{.*}}explicitDeviceConfig{{.*}}.tf"
 // CHECK-NEXT: device: "/device:GPU:0"
 
 // CHECK:      library {
 // CHECK-NEXT:   function {
 // CHECK-NEXT:     signature {
-// CHECK-NEXT:       name: "{{.*}}explicitDeviceConfig{{.*}}.tf_partition"
+// CHECK-NEXT:       name: "{{.*}}explicitDeviceConfig{{.*}}.tf
 // CHECK:          node_def {
 // CHECK:            op: "Const"
 // CHECK-NEXT:       device: "/device:GPU:0"
