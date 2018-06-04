@@ -1,3 +1,6 @@
 set(FUNCTIONSIGNATURETRANSFORMS_SOURCES
   FunctionSignatureTransforms/FunctionSignatureOpts.cpp
+  FunctionSignatureTransforms/DeadArgumentTransform.cpp
+  FunctionSignatureTransforms/ArgumentExplosionTransform.cpp
+  FunctionSignatureTransforms/OwnedToGuaranteedTransform.cpp
   PARENT_SCOPE)
