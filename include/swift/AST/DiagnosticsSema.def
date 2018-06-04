@@ -3209,6 +3209,8 @@ ERROR(unsupported_recursive_struct,none,
       "contains it",
       (Type))
 
+WARNING(type_not_constructible,none,
+        "value type is inconstructible", ())
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
 ERROR(unsupported_infinitely_sized_type,none,

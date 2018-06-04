@@ -169,6 +169,8 @@ private:
   bool diagnoseInfiniteRecursion(CanType parentType, ValueDecl *member,
                                  CanType memberType);
 
+  void diagnoseInconstructible(EnumDecl *E);
+
   void addPathElementsTo(Path &path, CanType type);
   void addPathElement(Path &path, ValueDecl *member, CanType memberType);
 
@@ -272,7 +274,10 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
 bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
                                    unsigned depth) {
   // Indirect enums are representational leaves.
-  if (E->isIndirect()) return false;
+  if (E->isIndirect()) {
+    diagnoseInconstructible(E);
+    return false;
+  }
 
   startExpandingType(type);
 
@@ -298,6 +303,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (addMember(type, elt, eltType, depth))
       return true;
   }
+  diagnoseInconstructible(E);
 
   return false;
 }
@@ -600,4 +606,44 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
               pathString);
 
   return true;
+}
+
+// Show a warning if the enum is inconstructible. The outcome of this method
+// is irrelevant.
+void CircularityChecker::diagnoseInconstructible(EnumDecl *E) {
+
+  auto containsType = [](TupleType *tuple, Type E) -> bool {
+    for (auto type: tuple->getElementTypes()) {
+      if (type->isEqual(E))
+        return true;
+    }
+    return false;
+  };
+  auto isInconstructible = [containsType, E]() -> bool {
+    auto elts = E->getAllElements();
+    if (elts.empty())
+      return false;
+
+    for (auto elt: elts) {
+      if (!elt->hasInterfaceType() ||
+          !(elt->isIndirect() || E->isIndirect()))
+        return false;
+
+      auto argTy = elt->getArgumentInterfaceType();
+      if (!argTy)
+        return false;
+
+      if (auto tuple = argTy->getAs<TupleType>()) {
+        if (!containsType(tuple, E->getSelfInterfaceType()))
+          return false;
+      } else if (auto paren = dyn_cast<ParenType>(argTy.getPointer())) {
+        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+          return false;
+      }
+    }
+    return true;
+  };
+
+  if (isInconstructible())
+    TC.diagnose(E, diag::type_not_constructible);
 }
