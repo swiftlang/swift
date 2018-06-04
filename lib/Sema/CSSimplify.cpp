@@ -102,8 +102,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
   
   auto params = levelTy->getParams();
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, decl, parameterDepth, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, decl, parameterDepth);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
@@ -126,7 +126,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallVectorImpl<bool> &defaultMap,
+                   const llvm::SmallBitVector &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
@@ -441,7 +441,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (defaultMap[paramIdx])
+      if (defaultMap.test(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -701,8 +701,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   SmallVector<AnyFunctionType::Param, 4> params;
   AnyFunctionType::decomposeInput(paramType, params);
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, callee, calleeLevel);
   
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
@@ -1032,8 +1032,8 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
     return matchTypes(argType, paramType, kind, flags, locator);
   }
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(type1, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(type1, callee, calleeLevel);
   
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
