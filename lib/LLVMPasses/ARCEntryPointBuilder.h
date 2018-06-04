@@ -200,6 +200,15 @@ public:
   bool isAtomic(CallInst *I) {
     return !isNonAtomic(I);
   }
+
+  /// Perform a pointer cast of pointer value \p V to \p Ty if \p V has a
+  /// different type than \p Ty. If \p V equals \p Ty, just return V.
+  llvm::Value *maybeCast(llvm::Value *V, llvm::Type *Ty) {
+    if (V->getType() == Ty)
+      return V;
+    return B.CreatePointerCast(V, Ty);
+  }
+
 private:
   Module &getModule() {
     return *B.GetInsertBlock()->getModule();
