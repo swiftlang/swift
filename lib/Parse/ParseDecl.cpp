@@ -4808,7 +4808,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_var_not_in_class)
+        diagnose(Tok, diag::class_var_not_in_class, 
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
     }
   }
@@ -5194,7 +5195,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-        diagnose(Tok, diag::class_func_not_in_class)
+        diagnose(Tok, diag::class_func_not_in_class,
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
 
         StaticSpelling = StaticSpellingKind::KeywordStatic;
