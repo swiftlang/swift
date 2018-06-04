@@ -1454,7 +1454,7 @@ extension Dictionary: Hashable where Value: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
@@ -4349,7 +4349,7 @@ extension Dictionary.Index {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {

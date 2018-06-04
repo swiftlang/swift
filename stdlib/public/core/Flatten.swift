@@ -234,7 +234,7 @@ extension FlattenCollection.Index : Hashable
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_outer)
     hasher.combine(_inner)

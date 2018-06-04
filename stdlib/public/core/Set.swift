@@ -489,7 +489,7 @@ extension Set: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
@@ -3658,7 +3658,7 @@ extension Set.Index {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
