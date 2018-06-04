@@ -2942,40 +2942,6 @@ getArgumentLabels(ConstraintSystem &cs, ConstraintLocatorBuilder locator) {
   return known->second;
 }
 
-/// Returns the function declaration corresponding to a @dynamicCallable
-/// attribute required method (if it exists) implemented by a type. Otherwise,
-/// return nullptr.
-static FuncDecl *
-lookupDynamicCallableMethod(Type type, ConstraintSystem &CS,
-                            const ConstraintLocatorBuilder &locator,
-                            StringRef methodName, StringRef argumentName,
-                            bool hasKeywordArgs, bool &error) {
-  auto &ctx = CS.getASTContext();
-  auto decl = type->getAnyNominal();
-  auto option = DeclName(ctx, DeclBaseName(ctx.getIdentifier(methodName)),
-                         { ctx.getIdentifier(argumentName) });
-  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
-                                        option, type,
-                                        FunctionRefKind::SingleApply,
-                                        CS.getConstraintLocator(locator),
-                                        /*includeInaccessibleMembers*/ false);
-  // Filter valid candidates.
-  auto candidates = matches.ViableCandidates;
-  auto filter = [&](OverloadChoice choice) {
-    auto cand = cast<FuncDecl>(choice.getDecl());
-    return !isValidDynamicCallableMethod(cand, decl, CS.TC, hasKeywordArgs);
-  };
-  candidates.erase(std::remove_if(candidates.begin(), candidates.end(), filter),
-                   candidates.end());
-
-  // If there is one candidate, return it. Otherwise, return nullptr.
-  auto size = candidates.size();
-  if (size == 1) return cast<FuncDecl>(candidates.front().getDecl());
-  // If there are >1 candidates, it is an overload error.
-  else if (size > 1) error = true;
-  return nullptr;
-}
-
 /// Return true if the specified type or a super-class/super-protocol has the
 /// @dynamicMemberLookup attribute on it.  This implementation is not
 /// particularly fast in the face of deep class hierarchies or lots of protocol
@@ -4287,6 +4253,39 @@ ConstraintSystem::simplifyKeyPathApplicationConstraint(
   return unsolved();
 }
 
+/// Returns the function declaration corresponding to a @dynamicCallable
+/// attribute required method (if it exists) implemented by a type. Otherwise,
+/// return nullptr.
+static FuncDecl *
+lookupDynamicCallableMethod(Type type, ConstraintSystem &CS,
+                            const ConstraintLocatorBuilder &locator,
+                            Identifier argumentName, bool hasKeywordArgs,
+                            bool &error) {
+  auto &ctx = CS.getASTContext();
+  auto decl = type->getAnyNominal();
+  auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
+  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
+                                        methodName, type,
+                                        FunctionRefKind::SingleApply,
+                                        CS.getConstraintLocator(locator),
+                                        /*includeInaccessibleMembers*/ false);
+  // Filter valid candidates.
+  auto candidates = matches.ViableCandidates;
+  auto filter = [&](OverloadChoice choice) {
+    auto cand = cast<FuncDecl>(choice.getDecl());
+    return !isValidDynamicCallableMethod(cand, decl, CS.TC, hasKeywordArgs);
+  };
+  candidates.erase(std::remove_if(candidates.begin(), candidates.end(), filter),
+                   candidates.end());
+
+  // If there is one candidate, return it. Otherwise, return nullptr.
+  auto size = candidates.size();
+  if (size == 1) return cast<FuncDecl>(candidates.front().getDecl());
+  // If there are >1 candidates, it is an overload error.
+  else if (size > 1) error = true;
+  return nullptr;
+}
+
 /// Looks up and returns the @dynamicCallable required methods (if they exist)
 /// implemented by a type. This function should not be called directly: instead,
 /// call `getDynamicCallableMethods` which performs caching.
@@ -4294,15 +4293,14 @@ static DynamicCallableMethods
 lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              const ConstraintLocatorBuilder &locator,
                              bool &error) {
+  auto &ctx = CS.getASTContext();
   DynamicCallableMethods methods;
   methods.argumentsMethod =
-    lookupDynamicCallableMethod(type, CS, locator, "dynamicallyCall",
-                                "withArguments", /*hasKeywordArgs*/ false,
-                                error);
+    lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withArguments,
+                                /*hasKeywordArgs*/ false, error);
   methods.keywordArgumentsMethod =
-    lookupDynamicCallableMethod(type, CS, locator, "dynamicallyCall",
-                                "withKeywordArguments", /*hasKeywordArgs*/ true,
-                                error);
+    lookupDynamicCallableMethod(type, CS, locator, ctx.Id_withKeywordArguments,
+                                /*hasKeywordArgs*/ true, error);
   return methods;
 }
 
