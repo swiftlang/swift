@@ -767,7 +767,7 @@ public:
     /// tensor function is lowered to a TF graph.
     StringLiteralInst *programPlaceholder;
     IntegerLiteralInst *programLengthPlaceholder;
-    StringLiteralInst *entryFunctionNamePlaceholder;
+    StringLiteralInst *entryFunctionBaseNamePlaceholder;
 
     /// This is the "TensorFlow.TensorComputation" object returned by the
     /// '_swift_tfc_StartTensorComputation' runtime API entrypoint.  This is
@@ -3186,9 +3186,10 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // public func _TFCStartTensorComputation(
   //   _ programByteAddress: UnsafeRawPointer,
   //   _ programByteCount: Int,
-  //   _ entryFunctionName: UnsafePointer<Int8>,
+  //   _ entryFunctionBaseName: UnsafePointer<Int8>,
   //   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   //   _ tensorArgumentCount: Int,
+  //   _ helperFunctionCount: Int,
   //   _ resultCount: Int
   // ) -> TensorComputation {
   auto startComputationFn =
@@ -3270,14 +3271,19 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::Bytes);
   auto program = wrapInStruct(programPlaceholder, ctx.getUnsafeRawPointerDecl(),
                               B, loc);
-  auto entryFunctionNamePlaceholder =
+  auto entryFunctionBaseNamePlaceholder =
     B.createStringLiteral(loc, StringRef(), StringLiteralInst::Encoding::UTF8);
-  auto entryFunctionName = B.createStruct(loc, int8PointerSILType,
-                                          { entryFunctionNamePlaceholder });
+  auto entryFunctionBaseName = B.createStruct(loc, int8PointerSILType,
+                                          { entryFunctionBaseNamePlaceholder });
 
   // Pass a length of zero for now, it will be filled in later.
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
+
+  // See the number of helper functions here based on the # devices involved in
+  // this TF program.
+  auto helperFunctionCount =
+    createIntValue(configuration.usedDeviceTypes.size() - 1, B, loc);
 
   // We pass the list of N tensor arguments as a pointer + length of
   // CTensorHandle values, i.e.:
@@ -3347,9 +3353,10 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   SILValue startArgs[] = {
     program,            // programByteAddress: UnsafeRawPointer
     programLength,      // programByteCount: Int
-    entryFunctionName,  // entryFunctionName: UnsafePointer<Int8>
+    entryFunctionBaseName,  // entryFunctionBaseName: UnsafePointer<Int8>
     firstPtr,           // tensorArgumentAddress: UnsafePointer<CTensorHandle>
     numTensorArguments, // tensorArgumentCount: Int
+    helperFunctionCount,// helperFunctionCount,: Int
     numTensorResults    // resultCount: Int
   };
 
@@ -3497,7 +3504,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     nullptr,  // New function hasn't been created yet.
     programPlaceholder,
     programLengthPlaceholder,
-    entryFunctionNamePlaceholder,
+    entryFunctionBaseNamePlaceholder,
     tensorComputation
   };
 }
@@ -3634,8 +3641,8 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
                          results, /*interfaceErrorResult*/None,
                          fn.getModule().getASTContext());
   auto resultFn = fn.getModule().getOrCreateFunction(
-      fn.getLocation(), fn.getName().str() + ".tf_partition",
-      SILLinkage::Private, newFnType,
+      fn.getLocation(), fn.getName().str() + ".tf", SILLinkage::Private,
+      newFnType,
       /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 
   PartitionCloner PC(*this, *resultFn, result.theTensorComputation,
@@ -3801,10 +3808,10 @@ public:
     }
 
     // Next translate it to a graph and emit it as a global symbol.
-    std::string entryFnName;
+    std::string entryFnBaseName;
     auto bytes = lowerTFGraph(tensorProgram.fn, partitioner.configuration,
-                              entryFnName);
-    assert(!StringRef(entryFnName).startswith("$"));
+                              entryFnBaseName);
+    assert(!StringRef(entryFnBaseName).startswith("$"));
 
     // Now that we know what the tensor program actually is, we can replace the
     // placeholder instructions for the data + length with the actual bits we
@@ -3819,14 +3826,14 @@ public:
                                         bytes.size());
 
       auto name =
-          B.createStringLiteral(fn->getLocation(), StringRef(entryFnName),
+          B.createStringLiteral(fn->getLocation(), StringRef(entryFnBaseName),
                                 StringLiteralInst::Encoding::UTF8);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();
       tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
       tensorProgram.programLengthPlaceholder->eraseFromParent();
-      tensorProgram.entryFunctionNamePlaceholder->replaceAllUsesWith(name);
-      tensorProgram.entryFunctionNamePlaceholder->eraseFromParent();
+      tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
+      tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
     }
 
     if (auto outs = getTFDumpIntermediateStream()) {

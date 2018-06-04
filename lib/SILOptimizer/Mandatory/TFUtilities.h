@@ -280,7 +280,7 @@ struct GraphGlobalConfiguration {
 
     /// Return the device string associated with `inst`, which is required to
     /// exist.
-    StringRef getDeviceString() const;
+    std::string getDeviceString() const;
 
    private:
     SILTensorOpInfo(BuiltinInst *inst) : inst(inst) {}
@@ -354,12 +354,19 @@ struct GraphGlobalConfiguration {
 
   /// Lower the specified SIL function (which was formed by the partitioner)
   /// into a TensorFlow graph, encode into a vector of bytes, and sets
-  /// `entryFnName` accordingly for the runtime to call as a TF graph
+  /// `entryFnBaseName` accordingly for the runtime to call as a TF graph
   /// function.
   ///
+  /// When configuration.usedDeviceTypes has N>1 devices, in addition to
+  /// `entryFnBaseName`, also generate another N-1 nodes named
+  /// `entryFnBaseName_helper_<i>`, with i ranging from 0 to N-2. These N nodes
+  /// correspond to the N per-device graph functions, and must be called by the
+  /// runtime in a single SessionRun() call. Those N-1 helper functions take no
+  /// input or output tensors, and are executed for their side-effects of
+  /// sending/receiving tensors with the function of `entryFnBaseName`.
   std::vector<char> lowerTFGraph(SILFunction *fn,
                                  const GraphGlobalConfiguration &configuration,
-                                 std::string &entryFnName);
+                                 std::string &entryFnBaseName);
 } // end namespace tf
 } // end namespace swift
 #endif

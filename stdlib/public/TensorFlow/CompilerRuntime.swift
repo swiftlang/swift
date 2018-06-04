@@ -87,12 +87,6 @@ public enum _RuntimeConfig {
   /// - Note: Set to true only for debugging purposes.
   static public var usesSynchronousExecution = false
 
-  /// When true, uses the TF eager C API, and TF interpreter backend.
-  /// Otherwise uses the TF C API, with execution mode set below.
-  static public var usesTFEagerAPI = false
-
-  /// Only defined when usesTFEagerAPI == false.
-  ///
   /// Setting the value to gpu requires that the Swift compiler and model code
   /// be built with `--config=cuda`. If there are multiple GPUs, an arbitrary
   /// one is chosen.
@@ -112,7 +106,6 @@ public enum _RuntimeConfig {
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
   /// session, or a remote session with the specified server address (must start
   /// with "grpc://" in that case).
-  /// Only defined when usesTFEagerAPI == false.
   @_fixed_layout
   public enum RuntimeSession {
     case local
@@ -220,11 +213,6 @@ public final class _ExecutionContext {
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
-  /// The set of all loaded programs indexed by their unique address.
-  /// Used when _RuntimeConfig.usesTFEagerAPI is true.
-  private var loadedTFEPrograms: Set<UnsafeRawPointer> = []
-
-  /// Used when _RuntimeConfig.usesTFEagerAPI is false.
   internal typealias ProgramInstance = (graph: CTFGraph, session: CTFSession)
   private var loadedTFPrograms: [UnsafeRawPointer : ProgramInstance] = [:]
 
@@ -247,12 +235,6 @@ public final class _ExecutionContext {
                           _RuntimeConfig.tensorflowVerboseLogLevel)
 
     let opts = TFE_NewContextOptions()
-    if _RuntimeConfig.usesTFEagerAPI {
-      // This only affects GPU based tensor computation, where any input tensors
-      // living in CPU will be transparently copied onto GPU.
-      TFE_ContextOptionsSetDevicePlacementPolicy(opts,
-                                                 TFE_DEVICE_PLACEMENT_SILENT)
-    }
     cContext = TFE_NewContext(opts, status)
     TFE_DeleteContextOptions(opts)
     checkOk(status)
@@ -336,59 +318,6 @@ internal extension _ExecutionContext {
 }
 
 fileprivate extension _ExecutionContext {
-  /// Load a serialized TensorFlow program in binary proto format to the
-  /// context. If the program has already been loaded, this function does
-  /// nothing.
-  /// - Parameters:
-  ///   - address: The address of the serialized program in memory.
-  ///   - count: The size of the program in bytes.
-  func loadProgramInBytes(_ address: UnsafeRawPointer, count: Int) {
-    sync { [unowned self] in
-      debugLog("Loading a program.")
-
-      // If the program is already loaded, do nothing.
-      if loadedTFEPrograms.contains(address) {
-        return
-      }
-
-      // Here we have to do a fairly awkward dance to load the graph functions
-      // and populate them into the TFE_Context.  We load the program as a
-      // TF_Graph, then copy the functions out of it, then copy them into the
-      // TFE_Context.
-      debugLog("Loading graph functions.")
-      let graph = TF_NewGraph()
-      // TensorFlow loads things through TF_Buffer.  Create one that avoids
-      // redundantly copying the program bytes.
-      var programBuf = TF_Buffer(data: address, length: count,
-                                 data_deallocator: nil)
-      let graphDefOptions = TF_NewImportGraphDefOptions()
-      TF_GraphImportGraphDef(graph, &programBuf, graphDefOptions, self.status)
-      TF_DeleteImportGraphDefOptions(graphDefOptions)
-      checkOk(self.status)
-      // Now that we have all of the TF_Function objects in the graph, copy them
-      // to standalone TF_Function's.
-      let funcCount = TF_GraphNumFunctions(graph)
-      // Allocate an array to accept functions.
-      var funcs: [CTFFunction?] = Array(repeating: nil, count: Int(funcCount))
-      TF_GraphGetFunctions(graph, &funcs, funcCount, self.status)
-      checkOk(self.status)
-      // Delete the graph as it's no longer needed.
-      TF_DeleteGraph(graph)
-
-      // Add functions to the context.
-      debugLog("Adding functions to context.")
-      for function in UnsafeBufferPointer(start: funcs, count: Int(funcCount)) {
-        TFE_ContextAddFunction(self.cContext, function, self.status)
-        checkOk(self.status)
-        TF_DeleteFunction(function)
-      }
-
-      // Memorize the loaded program by address.
-      loadedTFEPrograms.insert(address)
-      debugLog("Done loading a new program.")
-    }
-  }
-
   /// Returns a cached session along with its graph if it exists, or creates a
   /// new one and caches it.
   func session(
@@ -481,40 +410,6 @@ internal func dumpCTensorHandleContent(
   }
 }
 
-
-/// Used when _RuntimeConfig.usesTFEagerAPI is true.
-private class TFEState {
-  let status: CTFStatus = TF_NewStatus()
-
-  /// The TFE_Op that the program executes.
-  let op: CTFEOp
-
-  init(_ programByteAddress: UnsafeRawPointer,
-       programByteCount: Int,
-       entryFunctionNameAddress: UnsafePointer<Int8>) {
-    let context = _ExecutionContext.global
-    // Make sure the program is loaded into the context.
-    context.loadProgramInBytes(programByteAddress, count: programByteCount)
-
-    op = context.withMutableCContext { [status] ctx in
-      defer { checkOk(status) }
-      return TFE_NewOp(ctx, entryFunctionNameAddress, status)
-    }
-  }
-
-  deinit {
-    TFE_DeleteOp(op)
-    TF_DeleteStatus(status)
-  }
-}
-
-extension TFEState {
-  func addInput(_ inputTensorHandle: CTensorHandle) {
-    TFE_OpAddInput(op, inputTensorHandle, status)
-  }
-}
-
-/// Used when _RuntimeConfig.usesTFEagerAPI is false.
 private class TFState {
   let status: CTFStatus = TF_NewStatus()
 
@@ -544,12 +439,16 @@ extension TFState {
     inputTensors.append(cTensor!)
   }
 
-  func execute(_ entryFuncName: String,
-               _ returnValues: inout [CTensorHandle?]) {
-    let funcNode = TF_GraphOperationByName(graph, "tfc_func_" + entryFuncName)
+  /// See the comment on _TensorComputation.helperFunctionCount on the concept
+  /// of a "helper function".
+  func execute(_ entryFunctionBaseName: String,
+               helperFunctionCount: Int,
+               returnValues: inout [CTensorHandle?]) {
+    let funcNodeName = "tfc_func_" + entryFunctionBaseName
+    let funcNode = TF_GraphOperationByName(graph, funcNodeName)
     internalConsistencyCheck(
       funcNode != nil,
-      "Cannot find func node name \(entryFuncName)"
+      "Cannot find func node name \(funcNodeName)"
     )
     internalConsistencyCheck(
       TF_OperationNumOutputs(funcNode) == returnValues.count
@@ -558,7 +457,7 @@ extension TFState {
     // Prepare input related parameters for TF_SessionRun().
     var inputNodeSpecs: [TF_Output] = []
     for i in 0..<inputTensors.count {
-      let inputNodeName = "tfc_input_\(i)_\(entryFuncName)"
+      let inputNodeName = "tfc_input_\(i)_\(entryFunctionBaseName)"
       let inputNode = TF_GraphOperationByName(graph, inputNodeName)
       internalConsistencyCheck(inputNode != nil,
         "Cannot find input node name \(inputNodeName)")
@@ -568,50 +467,54 @@ extension TFState {
     // Prepare output related parameters for TF_SessionRun().
     var outputNodeSpecs: [TF_Output] = []
     for i in 0..<returnValues.count {
-      let outputNodeName = "tfc_output_\(i)_\(entryFuncName)"
+      let outputNodeName = "tfc_output_\(i)_\(entryFunctionBaseName)"
       let outputNode = TF_GraphOperationByName(graph, outputNodeName)
       internalConsistencyCheck(outputNode != nil,
                                "Cannot find output node name \(outputNodeName)")
       outputNodeSpecs.append(TF_Output(oper: outputNode, index: 0))
     }
-
     var outputTensors: [CTensor?] = Array(repeating: nil,
                                           count: returnValues.count)
+
+    // Prepare target related parameters for TF_SessionRun().
+    // A vector of TF_Operation* objects.
+    var targetNodeSpecs: [OpaquePointer?] = []
+    for i in 0..<helperFunctionCount {
+      let helperFuncNodeName = "tfc_func_\(entryFunctionBaseName)_helper_\(i)"
+      let helperFuncNode = TF_GraphOperationByName(graph, helperFuncNodeName)
+      guard helperFuncNode != nil else {
+        fatalError("Cannot find helper func node name \(helperFuncNodeName)")
+      }
+      targetNodeSpecs.append(helperFuncNode)
+    }
+
     if returnValues.count > 0 {
-      debugLog("Calling TF_SessionRun on function \(entryFuncName).")
       if _RuntimeConfig.executionMode.isTPU {
         debugLog("Enable TPU execution.")
         // When infeed is enabled, run it along with the output tensor nodes
         // below.
-        var infeedEnqueueNode = TF_GraphOperationByName(graph,
+        let infeedEnqueueNode = TF_GraphOperationByName(graph,
                                                         "InfeedEnqueueTuple")
-        let numTargets: Int32 = infeedEnqueueNode == nil ? 0 : 1
-        if numTargets > 0 {
+        if let infeedEnqueueNode = infeedEnqueueNode {
+          targetNodeSpecs.append(infeedEnqueueNode)
           debugLog("Running enqueue with \(inputTensors.count) input tensors.")
         }
-        debugLog("Running the main TF computation.")
-        TF_SessionRun(
-          cSession, nil,
-          // input related parameters
-          inputNodeSpecs, inputTensors, Int32(inputTensors.count),
-          // output related parameters
-          outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-          /*targets*/&infeedEnqueueNode, numTargets,
-          /*run_metadata*/nil, status
-        )
-        checkOk(status)
-      } else {
-        TF_SessionRun(
-          cSession, nil,
-          // input related parameters
-          inputNodeSpecs, inputTensors, Int32(inputTensors.count),
-          // output related parameters
-          outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-          /*targets*/nil, 0,
-          /*run_metadata*/nil, status
-        )
-        checkOk(status)
       }
+      debugLog("""
+        Calling TF_SessionRun on function \(entryFunctionBaseName), With \
+        \(targetNodeSpecs.count) target nodes.
+        """)
+      TF_SessionRun(
+        cSession, nil,
+        // input related parameters
+        inputNodeSpecs, inputTensors, Int32(inputTensors.count),
+        // output related parameters
+        outputNodeSpecs, &outputTensors, Int32(returnValues.count),
+        // target related parameters
+        targetNodeSpecs, Int32(targetNodeSpecs.count),
+        /*run_metadata*/nil, status
+      )
+      checkOk(status)
       debugLog("Done running TF computation.")
     } else {
       // TF_SessionRun() does not support execution that involves no
@@ -657,8 +560,18 @@ public final class _TensorComputation {
   /// The status for checking TensorFlow errors.
   let status: CTFStatus = TF_NewStatus()
 
-  /// The function to execute in this instance.
-  let entryFuncName: String
+  /// The base name for the set of graph functions to execute in this instance.
+  let entryFunctionBaseName: String
+
+  /// The number of helper functions associated with this TF graph
+  /// execution. For a graph execution over N TF devices, there is a single
+  /// *primary* graph function, responsible for taking input and producing
+  /// output tensors as part of the SessionRun() spec. The other N-1 graph
+  /// functions are *helper* functions, executed together with the primary one
+  /// for their side-effects, such as sending/receiving tensors, "helping" the
+  /// primary function produce the desired output tensors and side effects as
+  /// needed by the SessionRun() call.
+  let helperFunctionCount: Int
 
   /// The tensor handles returned by the tensor program.
   // TODO(hongm): Retire returnValues when eager based runtime is removed.
@@ -666,7 +579,6 @@ public final class _TensorComputation {
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
-  private var stateTFE: TFEState?
   private var stateTF: TFState?
 
   /// The thread to run tensor computation in. The global config flag
@@ -681,18 +593,22 @@ public final class _TensorComputation {
   /// - Parameters:
   ///   - programByteAddress: The address of the raw program.
   ///   - programByteCount: The number of bytes in the program.
+  ///   - entryFunctionBaseNameAddress: The base name of the functions to run.
   ///   - tensorArgumentAddress: The address to the buffer containing tensor
   ///     arguments as CTensorHandle.
   ///   - tensorArgumentCount: The number of tensor arguments to pass in.
+  ///   - helperFunctionCount: The number of helper functions to run.
+  ///   - resultCount: The number of output tensors.
   ///
   /// - TODO(clattner): `resultCount` should go away when the runtime is
   ///   implemented with an async design.
   @_versioned
   init(programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
-       entryFunctionNameAddress: UnsafePointer<Int8>,
+       entryFunctionBaseNameAddress: UnsafePointer<Int8>,
        tensorArgumentAddress: UnsafePointer<CTensorHandle>,
        tensorArgumentCount: Int,
+       helperFunctionCount: Int,
        resultCount: Int) {
     configureRuntimeFromEnvironment()
 
@@ -711,36 +627,23 @@ public final class _TensorComputation {
 
     // Now that we have them in our context, we can get ready to get the top
     // level function and create an op.
-    entryFuncName = String(cString: entryFunctionNameAddress)
+    self.entryFunctionBaseName = String(cString: entryFunctionBaseNameAddress)
     debugLog("""
-      Creating a new op with func name \
-      \(String(cString: entryFunctionNameAddress)).
+      Creating a new op with func base name \
+      \(String(cString: entryFunctionBaseNameAddress)).
       """)
-    if _RuntimeConfig.usesTFEagerAPI {
-      self.stateTFE = TFEState(programByteAddress,
-        programByteCount: programByteCount,
-        entryFunctionNameAddress: entryFunctionNameAddress)
-      debugLog("Done initializing TFE-specific state.")
-    } else {
-      self.stateTF = TFState(programByteAddress,
-        programByteCount: programByteCount)
-      debugLog("Done initializing TF-specific state.")
-    }
+    self.helperFunctionCount = helperFunctionCount
+    self.stateTF = TFState(programByteAddress,
+                           programByteCount: programByteCount)
+    debugLog("Done initializing TF-specific state.")
 
     if _RuntimeConfig.executionMode == .gpu {
-      guard let gpuDeviceName = context.gpuDeviceName else {
+      guard context.gpuDeviceName != nil else {
         fatalError("""
           The availability of a GPU device should have been confirmed \
           at this point.
           """)
       }
-      if let stateTFE = stateTFE {
-        internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
-        debugLog("Setting op device to \(gpuDeviceName).")
-        TFE_OpSetDevice(stateTFE.op, gpuDeviceName, status)
-        checkOk(status)
-      }
-      // For C API no explicit placement is needed.
     }
 
     debugLog("Populating the op's input list.")
@@ -749,18 +652,10 @@ public final class _TensorComputation {
         dumpCTensorHandleContent(i, inputTensorHandle)
       }
 
-      if let stateTFE = stateTFE {
-        internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
-        stateTFE.addInput(inputTensorHandle)
-      } else {
-        internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
-        guard let stateTF = stateTF else {
-          fatalError("""
-            stateTF must be defined when _RuntimeConfig.usesTFEagerAPI == false.
-            """)
-        }
-        stateTF.addInput(inputTensorHandle)
+      guard let stateTF = stateTF else {
+        fatalError("stateTF must be defined.")
       }
+      stateTF.addInput(inputTensorHandle)
     }
 
     debugLog("Created returning info.")
@@ -820,32 +715,17 @@ public final class _TensorComputation {
 }
 
 private extension _TensorComputation {
-  /// Executes the computation using TensorFlow Eager.
   // NOTE: This is to be called by the initializer. The computation gets
   // executed on initialization, thus this method will not be exposed to users.
   private func execute() {
-    debugLog("Executing TF function \(entryFuncName).")
-    if let stateTFE = stateTFE {
-      internalConsistencyCheck(_RuntimeConfig.usesTFEagerAPI)
-      var returnValueCount = Int32(returnValues.count)
-      TFE_Execute(stateTFE.op, &returnValues, &returnValueCount, status)
-      debugLog("""
-        returnValues.count=\(returnValues.count), \
-        returnValueCount=\(returnValueCount).
-        """)
-      assert(returnValueCount == returnValues.count)
-      debugLog("Done execution with eager.")
-      return
-    }
-    // Non-eager based execution.
-    internalConsistencyCheck(!_RuntimeConfig.usesTFEagerAPI)
+    debugLog("Executing TF function \(entryFunctionBaseName).")
     guard let stateTF = stateTF else {
-      fatalError("""
-        stateTF must be defined when _RuntimeConfig.usesTFEagerAPI == false.
-        """)
+      fatalError("stateTF must be defined.")
     }
-    stateTF.execute(entryFuncName, &returnValues)
-    debugLog("Done execution with non-eager.")
+    stateTF.execute(entryFunctionBaseName,
+                    helperFunctionCount: helperFunctionCount,
+                    returnValues: &returnValues)
+    debugLog("Done execution.")
   }
 }
 
@@ -884,12 +764,7 @@ extension _TensorComputation {
     if let stateTF = stateTF {
       return stateTF.cSession
     }
-    // FIXME: Revisit how to enforce this. One option is to move
-    // `usesTFEagerAPI` to a compile-time option. Another option is to mark the
-    // generated graph/binary with a set of compatible devices / runtime
-    // configs, so that we can error out when user sets runtime options such as
-    // _RuntimeConfig.usesTFEagerAPI in an incompatible way.
-    fatalError("No TF Session is available when usesTFEagerAPI is set!")
+    fatalError("No TF Session is available!")
   }
 }
 
@@ -909,32 +784,37 @@ extension _TensorComputation {
 /// - Parameters:
 ///   - programByteAddress: The address of the raw program.
 ///   - programByteCount: The number of bytes in the program.
+///   - entryFunctionBaseNameAddress: The base name of the functions to run.
 ///   - tensorArgumentAddress: The address to the buffer containing tensor
 ///     arguments as CTensorHandle.
 ///   - tensorArgumentCount: The number of tensor arguments to pass in.
+///   - helperFunctionCount: The number of helper functions to run.
+///   - resultCount: The number of output tensors.
 @_inlineable
 @_silgen_name("_swift_tfc_StartTensorComputation")
 public func _TFCStartTensorComputation(
   _ programByteAddress: UnsafeRawPointer,
   _ programByteCount: Int,
-  _ entryFunctionNameAddress: UnsafePointer<Int8>,
+  _ entryFunctionBaseNameAddress: UnsafePointer<Int8>,
   _ tensorArgumentAddress: UnsafePointer<CTensorHandle>,
   _ tensorArgumentCount: Int,
+  _ helperFunctionCount: Int,
   _ resultCount: Int
 ) -> _TensorComputation {
 
   debugLog("""
     _TFCStartTensorComputation() is called with \(programByteCount) \
     program bytes, \(tensorArgumentCount) input tensors \
-    \(String(cString:entryFunctionNameAddress)) as the func name, and \
-    \(resultCount) output tensors.
+    \(String(cString:entryFunctionBaseNameAddress)) as the func base name, \
+    \(helperFunctionCount) helper functions, and \(resultCount) output tensors.
     """)
 
   return _TensorComputation(programByteAddress: programByteAddress,
                             programByteCount: programByteCount,
-                            entryFunctionNameAddress: entryFunctionNameAddress,
+                            entryFunctionBaseNameAddress: entryFunctionBaseNameAddress,
                             tensorArgumentAddress: tensorArgumentAddress,
                             tensorArgumentCount: tensorArgumentCount,
+                            helperFunctionCount: helperFunctionCount,
                             resultCount: resultCount)
 }
 
