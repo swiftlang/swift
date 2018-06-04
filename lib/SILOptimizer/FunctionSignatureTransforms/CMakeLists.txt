@@ -1,0 +1,3 @@
+set(FUNCTIONSIGNATURETRANSFORMS_SOURCES
+  FunctionSignatureTransforms/FunctionSignatureOpts.cpp
+  PARENT_SCOPE)
