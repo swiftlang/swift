@@ -16,9 +16,6 @@ var LoopsTests = TestSuite("Loops")
 
 // Compute 1 << 10 == 1024
 LoopsTests.testAllBackends("simpleCounterLoop_a") {
-  // FIXME: This test fails on Eager API.
-  guard !_RuntimeConfig.usesTFEagerAPI else { return }
-
   let maxCount = 10
   // a cannot be an integer tensor due to a TensorFlow Eigen bug (b/77737504).
   var a = Tensor<Float>(1)
@@ -33,9 +30,6 @@ LoopsTests.testAllBackends("simpleCounterLoop_a") {
 }
 
 LoopsTests.testAllBackends("simpleCounterLoop_ab") {
-  // FIXME: This test fails on Eager API.
-  guard !_RuntimeConfig.usesTFEagerAPI else { return }
-
   let maxCount = 100
   var a = Tensor<Float>(0)
   let b = Tensor<Float>(1)
