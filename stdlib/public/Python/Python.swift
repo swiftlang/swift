@@ -1052,6 +1052,8 @@ private func performBinaryOp(
   _ op: PythonBinaryOp, lhs: PythonObject, rhs: PythonObject
 ) -> PythonObject {
   let result = op(lhs.ownedPyObject, rhs.ownedPyObject)
+  // If binary operation fails (e.g. due to `TypeError`), throw an exception.
+  try! throwPythonErrorIfPresent()
   return PythonObject(owning: result!)
 }
 
