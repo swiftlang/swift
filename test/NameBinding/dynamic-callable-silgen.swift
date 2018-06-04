@@ -8,8 +8,10 @@ public struct Callable {
  
 @_silgen_name("foo")
 public func foo(a: Callable) {
+  // The first two calls should resolve to the `withArguments:` method.
   a()
   a(1, 2, 3)
+  // The last call should resolve to the `withKeywordArguments:` method.
   a(1, 2, 3, label: 4)
 }
  
