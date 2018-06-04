@@ -72,13 +72,13 @@ func f1<T>(_: T) where #^FUNC_1^# {}
 func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: Begin completions
 // GEN_T_DOT-DAG: Keyword/None:                       Type[#T.Type#];
-// GEN_T_DOT-DAG: Keyword/CurrNominal:                self[#T#];
+// GEN_T_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_DOT: End completions
 func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC^# {}
 // GEN_T_ASSOC_DOT: Begin completions
 // GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/Super:         Q;
 // GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#T.Type#];
-// GEN_T_ASSOC_DOT-DAG: Keyword/CurrNominal:                self[#T#];
+// GEN_T_ASSOC_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_ASSOC_DOT: End completions
 func f3<T>(_: T) where T == #^FUNC_3^# {}
 func f3<T>(_: T) where T == T.#^FUNC_4^# {}
@@ -117,5 +117,4 @@ protocol P2 {
 // U_DOT: Begin completions
 // FIXME: Should complete Q from Assoc.
 // U_DOT-DAG: Keyword/None:                       Type[#Self.U.Type#];
-// U_DOT-DAG: Keyword/CurrNominal:                self[#Self.U#];
 // U_DOT: End completions
