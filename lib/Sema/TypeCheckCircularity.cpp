@@ -169,7 +169,7 @@ private:
   bool diagnoseInfiniteRecursion(CanType parentType, ValueDecl *member,
                                  CanType memberType);
 
-  void diagnoseInconstructible(EnumDecl *E);
+  void diagnoseNotConstructible(EnumDecl *E);
 
   void addPathElementsTo(Path &path, CanType type);
   void addPathElement(Path &path, ValueDecl *member, CanType memberType);
@@ -275,7 +275,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
                                    unsigned depth) {
   // Indirect enums are representational leaves.
   if (E->isIndirect()) {
-    diagnoseInconstructible(E);
+    diagnoseNotConstructible(E);
     return false;
   }
 
@@ -303,7 +303,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (addMember(type, elt, eltType, depth))
       return true;
   }
-  diagnoseInconstructible(E);
+  diagnoseNotConstructible(E);
 
   return false;
 }
@@ -608,9 +608,9 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
   return true;
 }
 
-// Show a warning if the enum is inconstructible. The outcome of this method
-// is irrelevant.
-void CircularityChecker::diagnoseInconstructible(EnumDecl *E) {
+/// Show a warning if the enum is not constructible. The outcome of this method
+/// is irrelevant.
+void CircularityChecker::diagnoseNotConstructible(EnumDecl *E) {
 
   auto containsType = [](TupleType *tuple, Type E) -> bool {
     for (auto type: tuple->getElementTypes()) {
@@ -619,7 +619,7 @@ void CircularityChecker::diagnoseInconstructible(EnumDecl *E) {
     }
     return false;
   };
-  auto isInconstructible = [containsType, E]() -> bool {
+  auto isNotConstructible = [containsType, E]() -> bool {
     auto elts = E->getAllElements();
     if (elts.empty())
       return false;
@@ -644,6 +644,6 @@ void CircularityChecker::diagnoseInconstructible(EnumDecl *E) {
     return true;
   };
 
-  if (isInconstructible())
-    TC.diagnose(E, diag::type_not_constructible);
+  if (isNotConstructible())
+    TC.diagnose(E, diag::enum_not_constructible);
 }

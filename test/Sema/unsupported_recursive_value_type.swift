@@ -42,7 +42,7 @@ enum RecursiveByGenericSubstitutionEnum<T> {
   case A(T)
 }
 
-enum InconstructibleEnum1 { // expected-warning {{value type is inconstructible}}
+enum InconstructibleEnum1 { // expected-warning {{enum with recursive-only cases is not constructible}}
   indirect case A(InconstructibleEnum1)
 }
 enum InconstructibleEnum2 { // OK
@@ -50,13 +50,13 @@ enum InconstructibleEnum2 { // OK
   case B(Bool)
   indirect case C(Int, InconstructibleEnum2)
 }
-enum InconstructibleEnum3 { // expected-warning {{value type is inconstructible}}
+enum InconstructibleEnum3 { // expected-warning {{enum with recursive-only cases is not constructible}}
   indirect case B(Int, InconstructibleEnum3)
 }
-indirect enum InconstructibleEnum4 { // expected-warning {{value type is inconstructible}}
+indirect enum InconstructibleEnum4 { // expected-warning {{enum with recursive-only cases is not constructible}}
   case A(InconstructibleEnum4)
 }
-indirect enum InconstructibleEnum5 { // expected-warning {{value type is inconstructible}}
+indirect enum InconstructibleEnum5 { // expected-warning {{enum with recursive-only cases is not constructible}}
   case B(Int, InconstructibleEnum5)
 }
 indirect enum InconstructibleEnum6 { // OK
