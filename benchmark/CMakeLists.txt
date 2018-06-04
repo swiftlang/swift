@@ -173,7 +173,7 @@ set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
-    multi-source/PrimsSplit/main.swift)
+    multi-source/PrimsSplit/Prims_main.swift)
 
 set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
 )
