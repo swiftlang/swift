@@ -4151,7 +4151,6 @@ public:
                              CurrDeclContext, TypeResolver.get(),
                              IncludeInstanceMembers);
     addKeyword("Type", MetaBase);
-    addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,

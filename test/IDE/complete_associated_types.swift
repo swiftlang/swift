@@ -177,7 +177,7 @@ func testStruct2() {
 func testStruct3(a: StructWithAssociatedTypes) {
   a.#^STRUCT_INSTANCE^#
 }
-// STRUCT_TYPE_COUNT: Begin completions, 26 items
+// STRUCT_TYPE_COUNT: Begin completions, 25 items
 
 // STRUCT_INSTANCE: Begin completions, 15 items
 // STRUCT_INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal:   deduceCommonA()[#Int#]
