@@ -982,7 +982,6 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
 
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Returns true if a declaration has a valid implementation of a
 /// @dynamicCallable attribute requirement.
 static bool hasValidDynamicCallableMethod(TypeChecker &TC,
@@ -1019,7 +1018,6 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
   return true;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::
 visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   // This attribute is only allowed on nominal types.
