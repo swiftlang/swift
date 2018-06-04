@@ -1967,16 +1967,30 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
-                                                bool suppressCast) {
-  // If it is known to have swift metadata, just load. A swift class is both
-  // heap metadata and type metadata.
-  if (hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType())) {
-    return emitLoadOfHeapMetadataRef(IGF, object,
-                getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType()),
-                suppressCast);
+                                                bool allowArtificialSubclasses){
+  switch (auto isaEncoding =
+            getIsaEncodingForType(IGF.IGM, objectType.getSwiftRValueType())) {
+  case IsaEncoding::Pointer:
+    // Directly load the isa pointer from a pure Swift class.
+    return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
+                                     /*suppressCast*/ false);
+  case IsaEncoding::ObjC:
+    // A class defined in Swift that inherits from an Objective-C class may
+    // end up dynamically subclassed by ObjC runtime hackery. The artificial
+    // subclass isn't a formal Swift type, so isn't appropriate as the result
+    // of `type(of:)`, but is still a physical subtype of the real class object,
+    // so can be used for some purposes like satisfying type parameters in
+    // generic signatures.
+    if (allowArtificialSubclasses
+        && hasKnownSwiftMetadata(IGF.IGM, objectType.getSwiftRValueType()))
+      return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
+                                       /*suppressCast*/ false);
+   
+    // Ask the Swift runtime to find the dynamic type. This will look through
+    // dynamic subclasses of Swift classes, and use the -class message for
+    // ObjC classes.
+    return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
   }
-
-  return emitDynamicTypeOfOpaqueHeapObject(IGF, object, repr);
 }
 
 static ClassDecl *getRootClass(ClassDecl *theClass) {
@@ -2001,6 +2015,11 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
   }
+  
+  // Existentials use the encoding of the enclosed dynamic type.
+  if (type->isAnyExistentialType()) {
+    return getIsaEncodingForType(IGM, ArchetypeType::getOpened(type));
+  }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // If we have a concrete superclass constraint, just recurse.
@@ -2012,9 +2031,6 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
     // conservative answer.
     return IsaEncoding::ObjC;
   }
-
-  // We should never be working with an unopened existential type here.
-  assert(!type->isAnyExistentialType());
 
   // Non-class heap objects should be pure Swift, so we can access their isas
   // directly.
