@@ -452,7 +452,6 @@ class SuperDerivedB : SuperBaseB {
 // CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}()[#SuperBaseB#]
 // CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#a: Double#})[#SuperBaseB#]
 // CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#int: Int#})[#SuperBaseB#]
-  }
 }
 
 //===--- Check that we assign a special semantic context to the overridden decl.
