@@ -15,11 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
@@ -299,13 +299,18 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // Prefer declarations in an overlay to similar declarations in
         // the Clang module it customizes.
         if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
-          if (isInOverlayModuleForImportedModule(firstDecl->getDeclContext(),
-                                                 secondDecl->getDeclContext())){
+          auto clangLoader = ctx.getClangModuleLoader();
+          if (!clangLoader) continue;
+
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                firstDecl->getDeclContext(),
+                                                secondDecl->getDeclContext())) {
             shadowed.insert(secondDecl);
             continue;
           }
 
-          if (isInOverlayModuleForImportedModule(secondDecl->getDeclContext(),
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                 secondDecl->getDeclContext(),
                                                  firstDecl->getDeclContext())) {
             shadowed.insert(firstDecl);
             break;
