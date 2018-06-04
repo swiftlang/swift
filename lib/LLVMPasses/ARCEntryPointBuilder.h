@@ -13,13 +13,14 @@
 #ifndef SWIFT_LLVMPASSES_ARCENTRYPOINTBUILDER_H
 #define SWIFT_LLVMPASSES_ARCENTRYPOINTBUILDER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
 
 namespace swift {
 
@@ -360,22 +361,28 @@ private:
     return BridgeReleaseN.get();
   }
 
+  Type *getNamedOpaquePtrTy(StringRef name) {
+    auto &M = getModule();
+    if (auto *ty = M.getTypeByName(name)) {
+      return ty->getPointerTo();
+    }
+
+    // Otherwise, create an anonymous struct type.
+    auto *ty = llvm::StructType::create(M.getContext(), name);
+    return ty->getPointerTo();
+  }
+
   Type *getObjectPtrTy() {
     if (ObjectPtrTy)
       return ObjectPtrTy.get();
-    auto &M = getModule();
-    ObjectPtrTy = M.getTypeByName("swift.refcounted")->getPointerTo();
-    assert(ObjectPtrTy && "Could not find the swift heap object type by name");
+    ObjectPtrTy = getNamedOpaquePtrTy("swift.refcounted");
     return ObjectPtrTy.get();
   }
 
   Type *getBridgeObjectPtrTy() {
     if (BridgeObjectPtrTy)
       return BridgeObjectPtrTy.get();
-    auto &M = getModule();
-    BridgeObjectPtrTy = M.getTypeByName("swift.bridge")->getPointerTo();
-    assert(BridgeObjectPtrTy &&
-           "Could not find the swift bridge object type by name");
+    BridgeObjectPtrTy = getNamedOpaquePtrTy("swift.bridge");
     return BridgeObjectPtrTy.get();
   }
 
