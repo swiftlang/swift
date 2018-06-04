@@ -76,6 +76,7 @@ public:
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(DiscardableResult)
   IGNORED_ATTR(DowngradeExhaustivityCheck)
+  IGNORED_ATTR(DynamicCallable)
   IGNORED_ATTR(DynamicMemberLookup)
   IGNORED_ATTR(Effects)
   IGNORED_ATTR(Exported)
@@ -846,6 +847,8 @@ public:
   
   void visitCDeclAttr(CDeclAttr *attr);
 
+  void visitDynamicCallableAttr(DynamicCallableAttr *attr);
+
   void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
   
   void visitFinalAttr(FinalAttr *attr);
@@ -928,6 +931,113 @@ static bool iswatchOS(TypeChecker &TC) {
 
 static bool isRelaxedIBAction(TypeChecker &TC) {
   return isiOS(TC) || iswatchOS(TC);
+}
+
+/// Returns true if a method is an valid implementation of a @dynamicCallable
+/// attribute requirement. The method is given to be defined as one of the
+/// following: `dynamicallyCall(withArguments:)` or
+/// `dynamicallyCall(withKeywordArguments:)`.
+bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
+                                         TypeChecker &TC,
+                                         bool hasKeywordArguments) {
+  // There are two cases to check.
+  // 1. `dynamicallyCall(withArguments:)`.
+  //    In this case, the method is valid if the argument has type `C` where
+  //    `C` conforms to `ExpressibleByArrayLiteral`.
+  //    `C.ArrayLiteralElement` and the return type can be arbitrary.
+  // 2. `dynamicallyCall(withKeywordArguments:)`
+  //    In this case, the method is valid if the argument has type `D` where
+  //    `D` conforms to `ExpressibleByDictionaryLiteral` and `D.Key` conforms to
+  //    `ExpressibleByStringLiteral`.
+  //    `D.Value` and the return type can be arbitrary.
+
+  auto paramList = funcDecl->getParameterList(1);
+  if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
+  auto argType = paramList->get(0)->getType();
+
+  // If non-keyword (positional) arguments, check that argument type conforms to
+  // `ExpressibleByArrayLiteral`.
+  if (!hasKeywordArguments) {
+    auto arrayLitProto =
+      TC.Context.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+    return TC.conformsToProtocol(argType, arrayLitProto, DC,
+                                 ConformanceCheckOptions()).hasValue();
+  }
+  // If keyword arguments, check that argument type conforms to
+  // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
+  // conforms to `ExpressibleByStringLiteral`.
+  auto stringLitProtocol =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
+  auto dictLitProto =
+    TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+  auto dictConf = TC.conformsToProtocol(argType, dictLitProto, DC,
+                                        ConformanceCheckOptions());
+  if (!dictConf) return false;
+  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
+  auto keyAssocType =
+    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
+  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
+                               ConformanceCheckOptions()).hasValue();
+
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Returns true if a declaration has a valid implementation of a
+/// @dynamicCallable attribute requirement.
+static bool hasValidDynamicCallableMethod(TypeChecker &TC,
+                                          NominalTypeDecl *decl,
+                                          Identifier argumentName,
+                                          bool hasKeywordArgs,
+                                          bool &error) {
+  auto declType = decl->getDeclaredType();
+  auto methodName = DeclName(TC.Context,
+                             DeclBaseName(TC.Context.Id_dynamicallyCall),
+                             { argumentName });
+  auto candidates = TC.lookupMember(decl, declType, methodName);
+  if (candidates.empty()) return false;
+
+  // Filter valid candidates.
+  candidates.filter([&](LookupResultEntry entry, bool isOuter) {
+    auto candidate = cast<FuncDecl>(entry.getValueDecl());
+    return isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs);
+  });
+
+  // If there are no valid candidates, return false.
+  if (candidates.size() == 0) return false;
+
+  auto candidate = cast<FuncDecl>(candidates.front().getValueDecl());
+  // If there are multiple valid candidates, emit overload error.
+  if (candidates.size() > 1) {
+    TC.diagnose(candidate->getLoc(),
+                diag::ambiguous_dynamic_callable_method,
+                candidate->getFullName());
+    error = true;
+    return false;
+  }
+  // Otherwise, there is a single valid method.
+  return true;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void AttributeChecker::
+visitDynamicCallableAttr(DynamicCallableAttr *attr) {
+  // This attribute is only allowed on nominal types.
+  auto decl = cast<NominalTypeDecl>(D);
+  auto type = decl->getDeclaredType();
+
+  bool hasValidMethod = false;
+  bool error = false;
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withArguments,
+                                  /*hasKeywordArgs*/ false, error);
+  hasValidMethod |=
+    hasValidDynamicCallableMethod(TC, decl, TC.Context.Id_withKeywordArguments,
+                                  /*hasKeywordArgs*/ true, error);
+  if (!hasValidMethod || error) {
+    TC.diagnose(attr->getLocation(), diag::invalid_dynamic_callable_type, type);
+    attr->setInvalid();
+  }
 }
 
 /// Given a subscript defined as "subscript(dynamicMember:)->T", return true if

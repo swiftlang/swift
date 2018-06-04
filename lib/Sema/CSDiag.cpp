@@ -5719,7 +5719,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
   if (!isUnresolvedOrTypeVarType(fnType) &&
-      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
+      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()
+      && !CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
     
     auto arg = callExpr->getArg();
 
