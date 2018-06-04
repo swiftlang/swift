@@ -29,6 +29,12 @@ namespace tf {
 
 enum class DeviceType { CPU, GPU, TPU };
 
+struct DeviceTypeHash {
+  std::size_t operator()(const DeviceType &deviceType) const {
+    return static_cast<size_t>(deviceType);
+  }
+};
+
 static const char DEFAULT_CPU_DEVICE[] = "/device:CPU:0";
 static const char DEFAULT_GPU_DEVICE[] = "/device:GPU:0";
 static const char DEFAULT_TPU_DEVICE[] = "TPU_SYSTEM";
@@ -76,7 +82,7 @@ struct GraphGlobalConfiguration {
   bool isTPUInfeedEnabled = false;
 
   // TF devices involved in the tensor computation.
-  std::unordered_set<DeviceType> usedDeviceTypes;
+  std::unordered_set<DeviceType, DeviceTypeHash> usedDeviceTypes;
 
   bool isTPUEnabled() const { return deviceType == DeviceType::TPU; }
 
