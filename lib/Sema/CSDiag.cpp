@@ -3460,12 +3460,10 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
-    SmallVector<bool, 4> defaultMap;
-    if (candidates.empty()) {
-      defaultMap.assign(params.size(), false);
-    } else {
-      computeDefaultMap(params, candidates[0].getDecl(),
-                        candidates[0].level, defaultMap);
+    llvm::SmallBitVector defaultMap(params.size());
+    if (!candidates.empty()) {
+      defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
+                                     candidates[0].level);
     }
 
     // Form a set of call arguments, using a dummy type (Void), because the
@@ -3873,9 +3871,6 @@ diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
       continue;
 
     auto params = candidate.getParameters();
-
-    SmallVector<bool, 4> defaultMap;
-    computeDefaultMap(params, decl, candidate.level, defaultMap);
     // If one of the candidates is an instance method with a single parameter
     // at the level 0, this might be viable situation for calling instance
     // method as curried member of type problem.
@@ -4071,7 +4066,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
-  SmallVectorImpl<bool> &DefaultMap;
+  const llvm::SmallBitVector &DefaultMap;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
   CalleeCandidateInfo CandidateInfo;
@@ -4087,7 +4082,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
-                  SmallVectorImpl<bool> &defaultMap,
+                  const llvm::SmallBitVector &defaultMap,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
       : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
@@ -4380,8 +4375,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   auto params = candidate.getParameters();
 
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, candidate.getDecl(), candidate.level, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4500,9 +4495,6 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
       continue;
 
     auto parameters = candidate.getParameters();
-
-    SmallVector<bool, 4> defaultMap;
-    computeDefaultMap(parameters, decl, candidate.level, defaultMap);
     if (parameters.size() != arguments.size())
       continue;
 
@@ -5007,8 +4999,8 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, candidate.getDecl(), candidate.level, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, candidate.getDecl(), candidate.level);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;

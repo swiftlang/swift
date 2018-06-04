@@ -798,46 +798,54 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   return result;
 }
 
-void swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                              const ValueDecl *paramOwner, unsigned level,
-                              SmallVectorImpl<bool> &outDefaultMap) {
+llvm::SmallBitVector
+swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                         const ValueDecl *paramOwner, unsigned level) {
+  llvm::SmallBitVector resultVector(params.size());
+  // No parameter owner means no parameter list means no default arguments
+  // - hand back the zeroed bitvector.
+  //
+  // FIXME: We ought to not request default argument info in this case.
+  if (!paramOwner)
+    return resultVector;
+
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
-  if (paramOwner) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-      if (level < func->getNumParameterLists())
-        paramList = func->getParameterList(level);
-    } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-      if (level == 1)
-        paramList = subscript->getIndices();
-    } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-      if (level == 1)
-        paramList = enumElement->getParameterList();
-    }
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
+    if (level < func->getNumParameterLists())
+      paramList = func->getParameterList(level);
+  } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
+    if (level == 1)
+      paramList = subscript->getIndices();
+  } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
+    if (level == 1)
+      paramList = enumElement->getParameterList();
   }
+
+  // No parameter list means no default arguments - hand back the zeroed
+  // bitvector.
+  if (!paramList)
+    return resultVector;
 
   switch (params.size()) {
   case 0:
-    break;
-
-  case 1:
-    outDefaultMap.push_back(paramList && paramList->size() == 1 &&
-                            paramList->get(0)->isDefaultArgument());
-    break;
+    return resultVector;
 
   default:
     // Arguments and parameters are not guaranteed to always line-up
     // perfectly, e.g. failure diagnostics tries to match argument type
     // to different "candidate" parameters.
-    if (paramList && params.size() != paramList->size())
-      paramList = nullptr;
+    if (params.size() != paramList->size())
+      return resultVector;
 
     for (auto i : range(0, params.size())) {
-      outDefaultMap.push_back(paramList &&
-                              paramList->get(i)->isDefaultArgument());
+      if (paramList->get(i)->isDefaultArgument()) {
+        resultVector.set(i);
+      }
     }
     break;
   }
+  return resultVector;
 }
 
 /// Turn a param list into a symbolic and printable representation that does not

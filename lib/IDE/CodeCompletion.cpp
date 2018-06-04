@@ -1544,17 +1544,11 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(funcType->getParams(), FD,
-                    /*level*/ FD->isInstanceMember() ? 1 : 0, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(funcType->getParams(), FD,
+                      /*level*/ FD->isInstanceMember() ? 1 : 0);
   
-  bool OneArg = defaultMap.size() == 1;
-  if (defaultMap.size() > 1) {
-    auto NonDefault = std::count(defaultMap.begin(), defaultMap.end() - 1, false);
-    OneArg = (NonDefault == 0);
-  }
-
-  if (OneArg) {
+  if (defaultMap.size() - defaultMap.count() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
       if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
