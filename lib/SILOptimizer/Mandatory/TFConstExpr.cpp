@@ -26,7 +26,8 @@ using namespace tf;
 
 static llvm::cl::opt<unsigned>
 ConstExprLimit("constexpr-limit", llvm::cl::init(256),
- llvm::cl::desc("Number of instructions interpreted in a constexpr function"));
+               llvm::cl::desc("Number of instructions interpreted in a"
+                              " constexpr function"));
 
 static llvm::Optional<SymbolicValue>
 evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,

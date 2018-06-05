@@ -1917,7 +1917,6 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
           // If we have more specific information about what went wrong, emit a
           // note.
 
-
           // This is a limitation of our current implementation, because we
           // don't have a SIL instruction for Tensor ops, and have to use
           // emitConstantInst which can fail.
@@ -1936,7 +1935,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
             break;
           case UnknownReason::TooManyInstructions:
             // TODO: Should pop up a level of the stack trace.
-            error = "constant expression too large to evaluate";
+            error = "expression is too large to evaluate at compile-time";
             break;
           }
 
