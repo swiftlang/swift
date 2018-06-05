@@ -251,7 +251,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     seed: Tensor
   ) -> (Tensor, Scalar, Scalar) {
     let mean = self.mean(alongAxes: axis)
-    let squaredDiff: Tensor = #tfop("SquaredDifference", self, mean)
+    let squaredDiff: Tensor = Raw.squaredDifference(self, mean)
     let variance = squaredDiff.mean(alongAxes: axis)
 
     let diff = self - mean
