@@ -1024,7 +1024,7 @@ public extension Tensor {
   }
 }
 
-public extension Tensor where Scalar : AccelerableByTensorFlow {
+public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
     let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
@@ -1032,10 +1032,8 @@ public extension Tensor where Scalar : AccelerableByTensorFlow {
     let paddedShape = ones ++ otherShape
     let nonEqualIndices = paddedShape.elementsNotEqual(shapeTensor)
     let broadcastIndices = Raw.where_(nonEqualIndices).flattened()
-    let unbroadcasted: Tensor = #tfop(
-      "Sum", handle, Tensor<Int32>(broadcastIndices), keep_dims: false,
-      Tidx: Int32.self
-    )
+    let unbroadcasted: Tensor = Raw.sum(
+      self, reductionIndices: Tensor<Int32>(broadcastIndices), keepDims: false)
     return Raw.reshape(unbroadcasted, shape: otherShape)
   }
 
@@ -1068,8 +1066,10 @@ public extension Tensor where Scalar : Numeric {
         scalars: sizes.flatMap { [$0.before, $0.after] }
       ).handle
     }
-    return #tfop("PadV2", self, _TFSend(paddings), Tensor(value),
-                 T: Scalar.self, Tpaddings: Int32.self)
+    return Raw.padV2(
+      self,
+      paddings: Tensor<Int32>(handle: _TFSend(paddings)),
+      constantValues: Tensor(value))
   }
 }
 
@@ -1093,27 +1093,27 @@ public extension Tensor {
       // return #tfop("GatherV2", self, Tensor<Int32>(index), Tensor<Int32>(0),
       //              Tindices: Int32.self)
       let indexTensor = Tensor<Int32>([index])
-      let remainingZeros: Tensor<Int32> = #tfop(
-        "Fill", (rankTensor - 1).rankLifted(), Tensor<Int32>(0)
-      )
+      let remainingZeros: Tensor<Int32> = Raw.fill(
+        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
       let startIndices = indexTensor.concatenated(with: remainingZeros)
 
-      let firstDimension: Tensor<Float> = #tfop(
-        "GatherV2", Tensor<Float>(shapeTensor), Tensor<Int32>(0),
-        Tensor<Int32>(0), Tindices: Int32.self
+      let firstDimension: Tensor<Float> = Raw.gatherV2(
+        params: Tensor<Float>(shapeTensor),
+        indices: Tensor<Int32>(0),
+        axis: Tensor<Int32>(0)
       )
       let boundSize = Tensor<Float>([1]) - firstDimension
       let scatterIndices: Tensor<Int32> = [[0]]
       let offset: Tensor<Int32> = Tensor<Int32>(
-        Tensor<Float>(
-          handle: #tfop("ScatterNd", scatterIndices, boundSize,
-                        rankTensor.rankLifted())
+        Raw.scatterNd(
+          indices: scatterIndices,
+          updates: boundSize,
+          shape: rankTensor.rankLifted()
         )
       )
       let boundSizes: Tensor<Int32> = shapeTensor + offset
-      let slice: Tensor = #tfop("Slice", self, startIndices, boundSizes,
-                        Index: Int32.self)
-      return #tfop("Squeeze", slice, squeeze_dims: [0])
+      let slice: Tensor = Raw.slice(self, begin: startIndices, size: boundSizes)
+      return slice.squeezingShape(at: 0)
     }
   }
 
@@ -1133,8 +1133,7 @@ public extension Tensor {
       // it is used here in spite of the fact it may perform allocation(?).
       // TODO: Consider more clearly distinguishing `subscript(index:)` and
       // `subscript(indices:)`, since their implementations are quite different.
-      return #tfop("GatherNd", self, Tensor<Int32>(indices),
-                   Tindices: Int32.self)
+      return Raw.gatherNd(params: self, indices: Tensor<Int32>(indices))
     }
   }
 
@@ -1157,22 +1156,22 @@ public extension Tensor {
       // (Gather, ScatterNd) not accepting Int32 for particular inputs. Refactor
       // if possible.
       let lowerBound = Tensor<Int32>([bounds.lowerBound])
-      let remainingZeros: Tensor<Int32> = #tfop(
-        "Fill", (rankTensor - 1).rankLifted(), Tensor<Int32>(0)
-      )
+      let remainingZeros: Tensor<Int32> = Raw.fill(
+        dims: (rankTensor - 1).rankLifted(), value: Tensor<Int32>(0))
       let startIndices = lowerBound.concatenated(with: remainingZeros)
 
       let boundSize = Tensor<Int32>([bounds.upperBound])
         - lowerBound - Tensor<Int32>(Tensor<Float>(shapeTensor)[0])
       let scatterIndices: Tensor<Int32> = [[0]]
       let offset: Tensor<Int32> = Tensor<Int32>(
-        Tensor<Float>(
-          handle: #tfop("ScatterNd", scatterIndices, Tensor<Float>(boundSize),
-                        rankTensor.rankLifted())
+        Raw.scatterNd(
+          indices: scatterIndices,
+          updates: boundSize,
+          shape: rankTensor.rankLifted()
         )
       )
       let boundSizes: Tensor<Int32> = shapeTensor + offset
-      return #tfop("Slice", self, startIndices, boundSizes, Index: Int32.self)
+      return Raw.slice(self, begin: startIndices, size: boundSizes)
     }
   }
 
