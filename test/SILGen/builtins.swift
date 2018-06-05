@@ -597,8 +597,8 @@ func pinUnpin(_ object : Builtin.NativeObject) {
 
 // SWIFT_ENABLE_TENSORFLOW
 // CHECK-LABEL: sil hidden @$S8builtins11poundAssert{{[_0-9a-zA-Z]*}}
-func poundAssert(_ condition: Builtin.Int1, _ message: Builtin.RawPointer) {
-  Builtin.poundAssert(condition, message)
+func poundAssert(_ message: Builtin.RawPointer) {
+  Builtin.poundAssert(true._getBuiltinLogicValue(), message)
   // CHECK: builtin "poundAssert"
 }
 
