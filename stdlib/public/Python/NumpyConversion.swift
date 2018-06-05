@@ -21,18 +21,20 @@
 private let np = Python.import("numpy")
 
 /// A type that can be initialized from a `numpy.ndarray` instance represented
-/// as a `PyValue`.
+/// as a `PythonObject`.
 public protocol ConvertibleFromNumpyArray {
-  init?(numpyArray: PyValue)
+  init?(numpyArray: PythonObject)
 }
 
 /// A type that is compatible with a NumPy scalar `dtype`.
 public protocol NumpyScalarCompatible {
-  static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool
+  static func isCompatible(withNumpyScalarType dtype: PythonObject) -> Bool
 }
 
 extension Bool : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.bool_, Python.bool: return true
     default: return false
@@ -41,7 +43,9 @@ extension Bool : NumpyScalarCompatible {
 }
 
 extension UInt8 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.uint8: return true
     default: return false
@@ -50,7 +54,9 @@ extension UInt8 : NumpyScalarCompatible {
 }
 
 extension Int8 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.int8: return true
     default: return false
@@ -59,7 +65,9 @@ extension Int8 : NumpyScalarCompatible {
 }
 
 extension UInt16 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.uint16: return true
     default: return false
@@ -68,7 +76,9 @@ extension UInt16 : NumpyScalarCompatible {
 }
 
 extension Int16 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.int16: return true
     default: return false
@@ -77,7 +87,9 @@ extension Int16 : NumpyScalarCompatible {
 }
 
 extension UInt32 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.uint32: return true
     default: return false
@@ -86,7 +98,9 @@ extension UInt32 : NumpyScalarCompatible {
 }
 
 extension Int32 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.int32: return true
     default: return false
@@ -95,7 +109,9 @@ extension Int32 : NumpyScalarCompatible {
 }
 
 extension UInt64 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.uint64: return true
     default: return false
@@ -104,7 +120,9 @@ extension UInt64 : NumpyScalarCompatible {
 }
 
 extension Int64 : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.int64: return true
     default: return false
@@ -113,7 +131,9 @@ extension Int64 : NumpyScalarCompatible {
 }
 
 extension Float : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.float32: return true
     default: return false
@@ -122,7 +142,9 @@ extension Float : NumpyScalarCompatible {
 }
 
 extension Double : NumpyScalarCompatible {
-  public static func isCompatible(withNumpyScalarType dtype: PyValue) -> Bool {
+  public static func isCompatible(
+    withNumpyScalarType dtype: PythonObject
+  ) -> Bool {
     switch dtype {
     case np.float64: return true
     default: return false
@@ -132,9 +154,9 @@ extension Double : NumpyScalarCompatible {
 
 extension Array : ConvertibleFromNumpyArray
   where Element : NumpyScalarCompatible {
-  public init?(numpyArray: PyValue) {
+  public init?(numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
-    guard Python.isinstance.call(with: numpyArray, np.ndarray) == true else {
+    guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
     }
     // Check if the dtype of the `ndarray` is compatible with the `Element`
