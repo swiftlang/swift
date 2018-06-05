@@ -39,6 +39,8 @@ add_swift_library(swiftSema STATIC
   TypeCheckAvailability.cpp
   TypeCheckCaptures.cpp
   TypeCheckCircularity.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  TypeCheckCompilerEvaluable.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
   TypeCheckError.cpp

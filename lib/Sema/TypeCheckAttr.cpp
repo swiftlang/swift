@@ -117,6 +117,7 @@ public:
   IGNORED_ATTR(WeakLinked)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
+  IGNORED_ATTR(CompilerEvaluable)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -889,6 +890,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
+  void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2570,6 +2572,50 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Done checking @differentiable attribute. Memorize the adjoint reference in
   // the attribute.
   attr->setAdjointFunction(resolvedAdjoint);
+}
+
+void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
+  // Check that the function is defined in an allowed context.
+  // TODO(marcrasi): In many cases, we can probably generate a more informative
+  // error message than just saying that it's "not allowed here". (Like "not
+  // allowed in a class [point at the class decl], put it at the top level or in
+  // a struct instead").
+  auto declContext = D->getDeclContext();
+  switch (declContext->getContextKind()) {
+  case DeclContextKind::FileUnit:
+    // Top level functions are okay.
+    break;
+  case DeclContextKind::GenericTypeDecl:
+    switch (cast<GenericTypeDecl>(declContext)->getKind()) {
+    case DeclKind::Constructor:
+    case DeclKind::Destructor:
+    case DeclKind::Func:
+    case DeclKind::Accessor:
+      // Functions are okay.
+      break;
+    case DeclKind::Struct:
+      // Structs are okay, if they are compiler-representable.
+      // TODO(marcrasi): Check that it's compiler-representable.
+      break;
+    default:
+      TC.diagnose(D, diag::compiler_evaluable_bad_context);
+      attr->setInvalid();
+      return;
+    }
+    break;
+  default:
+    TC.diagnose(D, diag::compiler_evaluable_bad_context);
+    attr->setInvalid();
+    return;
+  }
+
+  // Check that the signature only has allowed types.
+  // TODO(marcrasi): Do this.
+
+  // For @compilerEvaluable to be truly valid, the function body must also
+  // follow certain rules. We can only check these rules after the body is type
+  // checked, and it's not type checked yet, so we check these rules later in
+  // TypeChecker::checkFunctionBodyCompilerEvaluable().
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

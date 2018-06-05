@@ -2466,6 +2466,9 @@ public:
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
+
   void addExprForDiagnosis(Expr *E1, ExprAndConstraintSystem Result) {
     DiagnosedExprs[E1] = Result;
   }
