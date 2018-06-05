@@ -3616,5 +3616,5 @@ bool ClangImporter::isInOverlayModuleForImportedModule(
   auto clangModule =
   importedClangModuleUnit->getClangModule()->getTopLevelModule();
   return !clangModule->ExportAsModule.empty() &&
-  clangModule->ExportAsModule == overlayModule->getName().str();
+    clangModule->ExportAsModule == overlayModule->getName().str();
 }
