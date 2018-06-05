@@ -583,13 +583,12 @@ TryApplyInst *TryApplyInst::create(
 GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
                            SILValue original, unsigned sourceIndex,
                            ArrayRef<unsigned> paramIndices,
-                           bool seedable, bool preservingResult)
+                           SILGradientOptions options)
   : InstructionBase(debugLoc, getGradientSILType(module, original, sourceIndex,
-                                                 paramIndices, seedable,
-                                                 preservingResult)),
+                                                 paramIndices, options)),
     SourceIndex(sourceIndex),
-    NumParamIndices(paramIndices.size()), Seedable(seedable),
-    PreservingResult(preservingResult), Operands(this, original) {
+    NumParamIndices(paramIndices.size()), Options(options),
+    Operands(this, original) {
   std::copy(paramIndices.begin(), paramIndices.end(),
             getParameterIndicesData());
 }
@@ -597,17 +596,16 @@ GradientInst::GradientInst(SILModule &module, SILDebugLocation debugLoc,
 SILType GradientInst::getGradientSILType(SILModule &module, SILValue original,
                                          unsigned sourceIndex,
                                          ArrayRef<unsigned> paramIndices,
-                                         bool seedable,
-                                         bool preservingResult) {
+                                         SILGradientOptions options) {
   // If parameter indices are empty, return an invalid type (empty tuple type).
   // An "empty parameter indices" will be produced during verification.
   if (paramIndices.empty()) {
     auto invalidTy = TupleType::get({}, module.getASTContext());
     return SILType::getPrimitiveObjectType(CanType(invalidTy));
   }
-  SILReverseAutoDiffConfiguration config =
-    { sourceIndex, paramIndices, seedable, preservingResult };
-  auto origFnTy = original->getType().getAs<SILFunctionType>();
+  SILReverseAutoDiffIndices indices(sourceIndex, paramIndices);
+  SILReverseAutoDiffConfiguration config(indices, options);
+  auto origFnTy = original->getType().castTo<SILFunctionType>();
   auto gradFnTy = origFnTy->getGradientType(config, module);
   return SILType::getPrimitiveObjectType(gradFnTy->getCanonicalType());
 }
@@ -616,11 +614,11 @@ GradientInst *
 GradientInst::create(SILModule &M, SILDebugLocation debugLoc,
                      SILValue original, unsigned sourceIndex,
                      ArrayRef<unsigned> paramIndices,
-                     bool seedable, bool preservingResult) {
+                     SILGradientOptions options) {
   unsigned size = sizeof(GradientInst) + paramIndices.size() * sizeof(unsigned);
   void *buffer = M.allocateInst(size, alignof(GradientInst));
   return ::new (buffer) GradientInst(M, debugLoc, original, sourceIndex,
-                                     paramIndices, seedable, preservingResult);
+                                     paramIndices, options);
 }
 
 ArrayRef<unsigned> GradientInst::getParameterIndices() const {

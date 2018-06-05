@@ -128,18 +128,25 @@ public:
     StringRef primalName = StringRef(),
     StringRef adjointName = StringRef());
 
-  StringRef getPrimalName() const { return PrimalName; }
+  bool hasPrimal() const { return !PrimalName.empty(); }
+  StringRef getPrimalName() const { assert(hasPrimal()); return PrimalName; }
   void setPrimalName(StringRef name) { PrimalName = name; }
-  StringRef getAdjointName() const { return AdjointName; }
+
+  bool hasAdjoint() const { return !AdjointName.empty(); }
+  StringRef getAdjointName() const { assert(hasAdjoint()); return AdjointName; }
   void setAdjointName(StringRef name) { AdjointName = name; }
 
   unsigned getSourceIndex() const {
     return SourceIndex;
   }
-  
+
   ArrayRef<unsigned> getParamIndices() const;
   unsigned *getParamIndicesData() {
     return reinterpret_cast<unsigned *>(this+1);
+  }
+
+  SILReverseAutoDiffIndices getIndices() const {
+    return { getSourceIndex(), getParamIndices() };
   }
 
   void print(llvm::raw_ostream &OS) const;

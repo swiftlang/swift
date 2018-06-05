@@ -50,7 +50,7 @@ public:
     : Loc(loc), Kind(kind), V(value) {}
 
   static AutoDiffParameter getIndexParameter(SourceLoc loc, unsigned index) {
-    return { loc, Kind::Index, { index } };
+    return { loc, Kind::Index, index };
   }
 
   static AutoDiffParameter getSelfParameter(SourceLoc loc) {
@@ -77,31 +77,123 @@ public:
   }
 };
 
+/// SIL-level automatic differentiation indices. Consists of a source index,
+/// i.e. index of the dependent result to differentiate from, and parameter
+/// indices, i.e. index of an independent parameter to differentiate with
+/// respect to.
+struct SILReverseAutoDiffIndices {
+  unsigned source;
+  SmallVector<unsigned, 8> parameters;
+
+  /*implicit*/ SILReverseAutoDiffIndices(unsigned source,
+                                         ArrayRef<unsigned> parameters)
+    : source(source), parameters(parameters.begin(), parameters.end()) {}
+
+  bool isEqual(const SILReverseAutoDiffIndices &other) const {
+    return source == other.source &&
+           ArrayRef<unsigned>(parameters).equals(other.parameters);
+  }
+
+  // Returns true if it's a valid list of indices. To be valid, parameters
+  // indices need to be ascending.
+  bool isValid() const {
+    int last = -1;
+    for (auto paramIdx : parameters) {
+      if ((int)paramIdx <= last)
+        return false;
+      last = paramIdx;
+    }
+    return true;
+  }
+};
+
+/// Flags to define the semantics and the type signature of a gradient function.
+enum class SILGradientFlags : unsigned {
+  /// The gradient function is seedable, i.e. able to take a back-propagated
+  /// adjoint value as the last parameter.
+  Seedable = 1 << 0,
+  
+  /// The gradient function is preserving the result of the original function.
+  PreservingResult = 1 << 1,
+  
+  /// The adjoint computation is "delayed". We say that the adjoint computation
+  /// is delayed when when it's returned as a thunk.
+  Delayed = 1 << 2
+};
+using SILGradientOptions = OptionSet<SILGradientFlags>;
+static inline SILGradientOptions operator|(SILGradientFlags lhs,
+                                           SILGradientFlags rhs) {
+  return SILGradientOptions(unsigned(lhs) | unsigned(rhs));
+}
+
 /// SIL-level automatic differentiation configuration.
 struct SILReverseAutoDiffConfiguration {
-  unsigned sourceIndex;
-  ArrayRef<unsigned> parameterIndices;
-  bool seedable;
-  bool preservingResult;
+  SILReverseAutoDiffIndices indices;
+  SILGradientOptions options;
+
+  /*implicit*/
+  SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
+                                  bool seedable, bool preservingResult)
+    : indices(indices), options(getCanonicalGradientOptions()) {}
+
+  /*implicit*/
+  SILReverseAutoDiffConfiguration(SILReverseAutoDiffIndices indices,
+                                  SILGradientOptions options)
+    : indices(indices), options(options) {}
+
+  unsigned getSourceIndex() const {
+    return indices.source;
+  }
+
+  void setSourceIndex(unsigned index) {
+    indices.source = index;
+  }
+
+  ArrayRef<unsigned> getParameterIndices() const {
+    return ArrayRef<unsigned>(indices.parameters);
+  }
+
+  bool isSeedable() const {
+    return options.contains(SILGradientFlags::Seedable);
+  }
+
+  bool isPreservingResult() const {
+    return options.contains(SILGradientFlags::PreservingResult);
+  }
+
+  bool isDelayed() const {
+    return options.contains(SILGradientFlags::Delayed);
+  }
+
+  // FIXME: The master configuration should have all three gradient options
+  // enabled, that is, the canonical gradient should return a delayed gradient
+  // function. We need to handle this here as well as within the
+  // differentiation pass.
+  static SILGradientOptions getCanonicalGradientOptions() {
+    return SILGradientFlags::Seedable | SILGradientFlags::PreservingResult;
+  }
 
   /// Returns the "master" configuration, which all variants with the same
   /// parameter indices can derive from.
   static
-  SILReverseAutoDiffConfiguration getMaster(unsigned sourceIndex,
-                                            ArrayRef<unsigned> paramIndices) {
-    return { sourceIndex, paramIndices,
-             /*seedable*/ true, /*preservingResult*/ true };
+  SILReverseAutoDiffConfiguration getMaster(SILReverseAutoDiffIndices indices) {
+    return {
+      indices,
+      getCanonicalGradientOptions()
+    };
   }
 
-  bool isEqual(const SILReverseAutoDiffConfiguration &other) const {
-    return sourceIndex == other.sourceIndex &&
-           parameterIndices.equals(other.parameterIndices) &&
-           seedable == other.seedable &&
-           preservingResult == other.preservingResult;
+  SILReverseAutoDiffConfiguration getWithCanonicalOptions() const {
+    return getMaster(indices);
   }
 
   bool isMaster() const {
-    return seedable && preservingResult;
+    return options.toRaw() == getCanonicalGradientOptions().toRaw();
+  }
+
+  bool isEqual(const SILReverseAutoDiffConfiguration &other) const {
+    return indices.isEqual(other.indices) &&
+           options.toRaw() == other.options.toRaw();
   }
 };
 
@@ -109,47 +201,66 @@ struct SILReverseAutoDiffConfiguration {
 
 namespace llvm {
 
+using swift::SILReverseAutoDiffIndices;
 using swift::SILReverseAutoDiffConfiguration;
+using swift::SILGradientFlags;
+using swift::OptionSet;
 
 template<typename T> struct DenseMapInfo;
 
+template<> struct DenseMapInfo<SILReverseAutoDiffIndices> {
+  static SILReverseAutoDiffIndices getEmptyKey() {
+    return { DenseMapInfo<unsigned>::getEmptyKey(), { ~0U } };
+  }
+
+  static SILReverseAutoDiffIndices getTombstoneKey() {
+    return { DenseMapInfo<unsigned>::getTombstoneKey(), { ~0U - 1 } };
+  }
+
+  static unsigned getHashValue(const SILReverseAutoDiffIndices &Val) {
+    unsigned combinedHash =
+      hash_combine(~1U, DenseMapInfo<unsigned>::getHashValue(Val.source));
+    for (auto i : Val.parameters)
+      combinedHash = hash_combine(combinedHash,
+        DenseMapInfo<unsigned>::getHashValue(i));
+    return combinedHash;
+  }
+
+  static bool isEqual(const SILReverseAutoDiffIndices &LHS,
+                      const SILReverseAutoDiffIndices &RHS) {
+    return LHS.source == RHS.source &&
+           LHS.parameters.size() == RHS.parameters.size() &&
+           all_of(zip(LHS.parameters, RHS.parameters),
+                  [&](std::pair<unsigned, unsigned> pair) -> bool {
+                    return pair.first == pair.second;
+                  });
+  }
+};
+
 template<> struct DenseMapInfo<SILReverseAutoDiffConfiguration> {
   static SILReverseAutoDiffConfiguration getEmptyKey() {
-    return { DenseMapInfo<unsigned>::getEmptyKey(),
-             DenseMapInfo<ArrayRef<unsigned>>::getEmptyKey(),
-             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()),
-             static_cast<bool>(DenseMapInfo<unsigned>::getEmptyKey()) };
+    return { DenseMapInfo<SILReverseAutoDiffIndices>::getEmptyKey(), None };
   }
 
   static SILReverseAutoDiffConfiguration getTombstoneKey() {
-    return { DenseMapInfo<unsigned>::getTombstoneKey(),
-             DenseMapInfo<ArrayRef<unsigned>>::getTombstoneKey(),
-             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()),
-             static_cast<bool>(DenseMapInfo<unsigned>::getTombstoneKey()) };
+    return {
+      DenseMapInfo<SILReverseAutoDiffIndices>::getTombstoneKey(),
+      SILGradientFlags::Delayed
+    };
   }
 
   static unsigned getHashValue(const SILReverseAutoDiffConfiguration &Val) {
-    unsigned paramHash = ~1U;
-    for (auto i : Val.parameterIndices)
-      paramHash = hash_combine(paramHash,
-                               DenseMapInfo<unsigned>::getHashValue(i));
     return hash_combine(
-      paramHash,
-      DenseMapInfo<unsigned>::getHashValue(Val.seedable),
-      DenseMapInfo<unsigned>::getHashValue(Val.preservingResult)
+      DenseMapInfo<SILReverseAutoDiffIndices>::getHashValue(Val.indices),
+      DenseMapInfo<unsigned>::getHashValue(Val.options.toRaw())
     );
   }
 
   static bool isEqual(const SILReverseAutoDiffConfiguration &LHS,
                       const SILReverseAutoDiffConfiguration &RHS) {
-    auto numParams = LHS.parameterIndices.size();
-    if (numParams != RHS.parameterIndices.size())
-      return false;
-    for (unsigned i = 0; i < numParams; i++)
-      if (LHS.parameterIndices[i] != RHS.parameterIndices[i])
-        return false;
-    return LHS.seedable == RHS.seedable &&
-           LHS.preservingResult == LHS.preservingResult;
+    return DenseMapInfo<SILReverseAutoDiffIndices>
+             ::isEqual(LHS.indices, RHS.indices) &&
+           LHS.options.toRaw() == RHS.options.toRaw();
   }
 };
 
