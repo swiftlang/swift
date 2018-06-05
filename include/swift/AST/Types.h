@@ -2652,6 +2652,10 @@ public:
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
 
+    ValueOwnership getValueOwnership() const {
+      return Flags.getValueOwnership();
+    }
+
     bool operator==(Param const &b) const {
       return Label == b.Label && getType()->isEqual(b.getType()) &&
              Flags == b.Flags;
