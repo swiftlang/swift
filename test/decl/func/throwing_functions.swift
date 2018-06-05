@@ -153,3 +153,24 @@ let _ = rdar33040113() // expected-error {{call can throw but is not marked with
 // expected-note@-1 {{did you mean to use 'try'?}} {{9-9=try }}
 // expected-note@-2 {{did you mean to handle error as optional value?}} {{9-9=try? }}
 // expected-note@-3 {{did you mean to disable error propagation?}} {{9-9=try! }}
+
+enum MSV : Error {
+  case Foo, Bar, Baz
+  case CarriesInt(Int)
+}
+
+func genError() throws -> Int { throw MSV.Foo }
+
+struct IllegalContext {
+  var x: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
+
+  func foo(_ x: Int = genError()) {} // expected-error {{call can throw, but errors cannot be thrown out of a default argument}}
+
+  func catcher() throws {
+    do {
+      _ = try genError()
+    } catch MSV.CarriesInt(genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch pattern}}
+    } catch MSV.CarriesInt(let i) where i == genError() { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}}
+    }
+  }
+}
