@@ -2582,17 +2582,14 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // a struct instead").
   auto declContext = D->getDeclContext();
   switch (declContext->getContextKind()) {
+  case DeclContextKind::AbstractFunctionDecl:
+    // Nested functions are okay.
+    break;
   case DeclContextKind::FileUnit:
     // Top level functions are okay.
     break;
   case DeclContextKind::GenericTypeDecl:
     switch (cast<GenericTypeDecl>(declContext)->getKind()) {
-    case DeclKind::Constructor:
-    case DeclKind::Destructor:
-    case DeclKind::Func:
-    case DeclKind::Accessor:
-      // Functions are okay.
-      break;
     case DeclKind::Struct:
       // Structs are okay, if they are compiler-representable.
       // TODO(marcrasi): Check that it's compiler-representable.

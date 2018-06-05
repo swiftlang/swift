@@ -34,7 +34,7 @@
 func method(){}
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2:                  Begin completions, 10 items
+// KEYWORD2:                  Begin completions, 11 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
@@ -46,6 +46,7 @@ func method(){}
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
+// KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
