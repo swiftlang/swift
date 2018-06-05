@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -import-objc-header %S/Inputs/c_functions.h -primary-file %s -O -emit-ir -disable-llvm-optzns | %FileCheck %s
+// UNSUPPORTED: CPU=powerpc64le
 
 func return10() -> UInt32 {
 	return return7() + 3
