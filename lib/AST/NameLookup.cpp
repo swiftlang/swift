@@ -80,12 +80,32 @@ static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
     cast<ModuleDecl>(moduleScope)->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
 }
 
-bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
-  if (decls.empty())
+/// Determine whether the given declaration can be an override.
+static bool canBeAnOverride(ValueDecl *decl) {
+  // Only declarations within classes can have an overridden declaration.
+  if (!decl->getDeclContext()->getAsClassOrClassExtensionContext())
     return false;
 
+  // FIXME: We could rely on the presence of the 'override' keyword to
+  // narrow this check.
+  return true;
+}
+
+bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
+  if (decls.size() < 2)
+    return false;
+
+  auto lazyResolver = decls.front()->getASTContext().getLazyResolver();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
+    // Skip anything that can't be an override.
+    if (!canBeAnOverride(decl)) continue;
+
+    // Compute enough information to make the overridden-declaration available.
+    // FIXME: Narrow this check!
+    if (lazyResolver)
+      lazyResolver->resolveDeclSignature(decl);
+
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -1760,13 +1780,6 @@ bool DeclContext::lookupQualified(Type type,
   // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, ValueDecl *decl) -> bool {
-    // If the decl is currently being type checked, then we have something
-    // cyclic going on.  Instead of poking at parts that are potentially not
-    // set up, just assume it is acceptable.  This will make sure we produce an
-    // error later.
-    if (!decl->hasValidSignature())
-      return true;
-    
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -1785,8 +1798,12 @@ bool DeclContext::lookupQualified(Type type,
     }
 
     // Check access.
-    if (!(options & NL_IgnoreAccessControl))
+    if (!(options & NL_IgnoreAccessControl)) {
+      if (typeResolver)
+        typeResolver->resolveAccessControl(decl);
+
       return decl->isAccessibleFrom(this);
+    }
 
     return true;
   };
@@ -1827,11 +1844,6 @@ bool DeclContext::lookupQualified(Type type,
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
-
-      // Resolve the declaration signature when we find the
-      // declaration.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
 
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
