@@ -1478,6 +1478,43 @@ void TFDeabstraction::propagateTensorValues() {
   }
 }
 
+
+/// Create and return a new constant literal instruction for the specified
+/// scalar constant value.
+///
+/// TODO: this should eventually go away when we stop using literal instructions
+/// and builtin instructions to represent #tfop.  We should switch to a more
+/// principled design when we have a custom SIL instruction for graph ops.
+static SingleValueInstruction *
+emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
+                 SILBuilder &B) {
+  assert(symVal.isConstant() && "Not a constant value");
+
+  switch (symVal.getKind()) {
+  case SymbolicValue::Unknown:
+  case SymbolicValue::UninitMemory:
+  case SymbolicValue::Address:
+    assert(0 && "Shouldn't happen");
+  case SymbolicValue::Aggregate:
+  case SymbolicValue::String:
+  case SymbolicValue::Function:
+    // TODO: Unsupported right now.
+    return nullptr;
+
+  case SymbolicValue::Metatype: {
+    auto mt = MetatypeType::get(symVal.getMetatypeValue())->getCanonicalType();
+    return B.createMetatype(loc, SILType::getPrimitiveObjectType(mt));
+  }
+
+  case SymbolicValue::Integer:
+    return B.createIntegerLiteral(loc, type, symVal.getIntegerValue());
+  case SymbolicValue::Float:
+    return B.createFloatLiteral(loc, type, symVal.getFloatValue());
+  }
+}
+
+
+
 /// Decode the specified array constant value (which should be an
 /// array of constant integer or fp values) and add it as an expanded operand
 /// to the specified op that is being built up.
@@ -1513,7 +1550,7 @@ static void expandArrayConstant(ArrayRef<SymbolicValue> arrayElements,
 
     if (!elt || elt->getFunction() != forInst->getFunction()) {
       // Make a copy of the value, it may be computed.
-      elt = eltVal.emitConstantInst(B, arrayEltType, forInst->getLoc());
+      elt = emitConstantInst(eltVal, arrayEltType, forInst->getLoc(), B);
       elt->setDebugLocation(B.getSILDebugLocation(forInst->getLoc()));
     }
 
@@ -1556,9 +1593,11 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 
   // If we can't analyze the operands as arrays of constants, give up.
   auto scalarIt = constants.find(inst->getOperand(1));
-  if (scalarIt == constants.end()) return nullptr;
+  if (scalarIt == constants.end() || !scalarIt->second.isConstant())
+    return nullptr;
   auto shapeIt = constants.find(inst->getOperand(2));
-  if (shapeIt == constants.end()) return nullptr;
+  if (shapeIt == constants.end() || !shapeIt->second.isConstant())
+    return nullptr;
 
   // Okay, we were able to resolve the two arrays of constants.  Transform this
   // into the correct Const operation.
@@ -1652,7 +1691,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
 
   // If we can't analyze the scalars as an arrays of constants, give up.
   auto scalarIt = constants.find(inst->getOperand(1));
-  if (scalarIt == constants.end())
+  if (scalarIt == constants.end() || !scalarIt->second.isConstant())
     return nullptr;
 
   // We transform this into a __tfop_Const instruction, where the values are
@@ -1753,32 +1792,19 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
   // first SIL instruction that could not be folded.
   SmallVector<SymbolicValue, 32> results;
   constantEvaluator.computeConstantValues(valuesToCheck, results);
+  assert(valuesToCheck.size() == results.size() && "incorrect values returned");
 
   // Transform the returned information about constants into a map that we can
   // query.  The results list should correspond directly to the values we asked
   // about.
   DenseMap<SILValue, SymbolicValue> constants;
-
-  assert(valuesToCheck.size() == results.size() && "incorrect values returned");
-  for (unsigned i = 0, e = valuesToCheck.size(); i != e; ++i) {
-    // If this value is a non-constant, just ignore it.
-    if (!results[i].isConstant())
-      continue;
-
-    // Otherwise, add the information about it to our map.
+  for (unsigned i = 0, e = valuesToCheck.size(); i != e; ++i)
     constants.insert({valuesToCheck[i], results[i]});
-  }
-
 
   // Now that we've computed whether any of the operands are constants,
   // substitute them into the operations that we have, eliminating abstractions.
   // This makes it immediately obvious to partitioning what is and isn't a
   // constant.
-  //
-  // TODO: When something *isn't* a constant, we should diagnose why: is it a
-  // use of a non-constexpr function that caused the problem, or the use of
-  // some other thing that we can't analyze, like passing through a class?
-  //
   for (auto *&inst : tensorOps) {
     // Take a look at the various well known function calls that we can promote
     // to tensor operations.  We can promote them if we are able to constant
@@ -1865,12 +1891,14 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
         // evaluation logic.
         SILValue newVal;
         auto it = constants.find(operand);
+        assert(it != constants.end() &&
+               "out of sync with constant scanning loop above");
 
         // Given that we found a constant, materialize it as an instruction and
         // swap it in for our variable argument.
-        if (it != constants.end())
-          newVal = it->second.emitConstantInst(B, operand->getType(),
-                                               opInfo->inst->getLoc());
+        if (it->second.isConstant())
+          newVal = emitConstantInst(it->second, operand->getType(),
+                                    opInfo->inst->getLoc(), B);
 
         if (!newVal) {
           auto opClass = opInfo->operandClasses[i];
@@ -1885,6 +1913,38 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
                    diag::tf_op_misuse, error)
             .highlight(loc.getSourceRange());
           isError = true;
+
+          // If we have more specific information about what went wrong, emit a
+          // note.
+
+
+          // This is a limitation of our current implementation, because we
+          // don't have a SIL instruction for Tensor ops, and have to use
+          // emitConstantInst which can fail.
+          if (it->second.getKind() != SymbolicValue::Unknown)
+            break;
+
+          std::pair<SILNode *, UnknownReason> unknown =
+            it->second.getUnknownValue();
+          auto badInst = dyn_cast<SILInstruction>(unknown.first);
+          if (!badInst)
+            break;
+
+          switch (unknown.second) {
+          case UnknownReason::Default:
+            error = "could not fold operation";
+            break;
+          case UnknownReason::TooManyInstructions:
+            // TODO: Should pop up a level of the stack trace.
+            error = "constant expression too large to evaluate";
+            break;
+          }
+
+          loc = getUserSourceLocation(badInst);
+          diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+                   diag::tf_op_misuse_note, error)
+            .highlight(loc.getSourceRange());
+
           break;
         }
 
