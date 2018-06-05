@@ -3539,7 +3539,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 
   // Resolve the type.
   if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));
+    typeResolver->resolveIsObjC(const_cast<NominalTypeDecl *>(nominal));
 
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {

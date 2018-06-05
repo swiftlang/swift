@@ -1835,7 +1835,7 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     auto &ctx = classDecl->getASTContext();
     if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveDeclSignature(classDecl);
+      resolver->resolveIsObjC(classDecl);
 
     if (classDecl->isObjC())
       return ForeignRepresentableKind::Object;

@@ -80,17 +80,6 @@ static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
     cast<ModuleDecl>(moduleScope)->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
 }
 
-/// Determine whether the given declaration can be an override.
-static bool canBeAnOverride(ValueDecl *decl) {
-  // Only declarations within classes can have an overridden declaration.
-  if (!decl->getDeclContext()->getAsClassOrClassExtensionContext())
-    return false;
-
-  // FIXME: We could rely on the presence of the 'override' keyword to
-  // narrow this check.
-  return true;
-}
-
 bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.size() < 2)
     return false;
@@ -98,13 +87,9 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   auto lazyResolver = decls.front()->getASTContext().getLazyResolver();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
-    // Skip anything that can't be an override.
-    if (!canBeAnOverride(decl)) continue;
-
     // Compute enough information to make the overridden-declaration available.
-    // FIXME: Narrow this check!
     if (lazyResolver)
-      lazyResolver->resolveDeclSignature(decl);
+      lazyResolver->resolveOverriddenDecl(decl);
 
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
@@ -120,6 +105,10 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
+
+        if (lazyResolver)
+          lazyResolver->resolveOverriddenDecl(decl);
+
         continue;
       }
 
@@ -1909,17 +1898,20 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
       if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
+        typeResolver->resolveIsObjC(decl);
+
+      if (!decl->isObjC())
+        continue;
 
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
-      if (decl->getOverriddenDecl())
-        continue;
+      if (typeResolver)
+        typeResolver->resolveOverriddenDecl(decl);
 
-      // If the declaration is not @objc, it cannot be called dynamically.
-      if (!decl->isObjC())
+      if (decl->getOverriddenDecl())
         continue;
 
       auto dc = decl->getDeclContext();
