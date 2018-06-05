@@ -3981,7 +3981,7 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-  bool isNoReturnFunction(); // Defined in SILType.cpp
+  bool isNoReturnFunction() const; // Defined in SILType.cpp
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;
