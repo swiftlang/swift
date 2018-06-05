@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -148,8 +148,7 @@ static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
   assert(intValue.getBitWidth() == 1 &&
          "sema prevents non-int1 #assert condition");
   if (intValue.isNullValue()) {
-    auto *message = dyn_cast<StringLiteralInst>(builtinInst->getArguments()[1]);
-    assert(message && "argument to #assert must be a string literal");
+    auto *message = cast<StringLiteralInst>(builtinInst->getArguments()[1]);
     diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
              diag::pound_assert_failure, message->getValue());
     return;
