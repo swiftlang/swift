@@ -25,9 +25,9 @@ private let np = Python.import("numpy")
 
 extension ShapedArray : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PyValue) {
+  public init?(numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
-    guard Python.isinstance.call(with: numpyArray, np.ndarray) == true else {
+    guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`
@@ -66,9 +66,9 @@ extension ShapedArray : ConvertibleFromNumpyArray
 
 extension Tensor : ConvertibleFromNumpyArray
   where Scalar : NumpyScalarCompatible {
-  public init?(numpyArray: PyValue) {
+  public init?(numpyArray: PythonObject) {
     // Check if input is a `numpy.ndarray` instance.
-    guard Python.isinstance.call(with: numpyArray, np.ndarray) == true else {
+    guard Python.isinstance(numpyArray, np.ndarray) == true else {
       return nil
     }
     // Check if the dtype of the `ndarray` is compatible with the `Scalar`

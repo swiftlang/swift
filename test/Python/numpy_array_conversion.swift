@@ -66,7 +66,7 @@ NumpyArrayConversionTests.test("shapedarray-conversion") {
                 array)
   }
 
-  let numpyArrayFloat = np.ones([2, 3], dtype: np.float32)])
+  let numpyArrayFloat = np.ones([2, 3], dtype: np.float32)
   expectNil(ShapedArray<Double>(numpyArray: numpyArrayFloat))
   expectNil(ShapedArray<Int32>(numpyArray: numpyArrayFloat))
   if let array = expectNotNil(ShapedArray<Float>(numpyArray: numpyArrayFloat)) {
