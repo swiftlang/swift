@@ -37,17 +37,17 @@ let y = Tensor<Float>(2.0)
 let y2 = y*y*y*y
 
 // CHECK:   [[ONE:%.*]] = builtin "__tfop_tfc.scalarToTensor
-// CHECK:   [[ADD1:%.*]] = builtin "__tfop_Add,$in,$in"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
-// CHECK:   [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>)
-// CHECK:   builtin "__tfop_Sub,$in,$in"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>) : $TensorHandle<Float>
+// CHECK:   [[ADD1:%.*]] = builtin "__tfop_Add,$in,$in,T"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
+// CHECK:   [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in,T"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
+// CHECK:   builtin "__tfop_Sub,$in,$in,T"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type) : $TensorHandle<Float>
 // CHECK:   [[TWO:%.*]] = builtin "__tfop_tfc.scalarToTensor
 // CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
 // CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
-// CHECK:   [[MUL1:%.*]] = builtin "__tfop_Mul,$in,$in"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL1:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
 // CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
-// CHECK:   [[MUL2:%.*]] = builtin "__tfop_Mul,$in,$in"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL2:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
 // CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
-// CHECK:   [[MUL3:%.*]] = builtin "__tfop_Mul,$in,$in"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>)
+// CHECK:   [[MUL3:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
 
 // b/76155918
 let a: Tensor<Float> = [1, 2, 3]
