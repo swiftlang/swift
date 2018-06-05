@@ -363,3 +363,14 @@ class Derived : Base {
     while true {}
   }
 }
+
+// Inout writeback
+func takesInOut(value: inout SillyStruct) -> Never {
+  while true {}
+}
+
+struct SillyStruct {
+  mutating func mutatingMethod() -> Never {
+    takesInOut(value: &self)
+  }
+}
