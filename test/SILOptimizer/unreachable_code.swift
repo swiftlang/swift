@@ -374,3 +374,37 @@ struct SillyStruct {
     takesInOut(value: &self)
   }
 }
+
+// This triggers various problems
+public func genericMightBeNever<R>(
+  _ body: () -> R) -> R {
+  while true {}
+
+}
+
+func sillyGenericExample() -> Never {
+  return genericMightBeNever {
+    return genericMightBeNever {
+      return fatalError()
+    }
+  }
+}
+
+// https://bugs.swift.org/browse/SR-7472
+
+protocol P {
+    static var theThing: Self { get }
+}
+
+extension Never : P {
+    static var theThing: Never { return fatalError() }
+}
+
+func test<T: P>(_ type: T.Type) -> T {
+    return type.theThing
+}
+
+func f(i: Int?) {
+    guard i != nil else { Never.theThing }
+    guard i != nil else { test(Never.self) }
+}
