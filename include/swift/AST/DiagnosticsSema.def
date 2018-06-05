@@ -2436,6 +2436,11 @@ ERROR(differentiable_attr_ambiguous_function_identifier,none,
 ERROR(differentiable_attr_forward_mode_unsupported,none,
       "forward-mode automatic differentiation is not supported yet", ())
 
+ERROR(compiler_evaluable_bad_context,none,
+      "@compilerEvaluable functions not allowed here", ())
+ERROR(compiler_evaluable_loop,none,
+      "loops not allowed in @compilerEvaluable functions", ())
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------
