@@ -339,8 +339,10 @@ ERROR(static_report_error, none,
       "static report error", ())
 
 // SWIFT_ENABLE_TENSORFLOW
-WARNING(pound_assert_not_implemented,none,
-        "#assert doesn't actually do anything yet", ())
+ERROR(pound_assert_condition_not_constant,none,
+       "#assert condition not constant", ())
+ERROR(pound_assert_failure,none,
+       "%0", (StringRef))
 
 // Automatic differentiation diagnostics
 
