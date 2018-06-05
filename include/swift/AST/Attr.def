@@ -323,7 +323,7 @@ DECL_ATTR(differentiable, Differentiable,
           /* Not serialized */ 76)
 
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
-                 OnFunc | OnConstructor, 77)
+                 OnFunc | OnConstructor, /* Not serialized */ 77)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
