@@ -339,6 +339,12 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       return OmissionTypeName();
 
     // FIXME: Types that can be mapped, but aren't yet.
+    case clang::BuiltinType::ShortAccum:
+    case clang::BuiltinType::Accum:
+    case clang::BuiltinType::LongAccum:
+    case clang::BuiltinType::UShortAccum:
+    case clang::BuiltinType::UAccum:
+    case clang::BuiltinType::ULongAccum:
     case clang::BuiltinType::Half:
     case clang::BuiltinType::LongDouble:
     case clang::BuiltinType::Float16:
