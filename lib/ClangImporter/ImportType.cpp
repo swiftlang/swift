@@ -223,6 +223,12 @@ namespace {
         return Type();
 
       // FIXME: Types that can be mapped, but aren't yet.
+      case clang::BuiltinType::ShortAccum:
+      case clang::BuiltinType::Accum:
+      case clang::BuiltinType::LongAccum:
+      case clang::BuiltinType::UShortAccum:
+      case clang::BuiltinType::UAccum:
+      case clang::BuiltinType::ULongAccum:
       case clang::BuiltinType::Half:
       case clang::BuiltinType::Float16:
       case clang::BuiltinType::Float128:
