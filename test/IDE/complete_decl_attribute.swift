@@ -48,6 +48,7 @@ func method(){}
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
+// KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
