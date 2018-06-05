@@ -3210,7 +3210,7 @@ ERROR(unsupported_recursive_struct,none,
       (Type))
 
 WARNING(enum_not_constructible,none,
-        "enum with recursive-only cases is not constructible", ())
+        "enum containing only recursive cases is not constructible", ())
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
 ERROR(unsupported_infinitely_sized_type,none,
