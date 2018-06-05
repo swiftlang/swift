@@ -105,7 +105,7 @@ public func test1RecvScalar() {
 // the promoted tensor add on "x.scalar! + 2.0"
 // CHECK:      builtin "__tfop_Add,$in,$in,device"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
-// CHECK:      builtin "__tfop_Add,$in,$in,device"
+// CHECK:      builtin "__tfop_Add,$in,$in,T,device"
 
 // On host, we receive x, extract its scalar value, and then make a scalar
 // tensor to send back to device.
@@ -142,7 +142,7 @@ public func test1RecvTensor() {
 //
 // CHECK:      builtin "tensorflowSend_1"<TensorHandle<Float>>([[A:%.*]] : $TensorHandle<Float>)
 // CHECK-NEXT: [[B:%.*]] = builtin "tensorflowReceive_0"<TensorHandle<Float>>
-// CHECK:      builtin "__tfop_Add,$in,$in,device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
+// CHECK:      builtin "__tfop_Add,$in,$in,T,device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation

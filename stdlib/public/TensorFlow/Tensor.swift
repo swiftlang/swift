@@ -150,7 +150,7 @@ public extension Tensor where Scalar : Numeric {
   /// Perform an element-wise conversion from another `Tensor`.
   @_inlineable @inline(__always)
   init<OtherScalar : Numeric>(_ other: Tensor<OtherScalar>) {
-    self.init(handle: #tfop("Cast", other.handle, DstT: Scalar.self))
+    self = Raw.cast(other)
   }
 }
 
@@ -165,7 +165,7 @@ public extension Tensor {
   /// scalars).
   @_inlineable @inline(__always)
   init(_ elements: [Tensor]) {
-    self.init(handle: #tfop("Pack", elements))
+    self = Raw.pack(values: elements)
   }
 
   /// Creates a 1D tensor in from contiguous scalars in row-major order.
@@ -280,8 +280,8 @@ public extension Tensor {
   ///
   @_inlineable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
-    self.init(handle: #tfop("Fill", Tensor<Int32>(shape.dimensions),
-                            Tensor(repeatedValue)))
+    self = Raw.fill(
+      dims: Tensor<Int32>(shape.dimensions), value: Tensor(repeatedValue))
   }
 
   /// Creates a tensor by broadcasting the given scalar to a given rank with
@@ -289,7 +289,7 @@ public extension Tensor {
   @_inlineable @inline(__always)
   init(broadcasting scalar: Scalar, rank: Int32) {
     let shapeTensor = Tensor<Int32>(shape: [rank], repeating: 1)
-    self.init(handle: #tfop("Fill", shapeTensor, Tensor(scalar)))
+    self = Raw.fill(dims: shapeTensor, value: Tensor(scalar))
   }
 
   /// Creates a tensor of shape `[4]` from a 4-tuple.
@@ -499,11 +499,10 @@ public extension Tensor where Scalar : Numeric {
   ///
   @_inlineable @inline(__always)
   init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
-    self.init(
-      handle: #tfop(
-        "Range", Tensor(start), Tensor(end), Tensor(stride), Tidx: Scalar.self
-      )
-    )
+    self = Raw.range(
+      start: Tensor(start),
+      limit: Tensor(end),
+      delta: Tensor(stride))
   }
 
   /// Creates a one-hot tensor at given indices. The locations represented by
@@ -671,7 +670,9 @@ public extension AccelerableByTensorFlow {
   /// 1.
   @_inlineable @inline(__always)
   func makeTensor(withRank rank: Int32) -> Tensor<Self> {
-    return #tfop("Fill", Tensor<Int32>(ones: TensorShape(rank)), Tensor(self))
+    return Raw.fill(
+      dims: Tensor<Int32>(ones: TensorShape(rank)),
+      value: Tensor(self))
   }
 }
 
@@ -698,7 +699,7 @@ public extension Tensor {
     adjoint: _adjointReshaped(toShape:originalValue:seed:)
   )
   func reshaped(toShape newShape: Tensor<Int32>) -> Tensor {
-    return #tfop("Reshape", handle, newShape)
+    return Raw.reshape(self, shape: newShape)
   }
 
   /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
@@ -722,8 +723,7 @@ public extension Tensor {
     adjoint: _adjointExpandingShape(at:originalValue:seed:)
   )
   func expandingShape(at shapeIndex: Int32) -> Tensor {
-    return #tfop("ExpandDims", handle, Tensor<Int32>(shapeIndex),
-                 Tdim: Int32.self)
+    return Raw.expandDims(self, dim: Tensor<Int32>(shapeIndex))
   }
 
   /// Remove the specified dimensions of size 1 from the shape of a tensor. If
@@ -733,7 +733,7 @@ public extension Tensor {
   // ExpandDims only expands one axis at a time.
   @_inlineable @inline(__always)
   func squeezingShape(at axes: Int32...) -> Tensor {
-    return #tfop("Squeeze", handle, squeeze_dims: axes)
+    return Raw.squeeze(self, squeezeDims: axes)
   }
 
   /// Reshape to scalar.
