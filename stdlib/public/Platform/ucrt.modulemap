@@ -78,6 +78,11 @@ module ucrt [system] {
     }
 
     module POSIX {
+      module fcntl {
+        header "fcntl.h"
+        export *
+      }
+
       module sys {
         export *
 
