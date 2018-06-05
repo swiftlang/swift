@@ -118,6 +118,11 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
       encoder.setSamplerStates([smplr], range: 0..<1)
       encoder.setSamplerStates(
         [smplr], lodMinClamps: [0], lodMaxClamps: [0], range: 0..<1)
+        if #available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+        {
+            encoder.memoryBarrier([buf])
+            encoder.memoryBarrier(MTLBarrierScope.buffers)
+        }
       encoder.endEncoding()
     }
   }
@@ -203,6 +208,13 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
          encoder.setTileSamplerStates(
            [smplr], lodMinClamps: [0], lodMaxClamps: [0], range: 0..<1)
      #endif
+      #if os(OSX)
+        if #available(macOS 10.14, *)
+        {
+            encoder.memoryBarrier([buf], after:MTLRenderStages.fragment, before:MTLRenderStages.vertex)
+            encoder.memoryBarrier(MTLBarrierScope.renderTargets, after:MTLRenderStages.fragment, before:MTLRenderStages.vertex)
+        }
+      #endif
       encoder.endEncoding()
     }
   }
