@@ -4,7 +4,7 @@ import TensorFlow
 
 // TODO: move this to a #assert test.
 func recursive(a: Int) -> Int {
-  if a == 0 { return 0 }     // expected-note {{constant expression too large to evaluate}}
+  if a == 0 { return 0 }     // expected-note {{expression is too large to evaluate at compile-time}}
   return recursive(a: a-1)
 }
 public func recursion(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
