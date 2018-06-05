@@ -330,9 +330,14 @@ class FailingClass {
 // We should not report unreachable code inside protocol witness thunks
 
 protocol Fooable {
+  init()
   func foo() -> Never
 }
 struct Foo: Fooable {
+  init() { // no-warning
+    fatalError()
+  }
+
   func foo() -> Never { // no-warning
     while true {}
   }
@@ -340,12 +345,20 @@ struct Foo: Fooable {
 
 // We should not report unreachable code inside vtable thunks
 class Base {
+  required init(x: Int) {
+    fatalError()
+  }
+
   func foo(x: Int) -> Never {
     while true {}
   }
 }
 
 class Derived : Base {
+  required init(x: Int?) {
+    fatalError()
+  }
+
   override func foo(x: Int?) -> Never {
     while true {}
   }
