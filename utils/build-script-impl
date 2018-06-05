@@ -1751,6 +1751,7 @@ function set_lldb_xcodebuild_options() {
         LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
         SYMROOT="${lldb_build_dir}"
         OBJROOT="${lldb_build_dir}"
+        -UseNewBuildSystem=NO
         ${LLDB_EXTRA_XCODEBUILD_ARGS}
     )
     if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
