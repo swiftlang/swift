@@ -51,10 +51,8 @@ set(SOURCES
   # NumPy bridging for `ShapedArray`/`Tensor`.
   NumpyConversion.swift)
 
-message(STATUS "Maybe adding swift bindings.")
 # Copy TensorFlow bindings file, if it exists.
 if (TENSORFLOW_SWIFT_BINDINGS)
-  message(STATUS "Adding Swift bindings file to TensorFlow module: ${TENSORFLOW_SWIFT_BINDINGS}")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS}")
 endif()
 
