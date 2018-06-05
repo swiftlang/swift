@@ -3,6 +3,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar40799651
+
 import Network
 import Foundation
 import StdlibUnittest
