@@ -384,6 +384,9 @@ DECL_ATTR(differentiable, Differentiable,
           OnFunc | LongAttribute | NotSerialized,
           /* Not serialized */ 78)
 
+SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
+                 OnFunc | OnConstructor, /* Not serialized */ 79)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

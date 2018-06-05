@@ -5773,6 +5773,7 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(CompilerEvaluable)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
