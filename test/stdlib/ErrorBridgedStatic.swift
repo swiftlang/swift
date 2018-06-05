@@ -8,9 +8,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: static_stdlib
 
-// rdar://39473208
-// REQUIRES: asserts
-
 import StdlibUnittest
 
 class Bar: Foo {

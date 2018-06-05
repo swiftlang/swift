@@ -1195,14 +1195,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 13), "OSX");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 14), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(11, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(12, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(4, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(5, 0), "Simulator", "OS");
 
   } else {
     return false;

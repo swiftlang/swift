@@ -13,10 +13,12 @@
 #include <TargetConditionals.h>
 #include <Availability.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
 #include <dlfcn.h>
 #include <dispatch/dispatch.h>
 #include <os/base.h>
 #include <os/log.h>
+#include <os/signpost.h>
 #include <objc/runtime.h>
 #include <wchar.h>
 
@@ -99,9 +101,20 @@ API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))
 uint8_t *
 _os_log_pack_fill(os_log_pack_t pack, size_t size, int saved_errno, const void *dso, const char *fmt);
 
+API_AVAILABLE(macosx(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+uint8_t *
+_os_signpost_pack_fill(os_log_pack_t pack, size_t size,
+        int saved_errno, const void *dso, const char *fmt,
+        const char *spnm, os_signpost_id_t spid);
+
 API_AVAILABLE(macosx(10.12.4), ios(10.3), tvos(10.2), watchos(3.2))
 void
 os_log_pack_send(os_log_pack_t pack, os_log_t log, os_log_type_t type);
+
+API_AVAILABLE(macosx(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+void
+_os_signpost_pack_send(os_log_pack_t pack, os_log_t h,
+        os_signpost_type_t spty);
 
 static inline void
 _os_log_encode_arg(os_trace_blob_t ob, os_log_fmt_cmd_t cmd, const void *data)
@@ -111,7 +124,8 @@ _os_log_encode_arg(os_trace_blob_t ob, os_log_fmt_cmd_t cmd, const void *data)
 }
 
 static bool
-_os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, int saved_errno, os_trace_blob_t ob)
+_os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args,
+    int saved_errno, os_trace_blob_t ob)
 {
   os_log_fmt_hdr_s hdr = { };
   os_trace_blob_add(ob, &hdr, sizeof(hdr));
@@ -180,17 +194,27 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
             }
             break;
 
+#define encode_nsstring() ({ \
+  NSString *__arg = va_arg(args, NSString *); \
+  const char * _Nullable __var = __arg.UTF8String; \
+  cmd.cmd_size = sizeof(__var); \
+  _os_log_encode_arg(ob, &cmd, &__var); \
+  hdr.hdr_cmd_cnt++; \
+})
+
 #define encode_smallint(ty) ({ \
   int __var = va_arg(args, int); \
   cmd.cmd_size = sizeof(__var); \
   _os_log_encode_arg(ob, &cmd, &__var); \
-  hdr.hdr_cmd_cnt++; })
+  hdr.hdr_cmd_cnt++; \
+})
 
 #define encode(ty) ({ \
   ty __var = va_arg(args, ty); \
   cmd.cmd_size = sizeof(__var); \
   _os_log_encode_arg(ob, &cmd, &__var); \
-  hdr.hdr_cmd_cnt++; })
+  hdr.hdr_cmd_cnt++; \
+})
 
           /* fixed types */
           case 'c': // char
@@ -212,6 +236,12 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
               case T_PTRDIFF: encode(ptrdiff_t); break;
               default: return false;
             }
+            done = true;
+            break;
+
+          case 'C': // wchar is treated like %lc
+            cmd.cmd_type = OSLF_CMD_TYPE_SCALAR;
+            encode_smallint(wint_t);
             done = true;
             break;
 
@@ -243,24 +273,13 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
             done = true;
             break;
 
-#if 0
-          case 'C': // wide-char
-            value.type.wch = va_arg(args, wint_t);
-            _os_log_encode_arg(&value.type.wch, sizeof(value.type.wch), OS_LOG_BUFFER_VALUE_TYPE_SCALAR, flags, context);
+          case 's': // Strings sent from Swift as NSString objects
+            hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
+            cmd.cmd_type = OSLF_CMD_TYPE_STRING;
+            encode_nsstring();
+            precision = 0;
             done = true;
             break;
-#endif
-
-#if 0
-          // String types get sent from Swift as NSString objects.
-          case 's': // string
-            value.type.pch = va_arg(args, char *);
-            context->buffer->flags |= OS_LOG_BUFFER_HAS_NON_SCALAR;
-            _os_log_encode_arg(&value.type.pch, sizeof(value.type.pch), OS_LOG_BUFFER_VALUE_TYPE_STRING, flags, context);
-            prec = 0;
-            done = true;
-            break;
-#endif
 
           case '@': // CFTypeRef aka NSObject *
             hdr.hdr_flags |= OSLF_HDR_FLAG_HAS_NON_SCALAR;
@@ -298,12 +317,26 @@ _os_log_encode(char buf[OS_LOG_FMT_BUF_SIZE], const char *format, va_list args, 
   return true;
 }
 
+#undef encode_nsstring
 #undef encode_smallint
 #undef encode
 
 __attribute__((__visibility__("default")))
+void *
+_swift_os_log_return_address(void)
+{
+  return __builtin_return_address(1);
+}
+
+__attribute__((__visibility__("default")))
 void
-_swift_os_log(void *dso, void *retaddr, os_log_t oslog, os_log_type_t type, const char *format, va_list args)
+_swift_os_log(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_log_type_t type,
+    const char * _Nonnull fmt,
+    va_list args)
 {
   int saved_errno = errno; // %m
   char buf[OS_LOG_FMT_BUF_SIZE];
@@ -313,27 +346,83 @@ _swift_os_log(void *dso, void *retaddr, os_log_t oslog, os_log_type_t type, cons
     .ob_binary = true
   };
 
-  if (_os_log_encode(buf, format, args, saved_errno, &ob)) {
-    // Use os_log_pack_send where available.
+  if (_os_log_encode(buf, fmt, args, saved_errno, &ob)) {
     if (os_log_pack_send) {
       size_t sz = _os_log_pack_size(ob.ob_len);
-      union { os_log_pack_s pack; uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)]; } u;
-      // _os_log_encode has already packed `saved_errno` into a OSLF_CMD_TYPE_SCALAR command
-      // as the OSLF_CMD_TYPE_ERRNO does not deploy backwards, so passes zero for errno here.
-      uint8_t *ptr = _os_log_pack_fill(&u.pack, sz, 0, dso, format);
-      u.pack.olp_pc = retaddr;
+      union {
+        os_log_pack_s pack;
+        uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)];
+      } u;
+      /*
+       * _os_log_encode has already packed `saved_errno` into a
+       * OSLF_CMD_TYPE_SCALAR command as the OSLF_CMD_TYPE_ERRNO does not
+       * deploy backwards, so pass zero for errno here.
+       */
+      uint8_t *ptr = _os_log_pack_fill(&u.pack, sz, 0, dso, fmt);
+      u.pack.olp_pc = ra;
       memcpy(ptr, buf, ob.ob_len);
-      os_log_pack_send(&u.pack, oslog, type);
+      os_log_pack_send(&u.pack, h, type);
     } else {
-      _os_log_impl(dso, oslog, type, format, (uint8_t *)buf, ob.ob_len);
+      _os_log_impl((void *)dso, h, type, fmt, (uint8_t *)buf, ob.ob_len);
     }
   }
 }
 
+API_AVAILABLE(macosx(10.14), ios(12.0), tvos(12.0), watchos(5.0))
 __attribute__((__visibility__("default")))
-void *
-_swift_os_log_return_address(void)
+void
+_swift_os_signpost_with_format(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_signpost_type_t spty,
+    const char * _Nonnull spnm,
+    os_signpost_id_t spid,
+    const char * _Nullable fmt,
+    va_list args)
 {
-  return __builtin_return_address(1);
+  int saved_errno = errno; // %m
+  char buf[OS_LOG_FMT_BUF_SIZE];
+  os_trace_blob_s ob = {
+    .ob_s = buf,
+    .ob_size = OS_LOG_FMT_BUF_SIZE,
+    .ob_maxsize = OS_LOG_FMT_BUF_SIZE,
+    .ob_binary = true
+  };
+
+  /*
+   * Signposts with a signpost name but no message/arguments are valid;
+   * the underlying encode/pack/decode infrastructure agrees to treat
+   * these like having an empty format string.
+   */
+  bool encoded = fmt == NULL ?
+      _os_log_encode(buf, "", args, saved_errno, &ob) :
+      _os_log_encode(buf, fmt, args, saved_errno, &ob);
+  if (encoded) {
+    size_t sz = _os_log_pack_size(ob.ob_len);
+    union {
+      os_log_pack_s pack;
+      uint8_t buf[OS_LOG_FMT_BUF_SIZE + sizeof(os_log_pack_s)];
+    } u;
+    uint8_t *ptr = _os_signpost_pack_fill(&u.pack, sz, saved_errno, dso,
+        fmt, spnm, spid);
+    u.pack.olp_pc = ra;
+    memcpy(ptr, buf, ob.ob_len);
+    _os_signpost_pack_send(&u.pack, h, spty);
+  }
 }
 
+API_AVAILABLE(macosx(10.14), ios(12.0), tvos(12.0), watchos(5.0))
+__attribute__((__visibility__("default")))
+void
+_swift_os_signpost(
+    const void * _Nullable dso,
+    const void * _Nullable ra,
+    os_log_t _Nonnull h,
+    os_signpost_type_t spty,
+    const char * _Nonnull spnm,
+    os_signpost_id_t spid)
+{
+  va_list x;
+  _swift_os_signpost_with_format(dso, ra, h, spty, spnm, spid, NULL, x);
+}
