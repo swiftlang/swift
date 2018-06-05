@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/PassManager/Passes.h"
+#include "TFConstExpr.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -25,6 +26,7 @@
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
+using namespace tf;
 
 template<typename...T, typename...U>
 static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
@@ -117,13 +119,39 @@ static void diagnoseStaticReports(const SILInstruction *I,
 // SWIFT_ENABLE_TENSORFLOW
 /// \brief Emit a diagnostic for `poundAssert` builtins whose condition is
 /// false or whose condition cannot be evaluated.
-/// TODO(clattner / marcrasi): Implement this for real.
 static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
-  if (auto *builtinInst = dyn_cast<BuiltinInst>(I)) {
-    if (builtinInst->getBuiltinKind() == BuiltinValueKind::PoundAssert) {
-      diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
-               diag::pound_assert_not_implemented);
-    }
+  auto *builtinInst = dyn_cast<BuiltinInst>(I);
+  if (!builtinInst ||
+      builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
+    return;
+
+  // TODO(marcrasi / clattner): Instantiate this earlier so that its cache
+  // is useful. We don't right now, because instantiating one for every
+  // function greatly slows down or hangs compilation (e.g. compiling
+  // libswiftStdlibUnicodeUnittest.so slows down from <1min to >1hr).
+  ConstExprEvaluator constantEvaluator(M);
+
+  SmallVector<SymbolicValue, 1> values;
+  constantEvaluator.computeConstantValues({builtinInst->getArguments()[0]},
+                                          values);
+  SymbolicValue value = values[0];
+  if (!value.isConstant()) {
+    // TODO(marcrasi / clattner): Emit more informative error.
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_condition_not_constant);
+    return;
+  }
+  assert(value.getTypeKind() == SymbolicValue::TKInteger &&
+         "sema prevents non-integer #assert condition");
+
+  APInt intValue = value.getIntegerValue();
+  assert(intValue.getBitWidth() == 1 &&
+         "sema prevents non-int1 #assert condition");
+  if (intValue.isNullValue()) {
+    auto *message = cast<StringLiteralInst>(builtinInst->getArguments()[1]);
+    diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
+             diag::pound_assert_failure, message->getValue());
+    return;
   }
 }
 
