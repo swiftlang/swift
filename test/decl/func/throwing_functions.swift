@@ -205,19 +205,19 @@ struct IllegalContext {
     }
   }()
 
-  lazy var y1: Int = genError() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  lazy var y1: Int = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y2 = genError() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  lazy var y2 = genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y3 = try genError() // expected-error {{errors thrown from here are not handled}}
+  lazy var y3 = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y4: Int = try genError() // expected-error {{errors thrown from here are not handled}}
+  lazy var y4: Int = try genError() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y5 = B() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  lazy var y5 = B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y6 = try B() // expected-error {{errors thrown from here are not handled}}
+  lazy var y6 = try B() // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  lazy var y7 = { // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled}}
+  lazy var y7 = { // expected-error {{call can throw, but errors cannot be thrown out of a property initializer}}
     return try genError()
   }()
 
