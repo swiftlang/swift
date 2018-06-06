@@ -1409,7 +1409,8 @@ private:
 
     // HACK: functions can get queued multiple times in
     // definedFunctions, so be sure to be idempotent.
-    if (!E->isThrowsSet()) {
+    if (!E->isThrowsSet() &&
+        classification.getResult() != ThrowingKind::Invalid) {
       E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
                    classification.getResult() == ThrowingKind::Throws);
     }
@@ -1483,6 +1484,9 @@ private:
       Flags.set(ContextFlags::HasAnyThrowSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
 
+      // We set the throwing bit of an apply expr after performing this
+      // analysis, so ensure we don't emit duplicate diagnostics for functions
+      // that have been queued multiple times.
       if (auto expr = E.dyn_cast<Expr*>())
         if (auto apply = dyn_cast<ApplyExpr>(expr))
           if (apply->isThrowsSet())
