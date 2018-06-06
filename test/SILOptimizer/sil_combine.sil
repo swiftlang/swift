@@ -360,6 +360,53 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
   return %6 : $((Builtin.Int8, Builtin.Int8), Builtin.Int8)
 }
 
+// CHECK-LABEL: sil @optimize_load_first_char_from_string_literal
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 97
+// CHECK-NEXT:   return %0
+sil @optimize_load_first_char_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = string_literal utf8 "abc123a"
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %2 = struct_element_addr %1 : $*UInt8, #UInt8._value
+  %3 = load %2 : $*Builtin.Int8
+  return %3 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil @optimize_load_from_string_literal
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int8, 49
+// CHECK-NEXT:   return %0
+sil @optimize_load_from_string_literal : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+  %0 = string_literal utf8 "abc123a"
+  %1 = integer_literal $Builtin.Word, 3
+  %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %3 = index_addr %2 : $*UInt8, %1 : $Builtin.Word
+  %4 = struct_element_addr %3 : $*UInt8, #UInt8._value
+  %5 = load %4 : $*Builtin.Int8
+  return %5 : $Builtin.Int8
+}
+
+// CHECK-LABEL: sil @optimize_nested_index_addr
+// CHECK:      bb0(%0 : $Builtin.RawPointer):
+// CHECK-NEXT:   %1 = pointer_to_address %0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Word, 10
+// CHECK-NEXT:   %3 = index_addr %1 : $*UInt8, %2
+// CHECK-NEXT:   %4 = address_to_pointer %3
+// CHECK-NEXT:   return %4
+sil @optimize_nested_index_addr : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = integer_literal $Builtin.Word, 3
+  %2 = integer_literal $Builtin.Word, 7
+  %3 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*UInt8
+  %4 = index_addr %3 : $*UInt8, %1 : $Builtin.Word
+  %5 = index_addr %4 : $*UInt8, %2 : $Builtin.Word
+  %6 = address_to_pointer %5 : $*UInt8 to $Builtin.RawPointer
+  return %6 : $Builtin.RawPointer
+}
+
+
 // CHECK-LABEL: sil @release_value_test
 // CHECK: bb0({{%[0-9]+}} : $Builtin.Int8, [[RELEASE_TARGET:%[0-9]+]] : $Builtin.NativeObject):
 // CHECK-NEXT: strong_release [[RELEASE_TARGET]] : $Builtin.NativeObject
