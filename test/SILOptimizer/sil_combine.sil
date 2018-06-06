@@ -3579,3 +3579,61 @@ bb0(%0 : $Builtin.Int64):
   strong_retain %2 : $Builtin.BridgeObject
   return %2 : $Builtin.BridgeObject
 }
+
+// CHECK-LABEL: sil @optimize_stringObject_bit_operations
+// CHECK:      bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int64, 4611686018427387904
+// CHECK-NEXT:   return %0
+sil @optimize_stringObject_bit_operations : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %2 = string_literal utf8 "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 13835058055282163712
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 6917529027641081856
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_optimize_stringObject_bit_operations1
+// CHECK:   builtin "stringObjectOr_Int64"
+// CHECK:   builtin "and_Int64"
+sil @dont_optimize_stringObject_bit_operations1 : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%2 : $Builtin.RawPointer):
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, -9223372036854775808
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 4611686018427387904
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_optimize_stringObject_bit_operations2
+// CHECK:   builtin "stringObjectOr_Int64"
+// CHECK:   builtin "and_Int64"
+sil @dont_optimize_stringObject_bit_operations2 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %2 = string_literal utf8 "thequickbrownfoxjumpsoverthelazydogusingasmanycharacteraspossible123456789"
+  %5 = builtin "ptrtoint_Word"(%2 : $Builtin.RawPointer) : $Builtin.Word
+  %6 = builtin "zextOrBitCast_Word_Int64"(%5 : $Builtin.Word) : $Builtin.Int64
+  %9 = integer_literal $Builtin.Int64, 13835058055282163712
+  %10 = builtin "stringObjectOr_Int64"(%6 : $Builtin.Int64, %9 : $Builtin.Int64) : $Builtin.Int64
+  %11 = struct $UInt64 (%10 : $Builtin.Int64)
+  %12 = value_to_bridge_object %11 : $UInt64
+  %33 = unchecked_trivial_bit_cast %12 : $Builtin.BridgeObject to $UInt64
+  %34 = integer_literal $Builtin.Int64, 1152921504606846975
+  %35 = struct_extract %33 : $UInt64, #UInt64._value
+  %36 = builtin "and_Int64"(%35 : $Builtin.Int64, %34 : $Builtin.Int64) : $Builtin.Int64
+  return %36 : $Builtin.Int64
+}
+
