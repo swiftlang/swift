@@ -117,6 +117,18 @@ Type InheritedTypeRequest::operator()(
   return inheritedType ? inheritedType : ErrorType::get(tc.Context);
 }
 
+void InheritedTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  diags.diagnose(typeLoc.getLoc(), diag::circular_reference);
+}
+
+void InheritedTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  const auto &storage = getStorage();
+  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  diags.diagnose(typeLoc.getLoc(), diag::circular_reference_through);
+}
+
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
   auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
@@ -218,15 +230,15 @@ Type EnumRawTypeRequest::operator()(Evaluator &evaluator,
 
 void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
-  auto classDecl = std::get<0>(getStorage());
-  std::string className = "'" + std::string(classDecl->getNameStr()) + "'";
-  diags.diagnose(classDecl, diag::circular_class_inheritance, className);
+  auto enumDecl = std::get<0>(getStorage());
+  std::string className = "'" + std::string(enumDecl->getNameStr()) + "'";
+  diags.diagnose(enumDecl, diag::circular_enum_inheritance, className);
 }
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto classDecl = std::get<0>(getStorage());
+  auto enumDecl = std::get<0>(getStorage());
   // FIXME: Customize this further.
-  diags.diagnose(classDecl, diag::circular_reference_through);
+  diags.diagnose(enumDecl, diag::circular_reference_through);
 }
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {

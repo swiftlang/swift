@@ -58,8 +58,8 @@ private:
 public:
   // Cycle handling
   Type breakCycle() const { return Type(); }
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Caching
   bool isCached() const { return true; }
