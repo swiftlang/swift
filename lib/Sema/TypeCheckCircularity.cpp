@@ -169,7 +169,7 @@ private:
   bool diagnoseInfiniteRecursion(CanType parentType, ValueDecl *member,
                                  CanType memberType);
 
-  void diagnoseNotConstructible(EnumDecl *E);
+  void diagnoseNonWellFoundedEnum(EnumDecl *E);
 
   void addPathElementsTo(Path &path, CanType type);
   void addPathElement(Path &path, ValueDecl *member, CanType memberType);
@@ -275,7 +275,8 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
                                    unsigned depth) {
   // Indirect enums are representational leaves.
   if (E->isIndirect()) {
-    diagnoseNotConstructible(E);
+    // Diagnose whether the enum is non-well-founded before bailing
+    diagnoseNonWellFoundedEnum(E);
     return false;
   }
 
@@ -303,7 +304,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (addMember(type, elt, eltType, depth))
       return true;
   }
-  diagnoseNotConstructible(E);
+  diagnoseNonWellFoundedEnum(E);
 
   return false;
 }
@@ -608,9 +609,10 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
   return true;
 }
 
-/// Show a warning if the enum is not constructible. The outcome of this method
-/// is irrelevant.
-void CircularityChecker::diagnoseNotConstructible(EnumDecl *E) {
+/// Show a warning if all cases of the given enum are recursive,
+/// making it impossible to be instantiated. Such an enum is 'non-well-founded'.
+/// The outcome of this method is irrelevant.
+void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
 
   auto containsType = [](TupleType *tuple, Type E) -> bool {
     for (auto type: tuple->getElementTypes()) {
@@ -619,7 +621,7 @@ void CircularityChecker::diagnoseNotConstructible(EnumDecl *E) {
     }
     return false;
   };
-  auto isNotConstructible = [containsType, E]() -> bool {
+  auto isNonWellFounded = [containsType, E]() -> bool {
     auto elts = E->getAllElements();
     if (elts.empty())
       return false;
@@ -644,6 +646,6 @@ void CircularityChecker::diagnoseNotConstructible(EnumDecl *E) {
     return true;
   };
 
-  if (isNotConstructible())
-    TC.diagnose(E, diag::enum_not_constructible);
+  if (isNonWellFounded())
+    TC.diagnose(E, diag::enum_non_well_founded);
 }
