@@ -141,7 +141,7 @@ static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
              diag::pound_assert_condition_not_constant);
     return;
   }
-  assert(value.getTypeKind() == SymbolicValue::TKInteger &&
+  assert(value.getKind() == SymbolicValue::Integer &&
          "sema prevents non-integer #assert condition");
 
   APInt intValue = value.getIntegerValue();
