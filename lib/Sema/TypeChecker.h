@@ -581,6 +581,7 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
   options -= TypeResolutionFlags::EnumCase;
+  options -= TypeResolutionFlags::SubscriptParameters;
   options -= TypeResolutionFlags::ImmediateOptionalTypeArgument;
   options -= TypeResolutionFlags::AllowIUO;
   if (!preserveSIL) options -= TypeResolutionFlags::SILType;

@@ -319,3 +319,16 @@ struct SR2575 {
 }
 
 SR2575().subscript() // expected-error{{type 'SR2575' has no member 'subscript'}}
+
+// SR-7890
+
+struct InOutSubscripts {
+  subscript(x1: inout Int) -> Int { return 0 }
+  // expected-error@-1 {{'inout' must not be used on subscript parameters}}
+
+  subscript(x2: inout Int, y2: inout Int) -> Int { return 0 }
+  // expected-error@-1 2{{'inout' must not be used on subscript parameters}}
+
+  subscript(x3: (inout Int) -> ()) -> Int { return 0 } // ok
+  subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
+}
