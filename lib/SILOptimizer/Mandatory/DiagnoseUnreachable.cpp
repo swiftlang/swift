@@ -423,6 +423,20 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
     if (BI->getModule().isNoReturnBuiltinOrIntrinsic(BI->getName()))
       return BI;
   }
+
+  // These appear in accessors for stored properties with uninhabited
+  // type. Since a type containing an uninhabited stored property is
+  // itself uninhabited, we treat these identically to fatalError(), etc.
+  if (auto *SEI = dyn_cast<StructExtractInst>(I)) {
+    if (SEI->getType().getASTType()->isUninhabited())
+      return SEI;
+  }
+
+  if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
+    if (SEAI->getType().getASTType()->isUninhabited())
+      return SEAI;
+  }
+
   return nullptr;
 }
 
