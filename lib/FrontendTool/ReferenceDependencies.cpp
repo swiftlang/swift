@@ -23,6 +23,7 @@
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Types.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ReferenceDependencyKeys.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
@@ -31,6 +32,7 @@
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
+using namespace reference_dependency_keys;
 
 namespace {
 class ReferenceDependenciesEmitter {
@@ -214,11 +216,11 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
-  out << "interface-hash" << ": \"" << interfaceHash << "\"\n";
+  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash << "\"\n";
 }
 
 ProvidesEmitter::CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelNames() const {
-  out << "provides-top-level" << ":\n";
+  out << providesTopLevel << ":\n";
   
   CollectedProvidedDeclarations cpd;
   for (const Decl *D : SF->Decls)
@@ -362,7 +364,7 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
 
 void ProvidesEmitter::emitNominalTypes(
     const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) const {
-  out << "provides-nominal" << ":\n";
+  out << providesNominal << ":\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
       continue;
@@ -374,14 +376,14 @@ void ProvidesEmitter::emitNominalTypes(
 
 void ProvidesEmitter::emitMembers(
     const CollectedProvidedDeclarations &cpd) const {
-  out << "provides-member" << ":\n";
+  out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
     out << mangleTypeAsContext(entry.first);
     out << "\", \"\"]\n";
   }
 
-  // This is also part of "provides-member".
+  // This is also part of providesMember.
   for (auto *ED : cpd.extensionsWithJustMembers) {
     auto mangledName =
         mangleTypeAsContext(ED->getExtendedType()->getAnyNominal());
@@ -404,7 +406,7 @@ void ProvidesEmitter::emitDynamicLookupMembers() const {
     // We should (a) see if there's a cheaper way to keep it up to date,
     // and/or (b) see if we can fast-path cases where there's no ObjC
     // involved.
-    out << "provides-dynamic-lookup" << ":\n";
+    out << providesDynamicLookup << ":\n";
     class NameCollector : public VisibleDeclConsumer {
     private:
       SmallVector<DeclBaseName, 16> names;
@@ -520,7 +522,7 @@ void DependsEmitter::emit() const {
 }
 
 void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracker) const {
-  out << "depends-top-level" << ":\n";
+  out << dependsTopLevel << ":\n";
   for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
     out << "- ";
@@ -531,7 +533,7 @@ void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracke
 }
 
 void DependsEmitter::emitMember(ArrayRef<MemberTableEntryTy> sortedMembers) const {
-  out << "depends-member" << ":\n";
+  out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
     if (entry.first.first->hasAccess() &&
@@ -551,7 +553,7 @@ void DependsEmitter::emitMember(ArrayRef<MemberTableEntryTy> sortedMembers) cons
 }
 
 void DependsEmitter::emitNominal(ArrayRef<MemberTableEntryTy> sortedMembers) const {
-  out << "depends-nominal" << ":\n";
+  out << dependsNominal << ":\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
     while (i+1 != e && i[0].first.first == i[1].first.first) {
@@ -573,7 +575,7 @@ void DependsEmitter::emitNominal(ArrayRef<MemberTableEntryTy> sortedMembers) con
 }
 
 void DependsEmitter::emitDynamicLookup(const ReferencedNameTracker *const tracker) const {
-  out << "depends-dynamic-lookup" << ":\n";
+  out << dependsDynamicLookup << ":\n";
   for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
     out << "- ";
@@ -584,7 +586,7 @@ void DependsEmitter::emitDynamicLookup(const ReferencedNameTracker *const tracke
 }
 
 void DependsEmitter::emitExternal(const DependencyTracker &depTracker) const {
-  out << "depends-external" << ":\n";
+  out << dependsExternal << ":\n";
   for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
