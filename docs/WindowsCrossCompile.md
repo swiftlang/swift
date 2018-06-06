@@ -32,13 +32,34 @@ build the static libraries. Note that cross-compiling will require the use of
 `lld`. Ensure that `lld-link.exe` is available to clang via your path.
 Additionally, the ICU headers and libraries need to be provided for the build.
 
+#### macOS
+
 ```bash
---extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE, \
-  -DCMAKE_AR=<path to llvm-ar>, \
-  -DCMAKE_RANLIB=<path to llvm-ranlib>, \
-  -DSWIFT_SDKS=WINDOWS, \
-  -DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>, \
-  -DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>, \
-  -DSWIFT_WINDOWS_ICU_I18N=<path to ICU i18n lib>, \
-  -DSWIFT_WINDOWS_ICU_UC=<path to ICU UC lib>
+--extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
+-DCMAKE_AR=<path to llvm-ar>,\
+-DCMAKE_RANLIB=<path to llvm-ranlib>,\
+-DSWIFT_SDKS=WINDOWS,\
+-DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
+-DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>,\
+-DSWIFT_WINDOWS_ICU_I18N=<path to ICU i18n lib>,\
+-DSWIFT_WINDOWS_ICU_UC=<path to ICU UC lib>
 ```
+
+#### Linux
+
+For Linux, there are a few issues that require slightly different cmake options.
+
+```bash
+--extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
+-DCMAKE_AR=<path to llvm-ar>,\
+-DCMAKE_RANLIB=<path to llvm-ranlib>,\
+-DSWIFT_SDKS='LINUX;WINDOWS',\
+-DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
+-DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=<path to ICU UC includes>,\
+-DSWIFT_WINDOWS_x86_64_ICU_I18N=<path to ICU i18n lib>,\
+-DSWIFT_WINDOWS_x86_64_ICU_UC=<path to ICU UC lib>
+```
+
+## 4. Build the Swift runtime and standard library with `ninja`
+From the build directory, you can build the Swift runtime and standard library
+for Windows using `ninja swiftCore-windows-x86_64`.
