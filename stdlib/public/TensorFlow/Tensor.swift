@@ -536,10 +536,12 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   init(oneHotAtIndices indices: Tensor<Int32>, depth: Int32,
        onValue: Scalar = 1, offValue: Scalar = 0, axis: Int = -1) {
-    self.init(
-      handle: #tfop("OneHot", indices, Tensor<Int32>(depth),
-                    Tensor(onValue), Tensor(offValue),
-                    axis: axis, T: Scalar.self, TI: Int32.self)
+    self = Raw.oneHot(
+      indices: indices,
+      depth: Tensor<Int32>(depth),
+      onValue: Tensor(onValue),
+      offValue: Tensor(offValue),
+      axis: Int64(axis)
     )
   }
 }
