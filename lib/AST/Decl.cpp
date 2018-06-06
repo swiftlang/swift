@@ -2751,6 +2751,15 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = false;
 }
 
+Type EnumDecl::getRawType() const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getRawType(const_cast<EnumDecl *>(this));
+  }
+
+  return LazySemanticInfo.RawType.getPointer();
+}
+
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)

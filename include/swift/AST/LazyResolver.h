@@ -81,7 +81,7 @@ public:
   virtual Type getSuperclass(const ClassDecl *classDecl) = 0;
 
   /// Resolve the raw type of the given enum.
-  virtual void resolveRawType(EnumDecl *enumDecl) = 0;
+  virtual Type getRawType(EnumDecl *enumDecl) = 0;
 
   /// Resolve the inherited protocols of a given protocol.
   virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;

@@ -3162,6 +3162,8 @@ class EnumDecl final : public NominalTypeDecl {
   } LazySemanticInfo;
 
   friend class IterativeTypeChecker;
+  friend class EnumRawTypeRequest;
+  friend class TypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3278,14 +3280,11 @@ public:
   }
   
   /// Determine whether this enum declares a raw type in its inheritance clause.
-  bool hasRawType() const {
-    return (bool)LazySemanticInfo.RawType.getPointer();
-  }
+  bool hasRawType() const { return (bool)getRawType(); }
+
   /// Retrieve the declared raw type of the enum from its inheritance clause,
   /// or null if it has none.
-  Type getRawType() const {
-    return LazySemanticInfo.RawType.getPointer();
-  }
+  Type getRawType() const;
 
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) {

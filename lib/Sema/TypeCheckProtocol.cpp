@@ -3677,7 +3677,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         DerivedConformance::derivesProtocolConformance(TC, DC, enumDecl,
                                                        Proto) &&
-        enumDecl->hasRawType()) {
+        enumDecl->hasRawType() &&
+        !enumDecl->getRawType()->is<ErrorType>()) {
 
       auto rawType = enumDecl->getRawType();
 

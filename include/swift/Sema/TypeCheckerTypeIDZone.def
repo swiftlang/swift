@@ -16,3 +16,4 @@
 //===----------------------------------------------------------------------===//
 SWIFT_TYPEID(InheritedTypeRequest)
 SWIFT_TYPEID(SuperclassTypeRequest)
+SWIFT_TYPEID(EnumRawTypeRequest)

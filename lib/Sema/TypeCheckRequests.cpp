@@ -192,3 +192,52 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
   auto classDecl = std::get<0>(getStorage());
   classDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
 }
+
+//----------------------------------------------------------------------------//
+// Enum raw type computation.
+//----------------------------------------------------------------------------//
+Type EnumRawTypeRequest::operator()(Evaluator &evaluator,
+                                    EnumDecl *enumDecl) const {
+  for (unsigned int idx : indices(enumDecl->getInherited())) {
+    Type inheritedType = evaluator(InheritedTypeRequest{enumDecl, idx});
+    if (!inheritedType) continue;
+
+    // Skip existential types.
+    if (inheritedType->isExistentialType()) continue;
+
+    // We found a raw type; return it.
+    if (inheritedType->hasArchetype())
+      return inheritedType->mapTypeOutOfContext();
+
+    return inheritedType;
+  }
+
+  // No raw type.
+  return Type();
+}
+
+void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // FIXME: Improve this diagnostic.
+  auto classDecl = std::get<0>(getStorage());
+  std::string className = "'" + std::string(classDecl->getNameStr()) + "'";
+  diags.diagnose(classDecl, diag::circular_class_inheritance, className);
+}
+
+void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto classDecl = std::get<0>(getStorage());
+  // FIXME: Customize this further.
+  diags.diagnose(classDecl, diag::circular_reference_through);
+}
+
+Optional<Type> EnumRawTypeRequest::getCachedResult() const {
+  auto enumDecl = std::get<0>(getStorage());
+  if (enumDecl->LazySemanticInfo.RawType.getInt())
+    return enumDecl->LazySemanticInfo.RawType.getPointer();
+
+  return None;
+}
+
+void EnumRawTypeRequest::cacheResult(Type value) const {
+  auto enumDecl = std::get<0>(getStorage());
+  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+}

@@ -238,9 +238,8 @@ Type TypeChecker::getSuperclass(const ClassDecl *classDecl) {
            SuperclassTypeRequest(const_cast<ClassDecl *>(classDecl)));
 }
 
-void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestTypeCheckRawType(enumDecl));
+Type TypeChecker::getRawType(EnumDecl *enumDecl) {
+  return Context.evaluator(EnumRawTypeRequest(enumDecl));
 }
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
@@ -642,13 +641,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       ++i;
     }
-  }
-  // Set the superclass.
-  else if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-    enumDecl->setRawType(superclassTy);
-  } else {
-    assert(!superclassTy || isa<AbstractTypeParamDecl>(decl));
   }
 }
 

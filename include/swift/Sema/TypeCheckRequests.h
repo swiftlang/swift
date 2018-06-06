@@ -95,6 +95,34 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Request the raw type of the given enum.
+class EnumRawTypeRequest :
+    public SimpleRequest<EnumRawTypeRequest,
+                         CacheKind::SeparatelyCached,
+                         Type,
+                         EnumDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+  using SimpleRequest::operator();
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  Type operator()(Evaluator &evaluator, EnumDecl *enumDecl) const;
+
+public:
+  // Cycle handling
+  Type breakCycle() const { return Type(); }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 #define SWIFT_TYPEID_ZONE 10
 #define SWIFT_TYPEID_HEADER "swift/Sema/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

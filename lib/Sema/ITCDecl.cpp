@@ -210,13 +210,10 @@ void IterativeTypeChecker::processTypeCheckRawType(
     rawType = inherited.getType();
     break;
   }
-
-  // Set the raw type.
-  enumDecl->setRawType(rawType);
 }
 
 bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
-  enumDecl->setRawType(ErrorType::get(getASTContext()));
+  enumDecl->setRawType(Type());
   return true;
 }
 

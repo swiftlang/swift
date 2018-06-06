@@ -1082,8 +1082,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
-    if (resolver)
-      resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
