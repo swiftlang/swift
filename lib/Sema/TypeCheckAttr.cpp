@@ -2221,7 +2221,7 @@ static FuncDecl *getResolvedFuncDecl(
     DeclName funcName, SourceLoc funcNameLoc, TypeChecker &TC,
     DeclContext *lookupContext,
     const std::function<bool(FuncDecl *)> &isValidFuncDecl,
-    const std::function<bool(FuncDecl *)> &isValidTypeContext,
+    const std::function<bool(FuncDecl *)> &hasValidTypeContext,
     const std::function<void()> &overloadDiagnostic,
     const std::function<void()> &ambiguousDiagnostic,
     const std::function<void()> &notFunctionDiagnostic) {
@@ -2242,7 +2242,7 @@ static FuncDecl *getResolvedFuncDecl(
         notAFuncDecl = true;
         continue;
       }
-      if (!isValidTypeContext(funcDecl)) {
+      if (!hasValidTypeContext(funcDecl)) {
         wrongTypeContext = true;
         continue;
       }
