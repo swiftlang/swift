@@ -247,8 +247,7 @@ extension _StringObject {
   internal
   static var _variantMask: UInt {
     @inline(__always)
-    get { return UInt(Builtin.stringObjectOr_Int64(
-      _isValueBit._value, _subVariantBit._value)) }
+    get { return _isValueBit | _subVariantBit }
   }
 
   @inlinable
@@ -861,7 +860,7 @@ extension _StringObject {
     self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
-    var rawBits = _payloadBits & _StringObject._payloadMask
+    var rawBits = _payloadBits
     if isValue {
       var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
         rawBits._value, _StringObject._isValueBit._value)
