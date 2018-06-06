@@ -72,7 +72,7 @@ enum class InlineKind : uint8_t {
 enum : unsigned { NumInlineKindBits =
   countBitsUsed(static_cast<unsigned>(InlineKind::Last_InlineKind)) };
 
-/// This enum represents the possible values of the @effects attribute.
+/// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
 /// so please do not reorder existing values.
 enum class EffectsKind : uint8_t {

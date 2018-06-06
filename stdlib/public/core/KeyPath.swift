@@ -57,7 +57,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @effects(releasenone)
+  @_effects(releasenone)
   final public func hash(into hasher: inout Hasher) {
     return withBuffer {
       var buffer = $0
@@ -594,7 +594,7 @@ internal enum KeyPathComponent: Hashable {
     }
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
     var hasher = hasher
     func appendHashFromArgument(

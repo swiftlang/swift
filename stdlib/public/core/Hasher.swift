@@ -281,14 +281,14 @@ public struct Hasher {
 
   /// Initialize a new hasher.  The hasher uses a per-execution seed value that
   /// is set during process startup, usually from a high-quality random source.
-  @effects(releasenone)
+  @_effects(releasenone)
   public init() {
     self._core = Core(seed: Hasher._seed)
   }
 
   /// Initialize a new hasher using the specified seed value.
   @usableFromInline
-  @effects(releasenone)
+  @_effects(releasenone)
   internal init(_seed seed: (UInt64, UInt64)) {
     self._core = Core(seed: seed)
   }
@@ -331,37 +331,37 @@ public struct Hasher {
     value.hash(into: &self)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(_ value: UInt) {
     _core.combine(value)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(_ value: UInt64) {
     _core.combine(value)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(_ value: UInt32) {
     _core.combine(value)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(_ value: UInt16) {
     _core.combine(value)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(_ value: UInt8) {
     _core.combine(value)
   }
 
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _combine(bytes value: UInt64, count: Int) {
     _core.combine(bytes: value, count: count)
@@ -369,7 +369,7 @@ public struct Hasher {
 
   /// Feed the contents of `buffer` into this hasher, mixing it into the hasher
   /// state.
-  @effects(releasenone)
+  @_effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
     _core.combine(bytes: bytes)
   }
@@ -377,7 +377,7 @@ public struct Hasher {
   /// Finalize the hasher state and return the hash value.
   /// Finalizing invalidates the hasher; additional bits cannot be combined
   /// into it, and it cannot be finalized again.
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal mutating func _finalize() -> Int {
     return Int(truncatingIfNeeded: _core.finalize())
@@ -391,7 +391,7 @@ public struct Hasher {
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
-  @effects(releasenone)
+  @_effects(releasenone)
   public __consuming func finalize() -> Int {
     var core = _core
     return Int(truncatingIfNeeded: core.finalize())
@@ -399,13 +399,13 @@ public struct Hasher {
 
   // Generate a seed value from the current state of this hasher.
   // FIXME(hasher): Remove
-  @effects(readnone)
+  @_effects(readnone)
   @usableFromInline
   internal func _generateSeed() -> (UInt64, UInt64) {
     return _core._generateSeed()
   }
 
-  @effects(readnone)
+  @_effects(readnone)
   @usableFromInline
   internal static func _hash(seed: (UInt64, UInt64), _ value: UInt64) -> Int {
     var core = RawCore(seed: seed)
@@ -414,7 +414,7 @@ public struct Hasher {
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
   }
 
-  @effects(readnone)
+  @_effects(readnone)
   @usableFromInline
   internal static func _hash(seed: (UInt64, UInt64), _ value: UInt) -> Int {
     var core = RawCore(seed: seed)
@@ -431,7 +431,7 @@ public struct Hasher {
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
   }
 
-  @effects(readnone)
+  @_effects(readnone)
   @usableFromInline
   internal static func _hash(
     seed: (UInt64, UInt64),
@@ -442,7 +442,7 @@ public struct Hasher {
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
   }
 
-  @effects(readnone)
+  @_effects(readnone)
   @usableFromInline
   internal static func _hash(
     seed: (UInt64, UInt64),
