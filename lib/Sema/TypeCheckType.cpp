@@ -2712,13 +2712,13 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     StringRef name;
     switch (repr->getKind()) {
     case TypeReprKind::InOut:
-      name = "'inout'";
+      name = "inout";
       break;
     case TypeReprKind::Shared:
-      name = "'__shared'";
+      name = "__shared";
       break;
     case TypeReprKind::Owned:
-      name = "'__owned'";
+      name = "__owned";
       break;
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
