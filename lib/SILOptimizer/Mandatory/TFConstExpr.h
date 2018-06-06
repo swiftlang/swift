@@ -39,60 +39,84 @@ namespace tf {
   struct AddressSymbolicValue;
   struct AggregateSymbolicValue;
 
+  /// When we fail to constant fold a value, this captures a reason why,
+  /// allowing the caller to produce a specific diagnostic.  The "Unknown"
+  /// SymbolicValue representation also includes a pointer to the SILNode in
+  /// question that was problematic.
+  enum class UnknownReason {
+    // TODO: Eliminate the default code, by making classifications for each
+    // failure mode.
+    Default,
+
+    /// The constant expression was too big.  This is reported on a random
+    /// instruction within the constexpr that triggered the issue.
+    TooManyInstructions,
+  };
+
+
   /// This is the symbolic value tracked for each SILValue in a scope.  We
   /// support multiple representational forms for the constant node in order to
   /// avoid pointless memory bloat + copying.  This is intended to be a
-  /// light-weight POD type we can put in hashtables.
+  /// light-weight POD type we can put in hash tables and pass around by-value.
+  ///
+  /// Internally, this value has multiple ways to represent the same sorts of
+  /// symbolic values (e.g. to save memory).  It provides a simpler public
+  /// interface though.
   class SymbolicValue {
-    enum ValueKind {
+    enum RepresentationKind {
       /// This value is an alloc stack that is has not (yet) been initialized
       /// by flow-sensitive analysis.
-      UninitMemory,
+      RK_UninitMemory,
 
       /// This symbolic value cannot be determined, carries multiple values
       /// (i.e., varies dynamically at the top level), or is of some type that
       /// we cannot analyze and propagate (e.g. NSObject).
       ///
-      /// TODO: include state (e.g. the bad instruction in question) that
-      /// indicates why this was unknown so clients can produce a useful
-      /// diagnostic.
-      Unknown,
+      RK_Unknown,
 
       /// This value is known to be a metatype reference.  The type is stored
       /// in the "metatype" member.
-      Metatype,
+      RK_Metatype,
 
       /// This value is known to be a function reference, e.g. through
       /// function_ref directly, or a devirtualized method reference.
-      Function,
+      RK_Function,
 
       /// This value is a constant, and tracked by the "inst" member of the
       /// value union.  This could be an integer, floating point, string, or
       /// metatype value.
-      Inst,
+      RK_Inst,
 
       /// This value is represented with a bump pointer allocated APInt.
       /// TODO: We could store small integers into the union inline to avoid
       /// allocations if it ever matters.
-      Integer,
+      RK_Integer,
 
       /// This value is represented with a bump pointer allocated APFloat.
       /// TODO: We could store small floats into the union inline to avoid
       /// allocations if it ever matters.
-      Float,
+      RK_Float,
 
       /// This value is a pointer to a tracked memory location, along with zero
       /// or more indices (tuple indices, struct field indices, etc) into the
       /// value if it is an aggregate.
       ///
-      Address,
+      RK_Address,
 
       /// This value is an array, struct, or tuple of constants.  This is
       /// tracked by the "aggregate" member of the value union.  Note that we
       /// cheat and represent single-element structs as the value of their
       /// element (since they are so common).
-      Aggregate,
-    } kind;
+      RK_Aggregate,
+    };
+
+    RepresentationKind representationKind : 8;
+
+    union {
+      UnknownReason unknown_reason;
+      //unsigned integer_bitwidth;
+      // ...
+    } aux;
 
     union {
       /// When the value is Unknown, this contains the value that was the
@@ -132,77 +156,85 @@ namespace tf {
 
   public:
 
-    /// For constant values, this enum is used to discriminate across the kinds
-    /// of constant this holds, which allows use of the accessors.
-    enum TypeKind {
-      TKMetatype, TKFunction, TKInteger, TKFloat, TKString, TKAddress,
-      TKAggregate
+    /// This enum is used to indicate the sort of value held by a SymbolicValue
+    /// independent of its concrete representation.  This is the public
+    /// interface to SymbolicValue.
+    enum Kind {
+      Unknown, Metatype, Function, Integer, Float, String, Aggregate,
+
+      // These values are generally only seen internally to the system, external
+      // clients shouldn't have to deal with them.
+      Address, UninitMemory
     };
 
     /// For constant values, return the type classification of this value.
-    TypeKind getTypeKind() const;
+    Kind getKind() const;
 
     /// Return true if this represents a constant value.
     bool isConstant() const {
-      return kind != UninitMemory && kind != Unknown;
+      auto kind = getKind();
+      return kind != Unknown && kind != UninitMemory;
     }
 
-    static SymbolicValue getUnknown(SILNode *node) {
+    static SymbolicValue getUnknown(SILNode *node, UnknownReason reason) {
       assert(node && "node must be present");
       SymbolicValue result;
-      result.kind = Unknown;
+      result.representationKind = RK_Unknown;
       result.value.unknown = node;
+      result.aux.unknown_reason = reason;
       return result;
+    }
+
+    /// Return information about an unknown result, including the SIL node that
+    /// is a problem, and the reason it is an issue.
+    std::pair<SILNode *, UnknownReason> getUnknownValue() const {
+      assert(representationKind == RK_Unknown);
+      return { value.unknown, aux.unknown_reason };
     }
 
     static SymbolicValue getUninitMemory() {
       SymbolicValue result;
-      result.kind = UninitMemory;
+      result.representationKind = RK_UninitMemory;
       return result;
-    }
-
-    // Return true if this is an uninitialized memory buffer.
-    bool isUninitMemory() const {
-      return kind == UninitMemory;
     }
 
     static SymbolicValue getMetatype(CanType type) {
       SymbolicValue result;
-      result.kind = Metatype;
+      result.representationKind = RK_Metatype;
       result.value.metatype = type.getPointer();
       return result;
     }
 
     CanType getMetatypeValue() const {
-      assert(kind == Metatype);
+      assert(representationKind == RK_Metatype);
       return CanType(value.metatype);
     }
 
     static SymbolicValue getFunction(SILFunction *fn) {
       assert(fn && "Function cannot be null");
       SymbolicValue result;
-      result.kind = Function;
+      result.representationKind = RK_Function;
       result.value.function = fn;
       return result;
     }
 
-    bool isFunction() const { return kind == Function; }
-
     SILFunction *getFunctionValue() const {
-      assert(isFunction());
+      assert(getKind() == Function);
       return value.function;
     }
 
     static SymbolicValue getConstantInst(SingleValueInstruction *inst) {
       assert(inst && "inst value must be present");
       SymbolicValue result;
-      result.kind = Inst;
+      result.representationKind = RK_Inst;
       result.value.inst = inst;
       return result;
     }
 
+    // TODO: Remove this, it is just needed because deabstraction has no SIL
+    // instruction of its own.
     SingleValueInstruction *getConstantInstIfPresent() const {
-      return kind == Inst ? value.inst : nullptr;
+      return representationKind == RK_Inst ? value.inst : nullptr;
     }
 
     static SymbolicValue getInteger(const APInt &value,
@@ -224,7 +256,7 @@ namespace tf {
 
     /// Accessors for Address SymbolicValue's.
     bool isAddress() const {
-      return kind == Address;
+      return getKind() == Address;
     }
 
     SILValue getAddressBase() const;
@@ -236,19 +268,10 @@ namespace tf {
     static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
                                       llvm::BumpPtrAllocator &allocator);
 
-
-    bool isAggregate() const {
-      return kind == Aggregate;
-    }
     ArrayRef<SymbolicValue> getAggregateValue() const;
 
 
     // TODO: getStringValue.
-
-    /// Create and return a new constant literal instruction for the specified
-    /// scalar constant value.
-    SingleValueInstruction *
-    emitConstantInst(SILBuilder &B, SILType type, SILLocation loc) const;
 
     void print(llvm::raw_ostream &os, unsigned indent = 0) const;
     void dump() const;
@@ -283,21 +306,8 @@ namespace tf {
     /// that occur after after folding them.
     void computeConstantValues(ArrayRef<SILValue> values,
                                SmallVectorImpl<SymbolicValue> &results);
-
-    // Evaluate a call to the specified function as if it were a constant
-    // expression, returning false and filling in `results` on success, or
-    // returning true on failure.
-    //
-    // TODO: propagate a *good* error up, handling cases like "called a
-    // non-constexpr", "constant expr is infinite or too complex", and
-    // eventually things like "overflow detected for add with overflow traps".
-    // This should include the full call stack for the failure, and should
-    // specify the arguments passed to each call level.
-    //
-    bool evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
-                              ArrayRef<SymbolicValue> arguments,
-                              SmallVectorImpl<SymbolicValue> &results);
   };
+
 } // end namespace tf
 } // end namespace swift
 #endif
