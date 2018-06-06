@@ -2221,9 +2221,10 @@ static FuncDecl *getResolvedFuncDecl(
     DeclName funcName, SourceLoc funcNameLoc, TypeChecker &TC,
     DeclContext *lookupContext,
     const std::function<bool(FuncDecl *)> &isValidFuncDecl,
-    Diagnostic overloadDiagnostic, Diagnostic ambiguousDiagnostic,
-    Diagnostic notFunctionDiagnostic,
-    const std::function<bool(FuncDecl *)> &isValidTypeContext) {
+    const std::function<bool(FuncDecl *)> &isValidTypeContext,
+    const std::function<void()> &overloadDiagnostic,
+    const std::function<void()> &ambiguousDiagnostic,
+    const std::function<void()> &notFunctionDiagnostic) {
 
   FuncDecl *resolvedFuncDecl = nullptr;
 
@@ -2250,9 +2251,7 @@ static FuncDecl *getResolvedFuncDecl(
         continue;
       }
       if (resolvedFuncDecl) {
-        TC.diagnose(funcNameLoc,
-                    diag::differentiable_attr_ambiguous_function_identifier,
-                    funcName);
+        ambiguousDiagnostic();
         resolvedFuncDecl = nullptr;
         break;
       }
@@ -2265,18 +2264,15 @@ static FuncDecl *getResolvedFuncDecl(
     if (results.empty()) {
       TC.diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
                   funcName.isOperator());
-    }
-    else if (wrongTypeContext) {
+    } else if (wrongTypeContext) {
       TC.diagnose(funcNameLoc,
                   diag::differentiable_attr_function_not_same_type_context,
                   funcName);
-    }
-    else if (overloadNotFound) {
-      TC.diagnose(funcNameLoc, overloadDiagnostic);
+    } else if (overloadNotFound) {
+      overloadDiagnostic();
     } else {
       assert(notAFuncDecl && "Expected 'not a function' error");
-      notAFuncDecl
-      TC.diagnose(funcNameLoc, notFunctionDiagnostic);
+      notFunctionDiagnostic();
     }
   }
 
@@ -2331,19 +2327,26 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   FuncDecl *resolvedPrimal = nullptr;
   if (attr->getPrimal()) {
     auto primalSpecifier = attr->getPrimal().getValue();
+    auto primalNameLoc = primalSpecifier.Loc.getBaseNameLoc();
 
     auto primalTypeCtx = original->getInnermostTypeContext();
     if (!primalTypeCtx) primalTypeCtx = original->getParent();
 
-    Diagnostic primalOverloadDiagnostic(
-      diag::differentiable_attr_primal_overload_not_found,
-      primalSpecifier.Name, originalParamsTy);
-    Diagnostic primalAmbiguousDiagnostic(
-      diag::differentiable_attr_ambiguous_function_identifier,
-      primalSpecifier.Name);
-    Diagnostic primalNotFunctionDiagnostic(
-      diag::differentiable_attr_specified_not_function,
-      primalSpecifier.Name, /*isPrimal*/ true);
+    auto primalOverloadDiagnostic = [&]() {
+      TC.diagnose(primalNameLoc,
+                  diag::differentiable_attr_primal_overload_not_found,
+                  primalSpecifier.Name, originalParamsTy);
+    };
+    auto primalAmbiguousDiagnostic = [&]() {
+      TC.diagnose(primalNameLoc,
+                  diag::differentiable_attr_ambiguous_function_identifier,
+                  primalSpecifier.Name);
+    };
+    auto primalNotFunctionDiagnostic = [&]() {
+      TC.diagnose(primalNameLoc,
+                  diag::differentiable_attr_specified_not_function,
+                  primalSpecifier.Name, /*isPrimal*/ true);
+    };
 
     auto isValidPrimal = [&](FuncDecl *primalCandidate) {
       // Returns true if the primal candidate
@@ -2377,12 +2380,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     resolvedPrimal =
-      getResolvedFuncDecl(primalSpecifier.Name,
-                          primalSpecifier.Loc.getBaseNameLoc(),
-                          TC, primalTypeCtx, isValidPrimal,
+      getResolvedFuncDecl(primalSpecifier.Name, primalNameLoc,
+                          TC, primalTypeCtx, isValidPrimal, hasValidTypeContext,
                           primalOverloadDiagnostic, primalAmbiguousDiagnostic,
-                          primalNotFunctionDiagnostic,
-                          hasValidTypeContext);
+                          primalNotFunctionDiagnostic);
 
     if (!resolvedPrimal) return;
     // Memorize the primal reference in the attribute.
@@ -2526,19 +2527,26 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the adjoint declaration.
   FuncDecl *resolvedAdjoint = nullptr;
   auto adjointSpecifier = attr->getAdjoint();
+  auto adjointNameLoc = adjointSpecifier.Loc.getBaseNameLoc();
 
   auto adjointTypeCtx = original->getInnermostTypeContext();
   if (!adjointTypeCtx) adjointTypeCtx = original->getParent();
 
-  Diagnostic adjointOverloadDiagnostic(
-    diag::differentiable_attr_adjoint_overload_not_found,
-    adjointSpecifier.Name, expectedAdjointFnTy);
-  Diagnostic adjointAmbiguousDiagnostic(
-    diag::differentiable_attr_ambiguous_function_identifier,
-    adjointSpecifier.Name);
-  Diagnostic adjointNotFunctionDiagnostic(
-    diag::differentiable_attr_specified_not_function,
-    adjointSpecifier.Name, /*isPrimal*/ false);
+  auto adjointOverloadDiagnostic = [&]() {
+    TC.diagnose(adjointNameLoc,
+                diag::differentiable_attr_adjoint_overload_not_found,
+                adjointSpecifier.Name, expectedAdjointFnTy);
+  };
+  auto adjointAmbiguousDiagnostic = [&]() {
+    TC.diagnose(adjointNameLoc,
+                diag::differentiable_attr_ambiguous_function_identifier,
+                adjointSpecifier.Name);
+  };
+  auto adjointNotFunctionDiagnostic = [&]() {
+    TC.diagnose(adjointNameLoc,
+                diag::differentiable_attr_specified_not_function,
+                adjointSpecifier.Name, /*isPrimal*/ false);
+  };
 
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
     // Returns true if adjoint candidate has the expected type.
@@ -2548,12 +2556,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   resolvedAdjoint =
-    getResolvedFuncDecl(adjointSpecifier.Name,
-                        adjointSpecifier.Loc.getBaseNameLoc(),
-                        TC, adjointTypeCtx, isValidAdjoint,
+    getResolvedFuncDecl(adjointSpecifier.Name, adjointNameLoc,
+                        TC, adjointTypeCtx, isValidAdjoint, hasValidTypeContext,
                         adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
-                        adjointNotFunctionDiagnostic,
-                        hasValidTypeContext);
+                        adjointNotFunctionDiagnostic);
 
   if (!resolvedAdjoint) return;
   // Done checking @differentiable attribute.
