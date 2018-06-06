@@ -2371,8 +2371,6 @@ getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
                       NLKind::UnqualifiedLookup, results);
   if (results.size() == 1) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
-      if (auto *typeResolver = getTypeResolver())
-        typeResolver->resolveDeclSignature(nominalDecl);
       if (auto params = nominalDecl->getGenericParams()) {
         if (params->size() == args.size()) {
           // When we form the bound generic type, make sure we get the

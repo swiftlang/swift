@@ -18,11 +18,11 @@
 #include "MiscDiagnostics.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Debug.h"
 
@@ -1413,7 +1413,9 @@ static bool isObjCClassExtensionInOverlay(DeclContext *dc) {
   if (!classDecl)
     return false;
 
-  return isInOverlayModuleForImportedModule(ext, classDecl);
+  auto clangLoader = dc->getASTContext().getClangModuleLoader();
+  if (!clangLoader) return false;
+  return clangLoader->isInOverlayModuleForImportedModule(ext, classDecl);
 }
 
 void AttributeChecker::visitRequiredAttr(RequiredAttr *attr) {

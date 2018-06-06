@@ -161,8 +161,6 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       SmallVector<ProtocolConformance *, 2> conformances;
       loader.first->loadAllConformances(nominal, loader.second, conformances);
       loadAllConformances(nominal, conformances);
-    } else if (nominal->getParentSourceFile() && resolver) {
-      resolver->resolveDeclSignature(nominal);
     }
 
     nominalFunc(nominal);

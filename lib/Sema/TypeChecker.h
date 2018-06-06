@@ -1378,6 +1378,12 @@ public:
     validateDeclForNameLookup(VD);
   }
 
+  /// Resolve the "overridden" declaration of the given declaration.
+  virtual void resolveOverriddenDecl(ValueDecl *VD) override;
+
+  /// Resolve the "is Objective-C" bit for the given declaration.
+  virtual void resolveIsObjC(ValueDecl *VD) override;
+
   virtual void bindExtension(ExtensionDecl *ext) override;
 
   virtual void resolveExtension(ExtensionDecl *ext) override {

@@ -3794,6 +3794,51 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   if (isInvalid) PGD->setInvalid();
 }
 
+void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
+  // Only members of classes can override other declarations.
+  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    return;
+
+  // Types that aren't associated types cannot be overridden.
+  if (isa<TypeDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
+    return;
+
+  // FIXME: We should check for the 'override' or 'required' keywords
+  // here, to short-circuit checking in the common case.
+
+  // FIXME: We should perform more minimal validation.
+  validateDeclForNameLookup(VD);
+}
+
+void TypeChecker::resolveIsObjC(ValueDecl *VD) {
+  // Short-circuit this operation if we already know that the entity is @objc.
+  if (VD->isObjC()) return;
+
+  auto dc = VD->getDeclContext();
+  if (dc->getAsClassOrClassExtensionContext()) {
+    // Members of classes can be @objc.
+
+    // FIXME: We
+    validateDeclForNameLookup(VD);
+  }
+  else if (isa<ClassDecl>(VD)) {
+    // Classes can be @objc.
+
+    // Protocols and enums can also be @objc, but this is covered by the
+    // isObjC() check at the beginning.
+  }
+  else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
+    // Members of @objc protocols are @objc.
+  }
+  else {
+    // Cannot be @objc; do nothing.
+    return;
+  }
+
+  // FIXME: Narrow this computation to just the @objc bits.
+  validateDeclForNameLookup(VD);
+}
+
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {

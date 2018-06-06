@@ -7465,6 +7465,12 @@ GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
 
+  if (!proto->hasInterfaceType()) {
+    // FIXME: Overkill.
+    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
+      lazyResolver->resolveDeclSignature(proto);
+  }
+
   // Add the 'self' parameter.
   auto selfType =
     proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
