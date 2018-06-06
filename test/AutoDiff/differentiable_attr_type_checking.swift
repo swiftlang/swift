@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 4 -typecheck -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 @differentiable(reverse, adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
 let x: Float = 1

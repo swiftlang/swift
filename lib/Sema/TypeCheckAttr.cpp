@@ -2233,8 +2233,32 @@ static FuncDecl *getResolvedFuncDecl(
   bool wrongTypeContext = false;
   bool overloadNotFound = false;
 
-  // Perform lookup.
-  auto results = TC.lookupUnqualified(lookupContext, funcName, funcNameLoc);
+  // Perform lookup, ignoring access control.
+  auto options = defaultUnqualifiedLookupOptions |
+    NameLookupFlags::IgnoreAccessControl;
+  auto results =
+    TC.lookupUnqualified(lookupContext, funcName, funcNameLoc, options);
+
+  // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
+  // Swift 3. The code below is a workaround for resolving them.
+  //
+  // This is necessary because the stdlib is compiled with `-swift-version 3`
+  // for Swift 3 compatibility, and floating point types use the
+  // `@differentiable` attribute with static adjoint methods (such as
+  // `_adjointAdd`).
+  if (lookupContext->getASTContext().isSwiftVersion3() && results.empty() &&
+      lookupContext->isTypeContext()) {
+    auto tmp = TC.lookupMember(lookupContext,
+                               lookupContext->getSelfTypeInContext(), funcName);
+    for (auto choice : tmp) {
+      auto decl = choice.getValueDecl();
+      if (!decl) continue;
+      auto funcDecl = dyn_cast<FuncDecl>(decl);
+      if (!funcDecl) continue;
+      results.add(LookupResultEntry(funcDecl));
+    }
+  }
+
   for (auto choice : results) {
     auto decl = choice.getValueDecl();
     if (!decl) continue;
