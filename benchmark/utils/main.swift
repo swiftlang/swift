@@ -92,7 +92,7 @@ import NopDeinit
 import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
-#if !SWIFT_PACKAGE
+#if !(SWIFT_PACKAGE || Xcode)
 import ObjectiveCNoBridgingStubs
 #endif
 import ObserverClosure
@@ -254,7 +254,7 @@ registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
-#if !SWIFT_PACKAGE
+#if !(SWIFT_PACKAGE || Xcode)
 registerBenchmark(ObjectiveCNoBridgingStubs)
 #endif
 registerBenchmark(ObserverClosure)
