@@ -27,8 +27,6 @@ endif()
 
 add_swift_library(swiftPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Python.swift
-  NumpyConversion.swift
-
   DEPENDS cpython_modulemap
   TARGET_SDKS OSX CYGWIN FREEBSD LINUX HAIKU
   SWIFT_MODULE_DEPENDS_IOS Darwin
