@@ -2236,27 +2236,28 @@ static FuncDecl *getResolvedFuncDecl(
   // Perform lookup.
   auto results = TC.lookupUnqualified(lookupContext, funcName, funcNameLoc);
   for (auto choice : results) {
-    if (auto decl = choice.getValueDecl()) {
-      auto funcDecl = dyn_cast<FuncDecl>(decl);
-      if (!funcDecl) {
-        notAFuncDecl = true;
-        continue;
-      }
-      if (!hasValidTypeContext(funcDecl)) {
-        wrongTypeContext = true;
-        continue;
-      }
-      if (!isValidFuncDecl(funcDecl)) {
-        overloadNotFound = true;
-        continue;
-      }
-      if (resolvedFuncDecl) {
-        ambiguousDiagnostic();
-        resolvedFuncDecl = nullptr;
-        break;
-      }
-      resolvedFuncDecl = funcDecl;
+    auto decl = choice.getValueDecl();
+    if (!decl) continue;
+
+    auto funcDecl = dyn_cast<FuncDecl>(decl);
+    if (!funcDecl) {
+      notAFuncDecl = true;
+      continue;
     }
+    if (!hasValidTypeContext(funcDecl)) {
+      wrongTypeContext = true;
+      continue;
+    }
+    if (!isValidFuncDecl(funcDecl)) {
+      overloadNotFound = true;
+      continue;
+    }
+    if (resolvedFuncDecl) {
+      ambiguousDiagnostic();
+      resolvedFuncDecl = nullptr;
+      break;
+    }
+    resolvedFuncDecl = funcDecl;
   }
   // If function declaration could not be resolved, emit the appropriate
   // diagnostic.
