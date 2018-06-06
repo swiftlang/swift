@@ -2648,7 +2648,7 @@ void LoadableByAddress::run() {
   for (auto &F : *getModule())
     runOnFunction(&F);
 
-  if (modFuncs.empty()) {
+  if (modFuncs.empty() && modApplies.empty()) {
     return;
   }
 
