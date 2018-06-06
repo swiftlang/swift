@@ -8,33 +8,33 @@ import Swift
 // Data Structures //
 /////////////////////
 
-class foo {
+class Foo {
   var a: Int
-   deinit
+  deinit
   init()
 }
 
-class bar {
-  var start: foo
-  var end: foo
-   deinit
+class Bar {
+  var start: Foo
+  var end: Foo
+  deinit
   init()
 }
 
-struct baz {
-  var start: foo
-  var end: foo
+struct Baz {
+  var start: Foo
+  var end: Foo
   init()
 }
 
-struct boo {
-  var tbaz = baz()
+struct Boo {
+  var tBaz = Baz()
   var a = 0
   init()
 }
 
-struct lotsoffield {
-  var tbaz = baz()
+struct LotsOfFields {
+  var tBaz = Baz()
   var a = 0
   var b = 0
   var c = 0
@@ -42,15 +42,15 @@ struct lotsoffield {
   init()
 }
 
-struct goo {
-  var left : foo
-  var right : foo
-  var top : foo
-  var bottom : foo
+struct Goo {
+  var left : Foo
+  var right : Foo
+  var top : Foo
+  var bottom : Foo
 }
 
 public protocol P {
-  func foo() -> Int64
+  func Foo() -> Int64
 }
 
 public protocol KlassFoo : class {
@@ -80,11 +80,11 @@ bb0:
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @argument_with_incomplete_epilogue_release
-// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $goo, #goo.top
-// CHECK: function_ref @$S41argument_with_incomplete_epilogue_releaseTf4x_nTf4gn_n : $@convention(thin) (@guaranteed foo, @owned foo) -> ()
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $Goo, #Goo.top
+// CHECK: function_ref @$S41argument_with_incomplete_epilogue_releaseTf4x_nTf4gn_n : $@convention(thin) (@guaranteed Foo, @owned Foo) -> ()
 // CHECK: release_value [[IN2]]
-sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> () {
-bb0(%0 : $goo):
+sil @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned Goo) -> () {
+bb0(%0 : $Goo):
   // make inline costs = 2
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -111,18 +111,18 @@ bb0(%0 : $goo):
 
 
 
-  %1 = struct_extract %0 : $goo, #goo.top
-  %2 = ref_element_addr %1 : $foo, #foo.a
+  %1 = struct_extract %0 : $Goo, #Goo.top
+  %2 = ref_element_addr %1 : $Foo, #Foo.a
   %3 = load %2 : $*Int
   %4 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   apply %4(%3) : $@convention(thin) (Int) -> ()
 
-  %5 = struct_extract %0 : $goo, #goo.bottom
-  %6 = ref_element_addr %5 : $foo, #foo.a
+  %5 = struct_extract %0 : $Goo, #Goo.bottom
+  %6 = ref_element_addr %5 : $Foo, #Foo.a
   %7 = load %6 : $*Int
   apply %4(%7) : $@convention(thin) (Int) -> ()
 
-  release_value %1 : $foo
+  release_value %1 : $Foo
   %8 = tuple ()
   return %8 : $()
 }
@@ -136,15 +136,15 @@ bb0(%0 : $goo):
 sil [serialized] @user : $@convention(thin) (Builtin.NativeObject) -> ()
 sil [serialized] @create_object : $@convention(thin) () -> Builtin.NativeObject
 
-// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// Make sure argument is exploded and the Baz part is not passed in as argument, as its only use
 // is a release.
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_only_release_user
 // CHECK: [[IN:%.*]] = function_ref @$S38dead_argument_due_to_only_release_userTf4gX_n
-// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $boo, #boo.a
+// CHECK: [[IN2:%.*]] = struct_extract [[IN1:%.*]] : $Boo, #Boo.a
 // CHECK: apply [[IN]]([[IN2]])
-sil @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
-bb0(%0 : $boo):
+sil @dead_argument_due_to_only_release_user : $@convention(thin) (@owned Boo) -> (Int, Int) {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -169,23 +169,23 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = struct_extract %0 : $boo, #boo.tbaz
-  %2 = struct_extract %0 : $boo, #boo.a
-  release_value  %1 : $baz
+  %1 = struct_extract %0 : $Boo, #Boo.tBaz
+  %2 = struct_extract %0 : $Boo, #Boo.a
+  release_value  %1 : $Baz
   %4 = tuple (%2  : $Int, %2 : $Int)
   return %4 : $(Int, Int)
 }
 
-// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
+// Make sure argument is exploded and the Baz part is not passed in as argument, as its only use
 // is a release.
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_only_release_user_but__exploded
 // CHECK: [[FN1:%.*]] = function_ref @$S52dead_argument_due_to_only_release_user_but__explodedTf4gX_n
-// CHECK: [[IN1:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.c
-// CHECK: [[IN2:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.b
-// CHECK: [[IN3:%.*]] = struct_extract %0 : $lotsoffield, #lotsoffield.a
+// CHECK: [[IN1:%.*]] = struct_extract %0 : $LotsOfFields, #LotsOfFields.c
+// CHECK: [[IN2:%.*]] = struct_extract %0 : $LotsOfFields, #LotsOfFields.b
+// CHECK: [[IN3:%.*]] = struct_extract %0 : $LotsOfFields, #LotsOfFields.a
 // CHECK: apply [[FN1]]([[IN3]], [[IN2]], [[IN1]])
-sil @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int) {
-bb0(%0 : $lotsoffield):
+sil @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned LotsOfFields) -> (Int, Int, Int) {
+bb0(%0 : $LotsOfFields):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -210,21 +210,22 @@ bb0(%0 : $lotsoffield):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = struct_extract %0 : $lotsoffield, #lotsoffield.tbaz
-  %2 = struct_extract %0 : $lotsoffield, #lotsoffield.a
-  %3 = struct_extract %0 : $lotsoffield, #lotsoffield.b
-  %4 = struct_extract %0 : $lotsoffield, #lotsoffield.c
-  release_value  %1 : $baz
+  %1 = struct_extract %0 : $LotsOfFields, #LotsOfFields.tBaz
+  %2 = struct_extract %0 : $LotsOfFields, #LotsOfFields.a
+  %3 = struct_extract %0 : $LotsOfFields, #LotsOfFields.b
+  %4 = struct_extract %0 : $LotsOfFields, #LotsOfFields.c
+  release_value  %1 : $Baz
   %5 = tuple (%2  : $Int, %3 : $Int, %4 : $Int)
   return %5 : $(Int, Int, Int)
 }
 
-// Make sure argument is exploded and the baz part is not passed in as argument, as its only use
-// is a release.
+// Since this is a value that contains only a singular owned type, there is no
+// point from an ARC perspective in splitting it up. We still want to perform owned to guaranteed though.
+//
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_more_than_release_user
-// CHECK: [[FN1:%.*]] = function_ref @$S43dead_argument_due_to_more_than_release_userTf4gX_n : $@convention(thin) (@guaranteed baz, Int) -> (Int, Int)
-sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int) {
-bb0(%0 : $boo):
+// CHECK: [[FN1:%.*]] = function_ref @$S43dead_argument_due_to_more_than_release_userTf4g_n : $@convention(thin) (@guaranteed Boo) -> (Int, Int)
+sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned Boo) -> (Int, Int) {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -249,10 +250,10 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = struct_extract %0 : $boo, #boo.tbaz
-  %2 = struct_extract %0 : $boo, #boo.a
-  retain_value %1 : $baz
-  release_value %1 : $baz
+  %1 = struct_extract %0 : $Boo, #Boo.tBaz
+  %2 = struct_extract %0 : $Boo, #Boo.a
+  retain_value %1 : $Baz
+  release_value %1 : $Baz
   %4 = tuple (%2  : $Int, %2 : $Int)
   return %4 : $(Int, Int)
 }
@@ -304,12 +305,12 @@ bb3:
 // Make sure %0 is a dead argument.
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @exploded_release_to_dead_argument
-// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Boo):
 // CHECK: [[IN1:%.*]] = function_ref @$S33exploded_release_to_dead_argumentTf4d_n
 // CHECK: apply [[IN1]]()
 // CHECK: release_value [[INPUT_ARG0]]
-sil @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
+sil @exploded_release_to_dead_argument : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -334,11 +335,11 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = struct_extract %0 : $boo, #boo.tbaz
-  %2 = struct_extract %1 : $baz, #baz.start
-  %3 = struct_extract %1 : $baz, #baz.end
-  release_value  %2 : $foo
-  release_value  %3 : $foo
+  %1 = struct_extract %0 : $Boo, #Boo.tBaz
+  %2 = struct_extract %1 : $Baz, #Baz.start
+  %3 = struct_extract %1 : $Baz, #Baz.end
+  release_value  %2 : $Foo
+  release_value  %3 : $Foo
   %f = function_ref @update_global: $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
   %4 = tuple ()
@@ -349,11 +350,11 @@ bb0(%0 : $boo):
 // Make sure %0 is not a dead argument, but gets converted to a guaranteed arg.
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @exploded_release_to_guaranteed_param
-// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Boo):
 // CHECK: [[IN1:%.*]] = function_ref @$S36exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: release_value [[INPUT_ARG0]]
-sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
+sil @exploded_release_to_guaranteed_param : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -378,25 +379,25 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  %1 = struct_extract %0 : $boo, #boo.tbaz
-  %2 = struct_extract %1 : $baz, #baz.start
-  %3 = struct_extract %1 : $baz, #baz.end
-  %4 = struct_extract %0 : $boo, #boo.a
+  %1 = struct_extract %0 : $Boo, #Boo.tBaz
+  %2 = struct_extract %1 : $Baz, #Baz.start
+  %3 = struct_extract %1 : $Baz, #Baz.end
+  %4 = struct_extract %0 : $Boo, #Boo.a
   %5 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   apply %5(%4) : $@convention(thin) (Int) -> ()
-  release_value  %2 : $foo
-  release_value  %3 : $foo
+  release_value  %2 : $Foo
+  release_value  %3 : $Foo
   %6 = tuple ()
   return %6 : $()
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @single_owned_return_value
-// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Boo):
 // CHECK: [[IN1:%.*]] = function_ref @$S25single_owned_return_valueTf4n_g
 // CHECK: [[IN2:%.*]] = apply [[IN1]]([[INPUT_ARG0]]
 // CHECK: retain_value [[IN2]]
-sil @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo {
-bb0(%0 : $boo):
+sil @single_owned_return_value : $@convention(thin) (@owned Boo) -> @owned Boo {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -421,8 +422,8 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  retain_value %0 : $boo
-  return %0 : $boo
+  retain_value %0 : $Boo
+  return %0 : $Boo
 }
 
 
@@ -430,8 +431,8 @@ bb0(%0 : $boo):
 // CHECK: function_ref @$S45single_owned_return_value_with_self_recursionTf4n_g
 // CHECK: [[RET:%.*]] = apply
 // CHECK: retain_value [[RET]]
-sil @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo {
-bb0(%0 : $boo):
+sil @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned Boo) -> @owned Boo {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -458,23 +459,23 @@ bb0(%0 : $boo):
 
   cond_br undef, bb1, bb2
 bb1:
-  retain_value %0 : $boo
-  br bb3(%0 : $boo)
+  retain_value %0 : $Boo
+  br bb3(%0 : $Boo)
 bb2:
-  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
-  br bb3 (%3 : $boo)
-bb3(%4 : $boo):
-  return %4 : $boo
+  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned Boo) -> @owned Boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned Boo) -> @owned Boo
+  br bb3 (%3 : $Boo)
+bb3(%4 : $Boo):
+  return %4 : $Boo
 }
 
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @single_owned_return_value_with_interfering_release
-// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Boo):
 // CHECK: [[IN1:%.*]] = function_ref @$S50single_owned_return_value_with_interfering_releaseTf4x_nTf4gnn_n
 // CHECK-NOT: retain_value
 // CHECK: return
-sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) ->  boo {
-bb0(%0 : $boo):
+sil @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned Boo) ->  Boo {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -499,22 +500,22 @@ bb0(%0 : $boo):
   %c21 = builtin "assert_configuration"() : $Builtin.Int32
   %c22 = builtin "assert_configuration"() : $Builtin.Int32
 
-  retain_value %0 : $boo
-  %1 = struct_extract %0 : $boo, #boo.tbaz
-  %2 = struct_extract %1 : $baz, #baz.start
-  release_value %2: $foo
-  return %0 : $boo
+  retain_value %0 : $Boo
+  %1 = struct_extract %0 : $Boo, #Boo.tBaz
+  %2 = struct_extract %1 : $Baz, #Baz.start
+  release_value %2: $Foo
+  return %0 : $Boo
 }
 
 // Make sure we do not move the retain_value in the throw block.
 //
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
-// CHECK: function_ref @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error)
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned Boo) -> (@owned Boo, @error Error) {
+// CHECK: function_ref @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned Boo) -> (Boo, @error Error)
 // CHECK: bb1
 // CHECK-NOT: retain_value
 // CHECK: bb2
-sil [serialized] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error) {
-bb0(%0 : $boo):
+sil [serialized] @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned Boo) -> (@owned Boo, @error Error) {
+bb0(%0 : $Boo):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
@@ -542,11 +543,11 @@ bb0(%0 : $boo):
   cond_br undef, bb1, bb2
 
 bb1:
-  retain_value %0 : $boo
-  return %0 : $boo
+  retain_value %0 : $Boo
+  return %0 : $Boo
 
 bb2:
-  retain_value %0 : $boo
+  retain_value %0 : $Boo
   throw undef : $Error
 }
 
@@ -690,11 +691,11 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
   return %5 : $()
 }
 
-sil [serialized] @exploded_release_to_guaranteed_param_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @exploded_release_to_guaranteed_param : $@convention(thin) (@owned boo) -> ()
-  retain_value %0 : $boo
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
+sil [serialized] @exploded_release_to_guaranteed_param_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
+  %2 = function_ref @exploded_release_to_guaranteed_param : $@convention(thin) (@owned Boo) -> ()
+  retain_value %0 : $Boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned Boo) -> ()
   %5 = tuple()
   return %5 : $()
 }
@@ -707,27 +708,27 @@ bb0(%0 : $boo):
 // CHECK: [[RET:%.*]] = apply
 // CHECK: retain_value [[RET]]
 // CHECK: release_value [[RET]]
-sil @single_owned_return_value_with_self_recursion_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned boo) -> @owned boo
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
-  release_value %4 : $boo
+sil @single_owned_return_value_with_self_recursion_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
+  %2 = function_ref @single_owned_return_value_with_self_recursion : $@convention(thin) (@owned Boo) -> @owned Boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned Boo) -> @owned Boo
+  release_value %4 : $Boo
   %5 = tuple()
   return %5 : $()
 }
 
-sil [serialized] @exploded_release_to_dead_param_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @exploded_release_to_dead_argument : $@convention(thin) (@owned boo) -> ()
-  retain_value %0 : $boo
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> ()
+sil [serialized] @exploded_release_to_dead_param_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
+  %2 = function_ref @exploded_release_to_dead_argument : $@convention(thin) (@owned Boo) -> ()
+  retain_value %0 : $Boo
+  %4 = apply %2(%0) : $@convention(thin) (@owned Boo) -> ()
   %5 = tuple()
   return %5 : $()
 }
 
 
-sil [serialized] @single_owned_return_value_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
+sil [serialized] @single_owned_return_value_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
   cond_br undef, bb1, bb2
 
 bb1:
@@ -737,14 +738,14 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned boo) -> @owned boo
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> @owned boo
+  %2 = function_ref @single_owned_return_value : $@convention(thin) (@owned Boo) -> @owned Boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned Boo) -> @owned Boo
   %4 = tuple()
   return %4 : $()
 }
 
-sil [serialized] @single_owned_return_value_with_interfering_release_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
+sil [serialized] @single_owned_return_value_with_interfering_release_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
   cond_br undef, bb1, bb2
 
 bb1:
@@ -754,14 +755,14 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned boo) -> boo
-  %3 = apply %2(%0) : $@convention(thin) (@owned boo) -> boo
+  %2 = function_ref @single_owned_return_value_with_interfering_release : $@convention(thin) (@owned Boo) -> Boo
+  %3 = apply %2(%0) : $@convention(thin) (@owned Boo) -> Boo
   %4 = tuple()
   return %4 : $()
 }
 
-sil [serialized] @owned_to_unowned_retval_with_error_result_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
+sil [serialized] @owned_to_unowned_retval_with_error_result_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
   cond_br undef, bb1, bb2
 
 bb1:
@@ -771,10 +772,10 @@ bb2:
   br bb3
 
 bb3:
-  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned boo) -> (@owned boo, @error Error)
-  try_apply %2(%0) : $@convention(thin) (@owned boo) -> (@owned boo, @error Error), normal bb4, error bb5
+  %2 = function_ref @owned_to_unowned_retval_with_error_result : $@convention(thin) (@owned Boo) -> (@owned Boo, @error Error)
+  try_apply %2(%0) : $@convention(thin) (@owned Boo) -> (@owned Boo, @error Error), normal bb4, error bb5
 
-bb4(%99 : $boo):
+bb4(%99 : $Boo):
   %4 = tuple()
   return %4 : $()
 
@@ -782,34 +783,34 @@ bb5(%100 : $Error):
   unreachable
 }
 
-sil [serialized] @dead_argument_due_to_only_release_user_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @dead_argument_due_to_only_release_user : $@convention(thin) (@owned boo) -> (Int, Int)
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> (Int, Int)
+sil [serialized] @dead_argument_due_to_only_release_user_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
+  %2 = function_ref @dead_argument_due_to_only_release_user : $@convention(thin) (@owned Boo) -> (Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned Boo) -> (Int, Int)
   %5 = tuple()
   return %5 : $()
 }
 
-sil [serialized] @dead_argument_due_to_only_release_user_but__exploded_callsite : $@convention(thin) (@owned lotsoffield) -> () {
-bb0(%0 : $lotsoffield):
-  %2 = function_ref @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int)
-  %4 = apply %2(%0) : $@convention(thin) (@owned lotsoffield) -> (Int, Int, Int)
+sil [serialized] @dead_argument_due_to_only_release_user_but__exploded_callsite : $@convention(thin) (@owned LotsOfFields) -> () {
+bb0(%0 : $LotsOfFields):
+  %2 = function_ref @dead_argument_due_to_only_release_user_but__exploded : $@convention(thin) (@owned LotsOfFields) -> (Int, Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned LotsOfFields) -> (Int, Int, Int)
   %5 = tuple()
   return %5 : $()
 }
 
-sil [serialized] @dead_argument_due_to_more_than_release_user_callsite : $@convention(thin) (@owned boo) -> () {
-bb0(%0 : $boo):
-  %2 = function_ref @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned boo) -> (Int, Int)
-  %4 = apply %2(%0) : $@convention(thin) (@owned boo) -> (Int, Int)
+sil [serialized] @dead_argument_due_to_more_than_release_user_callsite : $@convention(thin) (@owned Boo) -> () {
+bb0(%0 : $Boo):
+  %2 = function_ref @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned Boo) -> (Int, Int)
+  %4 = apply %2(%0) : $@convention(thin) (@owned Boo) -> (Int, Int)
   %5 = tuple()
   return %5 : $()
 }
 
-sil [serialized] @argument_with_incomplete_epilogue_release_callsite : $@convention(thin) (@owned goo) -> () {
-bb0(%0 : $goo):
-  %2 = function_ref @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned goo) -> ()
-  %4 = apply %2(%0) : $@convention(thin) (@owned goo) -> ()
+sil [serialized] @argument_with_incomplete_epilogue_release_callsite : $@convention(thin) (@owned Goo) -> () {
+bb0(%0 : $Goo):
+  %2 = function_ref @argument_with_incomplete_epilogue_release : $@convention(thin) (@owned Goo) -> ()
+  %4 = apply %2(%0) : $@convention(thin) (@owned Goo) -> ()
   %5 = tuple()
   return %5 : $()
 }
@@ -1332,33 +1333,33 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 
 // CHECK-NEGATIVE-NOT: sil {{.*}}_dont_explode_single_enum
 
-sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
-bb0(%0 : $Optional<(foo, foo)>):
-  %281 = unchecked_enum_data %0 : $Optional<(foo, foo)>, #Optional.some!enumelt.1
-  %282 = tuple_extract %281 : $(foo, foo), 0
-  %283 = tuple_extract %281 : $(foo, foo), 1
-  strong_release %283 : $foo
-  return %282 : $foo
+sil [noinline] @dont_explode_single_enum : $@convention(thin) (@owned Optional<(Foo, Foo)>) -> @owned Foo {
+bb0(%0 : $Optional<(Foo, Foo)>):
+  %281 = unchecked_enum_data %0 : $Optional<(Foo, Foo)>, #Optional.some!enumelt.1
+  %282 = tuple_extract %281 : $(Foo, Foo), 0
+  %283 = tuple_extract %281 : $(Foo, Foo), 1
+  strong_release %283 : $Foo
+  return %282 : $Foo
 }
 
 
 
 // CHECK-LABEL: sil @call_with_single_enum
-// CHECK: [[F:%[0-9]+]] = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
+// CHECK: [[F:%[0-9]+]] = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(Foo, Foo)>) -> @owned Foo
 // CHECK: apply [[F]](%0)
 // CHECK: return
-sil @call_with_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo {
-bb0(%0 : $Optional<(foo, foo)>):
-  %f = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
-  %a = apply %f(%0) : $@convention(thin) (@owned Optional<(foo, foo)>) -> @owned foo
-  return %a : $foo
+sil @call_with_single_enum : $@convention(thin) (@owned Optional<(Foo, Foo)>) -> @owned Foo {
+bb0(%0 : $Optional<(Foo, Foo)>):
+  %f = function_ref @dont_explode_single_enum : $@convention(thin) (@owned Optional<(Foo, Foo)>) -> @owned Foo
+  %a = apply %f(%0) : $@convention(thin) (@owned Optional<(Foo, Foo)>) -> @owned Foo
+  return %a : $Foo
 }
 
 
 // Check if externally available functions are optimized.
 
-sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> () {
-bb0(%0 : $foo):
+sil public_external [noinline] @externally_available_with_dead_arg : $@convention(thin) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
   %r = tuple()
   return %r : $()
 }
@@ -1367,10 +1368,10 @@ bb0(%0 : $foo):
 // CHECK: [[F:%[0-9]+]] = function_ref @$S34externally_available_with_dead_argTf4d_n : $@convention(thin) () -> ()
 // CHECK: apply [[F]]()
 // CHECK: return
-sil @call_externally_available : $@convention(thin) (@guaranteed foo) -> () {
-bb0(%0 : $foo):
-  %f = function_ref @externally_available_with_dead_arg : $@convention(thin) (@guaranteed foo) -> ()
-  %a = apply %f(%0) : $@convention(thin) (@guaranteed foo) -> ()
+sil @call_externally_available : $@convention(thin) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  %f = function_ref @externally_available_with_dead_arg : $@convention(thin) (@guaranteed Foo) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed Foo) -> ()
   %r = tuple()
   return %r : $()
 }
@@ -1378,11 +1379,11 @@ bb0(%0 : $foo):
 
 // We should remove the array semantic from specialized calls.
 
-// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] [_semantics "array.Foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$S14array_semanticTfq4g_n : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
 // CHECK: release_value
-sil [serialized] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
+sil [serialized] [_semantics "array.Foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   // make it a non-trivial function
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
@@ -1566,7 +1567,7 @@ bb0(%0 : $T):
 
 sil hidden [noinline] @generic_in_to_guaranteed : $@convention(thin) <T where T : P> (@in T) -> Int64 {
 bb0(%0 : $*T):
-  %2 = witness_method $T, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %2 = witness_method $T, #P.Foo!1 : <Self where Self : P> (Self) -> () -> Int64 : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   %3 = apply %2<T>(%0) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   destroy_addr %0 : $*T
   return %3 : $Int64
@@ -1591,14 +1592,14 @@ bb0(%0 : $*T):
   return %15 : $Int64
 }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_dead_non_generic_arg : $@convention(thin) <T> (@owned foo, @in T) -> ()
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @generic_func_with_dead_non_generic_arg : $@convention(thin) <T> (@owned Foo, @in T) -> ()
 // CHECK: function_ref @$S027generic_func_with_dead_non_A4_argTf4dd_n : $@convention(thin) () -> ()
 // Call the specialization which is not polymorphic.
 // CHECK: apply
 // CHECK: destroy_addr
 // CHECK: end sil function 'generic_func_with_dead_non_generic_arg'
-sil [noinline] @generic_func_with_dead_non_generic_arg : $@convention(thin) <T> (@owned foo, @in T) -> () {
-bb0(%0 : $foo, %1 : $*T):
+sil [noinline] @generic_func_with_dead_non_generic_arg : $@convention(thin) <T> (@owned Foo, @in T) -> () {
+bb0(%0 : $Foo, %1 : $*T):
   destroy_addr %1 : $*T
   %r = tuple()
   return %r : $()
@@ -1723,19 +1724,19 @@ bb0(%0 : $*T):
 // CHECK-NOT: strong_release
 // CHECK: return
 
-// CHECK-LABEL: sil shared @$S25single_owned_return_valueTf4n_g : $@convention(thin) (@owned boo) -> boo
-// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $boo):
+// CHECK-LABEL: sil shared @$S25single_owned_return_valueTf4n_g : $@convention(thin) (@owned Boo) -> Boo
+// CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Boo):
 // CHECK-NOT: retain_value
 // CHECK: return
 
 // There should not be a single retain in this function.
 //
-// CHECK-LABEL: sil shared @$S45single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned boo) -> boo
+// CHECK-LABEL: sil shared @$S45single_owned_return_value_with_self_recursionTf4n_g : $@convention(thin) (@owned Boo) -> Boo
 // CHECK: bb0
 // CHECK-NOT: retain_value
 // CHECK: return
 
-// CHECK-LABEL: @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned boo) -> (boo, @error Error) {
+// CHECK-LABEL: @$S41owned_to_unowned_retval_with_error_resultTfq4n_g : $@convention(thin) (@owned Boo) -> (Boo, @error Error) {
 // CHECK: bb2
 // CHECK: retain_value
 // CHECK: throw
