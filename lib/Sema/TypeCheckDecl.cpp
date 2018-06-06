@@ -6509,19 +6509,13 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
     return;
   }
 
-  if (typeAlias->getDeclContext()->isModuleScopeContext() &&
-      typeAlias->getGenericParams() == nullptr) {
-    IterativeTypeChecker ITC(tc);
-    ITC.satisfy(requestResolveTypeDecl(typeAlias));
-  } else {
-    if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                        typeAlias, options)) {
-      typeAlias->setInvalid();
-      typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
-    }
-
-    typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
+  if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
+                      typeAlias, options)) {
+    typeAlias->setInvalid();
+    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
+
+  typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
 }
 
 
