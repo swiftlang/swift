@@ -1121,9 +1121,12 @@ void Driver::buildInputs(const ToolChain &TC,
 
       if (Ty == file_types::TY_Swift) {
         StringRef Basename = llvm::sys::path::filename(Value);
-        if (!SourceFileNames.insert({Basename, Value}).second) {
+        // We check duplicate filenames case-insensitively, because
+        // the filesystem used may be case-insensitive.
+        StringRef Key = Basename.lower();
+        if (!SourceFileNames.insert({Key, Value}).second) {
           Diags.diagnose(SourceLoc(), diag::error_two_files_same_name,
-                         Basename, SourceFileNames[Basename], Value);
+                         Basename, SourceFileNames[Key], Value);
           Diags.diagnose(SourceLoc(), diag::note_explain_two_files_same_name);
         }
       }
