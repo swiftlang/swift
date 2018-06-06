@@ -4395,9 +4395,6 @@ namespace {
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          if (auto typeResolver = Impl.getTypeResolver())
-            typeResolver->resolveDeclSignature(singleResult);
-
           // Skip versioned variants.
           const DeclAttributes &attrs = singleResult->getAttrs();
           if (attrs.isUnavailableInSwiftVersion(languageVersion))

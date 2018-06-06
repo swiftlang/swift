@@ -15,11 +15,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
@@ -81,11 +81,16 @@ static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 }
 
 bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
-  if (decls.empty())
+  if (decls.size() < 2)
     return false;
 
+  auto lazyResolver = decls.front()->getASTContext().getLazyResolver();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
+    // Compute enough information to make the overridden-declaration available.
+    if (lazyResolver)
+      lazyResolver->resolveOverriddenDecl(decl);
+
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -100,6 +105,10 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
+
+        if (lazyResolver)
+          lazyResolver->resolveOverriddenDecl(decl);
+
         continue;
       }
 
@@ -299,13 +308,18 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // Prefer declarations in an overlay to similar declarations in
         // the Clang module it customizes.
         if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
-          if (isInOverlayModuleForImportedModule(firstDecl->getDeclContext(),
-                                                 secondDecl->getDeclContext())){
+          auto clangLoader = ctx.getClangModuleLoader();
+          if (!clangLoader) continue;
+
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                firstDecl->getDeclContext(),
+                                                secondDecl->getDeclContext())) {
             shadowed.insert(secondDecl);
             continue;
           }
 
-          if (isInOverlayModuleForImportedModule(secondDecl->getDeclContext(),
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                 secondDecl->getDeclContext(),
                                                  firstDecl->getDeclContext())) {
             shadowed.insert(firstDecl);
             break;
@@ -1755,13 +1769,6 @@ bool DeclContext::lookupQualified(Type type,
   // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, ValueDecl *decl) -> bool {
-    // If the decl is currently being type checked, then we have something
-    // cyclic going on.  Instead of poking at parts that are potentially not
-    // set up, just assume it is acceptable.  This will make sure we produce an
-    // error later.
-    if (!decl->hasValidSignature())
-      return true;
-    
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -1780,8 +1787,12 @@ bool DeclContext::lookupQualified(Type type,
     }
 
     // Check access.
-    if (!(options & NL_IgnoreAccessControl))
+    if (!(options & NL_IgnoreAccessControl)) {
+      if (typeResolver)
+        typeResolver->resolveAccessControl(decl);
+
       return decl->isAccessibleFrom(this);
+    }
 
     return true;
   };
@@ -1822,11 +1833,6 @@ bool DeclContext::lookupQualified(Type type,
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
-
-      // Resolve the declaration signature when we find the
-      // declaration.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
 
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
@@ -1892,17 +1898,20 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
       if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
+        typeResolver->resolveIsObjC(decl);
+
+      if (!decl->isObjC())
+        continue;
 
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
-      if (decl->getOverriddenDecl())
-        continue;
+      if (typeResolver)
+        typeResolver->resolveOverriddenDecl(decl);
 
-      // If the declaration is not @objc, it cannot be called dynamically.
-      if (!decl->isObjC())
+      if (decl->getOverriddenDecl())
         continue;
 
       auto dc = decl->getDeclContext();
