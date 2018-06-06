@@ -3976,7 +3976,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     auto type = PD->getInterfaceType();
-    if (type->hasError() || type->hasUnresolvedType())
+    if (type->hasError())
       PD->markInvalid();
     break;
   }

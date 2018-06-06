@@ -1341,30 +1341,45 @@ namespace {
         }
       }
 
-      if (auto *param = dyn_cast<ParamDecl>(E->getDecl())) {
-        if (param->hasInterfaceType()) {
-          auto type = param->getInterfaceType();
-          if (type->hasTypeParameter())
-            type = param->getDeclContext()->mapTypeIntoContext(type);
-
-          CS.setType(param, type);
-          CS.setFavoredType(E, type.getPointer());
-        }
-      } else {
-        // If we're referring to an invalid declaration, don't type-check.
-        //
-        // FIXME: If the decl is in error, we get no information from this.
-        // We may, alternatively, want to use a type variable in that case,
-        // and possibly infer the type of the variable that way.
-        CS.getTypeChecker().validateDecl(E->getDecl());
-        if (E->getDecl()->isInvalid()) {
-          CS.setType(E, E->getDecl()->getInterfaceType());
-          return nullptr;
-        }
+      // If we're referring to an invalid declaration, don't type-check.
+      //
+      // FIXME: If the decl is in error, we get no information from this.
+      // We may, alternatively, want to use a type variable in that case,
+      // and possibly infer the type of the variable that way.
+      CS.getTypeChecker().validateDecl(E->getDecl());
+      if (E->getDecl()->isInvalid()) {
+        CS.setType(E, E->getDecl()->getInterfaceType());
+        return nullptr;
       }
 
       auto locator = CS.getConstraintLocator(E);
-      
+
+      if (auto *param = dyn_cast<ParamDecl>(E->getDecl())) {
+        // This can only happen when failure diangostics is trying
+        // to type-check expressions inside of a single-statement
+        // closure which refer to anonymous parameters, in this case
+        // let's either use type as written or allocate a fresh type
+        // variable, just like we do for closure type.
+        if (!CS.hasType(param)) {
+          Type paramType;
+          if (param->hasInterfaceType()) {
+            paramType = param->getInterfaceType();
+            if (paramType->hasTypeParameter())
+              paramType =
+                  param->getDeclContext()->mapTypeIntoContext(paramType);
+
+            if (paramType->hasUnboundGenericType())
+              paramType = CS.openUnboundGenericType(paramType, locator);
+
+            CS.setFavoredType(E, paramType.getPointer());
+          } else {
+            paramType = CS.createTypeVariable(locator, TVO_CanBindToLValue);
+          }
+
+          CS.setType(param, paramType);
+        }
+      }
+
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator,

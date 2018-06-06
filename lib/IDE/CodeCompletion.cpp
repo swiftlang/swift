@@ -2019,6 +2019,7 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
+    assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
 
     if (*ExprType) {
@@ -2105,6 +2106,10 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(Name);
     setClangDeclKeywords(VD, Pairs, Builder);
+
+    if (!VD->hasValidSignature())
+      return;
+
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
     if (VD->getName() != Ctx.Id_self && VD->isInOut()) {

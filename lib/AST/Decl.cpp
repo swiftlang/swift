@@ -2139,8 +2139,10 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
-  if (!type.isNull() && isa<ParamDecl>(this)) {
-    assert(!type->is<InOutType>() && "caller did not pass a base type");
+  if (!type.isNull()) {
+    assert(!type->hasTypeVariable() && "Type variable in interface type");
+    if (isa<ParamDecl>(this))
+      assert(!type->is<InOutType>() && "caller did not pass a base type");
   }
   // lldb creates global typealiases with archetypes in them.
   // FIXME: Add an isDebugAlias() flag, like isDebugVar().
@@ -2153,9 +2155,8 @@ void ValueDecl::setInterfaceType(Type type) {
         isa<AbstractClosureExpr>(getDeclContext()))) {
     assert(!type->hasArchetype() &&
            "Archetype in interface type");
-    assert(!type->hasTypeVariable() &&
-           "Archetype in interface type");
   }
+
   TypeAndAccess.setPointer(type);
 }
 
