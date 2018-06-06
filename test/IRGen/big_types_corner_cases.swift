@@ -254,3 +254,20 @@ class UseBigStructWithFunc {
     private func callMethod(ptr: ((BigStruct) -> Void)?) -> () {
     }
 }
+
+struct BiggerString {
+  var str: String
+  var double: Double
+}
+
+struct LoadableStructWithBiggerString {
+    public var a1: BiggerString
+    public var a2: [String]
+    public var a3: [String]
+}
+
+class ClassWithLoadableStructWithBiggerString {
+    public func f() -> LoadableStructWithBiggerString {
+        return LoadableStructWithBiggerString(a1: BiggerString(str:"", double:0.0), a2: [], a3: [])
+    }
+}
