@@ -421,7 +421,7 @@ static void prepareForRetypechecking(Expr *E) {
     }
     bool walkToTypeLocPre(TypeLoc &TL) override {
       if (TL.getType() && TL.getType()->hasError())
-        TL.setType(Type(), /*was validated*/false);
+        TL.setType(Type());
       return true;
     }
 

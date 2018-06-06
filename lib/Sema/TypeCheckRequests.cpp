@@ -129,7 +129,7 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
   auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
-  typeLoc.setType(value, true);
+  typeLoc.setType(value);
 }
 
 //----------------------------------------------------------------------------//

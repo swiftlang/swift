@@ -7013,8 +7013,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           // unresolved types we will need to deal with, and need to record the
           // appropriate substitutions for that environment. Wipe out the types
           // and validate them again.
-          aliasDecl->getUnderlyingTypeLoc().setType(Type(),
-                                                    /*validated=*/false);
+          aliasDecl->getUnderlyingTypeLoc().setType(Type());
           aliasDecl->setInterfaceType(Type());
 
           validateAccessControl(aliasDecl);
@@ -7299,7 +7298,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       switch (accessor->getAccessorKind()) {
       // For getters, set the result type to the value type.
       case AccessorKind::Get:
-        accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+        accessor->getBodyResultTypeLoc().setType(valueIfaceTy);
         break;
 
       // For setters and observers, set the old/new value parameter's type
@@ -7319,7 +7318,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       case AccessorKind::MutableAddress:
         if (Type resultType =
               buildAddressorResultType(*this, accessor, valueIfaceTy)) {
-          accessor->getBodyResultTypeLoc().setType(resultType, true);
+          accessor->getBodyResultTypeLoc().setType(resultType);
         }
         break;
 
