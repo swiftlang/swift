@@ -485,6 +485,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SelectValueInst:
   case SILInstructionKind::KeyPathInst:
   case SILInstructionKind::GlobalValueInst:
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GraphOperationInst:
     return InlineCost::Expensive;
 
   case SILInstructionKind::BuiltinInst: {

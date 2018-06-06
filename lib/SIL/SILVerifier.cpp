@@ -1185,7 +1185,12 @@ public:
     if (isAutoDiffBuiltinInst(BI))
       checkAutoDiffBuiltinInst(BI);
   }
-  
+
+  void checkGraphOperationInst(GraphOperationInst *GI) {
+    // FIXME
+    GI->getResults();
+  }
+
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");

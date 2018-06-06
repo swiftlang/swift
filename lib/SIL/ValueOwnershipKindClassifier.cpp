@@ -280,6 +280,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
   return Result->getOwnershipKind();
 }
 
+ValueOwnershipKind ValueOwnershipKindClassifier::visitGraphOperationResult(
+    GraphOperationResult *Result) {
+  return Result->getOwnershipKind();
+}
+
 ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
     DestructureTupleResult *Result) {
   return Result->getOwnershipKind();

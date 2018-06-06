@@ -1658,6 +1658,15 @@ ERROR(expr_expected_function_to_differentiate,none,
 ERROR(gradient_expr_expected_parameter,none,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+//------------------------------------------------------------------------------
+// Graph operation related parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(sil_expected_graph_op_attr_name,PointsToFirstBadToken,
+      "expected graph_op attribute name", ())
+ERROR(sil_expected_graph_op_attr_value,PointsToFirstBadToken,
+      "expected graph_op attribute value", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
