@@ -72,6 +72,7 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
   if (Unwrap) {
     DeclType = DeclType->getInOutObjectType();
     RealType = RealType->getInOutObjectType();
+    // FIXME FIXME FIXME
   }
 
   // DynamicSelfType is also sugar as far as debug info is concerned.

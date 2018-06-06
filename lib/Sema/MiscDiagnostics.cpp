@@ -2195,20 +2195,24 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
   // override uses a reference type, and the value type is bridged to the
   // reference type. This is a way to migrate code that makes use of types
   // that previously were not bridged to value types.
-  auto checkValueReferenceType = [&](Type overrideTy, Type baseTy,
-                                     SourceRange typeRange) -> bool {
+  auto checkValueReferenceType =
+      [&](Type overrideTy, VarDecl::Specifier overrideSpec,
+          Type baseTy, VarDecl::Specifier baseSpec,
+          SourceRange typeRange) -> bool {
     if (typeRange.isInvalid())
       return false;
 
-    auto normalizeType = [](Type ty) -> Type {
-      ty = ty->getInOutObjectType();
-      if (Type unwrappedTy = ty->getOptionalObjectType())
-        ty = unwrappedTy;
-      return ty;
+    auto normalizeType = [](Type &ty, VarDecl::Specifier spec) -> Type {
+      Type normalizedTy = ty;
+      if (Type unwrappedTy = normalizedTy->getOptionalObjectType())
+        normalizedTy = unwrappedTy;
+      if (spec == VarDecl::Specifier::InOut)
+        ty = InOutType::get(ty);
+      return normalizedTy;
     };
 
     // Is the base type bridged?
-    Type normalizedBaseTy = normalizeType(baseTy);
+    Type normalizedBaseTy = normalizeType(baseTy, baseSpec);
     const DeclContext *DC = decl->getDeclContext();
 
     ASTContext &ctx = decl->getASTContext();
@@ -2226,7 +2230,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       return false;
 
     // ...and is it bridged to the overridden type?
-    Type normalizedOverrideTy = normalizeType(overrideTy);
+    Type normalizedOverrideTy = normalizeType(overrideTy, overrideSpec);
     if (!bridged->isEqual(normalizedOverrideTy)) {
       // If both are nominal types, check again, ignoring generic arguments.
       auto *overrideNominal = normalizedOverrideTy->getAnyNominal();
@@ -2275,16 +2279,19 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     return false;
   };
 
-  auto checkType = [&](Type overrideTy, Type baseTy,
+  auto checkType = [&](Type overrideTy, VarDecl::Specifier overrideSpec,
+                       Type baseTy, VarDecl::Specifier baseSpec,
                        SourceRange typeRange) -> bool {
-    return checkValueReferenceType(overrideTy, baseTy, typeRange) ||
+    return checkValueReferenceType(overrideTy, overrideSpec,
+                                   baseTy, baseSpec, typeRange) ||
       checkTypeMissingEscaping(overrideTy, baseTy, typeRange);
   };
 
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     SourceRange typeRange = var->getTypeSourceRangeForDiagnostics();
     auto *baseVar = cast<VarDecl>(base);
-    return checkType(var->getInterfaceType(), baseVar->getInterfaceType(),
+    return checkType(var->getInterfaceType(), var->getSpecifier(),
+                     baseVar->getInterfaceType(), var->getSpecifier(),
                      typeRange);
   }
 
@@ -2307,7 +2314,8 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
       auto baseResultType = baseMethod->mapTypeIntoContext(
           baseMethod->getResultInterfaceType());
 
-      fixedAny |= checkType(resultType, baseResultType,
+      fixedAny |= checkType(resultType, VarDecl::Specifier::Default,
+                            baseResultType, VarDecl::Specifier::Default,
                             method->getBodyResultTypeLoc().getSourceRange());
     }
     return fixedAny;
@@ -2329,7 +2337,8 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
         subscript->getElementInterfaceType());
     auto baseResultType = baseSubscript->getDeclContext()->mapTypeIntoContext(
         baseSubscript->getElementInterfaceType());
-    fixedAny |= checkType(resultType, baseResultType,
+    fixedAny |= checkType(resultType, VarDecl::Specifier::Default,
+                          baseResultType, VarDecl::Specifier::Default,
                           subscript->getElementTypeLoc().getSourceRange());
     return fixedAny;
   }

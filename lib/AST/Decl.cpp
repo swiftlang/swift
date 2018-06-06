@@ -1960,14 +1960,7 @@ bool ValueDecl::hasInterfaceType() const {
 
 Type ValueDecl::getInterfaceType() const {
   assert(hasInterfaceType() && "No interface type was set");
-  auto ty = TypeAndAccess.getPointer();
-  // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
-  // off of InOutType.  Until then we should respect our parameter flags and
-  // return the type it expects.
-  if (auto *VD = dyn_cast<ParamDecl>(this)) {
-    ty = VD->isInOut() ? InOutType::get(ty) : ty;
-  }
-  return ty;
+  return TypeAndAccess.getPointer();
 }
 
 void ValueDecl::setInterfaceType(Type type) {
@@ -4072,13 +4065,9 @@ Type VarDecl::getType() const {
   if (!typeInContext) {
     const_cast<VarDecl *>(this)->typeInContext =
       getDeclContext()->mapTypeIntoContext(
-        getInterfaceType())->getInOutObjectType();
+        getInterfaceType());
   }
 
-  // FIXME(Remove InOutType): This grossness will go away when Sema is weaned
-  // off of InOutType.  Until then we should respect our parameter flags and
-  // return the type it expects.
-  if (isInOut()) return InOutType::get(typeInContext);
   return typeInContext;
 }
 
@@ -4380,7 +4369,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getSpecifier(),
             /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
             PD->hasType() && withTypes
-              ? PD->getType()->getInOutObjectType()
+              ? PD->getType()
               : Type(),
             PD->getDeclContext()),
     ArgumentName(PD->getArgumentName()),

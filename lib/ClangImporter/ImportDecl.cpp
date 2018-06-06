@@ -439,7 +439,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
     return ctorDecl;
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  selfRef->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+  selfRef->setType(LValueType::get(selfDecl->getType()));
   selfRef->propagateLValueAccessKind(AccessKind::Write);
 
   auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
@@ -1308,7 +1308,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
         // Construct left-hand side.
         Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
                                               /*Implicit=*/true);
-        lhs->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+        lhs->setType(LValueType::get(selfDecl->getType()));
 
         auto semantics = (var->hasStorage()
                           ? AccessSemantics::DirectToStorage
@@ -1460,7 +1460,7 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     // Construct left-hand side.
     Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
                                       /*Implicit=*/true);
-    lhs->setType(LValueType::get(selfDecl->getType()->getInOutObjectType()));
+    lhs->setType(LValueType::get(selfDecl->getType()));
 
     lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
                                   DeclNameLoc(), /*Implicit=*/true,
@@ -5663,7 +5663,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   Type selfType = selfParam->getType();
   Type initType = FunctionType::get(selfType, fnType);
   result->setInitializerInterfaceType(initType);
-  Type selfMetaType = MetatypeType::get(selfType->getInOutObjectType());
+  Type selfMetaType = MetatypeType::get(selfType);
   Type allocType = FunctionType::get(selfMetaType, fnType);
   result->setInterfaceType(allocType);
   Impl.recordImplicitUnwrapForDecl(result,

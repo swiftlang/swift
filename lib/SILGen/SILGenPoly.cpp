@@ -358,9 +358,8 @@ ManagedValue Transform::transform(ManagedValue v,
                                   CanType outputSubstType,
                                   SGFContext ctxt) {
   // Look through inout types.
-  if (isa<InOutType>(inputSubstType))
-    inputSubstType = CanType(inputSubstType->getInOutObjectType());
-  
+  inputSubstType = inputSubstType->getInOutObjectType()->getCanonicalType();
+
   // Load if the result isn't address-only.  All the translation routines
   // expect this.
   if (v.getType().isAddress()) {

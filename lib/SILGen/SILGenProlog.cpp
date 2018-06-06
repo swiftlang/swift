@@ -225,7 +225,7 @@ struct ArgumentInitHelper {
     if (vd->isInOut()) {
       SILValue address = argrv.getUnmanagedValue();
 
-      CanType objectType = vd->getType()->getInOutObjectType()->getCanonicalType();
+      CanType objectType = vd->getType()->getCanonicalType();
 
       // As a special case, don't introduce a local variable for
       // Builtin.UnsafeValueBuffer, which is not copyable.
@@ -265,6 +265,8 @@ struct ArgumentInitHelper {
 
   void emitParam(ParamDecl *PD) {
     auto type = PD->getType();
+    if (PD->isInOut())
+      type = InOutType::get(type); // FIXME remove InOutType
 
     ++ArgNo;
     if (PD->hasName()) {
@@ -331,6 +333,8 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
     Type type = (param->hasType()
                  ? param->getType()
                  : F.mapTypeIntoContext(param->getInterfaceType()));
+    if (param->isInOut())
+      type = InOutType::get(type); // FIXME remove InOutType
     makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
   }
 }

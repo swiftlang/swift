@@ -2137,7 +2137,7 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
     /* nothing */
     break;
   case ValueOwnership::InOut:
-    /* handled as part of an InOutType */
+    printer << "inout ";
     break;
   case ValueOwnership::Shared:
     printer << "__shared ";
@@ -2266,12 +2266,15 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   // through the paren types so that we don't print excessive @escapings.
   unsigned numParens = 0;
   if (!willUseTypeReprPrinting(TheTypeLoc, CurrentType, Options)) {
+    auto type = TheTypeLoc.getType()->getInOutObjectType();
+
     printParameterFlags(Printer, Options, paramFlags);
-    while (auto parenTy =
-                dyn_cast<ParenType>(TheTypeLoc.getType().getPointer())) {
+    while (auto parenTy = dyn_cast<ParenType>(type.getPointer())) {
       ++numParens;
-      TheTypeLoc = TypeLoc::withoutLoc(parenTy->getUnderlyingType());
+      type = parenTy->getUnderlyingType();
     }
+
+    TheTypeLoc = TypeLoc::withoutLoc(type);
   }
 
   for (unsigned i = 0; i < numParens; ++i)
@@ -3252,7 +3255,7 @@ public:
   void visitParenType(ParenType *T) {
     Printer << "(";
     printParameterFlags(Printer, Options, T->getParameterFlags());
-    visit(T->getUnderlyingType());
+    visit(T->getUnderlyingType()->getInOutObjectType());
     Printer << ")";
   }
 
@@ -3267,7 +3270,7 @@ public:
       if (i)
         Printer << ", ";
       const TupleTypeElt &TD = Fields[i];
-      Type EltType = TD.getType();
+      Type EltType = TD.getType()->getInOutObjectType();
 
       Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
       SWIFT_DEFER {
@@ -3540,7 +3543,7 @@ public:
       }
 
       printParameterFlags(Printer, Options, Param.getParameterFlags());
-      visit(Param.getType());
+      visit(Param.getPlainType());
       if (Param.isVariadic())
         Printer << "...";
     }
