@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-swift-frontend -swift-version 4 -typecheck -verify %s
 
 @differentiable(reverse, adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
 let x: Float = 1
@@ -6,12 +6,12 @@ let x: Float = 1
 @differentiable(reverse, adjoint: dfoo) // expected-error {{@differentiable may only be used on 'func' declarations}}
 protocol P {}
 
-func dfoo(_ x: Float, primal: Float, seed: Float) -> Float { // expected-note {{did you mean 'dfoo'?}}
+func dfoo(_ x: Float, primal: Float, seed: Float) -> Float {
   return 2 * x
 }
 
 @differentiable(reverse, adjoint: dfoo(_:primal:seed:)) // ok!
-func foo(_ x: Float) -> Float { // expected-note {{did you mean 'foo'?}}
+func foo(_ x: Float) -> Float {
   return x * x
 }
 
@@ -19,7 +19,7 @@ func foo(_ x: Float) -> Float { // expected-note {{did you mean 'foo'?}}
 struct CheckpointsFoo {
 }
 
-func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) { // expected-note {{did you mean 'pfoo'?}}
+func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) {
   return (CheckpointsFoo(), x * x)
 }
 func dfoo_checkpointed(_ x: Float, checkpoints: CheckpointsFoo, originalValue: Float, seed: Float) -> Float {
@@ -69,7 +69,7 @@ func foo5() -> Float {
 }
 
 @differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
-func meow1(_ x: Float, _: Float) -> Float { // expected-note {{did you mean}}
+func meow1(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
@@ -101,7 +101,7 @@ struct C {
 }
 
 struct S {
-  @differentiable(reverse, withRespectTo: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current declaration context}}
+  @differentiable(reverse, withRespectTo: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
   func meow1(_ x: Float) -> Float {
     return x + 1
   }
@@ -121,12 +121,12 @@ struct S {
     return lhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{ambiguous or overloaded identifier 'dPlus' cannot be used in @differentiable attribute}}
+  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'dPlus' is not defined in the current type context}}
   static func - (lhs: S, rhs: S) -> S {
     return lhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus_curried(_:)) // expected-error {{'dPlus_curried' is not defined in the current declaration context}}
+  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus_curried(_:)) // expected-error {{'dPlus_curried' is not defined in the current type context}}
   static func try_plus_curried_adjoint(lhs: S, rhs: S) -> S {
     return lhs
   }
@@ -140,24 +140,24 @@ struct S {
     return rhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dMul) // expected-error {{use of unresolved identifier 'dMul'}}
+  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (Int, S, S, S) -> (Int, S)'}}
   func instance_mul(lhs: Int, rhs: S) -> S {
     return rhs
   }
 }
 
 @differentiable(reverse, withRespectTo: (.1, .2), adjoint: dmeow2(_:_:_:_:_:)) // ok
-func meow2(_ x: Float, _: Float, _: Float) -> Float { // expected-note {{did you mean}}
+func meow2(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
 
 @differentiable(reverse, withRespectTo: (.2, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{parameter indices must be ascending}}
-func meow3(_ x: Float, _: Float, _: Float) -> Float { // expected-note {{did you mean}}
+func meow3(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
 
 @differentiable(reverse, withRespectTo: (.2, self, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
-func meow4(_ x: Float, _: Float, _: Float) -> Float { // expected-note {{did you mean}}
+func meow4(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
 

@@ -2214,124 +2214,70 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Returns the function declaration corresponding to the given function name and
+// lookup context. If the function declaration cannot be resolved, emits a
+// diagnostic and returns nullptr.
 static FuncDecl *getResolvedFuncDecl(
-    DifferentiableAttr::FunctionSpecifier funcSpecifier,
-    TypeChecker &TC, FuncDecl *original,
-    const std::function<bool(FuncDecl *)> &isValidLookupResult,
-    const std::function<void()> &overloadDiagnostic, bool isPrimal) {
-  FuncDecl *resolvedFuncDecl = nullptr;
-  UnresolvedDeclRefExpr UDRE(funcSpecifier.Name, DeclRefKind::Ordinary,
-                             funcSpecifier.Loc);
-  auto expr = TC.resolveDeclRefExpr(&UDRE, original->getInnermostDeclContext());
-  // If it's an unresolved dot expression, it must be a class method or an
-  // instance method.
-  if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(expr)) {
-    // Look up the decl name directly in the current type context.
-    auto typeCtx = original->getInnermostTypeContext();
-    auto lookupResult = TC.lookupMember(typeCtx,
-                                        typeCtx->getDeclaredInterfaceType(),
-                                        funcSpecifier.Name);
-    // Declare error flags.
-    bool exprIsNotFunction = false;
-    bool overloadNotFound = false;
+    DeclName funcName, SourceLoc funcNameLoc, TypeChecker &TC,
+    DeclContext *lookupContext,
+    const std::function<bool(FuncDecl *)> &isValidFuncDecl,
+    Diagnostic overloadDiagnostic, Diagnostic ambiguousDiagnostic,
+    Diagnostic notFunctionDiagnostic,
+    const std::function<bool(FuncDecl *)> &isValidTypeContext) {
 
-    for (auto lookupEntry : lookupResult) {
-      auto funcDecl = dyn_cast<FuncDecl>(lookupEntry.getValueDecl());
-      // Set flag if the lookup result is not a function declaration.
+  FuncDecl *resolvedFuncDecl = nullptr;
+
+  // Initialize error flags.
+  bool notAFuncDecl = false;
+  bool wrongTypeContext = false;
+  bool overloadNotFound = false;
+
+  // Perform lookup.
+  auto results = TC.lookupUnqualified(lookupContext, funcName, funcNameLoc);
+  for (auto choice : results) {
+    if (auto decl = choice.getValueDecl()) {
+      auto funcDecl = dyn_cast<FuncDecl>(decl);
       if (!funcDecl) {
-        exprIsNotFunction = true;
+        notAFuncDecl = true;
         continue;
       }
-      // Set flag if lookup result is invalid.
-      if (!isValidLookupResult(funcDecl)) {
+      if (!isValidTypeContext(funcDecl)) {
+        wrongTypeContext = true;
+        continue;
+      }
+      if (!isValidFuncDecl(funcDecl)) {
         overloadNotFound = true;
         continue;
       }
-      // If more than one lookup result has the expected function type, then
-      // the function is ambgiuous.
       if (resolvedFuncDecl) {
-        TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
+        TC.diagnose(funcNameLoc,
                     diag::differentiable_attr_ambiguous_function_identifier,
-                    funcSpecifier.Name);
-        return nullptr;
+                    funcName);
+        resolvedFuncDecl = nullptr;
+        break;
       }
-      // Resolve the function declaration.
       resolvedFuncDecl = funcDecl;
     }
-    // If the function declaration could not be resolved, check error flags.
-    if (!resolvedFuncDecl) {
-      if (overloadNotFound) {
-        overloadDiagnostic();
-        return nullptr;
-      }
-      assert(exprIsNotFunction && "Function declaration could not be resolved");
-      TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
-                  diag::differentiable_attr_specified_not_function,
-                  funcSpecifier.Name, isPrimal);
-      return nullptr;
-    }
   }
-  // If it's resolved to a type, it's not what we want.
-  else if (isa<TypeExpr>(expr))
-    TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
-                diag::differentiable_attr_specified_not_function,
-                funcSpecifier.Name, isPrimal);
-  // If it's directly resolved to a concrete declaration, it must be a free
-  // function in the module context.
-  else if (auto declRefExpr = dyn_cast<DeclRefExpr>(expr)) {
-    auto funcDecl = dyn_cast<FuncDecl>(declRefExpr->getDecl());
-    // If the candidate is not a function, then it's an error.
-    if (!funcDecl) {
-      TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
-                  diag::differentiable_attr_specified_not_function,
-                  funcSpecifier.Name, isPrimal);
-      return nullptr;
+  // If function declaration could not be resolved, emit the appropriate
+  // diagnostic.
+  if (!resolvedFuncDecl) {
+    if (results.empty()) {
+      TC.diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
+                  funcName.isOperator());
     }
-
-    // If the original and the primal or adjoint have different parents, or
-    // if they both have no type context and are in different modules, then
-    // it's an error.
-    auto inCompatibleContexts = [&](FuncDecl *decl1, FuncDecl *decl2) {
-      if (!decl1->getInnermostTypeContext() &&
-          !decl2->getInnermostTypeContext() &&
-          decl1->getParentModule() == decl2->getParentModule())
-        return true;
-      if (decl1->getParent() == decl2->getParent())
-        return true;
-      return false;
-    };
-
-    if (!inCompatibleContexts(original, funcDecl)) {
-      TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
+    else if (wrongTypeContext) {
+      TC.diagnose(funcNameLoc,
                   diag::differentiable_attr_function_not_same_type_context,
-                  funcSpecifier.Name);
-      return nullptr;
+                  funcName);
     }
-    // Otherwise, the original and the function are declared in the same
-    // context. Save this candidate for further type checking.
-    resolvedFuncDecl = funcDecl;
-  }
-  // Overloaded names are not supported.
-  // FIXME: Resolve using the expected function type.
-  else if (isa<OverloadedDeclRefExpr>(expr)) {
-    TC.diagnose(funcSpecifier.Loc.getBaseNameLoc(),
-                diag::differentiable_attr_ambiguous_function_identifier,
-                funcSpecifier.Name);
-    return nullptr;
-  }
-  // Error expressions have been handled already.
-  else if (isa<ErrorExpr>(expr))
-    return nullptr; // Diagnostics already emitted.
-  else
-    llvm_unreachable("Unhandled expr kind");
-
-  assert(resolvedFuncDecl && "Function declaration should have been resolved");
-
-  // Perform an additional check to handle cases that were not
-  // UnresolvedDotExpr.
-  if (!isValidLookupResult(resolvedFuncDecl)) {
-    overloadDiagnostic();
-    return nullptr;
+    else if (overloadNotFound) {
+      TC.diagnose(funcNameLoc, overloadDiagnostic);
+    } else {
+      assert(notAFuncDecl && "Expected 'not a function' error");
+      notAFuncDecl
+      TC.diagnose(funcNameLoc, notFunctionDiagnostic);
+    }
   }
 
   return resolvedFuncDecl;
@@ -2363,10 +2309,41 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto originalParamsTy =
     originalParams.getInterfaceType(original->getASTContext());
 
+  // If the original function and the primal/adjoint have different parents, or
+  // if they both have no type context and are in different modules, then
+  // it's an error.
+  auto hasValidTypeContext = [&](FuncDecl *decl) {
+    if (!original->getInnermostTypeContext() &&
+        !decl->getInnermostTypeContext() &&
+        original->getParentModule() == decl->getParentModule())
+      return true;
+    if (auto typeCtx1 = original->getInnermostTypeContext()) {
+      if (auto typeCtx2 = decl->getInnermostTypeContext()) {
+        auto type1 = typeCtx1->getDeclaredInterfaceType();
+        auto type2 = typeCtx2->getDeclaredInterfaceType();
+        return type1->isEqual(type2);
+      }
+    }
+    return original->getParent() == decl->getParent();
+  };
+
   // Resolve the primal declaration, if it exists.
   FuncDecl *resolvedPrimal = nullptr;
   if (attr->getPrimal()) {
     auto primalSpecifier = attr->getPrimal().getValue();
+
+    auto primalTypeCtx = original->getInnermostTypeContext();
+    if (!primalTypeCtx) primalTypeCtx = original->getParent();
+
+    Diagnostic primalOverloadDiagnostic(
+      diag::differentiable_attr_primal_overload_not_found,
+      primalSpecifier.Name, originalParamsTy);
+    Diagnostic primalAmbiguousDiagnostic(
+      diag::differentiable_attr_ambiguous_function_identifier,
+      primalSpecifier.Name);
+    Diagnostic primalNotFunctionDiagnostic(
+      diag::differentiable_attr_specified_not_function,
+      primalSpecifier.Name, /*isPrimal*/ true);
 
     auto isValidPrimal = [&](FuncDecl *primalCandidate) {
       // Returns true if the primal candidate
@@ -2399,16 +2376,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return true;
     };
 
-    auto primalOverloadDiagnostic = [&] {
-      TC.diagnose(primalSpecifier.Loc.getBaseNameLoc(),
-                  diag::differentiable_attr_primal_overload_not_found,
-                  primalSpecifier.Name, originalParamsTy);
-    };
+    resolvedPrimal =
+      getResolvedFuncDecl(primalSpecifier.Name,
+                          primalSpecifier.Loc.getBaseNameLoc(),
+                          TC, primalTypeCtx, isValidPrimal,
+                          primalOverloadDiagnostic, primalAmbiguousDiagnostic,
+                          primalNotFunctionDiagnostic,
+                          hasValidTypeContext);
 
-    resolvedPrimal = getResolvedFuncDecl(primalSpecifier, TC, original,
-                                         isValidPrimal,
-                                         primalOverloadDiagnostic,
-                                         /*isPrimal*/ true);
     if (!resolvedPrimal) return;
     // Memorize the primal reference in the attribute.
     attr->setPrimalFunction(resolvedPrimal);
@@ -2549,6 +2524,22 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Resolve the adjoint declaration.
+  FuncDecl *resolvedAdjoint = nullptr;
+  auto adjointSpecifier = attr->getAdjoint();
+
+  auto adjointTypeCtx = original->getInnermostTypeContext();
+  if (!adjointTypeCtx) adjointTypeCtx = original->getParent();
+
+  Diagnostic adjointOverloadDiagnostic(
+    diag::differentiable_attr_adjoint_overload_not_found,
+    adjointSpecifier.Name, expectedAdjointFnTy);
+  Diagnostic adjointAmbiguousDiagnostic(
+    diag::differentiable_attr_ambiguous_function_identifier,
+    adjointSpecifier.Name);
+  Diagnostic adjointNotFunctionDiagnostic(
+    diag::differentiable_attr_specified_not_function,
+    adjointSpecifier.Name, /*isPrimal*/ false);
+
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
     // Returns true if adjoint candidate has the expected type.
     auto adjointType = adjointCandidate->getInterfaceType()
@@ -2556,19 +2547,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return adjointType->isEqual(expectedAdjointFnTy);
   };
 
-  auto adjointOverloadDiagnostic = [&] {
-    TC.diagnose(attr->getAdjoint().Loc.getBaseNameLoc(),
-                diag::differentiable_attr_adjoint_overload_not_found,
-                attr->getAdjoint().Name, expectedAdjointFnTy);
-  };
+  resolvedAdjoint =
+    getResolvedFuncDecl(adjointSpecifier.Name,
+                        adjointSpecifier.Loc.getBaseNameLoc(),
+                        TC, adjointTypeCtx, isValidAdjoint,
+                        adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
+                        adjointNotFunctionDiagnostic,
+                        hasValidTypeContext);
 
-  FuncDecl *resolvedAdjoint = getResolvedFuncDecl(attr->getAdjoint(), TC,
-                                                  original, isValidAdjoint,
-                                                  adjointOverloadDiagnostic,
-                                                  /*isPrimal*/ false);
   if (!resolvedAdjoint) return;
-  // Done checking @differentiable attribute. Memorize the adjoint reference in
-  // the attribute.
+  // Done checking @differentiable attribute.
+  // Memorize the adjoint reference in the attribute.
   attr->setAdjointFunction(resolvedAdjoint);
 }
 
