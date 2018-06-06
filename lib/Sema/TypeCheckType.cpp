@@ -2876,7 +2876,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // `FunctionInput` so that e.g. ((foo: Int)) -> Int is considered a
     // tuple argument rather than a labeled Int argument.
     if (isImmediateFunctionInput) {
-      elementOptions -= TypeResolutionFlags::ImmediateFunctionInput;
+      elementOptions = withoutContext(elementOptions, true);
       elementOptions |= TypeResolutionFlags::FunctionInput;
     }
   } else {
