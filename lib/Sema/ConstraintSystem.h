@@ -1649,17 +1649,23 @@ public:
     return TypeLocTypes.find(&L)->second;
   }
 
-  Type getType(const ValueDecl *P, bool queryDeclOnMiss = true) const {
-    if (auto *PD = dyn_cast<ParamDecl>(P)) {
-      assert(hasType(PD) && "Expected type to have been set!");
-      return ParamTypes.find(PD)->second;
-    }
+  Type getType(const ParamDecl *P) const {
+    assert(hasType(P) && "Expected type to have been set!");
+    return ParamTypes.find(P)->second;
+  }
 
-    if (!queryDeclOnMiss)
-      return Type();
+  Type getTypeOrNull(const ValueDecl *D) const {
+    if (auto *P = dyn_cast<ParamDecl>(D))
+      return getType(P);
+    return Type();
+  }
 
-    assert(P->hasValidSignature());
-    return P->getInterfaceType();
+  Type getTypeOrInterfaceType(const ValueDecl *D) const {
+    if (auto *P = dyn_cast<ParamDecl>(D))
+      return getType(P);
+
+    assert(D->hasValidSignature());
+    return D->getInterfaceType();
   }
 
   /// Cache the type of the expression argument and return that same

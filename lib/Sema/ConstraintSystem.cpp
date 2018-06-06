@@ -1017,7 +1017,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType = TC.getUnopenedTypeOfReference(
-      varDecl, Type(), DC, getType(varDecl, false), base, wantInterfaceType);
+      varDecl, Type(), DC, getTypeOrNull(varDecl), base, wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
@@ -1338,8 +1338,8 @@ ConstraintSystem::getTypeOfMemberReference(
                                   AnyFunctionType::ExtInfo());
     } else {
       refType = TC.getUnopenedTypeOfReference(cast<VarDecl>(value), baseTy,
-                                              useDC, getType(value, false),
-                                              base, /*wantInterfaceType=*/true);
+                                              useDC, getTypeOrNull(value), base,
+                                              /*wantInterfaceType=*/true);
     }
 
     auto selfTy = outerDC->getSelfInterfaceType();
