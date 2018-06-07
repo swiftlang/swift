@@ -6,7 +6,7 @@
 
 import second
 
-// CHECK:       define{{( protected)?}} swiftcc [[INT]] @"$S17resilience_bypass7getSizeSiyF"() {{.*}} {
+// CHECK:       define{{( dllexport| protected)?}} swiftcc [[INT]] @"$S17resilience_bypass7getSizeSiyF"() {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    ret [[INT]] {{5|9}}
 // CHECK-NEXT:  }
