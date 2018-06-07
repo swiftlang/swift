@@ -437,7 +437,7 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(paramInfo.SpecifierKind,
+    auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default,
                                      paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
