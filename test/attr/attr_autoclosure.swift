@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -15,7 +15,7 @@ func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
 func func6(_: @autoclosure () -> Int) {func6(0)}
 
 // autoclosure + inout doesn't make sense.
-func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
+func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{'@autoclosure' may only be used on parameters}}
 }
 
 func func9(_ x: @autoclosure (Int) -> Bool) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
@@ -157,7 +157,7 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesAutoclosure(fn()) // ok
 }
 
-// expected-error @+1 {{@autoclosure must not be used on variadic parameters}}
+// expected-error @+1 {{'@autoclosure' must not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
 }

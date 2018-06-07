@@ -2193,11 +2193,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
-  // FIXME: Until we remove the IUO type from the type system, we
-  // need to continue to parse IUOs in SIL tests so that we can
-  // match the types we generate from the importer.
-  if (!options.contains(TypeResolutionFlags::SILMode))
-    options -= TypeResolutionFlags::AllowIUO;
+  options -= TypeResolutionFlags::AllowIUO;
 
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                          options | TypeResolutionFlags::ImmediateFunctionInput);
@@ -2712,13 +2708,13 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     StringRef name;
     switch (repr->getKind()) {
     case TypeReprKind::InOut:
-      name = "'inout'";
+      name = "inout";
       break;
     case TypeReprKind::Shared:
-      name = "'__shared'";
+      name = "__shared";
       break;
     case TypeReprKind::Owned:
-      name = "'__owned'";
+      name = "__owned";
       break;
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
@@ -2863,11 +2859,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   auto elementOptions = options;
   if (repr->isParenType()) {
     // We also want to disallow IUO within even a paren.
-    // FIXME: Until we remove the IUO type from the type system, we
-    // need to continue to parse IUOs in SIL tests so that we can
-    // match the types we generate from the importer.
-    if (!options.contains(TypeResolutionFlags::SILMode))
-      elementOptions -= TypeResolutionFlags::AllowIUO;
+    elementOptions -= TypeResolutionFlags::AllowIUO;
 
     // If we have a single ParenType, don't clear the context bits; we
     // still want to parse the type contained therein as if it were in
@@ -2876,7 +2868,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     // `FunctionInput` so that e.g. ((foo: Int)) -> Int is considered a
     // tuple argument rather than a labeled Int argument.
     if (isImmediateFunctionInput) {
-      elementOptions -= TypeResolutionFlags::ImmediateFunctionInput;
+      elementOptions = withoutContext(elementOptions, true);
       elementOptions |= TypeResolutionFlags::FunctionInput;
     }
   } else {

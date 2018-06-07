@@ -1309,8 +1309,6 @@ ERROR(attr_interpolated_string,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
-ERROR(attr_only_on_parameters_parse, none,
-      "'%0' may only be used on parameters", (StringRef))
 
 // Access control
 ERROR(attr_access_expected_set,none,

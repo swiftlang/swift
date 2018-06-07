@@ -181,7 +181,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
                                    Tok.getRawText().equals("__owned")))) {
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
-    diagnose(Tok.getLoc(), diag::attr_only_on_parameters_parse, Tok.getText());
+    diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
     consumeToken();
   }
 
