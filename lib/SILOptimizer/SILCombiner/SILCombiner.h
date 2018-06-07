@@ -26,6 +26,7 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ConcreteTypeAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
@@ -120,6 +121,8 @@ class SILCombiner :
 
   ConcreteTypeAnalysis *CTA;
 
+  ClassHierarchyAnalysis *CHA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -143,8 +146,9 @@ class SILCombiner :
 
 public:
   SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
-              ConcreteTypeAnalysis *CTA, bool removeCondFails)
-      : AA(AA), DA(DA), CTA(CTA), Worklist(), MadeChange(false),
+              ConcreteTypeAnalysis *CTA, ClassHierarchyAnalysis *CHA,
+              bool removeCondFails)
+      : AA(AA), DA(DA), CTA(CTA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {

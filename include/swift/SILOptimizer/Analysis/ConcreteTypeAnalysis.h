@@ -12,14 +12,14 @@
 namespace swift {
 
 class SILModule;
-class ClassDecl;
+class NominalTypeDecl;
 class ProtocolDecl;
 
 class ConcreteTypeAnalysis : public SILAnalysis {
 public:
   typedef SmallVector<NominalTypeDecl *, 8> NominalTypeList;
-  typedef llvm::DenseMap<ProtocolDecl *, ClassDecl *>
-      ProtocolSoleClassImplementation;
+  typedef llvm::DenseMap<ProtocolDecl *, NominalTypeDecl *>
+      ProtocolSoleTypeImplementation;
   typedef llvm::DenseMap<ProtocolDecl *, NominalTypeList>
       ProtocolImplementations;
 
@@ -51,8 +51,8 @@ public:
   virtual void invalidateFunctionTables() override {}
 
   /// Get the sole class that implements a protocol.
-  ClassDecl *getSoleClassImplementingProtocol(ProtocolDecl *P) {
-    return ProtocolSoleClassImplementationCache[P];
+  NominalTypeDecl *getSoleTypeImplementingProtocol(ProtocolDecl *P) {
+    return ProtocolSoleTypeImplementationCache[P];
   }
 
 private:
@@ -63,7 +63,7 @@ private:
   SILModule *M;
 
   /// A cache that maps a protocol to its sole class conforming to it.
-  ProtocolSoleClassImplementation ProtocolSoleClassImplementationCache;
+  ProtocolSoleTypeImplementation ProtocolSoleTypeImplementationCache;
 };
 
 } // namespace swift

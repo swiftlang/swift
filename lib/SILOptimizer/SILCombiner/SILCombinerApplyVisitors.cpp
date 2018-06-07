@@ -1027,15 +1027,30 @@ bool SILCombiner::propagateConcreteTypeFromCTAInternal(
   auto &M = Builder.getModule();
   if (!Protocol)
     return false;
-  auto *ClassDecl = CTA->getSoleClassImplementingProtocol(Protocol);
-  if (!ClassDecl)
+  auto *NTD = CTA->getSoleTypeImplementingProtocol(Protocol);
+  if (!NTD)
     return false;
 
-  auto ElementType = ClassDecl->getDeclaredType()->getCanonicalType();
-  if (!(ElementType->getClassOrBoundGenericClass())) { 
-   return false; 
+  ClassDecl *CD = nullptr;
+  /// Check if the class has no subclasses: direct or indirect.
+  if ((CD = dyn_cast<ClassDecl>(NTD)) &&
+          ((CHA->hasKnownDirectSubclasses(CD)) ||
+          (CHA->hasKnownIndirectSubclasses(CD)))) {
+    return false;
   }
 
+  auto ElementType = NTD->getDeclaredType()->getCanonicalType();
+  if ((isa<ClassDecl>(NTD)) && (!(ElementType->getClassOrBoundGenericClass()))) {
+    return false;
+  }
+
+  bool isCopied = false;
+  if (auto *Instance = dyn_cast<AllocStackInst>(Arg)) {
+    if (SILValue Src =
+            getAddressOfStackInit(Instance, Apply.getInstruction(), isCopied)) {
+      Arg = Src;
+    }
+  }
   if (auto *OER = dyn_cast<OpenExistentialRefInst>(Arg)) {
     ConcreteType = ElementType;
     SILType ConcreteSILType = M.Types.getLoweredType(ConcreteType);
@@ -1083,6 +1098,10 @@ bool SILCombiner::propagateConcreteTypeFromCTAInternal(
 //  %9 = apply %8(%7) : $@convention(method) 
 //     (@guaranteed C) -> Int return %6 : $Int
 SILInstruction *SILCombiner::propagateConcreteTypeFromCTA(FullApplySite Apply) {
+
+  if (!(Apply.getModule().isWholeModule())) {
+    return nullptr;
+  }
 
   SILValue Self = Apply.getSelfArgument();
   auto *WMI = dyn_cast<WitnessMethodInst>(Apply.getCallee());

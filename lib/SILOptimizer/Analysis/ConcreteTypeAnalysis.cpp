@@ -1,5 +1,4 @@
-//===--- ConcreteTypeAnalysis.cpp - Protocol to Class inheritance
-//------------===//
+//===--- ConcreteTypeAnalysis.cpp - Protocol to Class inheritance ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,7 +17,6 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 
 using namespace swift;
 
@@ -62,37 +60,36 @@ void ConcreteTypeAnalysis::init() {
   ProtocolImplementations ProtocolImplementationsCache;
 
   M->getSwiftModule()->getTopLevelDecls(Decls);
-  NominalTypeWalker Walker(ProtocolImplementationsCache);
 
+  /// This operation is quadratic and should only be performed
+  /// in whole module compilation.
+  NominalTypeWalker Walker(ProtocolImplementationsCache);
   for (auto *D : Decls) {
     D->walk(Walker);
   }
 
-  /// Get the class hierarchy.
-  ClassHierarchyAnalysis *CHA =
-      llvm::dyn_cast<ClassHierarchyAnalysis>(createClassHierarchyAnalysis(M));
-
   for (auto *D : Decls) {
     auto ProtoDecl = dyn_cast<ProtocolDecl>(D);
-    /// Check for protocols that are either internal or lowe  with whole module
-    /// compilation enabled or file private or lower.
+    /// Check for protocols that are either internal or lower with whole module
+    /// compilation enabled.
     if (ProtoDecl && ProtoDecl->hasAccess() &&
         ProtocolImplementationsCache.count(ProtoDecl) &&
-        ((ProtoDecl->getEffectiveAccess() <= AccessLevel::Internal))) {
+        (ProtoDecl->getEffectiveAccess() <= AccessLevel::Internal)) {
 
-      /// Make sure one class implements this protocol.
-      SmallVector<NominalTypeDecl *, 8> ImplementedClassOrProtocolList =
+      /// Make sure one class/enum/struct implements this protocol.
+      SmallVector<NominalTypeDecl *, 8> ImplementedDeclList =
           ProtocolImplementationsCache[ProtoDecl];
-      if (ImplementedClassOrProtocolList.size() == 1) {
-        /// Make sure it is a class declaration that implements this protocol.
-        /// Check if the class has no subclasses: direct or indirect.
-        auto CD =
-            dyn_cast<ClassDecl>(*(ImplementedClassOrProtocolList.begin()));
-        if (CD && (CD->getEffectiveAccess() <= AccessLevel::Internal) &&
-            (!CHA->hasKnownDirectSubclasses(CD)) &&
-            (!CHA->hasKnownIndirectSubclasses(CD))) {
-          ProtocolSoleClassImplementationCache[ProtoDecl] = CD;
-        }
+      /// Bail if more than one type implements the protocol.
+      if (ImplementedDeclList.size() > 1)
+        continue;
+      auto NTD = *(ImplementedDeclList.begin());
+      /// Check the access level.
+      if (NTD->getEffectiveAccess() > AccessLevel::Internal)
+        continue;
+
+      /// Check if it is a class/struct/enum.
+      if (isa<ClassDecl>(NTD) || isa<StructDecl>(NTD) || isa<EnumDecl>(NTD)) {
+        ProtocolSoleTypeImplementationCache[ProtoDecl] = NTD;
       }
     }
   }
