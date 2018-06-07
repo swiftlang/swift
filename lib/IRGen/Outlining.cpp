@@ -36,7 +36,11 @@ void OutliningMetadataCollector::collectTypeMetadataForLayout(SILType type) {
   }
 
   CanType formalType = type.getSwiftRValueType();
-  if (isa<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(formalType))) {
+  auto &ti = IGF.IGM.getTypeInfoForLowered(formalType);
+  // We don't need the metadata for fixed size types or types that are not ABI
+  // accessible. Outlining will call the value witness of the enclosing type of
+  // non ABI accessible field/element types.
+  if (isa<FixedTypeInfo>(ti) || !ti.isABIAccessible()) {
     return;
   }
 
