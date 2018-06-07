@@ -39,10 +39,10 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 -DCMAKE_AR=<path to llvm-ar>,\
 -DCMAKE_RANLIB=<path to llvm-ranlib>,\
 -DSWIFT_SDKS=WINDOWS,\
--DSWIFT_WINDOWS_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
--DSWIFT_WINDOWS_ICU_UC_INCLUDE=<path to ICU UC includes>,\
--DSWIFT_WINDOWS_ICU_I18N=<path to ICU i18n lib>,\
--DSWIFT_WINDOWS_ICU_UC=<path to ICU UC lib>
+-DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
+-DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=<path to ICU UC includes>,\
+-DSWIFT_WINDOWS_x86_64_ICU_I18N=<path to ICU i18n lib>,\
+-DSWIFT_WINDOWS_x86_64_ICU_UC=<path to ICU UC lib>
 ```
 
 #### Linux
