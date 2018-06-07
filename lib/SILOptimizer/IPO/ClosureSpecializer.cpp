@@ -285,11 +285,17 @@ SingleValueInstruction *CallSiteDescriptor::getClosure() const {
   return CInfo->Closure;
 }
 
-static bool isNonInoutIndirectSILArgument(SILValue Arg,
+static bool isConsumingIndirectSILArgumentConvention(SILArgumentConvention ArgConvention) {
+  return ArgConvention.isIndirectConvention() &&
+    ArgConvention != SILArgumentConvention::Indirect_In_Guaranteed &&
+    ArgConvention != SILArgumentConvention::Indirect_Inout &&
+    ArgConvention != SILArgumentConvention::Indirect_InoutAliasable;
+}
+
+static bool isConsumingIndirectSILArgument(SILValue Arg,
                                           SILArgumentConvention ArgConvention) {
-  return !Arg->getType().isObject() && ArgConvention.isIndirectConvention() &&
-         ArgConvention != SILArgumentConvention::Indirect_Inout &&
-         ArgConvention != SILArgumentConvention::Indirect_InoutAliasable;
+  return !Arg->getType().isObject()
+    && isConsumingIndirectSILArgumentConvention(ArgConvention);
 }
 
 /// Update the callsite to pass in the correct arguments.
@@ -332,12 +338,12 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 
     // Non-inout indirect arguments are not supported yet.
     assert(ArgTy.isObject() ||
-           !isNonInoutIndirectSILArgument(Arg, ArgConvention));
+           !isConsumingIndirectSILArgument(Arg, ArgConvention));
 
     // If argument is not an object and it is an inout parameter,
     // continue...
     if (!ArgTy.isObject() &&
-        !isNonInoutIndirectSILArgument(Arg, ArgConvention)) {
+        !isConsumingIndirectSILArgument(Arg, ArgConvention)) {
       NewArgs.push_back(Arg);
       ++ClosureArgIdx;
       continue;
@@ -472,7 +478,7 @@ void CallSiteDescriptor::extendArgumentLifetime(
   SILBuilderWithScope Builder(getClosure());
 
   // Indirect non-inout arguments are not supported yet.
-  assert(!isNonInoutIndirectSILArgument(Arg, ArgConvention));
+  assert(!isConsumingIndirectSILArgument(Arg, ArgConvention));
 
   if (ArgTy.isObject()) {
     Builder.createRetainValue(getClosure()->getLoc(), Arg,
@@ -534,8 +540,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
       }
       auto ArgConvention =
           ClosureCalleeConv.getSILArgumentConvention(ClosureArgIdx);
-      if (ArgConvention != SILArgumentConvention::Indirect_Inout &&
-          ArgConvention != SILArgumentConvention::Indirect_InoutAliasable)
+      if (isConsumingIndirectSILArgumentConvention(ArgConvention))
         return false;
       ++ClosureArgIdx;
     }
@@ -601,7 +606,8 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ParamConv = PInfo.getConvention();
       assert(!SILModuleConventions(M).useLoweredAddresses()
              || ParamConv == ParameterConvention::Indirect_Inout
-             || ParamConv == ParameterConvention::Indirect_InoutAliasable);
+             || ParamConv == ParameterConvention::Indirect_InoutAliasable
+             || ParamConv == ParameterConvention::Indirect_In_Guaranteed);
     } else {
       ParamConv = ClosedOverFunConv.getSILType(PInfo).isTrivial(M)
                       ? ParameterConvention::Direct_Unowned

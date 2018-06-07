@@ -881,9 +881,16 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
     case CaptureKind::StorageAddress: {
       // Non-escaping lvalues are captured as the address of the value.
       SILType ty = loweredTy.getAddressType();
+      
+      ParameterConvention convention
+        = ParameterConvention::Indirect_InoutAliasable;
+      
+      if (auto var = dyn_cast<VarDecl>(VD))
+        if (var->isLet())
+          convention = ParameterConvention::Indirect_In_Guaranteed;
+      
       auto param =
-          SILParameterInfo(ty.getASTType(),
-                           ParameterConvention::Indirect_InoutAliasable);
+          SILParameterInfo(ty.getASTType(), convention);
       inputs.push_back(param);
       break;
     }
