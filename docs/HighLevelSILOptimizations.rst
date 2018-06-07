@@ -313,19 +313,19 @@ Dictionary
 ~~~~~~~~~~
 TBD.
 
-@effects attribute
+@_effects attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The @effects attribute describes how a function affects "the state of the world".
+The @_effects attribute describes how a function affects "the state of the world".
 More practically how the optimizer can modify the program based on information
 that is provided by the attribute.
 
 Usage:
 
-  @effects(readonly) func foo() { .. }
+  @_effects(readonly) func foo() { .. }
 
 
-The @effects attribute supports the following tags:
+The @_effects attribute supports the following tags:
 
 readnone
 
@@ -363,13 +363,13 @@ releasenone
       }
     }
 
-    @effects(releasenone)
+    @_effects(releasenone)
     func validReleaseNoneFunction(x: Int) -> Int {
       global.x = 5
       return x + 2
     }
 
-    @effects(releasenone)
+    @_effects(releasenone)
     func validReleaseNoneFunction(x: Int) -> Int {
       var notExternallyVisibleObject = SomeObject()
       return x +  notExternallyVisibleObject.x

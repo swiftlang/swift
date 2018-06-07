@@ -334,7 +334,7 @@ bool FunctionSideEffects::setDefinedEffects(SILFunction *F) {
     case EffectsKind::ReadNone:
       return true;
     case EffectsKind::ReadOnly:
-      // @effects(readonly) is worthless if we have owned parameters, because
+      // @_effects(readonly) is worthless if we have owned parameters, because
       // the release inside the callee may call a deinit, which itself can do
       // anything.
       if (!F->hasOwnedParameters()) {
@@ -356,7 +356,7 @@ bool FunctionSideEffects::summarizeFunction(SILFunction *F) {
   if (!F->empty())
     ParamEffects.resize(F->getArguments().size());
 
-  // Handle @effects attributes
+  // Handle @_effects attributes
   if (setDefinedEffects(F)) {
     LLVM_DEBUG(llvm::dbgs() << "  -- has defined effects " << F->getName() << '\n');
     return true;
@@ -463,7 +463,7 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
   }
 
   if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
-    // Does the function have any @effects?
+    // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;
   }

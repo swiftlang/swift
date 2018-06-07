@@ -668,7 +668,7 @@ extension String {
 
 extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   public // @testable
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self.init(Unicode.Scalar(_value: UInt32(value)))
@@ -699,7 +699,7 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
 
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
@@ -715,7 +715,7 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
 
 extension String : _ExpressibleByBuiltinUTF16StringLiteral {
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   @_semantics("string.makeUTF16")
   public init(
     _builtinUTF16StringLiteral start: Builtin.RawPointer,
@@ -736,7 +736,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
 extension String : _ExpressibleByBuiltinStringLiteral {
   @inline(__always)
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -922,7 +922,7 @@ extension String {
 
 extension String {
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_semantics("string.concat")
   public static func + (lhs: String, rhs: String) -> String {
     var lhs = lhs
