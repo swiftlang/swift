@@ -99,7 +99,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     if (!key)
       return LoadResult::HadError;
     StringRef keyString = key->getValue(scratch);
-      
+
     using namespace reference_dependency_keys;
 
     if (keyString == interfaceHash) {
