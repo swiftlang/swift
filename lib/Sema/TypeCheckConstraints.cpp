@@ -1894,38 +1894,6 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
                                     typeExpr->getTypeLoc());
 }
 
-/// \brief Clean up the given ill-formed expression, removing any references
-/// to type variables and setting error types on erroneous expression nodes.
-void CleanupIllFormedExpressionRAII::doIt(Expr *expr) {
-  class CleanupIllFormedExpression : public ASTWalker {
-  public:
-    bool walkToDeclPre(Decl *D) override {
-      // This handles parameter decls in ClosureExprs.
-      if (auto VD = dyn_cast<VarDecl>(D)) {
-        if (VD->hasType() && VD->getType()->hasTypeVariable()) {
-          VD->markInvalid();
-        }
-      }
-      return true;
-    }
-
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-  
-  if (expr)
-    expr->walk(CleanupIllFormedExpression());
-}
-
-
-CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
-  if (expr)
-    CleanupIllFormedExpressionRAII::doIt(*expr);
-}
-
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
@@ -2004,7 +1972,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
 
   ConstraintSystem cs(*this, dc, csOptions);
   cs.baseCS = baseCS;
-  CleanupIllFormedExpressionRAII cleanup(expr);
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
   // ok to have a purpose without a convertType (which is used for call
@@ -2071,10 +2038,8 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
       return Type();
   }
 
-  if (options.contains(TypeCheckExprFlags::SkipApplyingSolution)) {
-    cleanup.disable();
+  if (options.contains(TypeCheckExprFlags::SkipApplyingSolution))
     return solution.simplifyType(cs.getType(expr));
-  }
 
   // Apply the solution to the expression.
   result = cs.applySolution(
@@ -2109,7 +2074,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   }
 
   expr = result;
-  cleanup.disable();
   return cs.getType(expr);
 }
 
@@ -2123,7 +2087,6 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::SuppressDiagnostics);
-  CleanupIllFormedExpressionRAII cleanup(expr);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -2212,18 +2175,12 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
 
-  // If the previous checking gives the expr error type,
-  // clear the result and re-check.
-  {
-    CleanupIllFormedExpressionRAII cleanup(expr);
+  const Type originalType = expr->getType();
+  if (originalType && originalType->hasError())
+    expr->setType(Type());
 
-    const Type originalType = expr->getType();
-    if (originalType && originalType->hasError())
-      expr->setType(Type());
-
-    cs.solve(expr, /*convertType*/ Type(), listener, viable,
-             allowFreeTypeVariables);
-  }
+  cs.solve(expr, /*convertType*/ Type(), listener, viable,
+           allowFreeTypeVariables);
 
   for (auto &solution : viable) {
     auto exprType = solution.simplifyType(cs.getType(expr));
@@ -2237,7 +2194,6 @@ bool TypeChecker::typeCheckCompletionSequence(Expr *&expr, DeclContext *DC) {
 
   // Construct a constraint system from this expression.
   ConstraintSystem CS(*this, DC, ConstraintSystemFlags::SuppressDiagnostics);
-  CleanupIllFormedExpressionRAII cleanup(expr);
 
   auto *SE = cast<SequenceExpr>(expr);
   assert(SE->getNumElements() >= 3);
@@ -2323,7 +2279,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(expr);
   if (auto generatedExpr = cs.generateConstraintsShallow(expr))
     expr = generatedExpr;
   else
@@ -2366,7 +2321,6 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc) {
   }
 
   expr = result;
-  cleanup.disable();
   return false;
 }
 
@@ -3236,8 +3190,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(expr);
-
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
@@ -3285,7 +3237,6 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   }
 
   expr = result;
-  cleanup.disable();
   return false;
 }
 

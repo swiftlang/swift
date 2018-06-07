@@ -2340,25 +2340,6 @@ public:
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
 };
 
-/// \brief RAII object that cleans up the given expression if not explicitly
-/// disabled.
-class CleanupIllFormedExpressionRAII {
-  Expr **expr;
-
-public:
-  CleanupIllFormedExpressionRAII(Expr *&expr)
-    : expr(&expr) { }
-
-  ~CleanupIllFormedExpressionRAII();
-
-  static void doIt(Expr *expr);
-
-  /// \brief Disable the cleanup of this expression; it doesn't need it.
-  void disable() {
-    expr = nullptr;
-  }
-};
-
 /// Temporary on-stack storage and unescaping for encoded diagnostic
 /// messages.
 ///
