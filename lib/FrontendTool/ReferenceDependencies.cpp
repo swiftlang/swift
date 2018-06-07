@@ -71,7 +71,7 @@ public:
   
 private:
   /// Collected and later written information.
-  struct CollectedProvidedDeclarations {
+  struct CollectedDeclarations {
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
     llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
     llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
@@ -80,14 +80,14 @@ private:
   };
   
   void emit() const;
-  CollectedProvidedDeclarations emitTopLevelNames() const;
+  CollectedDeclarations emitTopLevelNames() const;
   void emitNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) const;
-  void emitMembers(const CollectedProvidedDeclarations &cpd) const;
+  void emitMembers(const CollectedDeclarations &cpd) const;
   void emitDynamicLookupMembers() const;
   
-  void emitTopLevelDecl(const Decl *D, CollectedProvidedDeclarations &cpd) const;
-  void emitExtensionDecl(const ExtensionDecl *D, CollectedProvidedDeclarations &cpd) const;
-  void emitNominalTypeDecl(const NominalTypeDecl *NTD, CollectedProvidedDeclarations &cpd) const;
+  void emitTopLevelDecl(const Decl *D, CollectedDeclarations &cpd) const;
+  void emitExtensionDecl(const ExtensionDecl *D, CollectedDeclarations &cpd) const;
+  void emitNominalTypeDecl(const NominalTypeDecl *NTD, CollectedDeclarations &cpd) const;
   void emitValueDecl(const ValueDecl *VD) const;
   
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
@@ -195,7 +195,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
 }
 
 void ProvidesEmitter::emit() const {
-  CollectedProvidedDeclarations cpd = emitTopLevelNames();
+  CollectedDeclarations cpd = emitTopLevelNames();
   emitNominalTypes(cpd.extendedNominals);
   emitMembers(cpd);
   emitDynamicLookupMembers();
@@ -219,10 +219,10 @@ void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash << "\"\n";
 }
 
-ProvidesEmitter::CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelNames() const {
+ProvidesEmitter::CollectedDeclarations ProvidesEmitter::emitTopLevelNames() const {
   out << providesTopLevel << ":\n";
   
-  CollectedProvidedDeclarations cpd;
+  CollectedDeclarations cpd;
   for (const Decl *D : SF->Decls)
     emitTopLevelDecl(D, cpd);
   for (auto *operatorFunction : cpd.memberOperatorDecls)
@@ -232,7 +232,7 @@ ProvidesEmitter::CollectedProvidedDeclarations ProvidesEmitter::emitTopLevelName
 
 void ProvidesEmitter::emitTopLevelDecl(
     const Decl *const D,
-    CollectedProvidedDeclarations &cpd) const {
+    CollectedDeclarations &cpd) const {
   switch (D->getKind()) {
   case DeclKind::Module:
     break;
@@ -292,7 +292,7 @@ void ProvidesEmitter::emitTopLevelDecl(
 
 void ProvidesEmitter::emitExtensionDecl(
     const ExtensionDecl *const ED,
-    CollectedProvidedDeclarations &cpd) const {
+    CollectedDeclarations &cpd) const {
   auto *NTD = ED->getExtendedType()->getAnyNominal();
   if (!NTD)
     return;
@@ -318,7 +318,7 @@ void ProvidesEmitter::emitExtensionDecl(
 
 void ProvidesEmitter::emitNominalTypeDecl(
     const NominalTypeDecl *const NTD,
-    CollectedProvidedDeclarations &cpd) const {
+    CollectedDeclarations &cpd) const {
   if (!NTD->hasName())
     return;
   if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
@@ -329,7 +329,7 @@ void ProvidesEmitter::emitNominalTypeDecl(
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
-void ProvidesEmitter::CollectedProvidedDeclarations::findNominalsAndOperators(const DeclRange members) {
+void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(const DeclRange members) {
   for (const Decl *D : members) {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
@@ -375,7 +375,7 @@ void ProvidesEmitter::emitNominalTypes(
 }
 
 void ProvidesEmitter::emitMembers(
-    const CollectedProvidedDeclarations &cpd) const {
+    const CollectedDeclarations &cpd) const {
   out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
