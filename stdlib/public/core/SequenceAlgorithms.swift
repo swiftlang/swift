@@ -749,6 +749,15 @@ extension Sequence {
     return try _compactMap(transform)
   }
 
+  /// Returns an array containing the non-`nil` elements of this sequence.
+  ///
+  /// This is just a shorthand for `compactMap { $0 }`.
+  @inlinable
+  public func compact<T>(
+  ) -> [T] where Element == Optional<T> {
+    return _compactMap { $0 }
+  }
+
   /// Returns an array containing the non-`nil` results of calling the given
   /// transformation with each element of this sequence.
   ///
