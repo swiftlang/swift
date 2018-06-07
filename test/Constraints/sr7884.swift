@@ -9,7 +9,7 @@ func f<T>(_ x: T?) -> T? {
   return x
 }
 
-let r = f(1) // calls optional variant
+let r = f(1)
 let _ = r! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
 
 // SR-7899
