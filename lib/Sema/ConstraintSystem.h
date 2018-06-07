@@ -1654,18 +1654,12 @@ public:
     return ParamTypes.find(P)->second;
   }
 
-  Type getTypeOrNull(const ValueDecl *D) const {
-    if (auto *P = dyn_cast<ParamDecl>(D))
-      return getType(P);
-    return Type();
-  }
-
-  Type getTypeOrInterfaceType(const ValueDecl *D) const {
+  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
     if (auto *P = dyn_cast<ParamDecl>(D))
       return getType(P);
 
     assert(D->hasValidSignature());
-    return D->getInterfaceType();
+    return wantInterfaceType ? D->getInterfaceType() : D->getType();
   }
 
   /// Cache the type of the expression argument and return that same
@@ -2239,6 +2233,22 @@ public:
                           ConstraintLocatorBuilder locator,
                           DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
+
+  /// Return the type-of-reference of the given value.
+  ///
+  /// \param baseType if non-null, return the type of a member reference to
+  ///   this value when the base has the given type
+  ///
+  /// \param UseDC The context of the access.  Some variables have different
+  ///   types depending on where they are used.
+  ///
+  /// \param base The optional base expression of this value reference
+  ///
+  /// \param wantInterfaceType Whether we want the interface type, if available.
+  Type getUnopenedTypeOfReference(VarDecl *value, Type baseType,
+                                  DeclContext *UseDC,
+                                  const DeclRefExpr *base = nullptr,
+                                  bool wantInterfaceType = false);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
   /// as a member with a base of the given type.
