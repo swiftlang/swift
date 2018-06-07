@@ -76,7 +76,7 @@ private:
     llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
     llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
     
-    void findNominalsAndOperators(DeclRange members);
+    void findNominalsAndOperators(const DeclRange members);
   };
   
   void emit() const;
@@ -329,7 +329,7 @@ void ProvidesEmitter::emitNominalTypeDecl(
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
-void ProvidesEmitter::CollectedProvidedDeclarations::findNominalsAndOperators(DeclRange members) {
+void ProvidesEmitter::CollectedProvidedDeclarations::findNominalsAndOperators(const DeclRange members) {
   for (const Decl *D : members) {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
