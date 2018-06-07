@@ -44,8 +44,9 @@ internal class Other {
      self.z = z;
    }
 
-// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_propagate_cta5OtherC6doWorkSiyF : $@convention(method) (@guaranteed Other) -> Int {
+// CHECK-LABEL: sil hidden [noinline] @$S25sil_combine_propagate_cta5OtherC11doWorkClassSiyF : $@convention(method) (@guaranteed Other) -> Int {
 // CHECK: bb0
+// CHECK: debug_value
 // CHECK: integer_literal
 // CHECK: ref_element_addr
 // CHECK: open_existential_addr
@@ -59,7 +60,7 @@ internal class Other {
 // CHECK: cond_fail
 // CHECK: struct 
 // CHECK: return
-// CHECK: } // end sil function '$S25sil_combine_propagate_cta5OtherC6doWorkSiyF'
+// CHECK: } // end sil function '$S25sil_combine_propagate_cta5OtherC11doWorkClassSiyF'
    @inline(never) func doWorkClass () ->Int {
       return self.x.foo(x:self.x) + self.y.bar(x:self.y) + self.z.foo()
    }
@@ -113,8 +114,6 @@ internal enum AnEnum : AProtocol {
         switch self {
         case .avalue:
             return 10
-        default:
-            return 0
         }
     }
 }
