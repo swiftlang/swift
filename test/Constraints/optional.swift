@@ -94,7 +94,7 @@ func test9(_ i: Int, io: Int?) {
   let _: Double = result2
 
   let result3 = test9_helper2(i)
-  var _: Double = result3
+  var _: Int = result3
   let result4 = test9_helper2(io)
   let _: Double = result4
 }
