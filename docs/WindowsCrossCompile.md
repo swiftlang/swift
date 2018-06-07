@@ -47,7 +47,8 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 
 #### Linux
 
-For Linux, there are a few issues that require slightly different cmake options.
+For Linux, you will also need to build the Linux SDK with the cmake options
+below.
 
 ```bash
 --extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
