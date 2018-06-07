@@ -25,7 +25,7 @@ import resilient_protocol
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol22OtherResilientProtocolMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol22OtherResilientProtocolMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
@@ -133,7 +133,7 @@ protocol InternalProtocol {
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol24ProtocolWithRequirementsMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
@@ -151,10 +151,10 @@ protocol InternalProtocol {
 
 // CHECK-SAME: internal constant {
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
 // CHECK-SAME: @secondWitness
 
 // CHECK-SAME: }

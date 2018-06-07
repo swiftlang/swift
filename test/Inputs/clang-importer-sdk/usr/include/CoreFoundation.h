@@ -2,8 +2,6 @@
 #define __COREFOUNDATION_COREFOUNDATION__ 1
 #define __COREFOUNDATION__ 1
 
-#include <MacTypes.h>
-
 typedef const struct __CFAllocator * CFAllocatorRef;
 const CFAllocatorRef kCFAllocatorDefault;
 
