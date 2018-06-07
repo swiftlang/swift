@@ -102,6 +102,8 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD);
 
+  void visitDestructorDecl(DestructorDecl *DD);
+
   void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD);

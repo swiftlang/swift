@@ -737,6 +737,8 @@ public:
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
+
+    // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     auto *BC =
         ZeroInitBuilder.CreateBitCast(AI, IGM.OpaquePtrTy->getPointerTo());

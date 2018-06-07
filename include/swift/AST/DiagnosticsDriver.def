@@ -155,7 +155,14 @@ WARNING(warn_use_filelists_deprecated, none,
         "the option '-driver-use-filelists' is deprecated; use "
         "'-driver-filelist-threshold=0' instead", ())
 
+WARNING(warn_emit_public_type_metadata_accessors_deprecated, none,
+        "the option '-emit-public-type-metadata-accessors' is no longer "
+        "needed and is deprecated; consider removing it", ())
+
 REMARK(remark_using_batch_mode,none, "using batch mode", ())
+
+ERROR(cannot_find_migration_script, none,
+      "missing migration script from path '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -1722,7 +1722,8 @@ namespace {
       }
       
       auto projectionGenericSig = projectionFunction->getGenericSignature();
-      auto subMap = projectionGenericSig->getSubstitutionMap(
+      auto subMap = SubstitutionMap::get(
+          projectionGenericSig,
           [&](SubstitutableType *type) -> Type {
             auto genericParam = cast<GenericTypeParamType>(type);
             auto index =
@@ -1782,7 +1783,8 @@ namespace {
       auto projectFn = C.getProjectKeyPathReadOnly(nullptr);
 
       auto projectionGenericSig = projectFn->getGenericSignature();
-      auto subMap = projectionGenericSig->getSubstitutionMap(
+      auto subMap = SubstitutionMap::get(
+          projectionGenericSig,
           [&](SubstitutableType *type) -> Type {
             auto genericParam = cast<GenericTypeParamType>(type);
             auto index =

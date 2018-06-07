@@ -35,10 +35,10 @@ enum AllMixedRefcounted {
 // CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO*
 // CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc18AllMixedRefcountedO* %0 to i64*
 // CHECK:   %2 = load i64, i64* %1, align 8
-// --                         0x3fffffffffffffff
-// CHECK:   %3 = and i64 %2, 4611686018427387903
-// CHECK:   %4 = inttoptr i64 %3 to %objc_object*
-// CHECK:   call void @swift_unknownRelease(%objc_object* %4) {{#[0-9]+}}
+// CHECK:   %3 = lshr i64 %2, 62
+// CHECK:   %4 = trunc i64 %3 to i8
+// CHECK:   %5 = and i8 %4, 3
+// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc18AllMixedRefcountedOWOe"(i64 %2)
 // CHECK:   ret void
 // CHECK: }
 
@@ -52,3 +52,51 @@ enum AllMixedRefcountedTwoSimple {
 
 // CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOwxx"
 // CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27AllMixedRefcountedTwoSimpleOWOy"
+
+struct Val {
+}
+
+// Currently, swift_unknownRelease does not support the indirect heap object.
+
+enum MixedRefcountedWithIndirect {
+  indirect case Indirect(Builtin.Int64)
+  case Ref(Builtin.UnknownObject)
+  case None
+}
+
+// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOwxx"(%swift.opaque* noalias %object, %swift.type* %MixedRefcountedWithIndirect)
+// CHECK: entry:
+// CHECK:   %0 = bitcast %swift.opaque* %object to %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO*
+// CHECK:   %1 = bitcast %T39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectO* %0 to i64*
+// CHECK:   %2 = load i64, i64* %1, align 8
+// CHECK:   %3 = lshr i64 %2, 62
+// CHECK:   %4 = trunc i64 %3 to i8
+// CHECK:   %5 = and i8 %4, 3
+// CHECK:   call void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64 %2)
+// CHECK:   ret void
+// CHECK: }
+
+
+// CHECK-LABEL: define linkonce_odr hidden void @"$S39enum_value_semantics_special_cases_objc27MixedRefcountedWithIndirectOWOe"(i64)
+// CHECK: entry:
+// CHECK:   %1 = lshr i64 %0, 62
+// CHECK:   %2 = trunc i64 %1 to i8
+// CHECK:   %3 = and i8 %2, 3
+// CHECK:   switch i8 %3, label %9 [
+// CHECK:     i8 0, label %4
+// CHECK:     i8 1, label %6
+// CHECK:   ]
+
+// CHECK: ; <label>:4:
+// CHECK:   %5 = inttoptr i64 %0 to %swift.refcounted*
+// CHECK:   call void @swift_release(%swift.refcounted* %5) #1
+// CHECK:   br label %9
+
+// CHECK: ; <label>:6:
+// CHECK:   %7 = and i64 %0, 4611686018427387903
+// CHECK:   %8 = inttoptr i64 %7 to %objc_object*
+// CHECK:   call void @swift_unknownRelease(%objc_object* %8) #1
+// CHECK:   br label %9
+
+// CHECK: ; <label>:9:
+// CHECK:   ret void

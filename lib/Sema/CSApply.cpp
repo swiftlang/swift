@@ -95,8 +95,9 @@ SubstitutionMap Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  return sig->getSubstitutionMap(QueryTypeSubstitutionMap{subs},
-                                 lookupConformanceFn);
+  return SubstitutionMap::get(sig,
+                              QueryTypeSubstitutionMap{subs},
+                              lookupConformanceFn);
 }
 
 /// \brief Find a particular named function witness for a type that conforms to
@@ -357,16 +358,6 @@ diagnoseInvalidDynamicConstructorReferences(ConstraintSystem &cs,
       [&](const Expr *expr) -> Type {
         return cs.getType(expr);
       });
-
-  // 'super.' is always OK
-  if (isa<SuperRefExpr>(base))
-    return true;
-
-  // 'self.' reference with concrete type is OK
-  if (isa<DeclRefExpr>(base) &&
-      cast<DeclRefExpr>(base)->getDecl()->getBaseName() == tc.Context.Id_self &&
-      !baseTy->is<ArchetypeType>())
-    return true;
 
   // FIXME: The "hasClangNode" check here is a complete hack.
   if (isNonFinalClass(instanceTy) &&
@@ -1824,7 +1815,8 @@ namespace {
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
 
-      auto subMap = genericSig->getSubstitutionMap(
+      auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *type) -> Type {
           assert(type->isEqual(genericSig->getGenericParams()[0]));
           return valueType;
@@ -2695,12 +2687,6 @@ namespace {
 
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
-      // If the member is a constructor, verify that it can be legally
-      // referenced from this base.
-      if (!diagnoseInvalidDynamicConstructorReferences(cs, base, nameLoc,
-                                                       ctor, SuppressDiagnostics))
-        return nullptr;
-
       // If the subexpression is a metatype, build a direct reference to the
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
@@ -2722,6 +2708,17 @@ namespace {
           if (dre->getDecl()->getFullName() == cs.getASTContext().Id_self) {
             // We have a reference to 'self'.
             diagnoseBadInitRef = false;
+
+            // Special case -- in a protocol extension initializer with a class
+            // constrainted Self type, 'self' has archetype type, and only
+            // required initializers can be called.
+            if (cs.getType(dre)->getRValueType()->is<ArchetypeType>()) {
+              if (!diagnoseInvalidDynamicConstructorReferences(cs, base,
+                                                               nameLoc,
+                                                               ctor,
+                                                               SuppressDiagnostics))
+                return nullptr;
+            }
 
             // Make sure the reference to 'self' occurs within an initializer.
             if (!dyn_cast_or_null<ConstructorDecl>(
@@ -3658,10 +3655,7 @@ namespace {
       auto *locator = cs.getConstraintLocator(expr);
 
       if (!choice) {
-        if (tc.Context.LangOpts.EnableObjCInterop)
-          choice = solution.getDisjunctionChoice(locator);
-        else
-          choice = 0;
+        choice = solution.getDisjunctionChoice(locator);
       }
 
       // Handle the coercion/bridging of the underlying subexpression, where

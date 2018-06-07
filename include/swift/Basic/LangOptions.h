@@ -223,9 +223,6 @@ namespace swift {
     /// Enables key path resilience.
     bool EnableKeyPathResilience = false;
 
-    /// Enables public emission of private metadata accessors.
-    bool EmitPublicTypeMetadataAccessors = false;
-
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;

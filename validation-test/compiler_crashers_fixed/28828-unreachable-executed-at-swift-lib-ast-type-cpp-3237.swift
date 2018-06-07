@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol A{{}protocol a{extension{class a<a{let d=a(class a<P
+// RUN: not %target-swift-frontend %s -emit-ir
+class a<a{class a{extension{protocol P{class a:a{func a:Self.a

@@ -195,10 +195,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
 
     case ConstraintLocator::AutoclosureResult:
-    case ConstraintLocator::RvalueAdjustment:
+    case ConstraintLocator::LValueConversion:
+    case ConstraintLocator::RValueAdjustment:
     case ConstraintLocator::ScalarToTuple:
     case ConstraintLocator::UnresolvedMember:
-      // Arguments in autoclosure positions, rvalue adjustments, and
+      // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
       // scalar-to-tuple conversions, and unresolved members are
       // implicit.
       path = path.slice(1);

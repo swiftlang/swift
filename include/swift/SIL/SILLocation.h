@@ -428,7 +428,7 @@ public:
   static DebugLoc decode(SourceLoc Loc, const SourceManager &SM);
 
   /// Return the decoded debug location.
-  DebugLoc decodeDebugLoc(const SourceManager &SM) const {
+  LLVM_NODISCARD DebugLoc decodeDebugLoc(const SourceManager &SM) const {
     return isDebugInfoLoc() ? Loc.DebugInfoLoc
                             : decode(getDebugSourceLoc(), SM);
   }

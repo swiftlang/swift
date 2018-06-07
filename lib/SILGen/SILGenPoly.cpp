@@ -2693,7 +2693,8 @@ buildThunkSignature(SILGenFunction &SGF,
   // archetypes.
   if (auto calleeGenericSig = SGF.F.getLoweredFunctionType()
           ->getGenericSignature()) {
-    contextSubs = calleeGenericSig->getSubstitutionMap(
+    contextSubs = SubstitutionMap::get(
+      calleeGenericSig,
       [&](SubstitutableType *type) -> Type {
         return genericEnv->mapTypeIntoContext(type);
       },
@@ -2701,7 +2702,8 @@ buildThunkSignature(SILGenFunction &SGF,
   }
 
   // Calculate substitutions to map interface types to the caller's archetypes.
-  interfaceSubs = genericSig->getSubstitutionMap(
+  interfaceSubs = SubstitutionMap::get(
+    genericSig,
     [&](SubstitutableType *type) -> Type {
       if (type->isEqual(newGenericParam))
         return openedExistential;
@@ -3343,10 +3345,19 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness) {
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
-  if (isFinal || isExtension || witness.isForeignToNativeThunk()
-      // Hack--We emit a static thunk for ObjC allocating constructors.
-      || (decl->hasClangNode() && witness.kind == SILDeclRef::Kind::Allocator))
+  if (isFinal || isExtension || witness.isForeignToNativeThunk())
     return WitnessDispatchKind::Static;
+
+  if (witness.kind == SILDeclRef::Kind::Allocator) {
+    // Non-required initializers can witness a protocol requirement if the class
+    // is final, so we can statically dispatch to them.
+    if (!cast<ConstructorDecl>(decl)->isRequired())
+      return WitnessDispatchKind::Static;
+
+    // We emit a static thunk for ObjC allocating constructors.
+    if (decl->hasClangNode())
+      return WitnessDispatchKind::Static;
+  }
 
   // Otherwise emit a class method.
   return WitnessDispatchKind::Class;

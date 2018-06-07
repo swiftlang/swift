@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_SUPPORT_TRACING_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -91,8 +92,11 @@ void unregisterConsumer(TraceConsumer *Consumer);
 
 // Class that utilizes the RAII idiom for the operations being traced
 class TracedOperation final {
+  using DiagnosticProvider = std::function<void(SmallVectorImpl<DiagnosticEntryInfo> &)>;
+
   OperationKind OpKind;
   llvm::Optional<uint64_t> OpId;
+  llvm::Optional<DiagnosticProvider> DiagProvider;
   bool Enabled;
 
 public:
@@ -116,13 +120,20 @@ public:
     OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
-  void finish(ArrayRef<DiagnosticEntryInfo> Diagnostics = llvm::None) {
+  void finish() {
     if (OpId.hasValue()) {
+      SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
+      if (DiagProvider.hasValue())
+        (*DiagProvider)(Diagnostics);
       operationFinished(OpId.getValue(), OpKind, Diagnostics);
       OpId.reset();
     }
   }
 
+  void setDiagnosticProvider(DiagnosticProvider &&DiagProvider) {
+    assert(!this->DiagProvider.hasValue());
+    this->DiagProvider = std::move(DiagProvider);
+  }
 };
 
 } // namespace sourcekitd

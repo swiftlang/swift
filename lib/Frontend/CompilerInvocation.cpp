@@ -309,9 +309,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.EmitPublicTypeMetadataAccessors =
-    Args.hasArg(OPT_emit_public_type_metadata_accessors);
-
   Opts.EnableNSKeyedArchiverDiagnostics =
       Args.hasFlag(OPT_enable_nskeyedarchiver_diagnostics,
                    OPT_disable_nskeyedarchiver_diagnostics,
@@ -959,9 +956,16 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     auto &Triple = LangOpts.Target;
     bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
 
+    llvm::SmallString<128> basePath;
+    if (auto DataDir = Args.getLastArg(OPT_api_diff_data_dir)) {
+      basePath = DataDir->getValue();
+    } else {
+      basePath = ResourcePath;
+      llvm::sys::path::append(basePath, "migrator");
+    }
+
     bool Supported = true;
-    llvm::SmallString<128> dataPath(ResourcePath);
-    llvm::sys::path::append(dataPath, "migrator");
+    llvm::SmallString<128> dataPath(basePath);
 
     if (Triple.isMacOSX())
       llvm::sys::path::append(dataPath,
@@ -978,8 +982,7 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     else
       Supported = false;
     if (Supported) {
-      llvm::SmallString<128> authoredDataPath(ResourcePath);
-      llvm::sys::path::append(authoredDataPath, "migrator");
+      llvm::SmallString<128> authoredDataPath(basePath);
       llvm::sys::path::append(authoredDataPath,
                               getScriptFileName("overlay", isSwiftVersion3));
       // Add authored list first to take higher priority.

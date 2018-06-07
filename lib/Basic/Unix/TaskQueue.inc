@@ -29,6 +29,10 @@
 #include <unistd.h>
 #endif
 
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+#include <sys/resource.h>
+#endif
+
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -44,6 +48,21 @@ extern "C" {
 
 namespace swift {
 namespace sys {
+
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
+TaskProcessInformation::TaskProcessInformation(ProcessId Pid, struct rusage Usage)
+    : TaskProcessInformation(Pid,
+        uint64_t(Usage.ru_utime.tv_sec) * 1000000 +
+        uint64_t(Usage.ru_utime.tv_usec),
+        uint64_t(Usage.ru_stime.tv_sec) * 1000000 +
+        uint64_t(Usage.ru_stime.tv_usec),
+        Usage.ru_maxrss) {
+#ifndef __APPLE__
+            // Apple systems report bytes; everything else appears to report KB.
+            this->ProcessUsage.getValue().Maxrss <<= 10;
+#endif // __APPLE__
+        }
+#endif // defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
 
 class Task {
   /// The path to the executable which this Task will execute.
@@ -493,12 +512,19 @@ static bool
 cleanUpAHungUpTask(Task &T,
                    const TaskQueue::TaskFinishedCallback FinishedCallback,
                    TaskQueue::TaskSignalledCallback SignalledCallback);
-static Optional<int> waitForPid(const pid_t pidToWaitFor);
+
+/**
+ Wait for the process with a given pid to finish.
+
+ @param pidToWaitFor the pid of the process to wait for
+ @return Status information of the wait call and information about process
+ */
+static std::pair<Optional<int>, TaskProcessInformation> waitForPid(const pid_t pidToWaitFor);
 static bool
-cleanUpAfterSignal(int Status, const Task &T,
+cleanUpAfterSignal(int Status, const Task &T, TaskProcessInformation ProcInfo,
                    const TaskQueue::TaskSignalledCallback SignalledCallback);
 static bool
-cleanUpAfterExit(int Status, const Task &T,
+cleanUpAfterExit(int Status, const Task &T, TaskProcessInformation ProcInfo,
                  const TaskQueue::TaskFinishedCallback FinishedCallback);
 
 Optional<std::vector<int>>
@@ -555,34 +581,44 @@ static bool
 cleanUpAHungUpTask(Task &T,
                    const TaskQueue::TaskFinishedCallback FinishedCallback,
                    const TaskQueue::TaskSignalledCallback SignalledCallback) {
-  const Optional<int> StatusIfOK = waitForPid(T.getPid());
-  if (!StatusIfOK)
+  const auto StatusAndProcessInformation = waitForPid(T.getPid());
+  if (!StatusAndProcessInformation.first)
     return true;
 
   T.finishExecution();
-  int Status = *StatusIfOK;
+  int Status = *(StatusAndProcessInformation.first);
+  TaskProcessInformation ProcInfo = StatusAndProcessInformation.second;
   return WIFEXITED(Status)
-             ? cleanUpAfterExit(Status, T, FinishedCallback)
+             ? cleanUpAfterExit(Status, T, ProcInfo, FinishedCallback)
              : WIFSIGNALED(Status)
-                   ? cleanUpAfterSignal(Status, T, SignalledCallback)
+                   ? cleanUpAfterSignal(Status, T, ProcInfo, SignalledCallback)
                    : false /* Can this case ever happen? */;
 }
 
-static Optional<int> waitForPid(const pid_t pidToWaitFor) {
+static std::pair<Optional<int>, TaskProcessInformation> waitForPid(const pid_t pidToWaitFor) {
   for (;;) {
     int Status = 0;
+
+#if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__) && defined(HAVE_WAIT4)
+    struct rusage Usage;
+    const pid_t pidFromWait = wait4(pidToWaitFor, &Status, 0, &Usage);
+    TaskProcessInformation ProcInfo(pidToWaitFor, Usage);
+#else
     const pid_t pidFromWait = waitpid(pidToWaitFor, &Status, 0);
+    TaskProcessInformation ProcInfo(pidToWaitFor);
+#endif
+
     if (pidFromWait == pidToWaitFor)
-      return Status;
+      return std::make_pair(Status, ProcInfo);
     assert(pidFromWait == -1 &&
            "Did not pass WNOHANG, should only get pidToWaitFor or -1");
     if (errno == ECHILD || errno == EINVAL)
-      return None;
+      return std::make_pair(None, TaskProcessInformation(pidToWaitFor));
   }
 }
 
 static bool
-cleanUpAfterExit(int Status, const Task &T,
+cleanUpAfterExit(int Status, const Task &T, TaskProcessInformation ProcInfo,
                  const TaskQueue::TaskFinishedCallback FinishedCallback) {
   const int Result = WEXITSTATUS(Status);
   if (!FinishedCallback) {
@@ -593,12 +629,12 @@ cleanUpAfterExit(int Status, const Task &T,
   // If we have a TaskFinishedCallback, only have an error if the callback
   // returns StopExecution.
   return TaskFinishedResponse::StopExecution ==
-         FinishedCallback(T.getPid(), Result, T.getOutput(), T.getErrors(),
+         FinishedCallback(T.getPid(), Result, T.getOutput(), T.getErrors(), ProcInfo,
                           T.getContext());
 }
 
 static bool
-cleanUpAfterSignal(int Status, const Task &T,
+cleanUpAfterSignal(int Status, const Task &T, TaskProcessInformation ProcInfo,
                    const TaskQueue::TaskSignalledCallback SignalledCallback) {
   // The process exited due to a signal.
   const int Signal = WTERMSIG(Status);
@@ -613,7 +649,7 @@ cleanUpAfterSignal(int Status, const Task &T,
   // returns StopExecution.
   return TaskFinishedResponse::StopExecution ==
          SignalledCallback(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
-                           T.getContext(), Signal);
+                           T.getContext(), Signal, ProcInfo);
 }
 
 void TaskMonitor::stopPolling(ArrayRef<int> FinishedFds) {

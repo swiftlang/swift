@@ -244,6 +244,10 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateAutolinkingArgs(diags, args);
+
+  if (args.hasArg(options::OPT_emit_public_type_metadata_accessors))
+    diags.diagnose(SourceLoc(),
+                   diag::warn_emit_public_type_metadata_accessors_deprecated);
 }
 
 std::unique_ptr<ToolChain>
@@ -279,6 +283,28 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     break;
   }
   return nullptr;
+}
+
+std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
+  const auto &ArgList = C.getArgs();
+  unsigned NumberOfParallelCommands = 1;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_j)) {
+    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+      return nullptr;
+    }
+  }
+
+  const bool DriverSkipExecution =
+    ArgList.hasArg(options::OPT_driver_skip_execution,
+                   options::OPT_driver_print_jobs);
+  if (DriverSkipExecution) {
+    return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
+  } else {
+    return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
+                                             C.getStatsReporter());
+  }
 }
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
@@ -633,9 +659,6 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution,
-                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -787,15 +810,6 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
-  unsigned NumberOfParallelCommands = 1;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
-    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-      return nullptr;
-    }
-  }
-
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
     return nullptr;
@@ -825,12 +839,10 @@ Driver::buildCompilation(const ToolChain &TC,
                       StartTime,
                       LastBuildTime,
                       DriverFilelistThreshold,
-                      NumberOfParallelCommands,
                       Incremental,
                       BatchMode,
                       DriverBatchSeed,
                       DriverForceOneBatchRepartition,
-                      DriverSkipExecution,
                       SaveTemps,
                       ShowDriverTimeCompilation,
                       std::move(StatsReporter)));
@@ -1427,10 +1439,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           sys::TaskQueue queue;
           queue.addTask(xcrunPath->c_str(), args);
           queue.execute(nullptr,
-                        [&OI](sys::ProcessId PID,
-                              int returnCode,
-                              StringRef output,
-                              StringRef errors,
+                        [&OI](sys::ProcessId PID, int returnCode,
+                              StringRef output, StringRef errors,
+                              sys::TaskProcessInformation ProcInfo,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();

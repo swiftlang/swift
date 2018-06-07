@@ -1232,6 +1232,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterClosureType:
       case ChunkKind::DeclAttrParamColon:
+      case ChunkKind::OptionalMethodCallTail:
         continue;
       case ChunkKind::ThrowsKeyword:
       case ChunkKind::RethrowsKeyword:

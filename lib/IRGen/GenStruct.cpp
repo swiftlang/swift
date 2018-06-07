@@ -287,19 +287,17 @@ namespace {
             VarDecl *FieldToFind;
             Size FieldOffset = Size::invalid();
 
-            using super = StructMetadataScanner<FindOffsetOfFieldOffsetVector>;
+            FindOffsetOfFieldOffsetVector(IRGenModule &IGM, VarDecl *Field)
+                : StructMetadataScanner<FindOffsetOfFieldOffsetVector>(
+                      IGM, cast<StructDecl>(Field->getDeclContext())),
+                  FieldToFind(Field) {}
 
-            FindOffsetOfFieldOffsetVector(IRGenModule &IGM,
-                                          VarDecl *Field)
-              : super(IGM, cast<StructDecl>(Field->getDeclContext())),
-                FieldToFind(Field)
-            {}
-              
             void addFieldOffset(VarDecl *Field) {
               if (Field == FieldToFind) {
                 FieldOffset = this->NextOffset;
               }
-              super::addFieldOffset(Field);
+              StructMetadataScanner<
+                  FindOffsetOfFieldOffsetVector>::addFieldOffset(Field);
             }
           };
           

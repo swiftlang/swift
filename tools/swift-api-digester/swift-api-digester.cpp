@@ -4104,8 +4104,8 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
   readFileLineByLine(Path, IgnoredUsrs);
 }
 
-static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
-  APIDiffItemStore Store;
+static int deserializeDiffItems(APIDiffItemStore &Store, StringRef DiffPath,
+    StringRef OutputPath) {
   Store.addStorePath(DiffPath);
   std::error_code EC;
   llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
@@ -4222,13 +4222,18 @@ int main(int argc, char *argv[]) {
       llvm::cl::PrintHelpMessage();
       return 1;
     }
-    if (options::Action == ActionType::DeserializeDiffItems)
-      return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
-    else
+    if (options::Action == ActionType::DeserializeDiffItems) {
+      CompilerInstance CI;
+      APIDiffItemStore Store(CI.getDiags());
+      return deserializeDiffItems(Store, options::SDKJsonPaths[0],
+        options::OutputFile);
+    } else {
       return deserializeSDKDump(options::SDKJsonPaths[0], options::OutputFile);
+    }
   }
   case ActionType::GenerateNameCorrectionTemplate: {
-    APIDiffItemStore Store;
+    CompilerInstance CI;
+    APIDiffItemStore Store(CI.getDiags());
     auto &Paths = options::SDKJsonPaths;
     for (unsigned I = 0; I < Paths.size(); I ++)
       Store.addStorePath(Paths[I]);

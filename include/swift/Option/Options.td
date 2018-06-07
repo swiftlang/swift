@@ -358,7 +358,7 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
 def emit_public_type_metadata_accessors :
   Flag<["-"], "emit-public-type-metadata-accessors">,
   Flags<[FrontendOption]>,
-  HelpText<"Emit all type metadata accessors as public">;
+  HelpText<"Emit all type metadata accessors as public (deprecated: now does nothing)">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -543,6 +543,13 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_dir: Separate<["-"], "api-diff-data-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  HelpText<"Load platform and version specific API migration data files from <path>. "
+      "Ignored if -api-diff-data-file is specified.">,
   MetaVarName<"<path>">;
 
 def dump_usr: Flag<["-"], "dump-usr">,

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1144,19 +1144,6 @@ private:
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
 
-    /// \brief Register given scope to be tracked by the current solver state,
-    /// this helps to make sure that all of the retired/generated constraints
-    /// are dealt with correctly when the life time of the scope ends.
-    ///
-    /// \param scope The scope to associate with current solver state.
-    void registerScope(SolverScope *scope) {
-      CS.incrementScopeCounter();
-      auto scopeInfo =
-        std::make_tuple(scope, retiredConstraints.begin(),
-                        generatedConstraints.size());
-      scopes.push_back(scopeInfo);
-    }
-
     /// \brief Check whether there are any retired constraints present.
     bool hasRetiredConstraints() const {
       return !retiredConstraints.empty();
@@ -1204,6 +1191,22 @@ private:
       }
     }
 
+    /// \brief Register given scope to be tracked by the current solver state,
+    /// this helps to make sure that all of the retired/generated constraints
+    /// are dealt with correctly when the life time of the scope ends.
+    ///
+    /// \param scope The scope to associate with current solver state.
+    void registerScope(SolverScope *scope) {
+      ++depth;
+      ++NumStatesExplored;
+
+      CS.incrementScopeCounter();
+      auto scopeInfo =
+        std::make_tuple(scope, retiredConstraints.begin(),
+                        generatedConstraints.size());
+      scopes.push_back(scopeInfo);
+    }
+
     /// \brief Restore all of the retired/generated constraints to the state
     /// before given scope. This is required because retired constraints have
     /// to be re-introduced to the system in order of arrival (LIFO) and list
@@ -1212,6 +1215,8 @@ private:
     ///
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
+      --depth;
+
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
@@ -1440,6 +1445,9 @@ public:
     /// The previous score.
     Score PreviousScore;
 
+    /// Time in fractional seconds at which we entered this scope.
+    double startTime;
+
     /// Constraint graph scope associated with this solver scope.
     ConstraintGraphScope CGScope;
 
@@ -1451,6 +1459,13 @@ public:
   public:
     explicit SolverScope(ConstraintSystem &cs);
     ~SolverScope();
+
+    Optional<double> getElapsedTimeInFractionalSeconds() {
+      if (!cs.Timer)
+        return None;
+
+      return cs.Timer->getElapsedProcessTimeInFractionalSeconds() - startTime;
+    }
   };
 
   ConstraintSystem(TypeChecker &tc, DeclContext *dc,

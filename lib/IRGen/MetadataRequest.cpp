@@ -432,9 +432,10 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 ConstantReference
 irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
+  if (IGM.isStandardLibrary())
+    return ConstantReference();
   if (!isTypeMetadataAccessTrivial(IGM, type))
     return ConstantReference();
-
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
 
@@ -589,17 +590,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   return false;
 }
 
-/// Determine whether we should promote the type metadata access function
-/// for the given nominal type to "public".
-static bool promoteMetadataAccessFunctionToPublic(
-                                              const NominalTypeDecl *nominal) {
-  ASTContext &ctx = nominal->getASTContext();
-
-  // When -emit-public-type-metadata-accessors is provided, promote all
-  // of the metadata access functions to public.
-  return ctx.LangOpts.EmitPublicTypeMetadataAccessors;
-}
-
 /// Return the standard access strategy for getting a non-dependent
 /// type metadata object.
 MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
@@ -632,12 +622,8 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     case FormalLinkage::PublicUnique:
       return MetadataAccessStrategy::PublicUniqueAccessor;
     case FormalLinkage::HiddenUnique:
-      if (promoteMetadataAccessFunctionToPublic(nominal))
-        return MetadataAccessStrategy::PublicUniqueAccessor;
       return MetadataAccessStrategy::HiddenUniqueAccessor;
     case FormalLinkage::Private:
-      if (promoteMetadataAccessFunctionToPublic(nominal))
-        return MetadataAccessStrategy::PublicUniqueAccessor;
       return MetadataAccessStrategy::PrivateAccessor;
 
     case FormalLinkage::PublicNonUnique:

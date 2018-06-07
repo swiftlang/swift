@@ -39,7 +39,6 @@ public protocol _HasCustomAnyHashableRepresentation {
 
 @usableFromInline // FIXME(sil-serialize-all)
 internal protocol _AnyHashableBox {
-  var _typeID: ObjectIdentifier { get }
   func _unbox<T : Hashable>() -> T?
 
   /// Determine whether values in the boxes are equivalent.
@@ -63,12 +62,6 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
   @inlinable // FIXME(sil-serialize-all)
   internal init(_ base: Base) {
     self._baseHashable = base
-  }
-
-
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _typeID: ObjectIdentifier {
-    return ObjectIdentifier(type(of: self))
   }
 
   @inlinable // FIXME(sil-serialize-all)

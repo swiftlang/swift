@@ -1,5 +1,5 @@
-// RUN: not --crash %target-swift-frontend -typecheck %s
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend -typecheck %s
+
 
 protocol A {
     associatedtype B

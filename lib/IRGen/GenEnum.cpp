@@ -3129,15 +3129,12 @@ namespace {
                                                &refcounting)) {
           allSingleRefcount = false;
         } else if (haveRefcounting) {
-          // Different payloads have different reference counting styles.
-          if (refcounting != Refcounting) {
-            // Fall back to unknown entry points if the Objective-C runtime is
-            // available.
-            Refcounting = ReferenceCounting::Unknown;
-            // Otherwise, use value witnesses.
-            if (!IGM.ObjCInterop)
-              allSingleRefcount = false;
-          }
+          // Only support a single style of reference counting for now.
+          // swift_unknowRetain does not support the heap buffer of indirect
+          // enums. And I am not convinced that unknowRetain supports
+          // bridgedObjectRetain.
+          if (refcounting != Refcounting)
+            allSingleRefcount = false;
         } else {
           Refcounting = refcounting;
           haveRefcounting = true;

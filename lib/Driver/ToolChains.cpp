@@ -183,8 +183,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_warn_swift3_objc_inference_minimal,
                        options::OPT_warn_swift3_objc_inference_complete);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_emit_public_type_metadata_accessors);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_testing);
   inputArgs.AddLastArg(arguments, options::OPT_g_Group);
@@ -267,6 +265,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
           context.Args.getLastArg(options::OPT_api_diff_data_file)) {
     Arguments.push_back("-api-diff-data-file");
     Arguments.push_back(DataPath->getValue());
+  }
+  if (auto DataDir = context.Args.getLastArg(options::OPT_api_diff_data_dir)) {
+    Arguments.push_back("-api-diff-data-dir");
+    Arguments.push_back(DataDir->getValue());
   }
   if (context.Args.hasArg(options::OPT_dump_usr)) {
     Arguments.push_back("-dump-usr");

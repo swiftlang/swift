@@ -1487,12 +1487,12 @@ namespace {
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
         // The result type of the function must be convertible to the base type.
-        // TODO: we definitely want this to include ImplicitlyUnwrappedOptional; does it
-        // need to include everything else in the world?
+        // TODO: we definitely want this to include ImplicitlyUnwrappedOptional;
+        // does it need to include everything else in the world?
         auto outputTy = CS.createTypeVariable(
             CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
         CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+          CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
 
         // The function/enum case must be callable with the given argument.
         auto funcTy = FunctionType::get(CS.getType(arg), outputTy);
@@ -1505,7 +1505,7 @@ namespace {
 
       // Otherwise, the member needs to be convertible to the base type.
       CS.addConstraint(ConstraintKind::Conversion, memberTy, baseTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+        CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
       
       // The member type also needs to be convertible to the context type, which
       // preserves lvalue-ness.
@@ -2388,7 +2388,7 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr));
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
                        CS.getType(expr->getBase()),
-           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
       return tv;
     }
 

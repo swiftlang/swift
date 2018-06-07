@@ -24,8 +24,9 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
-#include "swift/SIL/SILWitnessTable.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVTableVisitor.h"
+#include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
@@ -233,13 +234,6 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset)
       addSymbol(LinkEntity::forFieldOffset(var));
-
-    // The non-allocating forms of the destructors.
-    if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      // ObjC classes don't have a symbol for their destructor.
-      if (!isObjC)
-        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
-    }
   }
 
   visitNominalTypeDecl(CD);
@@ -298,6 +292,19 @@ void TBDGenVisitor::visitConstructorDecl(ConstructorDecl *CD) {
     addSymbol(SILDeclRef(CD, SILDeclRef::Kind::Initializer));
   }
   visitAbstractFunctionDecl(CD);
+}
+
+void TBDGenVisitor::visitDestructorDecl(DestructorDecl *DD) {
+  // Class destructors come in two forms (deallocating and non-deallocating),
+  // like constructors above. This is the deallocating one:
+  visitAbstractFunctionDecl(DD);
+
+  auto parentClass = DD->getParent()->getAsClassOrClassExtensionContext();
+
+  // But the non-deallocating one doesn't apply to some @objc classes.
+  if (!Lowering::usesObjCAllocator(parentClass)) {
+    addSymbol(SILDeclRef(DD, SILDeclRef::Kind::Destroyer));
+  }
 }
 
 void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
