@@ -228,7 +228,7 @@ extension _StringGuts {
   // FIXME(TODO: JIRA): HACK HACK HACK: Work around for ARC :-(
   //
   @usableFromInline
-  @effects(readonly)
+  @_effects(readonly)
   internal static func getCocoaLength(_unsafeBitPattern: UInt) -> Int {
     return _stdlib_binary_CFStringGetLength(
       Builtin.reinterpretCast(_unsafeBitPattern))
@@ -399,7 +399,7 @@ extension _StringGuts {
   @inlinable
   internal
   var _unmanagedASCIIView: _UnmanagedString<UInt8> {
-    @effects(readonly)
+    @_effects(readonly)
     get {
       _sanityCheck(_object.isContiguousASCII)
       if _object.isUnmanaged {
@@ -420,7 +420,7 @@ extension _StringGuts {
   @inlinable
   internal
   var _unmanagedUTF16View: _UnmanagedString<UTF16.CodeUnit> {
-    @effects(readonly)
+    @_effects(readonly)
     get {
       _sanityCheck(_object.isContiguousUTF16)
       if _object.isUnmanaged {
@@ -807,7 +807,7 @@ extension _StringGuts {
   @usableFromInline
   internal
   var _nonStoredCount: Int {
-    @effects(readonly)
+    @_effects(readonly)
     get {
       if _object.isSmall {
         return _object.smallUTF8Count

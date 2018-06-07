@@ -130,7 +130,7 @@ extension Character
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self.init(Unicode.Scalar(_builtinUnicodeScalarLiteral: value))
   }
@@ -139,7 +139,7 @@ extension Character
   // integer constant in case of small character literals.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  @effects(readonly)
+  @_effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf8CodeUnitCount: Builtin.Word,
@@ -194,7 +194,7 @@ extension Character
   // integer constant in case of small character literals.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  @effects(readonly)
+  @_effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
     utf16CodeUnitCount: Builtin.Word
@@ -483,7 +483,7 @@ extension Character: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @effects(releasenone)
+  @_effects(releasenone)
   public func hash(into hasher: inout Hasher) {
     // FIXME(performance): constructing a temporary string is extremely
     // wasteful and inefficient.

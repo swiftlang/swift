@@ -2222,7 +2222,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 }
 
 /// Return True if the function \p f is a 'readonly' function. Checking
-/// for the SIL @effects(readonly) attribute is not enough because this
+/// for the SIL @_effects(readonly) attribute is not enough because this
 /// definition does not match the definition of the LLVM readonly function
 /// attribute. In this function we do the actual check.
 static bool isReadOnlyFunction(SILFunction *f) {
@@ -2235,11 +2235,11 @@ static bool isReadOnlyFunction(SILFunction *f) {
   auto Eff = f->getEffectsKind();
 
   // Swift's readonly does not automatically match LLVM's readonly.
-  // Swift SIL optimizer relies on @effects(readonly) to remove e.g.
+  // Swift SIL optimizer relies on @_effects(readonly) to remove e.g.
   // dead code remaining from initializers of strings or dictionaries
   // of variables that are not used. But those initializers are often
   // not really readonly in terms of LLVM IR. For example, the
-  // Dictionary.init() is marked as @effects(readonly) in Swift, but
+  // Dictionary.init() is marked as @_effects(readonly) in Swift, but
   // it does invoke reference-counting operations.
   if (Eff == EffectsKind::ReadOnly || Eff == EffectsKind::ReadNone) {
     // TODO: Analyze the body of function f and return true if it is

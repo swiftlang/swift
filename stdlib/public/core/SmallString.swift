@@ -129,7 +129,7 @@ extension _SmallUTF8String {
 
   @inline(__always)
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   public // @testable
   init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
 #if arch(i386) || arch(arm)
