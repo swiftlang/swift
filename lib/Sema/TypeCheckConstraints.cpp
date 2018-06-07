@@ -2005,7 +2005,6 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   ConstraintSystem cs(*this, dc, csOptions);
   cs.baseCS = baseCS;
   CleanupIllFormedExpressionRAII cleanup(expr);
-  ExprCleaner cleanup2(expr);
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
   // ok to have a purpose without a convertType (which is used for call
@@ -2202,8 +2201,6 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
-
-  ExprCleaner cleaner(expr);
 
   // Construct a constraint system from this expression.
   ConstraintSystemOptions options;

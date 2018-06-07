@@ -3484,52 +3484,6 @@ ForcedCheckedCastExpr *findForcedDowncast(ASTContext &ctx, Expr *expr);
 // Note: this may update the provided expr pointer.
 void eraseOpenedExistentials(constraints::ConstraintSystem &CS, Expr *&expr);
 
-
-/// ExprCleaner - This class is used by shrink to ensure that in
-/// no situation will an expr node be left with a dangling type variable stuck
-/// to it.  Often type checking will create new AST nodes and replace old ones
-/// (e.g. by turning an UnresolvedDotExpr into a MemberRefExpr).  These nodes
-/// might be left with pointers into the temporary constraint system through
-/// their type variables, and we don't want pointers into the original AST to
-/// dereference these now-dangling types.
-class ExprCleaner {
-  llvm::SmallVector<VarDecl*, 4> Vars;
-public:
-
-  ExprCleaner(Expr *E) {
-    struct ExprCleanerImpl : public ASTWalker {
-      ExprCleaner *TS;
-      ExprCleanerImpl(ExprCleaner *TS) : TS(TS) {}
-
-      bool walkToDeclPre(Decl *D) override {
-        if (auto VD = dyn_cast<VarDecl>(D))
-          TS->Vars.push_back(VD);
-
-        return true;
-      }
-
-      // Don't walk into statements.  This handles the BraceStmt in
-      // non-single-expr closures, so we don't walk into their body.
-      std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-        return { false, S };
-      }
-    };
-
-    E->walk(ExprCleanerImpl(this));
-  }
-
-  ~ExprCleaner() {
-    // Check each of the expression nodes to verify that there are no type
-    // variables hanging out.  If so, just nuke the type.
-    for (auto VD : Vars) {
-      if (VD->hasType() && VD->getType()->hasTypeVariable()) {
-        VD->setType(Type());
-        VD->setInterfaceType(Type());
-      }
-    }
-  }
-};
-
 // Count the number of overload sets present
 // in the expression and all of the children.
 class OverloadSetCounter : public ASTWalker {
