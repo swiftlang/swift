@@ -1800,14 +1800,15 @@ bool TFFunctionPartition::markFunction() {
   SmallVector<SILInstruction*, 32> tensorOps;
   bool invalidOpFound = false;
   for (auto *BB : llvm::depth_first(&fn)) {
-    for (auto I = BB->begin(), E = BB->end(); I != E; ) {
-      // Manually move iterator to avoid invalidation if we replace 'inst'.
-      auto *inst = &*I++;
+    for (auto I = BB->begin(), E = BB->end(); I != E; I++) {
+      auto *inst = &*I;
 
       // If this is a well known function that can be transformed into an op, do
       // so first.
-      if (auto apply = dyn_cast<ApplyInst>(inst))
+      if (auto apply = dyn_cast<ApplyInst>(inst)) {
         inst = SILTensorOpInfo::decodeApply(apply);
+        I = SILBasicBlock::iterator(inst);
+      }
 
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
@@ -1850,6 +1851,7 @@ bool TFFunctionPartition::markFunction() {
       // about it.
       // TODO(clattner): Remove this when deabstraction subsumes it.
       inst = opInfo->canonicalizeOperands(&configuration);
+      I = SILBasicBlock::iterator(inst);
 
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
