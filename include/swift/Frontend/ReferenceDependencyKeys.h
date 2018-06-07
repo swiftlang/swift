@@ -17,6 +17,8 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
+  /// Define these string constants for reference dependencies (a.k.a. swiftdeps)
+  /// in one place to ensure consistency.
   namespace reference_dependency_keys {
   static constexpr StringLiteral providesTopLevel("provides-top-level");
   static constexpr StringLiteral providesNominal("provides-nominal");
