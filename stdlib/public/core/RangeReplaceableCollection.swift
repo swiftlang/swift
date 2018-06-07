@@ -1106,16 +1106,8 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   public mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    guard var i = try firstIndex(where: shouldBeRemoved) else { return }
-    var j = index(after: i)
-    while j != endIndex {
-      if try !shouldBeRemoved(self[j]) {
-        swapAt(i, j)
-        formIndex(after: &i)
-      }
-      formIndex(after: &j)
-    }
-    removeSubrange(i...)
+    let suffixStart = try _halfStablePartition(isSuffixElement: shouldBeRemoved)
+    removeSubrange(suffixStart...)
   }
 }
 
