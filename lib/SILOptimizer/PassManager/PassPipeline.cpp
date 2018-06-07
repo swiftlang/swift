@@ -384,6 +384,7 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadObjectElimination();
 
   // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
+  // This is needed to fully optimize static small String constants.
   P.addSimplifyCFG();
   P.addSILCombine();
   P.addPerformanceConstantPropagation();
