@@ -35,6 +35,9 @@ using namespace swift;
 using namespace reference_dependency_keys;
 
 namespace {
+/// Emits the reference dependencies from the frontend so that the driver
+/// can compute a dependency graph for the whole module, and use it to decide
+/// which files need to be recompiled when doing incremental compilation.
 class ReferenceDependenciesEmitter {
   SourceFile * const SF;
   const DependencyTracker &depTracker;
@@ -44,21 +47,35 @@ class ReferenceDependenciesEmitter {
   SF(SF), depTracker(depTracker), out(out) {}
   
 public:
+  /// Emits the provided and depended-upon dependencies to a file
+  ///
+  /// \param diags Where problems opening the file are emitted
+  /// \param SF The SourceFile containing the code with the dependences
+  /// \param depTracker The entities depended-upon
+  /// \param outputPath The path of the file where the dependencies are written to
   /// \return true on error
   static bool emit(DiagnosticEngine &diags, SourceFile *SF,
                    const DependencyTracker &depTracker,
                    StringRef outputPath);
+  
+  /// Emit the dependencies.
   static void emit(SourceFile *SF, const DependencyTracker &depTracker, llvm::raw_ostream &out);
   
 private:
+  /// Opens file for reference dependencies. Emits diagnostic if needed.
+  ///
+  /// \return nullptr on error
   static std::unique_ptr<llvm::raw_fd_ostream> openFile(DiagnosticEngine &diags,
                                                         StringRef OutputPath);
+  /// Emits all the dependency information.
   void emit() const;
+  
   void emitProvides() const;
   void emitDepends() const;
   void emitInterfaceHash() const;
 };
   
+/// Emits the declarations provided by a source file.
 class ProvidesEmitter {
   const SourceFile * const SF;
   llvm::raw_ostream &out;
@@ -67,19 +84,35 @@ class ProvidesEmitter {
   : SF(SF), out(out) {}
   
 public:
+  /// Emit declarations
+  ///
+  /// \param SF Contains the declarations to emit
+  ///
+  /// \param out Where the declarations are emitted
   static void emit(const SourceFile * SF, llvm::raw_ostream &out);
   
 private:
-  /// Collected and later written information.
+  /// Aggregates declarations which are collected first and emitted later.
   struct CollectedDeclarations {
+    /// Records every nominal declaration, and whether or not the declaration
+    /// changes the externally-observable shape of the type.
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+    
+    /// Records operator declarations so they can be included as top-level declarations.
     llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
+    
+    /// Records extension declarations which are not introducing a conformance
+    /// to a public protocol and add a public member.
     llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
     
+    /// Recursively computes the transitive closure over members
+    /// adding memberOperatorDecls and extendedNominals to the receiver.
     void findNominalsAndOperators(const DeclRange members);
   };
   
+  /// Emit all provided declartions.
   void emit() const;
+  
   CollectedDeclarations emitTopLevelNames() const;
   void emitNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) const;
   void emitMembers(const CollectedDeclarations &cpd) const;
@@ -94,10 +127,13 @@ private:
   static bool declIsPrivate(const Decl *member);
 };
 
-  
+/// Emit the depended-upon declartions.
 class DependsEmitter {
+  /// The file that dependes upon the declarations.
   const SourceFile *const SF;
+  /// The dependencies collected by the compiler.
   const DependencyTracker &depTracker;
+  
   llvm::raw_ostream &out;
   
   DependsEmitter(const SourceFile *SF, const DependencyTracker &depTracker,
@@ -105,13 +141,21 @@ class DependsEmitter {
   : SF(SF), depTracker(depTracker), out(out) {}
   
 public:
+  /// A NominalTypeDecl, its DeclBaseName, and whether it is externally-visible.
   using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
   
+  /// Emit the dependencies
+  ///
+  /// \param SF SourceFile containing the dependent code
+  /// \param depTracker Contains the dependencies found during compilation
+  /// \param out Where the dependencies are emitted
   static void emit(const SourceFile *SF, const DependencyTracker &depTracker,
                    llvm::raw_ostream &out);
   
 private:
+  /// Emit all the dependencies.
   void emit() const;
+  
   void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
   void emitMember(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
   void emitNominal(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
