@@ -96,6 +96,7 @@ class Foo {
   // armv7s-ios: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*, [4 x i32])*)(i8* [[SELFCAST]], i8* [[SEL]], [4 x i32] [[LOADED]])
 
   // armv7k-watchos: define hidden swiftcc float @"$S8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float, float, float, float, [[SELF:%.*]]* swiftself) {{.*}} {
+  // armv7k-watchos: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7k-watchos: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7k-watchos: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7k-watchos: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x float]*
