@@ -17,24 +17,22 @@
 #include "llvm/ADT/StringRef.h"
 
 namespace swift {
-  /// Define these string constants for reference dependencies (a.k.a. swiftdeps)
-  /// in one place to ensure consistency.
-  namespace reference_dependency_keys {
-  static constexpr StringLiteral providesTopLevel("provides-top-level");
-  static constexpr StringLiteral providesNominal("provides-nominal");
-  static constexpr StringLiteral providesMember("provides-member");
-  static constexpr StringLiteral
-      providesDynamicLookup("provides-dynamic-lookup");
+/// Define these string constants for reference dependencies (a.k.a. swiftdeps)
+/// in one place to ensure consistency.
+namespace reference_dependency_keys {
+static constexpr StringLiteral providesTopLevel("provides-top-level");
+static constexpr StringLiteral providesNominal("provides-nominal");
+static constexpr StringLiteral providesMember("provides-member");
+static constexpr StringLiteral providesDynamicLookup("provides-dynamic-lookup");
 
-  static constexpr StringLiteral dependsTopLevel("depends-top-level");
-  static constexpr StringLiteral dependsMember("depends-member");
-  static constexpr StringLiteral dependsNominal("depends-nominal");
-  static constexpr StringLiteral dependsDynamicLookup("depends-dynamic-lookup");
-  static constexpr StringLiteral dependsExternal("depends-external");
+static constexpr StringLiteral dependsTopLevel("depends-top-level");
+static constexpr StringLiteral dependsMember("depends-member");
+static constexpr StringLiteral dependsNominal("depends-nominal");
+static constexpr StringLiteral dependsDynamicLookup("depends-dynamic-lookup");
+static constexpr StringLiteral dependsExternal("depends-external");
 
-  static constexpr StringLiteral interfaceHash("interface-hash");
-  } // end namespace reference_dependency_keys
+static constexpr StringLiteral interfaceHash("interface-hash");
+} // end namespace reference_dependency_keys
 } // end namespace swift
 
 #endif
-

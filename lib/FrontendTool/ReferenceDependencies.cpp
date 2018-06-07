@@ -22,9 +22,9 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ReferenceDependencyKeys.h"
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -39,28 +39,30 @@ namespace {
 /// can compute a dependency graph for the whole module, and use it to decide
 /// which files need to be recompiled when doing incremental compilation.
 class ReferenceDependenciesEmitter {
-  SourceFile * const SF;
+  SourceFile *const SF;
   const DependencyTracker &depTracker;
   llvm::raw_ostream &out;
-  
-  ReferenceDependenciesEmitter(SourceFile *const SF, const DependencyTracker &depTracker, llvm::raw_ostream &out) :
-  SF(SF), depTracker(depTracker), out(out) {}
-  
+
+  ReferenceDependenciesEmitter(SourceFile *const SF,
+                               const DependencyTracker &depTracker,
+                               llvm::raw_ostream &out)
+      : SF(SF), depTracker(depTracker), out(out) {}
+
 public:
   /// Emits the provided and depended-upon dependencies to a file
   ///
   /// \param diags Where problems opening the file are emitted
   /// \param SF The SourceFile containing the code with the dependences
   /// \param depTracker The entities depended-upon
-  /// \param outputPath The path of the file where the dependencies are written to
-  /// \return true on error
+  /// \param outputPath The path of the file where the dependencies are written
+  /// to \return true on error
   static bool emit(DiagnosticEngine &diags, SourceFile *SF,
-                   const DependencyTracker &depTracker,
-                   StringRef outputPath);
-  
+                   const DependencyTracker &depTracker, StringRef outputPath);
+
   /// Emit the dependencies.
-  static void emit(SourceFile *SF, const DependencyTracker &depTracker, llvm::raw_ostream &out);
-  
+  static void emit(SourceFile *SF, const DependencyTracker &depTracker,
+                   llvm::raw_ostream &out);
+
 private:
   /// Opens file for reference dependencies. Emits diagnostic if needed.
   ///
@@ -69,60 +71,64 @@ private:
                                                         StringRef OutputPath);
   /// Emits all the dependency information.
   void emit() const;
-  
+
   void emitProvides() const;
   void emitDepends() const;
   void emitInterfaceHash() const;
 };
-  
+
 /// Emits the declarations provided by a source file.
 class ProvidesEmitter {
-  const SourceFile * const SF;
+  const SourceFile *const SF;
   llvm::raw_ostream &out;
-  
-  ProvidesEmitter(const SourceFile * const SF, llvm::raw_ostream &out)
-  : SF(SF), out(out) {}
-  
+
+  ProvidesEmitter(const SourceFile *const SF, llvm::raw_ostream &out)
+      : SF(SF), out(out) {}
+
 public:
   /// Emit declarations
   ///
   /// \param SF Contains the declarations to emit
   ///
   /// \param out Where the declarations are emitted
-  static void emit(const SourceFile * SF, llvm::raw_ostream &out);
-  
+  static void emit(const SourceFile *SF, llvm::raw_ostream &out);
+
 private:
   /// Aggregates declarations which are collected first and emitted later.
   struct CollectedDeclarations {
     /// Records every nominal declaration, and whether or not the declaration
     /// changes the externally-observable shape of the type.
     llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
-    
-    /// Records operator declarations so they can be included as top-level declarations.
+
+    /// Records operator declarations so they can be included as top-level
+    /// declarations.
     llvm::SmallVector<const FuncDecl *, 8> memberOperatorDecls;
-    
+
     /// Records extension declarations which are not introducing a conformance
     /// to a public protocol and add a public member.
     llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
-    
+
     /// Recursively computes the transitive closure over members
     /// adding memberOperatorDecls and extendedNominals to the receiver.
     void findNominalsAndOperators(const DeclRange members);
   };
-  
+
   /// Emit all provided declartions.
   void emit() const;
-  
+
   CollectedDeclarations emitTopLevelNames() const;
-  void emitNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) const;
+  void emitNominalTypes(const llvm::MapVector<const NominalTypeDecl *, bool>
+                            &extendedNominals) const;
   void emitMembers(const CollectedDeclarations &cpd) const;
   void emitDynamicLookupMembers() const;
-  
+
   void emitTopLevelDecl(const Decl *D, CollectedDeclarations &cpd) const;
-  void emitExtensionDecl(const ExtensionDecl *D, CollectedDeclarations &cpd) const;
-  void emitNominalTypeDecl(const NominalTypeDecl *NTD, CollectedDeclarations &cpd) const;
+  void emitExtensionDecl(const ExtensionDecl *D,
+                         CollectedDeclarations &cpd) const;
+  void emitNominalTypeDecl(const NominalTypeDecl *NTD,
+                           CollectedDeclarations &cpd) const;
   void emitValueDecl(const ValueDecl *VD) const;
-  
+
   static bool extendedTypeIsPrivate(TypeLoc inheritedType);
   static bool declIsPrivate(const Decl *member);
 };
@@ -133,17 +139,17 @@ class DependsEmitter {
   const SourceFile *const SF;
   /// The dependencies collected by the compiler.
   const DependencyTracker &depTracker;
-  
+
   llvm::raw_ostream &out;
-  
+
   DependsEmitter(const SourceFile *SF, const DependencyTracker &depTracker,
                  llvm::raw_ostream &out)
-  : SF(SF), depTracker(depTracker), out(out) {}
-  
+      : SF(SF), depTracker(depTracker), out(out) {}
+
 public:
   /// A NominalTypeDecl, its DeclBaseName, and whether it is externally-visible.
   using MemberTableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
-  
+
   /// Emit the dependencies
   ///
   /// \param SF SourceFile containing the dependent code
@@ -151,22 +157,21 @@ public:
   /// \param out Where the dependencies are emitted
   static void emit(const SourceFile *SF, const DependencyTracker &depTracker,
                    llvm::raw_ostream &out);
-  
+
 private:
   /// Emit all the dependencies.
   void emit() const;
-  
+
   void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
   void emitMember(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
   void emitNominal(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
   void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
   void emitExternal(const DependencyTracker &depTracker) const;
-  
-  
+
   static SmallVector<std::pair<DeclBaseName, bool>, 16>
   sortedByName(const llvm::DenseMap<DeclBaseName, bool> map);
 };
-} // end anon namespace
+} // namespace
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::ASTMangler Mangler;
@@ -188,15 +193,18 @@ static std::string escape(DeclBaseName name) {
   return llvm::yaml::escape(name.userFacingName());
 }
 
-std::unique_ptr<llvm::raw_fd_ostream>ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags, StringRef outputPath) {
+std::unique_ptr<llvm::raw_fd_ostream>
+ReferenceDependenciesEmitter::openFile(DiagnosticEngine &diags,
+                                       StringRef outputPath) {
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
-  
+
   std::error_code EC;
-  auto out = llvm::make_unique<llvm::raw_fd_ostream>(outputPath, EC, llvm::sys::fs::F_None);
-  
+  auto out = llvm::make_unique<llvm::raw_fd_ostream>(outputPath, EC,
+                                                     llvm::sys::fs::F_None);
+
   if (out->has_error() || EC) {
     diags.diagnose(SourceLoc(), diag::error_opening_output, outputPath,
                    EC.message());
@@ -231,8 +239,7 @@ void ReferenceDependenciesEmitter::emit() const {
   emitInterfaceHash();
 }
 
-bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
-                                      SourceFile *SF,
+bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                       const DependencyTracker &depTracker,
                                       StringRef outputPath) {
   return ReferenceDependenciesEmitter::emit(diags, SF, depTracker, outputPath);
@@ -260,12 +267,14 @@ void ReferenceDependenciesEmitter::emitDepends() const {
 void ReferenceDependenciesEmitter::emitInterfaceHash() const {
   llvm::SmallString<32> interfaceHash;
   SF->getInterfaceHash(interfaceHash);
-  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash << "\"\n";
+  out << reference_dependency_keys::interfaceHash << ": \"" << interfaceHash
+      << "\"\n";
 }
 
-ProvidesEmitter::CollectedDeclarations ProvidesEmitter::emitTopLevelNames() const {
+ProvidesEmitter::CollectedDeclarations
+ProvidesEmitter::emitTopLevelNames() const {
   out << providesTopLevel << ":\n";
-  
+
   CollectedDeclarations cpd;
   for (const Decl *D : SF->Decls)
     emitTopLevelDecl(D, cpd);
@@ -274,9 +283,8 @@ ProvidesEmitter::CollectedDeclarations ProvidesEmitter::emitTopLevelNames() cons
   return cpd;
 }
 
-void ProvidesEmitter::emitTopLevelDecl(
-    const Decl *const D,
-    CollectedDeclarations &cpd) const {
+void ProvidesEmitter::emitTopLevelDecl(const Decl *const D,
+                                       CollectedDeclarations &cpd) const {
   switch (D->getKind()) {
   case DeclKind::Module:
     break;
@@ -334,9 +342,8 @@ void ProvidesEmitter::emitTopLevelDecl(
   }
 }
 
-void ProvidesEmitter::emitExtensionDecl(
-    const ExtensionDecl *const ED,
-    CollectedDeclarations &cpd) const {
+void ProvidesEmitter::emitExtensionDecl(const ExtensionDecl *const ED,
+                                        CollectedDeclarations &cpd) const {
   auto *NTD = ED->getExtendedType()->getAnyNominal();
   if (!NTD)
     return;
@@ -360,9 +367,8 @@ void ProvidesEmitter::emitExtensionDecl(
   cpd.findNominalsAndOperators(ED->getMembers());
 }
 
-void ProvidesEmitter::emitNominalTypeDecl(
-    const NominalTypeDecl *const NTD,
-    CollectedDeclarations &cpd) const {
+void ProvidesEmitter::emitNominalTypeDecl(const NominalTypeDecl *const NTD,
+                                          CollectedDeclarations &cpd) const {
   if (!NTD->hasName())
     return;
   if (NTD->hasAccess() && NTD->getFormalAccess() <= AccessLevel::FilePrivate) {
@@ -373,22 +379,22 @@ void ProvidesEmitter::emitNominalTypeDecl(
   cpd.findNominalsAndOperators(NTD->getMembers());
 }
 
-void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(const DeclRange members) {
+void ProvidesEmitter::CollectedDeclarations::findNominalsAndOperators(
+    const DeclRange members) {
   for (const Decl *D : members) {
     auto *VD = dyn_cast<ValueDecl>(D);
     if (!VD)
       continue;
-    
-    if (VD->hasAccess() &&
-        VD->getFormalAccess() <= AccessLevel::FilePrivate) {
+
+    if (VD->hasAccess() && VD->getFormalAccess() <= AccessLevel::FilePrivate) {
       continue;
     }
-    
+
     if (VD->getFullName().isOperator()) {
       memberOperatorDecls.push_back(cast<FuncDecl>(VD));
       continue;
     }
-    
+
     auto nominal = dyn_cast<NominalTypeDecl>(D);
     if (!nominal)
       continue;
@@ -407,7 +413,8 @@ void ProvidesEmitter::emitValueDecl(const ValueDecl *const VD) const {
 }
 
 void ProvidesEmitter::emitNominalTypes(
-    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals) const {
+    const llvm::MapVector<const NominalTypeDecl *, bool> &extendedNominals)
+    const {
   out << providesNominal << ":\n";
   for (auto entry : extendedNominals) {
     if (!entry.second)
@@ -418,8 +425,7 @@ void ProvidesEmitter::emitNominalTypes(
   }
 }
 
-void ProvidesEmitter::emitMembers(
-    const CollectedDeclarations &cpd) const {
+void ProvidesEmitter::emitMembers(const CollectedDeclarations &cpd) const {
   out << providesMember << ":\n";
   for (auto entry : cpd.extendedNominals) {
     out << "- [\"";
@@ -481,20 +487,20 @@ bool ProvidesEmitter::extendedTypeIsPrivate(TypeLoc inheritedType) {
   auto type = inheritedType.getType();
   if (!type)
     return true;
-  
+
   if (!type->isExistentialType()) {
     // Be conservative. We don't know how to deal with other extended types.
     return false;
   }
-  
+
   auto layout = type->getExistentialLayout();
   assert(!layout.superclass && "Should not have a subclass existential "
-         "in the inheritance clause of an extension");
+                               "in the inheritance clause of an extension");
   for (auto protoTy : layout.getProtocols()) {
     if (!declIsPrivate(protoTy->getDecl()))
       return false;
   }
-  
+
   return true;
 }
 
@@ -502,29 +508,30 @@ bool ProvidesEmitter::declIsPrivate(const Decl *member) {
   auto *VD = dyn_cast<ValueDecl>(member);
   if (!VD) {
     switch (member->getKind()) {
-      case DeclKind::Import:
-      case DeclKind::PatternBinding:
-      case DeclKind::EnumCase:
-      case DeclKind::TopLevelCode:
-      case DeclKind::IfConfig:
-      case DeclKind::PoundDiagnostic:
-        return true;
-        
-      case DeclKind::Extension:
-      case DeclKind::InfixOperator:
-      case DeclKind::PrefixOperator:
-      case DeclKind::PostfixOperator:
-        return false;
-        
-      default:
-        llvm_unreachable("everything else is a ValueDecl");
+    case DeclKind::Import:
+    case DeclKind::PatternBinding:
+    case DeclKind::EnumCase:
+    case DeclKind::TopLevelCode:
+    case DeclKind::IfConfig:
+    case DeclKind::PoundDiagnostic:
+      return true;
+
+    case DeclKind::Extension:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
+      return false;
+
+    default:
+      llvm_unreachable("everything else is a ValueDecl");
     }
   }
-  
+
   return VD->getFormalAccess() <= AccessLevel::FilePrivate;
 }
 
-void DependsEmitter::emit(const SourceFile *SF, const DependencyTracker &depTracker,
+void DependsEmitter::emit(const SourceFile *SF,
+                          const DependencyTracker &depTracker,
                           llvm::raw_ostream &out) {
   DependsEmitter(SF, depTracker, out).emit();
 }
@@ -565,7 +572,8 @@ void DependsEmitter::emit() const {
   emitExternal(depTracker);
 }
 
-void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracker) const {
+void DependsEmitter::emitTopLevelNames(
+    const ReferencedNameTracker *const tracker) const {
   out << dependsTopLevel << ":\n";
   for (auto &entry : sortedByName(tracker->getTopLevelNames())) {
     assert(!entry.first.empty());
@@ -576,7 +584,8 @@ void DependsEmitter::emitTopLevelNames(const ReferencedNameTracker *const tracke
   }
 }
 
-void DependsEmitter::emitMember(ArrayRef<MemberTableEntryTy> sortedMembers) const {
+void DependsEmitter::emitMember(
+    ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
     assert(entry.first.first != nullptr);
@@ -596,7 +605,8 @@ void DependsEmitter::emitMember(ArrayRef<MemberTableEntryTy> sortedMembers) cons
   }
 }
 
-void DependsEmitter::emitNominal(ArrayRef<MemberTableEntryTy> sortedMembers) const {
+void DependsEmitter::emitNominal(
+    ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << dependsNominal << ":\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
     bool isCascading = i->second;
@@ -618,7 +628,8 @@ void DependsEmitter::emitNominal(ArrayRef<MemberTableEntryTy> sortedMembers) con
   }
 }
 
-void DependsEmitter::emitDynamicLookup(const ReferencedNameTracker *const tracker) const {
+void DependsEmitter::emitDynamicLookup(
+    const ReferencedNameTracker *const tracker) const {
   out << dependsDynamicLookup << ":\n";
   for (auto &entry : sortedByName(tracker->getDynamicLookupNames())) {
     assert(!entry.first.empty());
