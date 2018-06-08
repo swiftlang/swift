@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "TFConstExpr"
 #include "TFConstExpr.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -128,8 +129,6 @@ lookupOrLinkWitnessTable(ProtocolConformanceRef confRef, SILModule &module,
   auto *conf = confRef.getConcrete();
   auto wtable = module.lookUpWitnessTable(conf);
   if (wtable) return wtable;
-
-
 
   auto *decl =
     conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -607,7 +606,7 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
     // call.
     auto cst = getConstantValue(apply->getOperand(applyParamBaseIndex+i));
     if (!cst.isConstant())
-      return failure(UnknownReason::Default);
+      return cst;
 
     paramConstants.push_back(cst);
   }

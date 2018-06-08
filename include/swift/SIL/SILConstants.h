@@ -262,8 +262,12 @@ public:
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
 
-
   // TODO: getStringValue.
+
+
+  /// Given that this is an 'Unknown' value, emit diagnostic notes providing
+  /// context about what the problem is.
+  void emitUnknownDiagnosticNotes();
 
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
