@@ -3666,7 +3666,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   }
 
   auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserResult<Expr> {
-    for (unsigned i : range(parenDepth)) {
+    for (unsigned i = 0; i < parenDepth; ++i) {
       skipUntilDeclStmtRBrace(tok::r_paren);
       parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName);
     }

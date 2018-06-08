@@ -365,7 +365,7 @@ struct GraphGlobalConfiguration {
   ///
   /// When configuration.usedDeviceTypes has N>1 devices, in addition to
   /// `entryFnBaseName`, also generate another N-1 nodes named
-  /// `entryFnBaseName_helper_<i>`, with i ranging from 0 to N-2. These N nodes
+  /// `entryFnBaseName_helper_{i}`, with i ranging from 0 to N-2. These N nodes
   /// correspond to the N per-device graph functions, and must be called by the
   /// runtime in a single SessionRun() call. Those N-1 helper functions take no
   /// input or output tensors, and are executed for their side-effects of

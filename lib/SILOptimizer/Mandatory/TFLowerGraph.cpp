@@ -293,9 +293,9 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   /// The created nodes follow this naming convention shared with the runtime:
   /// - The graph node for the function call has op type set <funcOpType>, and
   ///   name set to tfc_func_<funcNodeBaseName> for the primary function, and
-  ///   tfc_func_<funcNodeBaseName>_helper<i> for the i-th helper function.
-  /// - The i-th input node is named tfc_input_<i>_<funcNodeBaseName>
-  /// - The j-th output node is named tfc_output_<j>_<funcNodeBaseName>
+  ///   tfc_func_<funcNodeBaseName>_helper_{i} for the i-th helper function.
+  /// - The i-th input node is named tfc_input_{i}_<funcNodeBaseName>
+  /// - The j-th output node is named tfc_output_{j}_<funcNodeBaseName>
   /// - If TPU infeed is enabled, the graph contains an 'InfeedEnqueueTuple'
   ///   node for caller feed input tensors.
   ///
