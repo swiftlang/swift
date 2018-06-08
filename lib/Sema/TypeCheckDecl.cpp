@@ -3815,9 +3815,6 @@ void TypeChecker::resolveIsObjC(ValueDecl *VD) {
   auto dc = VD->getDeclContext();
   if (dc->getAsClassOrClassExtensionContext()) {
     // Members of classes can be @objc.
-
-    // FIXME: We
-    validateDeclForNameLookup(VD);
   }
   else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.

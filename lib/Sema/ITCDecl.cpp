@@ -341,7 +341,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
     if (typeAliasDecl->getDeclContext()->isModuleScopeContext() &&
         typeAliasDecl->getGenericParams() == nullptr) {
       TypeResolutionOptions options =
-                                   TypeResolutionFlags::TypeAliasUnderlyingType;
+        TypeResolutionFlags::TypeAliasUnderlyingType;
       if (!typeAliasDecl->getDeclContext()->isCascadingContextForLookup(
             /*functionsAreNonCascading*/true)) {
         options |= TypeResolutionFlags::KnownNonCascadingDependency;
