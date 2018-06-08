@@ -3817,9 +3817,6 @@ void TypeChecker::resolveIsObjC(ValueDecl *VD) {
   auto dc = VD->getDeclContext();
   if (dc->getAsClassOrClassExtensionContext()) {
     // Members of classes can be @objc.
-
-    // FIXME: We
-    validateDeclForNameLookup(VD);
   }
   else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.
@@ -7992,8 +7989,10 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         validateAccessControl(typealias);
 
         ProtocolRequirementTypeResolver resolver;
+        TypeResolutionOptions options =
+          TypeResolutionFlags::TypeAliasUnderlyingType;
         if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, TypeResolutionOptions(), &resolver)) {
+                         typealias, options, &resolver)) {
           typealias->setInvalid();
           typealias->getUnderlyingTypeLoc().setInvalidType(Context);
         }
