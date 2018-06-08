@@ -1474,6 +1474,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _append(buffer)
     }
 
+    public mutating func append(contentsOf bytes: [UInt8]) {
+        bytes.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) -> Void in
+            _append(buffer)
+        }
+    }
+
     @inlinable
     public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
         let underestimatedCount = Swift.max(newElements.underestimatedCount, 1)
