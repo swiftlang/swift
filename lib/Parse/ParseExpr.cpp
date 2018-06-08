@@ -1927,6 +1927,37 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
+        
+        if (auto tuple = dyn_cast<TupleExpr>(Exprs.back())) {
+          // If parseExprList() returns a TupleExpr instead of a ParenExpr, 
+          // the interpolation must have had an argument label, or multiple
+          // elements, or both. Reject these.
+          if (tuple->getNumElements() > 1) {
+            SourceLoc StartLoc = tuple->getStartLoc();
+            SourceLoc SecondExprLoc = tuple->getElement(1)->getStartLoc();
+            SourceLoc EndLoc = tuple->getEndLoc();
+            
+            diagnose(SecondExprLoc, diag::string_interpolation_multiple_exprs);
+            diagnose(StartLoc, diag::string_interpolation_form_tuple)
+              .fixItInsert(StartLoc, "(")
+              .fixItInsertAfter(EndLoc, ")");
+              
+            Exprs.back() =
+              new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
+                                      /*hasTrailingClosure=*/false);
+          } else if (tuple->getNumElements() == 1 && 
+                   !tuple->getElementName(0).empty()) {
+            SourceLoc NameStart = tuple->getElementNameLoc(0);
+            SourceLoc ArgStart = tuple->getElement(0)->getStartLoc();
+            
+            diagnose(NameStart, diag::string_interpolation_keyword_argument)
+              .fixItRemoveChars(NameStart, ArgStart);
+            
+            Exprs.back() =
+              new (Context) ParenExpr(tuple->getLParenLoc(), tuple->getElement(0), 
+                                      tuple->getRParenLoc(), /*hasTrailingClosure=*/false);
+          }
+        }
 
         if (!Tok.is(tok::eof)) {
           diagnose(Tok, diag::string_interpolation_extra);

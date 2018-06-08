@@ -1226,6 +1226,14 @@ ERROR(expected_type_after_as,none,
 ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
+// Interpolated value accidentally forms a tuple.
+ERROR(string_interpolation_multiple_exprs,none,
+      "interpolations should be a single expression", ())
+NOTE(string_interpolation_form_tuple,none,
+      "insert parentheses to form a tuple", ())
+ERROR(string_interpolation_keyword_argument,PointsToFirstBadToken,
+      "interpolations cannot start with a keyword argument", ())
+
 // Keypath expressions.
 ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#keyPath'", ())
