@@ -20,9 +20,6 @@
 
 #include "swift/SIL/SILValue.h"
 
-namespace llvm {
-  //class BumpPtrAllocator;
-}
 namespace swift {
 class SingleValueInstruction;
 class SILValue;
