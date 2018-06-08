@@ -473,7 +473,7 @@ static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
   auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex());
 
   // Limiting to 32 bits is more than enough. The reason why not limiting to 64
-  // bits is to let room for overflow when we add two indices.
+  // bits is to leave room for overflow when we add two indices.
   if (!Index || Index->getValue().getActiveBits() > 32)
     return nullptr;
 
