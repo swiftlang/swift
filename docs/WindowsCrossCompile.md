@@ -38,7 +38,7 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 --extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
 -DCMAKE_AR=<path to llvm-ar>,\
 -DCMAKE_RANLIB=<path to llvm-ranlib>,\
--DSWIFT_SDKS=WINDOWS,\
+-DSWIFT_SDKS='OSX;WINDOWS',\
 -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
 -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=<path to ICU UC includes>,\
 -DSWIFT_WINDOWS_x86_64_ICU_I18N=<path to ICU i18n lib>,\
@@ -47,19 +47,8 @@ Additionally, the ICU headers and libraries need to be provided for the build.
 
 #### Linux
 
-For Linux, you will also need to build the Linux SDK with the cmake options
-below.
-
-```bash
---extra-cmake-options=-DSWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER=FALSE,\
--DCMAKE_AR=<path to llvm-ar>,\
--DCMAKE_RANLIB=<path to llvm-ranlib>,\
--DSWIFT_SDKS='LINUX;WINDOWS',\
--DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE=<path to ICU i18n includes>,\
--DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE=<path to ICU UC includes>,\
--DSWIFT_WINDOWS_x86_64_ICU_I18N=<path to ICU i18n lib>,\
--DSWIFT_WINDOWS_x86_64_ICU_UC=<path to ICU UC lib>
-```
+For Linux, you will need to build the Linux SDK instead of the macOS SDK by
+replacing the cmake option with `-DSWIFT_SDKS='LINUX;WINDOWS'`.
 
 ## 4. Build the Swift runtime and standard library with `ninja`
 From the build directory, you can build the Swift runtime and standard library
