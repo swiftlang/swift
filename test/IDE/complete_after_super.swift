@@ -9,6 +9,21 @@
 // RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_DOT_1 < %t.super.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONV_CONSTRUCTOR_SUPER_DOT > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NOINIT < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONV_CONSTRUCTOR_SUPER_NO_DOT > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NOINIT < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONV_CONSTRUCTOR_SUPER_PAREN > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NOINIT < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_PAREN > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NOINIT < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_FUNC_SUPER_PAREN > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_NOINIT < %t.super.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_INIT_1 > %t.super.txt
 // RUN: %FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_INIT_1 < %t.super.txt
 
@@ -64,6 +79,11 @@
 // RUN: %FileCheck %s -check-prefix=FUNC_SUPER_DOT_2 < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_FUNC_SUPER_NODOT > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_FUNC_SUPER < %t.super.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLASS_FUNC_SUPER_DOT > %t.super.txt
+// RUN: %FileCheck %s -check-prefix=CLASS_FUNC_SUPER < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 > %t.super.txt
 // RUN: %FileCheck %s -check-prefix=SEMANTIC_CONTEXT_OVERRIDDEN_DECL_1 < %t.super.txt
@@ -221,9 +241,17 @@ class SuperDerivedA : SuperBaseA {
 
   init(a: Int) {
     super.#^CONSTRUCTOR_SUPER_DOT_1^#
+    super(#^CONSTRUCTOR_SUPER_PAREN^#
 // CONSTRUCTOR_SUPER_DOT_1: Begin completions, 7 items
 // CONSTRUCTOR_SUPER_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#SuperBaseA#]{{; name=.+$}}
 // CONSTRUCTOR_SUPER_DOT_1: End completions
+  }
+
+  convenience init(foo1: Int) {
+    super.#^CONV_CONSTRUCTOR_SUPER_DOT^#
+    super#^CONV_CONSTRUCTOR_SUPER_NO_DOT^#
+    super(#^CONV_CONSTRUCTOR_SUPER_PAREN^#
+// CONSTRUCTOR_SUPER_NOINIT-NOT: Decl[Constructor]
   }
 
   init (a: Float) {
@@ -411,6 +439,19 @@ class SuperDerivedB : SuperBaseB {
 // FUNC_SUPER_DOT_2: Begin completions, 6 items
 // FUNC_SUPER_DOT_2: End completions
   }
+
+  class func test3() {
+    super#^CLASS_FUNC_SUPER_NODOT^#
+  }
+  class func test4() {
+    super.#^CLASS_FUNC_SUPER_DOT^#
+  }
+  class func test5() {
+    super(#^CLASS_FUNC_SUPER_PAREN^#
+  }
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}()[#SuperBaseB#]
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#a: Double#})[#SuperBaseB#]
+// CLASS_FUNC_SUPER: Decl[Constructor]/CurrNominal: {{.init|init}}({#int: Int#})[#SuperBaseB#]
 }
 
 //===--- Check that we assign a special semantic context to the overridden decl.
