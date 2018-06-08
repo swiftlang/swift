@@ -144,9 +144,9 @@ class NestedGeneric<U> {
 
 // CHECK: sil hidden @$S16generic_closures018nested_closure_in_A0yxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK:   function_ref [[OUTER_CLOSURE:@\$S16generic_closures018nested_closure_in_A0yxxlFxyXEfU_]]
-// CHECK: sil private [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
+// CHECK: sil private [[OUTER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK:   function_ref [[INNER_CLOSURE:@\$S16generic_closures018nested_closure_in_A0yxxlFxyXEfU_xyXEfU_]]
-// CHECK: sil private [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
+// CHECK: sil private [[INNER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 func nested_closure_in_generic<T>(_ x:T) -> T {
   return { { x }() }()
 }
