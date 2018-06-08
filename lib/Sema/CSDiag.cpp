@@ -7333,16 +7333,6 @@ bool FailureDiagnosis::visitPoundAssertExpr(PoundAssertExpr *PAE) {
                                       CTP_CallArgument);
 }
 
-static bool isDictionaryLiteralCompatible(Type ty, ConstraintSystem &CS,
-                                          SourceLoc loc) {
-  auto DLC =
-      CS.TC.getProtocol(loc, KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  if (!DLC) return false;
-  return CS.TC
-      .conformsToProtocol(ty, DLC, CS.DC, ConformanceCheckFlags::InExpression)
-      .hasValue();
-}
-
 bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   // If we had a contextual type, then it either conforms to
   // ExpressibleByArrayLiteral or it is an invalid contextual type.
