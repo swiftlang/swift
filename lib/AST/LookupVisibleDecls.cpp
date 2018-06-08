@@ -477,8 +477,11 @@ class RestateFilteringConsumer : public VisibleDeclConsumer {
   VisibleDeclConsumer &parentConsumer;
   LazyResolver *resolver;
 
-  llvm::DenseSet<DeclName> foundVars;
-  llvm::DenseSet<std::pair<DeclName, CanType>> foundFuncs;
+  using FoundDecl = std::pair<ValueDecl*, DeclVisibilityKind>;
+  using NameAndType = std::pair<DeclName, CanType>;
+
+  llvm::DenseMap<DeclName, FoundDecl> foundVars;
+  llvm::DenseMap<NameAndType, FoundDecl> foundFuncs;
 
 public:
   RestateFilteringConsumer(VisibleDeclConsumer &parentConsumer,
@@ -503,19 +506,34 @@ public:
       parentConsumer.foundDecl(VD, Reason);
       return;
     }
-    auto GFT = VD->getInterfaceType()->getAs<GenericFunctionType>();
-    if (!GFT) {
-      if (foundVars.insert(VD->getFullName()).second)
-        parentConsumer.foundDecl(VD, Reason);
+    // Do not feed anything to the parent consumer if we found a valid
+    // new declaration: there might be another conflicting one with a
+    // higher access level that we want to prioritize later.
+    if (auto GFT = VD->getInterfaceType()->getAs<GenericFunctionType>()) {
+      auto type = stripSelfRequirementsIfNeeded(VD, GFT);
+      NameAndType nameAndType = {VD->getFullName(), type};
+
+      if ((foundFuncs.find(nameAndType) == foundFuncs.end()) ||
+          (foundFuncs[nameAndType].first->getFormalAccess() <
+           VD->getFormalAccess()))
+        foundFuncs[nameAndType] = {VD, Reason};
       return;
     }
-    auto type = stripSelfRequirementsIfNeeded(VD, GFT);
-    if (foundFuncs.insert({VD->getFullName(), type}).second) {
-      parentConsumer.foundDecl(VD, Reason);
-    }
+    auto declName = VD->getFullName();
+    if ((foundVars.find(declName) == foundVars.end()) ||
+        (foundVars[declName].first->getFormalAccess() <
+         VD->getFormalAccess()))
+      foundVars[declName] = {VD, Reason};
+  }
+
+  void feedFilteredResultsToParentConsumer() const {
+    for (auto entry: foundVars)
+      parentConsumer.foundDecl(entry.getSecond().first, entry.getSecond().second);
+    for (auto entry: foundFuncs)
+      parentConsumer.foundDecl(entry.getSecond().first, entry.getSecond().second);
   }
 private:
-  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD, GenericFunctionType *GFT) {
+  CanType stripSelfRequirementsIfNeeded(ValueDecl *VD, GenericFunctionType *GFT) const {
     // Preserve the generic signature if this is a subscript, which are uncurried,
     // or if we have generic params other than Self. Otherwise, use
     // the resultType of the curried function type.
@@ -922,6 +940,7 @@ static void lookupVisibleMemberDecls(
                                TypeResolver, GSB, Visited);
 
   // Report the declarations we found to the real consumer.
+  restateConsumer.feedFilteredResultsToParentConsumer();
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
     Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }

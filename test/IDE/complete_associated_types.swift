@@ -268,7 +268,7 @@ func testBrokenConformances1() {
   StructWithBrokenConformance.#^BROKEN_CONFORMANCE_1^#
 }
 
-// BROKEN_CONFORMANCE_1: Begin completions, 33 items
+// BROKEN_CONFORMANCE_1: Begin completions, 35 items
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#StructWithBrokenConformance.DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#StructWithBrokenConformance.DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
 // BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#StructWithBrokenConformance.FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB

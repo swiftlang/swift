@@ -177,8 +177,8 @@ public class TestPublicDE : ProtocolDPrivate, ProtocolEPublic {
 // TEST_INTERNAL_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 // TEST_PUBLIC_DE: Begin completions, 2 items
-// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: func colliding() {|}{{; name=.+$}}
-// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func colliding() {|}{{; name=.+$}}
+// TEST_PUBLIC_DE-DAG: Decl[InstanceMethod]/Super: public func collidingGeneric<T>(x: T) {|}{{; name=.+$}}
 
 private class TestPrivateED : ProtocolEPublic, ProtocolDPrivate {
   #^TEST_PRIVATE_ED^#
