@@ -41,6 +41,7 @@
 #include "SwiftValue.h"
 #endif
 
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
 
@@ -2667,7 +2668,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   // Allocate a buffer to store the T? returned by bridging.
   // The extra byte is for the tag.
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (targetType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.
