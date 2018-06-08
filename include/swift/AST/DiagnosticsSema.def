@@ -2529,6 +2529,14 @@ ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
 ERROR(compiler_evaluable_loop,none,
       "loops not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_forbidden_expression,none,
+      "expression not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_non_local_mutable,none,
+      "referencing non-local mutable variables not allowed in @compilerEvaluable functions", ())
+ERROR(compiler_evaluable_forbidden_type,none,
+      "type %0 cannot be used in @compilerEvaluable functions", (Type))
+ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
+      "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
