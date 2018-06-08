@@ -711,10 +711,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   return false;
 }
 
-void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
-                                              const ArrayRef<const char*> &Args,
-                                              StringRef SDKPath,
-                                              StringRef ResourceDir) {
+void CompilerInvocation::buildDebugFlags(std::string &Output,
+                                         const ArrayRef<const char*> &Args,
+                                         StringRef SDKPath,
+                                         StringRef ResourceDir) {
   // This isn't guaranteed to be the same temp directory as what the driver
   // uses, but it's highly likely.
   llvm::SmallString<128> TDir;
@@ -756,32 +756,61 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
   } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
     else if (A->getOption().matches(options::OPT_gdwarf_types))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
+    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
       if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
         ArgStringList RenderedArgs;
         for (auto A : Args)
           A->render(Args, RenderedArgs);
-        CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                                 RenderedArgs, SDKPath,
-                                                 ResourceDir);
+        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                            RenderedArgs, SDKPath,
+                                            ResourceDir);
       }
       // TODO: Should we support -fdebug-compilation-dir?
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);
       Opts.DebugCompilationDir = cwd.str();
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
+    if (A->containsValue("dwarf"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    else if (A->containsValue("codeview"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  } else if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+    // If -g was specified but not -debug-info-format, DWARF is assumed.
+    Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+  if (Args.hasArg(options::OPT_debug_info_format) &&
+      !Args.hasArg(options::OPT_g_Group)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   debugFormatArg->getAsString(Args), "-g");
+  }
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+      (Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
+       Opts.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   debugFormatArg->getAsString(Args),
+                   Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
+                     ? "-gline-tables-only"
+                     : "-gdwarf_types");
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
