@@ -921,6 +921,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     // value = SymbolicValue::getStringValue(rawString, allocator);
     // return false;
     P.diagnose(P.Tok, diag::sil_unhandled_graph_op_attr_value);
+    return true;
   }
   // Handle metatypes (the instance type is parsed).
   if (P.Tok.is(tok::sil_dollar)) {
