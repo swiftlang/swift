@@ -21,6 +21,49 @@ static llvm::cl::opt<bool> FSODisableArgExplosion(
     llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
                    "only for testing purposes"));
 
+//===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+/// Return true if it's both legal and a good idea to explode this argument.
+static bool shouldExplode(ArgumentDescriptor &argDesc,
+                          ConsumedArgToEpilogueReleaseMatcher &ERM) {
+  // We cannot optimize the argument.
+  if (!argDesc.canOptimizeLiveArg())
+    return false;
+
+  // See if the projection tree consists of potentially multiple levels of
+  // structs containing one field. In such a case, there is no point in
+  // exploding the argument.
+  //
+  // Also, in case of a type can not be exploded, e.g an enum, we treat it
+  // as a singleton.
+  if (argDesc.ProjTree.isSingleton())
+    return false;
+
+  auto *arg = argDesc.Arg;
+  if (!shouldExpand(arg->getModule(), arg->getType().getObjectType())) {
+    return false;
+  }
+
+  // If this argument is @owned and we can not find all the releases for it
+  // try to explode it, maybe we can find some of the releases and O2G some
+  // of its components.
+  //
+  // This is a potentially a very profitable optimization. Ignore other
+  // heuristics.
+  if (arg->hasConvention(SILArgumentConvention::Direct_Owned) &&
+      ERM.hasSomeReleasesForArgument(arg))
+    return true;
+
+  unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
+  return explosionSize >= 1 && explosionSize <= 3;
+}
+
+//===----------------------------------------------------------------------===//
+//                               Implementation
+//===----------------------------------------------------------------------===//
+
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
   // If we are not supposed to perform argument explosion, bail.
   if (FSODisableArgExplosion)
@@ -52,7 +95,7 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
       continue;
 
     A.ProjTree.computeUsesAndLiveness(A.Arg);
-    A.Explode = A.shouldExplode(ArgToReturnReleaseMap);
+    A.Explode = shouldExplode(A, ArgToReturnReleaseMap);
 
     // Modified self argument.
     if (A.Explode && Args[i]->isSelf()) {
