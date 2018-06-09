@@ -8088,9 +8088,9 @@ public:
     return { getTrailingObjects<GraphOperationAttribute>(), NumAttributes };
   }
 
-  Optional<GraphOperationAttribute> getAttribute(Identifier name) {
+  Optional<GraphOperationAttribute> getAttribute(StringRef name) {
     for (auto attr : getAttributes())
-      if (attr.name == name)
+      if (attr.name.is(name))
         return attr;
     return None;
   };
@@ -8100,7 +8100,7 @@ public:
   }
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
 // Out of line to work around forward declaration issues.
 inline GraphOperationInst *GraphOperationResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();
