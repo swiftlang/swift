@@ -175,6 +175,11 @@ namespace swift {
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
+    /// \brief After this many disjunctions, start evaluating heuristics to
+    /// predict exponential memory complexity for solving expression types.
+    unsigned SolverComplexityEvaluationThreshold = 16 * 1024;
+
+    /// \brief Hard upper bound quantity of disjuntions to try.
     unsigned SolverBindingThreshold = 1024 * 1024;
 
     /// \brief The upper bound to number of sub-expressions unsolved

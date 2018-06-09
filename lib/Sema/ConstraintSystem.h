@@ -3092,36 +3092,66 @@ public:
   /// increase the likelihood that a favored constraint will be successfully
   /// resolved before any others.
   void optimizeConstraints(Expr *e);
-  
+
+  /// \brief Why (and if) an expression has been deemed too complex
+  enum class ComplexityEvaluation: unsigned char {
+    /// The expresssion has not yet been found to be too complex.
+    StillSolvable = 0,
+    /// Expression is predicted to have exponential time complexity. We have
+    ///    not found enough types given the quantity of disjunctions
+    ///    we have examined. We predict we will eventually exceed the
+    ///    memory threshold, so bail out early to save everybody time.
+    StrategicFailureTypeAssignmentDisjunctionRatio,
+    /// Expression is predicted to have exponential time complexity.
+    ///    We have looked through too many alternatives. We predict we
+    ///    will eventually exceed the memory threshold, so bail out
+    ///    early to save everybody time.
+    StrategicFailureHighDisjunctionCount,
+    /// We have run for too long.
+    HardFailureTimeThresholdExceeded,
+    /// We have exhausted the memory available for the solver's use.
+    HardFailureMemoryThresholdExceeded
+  };
+
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
-  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+  bool getShouldFailDueToExpressionComplexity(SmallVectorImpl<Solution> const &solutions) {
+    return getExpressionComplexity(solutions) != ComplexityEvaluation::StillSolvable;
+  }
+
+
+  /// \brief Determine why we've already explored too many paths in an
+  /// attempt to solve this expression.
+  ComplexityEvaluation getExpressionComplexity(SmallVectorImpl<Solution> const &solutions) {
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
       // threshold since we're arbitrarily ending evaluation and
       // emitting an error.
       Timer->disableWarning();
-      return true;
+      return ComplexityEvaluation::HardFailureTimeThresholdExceeded;
     }
 
     if (!getASTContext().isSwiftVersion3()) {
+      //making good progress, continue in spite of possible memory issues
       if (CountScopes < TypeCounter)
-        return false;
+        return ComplexityEvaluation::StillSolvable;
 
       // If we haven't explored a relatively large number of possibilities
       // yet, continue.
-      if (CountScopes <= 16 * 1024)
-        return false;
+      if (CountScopes <= TC.Context.LangOpts.SolverComplexityEvaluationThreshold)
+        return ComplexityEvaluation::StillSolvable;
 
-      // Clearly exponential
+      // Rather than waiting until we've used a huge amount of memory, attempt to
+      //   make the choice to bail out based on the number of type bindings /
+      //   disjunction choices we visit. Bail on clearly exponential situations.
       if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
-        return true;
+        return ComplexityEvaluation::StrategicFailureTypeAssignmentDisjunctionRatio;
 
       // Bail out once we've looked at a really large number of
       // choices, even if we haven't used a huge amount of memory.
       if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
-        return true;
+        return ComplexityEvaluation::StrategicFailureHighDisjunctionCount;
     }
 
     auto used = TC.Context.getSolverMemory();
@@ -3130,7 +3160,11 @@ public:
     }
     MaxMemory = std::max(used, MaxMemory);
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return MaxMemory > threshold;
+    if (MaxMemory > threshold)
+      return ComplexityEvaluation::HardFailureMemoryThresholdExceeded;
+    
+
+    return ComplexityEvaluation::StillSolvable;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(

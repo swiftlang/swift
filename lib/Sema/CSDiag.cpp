@@ -8765,9 +8765,32 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
     // Fall through to produce diagnostics.
   }
 
-  if (getExpressionTooComplex(viable)) {
-    TC.diagnose(expr->getLoc(), diag::expression_too_complex).
-      highlight(expr->getSourceRange());
+
+  if (getShouldFailDueToExpressionComplexity(viable)) {
+    auto complexityEvaluation = getExpressionComplexity(viable);
+    switch(complexityEvaluation){
+      case ComplexityEvaluation::StrategicFailureTypeAssignmentDisjunctionRatio:
+        TC.diagnose(expr->getLoc(),
+                    diag::expression_too_complex_predicted_exponential_ratio).highlight(expr->getSourceRange());
+        break;
+      case ComplexityEvaluation::StrategicFailureHighDisjunctionCount:
+        TC.diagnose(expr->getLoc(),
+                    diag::expression_too_complex_predicted_exponential_disjunction_count).highlight(expr->getSourceRange());
+        break;
+      case ComplexityEvaluation::HardFailureMemoryThresholdExceeded:
+        TC.diagnose(expr->getLoc(),
+                    diag::expression_too_complex_hard_memory).highlight(expr->getSourceRange());
+        break;
+      case ComplexityEvaluation::HardFailureTimeThresholdExceeded:
+        TC.diagnose(expr->getLoc(),
+                    diag::expression_too_complex_hard_time).highlight(expr->getSourceRange());
+        break;
+      default: //StillSolvable and future cases without special descriptions
+        TC.diagnose(expr->getLoc(),
+                    diag::expression_too_complex_default).highlight(expr->getSourceRange());
+        break;
+    }
+
     return true;
   }
 

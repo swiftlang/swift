@@ -160,8 +160,20 @@ ERROR(cannot_pass_rvalue_mutating_getter,none,
       "cannot use mutating getter on immutable value of type %0",
       (Type))
 
-ERROR(expression_too_complex,none,
-      "the compiler is unable to type-check this expression in reasonable time; "
+ERROR(expression_too_complex_hard_memory,none,
+      "the compiler is unable to type-check this expression in reasonable time. Solver memory limit reached; "
+      "try breaking up the expression into distinct sub-expressions", ())
+ERROR(expression_too_complex_hard_time,none,
+      "the compiler is unable to type-check this expression in reasonable time. Solver time limit reached; "
+      "try breaking up the expression into distinct sub-expressions", ())
+ERROR(expression_too_complex_predicted_exponential_ratio,none,
+      "the compiler is unable to type-check this expression in reasonable time. Predicting solver memory exhaustion. Heuristic: type assignments/disjunctions; "
+      "try breaking up the expression into distinct sub-expressions", ())
+ERROR(expression_too_complex_predicted_exponential_disjunction_count,none,
+      "the compiler is unable to type-check this expression in reasonable time. Predicting solver memory exhaustion. Heuristic: high disjunction count; "
+      "try breaking up the expression into distinct sub-expressions", ())
+ERROR(expression_too_complex_default,none,
+      "the compiler is unable to type-check this expression in reasonable time. Reason unspecified.; "
       "try breaking up the expression into distinct sub-expressions", ())
 
 ERROR(value_type_comparison_with_nil_illegal_did_you_mean,none,

@@ -565,7 +565,7 @@ bool ConstraintSystem::tryTypeVariableBindings(
   ++solverState->NumTypeVariablesBound;
 
   // If we've already explored a lot of potential solutions, bail.
-  if (getExpressionTooComplex(solutions))
+  if (getShouldFailDueToExpressionComplexity(solutions))
     return true;
 
   for (unsigned tryCount = 0; !anySolved && !bindings.empty(); ++tryCount) {
@@ -1405,7 +1405,7 @@ ConstraintSystem::solve(Expr *&expr,
   // had found at least one solution before deciding an expression was
   // "too complex". Maintain that behavior, but for Swift > 3 return
   // Unsolved in these cases.
-  auto tooComplex = getExpressionTooComplex(solutions);
+  auto tooComplex = getShouldFailDueToExpressionComplexity(solutions);
   auto unsolved = tooComplex || solutions.empty();
 
   return unsolved ? SolutionKind::Unsolved : SolutionKind::Solved;
@@ -2038,7 +2038,7 @@ bool ConstraintSystem::solveSimplified(
     }
 
     // If the expression was deemed "too complex", stop now and salvage.
-    if (getExpressionTooComplex(solutions))
+    if (getShouldFailDueToExpressionComplexity(solutions))
       break;
 
     // Try to solve the system with this option in the disjunction.
@@ -2102,7 +2102,7 @@ bool ConstraintSystem::solveSimplified(
 
   // If we are exiting due to an expression that is too complex, do
   // not allow our caller to continue as if we have been successful.
-  auto tooComplex = getExpressionTooComplex(solutions);
+  auto tooComplex = getShouldFailDueToExpressionComplexity(solutions);
   return tooComplex || !lastSolvedChoice;
 }
 
