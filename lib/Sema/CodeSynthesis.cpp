@@ -2037,9 +2037,12 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     ctor->getAttrs().add(clonedAttr);
   }
 
-  // Make sure the constructor is only as available as its superclass's
-  // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
+  // If the superclass has its own availability, make sure the synthesized
+  // constructor is only as available as its superclass's constructor.
+  if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+    AvailabilityInference::applyInferredAvailableAttrs(
+        ctor, {classDecl, superclassCtor}, ctx);
+  }
 
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
