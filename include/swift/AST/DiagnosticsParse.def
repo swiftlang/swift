@@ -1227,7 +1227,7 @@ ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
 // Interpolated value accidentally forms a tuple.
-ERROR(string_interpolation_multiple_exprs,none,
+ERROR(string_interpolation_single_expr,none,
       "interpolations should be a single expression", ())
 NOTE(string_interpolation_form_tuple,none,
       "insert parentheses to form a tuple", ())

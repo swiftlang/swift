@@ -1937,7 +1937,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
             SourceLoc SecondExprLoc = tuple->getElement(1)->getStartLoc();
             SourceLoc EndLoc = tuple->getEndLoc();
             
-            diagnose(SecondExprLoc, diag::string_interpolation_multiple_exprs);
+            diagnose(SecondExprLoc, diag::string_interpolation_single_expr);
             diagnose(StartLoc, diag::string_interpolation_form_tuple)
               .fixItInsert(StartLoc, "(")
               .fixItInsertAfter(EndLoc, ")");
