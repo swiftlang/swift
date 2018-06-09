@@ -119,40 +119,6 @@ struct ArgumentDescriptor {
     return false;
   }
 
-  /// Return true if it's both legal and a good idea to explode this argument.
-  bool shouldExplode(ConsumedArgToEpilogueReleaseMatcher &ERM) const {
-    // We cannot optimize the argument.
-    if (!canOptimizeLiveArg())
-      return false;
-
-    // See if the projection tree consists of potentially multiple levels of
-    // structs containing one field. In such a case, there is no point in
-    // exploding the argument.
-    //
-    // Also, in case of a type can not be exploded, e.g an enum, we treat it
-    // as a singleton.
-    if (ProjTree.isSingleton())
-      return false;
-
-    auto Ty = Arg->getType().getObjectType();
-    if (!shouldExpand(Arg->getModule(), Ty)) {
-      return false;
-    }
-
-    // If this argument is @owned and we can not find all the releases for it
-    // try to explode it, maybe we can find some of the releases and O2G some
-    // of its components.
-    //
-    // This is a potentially a very profitable optimization. Ignore other
-    // heuristics.
-    if (hasConvention(SILArgumentConvention::Direct_Owned) &&
-        ERM.hasSomeReleasesForArgument(Arg))
-      return true;
-
-    unsigned explosionSize = ProjTree.getLiveLeafCount();
-    return explosionSize >= 1 && explosionSize <= 3;
-  }
-
   llvm::Optional<ValueOwnershipKind>
   getTransformedOwnershipKind(SILType SubTy) {
     if (IsEntirelyDead)
