@@ -295,7 +295,7 @@ DECL_ATTR(_cdecl, CDecl,
 
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
                  OnFunc | OnVar | OnSubscript | OnConstructor |
-                 OnDestructor | OnStruct | OnEnum | OnClass |
+                 OnDestructor | OnStruct | OnEnum | OnClass | OnTypeAlias |
                  OnProtocol | LongAttribute | UserInaccessible,
                  64)
 
