@@ -1,0 +1,11 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+func foo() {}
+
+// CHECK: import Builtin
+// CHECK: import Swift
+// CHECK-NOT: import Builtin
+// CHECK-NOT: import Swift{{$}}
