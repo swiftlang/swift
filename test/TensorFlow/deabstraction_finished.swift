@@ -2,18 +2,6 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -verify %s | %FileCheck %s
 import TensorFlow
 
-// TODO: move this to a #assert test.
-func recursive(a: Int) -> Int {
-  if a == 0 { return 0 }     // expected-note {{expression is too large to evaluate at compile-time}}
-  return recursive(a: a-1)
-}
-public func recursion(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
-  // expected-error @+1 {{attribute 'axis' requires a constant argument}}
-  return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: recursive(a: 20000))
-}
-
-
-
 
 public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
   let b = a.toDevice()
