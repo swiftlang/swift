@@ -2471,15 +2471,14 @@ GraphOperationInst *GraphOperationInst::create(
     ArrayRef<SILType> resultTypes) {
   llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
   for (auto resultType : resultTypes) {
-    if (resultType.isTrivial(M)) {
-      resultOwnerships.push_back(ValueOwnershipKind::Trivial);
-      continue;
-    }
-    resultOwnerships.push_back(ValueOwnershipKind::Owned);
+    auto ownership = resultType.isTrivial(M)
+      ? ValueOwnershipKind::Trivial : ValueOwnershipKind::Owned;
+    resultOwnerships.push_back(ownership);
   }
 
   unsigned size =
-    totalSizeToAlloc<MultipleValueInstruction *, GraphOperationResult, Operand, GraphOperationAttribute>(
+    totalSizeToAlloc<MultipleValueInstruction *, GraphOperationResult, Operand,
+                     GraphOperationAttribute>(
       1, resultTypes.size(), arguments.size(), attributes.size());
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
   return ::new (buffer) GraphOperationInst(M, loc, name, arguments, attributes,

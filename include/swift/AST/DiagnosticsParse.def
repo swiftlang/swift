@@ -1666,6 +1666,8 @@ ERROR(sil_expected_graph_op_attr_name,PointsToFirstBadToken,
       "expected graph_op attribute name", ())
 ERROR(sil_expected_graph_op_attr_value,PointsToFirstBadToken,
       "expected graph_op attribute value", ())
+ERROR(sil_unhandled_graph_op_attr_value,PointsToFirstBadToken,
+      "unhandled graph_op attribute value", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

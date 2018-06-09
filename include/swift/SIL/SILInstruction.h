@@ -8038,11 +8038,9 @@ class GraphOperationInst final
                                             resultOwnerships),
     Name(name), NumOperands(arguments.size()), NumAttributes(attrs.size()) {
       auto allOperands = getAllOperands();
-      for (unsigned i : indices(arguments)) {
+      for (unsigned i : indices(arguments))
         new (&allOperands[i]) Operand(this, arguments[i]);
-      }
-      memcpy(getAttributes().data(), attrs.begin(),
-             sizeof(attrs[0]) * attrs.size());
+      std::copy(attrs.begin(), attrs.end(), getAttributes().data());
     }
 
 public:

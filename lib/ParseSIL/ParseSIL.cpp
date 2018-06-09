@@ -920,7 +920,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     // StringRef rawString = P.Tok.getText().drop_front().drop_back();
     // value = SymbolicValue::getStringValue(rawString, allocator);
     // return false;
-    llvm_unreachable("`SymbolicValue.getStringValue` is unimplemented");
+    P.diagnose(P.Tok, diag::sil_unhandled_graph_op_attr_value);
   }
   // Handle metatypes (the instance type is parsed).
   if (P.Tok.is(tok::sil_dollar)) {
@@ -2840,7 +2840,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::GraphOperationInst: {
     // Parse graph operation name.
-    if (P.Tok.getKind() != tok::string_literal) {
+    if (P.Tok.isNot(tok::string_literal)) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "graph_op name");
       return true;
     }
@@ -2849,7 +2849,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     P.consumeToken(tok::string_literal);
 
     // Parse graph operation arguments.
-    if (P.Tok.getKind() != tok::l_paren) {
+    if (P.Tok.isNot(tok::l_paren)) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
       return true;
     }
@@ -2904,9 +2904,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       if (parseSILType(temp))
         return true;
       resultTypes.push_back(temp);
-      if (!P.Tok.is(tok::comma))
+      if (!P.consumeIf(tok::comma))
         break;
-      P.consumeToken(tok::comma);
     }
 
     if (parseSILDebugLocation(InstLoc, B))

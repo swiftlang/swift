@@ -1180,40 +1180,40 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitSymbolicValue(SymbolicValue v) {
     switch (v.getKind()) {
-      case swift::SymbolicValue::Integer:
-        *this << v.getIntegerValue();
-        return;
-      case swift::SymbolicValue::Float: {
-        SmallString<12> decimal;
-        v.getFloatValue().toString(decimal);
-        *this << decimal;
-        return;
-      }
-      case swift::SymbolicValue::String:
-        // TODO: Uncomment when `getStringValue` is implemented.
-        // *this << v.getStringValue();
-        llvm_unreachable("`SymbolicValue.getStringValue` is unimplemented");
-        break;
-      case swift::SymbolicValue::Metatype: {
-        auto metatype = cast<AnyMetatypeType>(v.getMetatypeValue());
-        *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
-        break;
-      }
-      case swift::SymbolicValue::Aggregate:
-        *this << "[";
-        interleave(v.getAggregateValue(), [&](SymbolicValue element) {
-          visitSymbolicValue(element);
-        }, [&] {
-          *this << ", ";
-        });
-        *this << "]";
-        break;
-      case swift::SymbolicValue::Function:
-      case swift::SymbolicValue::Address:
-      case swift::SymbolicValue::UninitMemory:
-      case swift::SymbolicValue::Unknown:
-        llvm_unreachable("Unimplemented SymbolicValue case");
-        break;
+    case swift::SymbolicValue::Integer:
+      *this << v.getIntegerValue();
+      return;
+    case swift::SymbolicValue::Float: {
+      SmallString<12> decimal;
+      v.getFloatValue().toString(decimal);
+      *this << decimal;
+      return;
+    }
+    case swift::SymbolicValue::String:
+      // TODO: Uncomment when `getStringValue` is implemented.
+      // *this << v.getStringValue();
+      llvm_unreachable("`SymbolicValue.getStringValue` is unimplemented");
+      break;
+    case swift::SymbolicValue::Metatype: {
+      auto metatype = cast<AnyMetatypeType>(v.getMetatypeValue());
+      *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
+      break;
+    }
+    case swift::SymbolicValue::Aggregate:
+      *this << "[";
+      interleave(v.getAggregateValue(), [&](SymbolicValue element) {
+        visitSymbolicValue(element);
+      }, [&] {
+        *this << ", ";
+      });
+      *this << "]";
+      break;
+    case swift::SymbolicValue::Function:
+    case swift::SymbolicValue::Address:
+    case swift::SymbolicValue::UninitMemory:
+    case swift::SymbolicValue::Unknown:
+      llvm_unreachable("Unimplemented SymbolicValue case");
+      break;
     }
   }
 

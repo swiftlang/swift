@@ -1187,9 +1187,8 @@ public:
   }
 
   void checkGraphOperationInst(GraphOperationInst *GI) {
-    for (auto attr : GI->getAttributes()) {
+    for (auto attr : GI->getAttributes())
       require(attr.value.isConstant(), "Invalid graph operation attribute");
-    }
   }
 
   void checkFunctionRefInst(FunctionRefInst *FRI) {
