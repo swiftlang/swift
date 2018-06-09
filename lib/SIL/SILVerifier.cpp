@@ -1186,6 +1186,7 @@ public:
       checkAutoDiffBuiltinInst(BI);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   void checkGraphOperationInst(GraphOperationInst *GI) {
     for (auto attr : GI->getAttributes())
       require(attr.value.isConstant(), "Invalid graph operation attribute");

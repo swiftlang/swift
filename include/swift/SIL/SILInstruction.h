@@ -7982,6 +7982,7 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
   return cast<DestructureTupleInst>(Parent);
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
 /// A result for the graph_op instruction. See documentation for
 /// graph_op for more information.
 class GraphOperationResult final : public MultipleValueInstructionResult {
@@ -8002,7 +8003,8 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// An graph operation attribute. Attributes have a name and a constant value.
+/// An graph operation attribute.
+/// Currently, attributes have a name and a constant value.
 struct GraphOperationAttribute {
   Identifier name;
   SymbolicValue value;
@@ -8098,6 +8100,7 @@ public:
   }
 };
 
+/// SWIFT_ENABLE_TENSORFLOW
 // Out of line to work around forward declaration issues.
 inline GraphOperationInst *GraphOperationResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();

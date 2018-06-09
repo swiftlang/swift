@@ -280,13 +280,14 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureStructResult(
   return Result->getOwnershipKind();
 }
 
-ValueOwnershipKind ValueOwnershipKindClassifier::visitGraphOperationResult(
-    GraphOperationResult *Result) {
+ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
+    DestructureTupleResult *Result) {
   return Result->getOwnershipKind();
 }
 
-ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
-    DestructureTupleResult *Result) {
+// SWIFT_ENABLE_TENSORFLOW
+ValueOwnershipKind ValueOwnershipKindClassifier::visitGraphOperationResult(
+    GraphOperationResult *Result) {
   return Result->getOwnershipKind();
 }
 

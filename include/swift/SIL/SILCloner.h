@@ -1604,6 +1604,7 @@ void SILCloner<ImplClass>::visitDestructureTupleInst(
                                           getOpValue(Inst->getOperand())));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
