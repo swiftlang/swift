@@ -1945,6 +1945,19 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
             Exprs.back() =
               new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
                                       /*hasTrailingClosure=*/false);
+          } else if (tuple->getNumElements() == 0) {
+            SourceLoc StartLoc = tuple->getStartLoc();
+            SourceLoc EndLoc = tuple->getEndLoc();
+            SourceLoc SlashLoc = StartLoc.getAdvancedLocOrInvalid(-1);
+            
+            diagnose(EndLoc, diag::string_interpolation_single_expr);
+            diagnose(SlashLoc, diag::string_interpolation_delete_empty)
+              .fixItRemoveChars(SlashLoc, EndLoc.getAdvancedLocOrInvalid(1));
+            
+            auto Error = new (Context) ErrorExpr(SourceRange(EndLoc, EndLoc));
+            Exprs.back() =
+              new (Context) ParenExpr(SourceLoc(), Error, SourceLoc(), 
+                                    /*hasTrailingClosure=*/false);
           } else if (tuple->getNumElements() == 1 && 
                    !tuple->getElementName(0).empty()) {
             SourceLoc NameStart = tuple->getElementNameLoc(0);

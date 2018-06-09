@@ -1231,6 +1231,8 @@ ERROR(string_interpolation_single_expr,none,
       "interpolations should be a single expression", ())
 NOTE(string_interpolation_form_tuple,none,
       "insert parentheses to form a tuple", ())
+NOTE(string_interpolation_delete_empty,none,
+      "delete empty interpolation", ())
 ERROR(string_interpolation_keyword_argument,PointsToFirstBadToken,
       "interpolations cannot start with a keyword argument", ())
 

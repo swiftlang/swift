@@ -9,7 +9,7 @@ func papaBear() {
 
 // Test with too few interpolated values.
 func mamaBear() {
-  _ = "\()" // expected-error{{expected expression in list of expressions}}
+  _ = "\()" // expected-error{{interpolations should be a single expression}} expected-note {{delete empty interpolation}} {{8-11=}}
 }
 
 // Test with the correct number of interpolated values.
