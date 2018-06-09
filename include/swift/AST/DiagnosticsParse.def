@@ -248,7 +248,7 @@ ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
 ERROR(computed_property_no_accessors, none,
-      "computed property must have accessors specified", ())
+      "%select{computed property|subscript}0 must have accessors specified", (bool))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
 ERROR(computed_property_missing_type,none,
