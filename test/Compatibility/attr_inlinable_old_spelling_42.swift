@@ -1,8 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
-// RUN: %target-typecheck-verify-swift -swift-version 4
 // RUN: %target-typecheck-verify-swift -swift-version 4.2
 
-// Until -swift-version 5 mode, the old spelling only produces a warning.
+// In -swift-version 4.2 mode, the old spelling produces a warning.
 
 @_inlineable public func oldInlinableFunction() {}
 // expected-warning@-1 {{'@_inlineable' has been renamed to '@inlinable'}}{{2-13=inlinable}}
