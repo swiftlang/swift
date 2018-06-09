@@ -889,8 +889,8 @@ void SILParser::convertRequirements(SILFunction *F,
 
 // SWIFT_ENABLE_TENSORFLOW
 /// Parse a SIL constant value (one of the following categories):
-/// - An integer literal (42).
-/// - A floating point literal (3.14).
+/// - An integer datatype and literal (i32 42).
+/// - A floating point datatype and literal (f64 3.14).
 /// - A metatype (the instance type is parsed) ($Float).
 /// - An aggregate ([1, 2, 3]).
 /// Returns true on error.
@@ -898,23 +898,63 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
                                SILBuilder &B) {
   auto &P = SP.P;
   auto &allocator = B.getModule().getASTContext().getAllocator();
-  // Handle integer literals.
-  if (P.Tok.is(tok::integer_literal)) {
-    APInt intValue;
-    if (SP.parseInteger(intValue, diag::sil_graph_op_expected_attr_value))
-      return true;
-    value = SymbolicValue::getInteger(intValue, allocator);
-    return false;
+
+  if (P.Tok.is(tok::identifier)) {
+    // Bitwidth of the integer/floating point literal.
+    unsigned width;
+    // Handle integer literals.
+    if (P.Tok.getText().startswith("i")) {
+      // Parse integer datatype.
+      P.consumeStartingCharacterOfCurrentToken();
+      if (SP.parseInteger(width, diag::sil_const_expected_int_datatype))
+        return true;
+
+      // Parse integer value.
+      bool negative = false;
+      if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
+        negative = true;
+        P.consumeToken();
+      }
+      APInt intValue(width, 0);
+      if (SP.parseInteger(intValue, diag::sil_graph_op_expected_attr_value))
+        return true;
+
+      // Negate and truncate value, if necessary.
+      if (negative)
+        intValue = -intValue;
+      if (intValue.getBitWidth() != width)
+        intValue = intValue.zextOrTrunc(width);
+
+      value = SymbolicValue::getInteger(intValue, allocator);
+      return false;
+    }
+    // Handle floating point literals.
+    if (P.Tok.getText().startswith("f")) {
+      // Parse floating point datatype.
+      auto datatypeToken = P.Tok;
+      P.consumeStartingCharacterOfCurrentToken();
+      if (SP.parseInteger(width, diag::sil_const_expected_fp_datatype))
+        return true;
+
+      // Parse floating point value.
+      double floatValue;
+      P.Tok.getText().getAsDouble(floatValue);
+      P.consumeToken(tok::floating_literal);
+      switch (width) {
+      case 32:
+        value = SymbolicValue::getFloat(APFloat((float)floatValue), allocator);
+        break;
+      case 64:
+        value = SymbolicValue::getFloat(APFloat(floatValue), allocator);
+        break;
+      default:
+        P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
+        return true;
+      }
+      return false;
+    }
   }
-  // Handle floating point literals.
-  if (P.Tok.is(tok::floating_literal)) {
-    double floatValue;
-    P.Tok.getText().getAsDouble(floatValue);
-    P.consumeToken(tok::floating_literal);
-    value = SymbolicValue::getFloat(APFloat(floatValue), allocator);
-    return false;
-  }
-  // Handle string literalss.
+  // Handle string literals.
   if (P.Tok.is(tok::string_literal)) {
     // TODO: Uncomment when `getStringValue` is implemented.
     // StringRef rawString = P.Tok.getText().drop_front().drop_back();
@@ -2893,6 +2933,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                diag::sil_graph_op_expected_attr_name))
           return makeParserError();
         SymbolicValue attrValue;
+        if (!P.consumeIf(tok::equal)) {
+          P.diagnose(P.Tok, diag::expected_equal_in_sil_instr);
+          return makeParserError();
+        }
         if (parseSymbolicValue(attrValue, *this, B))
           return makeParserError();
         attributes.push_back({ attrName, attrValue });

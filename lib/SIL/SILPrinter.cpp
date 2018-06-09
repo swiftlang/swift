@@ -1180,13 +1180,16 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitSymbolicValue(SymbolicValue v) {
     switch (v.getKind()) {
-    case SymbolicValue::Integer:
-      *this << v.getIntegerValue();
+    case SymbolicValue::Integer: {
+      APInt intValue = v.getIntegerValue();
+      *this << "i" << intValue.getBitWidth() << " " << intValue;
       return;
+    }
     case SymbolicValue::Float: {
       SmallString<12> decimal;
-      v.getFloatValue().toString(decimal);
-      *this << decimal;
+      APFloat floatValue = v.getFloatValue();
+      floatValue.toString(decimal);
+      *this << "f" << APFloat::getSizeInBits(floatValue.getSemantics()) << " " << decimal;
       return;
     }
     case SymbolicValue::String:
@@ -1233,7 +1236,7 @@ public:
       *this << " [";
       interleave(GI->getAttributes(), [&](GraphOperationAttribute attr) {
         *this << attr.name.str();
-        *this << " ";
+        *this << " = ";
         visitSymbolicValue(attr.value);
       }, [&] {
         *this << ", ";
