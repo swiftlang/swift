@@ -16,7 +16,6 @@ bb0:
 
 // CHECK-LABEL: sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
 // CHECK: bb0:
-//    %0 = graph_op "tf.Dummy" () [int 1, float 3.14{{[0-9]*}}, metatype $Float, array {{\[\[}}1, 2], [3, 4]]] : $Tensor<Float>
 // CHECK-NEXT:   %0 = graph_op "tf.Dummy"() [int 1, float 3.14{{[0-9]*}}, metatype $Float, array {{\[\[}}1, 2], [3, 4]]] : $Tensor<Float>
 // CHECK-NEXT:   return %0 : $Tensor<Float>
 // CHECK-NEXT: }
