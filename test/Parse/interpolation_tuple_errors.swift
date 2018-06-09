@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck -verify %s
+// RUN: %target-typecheck-verify-swift
 
 let str = "a"
 
