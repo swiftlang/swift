@@ -24,14 +24,16 @@
 #ifndef SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
-#include "swift/SIL/SILConstants.h"
 #include "llvm/Support/Allocator.h"
+#include "swift/Basic/LLVM.h"
 
 namespace swift {
   class SingleValueInstruction;
-  class SILValue;
   class SILBuilder;
+  class SILModule;
+  class SILValue;
   class SerializedSILLoader;
+  class SymbolicValue;
 
 namespace tf {
 

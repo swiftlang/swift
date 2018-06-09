@@ -15,8 +15,15 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/Support/TrailingObjects.h"
 using namespace swift;
+
+template<typename...T, typename...U>
+static InFlightDiagnostic
+diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
 
 //===----------------------------------------------------------------------===//
 // SymbolicValue implementation
@@ -382,4 +389,67 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
   assert(getKind() == Aggregate);
   return value.aggregate->getElements();
 }
+
+//===----------------------------------------------------------------------===//
+// Higher level code
+//===----------------------------------------------------------------------===//
+
+
+/// The SIL location for operations we process are usually deep in the bowels
+/// of inlined code from opaque libraries, which are all implementation details
+/// to the user.  As such, walk the inlining location of the specified node to
+/// return the first location *outside* opaque libraries.
+static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
+  auto ds = loc.getScope();
+
+  if (!ds || loc.getLocation().getSourceLoc().isValid())
+    return loc;
+
+  // Zip through inlined call site information that came from the
+  // implementation guts of the tensor library.  We want to report the
+  // message inside the user's code, not in the guts we inlined through.
+  for (; auto ics = ds->InlinedCallSite; ds = ics) {
+    // If we found a valid inlined-into location, then we are good.
+    if (ds->Loc.getSourceLoc().isValid())
+      return SILDebugLocation(ds->Loc, ds);
+    if (SILFunction *F = ds->getInlinedFunction()) {
+      if (F->getLocation().getSourceLoc().isValid())
+        break;
+    }
+  }
+
+  if (ds->Loc.getSourceLoc().isValid())
+    return SILDebugLocation(ds->Loc, ds);
+
+  return loc;
+}
+
+/// Given that this is an 'Unknown' value, emit diagnostic notes providing
+/// context about what the problem is.
+void SymbolicValue::emitUnknownDiagnosticNotes() {
+  std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
+  auto badInst = dyn_cast<SILInstruction>(unknown.first);
+  if (!badInst) return;
+
+  std::string error;
+  switch (unknown.second) {
+  case UnknownReason::Default:
+    error = "could not fold operation";
+    break;
+  case UnknownReason::TooManyInstructions:
+    // TODO: Should pop up a level of the stack trace.
+    error = "expression is too large to evaluate at compile-time";
+    break;
+  }
+
+  auto &module = badInst->getModule();
+
+  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
+  if (loc.isNull()) return;
+
+  diagnose(module.getASTContext(), loc.getSourceLoc(),
+           diag::tf_op_misuse_note, error)
+    .highlight(loc.getSourceRange());
+}
+
 

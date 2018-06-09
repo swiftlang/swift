@@ -19,8 +19,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
-#include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -125,10 +124,11 @@ static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
       builtinInst->getBuiltinKind() != BuiltinValueKind::PoundAssert)
     return;
 
-  // TODO(marcrasi / clattner): Instantiate this earlier so that its cache
+  // TODO(marcrasi): Instantiate this earlier so that its cache
   // is useful. We don't right now, because instantiating one for every
   // function greatly slows down or hangs compilation (e.g. compiling
   // libswiftStdlibUnicodeUnittest.so slows down from <1min to >1hr).
+  //
   ConstExprEvaluator constantEvaluator(M);
 
   SmallVector<SymbolicValue, 1> values;
@@ -136,9 +136,13 @@ static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
                                           values);
   SymbolicValue value = values[0];
   if (!value.isConstant()) {
-    // TODO(marcrasi / clattner): Emit more informative error.
     diagnose(M.getASTContext(), I->getLoc().getSourceLoc(),
              diag::pound_assert_condition_not_constant);
+
+    // If we have more specific information about what went wrong, emit
+    // notes.
+    if (value.getKind() == SymbolicValue::Unknown)
+      value.emitUnknownDiagnosticNotes();
     return;
   }
   assert(value.getKind() == SymbolicValue::Integer &&
