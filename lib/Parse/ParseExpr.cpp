@@ -1930,8 +1930,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         
         if (auto tuple = dyn_cast<TupleExpr>(Exprs.back())) {
           // If parseExprList() returns a TupleExpr instead of a ParenExpr, 
-          // the interpolation must have had an argument label, or multiple
-          // elements, or both. Reject these.
+          // the interpolation must have had an argument label, or the wrong 
+          // number of elements, or both. Reject these.
           if (tuple->getNumElements() > 1) {
             SourceLoc StartLoc = tuple->getStartLoc();
             SourceLoc SecondExprLoc = tuple->getElement(1)->getStartLoc();
