@@ -1193,21 +1193,19 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
-  ParserResult<Expr> parseExpr(Diag<> ID, bool allowAmpPrefix = false) {
-    return parseExprImpl(ID, /*isExprBasic=*/false, allowAmpPrefix);
+  ParserResult<Expr> parseExpr(Diag<> ID) {
+    return parseExprImpl(ID, /*isExprBasic=*/false);
   }
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic,
-                                   bool allowAmpPrefix = false);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isForConditionalDirective = false,
-                                       bool allowAmpPrefix = false);
+                                       bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
@@ -1311,8 +1309,7 @@ public:
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
                              Expr *&trailingClosure,
-                             syntax::SyntaxKind Kind,
-                             bool allowAmpPrefix = false);
+                             syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
