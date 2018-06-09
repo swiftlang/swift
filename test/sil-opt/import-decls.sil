@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s | %FileCheck %s
 
+sil_stage raw
+
 import Builtin
 import Swift
 
