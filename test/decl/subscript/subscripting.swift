@@ -172,7 +172,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{computed property must have accessors specified}}
+  } // expected-error {{subscript must have accessors specified}}
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int { // expected-error{{subscript declarations must have a getter}}
