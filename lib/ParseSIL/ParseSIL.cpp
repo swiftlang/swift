@@ -901,7 +901,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
   // Handle integer literals.
   if (P.Tok.is(tok::integer_literal)) {
     APInt intValue;
-    if (SP.parseInteger(intValue, diag::sil_expected_graph_op_attr_value))
+    if (SP.parseInteger(intValue, diag::sil_graph_op_expected_attr_value))
       return true;
     value = SymbolicValue::getInteger(intValue, allocator);
     return false;
@@ -920,7 +920,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     // StringRef rawString = P.Tok.getText().drop_front().drop_back();
     // value = SymbolicValue::getStringValue(rawString, allocator);
     // return false;
-    P.diagnose(P.Tok, diag::sil_unhandled_graph_op_attr_value);
+    P.diagnose(P.Tok, diag::sil_graph_op_unhandled_attr_value);
     return true;
   }
   // Handle metatypes (the instance type is parsed).
@@ -933,26 +933,30 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     return false;
   }
   // Handle aggregate literals.
-  if (P.consumeIf(tok::l_square)) {
+  if (P.Tok.is(tok::l_square)) {
+    SourceLoc lSquareLoc = P.consumeToken(tok::l_square);
+    SourceLoc rSquareLoc;
+
     SmallVector<SymbolicValue, 8> elements;
-    while (true) {
-      if (P.consumeIf(tok::r_square))
-        break;
+    ParserStatus status =
+      P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
+                  /*AllowSepAfterLast*/ false,
+                  diag::sil_const_aggregate_expected_rsquare,
+                  // SyntaxKind::TuplePatternElementList,
+                  SyntaxKind::Unknown,
+                  [&]() -> ParserStatus {
       SymbolicValue element;
       if (parseSymbolicValue(element, SP, B))
-        return true;
+        return makeParserError();
       elements.push_back(element);
-      if (P.consumeIf(tok::comma))
-        continue;
-      if (P.consumeIf(tok::r_square))
-        break;
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "]' or ',");
+      return makeParserSuccess();
+    });
+    if (status.isError())
       return true;
-    }
     value = SymbolicValue::getAggregate(elements, allocator);
     return false;
   }
-  P.diagnose(P.Tok, diag::sil_expected_graph_op_attr_value);
+  P.diagnose(P.Tok, diag::sil_graph_op_expected_attr_value);
   return true;
 };
 
@@ -2855,45 +2859,47 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     SmallVector<SILValue, 4> arguments;
-    P.consumeToken(tok::l_paren);
-    while (true) {
-      if (P.consumeIf(tok::r_paren))
-        break;
-      SILValue value;
-      if (parseTypedValueRef(value, B))
-        return true;
-      arguments.push_back(value);
-      if (P.consumeIf(tok::comma))
-        continue;
-      if (P.consumeIf(tok::r_paren))
-        break;
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ")' or ',");
+    SourceLoc lParenLoc = P.consumeToken(tok::l_paren);
+    SourceLoc rParenLoc;
+    ParserStatus status =
+      P.parseList(tok::r_paren, lParenLoc, rParenLoc,
+                  /*AllowSepAfterLast*/ false,
+                  diag::sil_graph_op_expected_rparen,
+                  SyntaxKind::TuplePatternElementList,
+                  [&]() -> ParserStatus {
+        SILValue value;
+        if (parseTypedValueRef(value, B))
+          return makeParserError();
+        arguments.push_back(value);
+        return makeParserSuccess();
+      });
+    if (status.isError())
       return true;
-    }
 
     // Parse optional graph operation attributes.
     SmallVector<GraphOperationAttribute, 4> attributes;
-    SourceLoc lastLoc = P.getEndOfPreviousLoc();
-    if (P.consumeIf(tok::l_square)) {
-      while (true) {
-        if (P.consumeIf(tok::r_square))
-          break;
+    SourceLoc lSquareLoc;
+    if (P.consumeIf(tok::l_square, lSquareLoc)) {
+      SourceLoc rSquareLoc;
+      ParserStatus status =
+        P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
+                    /*AllowSepAfterLast*/ false,
+                    diag::sil_graph_op_expected_rsquare,
+                    SyntaxKind::Unknown,
+                    [&]() -> ParserStatus {
         // Parse an attribute.
         Identifier attrName;
-        if (parseSILIdentifier(attrName, lastLoc,
-                               diag::sil_expected_graph_op_attr_name))
-          return true;
+        if (parseSILIdentifier(attrName, lSquareLoc,
+                               diag::sil_graph_op_expected_attr_name))
+          return makeParserError();
         SymbolicValue attrValue;
         if (parseSymbolicValue(attrValue, *this, B))
-          return true;
+          return makeParserError();
         attributes.push_back({ attrName, attrValue });
-        if (P.consumeIf(tok::comma))
-          continue;
-        if (P.consumeIf(tok::r_square))
-          break;
-        P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "]' or ',");
+        return makeParserSuccess();
+      });
+      if (status.isError())
         return true;
-      }
     }
 
     // Parse graph operation result types.

@@ -8003,8 +8003,7 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// An graph operation attribute.
-/// Currently, attributes have a name and a constant value.
+/// An graph operation attribute. Attributes have a name and a constant value.
 struct GraphOperationAttribute {
   Identifier name;
   SymbolicValue value;
@@ -8042,7 +8041,8 @@ class GraphOperationInst final
       auto allOperands = getAllOperands();
       for (unsigned i : indices(arguments))
         new (&allOperands[i]) Operand(this, arguments[i]);
-      std::copy(attrs.begin(), attrs.end(), getAttributes().data());
+      std::uninitialized_copy(attrs.begin(), attrs.end(),
+                              getAttributes().data());
     }
 
 public:
