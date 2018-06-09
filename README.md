@@ -208,7 +208,7 @@ then run the build product in Terminal.
 Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `--rebuild` to `build-script`.
+be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing the `--reconfigure` option.
