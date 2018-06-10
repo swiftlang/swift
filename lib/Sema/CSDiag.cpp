@@ -5820,11 +5820,48 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
   
+  // Check if any of the candidates has a specified number of arguments.
+  auto hasMatchingArgNum = [&](CalleeCandidateInfo &CCI, size_t numArgs) {
+    for (unsigned i = 0; i < CCI.size(); ++i) {
+      auto &&candidate = CCI[i];
+      if (auto *ty  = candidate.getUncurriedFunctionType()) {
+        if (auto *FTy = ty->getAs<AnyFunctionType>()) {
+          if (numArgs == FTy->getParams().size()) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
   
   // Collect a full candidate list of callees based on the partially type
   // checked function.
   CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, CS);
+
+  // In the case that function subexpression was resolved independently in
+  // the first place, the resolved type may not provide the best diagnostic.
+  // We consider the number of arguments to decide whether we'd go with it or
+  // stay with the original one.
+  if (fnExpr != callExpr->getFn()) {
+    size_t numArgs = 1;
+    auto arg = callExpr->getArg();
+    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+      numArgs = tuple->getNumElements();
+    }
+
+    if (!hasMatchingArgNum(calleeInfo, numArgs)) {
+      CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
+                                         hasTrailingClosure, CS);
+      if (hasMatchingArgNum(calleeInfoOrig, numArgs)) {
+        fnExpr = callExpr->getFn();
+        fnType = getFuncType(CS.getType(fnExpr));
+        calleeInfo = calleeInfoOrig;
+      }
+    }
+  }
 
   // Filter list of the candidates based on the known function type.
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
