@@ -117,13 +117,13 @@ Cloning code from the standard library
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Swift compiler can copy code from the standard library into the
-application for functions marked @_inlineable. This allows the optimizer to
+application for functions marked @inlinable. This allows the optimizer to
 inline calls from the stdlib and improve the performance of code that uses
 common operators such as '+=' or basic containers such as Array. However,
 importing code from the standard library can increase the binary size.
 
 To prevent copying of functions from the standard library into the user
-program, make sure the function in question is not marked @_inlineable.
+program, make sure the function in question is not marked @inlinable.
 
 Array
 ~~~~~

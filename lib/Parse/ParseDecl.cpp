@@ -1537,15 +1537,17 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
   
-  auto checkInvalidAttrName = [&](StringRef invalidName, StringRef correctName,
-                              DeclAttrKind kind, Diag<StringRef, StringRef> diag) {
+  auto checkInvalidAttrName = [&](StringRef invalidName,
+                                  StringRef correctName,
+                                  DeclAttrKind kind,
+                                  Optional<Diag<StringRef, StringRef>> diag = None) {
     if (DK == DAK_Count && Tok.getText() == invalidName) {
-      // We renamed @availability to @available, so if we see the former,
-      // treat it as the latter and emit a Fix-It.
       DK = kind;
-      
-      diagnose(Tok, diag, invalidName, correctName)
+
+      if (diag) {
+        diagnose(Tok, *diag, invalidName, correctName)
             .fixItReplace(Tok.getLoc(), correctName);
+      }
     }
   };
 
@@ -1556,14 +1558,17 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Check if attr is inlineable, and suggest inlinable instead
   checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
 
-  // In Swift 5 and above, these become hard errors. Otherwise, emit a
-  // warning for compatibility.
-  if (!Context.isSwiftVersionAtLeast(5)) {
+  // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
+  // warning for compatibility. Otherwise, don't diagnose at all.
+  if (Context.isSwiftVersionAtLeast(5)) {
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
+  } else if (Context.isSwiftVersionAtLeast(4, 2)) {
     checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
     checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
-    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
