@@ -1,6 +1,8 @@
-// Check that the sdk and resource dirs end up in the debug info.
-// RUN: %target-swiftc_driver %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swiftc_driver %s -emit-ir -sdk "/Weird Location/SDK" -g -o - | %FileCheck --check-prefix CHECK-EXPLICIT %s
+// Check that the sdk and resource dirs end up in the debug info if we pass the
+// frontend flag. This tests the general functionality; we test the macosx
+// specific toolchain logic in compiler-flags-macosx.swift.
+// RUN: %target-swiftc_driver %s -emit-ir -Xfrontend -use-dwarf-debug-flags -g -o - | %FileCheck %s
+// RUN: %target-swiftc_driver %s -emit-ir -Xfrontend -use-dwarf-debug-flags -sdk "/Weird Location/SDK" -g -o - | %FileCheck --check-prefix CHECK-EXPLICIT %s
 // CHECK:          !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
 // CHECK-SAME:                    flags: "
 // CHECK-NOT:                     "
@@ -13,6 +15,6 @@
 // CHECK-EXPLICIT-SAME:           -resource-dir 
 
 // Check that we don't write temporary file names in the debug info
-// RUN: TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -o - | %FileCheck --check-prefix CHECK-TEMP %s
+// RUN: TMPDIR=abc/def %target-swift-frontend %s -I abc/def/xyz -g -emit-ir -use-dwarf-debug-flags -o - | %FileCheck --check-prefix CHECK-TEMP %s
 // CHECK-TEMP: !DICompileUnit({{.*}} flags: "{{.*}} -I <temporary-file>
 

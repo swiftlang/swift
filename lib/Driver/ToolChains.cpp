@@ -360,6 +360,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments.push_back("-index-system-modules");
   }
 
+  // Request whether the compilation flags should be written into DWARF info.
+  if (usesDWARFDebugFlags()) {
+    Arguments.push_back("-use-dwarf-debug-flags");
+  }
+
   return II;
 }
 

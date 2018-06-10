@@ -197,6 +197,10 @@ protected:
                                           const llvm::opt::ArgList &args,
                                           StringRef extraEntry = "") const;
 
+  /// Specific toolchains should override this to indicate whether the
+  /// compilation flags should be written into DWARF debug info.
+  virtual bool usesDWARFDebugFlags() const { return false; }
+
 public:
   virtual ~ToolChain() = default;
 

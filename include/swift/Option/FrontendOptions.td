@@ -486,4 +486,7 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def enable_key_path_resilience : Flag<["-"], "enable-key-path-resilience">,
   HelpText<"Enable key path resilience.">;
 
+def use_dwarf_debug_flags : Flag<["-"], "use-dwarf-debug-flags">,
+  HelpText<"Write the compilation flags into the DWARF debug info.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
