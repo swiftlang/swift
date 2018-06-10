@@ -86,7 +86,8 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            bool &isFramework) {
-  llvm::SmallString<64> moduleFilename(moduleID.first.str());
+  llvm::SmallString<64> moduleName(moduleID.first.str());
+  llvm::SmallString<64> moduleFilename(moduleName);
   moduleFilename += '.';
   moduleFilename += SERIALIZED_MODULE_EXTENSION;
 
@@ -96,9 +97,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
   // FIXME: Which name should we be using here? Do we care about CPU subtypes?
   // FIXME: At the very least, don't hardcode "arch".
-  llvm::SmallString<16> archFile{
+  llvm::SmallString<16> archName{
       ctx.LangOpts.getPlatformConditionValue(PlatformConditionKind::Arch)};
-  llvm::SmallString<16> archDocFile{archFile};
+  llvm::SmallString<16> archFile{archName};
+  llvm::SmallString<16> archDocFile{archName};
   if (!archFile.empty()) {
     archFile += '.';
     archFile += SERIALIZED_MODULE_EXTENSION;
@@ -122,6 +124,13 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             archFile.str(), archDocFile.str(),
                             moduleBuffer, moduleDocBuffer,
                             scratch);
+
+      if(err == std::errc::no_such_file_or_directory) {
+        ctx.Diags.diagnose(moduleID.second, diag::sema_no_import_arch,
+                           moduleName, archName);
+      }
+
+      return false;
     }
     if (!err)
       return true;
