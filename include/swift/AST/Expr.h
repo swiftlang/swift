@@ -2300,7 +2300,7 @@ public:
     return Bits.SubscriptExpr.HasArgLabelLocs;
   }
 
-  /// Whether this call with written with a trailing closure.
+  /// Whether this call was written with a trailing closure.
   bool hasTrailingClosure() const {
     return Bits.SubscriptExpr.HasTrailingClosure;
   }
