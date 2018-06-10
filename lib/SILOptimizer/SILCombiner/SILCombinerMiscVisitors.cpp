@@ -485,7 +485,7 @@ static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
 /// Example in SIL pseudo code:
 ///     %0 = string_literal "abc"
 ///     %1 = integer_literal 2
-///     %2 = index_addr %0, %2
+///     %2 = index_addr %0, %1
 ///     %3 = load %2
 /// ->
 ///     %3 = integer_literal 'c'
