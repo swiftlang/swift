@@ -9,8 +9,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-build-swift -g -Onone -DUSE_STDLIBUNITTEST %s -o %t/Algorithms
-// RUN: %target-run %t/Algorithms
+// RUN: %target-build-swift -g -Onone -DUSE_STDLIBUNITTEST %s -o %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 #if USE_STDLIBUNITTEST
