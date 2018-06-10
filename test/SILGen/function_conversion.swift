@@ -641,3 +641,27 @@ func rdar35702810_anyhashable() {
   // CHECK: convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed (@guaranteed Set<B>) -> () to $@noescape @callee_guaranteed (@guaranteed Set<B>) -> ()
   bar_set(type: B.self, fn_set)
 }
+
+// ==== Function conversion with parameter substToOrig reabstraction.
+
+struct FunctionConversionParameterSubstToOrigReabstractionTest {
+  typealias SelfTy = FunctionConversionParameterSubstToOrigReabstractionTest
+
+  class Klass: Error {}
+
+  struct Foo<T> {
+    static func enum1Func(_ : (T) -> Foo<Error>) -> Foo<Error> {
+      // Just to make it compile.
+      return Optional<Foo<Error>>.none!
+    }
+  }
+
+  static func bar<T>(t: T) -> Foo<T> {
+    // Just to make it compile.
+    return Optional<Foo<T>>.none!
+  }
+
+  static func testFunc() -> Foo<Error> {
+    return Foo<Klass>.enum1Func(SelfTy.bar)
+  }
+}
