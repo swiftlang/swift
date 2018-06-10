@@ -4845,6 +4845,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
       // Treat keywords that could be the start of a pattern specially.
       return;
     }
+    // FIXME: __consuming should not appear in CodeCompletion until it is
+    // finalized in a language proposal.
+    if (Name == "__consuming")
+      return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
