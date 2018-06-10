@@ -20,4 +20,7 @@ func babyBear() {
 // Test with an argument label
 func funkyBear() {
   _ = "\(describing: str)" // expected-error{{interpolations cannot start with a keyword argument}} {{10-22=}}
+  _ = "\(format: str)" // expected-error{{interpolations cannot start with a keyword argument}} {{10-18=}}
+  _ = "\(validatingUTF8: str)" // expected-error{{interpolations cannot start with a keyword argument}} {{10-26=}}
+  _ = "\(fnord: str)" // expected-error{{interpolations cannot start with a keyword argument}} {{10-17=}}
 }
