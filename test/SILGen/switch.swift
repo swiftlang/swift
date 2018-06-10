@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch %s -swift-version 3 | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

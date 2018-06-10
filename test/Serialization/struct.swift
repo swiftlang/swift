@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_struct.swift
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_struct.swift -swift-version 3
 // RUN: llvm-bcanalyzer %t/def_struct.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -I %t %s -o /dev/null
+// RUN: %target-swift-frontend -emit-silgen -I %t %s -o /dev/null -swift-version 3
 
 // CHECK-NOT: UnknownCode
 

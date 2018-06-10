@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -module-name ZZZ %s -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -module-name ZZZ %s -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unknown -swift-version 3
 
 import Foundation
 

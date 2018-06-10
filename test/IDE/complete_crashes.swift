@@ -134,7 +134,7 @@ protocol Fooable {
 }
 
 // rdar://problem/22688199
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 | %FileCheck %s -check-prefix=FLIP_CURRIED
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22688199 -swift-version 3 | %FileCheck %s -check-prefix=FLIP_CURRIED
 func curried(_ a: Int)(_ b1: Int, _ b2: Int) { }
 func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {

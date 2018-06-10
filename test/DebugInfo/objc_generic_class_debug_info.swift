@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -g -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -g -verify -swift-version 3
 
 // REQUIRES: objc_interop
 

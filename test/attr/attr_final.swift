@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 class Super {
   final var i: Int { get { return 5 } } // expected-note{{overridden declaration is here}}
