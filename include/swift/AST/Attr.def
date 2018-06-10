@@ -320,7 +320,7 @@ DECL_ATTR(_cdecl, CDecl,
   LongAttribute | UserInaccessible,
   63)
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
-  OnAbstractFunction | OnVar | OnSubscript | OnNominalType |
+  OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias |
   LongAttribute,
   64)
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,

@@ -880,8 +880,8 @@ public:
   /// This is usually the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
   /// check for isSwiftVersionAtLeast(5).
-  bool isSwiftVersionAtLeast(unsigned major) const {
-    return LangOpts.isSwiftVersionAtLeast(major);
+  bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
 
 private:
