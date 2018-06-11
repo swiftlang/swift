@@ -624,7 +624,9 @@ private:
   void printOneParameter(const ParamDecl *param, ParameterTypeFlags paramFlags,
                          bool Curried, bool ArgNameIsAPIByDefault);
 
-  void printParameterList(ParameterList *PL, Type paramListTy, bool isCurried,
+  void printParameterList(ParameterList *PL,
+                          ArrayRef<AnyFunctionType::Param> params,
+                          bool isCurried,
                           llvm::function_ref<bool()> isAPINameByDefault);
 
   /// \brief Print the function parameters in curried or selector style,
@@ -2309,30 +2311,19 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   }
 }
 
-void PrintAST::printParameterList(ParameterList *PL, Type paramListTy,
+void PrintAST::printParameterList(ParameterList *PL,
+                                  ArrayRef<AnyFunctionType::Param> params,
                                   bool isCurried,
                                   llvm::function_ref<bool()> isAPINameByDefault) {
-  SmallVector<ParameterTypeFlags, 4> paramFlags;
-  if (paramListTy && !paramListTy->hasError()) {
-    if (auto parenTy = dyn_cast<ParenType>(paramListTy.getPointer())) {
-      paramFlags.push_back(parenTy->getParameterFlags());
-    } else if (auto tupleTy = paramListTy->getAs<TupleType>()) {
-      for (auto elt : tupleTy->getElements())
-        paramFlags.push_back(elt.getParameterFlags());
-    } else {
-      paramFlags.push_back({});
-    }
-  } else {
-    // Malformed AST, just use default flags
-    paramFlags.resize(PL->size());
-  }
-
   Printer << "(";
+  const unsigned paramSize = params.size();
   for (unsigned i = 0, e = PL->size(); i != e; ++i) {
     if (i > 0)
       Printer << ", ";
-
-    printOneParameter(PL->get(i), paramFlags[i], isCurried,
+    auto paramFlags = (i < paramSize)
+                    ? params[i].getParameterFlags()
+                    : ParameterTypeFlags();
+    printOneParameter(PL->get(i), paramFlags, isCurried,
                       isAPINameByDefault());
   }
   Printer << ")";
@@ -2350,15 +2341,13 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
         curTy = funTy->getResult();
   }
 
-  SmallVector<Type, 4> parameterListTypes;
+  SmallVector<ArrayRef<AnyFunctionType::Param>, 4> parameterListTypes;
   for (unsigned i = 0; i < BodyParams.size(); ++i) {
     if (curTy) {
       if (auto funTy = curTy->getAs<AnyFunctionType>()) {
-        parameterListTypes.push_back(funTy->getInput());
+        parameterListTypes.push_back(funTy->getParams());
         if (i < BodyParams.size() - 1)
           curTy = funTy->getResult();
-      } else {
-        parameterListTypes.push_back(curTy);
       }
     }
   }
@@ -2368,7 +2357,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
     // Be extra careful in the event of printing mal-formed ASTs
     auto paramListType = CurrPattern < parameterListTypes.size()
                              ? parameterListTypes[CurrPattern]
-                             : nullptr;
+                             : ArrayRef<AnyFunctionType::Param>();
     printParameterList(BodyParams[CurrPattern], paramListType,
                        /*isCurried=*/CurrPattern > 0,
                        [&]()->bool {
@@ -2563,11 +2552,18 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     llvm::SaveAndRestore<PrintOptions::ArgAndParamPrintingMode>
       mode(Options.ArgAndParamPrinting,
            PrintOptions::ArgAndParamPrintingMode::EnumElement);
-    printParameterList(PL,
-                       elt->hasInterfaceType()
-                         ? elt->getArgumentInterfaceType()
-                         : nullptr,
-                       /*isCurried=*/false,
+
+
+    auto params = ArrayRef<AnyFunctionType::Param>();
+    if (elt->hasInterfaceType() && !elt->getInterfaceType()->hasError()) {
+      // Walk to the params of the associated values.
+      // (EnumMetaType) -> (AssocValues) -> Enum
+      params = elt->getInterfaceType()->castTo<AnyFunctionType>()
+                                      ->getResult()
+                                      ->castTo<AnyFunctionType>()
+                                      ->getParams();
+    }
+    printParameterList(PL, params, /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return true;});
   }
 
@@ -2636,11 +2632,12 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer << "subscript";
   }, [&] { // Parameters
     printGenericDeclGenericParams(decl);
-    printParameterList(decl->getIndices(),
-                       decl->hasInterfaceType()
-                         ? decl->getIndicesInterfaceType()
-                         : nullptr,
-                       /*isCurried=*/false,
+    auto params = ArrayRef<AnyFunctionType::Param>();
+    if (decl->hasInterfaceType() && !decl->getInterfaceType()->hasError()) {
+      // Walk to the params of the subscript's indices.
+      params = decl->getInterfaceType()->castTo<AnyFunctionType>()->getParams();
+    }
+    printParameterList(decl->getIndices(), params, /*isCurried=*/false,
                        /*isAPINameByDefault*/[]()->bool{return false;});
   });
   Printer << " -> ";
@@ -3522,6 +3519,35 @@ public:
     }
   }
 
+  void visitAnyFunctionTypeParams(ArrayRef<AnyFunctionType::Param> Params,
+                                  bool printLabels) {
+    Printer << "(";
+
+    for (unsigned i = 0, e = Params.size(); i != e; ++i) {
+      if (i)
+        Printer << ", ";
+      const AnyFunctionType::Param &Param = Params[i];
+
+      Printer.callPrintStructurePre(PrintStructureKind::FunctionParameter);
+      SWIFT_DEFER {
+        Printer.printStructurePost(PrintStructureKind::FunctionParameter);
+      };
+
+      if (printLabels && Param.hasLabel()) {
+        Printer.printName(Param.getLabel(),
+                          PrintNameContext::FunctionParameterExternal);
+        Printer << ": ";
+      }
+
+      printParameterFlags(Printer, Options, Param.getParameterFlags());
+      visit(Param.getType());
+      if (Param.isVariadic())
+        Printer << "...";
+    }
+
+    Printer << ")";
+  }
+
   void visitFunctionType(FunctionType *T) {
     Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
     SWIFT_DEFER {
@@ -3531,26 +3557,7 @@ public:
     printFunctionExtInfo(T->getExtInfo());
 
     // If we're stripping argument labels from types, do it when printing.
-    Type inputType = T->getInput();
-    if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
-      SmallVector<TupleTypeElt, 4> elements;
-      elements.reserve(tupleTy->getNumElements());
-      for (const auto &elt : tupleTy->getElements())
-        elements.push_back(elt.getWithoutName());
-      inputType = TupleType::get(elements, inputType->getASTContext());
-    }
-
-    bool needsParens =
-      !inputType->hasParenSugar() &&
-      !inputType->is<TupleType>();
-
-    if (needsParens)
-      Printer << "(";
-
-    visit(inputType);
-
-    if (needsParens)
-      Printer << ")";
+    visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/false);
 
     if (T->throws())
       Printer << " " << tok::kw_throws;
@@ -3579,17 +3586,7 @@ public:
                           PrintAST::PrintRequirements);
     Printer << " ";
 
-    bool needsParens =
-      !T->getInput()->hasParenSugar() &&
-      !T->getInput()->is<TupleType>();
-
-    if (needsParens)
-      Printer << "(";
-
-    visit(T->getInput());
-
-    if (needsParens)
-      Printer << ")";
+   visitAnyFunctionTypeParams(T->getParams(), /*printLabels*/true);
 
     if (T->throws())
       Printer << " " << tok::kw_throws;
