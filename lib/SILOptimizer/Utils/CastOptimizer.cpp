@@ -1434,10 +1434,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
                                                       SourceType, Conformances);
           auto Projection =
               B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
-          auto Value = B.createLoad(Loc, Src,
-                                    swift::LoadOwnershipQualifier::Unqualified);
-          B.createStore(Loc, Value, Projection,
-                        swift::StoreOwnershipQualifier::Unqualified);
+          B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
           B.createStore(Loc, AllocBox, Dest,
                         swift::StoreOwnershipQualifier::Unqualified);
           break;
