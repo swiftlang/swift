@@ -325,11 +325,14 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     resolver = &defaultResolver;
 
   MutableArrayRef<TypeLoc> inheritedClause;
+  Type declInterfaceTy;
 
   // If we already checked the inheritance clause, don't do so again.
   if (auto type = dyn_cast<TypeDecl>(decl)) {
     if (type->checkedInheritanceClause())
       return;
+
+    declInterfaceTy = type->getDeclaredInterfaceType();
 
     // This breaks infinite recursion, which will be diagnosed separately.
     type->setCheckedInheritanceClause();
@@ -342,6 +345,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (ext->isInvalid() ||
         ext->checkedInheritanceClause())
       return;
+
+    declInterfaceTy = ext->getExtendedType();
 
     // This breaks infinite recursion, which will be diagnosed separately.
     ext->setCheckedInheritanceClause();
@@ -447,8 +452,26 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
       inheritedTy = inheritedTy->mapTypeOutOfContext();
 
-    // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
+
+    // Check for a stated conformance to Any, which is redundant.
+    // Ignore cases of ': Any' *constraints* that are parsed as inheritance
+    // clauses, such as with protocol and placeholder decls e.g <T : Any>, as
+    // these should be handled by the generic signature builder along with
+    // redundant constraints that appear as a part of a 'where' clause.
+    if (inheritedCanTy == Context.TheAnyType &&
+        !isa<AbstractTypeParamDecl>(decl) && !isa<ProtocolDecl>(decl)) {
+      auto diagLoc = inherited.getSourceRange().Start;
+      auto removalRange = getRemovalRange(i);
+
+      diagnose(diagLoc, diag::redundant_conformance_warning, declInterfaceTy,
+               inheritedTy)
+          .fixItRemoveChars(removalRange.Start, removalRange.End);
+      diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
+      continue;
+    }
+
+    // Check whether we inherited from the same type twice.
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
       // If the duplicated type is 'AnyObject', check whether the first was

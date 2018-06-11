@@ -1724,6 +1724,11 @@ WARNING(redundant_conformance_adhoc_conditional,none,
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+WARNING(redundant_conformance_warning,none,
+        "redundant conformance of %0 to %1", (Type, Type))
+NOTE(all_types_implicitly_conform_to,none,
+     "all types implicitly conform to %0", (Type))
+
 
 // "Near matches"
 WARNING(req_near_match,none,
