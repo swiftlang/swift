@@ -40,6 +40,22 @@ struct S {
   }
 }
 
+
+class DefaultValue {
+  static func foo(_ a: Int) {}
+  static func foo(_ a: Int, _ b: Int = 1) {}
+  static func foo(_ a: Int, _ b: Int = 1, _ c: Int = 2) {}
+}
+DefaultValue.foo(1.0, 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+
+
+class Variadic {
+  static func foo(_ a: Int) {}
+  static func foo(_ a: Int, _ b: Double...) {}
+}
+Variadic.foo(1.0, 2.0, 3.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+
+
 //=-------------- SR-7918 --------------=/
 class sr7918_Suit {
   static func foo<T: Any>(_ :inout T) {}

@@ -5665,6 +5665,60 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
   return true;
 }
 
+// Check if any of the candidates can accept a specified number of arguments,
+// regardless of parameter type or label information.
+static bool acceptNumArgs(const CalleeCandidateInfo &CCI, size_t numArgs) {
+  // Check if a partial parameter list (starting from currentIndex) can accept
+  // a number of remaining arguments.
+  std::function<bool(const ParameterList*, unsigned, size_t)> accept;
+  accept = [&](const ParameterList *paramList,
+                    unsigned currentIndex, size_t remainingArgs) {
+    // In terms of no more remaining argument, it is acceptable if all the rest
+    // parameters are either variadic or with a default value.
+    if (0 == remainingArgs) {
+      for (auto i = currentIndex; i < paramList->size(); ++i) {
+        auto param = paramList->get(i);
+        if (param->isVariadic() ||
+            param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+          continue;
+        return false;
+      }
+      return true;
+    }
+
+    // Return false if we reach the end of the paramList while there is
+    // still remaining arguments to handle.
+    if (currentIndex >= paramList->size()) return false;
+
+    // If the current parameter is variadic, it may accept zero to more
+    // remaining arguments and we try all possible cases until it succeeds;
+    // otherwise, accept only one remaining argument.
+    auto param = paramList->get(currentIndex);
+    if (param->isVariadic()) {
+      for (unsigned i = 0; i <= numArgs; ++i) {
+        if (accept(paramList, currentIndex + 1, remainingArgs - i))
+          return true;
+      }
+      return false;
+    } else {
+      return accept(paramList, currentIndex + 1, remainingArgs - 1);
+    }
+  };
+
+  for (unsigned i = 0; i < CCI.size(); ++i) {
+    auto &&cand = CCI[i];
+    auto function = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
+    if (!function) continue;
+
+    auto paramLists = function->getParameterLists();
+    if (cand.level >= paramLists.size()) continue;
+
+    auto paramList = paramLists[cand.level];
+    if (accept(paramList, 0, numArgs)) return true;
+  }
+  return false;
+}
+
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // If this call involves trailing closure as an argument,
   // let's treat it specially, because re-typecheck of the
@@ -5820,21 +5874,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     return true;
   }
   
-  // Check if any of the candidates has a specified number of arguments.
-  auto hasMatchingArgNum = [&](CalleeCandidateInfo &CCI, size_t numArgs) {
-    for (unsigned i = 0; i < CCI.size(); ++i) {
-      auto &&candidate = CCI[i];
-      if (auto *ty  = candidate.getUncurriedFunctionType()) {
-        if (auto *FTy = ty->getAs<AnyFunctionType>()) {
-          if (numArgs == FTy->getParams().size()) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  };
-
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
   
   // Collect a full candidate list of callees based on the partially type
@@ -5852,10 +5891,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       numArgs = tuple->getNumElements();
     }
 
-    if (!hasMatchingArgNum(calleeInfo, numArgs)) {
+    if (!acceptNumArgs(calleeInfo, numArgs)) {
       CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
                                          hasTrailingClosure, CS);
-      if (hasMatchingArgNum(calleeInfoOrig, numArgs)) {
+      if (acceptNumArgs(calleeInfoOrig, numArgs)) {
         fnExpr = callExpr->getFn();
         fnType = getFuncType(CS.getType(fnExpr));
         calleeInfo = calleeInfoOrig;
