@@ -81,6 +81,35 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
   return std::error_code();
 }
 
+static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
+                             SourceLoc sourceLocation,
+                             llvm::SmallString<64> moduleName,
+                             llvm::SmallString<16> archName,
+                             llvm::SmallString<128> directoryPath) {
+
+  std::error_code errorCode;
+  llvm::Twine twineDirPath(directoryPath);
+  llvm::sys::fs::directory_iterator directoryIterator(twineDirPath,
+                                                      errorCode,
+                                                      true);
+  llvm::sys::fs::directory_iterator endIterator;
+
+  if(errorCode) {
+      return;
+    }
+
+  std::string foundArchs;
+  for (; directoryIterator != endIterator; directoryIterator.increment(errorCode)) {
+    auto entry = *directoryIterator;
+    llvm::StringRef filePath(entry.path());
+    foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "")
+                            + llvm::sys::path::stem(filePath).str();
+  }
+
+  ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch,
+                     moduleName, archName, foundArchs);
+}
+
 static bool
 findModule(ASTContext &ctx, AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
@@ -125,12 +154,15 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
 
-      if(err == std::errc::no_such_file_or_directory) {
-        ctx.Diags.diagnose(moduleID.second, diag::sema_no_import_arch,
-                           moduleName, archName);
-      }
+    if(err == std::errc::no_such_file_or_directory) {
+      addDiagnosticInfoForArchitectureMismatch(ctx,
+                                               moduleID.second,
+                                               moduleName,
+                                               archName,
+                                               currPath);
+    }
 
-      return false;
+    return false;
     }
     if (!err)
       return true;
