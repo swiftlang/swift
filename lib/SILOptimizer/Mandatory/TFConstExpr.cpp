@@ -310,6 +310,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
   const BuiltinInfo &builtin = inst->getBuiltinInfo();
 
   // Handle various cases in groups.
+  auto unknownResult = [&]() -> SymbolicValue {
+    return SymbolicValue::getUnknown(SILValue(inst), UnknownReason::Default);
+  };
 
   // Unary operations first.
   if (inst->getNumOperands() == 1) {
@@ -327,6 +330,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     // TODO: We can/should diagnose statically detectable integer overflow
     // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
     auto IntCheckedTruncFn = [&](bool srcSigned, bool dstSigned)->SymbolicValue{
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto operandVal = operand.getIntegerValue();
       uint32_t srcBitWidth = operandVal.getBitWidth();
       auto dstBitWidth =
@@ -363,6 +369,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
       return IntCheckedTruncFn(false, false);
     case BuiltinValueKind::SIToFP:
     case BuiltinValueKind::UIToFP: {
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto operandVal = operand.getIntegerValue();
       auto &semantics =
         inst->getType().castTo<BuiltinFloatType>()->getAPFloatSemantics();
@@ -379,6 +388,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     case BuiltinValueKind::ZExtOrBitCast:
     case BuiltinValueKind::SExt:
     case BuiltinValueKind::SExtOrBitCast: {
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       unsigned destBitWidth =
         inst->getType().castTo<BuiltinIntegerType>()->getGreatestWidth();
 
@@ -425,6 +437,10 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntCompare =
       [&](const std::function<bool(const APInt &, const APInt &)> &fn)
         -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Integer ||
+          operand1.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto result = fn(operand0.getIntegerValue(), operand1.getIntegerValue());
       return SymbolicValue::getInteger(APInt(1, result),
                                        evaluator.getAllocator());
@@ -432,16 +448,26 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldFPCompare =
       [&](const std::function<bool(APFloat::cmpResult result)> &fn)
         -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Float ||
+          operand1.getKind() != SymbolicValue::Float)
+        return unknownResult();
+
       auto comparison =
           operand0.getFloatValue().compare(operand1.getFloatValue());
       return SymbolicValue::getInteger(APInt(1, fn(comparison)),
                                        evaluator.getAllocator());
     };
 
+#define REQUIRE_KIND(KIND)                          \
+  if (operand0.getKind() != SymbolicValue::KIND ||  \
+      operand1.getKind() != SymbolicValue::KIND)    \
+      return unknownResult();
+
     switch (builtin.ID) {
     default: break;
 #define INT_BINOP(OPCODE, EXPR)                                            \
     case BuiltinValueKind::OPCODE: {                                       \
+      REQUIRE_KIND(Integer)                                                \
       auto l = operand0.getIntegerValue(), r = operand1.getIntegerValue(); \
       return SymbolicValue::getInteger((EXPR), evaluator.getAllocator());  \
     }
@@ -461,6 +487,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 #undef INT_BINOP
 #define FP_BINOP(OPCODE, EXPR)                                           \
     case BuiltinValueKind::OPCODE: {                                     \
+      REQUIRE_KIND(Float)                                                \
       auto l = operand0.getFloatValue(), r = operand1.getFloatValue();   \
       return SymbolicValue::getFloat((EXPR), evaluator.getAllocator());  \
     }
@@ -473,6 +500,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 
 #define INT_COMPARE(OPCODE, EXPR)                                              \
     case BuiltinValueKind::OPCODE:                                             \
+      REQUIRE_KIND(Integer)                                                    \
       return constFoldIntCompare([&](const APInt &l, const APInt &r) -> bool { \
         return (EXPR);                                                         \
       })
@@ -489,6 +517,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 #undef INT_COMPARE
 #define FP_COMPARE(OPCODE, EXPR)                                         \
     case BuiltinValueKind::OPCODE:                                       \
+      REQUIRE_KIND(Float)                                                \
       return constFoldFPCompare([&](APFloat::cmpResult result) -> bool { \
         return (EXPR);                                                   \
       })
@@ -513,9 +542,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     FP_COMPARE(FCMP_UNE, result != APFloat::cmpEqual);
     FP_COMPARE(FCMP_UNO, result == APFloat::cmpUnordered);
 #undef FP_COMPARE
+#undef REQUIRE_KIND
     }
   }
-
 
   // Three operand builtins.
   if (inst->getNumOperands() == 3) {
@@ -531,13 +560,17 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntOverflow =
       [&](const std::function<APInt(const APInt &, const APInt &, bool &)> &fn)
             -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Integer ||
+          operand1.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       // TODO: We can/should diagnose statically detectable integer overflow
       // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
       auto l = operand0.getIntegerValue(), r = operand1.getIntegerValue();
       bool overflowed = false;
       auto result = fn(l, r, overflowed);
       auto &allocator = evaluator.getAllocator();
-      // Build the Symbolic value result for our truncated value.
+      // Build the Symbolic value result for our normal and overflow bit.
       return SymbolicValue::getAggregate({
         SymbolicValue::getInteger(result, allocator),
         SymbolicValue::getInteger(APInt(1, overflowed), allocator)
@@ -576,7 +609,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
   DEBUG(llvm::errs() << "ConstExpr Unknown Builtin: " << *inst << "\n");
 
   // Otherwise, we don't know how to handle this builtin.
-  return SymbolicValue::getUnknown(SILValue(inst), UnknownReason::Default);
+  return unknownResult();
 }
 
 
