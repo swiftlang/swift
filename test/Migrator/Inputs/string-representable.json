@@ -216,4 +216,15 @@
     "NewPrintedName": "NewAttribute",
     "NewTypeName": "AttributeWrapper"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "OptionalDictionaryKeyUpdate",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)BarForwardDeclaredClass(im)initWithOldLabel0:",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "AwesomeIntWrapper",
+    "ModuleName": "bar"
+  },
 ]

@@ -1,10 +1,11 @@
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.mod)
 // RUN: %target-swift-frontend -emit-module -o %t.mod/Cities.swiftmodule %S/Inputs/Cities.swift -module-name Cities -parse-as-library
-// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null
+// RUN: %empty-directory(%t) && %target-swift-frontend -c -update-code -primary-file %s  -I %t.mod -api-diff-data-file %S/Inputs/string-representable.json -emit-migrated-file-path %t/string-representable.swift.result -disable-migrator-fixits -o /dev/null -F %S/mock-sdk
 // RUN: diff -u %S/string-representable.swift.expected %t/string-representable.swift.result
 
 import Cities
+import Bar
 
 func foo(_ c: Container) -> String {
   c.Value = ""
@@ -42,3 +43,5 @@ func foo(_ c: Container) -> String {
   c.optionalAttrDict = nil
   return c.Value
 }
+
+class C: BarForwardDeclaredClass {}
