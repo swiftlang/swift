@@ -900,6 +900,7 @@ std::pair<Type, Type>
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocatorBuilder locator,
+                                     DeclContext *useDC,
                                      const DeclRefExpr *base) {
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
@@ -966,7 +967,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Unqualified reference to a type.
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
-    auto type = TC.resolveTypeInContext(typeDecl, nullptr, DC,
+    auto type = TC.resolveTypeInContext(typeDecl, nullptr, useDC,
                                         TypeResolutionFlags::InExpression,
                                         /*isSpecialized=*/false);
 
@@ -987,7 +988,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
-  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), DC, base,
+  Type valueType = TC.getUnopenedTypeOfReference(varDecl, Type(), useDC, base,
                                                  wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
@@ -1258,7 +1259,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefKind, locator, base);
+    return getTypeOfReference(value, functionRefKind, locator, useDC, base);
   }
 
   // Don't open existentials when accessing typealias members of
@@ -1671,7 +1672,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(),
-                             choice.getFunctionRefKind(), locator);
+                             choice.getFunctionRefKind(), locator, useDC);
     }
 
     // For a non-subscript declaration found via dynamic lookup, strip

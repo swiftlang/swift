@@ -2203,6 +2203,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
+                          DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
