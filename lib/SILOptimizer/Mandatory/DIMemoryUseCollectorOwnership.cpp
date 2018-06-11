@@ -877,9 +877,32 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
+      
       // If this is an @inout parameter, it is like both a load and store.
-      case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable: {
+        // FIXME: The @inout_aliasable convention is used for indirect captures
+        // of both 'let' and 'var' variables. Using a more specific convention
+        // for 'let' properties like @in_guaranteed unfortunately exposes bugs
+        // elsewhere in the pipeline. A 'let' capture cannot really be mutated
+        // by the callee, and this is enforced by sema, so we can consider it
+        // a nonmutating use.
+        bool isLet = true;
+        
+        for (unsigned i = 0; i < TheMemory.NumElements; ++i) {
+          if (!TheMemory.isElementLetProperty(i)) {
+            isLet = false;
+            break;
+          }
+        }
+        
+        if (isLet) {
+          addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
+          continue;
+        }
+        
+        LLVM_FALLTHROUGH;
+      }
+      case ParameterConvention::Indirect_Inout: {
         // If we're in the initializer for a struct, and this is a call to a
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
