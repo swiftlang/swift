@@ -285,14 +285,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     resolver = &defaultResolver;
 
   MutableArrayRef<TypeLoc> inheritedClause;
+  Type declInterfaceTy;
 
   if (auto type = dyn_cast<TypeDecl>(decl)) {
+    declInterfaceTy = type->getDeclaredInterfaceType();
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
     if (!ext->getExtendedType())
       return;
 
+    declInterfaceTy = ext->getExtendedType();
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
@@ -379,16 +382,37 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasError())
       continue;
 
-    // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
+    auto isConstraint =
+        isa<AbstractTypeParamDecl>(decl) || isa<ProtocolDecl>(decl);
+
+    // Check for a stated conformance to Any, which is redundant.
+    // Ignore cases of ': Any' *constraints* that are parsed as inheritance
+    // clauses, such as with protocol and placeholder decls e.g <T : Any>, as
+    // these are handled by the generic signature builder along with redundant
+    // constraints that appear in 'where' clauses.
+    if (inheritedCanTy == Context.TheAnyType) {
+      if (!isConstraint) {
+        auto diagLoc = inherited.getSourceRange().Start;
+        auto removalRange = getRemovalRange(i);
+
+        diagnose(diagLoc, diag::redundant_conformance_warning, declInterfaceTy,
+                 inheritedTy)
+            .highlight(inherited.getSourceRange())
+            .fixItRemoveChars(removalRange.Start, removalRange.End);
+        diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
+      }
+      continue;
+    }
+
+    // Check whether we inherited from the same type twice.
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
       // If the duplicated type is 'AnyObject', check whether the first was
       // written as 'class'. Downgrade the error to a warning in such cases
       // for backward compatibility with Swift <= 4.
       if (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-          inheritedTy->isAnyObject() &&
-          (isa<ProtocolDecl>(decl) || isa<AbstractTypeParamDecl>(decl)) &&
+          inheritedTy->isAnyObject() && isConstraint &&
           Lexer::getTokenAtLocation(Context.SourceMgr,
                                     knownType->second.second.Start)
             .is(tok::kw_class)) {
@@ -432,8 +456,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       //
       // Extensions, structs and enums can only inherit from protocol
       // compositions that do not contain AnyObject or class members.
-      if (isa<ProtocolDecl>(decl) ||
-          isa<AbstractTypeParamDecl>(decl) ||
+      if (isConstraint ||
           (!layout.hasExplicitAnyObject &&
            !layout.explicitSuperclass)) {
         continue;
