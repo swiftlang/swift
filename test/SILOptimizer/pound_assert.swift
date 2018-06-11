@@ -1,5 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
 
+
+
+func overflowTrap() {
+  let _ = Int8(123231)
+  //#assert(Int8(124) + 8 > 42)
+}
+
 func isOne(_ x: Int) -> Bool {
   return x == 1
 }
@@ -19,15 +26,41 @@ func nonConstant() {
   #assert(isOne(Int(readLine()!)!), "input is not 1") // expected-error{{#assert condition not constant}}
 }
 
-
-
+// @constexpr
 func recursive(a: Int) -> Int {
   if a == 0 { return 0 }     // expected-note {{expression is too large to evaluate at compile-time}}
   return recursive(a: a-1)
 }
 
-func recursion() {
+func test_recursive() {
   // expected-error @+1 {{#assert condition not constant}}
   #assert(recursive(a: 20000) > 42)
+}
+
+// @constexpr
+func loops1(a: Int) -> Int {
+  var x = 42
+  while x <= 42 {
+    x += a
+  } // expected-note {{control flow loop found}}
+  return x
+}
+
+// @constexpr
+func loops2(a: Int) -> Int {
+  var x = 42
+  for i in 0 ... a {
+    x += i
+  }
+  return x
+}
+
+
+func test_loops() {
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(loops1(a: 20000) > 42)
+
+  // TODO: xpected-error @+1 {{#assert condition not constant}}
+  //#assert(loops2(a: 20000) > 42)
 }
 

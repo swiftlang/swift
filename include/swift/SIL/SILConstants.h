@@ -43,6 +43,9 @@ enum class UnknownReason {
   /// The constant expression was too big.  This is reported on a random
   /// instruction within the constexpr that triggered the issue.
   TooManyInstructions,
+
+  /// A control flow loop was found.
+  Loop
 };
 
 
@@ -152,7 +155,14 @@ public:
   /// independent of its concrete representation.  This is the public
   /// interface to SymbolicValue.
   enum Kind {
-    Unknown, Metatype, Function, Integer, Float, String, Aggregate,
+    Unknown, Metatype, Function, Integer, Float,
+
+    // String values may have SIL type of Builtin.RawPointer or Builtin.Word
+    // type.
+    String,
+
+    // This can be an array, struct, tuple, etc.
+    Aggregate,
 
     // These values are generally only seen internally to the system, external
     // clients shouldn't have to deal with them.
@@ -266,8 +276,9 @@ public:
 
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
-  /// context about what the problem is.
-  void emitUnknownDiagnosticNotes();
+  /// context about what the problem is.  If there is no location for some
+  /// reason, we fall back to using the specified location.
+  void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
 
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
