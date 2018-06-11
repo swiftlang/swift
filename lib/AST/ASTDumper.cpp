@@ -3360,6 +3360,25 @@ namespace {
       OS << ")";
     }
 
+    void printAnyFunctionParams(ArrayRef<AnyFunctionType::Param> params,
+                                StringRef label) {
+      printCommon(label, "function_params");
+      printField("num_params", params.size());
+      Indent += 2;
+      for (const auto &param : params) {
+        OS << "\n";
+        OS.indent(Indent) << "(";
+        PrintWithColorRAII(OS, TypeFieldColor) << "param";
+        if (param.hasLabel())
+          printField("name", param.getLabel().str());
+        dumpParameterFlags(param.getParameterFlags());
+        printRec(param.getType());
+        OS << ")";
+      }
+      Indent -= 2;
+      OS << ")";
+    }
+
     void printAnyFunctionTypeCommon(AnyFunctionType *T, StringRef label,
                                     StringRef name) {
       printCommon(label, name);
@@ -3374,7 +3393,10 @@ namespace {
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 
-      printRec("input", T->getInput());
+      OS << "\n";
+      Indent += 2;
+      printAnyFunctionParams(T->getParams(), "input");
+      Indent -=2;
       printRec("output", T->getResult());
     }
 
