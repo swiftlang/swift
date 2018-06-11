@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "definite-init"
 #include "PMOMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/ADT/StringExtras.h"
@@ -364,21 +365,6 @@ bool ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   return true;
 }
 
-// Returns true when the instruction represents added instrumentation for
-/// run-time sanitizers.
-static bool isSanitizerInstrumentation(SILInstruction *Instruction,
-                                       ASTContext &Ctx) {
-  auto *BI = dyn_cast<BuiltinInst>(Instruction);
-  if (!BI)
-    return false;
-
-  Identifier Name = BI->getName();
-  if (Name == Ctx.getIdentifier("tsanInoutAccess"))
-    return true;
-
-  return false;
-}
-
 bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
@@ -630,7 +616,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Sanitizer instrumentation is not user visible, so it should not
     // count as a use and must not affect compile-time diagnostics.
-    if (isSanitizerInstrumentation(User, Module.getASTContext()))
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // Otherwise, the use is something complicated, it escapes.

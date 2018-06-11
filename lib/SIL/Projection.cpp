@@ -898,7 +898,7 @@ processUsersOfValue(ProjectionTree &Tree,
       Worklist.push_back({V, ChildNode});
     } else {
       LLVM_DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
-            "Adding to non projection user!\b");
+            "Adding to non projection user!\n");
 
       // The only projection which we do not currently handle are enums since we
       // may not know the correct case. This can be extended in the future.
