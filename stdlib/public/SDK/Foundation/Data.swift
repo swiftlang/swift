@@ -1122,28 +1122,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _sliceRange = 0..<count
     }
     
-    /// Initialize a `Data` with the contents of an Array.
-    ///
-    /// - parameter bytes: An array of bytes to copy.
-    public init(bytes: Array<UInt8>) {
-        let count = bytes.count
-        _backing = bytes.withUnsafeBufferPointer {
-            return _DataStorage(bytes: $0.baseAddress, length: count)
-        }
-        _sliceRange = 0..<count
-    }
-    
-    /// Initialize a `Data` with the contents of an Array.
-    ///
-    /// - parameter bytes: An array of bytes to copy.
-    public init(bytes: ArraySlice<UInt8>) {
-        let count = bytes.count
-        _backing = bytes.withUnsafeBufferPointer {
-            return _DataStorage(bytes: $0.baseAddress, length: count)
-        }
-        _sliceRange = 0..<count
-    }
-    
     /// Initialize a `Data` with a repeating byte pattern
     ///
     /// - parameter repeatedValue: A byte to initialize the pattern
@@ -1260,30 +1238,20 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     // slightly faster paths for common sequences
-    
+    @inlinable
     public init<S: Sequence>(_ elements: S) where S.Iterator.Element == UInt8 {
-        if elements is Array<UInt8> {
-            self.init(bytes: _identityCast(elements, to: Array<UInt8>.self))
-        } else if elements is ArraySlice<UInt8> {
-            self.init(bytes: _identityCast(elements, to: ArraySlice<UInt8>.self))
-        } else if elements is UnsafeBufferPointer<UInt8> {
-            self.init(buffer: _identityCast(elements, to: UnsafeBufferPointer<UInt8>.self))
-        } else if let buffer = elements as? UnsafeMutableBufferPointer<UInt8> {
-            self.init(buffer: buffer)
-        } else if let data = elements as? Data {
-            let len = data.count
-            let backing = data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) in
-                return _DataStorage(bytes: bytes, length: len)
-            }
-            self.init(backing: backing, range: 0..<len)
-        } else {
-            let underestimatedCount = elements.underestimatedCount
-            self.init(count: underestimatedCount)
-            
-            let (endIterator, _) = UnsafeMutableBufferPointer(start: _backing._bytes?.assumingMemoryBound(to: UInt8.self), count: underestimatedCount).initialize(from: elements)
-            var iter = endIterator
-            while let byte = iter.next() { self.append(byte) }
+        let backing = _DataStorage(capacity: Swift.max(elements.underestimatedCount, 1))
+        var (iter, endIndex) = elements._copyContents(initializing: UnsafeMutableBufferPointer(start: backing._bytes?.bindMemory(to: UInt8.self, capacity: backing._capacity), count: backing._capacity))
+        backing._length = endIndex
+        while var element = iter.next() {
+            backing.append(&element, length: 1)
         }
+        self.init(backing: backing, range: 0..<backing._length)
+    }
+    
+    @inlinable
+    public init<S: Sequence>(bytes elements: S) where S.Iterator.Element == UInt8 {
+        self.init(elements)
     }
 
     @usableFromInline
@@ -1506,15 +1474,23 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _append(buffer)
     }
 
-    public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
-        for byte in newElements {
-            append(byte)
-        }
-    }
-    
     public mutating func append(contentsOf bytes: [UInt8]) {
         bytes.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<UInt8>) -> Void in
             _append(buffer)
+        }
+    }
+
+    @inlinable
+    public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
+        let underestimatedCount = Swift.max(newElements.underestimatedCount, 1)
+        _withStackOrHeapBuffer(underestimatedCount) { (buffer) in
+            let capacity = buffer.pointee.capacity
+            let base = buffer.pointee.memory.bindMemory(to: UInt8.self, capacity: capacity)
+            var (iter, endIndex) = newElements._copyContents(initializing: UnsafeMutableBufferPointer(start: base, count: capacity))
+            _append(UnsafeBufferPointer(start: base, count: endIndex))
+            while var element = iter.next() {
+                append(&element, count: 1)
+            }
         }
     }
     
@@ -1897,13 +1873,7 @@ extension Data {
 
 /// Provides bridging functionality for struct Data to class NSData and vice-versa.
 
-#if DEPLOYMENT_RUNTIME_SWIFT
-internal typealias DataBridgeType = _ObjectTypeBridgeable
-#else
-internal typealias DataBridgeType = _ObjectiveCBridgeable
-#endif
-
-extension Data : DataBridgeType {
+extension Data : _ObjectiveCBridgeable {
     @_semantics("convertToObjectiveC")
     public func _bridgeToObjectiveC() -> NSData {
         return _backing.bridgedReference(_sliceRange)
