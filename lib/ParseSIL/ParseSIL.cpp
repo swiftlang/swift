@@ -891,6 +891,8 @@ void SILParser::convertRequirements(SILFunction *F,
 /// Parse a SIL constant value (one of the following categories):
 /// - An integer datatype and literal (i32 42).
 /// - A floating point datatype and literal (f64 3.14).
+///   - The literal value may be in either decimal or the hexadecimal format
+///     used by the 'float_literal' instruction.
 /// - A metatype (the instance type is parsed) ($Float).
 /// - An aggregate ([i32 1, i64 2, f32 3]).
 /// Returns true on error.
@@ -937,21 +939,44 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
         return true;
 
       // Parse floating point value.
+      // Handle hexadecimal case.
+      if (P.Tok.is(tok::integer_literal)) {
+        APInt bits(width, 0);
+        P.Tok.getText().getAsInteger(0, bits);
+        P.consumeToken(tok::integer_literal);
+        if (bits.getBitWidth() != width)
+          bits = bits.zextOrTrunc(width);
+        switch (width) {
+          case 32: {
+            APFloat floatValue(APFloat::IEEEsingle(), bits);
+            value = SymbolicValue::getFloat(floatValue, allocator);
+            return false;
+          }
+          case 64: {
+            APFloat floatValue(APFloat::IEEEdouble(), bits);
+            value = SymbolicValue::getFloat(floatValue, allocator);
+            return false;
+          }
+          default:
+            P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
+            return true;
+        }
+      }
+      // Handle decimal case.
       double floatValue;
       P.Tok.getText().getAsDouble(floatValue);
       P.consumeToken(tok::floating_literal);
       switch (width) {
       case 32:
         value = SymbolicValue::getFloat(APFloat((float)floatValue), allocator);
-        break;
+        return false;
       case 64:
         value = SymbolicValue::getFloat(APFloat(floatValue), allocator);
-        break;
+        return false;
       default:
         P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
         return true;
       }
-      return false;
     }
   }
   // Handle string literals.

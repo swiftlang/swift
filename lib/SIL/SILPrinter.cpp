@@ -1186,10 +1186,16 @@ public:
       return;
     }
     case SymbolicValue::Float: {
-      SmallString<12> decimal;
       APFloat floatValue = v.getFloatValue();
+      *this << "f" << APFloat::getSizeInBits(floatValue.getSemantics()) << " ";
+
+      APInt bits = floatValue.bitcastToAPInt();
+      *this << "0x" << bits.toString(16, /*Signed*/ false);
+      *this << " ";
+
+      SmallString<12> decimal;
       floatValue.toString(decimal);
-      *this << "f" << APFloat::getSizeInBits(floatValue.getSemantics()) << " " << decimal;
+      *this << "/* " << decimal << " */";
       return;
     }
     case SymbolicValue::String:
