@@ -363,8 +363,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Retrieve the location of the start of the inheritance clause.
   auto getStartLocOfInheritanceClause = [&] {
     if (auto genericTypeDecl = dyn_cast<GenericTypeDecl>(decl)) {
-      if (auto genericParams = genericTypeDecl->getGenericParams())
-        return genericParams->getSourceRange().End;
+      // Get the end location of the generic parameters, except for protocols
+      // which don't have explicit generic parameters.
+      if (!isa<ProtocolDecl>(decl))
+        if (auto genericParams = genericTypeDecl->getGenericParams())
+          return genericParams->getSourceRange().End;
 
       return genericTypeDecl->getNameLoc();
     }
@@ -373,7 +376,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       return typeDecl->getNameLoc();
 
     if (auto ext = dyn_cast<ExtensionDecl>(decl))
-      return ext->getSourceRange().End;
+      return ext->getExtendedTypeLoc().getLoc();
 
     return SourceLoc();
   };
