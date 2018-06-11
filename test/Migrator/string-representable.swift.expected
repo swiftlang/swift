@@ -27,18 +27,18 @@ func foo(_ c: Container) -> String {
   _ = convertFromSimpleAttributeArray(c.getAttrArray())
   _ = convertFromOptionalSimpleAttributeArray(c.getOptionalAttrArray())
 
-  c.addingAttributes(convertToCitiesContainerAttributeDictionary(convertFromSimpleAttributeDictionary(c.getAttrDictionary())))
-  c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.getAttrDictionary())))
+  c.addingAttributes(c.getAttrDictionary())
+  c.adding(optionalAttributes: c.getAttrDictionary())
 
   c.attrDict = convertToSimpleAttributeDictionary(["a": "b", "a": "b", "a": "b"])
   c.attrArr = convertToSimpleAttributeArray(["key1", "key2"])
   _ = convertFromSimpleAttributeArray(c.attrArr)
   _ = convertFromSimpleAttributeDictionary(c.attrDict)
-  c.adding(attributes: convertToSimpleAttributeDictionary(convertFromSimpleAttributeDictionary(c.attrDict)))
-  _ = Container(optionalAttrArray: convertToOptionalSimpleAttributeArray(convertFromSimpleAttributeArray(c.attrArr)))
-  c.adding(optionalAttributes: convertToOptionalSimpleAttributeDictionary(convertFromOptionalSimpleAttributeDictionary(c.optionalAttrDict)))
+  c.adding(attributes: c.attrDict)
+  _ = Container(optionalAttrArray: c.attrArr)
+  c.adding(optionalAttributes: c.optionalAttrDict)
   _ = convertFromNewAttribute(AttributeWrapper.NewAttribute)
-  c.Value = convertToNewAttribute(convertFromNewAttribute(AttributeWrapper.NewAttribute))
+  c.Value = AttributeWrapper.NewAttribute
   c.optionalAttrDict = nil
   return convertFromNewAttribute(c.Value)
 }
