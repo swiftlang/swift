@@ -1610,7 +1610,6 @@ void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto arguments =
     getOpValueArray<4>(OperandValueArrayRef(Inst->getArguments()));
-  auto attributes = Inst->getAttributes();
   SmallVector<SILType, 4> resultTypes;
   for (auto result : Inst->getResults())
     resultTypes.push_back(result->getType());
