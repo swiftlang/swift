@@ -892,7 +892,7 @@ void SILParser::convertRequirements(SILFunction *F,
 /// - An integer datatype and literal (i32 42).
 /// - A floating point datatype and literal (f64 3.14).
 /// - A metatype (the instance type is parsed) ($Float).
-/// - An aggregate ([1, 2, 3]).
+/// - An aggregate ([i32 1, i64 2, f32 3]).
 /// Returns true on error.
 static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
                                SILBuilder &B) {
@@ -982,7 +982,6 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
       P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
                   /*AllowSepAfterLast*/ false,
                   diag::sil_const_aggregate_expected_rsquare,
-                  // SyntaxKind::TuplePatternElementList,
                   SyntaxKind::Unknown,
                   [&]() -> ParserStatus {
       SymbolicValue element;

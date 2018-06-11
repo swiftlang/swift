@@ -8003,7 +8003,7 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// An graph operation attribute. Attributes have a name and a constant value.
+/// A graph operation attribute. Attributes have a name and a constant value.
 struct GraphOperationAttribute {
   Identifier name;
   SymbolicValue value;
