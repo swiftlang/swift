@@ -6517,18 +6517,24 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   // Determine the selector of the counterpart.
   FuncDecl *getter = nullptr, *setter = nullptr;
+  const clang::ObjCMethodDecl *getterObjCMethod = nullptr,
+                              *setterObjCMethod = nullptr;
   clang::Selector counterpartSelector;
   if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
     getter = cast<FuncDecl>(decl);
+    getterObjCMethod = objcMethod;
     counterpartSelector = Impl.setObjectAtIndexedSubscript;
   } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript) {
     setter = cast<FuncDecl>(decl);
+    setterObjCMethod = objcMethod;
     counterpartSelector = Impl.objectAtIndexedSubscript;
   } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
     getter = cast<FuncDecl>(decl);
+    getterObjCMethod = objcMethod;
     counterpartSelector = Impl.setObjectForKeyedSubscript;
   } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
     setter = cast<FuncDecl>(decl);
+    setterObjCMethod = objcMethod;
     counterpartSelector = Impl.objectForKeyedSubscript;
   } else {
     llvm_unreachable("Unknown getter/setter selector");
@@ -6539,13 +6545,15 @@ SwiftDeclConverter::importSubscript(Decl *decl,
                           clang::ObjCMethodDecl::Optional);
 
   if (auto *counterpart = findCounterpart(counterpartSelector)) {
+    const clang::ObjCMethodDecl *counterpartMethod = nullptr;
+
     // If the counterpart to the method we're attempting to import has the
     // swift_private attribute, don't import as a subscript.
     if (auto importedFrom = counterpart->getClangDecl()) {
       if (importedFrom->hasAttr<clang::SwiftPrivateAttr>())
         return nullptr;
 
-      auto counterpartMethod = dyn_cast<clang::ObjCMethodDecl>(importedFrom);
+      counterpartMethod = cast<clang::ObjCMethodDecl>(importedFrom);
       if (optionalMethods)
         optionalMethods = (counterpartMethod->getImplementationControl() ==
                            clang::ObjCMethodDecl::Optional);
@@ -6553,10 +6561,13 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
     assert(!counterpart || !counterpart->isStatic());
 
-    if (getter)
+    if (getter) {
       setter = counterpart;
-    else
+      setterObjCMethod = counterpartMethod;
+    } else {
       getter = counterpart;
+      getterObjCMethod = counterpartMethod;
+    }
   }
 
   // Swift doesn't have write-only subscripting.
@@ -6644,6 +6655,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       // Otherwise, just forget we had a setter.
       // FIXME: This feels very, very wrong.
       setter = nullptr;
+      setterObjCMethod = nullptr;
       setterIndex = nullptr;
     }
 
@@ -6704,8 +6716,13 @@ SwiftDeclConverter::importSubscript(Decl *decl,
         buildSubscriptSetterDecl(Impl, subscript, setter, elementTy,
                                  dc, setterIndex);
 
-  /// Record the subscript as an alternative declaration.
+  // Record the subscript as an alternative declaration.
   Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
+
+  // Import attributes for the accessors if there is a pair.
+  Impl.importAttributes(getterObjCMethod, getterThunk);
+  if (setterObjCMethod)
+    Impl.importAttributes(setterObjCMethod, setterThunk);
 
   subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
@@ -7347,6 +7364,11 @@ void ClangImporter::Implementation::importAttributes(
     Decl *MappedDecl,
     const clang::ObjCContainerDecl *NewContext)
 {
+  // Subscripts are special-cased since there isn't a 1:1 mapping
+  // from its accessor(s) to the subscript declaration.
+  if (isa<SubscriptDecl>(MappedDecl))
+    return;
+
   ASTContext &C = SwiftContext;
 
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(ClangDecl))
