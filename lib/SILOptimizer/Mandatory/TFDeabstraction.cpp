@@ -29,6 +29,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -1914,36 +1915,10 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
             .highlight(loc.getSourceRange());
           isError = true;
 
-          // If we have more specific information about what went wrong, emit a
-          // note.
-
-          // This is a limitation of our current implementation, because we
-          // don't have a SIL instruction for Tensor ops, and have to use
-          // emitConstantInst which can fail.
-          if (it->second.getKind() != SymbolicValue::Unknown)
-            break;
-
-          std::pair<SILNode *, UnknownReason> unknown =
-            it->second.getUnknownValue();
-          auto badInst = dyn_cast<SILInstruction>(unknown.first);
-          if (!badInst)
-            break;
-
-          switch (unknown.second) {
-          case UnknownReason::Default:
-            error = "could not fold operation";
-            break;
-          case UnknownReason::TooManyInstructions:
-            // TODO: Should pop up a level of the stack trace.
-            error = "expression is too large to evaluate at compile-time";
-            break;
-          }
-
-          loc = getUserSourceLocation(badInst);
-          diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-                   diag::tf_op_misuse_note, error)
-            .highlight(loc.getSourceRange());
-
+          // If we have more specific information about what went wrong, emit
+          // notes.
+          if (it->second.getKind() == SymbolicValue::Unknown)
+            it->second.emitUnknownDiagnosticNotes();
           break;
         }
 
