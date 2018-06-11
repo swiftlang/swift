@@ -102,8 +102,12 @@ static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
   for (; directoryIterator != endIterator; directoryIterator.increment(errorCode)) {
     auto entry = *directoryIterator;
     llvm::StringRef filePath(entry.path());
-    foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "")
-                            + llvm::sys::path::stem(filePath).str();
+    llvm::StringRef extension = llvm::sys::path::extension(filePath);
+    if(extension.startswith(".") &&
+       extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+        foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "")
+                                + llvm::sys::path::stem(filePath).str();
+    }
   }
 
   ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch,
