@@ -1,6 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -emit-verbose-sil -disable-objc-attr-requires-foundation-module | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -emit-verbose-sil -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 @objc class ObjCClass {}
 
