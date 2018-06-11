@@ -214,9 +214,14 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
-  if (module.linkFunction(name))
-    return module.findFunction(name, SILLinkage::PublicExternal);
-  return nullptr;
+  auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
+  assert(fn);
+  bool loaded = module.loadFunction(fn);
+  assert(loaded); (void)loaded;
+  bool linked = module.linkFunction(fn);
+  assert(linked); (void)linked;
+  assert(fn->isDefinition());
+  return fn;
 }
 
 /// Looks up members by `name` in the context of `typeDecl`, `proto` and
@@ -606,6 +611,22 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
           continue;
         default: break;
         }
+      }
+
+      // In this case, the expected SIL code to match looks like:
+      //  %0 = string_literal utf8 "foo"
+      //  // function_ref specialized String.init(
+      //       _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+      // function_ref @$SSS21_builtinStringLiteral... : $@convention(thin) (
+      //       Builtin.RawPointer...) -> @owned String
+      // %4 = apply %3(%0, ...
+      // So we want to follow the first func arg of the ApplyInst (%0 above).
+      if (auto *ai = dyn_cast<ApplyInst>(str)) {
+        // If the ApplyInst does not have such an operand, we bail with failure.
+        if (ai->getNumOperands() < 2) return nullptr;
+
+        str = ai->getOperand(1);
+        continue;
       }
 
       // It is possible that we have a variable string, we want to reject it

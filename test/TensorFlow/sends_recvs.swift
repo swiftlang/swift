@@ -240,7 +240,7 @@ public func test1RecvTensor() {
 // CHECK-NEXT: function_ref 
 // CHECK-NEXT: [[A_HANDLE:%.*]] = apply
 // CHECK-NEXT: [[A_TENSOR:%.*]] = struct $Tensor<Float> ([[A_HANDLE]]
-// CHECK:      // function_ref atariSim(_:)
+// CHECK:      // function_ref {{.*}} atariSim(_:)
 // CHECK-NEXT: [[ATARI_FN:%.*]] = function_ref
 // CHECK-NEXT: [[B_TENSOR:%.*]] = apply [[ATARI_FN]]([[A_TENSOR]])
 // CHECK-NEXT: [[B_HANDLE:%.*]] = struct_extract [[B_TENSOR]] : $Tensor<Float>, #Tensor.handle
