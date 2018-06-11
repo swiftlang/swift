@@ -963,7 +963,6 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
         }
       }
       // Handle decimal case.
-      double tmpValue;
       bool negative = false;
       if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
         negative = true;
@@ -973,6 +972,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
         P.diagnose(P.Tok, diag::sil_const_expected_fp_value);
         return true;
       }
+      double tmpValue;
       P.Tok.getText().getAsDouble(tmpValue);
       P.consumeToken(tok::floating_literal);
 
