@@ -4121,15 +4121,16 @@ namespace {
 
         // Update the method type with the new result type.
         auto methodTy = type->castTo<FunctionType>();
-        type = FunctionType::get(methodTy->getInput(), resultTy, 
+        type = FunctionType::get(methodTy->getParams(), resultTy,
                                  methodTy->getExtInfo());
       }
 
       // Add the 'self' parameter to the function type. NB. a method's formal
       // type should be (Type) -> (Args...) -> Ret, not Type -> (Args...) ->
       // Ret.
-      auto parenSelfType = ParenType::get(Impl.SwiftContext, selfInterfaceType);
-      type = FunctionType::get(parenSelfType, type);
+      auto selfParam = AnyFunctionType::Param(selfInterfaceType,
+                                              Identifier(), ParameterTypeFlags());
+      type = FunctionType::get({selfParam}, type, AnyFunctionType::ExtInfo());
 
       auto interfaceType = getGenericMethodType(dc, type->castTo<AnyFunctionType>());
       result->setInterfaceType(interfaceType);
@@ -6160,8 +6161,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Add the implicit 'self' parameter patterns.
   SmallVector<ParameterList *, 4> bodyParams;
   auto selfMetaVar = ParamDecl::createSelf(SourceLoc(), dc, /*static*/ true);
-  auto selfTy = dc->getSelfInterfaceType();
-  auto selfMetaTy = MetatypeType::get(selfTy);
   bodyParams.push_back(ParameterList::createWithoutLoc(selfMetaVar));
 
   // Import the type that this method will have.
@@ -6189,16 +6188,24 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   }
 
   // Rebuild the function type with the appropriate result type;
-  Type resultTy = selfTy;
+  Type resultTy = dc->getSelfInterfaceType();
   if (resultIsOptional)
     resultTy = OptionalType::get(resultTy);
 
-  type = FunctionType::get(oldFnType->getInput(), resultTy,
+  type = FunctionType::get(oldFnType->getParams(), resultTy,
                            oldFnType->getExtInfo());
 
   // Add the 'self' parameter to the function types.
-  Type allocType = FunctionType::get(selfMetaTy, type);
-  Type initType = FunctionType::get(selfTy, type);
+  auto selfTy = dc->getSelfInterfaceType();
+  auto selfParam = AnyFunctionType::Param(selfTy,
+                                          Identifier(), ParameterTypeFlags());
+  auto selfMetaTy = MetatypeType::get(selfTy);
+  auto selfMetaParam = AnyFunctionType::Param(selfMetaTy, Identifier(),
+                                              ParameterTypeFlags());
+  Type allocType = FunctionType::get({selfMetaParam}, type,
+                                     AnyFunctionType::ExtInfo());
+  Type initType = FunctionType::get({selfParam}, type,
+                                    AnyFunctionType::ExtInfo());
 
   // Look for other imported constructors that occur in this context with
   // the same name.
