@@ -1928,10 +1928,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (Indirection)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
-    // There are variables without storage, such as "struct { func foo() {}
-    // }". Emit them as constant 0.
-    if (isa<llvm::UndefValue>(Piece))
-      Piece = llvm::ConstantInt::get(IGM.Int64Ty, 0);
+    // There are undefined values. Emit them as constant 0.
+    if (isa<llvm::UndefValue>(Piece)) {
+      auto undefSize = IGM.DataLayout.getTypeSizeInBits(Piece->getType());
+      
+      Piece = llvm::ConstantInt::get(
+         llvm::IntegerType::get(IGM.getLLVMContext(), undefSize), 0);
+    }
 
     if (IsPiece) {
       // Advance the offset and align it for the next piece.

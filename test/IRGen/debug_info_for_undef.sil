@@ -1,0 +1,14 @@
+// RUN: %target-swift-frontend -g -O -emit-ir -verify %s
+
+import Swift
+
+sil_stage canonical
+
+struct Foo { var x: Int32; var y: Int32 }
+
+sil @undef_debug_info : $@convention(thin) (Int32) -> () {
+entry(%x : $Int32):
+  %y = struct $Foo (%x : $Int32, undef : $Int32)
+  debug_value %y : $Foo, let, name "x", argno 1
+  return undef : $()
+}
