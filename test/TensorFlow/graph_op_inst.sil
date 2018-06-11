@@ -10,13 +10,21 @@ struct Tensor<Scalar> {}
 
 sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
 bb0:
-  %0 = graph_op "tf.Dummy"() [int = i64 48, hex_float = f64 0x40091EB851EB851F, dec_float = f32 3.14, metatype = $Float, array = [[i32 1, i32 2], [i32 3, i32 4]]] : $Tensor<Float>
+  %0 = graph_op "tf.Dummy"() [int1 = i32 -3, int2 = i8 4, int3 = i64 42] : $Tensor<Float>
+  %1 = graph_op "tf.Dummy"() [hex1 = f64 0x40091EB851EB851F, hex2 = f32 0x4048F5C3] : $Tensor<Float>
+  %3 = graph_op "tf.Dummy"() [float1 = f64 3.14, float2 = f32 -3.14] : $Tensor<Float>
+  %4 = graph_op "tf.Dummy"() [metatype1 = $Float, metatype2 = $Tensor<Float>] : $Tensor<Float>
+  %5 = graph_op "tf.Dummy"() [array = [[i8 1, i32 -2], [f32 -1.0, $Float]]] : $Tensor<Float>
   return %0 : $Tensor<Float>
 }
 
 // CHECK-LABEL: sil @attribute_test : $@convention(thin) () -> Tensor<Float> {
 // CHECK: bb0:
-// CHECK-NEXT:   %0 = graph_op "tf.Dummy"() [int = i64 48, hex_float = f64 0x40091EB851EB851F /* 3.1400000000000001 */, dec_float = f32 0x4048F5C3 /* 3.1400001 */, metatype = $Float, array = {{\[\[}}i32 1, i32 2], [i32 3, i32 4]]] : $Tensor<Float>
+// CHECK-NEXT:   %0 = graph_op "tf.Dummy"() [int1 = i32 -3, int2 = i8 4, int3 = i64 42] : $Tensor<Float> // user: %5
+// CHECK-NEXT:   %1 = graph_op "tf.Dummy"() [hex1 = f64 0x40091EB851EB851F /* 3.1400000000000001 */, hex2 = f32 0x4048F5C3 /* 3.1400001 */] : $Tensor<Float>
+// CHECK-NEXT:   %2 = graph_op "tf.Dummy"() [float1 = f64 0x40091EB851EB851F /* 3.1400000000000001 */, float2 = f32 0xC048F5C3 /* -3.1400001 */] : $Tensor<Float>
+// CHECK-NEXT:   %3 = graph_op "tf.Dummy"() [metatype1 = $Float, metatype2 = $Tensor<Float>] : $Tensor<Float>
+// CHECK-NEXT:   %4 = graph_op "tf.Dummy"() [array = {{\[\[}}i8 1, i32 -2], [f32 0xBF800000 /* -1 */, $Float]]] : $Tensor<Float>
 // CHECK-NEXT:   return %0 : $Tensor<Float>
 // CHECK-NEXT: }
 

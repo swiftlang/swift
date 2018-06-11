@@ -1674,9 +1674,13 @@ ERROR(sil_graph_op_expected_rsquare,PointsToFirstBadToken,
       "expected ']' in 'graph_op' attribute list", ())
 
 ERROR(sil_const_expected_int_datatype,PointsToFirstBadToken,
-      "expected int datatype ('i[0-9]+', e.g. 'i32')", ())
+      "expected integer datatype ('i[0-9]+', e.g. 'i32')", ())
+ERROR(sil_const_expected_int_value,PointsToFirstBadToken,
+      "expected integer value in SIL constant value", ())
 ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
       "expected floating point datatype ('f32' or 'f64')", ())
+ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
+      "expected floating point value in SIL constant value", ())
 ERROR(sil_const_aggregate_expected_rsquare,PointsToFirstBadToken,
       "expected ']' at end of aggregate 'SymbolicValue'", ())
 

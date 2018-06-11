@@ -918,7 +918,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
         P.consumeToken();
       }
       APInt intValue(width, 0);
-      if (SP.parseInteger(intValue, diag::sil_graph_op_expected_attr_value))
+      if (SP.parseInteger(intValue, diag::sil_const_expected_int_value))
         return true;
 
       // Negate and truncate value, if necessary.
@@ -940,7 +940,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
 
       // Parse floating point value.
       // Handle hexadecimal case.
-      if (P.Tok.is(tok::integer_literal)) {
+      if (P.Tok.is(tok::integer_literal) && P.Tok.getText().startswith("0x")) {
         APInt bits(width, 0);
         P.Tok.getText().getAsInteger(0, bits);
         P.consumeToken(tok::integer_literal);
@@ -963,20 +963,35 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
         }
       }
       // Handle decimal case.
-      double floatValue;
-      P.Tok.getText().getAsDouble(floatValue);
+      double tmpValue;
+      bool negative = false;
+      if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
+        negative = true;
+        P.consumeToken();
+      }
+      if (!P.Tok.is(tok::floating_literal)) {
+        P.diagnose(P.Tok, diag::sil_const_expected_fp_value);
+        return true;
+      }
+      P.Tok.getText().getAsDouble(tmpValue);
       P.consumeToken(tok::floating_literal);
+
+      APFloat floatValue((float) 0);
       switch (width) {
       case 32:
-        value = SymbolicValue::getFloat(APFloat((float)floatValue), allocator);
-        return false;
+        floatValue = APFloat((float) tmpValue);
+        break;
       case 64:
-        value = SymbolicValue::getFloat(APFloat(floatValue), allocator);
-        return false;
+        floatValue = APFloat(tmpValue);
+        break;
       default:
         P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
         return true;
       }
+      if (negative)
+        floatValue.changeSign();
+      value = SymbolicValue::getFloat(floatValue, allocator);
+      return false;
     }
   }
   // Handle string literals.
