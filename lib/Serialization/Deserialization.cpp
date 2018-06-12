@@ -2559,7 +2559,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         SourceLoc loc;
         for (auto paramValue : paramValues) {
           auto parameter = paramValue & 0x01
-            ? AutoDiffParameter::getSelfParameter(loc),
+            ? AutoDiffParameter::getSelfParameter(loc)
             : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
           parameters.push_back(parameter);
         }
