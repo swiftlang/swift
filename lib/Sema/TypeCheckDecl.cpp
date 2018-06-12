@@ -1029,8 +1029,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
-          Optional<clang::VersionTuple> introduced;
-          Optional<clang::VersionTuple> obsoleted;
+          Optional<llvm::VersionTuple> introduced;
+          Optional<llvm::VersionTuple> obsoleted;
 
         public:
           static AvailabilityRange from(const ValueDecl *VD) {

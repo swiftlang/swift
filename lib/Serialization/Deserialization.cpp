@@ -2462,11 +2462,11 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 #define DECODE_VER_TUPLE(X)\
   if (X##_HasMinor) {\
     if (X##_HasSubminor)\
-      X = clang::VersionTuple(X##_Major, X##_Minor, X##_Subminor);\
+      X = llvm::VersionTuple(X##_Major, X##_Minor, X##_Subminor);\
     else\
-      X = clang::VersionTuple(X##_Major, X##_Minor);\
+      X = llvm::VersionTuple(X##_Major, X##_Minor);\
     }\
-  else X = clang::VersionTuple(X##_Major);
+  else X = llvm::VersionTuple(X##_Major);
 
         bool isImplicit;
         bool isUnavailable;
@@ -2486,7 +2486,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         StringRef message = blobData.substr(0, messageSize);
         blobData = blobData.substr(messageSize);
         StringRef rename = blobData.substr(0, renameSize);
-        clang::VersionTuple Introduced, Deprecated, Obsoleted;
+        llvm::VersionTuple Introduced, Deprecated, Obsoleted;
         DECODE_VER_TUPLE(Introduced)
         DECODE_VER_TUPLE(Deprecated)
         DECODE_VER_TUPLE(Obsoleted)

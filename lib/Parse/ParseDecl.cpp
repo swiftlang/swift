@@ -318,7 +318,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   StringRef Platform = Tok.getText();
 
   StringRef Message, Renamed;
-  clang::VersionTuple Introduced, Deprecated, Obsoleted;
+  llvm::VersionTuple Introduced, Deprecated, Obsoleted;
   SourceRange IntroducedRange, DeprecatedRange, ObsoletedRange;
   auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
 
@@ -1286,7 +1286,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
       for (auto *Spec : Specs) {
         PlatformKind Platform;
-        clang::VersionTuple Version;
+        llvm::VersionTuple Version;
         SourceRange VersionRange;
         PlatformAgnosticAvailabilityKind PlatformAgnostic;
 
@@ -1316,9 +1316,9 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                      /*Rename=*/StringRef(),
                                      /*Introduced=*/Version,
                                      /*IntroducedRange=*/VersionRange,
-                                     /*Deprecated=*/clang::VersionTuple(),
+                                     /*Deprecated=*/llvm::VersionTuple(),
                                      /*DeprecatedRange=*/SourceRange(),
-                                     /*Obsoleted=*/clang::VersionTuple(),
+                                     /*Obsoleted=*/llvm::VersionTuple(),
                                      /*ObsoletedRange=*/SourceRange(),
                                      PlatformAgnostic,
                                      /*Implicit=*/false));
@@ -1438,7 +1438,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   return false;
 }
 
-bool Parser::parseVersionTuple(clang::VersionTuple &Version,
+bool Parser::parseVersionTuple(llvm::VersionTuple &Version,
                                SourceRange &Range,
                                const Diagnostic &D) {
   SyntaxParsingContext VersionContext(SyntaxContext, SyntaxKind::VersionTuple);
@@ -1459,7 +1459,7 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
       consumeToken();
       return true;
     }
-    Version = clang::VersionTuple(major);
+    Version = llvm::VersionTuple(major);
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     return false;
@@ -1493,9 +1493,9 @@ bool Parser::parseVersionTuple(clang::VersionTuple &Version,
     Range = SourceRange(StartLoc, Tok.getLoc());
     consumeToken();
     
-    Version = clang::VersionTuple(major, minor, micro);
+    Version = llvm::VersionTuple(major, minor, micro);
   } else {
-    Version = clang::VersionTuple(major, minor);
+    Version = llvm::VersionTuple(major, minor);
   }
 
   return false;

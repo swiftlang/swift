@@ -15,7 +15,7 @@
 
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
-#include "clang/Basic/VersionTuple.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -383,9 +383,9 @@ struct AvailableAttrInfo {
   bool IsDeprecated = false;
   UIdent Platform;
   llvm::SmallString<32> Message;
-  llvm::Optional<clang::VersionTuple> Introduced;
-  llvm::Optional<clang::VersionTuple> Deprecated;
-  llvm::Optional<clang::VersionTuple> Obsoleted;
+  llvm::Optional<llvm::VersionTuple> Introduced;
+  llvm::Optional<llvm::VersionTuple> Deprecated;
+  llvm::Optional<llvm::VersionTuple> Obsoleted;
 };
 
 struct NoteRegion {
