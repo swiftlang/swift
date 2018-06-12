@@ -212,7 +212,8 @@ static bool emitLoadedModuleTraceIfNeeded(ASTContext &ctxt,
     StringRef realPath;
     int FD;
     // FIXME: appropriate error handling
-    if (llvm::sys::fs::openFileForRead(dep, FD, &buffer)) {
+    if (llvm::sys::fs::openFileForRead(dep, FD, llvm::sys::fs::OF_None,
+                                       &buffer)) {
       // Couldn't open the file now, so let's just assume the old path was
       // canonical (enough).
       realPath = dep;
@@ -1440,7 +1441,7 @@ static bool dumpAPI(ModuleDecl *Mod, StringRef OutDir) {
     }
 
     std::error_code EC;
-    llvm::raw_fd_ostream OS(OutPath, EC, fs::OpenFlags::F_RW);
+    llvm::raw_fd_ostream OS(OutPath, EC, fs::FA_Read | fs::FA_Write);
     if (EC) {
       llvm::errs() << "error opening file '" << OutPath << "': "
                    << EC.message() << '\n';

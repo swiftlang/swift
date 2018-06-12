@@ -456,7 +456,8 @@ void saveReuseLog(SourceManager &SourceMgr, unsigned BufferID,
                   SyntaxParsingCache *Cache) {
   std::error_code ErrorCode;
   llvm::raw_fd_ostream ReuseLog(options::IncrementalReuseLog, ErrorCode,
-                                llvm::sys::fs::OpenFlags::F_RW);
+                                llvm::sys::fs::FA_Read |
+                                    llvm::sys::fs::FA_Write);
   assert(!ErrorCode && "Unable to open incremental usage log");
 
   for (auto ReuseRange : Cache->getReusedRanges()) {
