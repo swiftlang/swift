@@ -1188,8 +1188,12 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkGraphOperationInst(GraphOperationInst *GI) {
-    for (auto attr : GI->getAttributes())
+    llvm::DenseSet<Identifier> attributeNames;
+    for (auto attr : GI->getAttributes()) {
+      require(attributeNames.insert(attr.name).second,
+              "Duplicate attribute name '" + attr.name.str() + "'");
       require(attr.value.isConstant(), "Invalid graph operation attribute");
+    }
   }
 
   void checkFunctionRefInst(FunctionRefInst *FRI) {
