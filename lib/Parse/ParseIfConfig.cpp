@@ -278,7 +278,8 @@ public:
     }
 
     // 'swift' '(' '>=' float-literal ( '.' integer-literal )* ')'
-    if (*KindName == "swift") {
+    // 'compiler' '(' '>=' float-literal ( '.' integer-literal )* ')'
+    if (*KindName == "swift" || *KindName == "compiler") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
       llvm::Optional<StringRef> PrefixName = PUE ?
         getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
@@ -445,13 +446,18 @@ public:
           Str, SourceLoc(), nullptr).getValue();
       auto thisVersion = version::Version::getCurrentCompilerVersion();
       return thisVersion >= Val;
-    } else if (KindName == "swift") {
+    } else if ((KindName == "swift") || (KindName == "compiler")) {
       auto PUE = cast<PrefixUnaryExpr>(Arg);
       auto Str = extractExprSource(Ctx.SourceMgr, PUE->getArg());
       auto Val = version::Version::parseVersionString(
           Str, SourceLoc(), nullptr).getValue();
-      auto thisVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-      return thisVersion >= Val;
+      if (KindName == "swift") {
+        return Ctx.LangOpts.EffectiveLanguageVersion >= Val;  
+      } else if (KindName == "compiler") {
+        return version::Version::getCurrentLanguageVersion() >= Val;
+      } else {
+        llvm_unreachable("unsupported version conditional");
+      }
     } else if (KindName == "canImport") {
       auto Str = extractExprSource(Ctx.SourceMgr, Arg);
       return Ctx.canImportModule({ Ctx.getIdentifier(Str) , E->getLoc()  });
@@ -539,7 +545,8 @@ public:
 
   bool visitCallExpr(CallExpr *E) {
     auto KindName = getDeclRefStr(E->getFn());
-    return KindName == "_compiler_version" || KindName == "swift";
+    return KindName == "_compiler_version" || KindName == "swift" ||
+        KindName == "compiler";
   }
 
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *E) { return visit(E->getArg()); }

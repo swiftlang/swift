@@ -69,7 +69,21 @@ foo bar
 let _: Int = 1
 #endif
 
+#if !compiler(>=4.1)
+// There should be no error here.
+foo bar
+#else
+let _: Int = 1
+#endif
+
 #if (swift(>=2.2))
+let _: Int = 1
+#else
+// There should be no error here.
+foo bar
+#endif
+
+#if (compiler(>=4.1))
 let _: Int = 1
 #else
 // There should be no error here.
@@ -83,13 +97,33 @@ foo bar baz // expected-error 2 {{consecutive statements}}
 undefinedElse() // expected-error {{use of unresolved identifier 'undefinedElse'}}
 #endif
 
+#if compiler(>=99.0) || compiler(>=88.1.1)
+// There should be no error here.
+foo bar baz // expected-error 2 {{consecutive statements}}
+#else
+undefinedElse() // expected-error {{use of unresolved identifier 'undefinedElse'}}
+#endif
+
 #if swift(>=99.0) || FOO
 undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 #else
 undefinedElse()
 #endif
 
+#if compiler(>=99.0) || FOO
+undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
+#else
+undefinedElse()
+#endif
+
 #if swift(>=99.0) && FOO
+// There should be no error here.
+foo bar baz // expected-error 2 {{consecutive statements}}
+#else
+undefinedElse() // expected-error {{use of unresolved identifier 'undefinedElse'}}
+#endif
+
+#if compiler(>=99.0) && FOO
 // There should be no error here.
 foo bar baz // expected-error 2 {{consecutive statements}}
 #else
@@ -103,7 +137,21 @@ undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 foo bar baz // expected-error 2 {{consecutive statements}}
 #endif
 
+#if FOO && compiler(>=4.0)
+undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
+#else
+// There should be no error here.
+foo bar baz // expected-error 2 {{consecutive statements}}
+#endif
+
 #if swift(>=2.2) && swift(>=1)
+undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
+#else
+// There should be no error here.
+foo bar baz // expected-error 2 {{consecutive statements}}
+#endif
+
+#if compiler(>=4.1) && compiler(>=4)
 undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 #else
 // There should be no error here.
