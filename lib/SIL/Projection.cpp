@@ -1103,10 +1103,12 @@ public:
 //                               ProjectionTree
 //===----------------------------------------------------------------------===//
 
-ProjectionTree::
-ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
+ProjectionTree::ProjectionTree(
+    SILModule &Mod, SILType BaseTy,
+    llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
+    : Mod(Mod), Allocator(Allocator) {
   LLVM_DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
-                     << "\n");
+                          << "\n");
 
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);

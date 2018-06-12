@@ -5466,47 +5466,7 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
   CalleeCandidateInfo candidateInfo(baseType, choices,
                                     callArgHasTrailingClosure(argExpr),
                                     CS, true);
-  struct TypeConvertibleChecker {
-    ConstraintSystem &CS;
 
-    TypeConvertibleChecker(ConstraintSystem &CS) : CS(CS) {}
-
-    // Checks whether type1 is implicitly convertible to type2
-    bool isImplicitlyConvertible(Type type1, Type type2) {
-      if (!type1 || !type2)
-        return false;
-
-      if (auto tup1 = type1->getAs<TupleType>()) {
-        if (auto tup2 = type2->getAs<TupleType>())
-          return isImplicitlyConvertibleTuple(tup1, tup2);
-        else
-          return false;
-      }
-      if (type1->isEqual(type2) || type2->is<GenericTypeParamType>() ||
-          CS.TC.isSubtypeOf(type1, type2, CS.DC))
-        return true;
-      return false;
-    }
-
-    bool isImplicitlyConvertibleTuple(TupleType *tup1, TupleType *tup2) {
-      if (tup1->getNumElements() != tup2->getNumElements())
-        return false;
-
-      for (unsigned i = 0, e = tup1->getNumElements(); i < e; i ++) {
-        auto element1 = tup1->getElement(i);
-        auto element2 = tup2->getElement(i);
-        if (element1.hasName()) {
-          if (!element2.hasName() || element1.getName() !=
-              element2.getName())
-            return false;
-        }
-        if (!isImplicitlyConvertible(element1.getType(),
-                                     element2.getType()))
-          return false;
-      }
-      return true;
-    }
-  } checker(CS);
   auto params = swift::decomposeArgType(CS.getType(argExpr), argLabels);
   using ClosenessPair = CalleeCandidateInfo::ClosenessResultTy;
 
@@ -5520,8 +5480,9 @@ bool FailureDiagnosis::diagnoseSubscriptMisuse(ApplyExpr *callExpr) {
       return {CC_GeneralMismatch, {}};
 
     for (unsigned i = 0, e = params.size(); i < e; i ++) {
-      if (checker.isImplicitlyConvertible(params[i].getType(),
-                                          candParams[i].getType()))
+      if (CS.TC.isConvertibleTo(params[i].getType(),
+                                candParams[i].getType(), CS.DC) ||
+          candParams[i].getType()->is<GenericTypeParamType>())
         continue;
       return {CC_GeneralMismatch, {}};
     }

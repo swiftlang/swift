@@ -44,6 +44,11 @@
 #include <cstring>
 #include <type_traits>
 
+#if defined(__GLIBCXX__) && __GLIBCXX__ < 20160726
+#include <stddef.h>
+namespace std { using ::max_align_t; }
+#endif
+
 using namespace swift;
 using namespace swift::hashable_support;
 using namespace metadataimpl;

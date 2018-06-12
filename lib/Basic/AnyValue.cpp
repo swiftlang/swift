@@ -1,4 +1,4 @@
-//===--- Portability.h ------------------------------------------*- C++ -*-===//
+//===--- AnyValue.cpp - Out-of-line code for AnyValue ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Includes stub APIs that make the portable runtime easier to write.
+//  This file implements support code for AnyValue.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_RUNTIME_PORTABILITY_H
-#define SWIFT_RUNTIME_PORTABILITY_H
-#include <cstddef>
+#include "swift/Basic/AnyValue.h"
+using namespace swift;
 
-size_t _swift_strlcpy(char *dst, const char *src, size_t maxlen);
+AnyValue::HolderBase::~HolderBase() { }
 
-#endif
+std::string AnyValue::getAsString() const {
+  std::string result;
+  {
+    llvm::raw_string_ostream out(result);
+    simple_display(out, *this);
+  }
+  return result;
+}

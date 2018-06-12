@@ -87,6 +87,11 @@ public:
   class pred_iterator {
     SILSuccessor *Cur;
 
+    // Cache the basic block to avoid repeated pointer chasing.
+    SILBasicBlock *Block;
+
+    void cacheBasicBlock();
+
   public:
     using difference_type = std::ptrdiff_t;
     using value_type = SILBasicBlock *;
@@ -94,26 +99,33 @@ public:
     using reference = SILBasicBlock *&;
     using iterator_category = std::forward_iterator_tag;
 
-    pred_iterator(SILSuccessor *Cur = 0) : Cur(Cur) {}
+    pred_iterator(SILSuccessor *Cur = nullptr) : Cur(Cur), Block(nullptr) {
+      cacheBasicBlock();
+    }
 
     bool operator==(pred_iterator I2) const { return Cur == I2.Cur; }
     bool operator!=(pred_iterator I2) const { return Cur != I2.Cur; }
 
     pred_iterator &operator++() {
-      assert(Cur && "Trying to advance past end");
+      assert(Cur != nullptr);
       Cur = Cur->Next;
+      cacheBasicBlock();
       return *this;
     }
 
-    pred_iterator operator++(int) {
-      pred_iterator copy = *this;
-      ++*this;
+    pred_iterator operator+(unsigned distance) const {
+      auto copy = *this;
+      if (distance == 0)
+        return copy;
+      do {
+        copy.Cur = Cur->Next;
+      } while (--distance > 0);
+      copy.cacheBasicBlock();
       return copy;
     }
 
     SILSuccessor *getSuccessorRef() const { return Cur; }
-    SILBasicBlock *operator*();
-    const SILBasicBlock *operator*() const;
+    SILBasicBlock *operator*() const { return Block; }
   };
 };
 

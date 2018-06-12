@@ -1,4 +1,4 @@
-//===--- Portability.h ------------------------------------------*- C++ -*-===//
+//===--- ArithmeticEvaluatorTypeIDZone.def - --------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,14 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Includes stub APIs that make the portable runtime easier to write.
+//  This definition file describes the types in the "arithmetic evaluatior"
+//  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-
-#ifndef SWIFT_RUNTIME_PORTABILITY_H
-#define SWIFT_RUNTIME_PORTABILITY_H
-#include <cstddef>
-
-size_t _swift_strlcpy(char *dst, const char *src, size_t maxlen);
-
-#endif
+SWIFT_TYPEID(UncachedEvaluationRule)
+SWIFT_TYPEID(InternallyCachedEvaluationRule)
+SWIFT_TYPEID(ExternallyCachedEvaluationRule)

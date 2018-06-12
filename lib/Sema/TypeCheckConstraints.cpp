@@ -858,6 +858,8 @@ namespace {
     TypeChecker &TC;
     DeclContext *DC;
 
+    Expr *ParentExpr;
+
     /// A stack of expressions being walked, used to determine where to
     /// insert RebindSelfInConstructorExpr nodes.
     llvm::SmallVector<Expr *, 8> ExprStack;
@@ -886,7 +888,8 @@ namespace {
     void resolveKeyPathExpr(KeyPathExpr *KPE);
 
   public:
-    PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
+    PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
+        : TC(tc), DC(dc), ParentExpr(parent) {}
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
@@ -945,6 +948,43 @@ namespace {
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
+      }
+
+      // Let's try to figure out if `InOutExpr` is out of place early
+      // otherwise there is a risk of producing solutions which can't
+      // be later applied to AST and would result in the crash in some
+      // cases. Such expressions are only allowed in argument positions
+      // of function/operator calls.
+      if (isa<InOutExpr>(expr)) {
+        // If this is an implicit `inout` expression we assume that
+        // compiler knowns what it's doing.
+        if (expr->isImplicit())
+          return finish(true, expr);
+
+        if (TC.isExprBeingDiagnosed(ParentExpr) ||
+            TC.isExprBeingDiagnosed(expr))
+          return finish(true, expr);
+
+        auto parents = ParentExpr->getParentMap();
+
+        auto result = parents.find(expr);
+        if (result != parents.end()) {
+          auto *parent = result->getSecond();
+
+          if (isa<SequenceExpr>(parent))
+            return finish(true, expr);
+
+          if (isa<TupleExpr>(parent) || isa<ParenExpr>(parent)) {
+            auto call = parents.find(parent);
+            if (call != parents.end() &&
+                (isa<ApplyExpr>(call->getSecond()) ||
+                 isa<UnresolvedMemberExpr>(call->getSecond())))
+              return finish(true, expr);
+          }
+        }
+
+        TC.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
+        return finish(false, nullptr);
       }
 
       return finish(true, expr);
@@ -1683,7 +1723,7 @@ CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
 bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(*this, dc);
+  PreCheckExpression preCheck(*this, dc, expr);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;

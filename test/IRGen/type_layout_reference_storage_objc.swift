@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// XFAIL: *
 
 import Foundation
 
