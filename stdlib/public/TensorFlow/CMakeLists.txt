@@ -33,6 +33,8 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-swift-version" "4")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 list(APPEND swift_stdlib_compile_flags "-Xcc" "-I${TF_INCLUDE_DIR}")
+# FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
+list(APPEND swift_stdlib_compile_flags "-Onone")
 
 set(SOURCES
   CompilerRuntime.swift
