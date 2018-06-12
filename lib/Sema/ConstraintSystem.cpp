@@ -1726,7 +1726,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
         // Build the disjunction to attempt binding both T? and T (or
         // function returning T? and function returning T).
-        Type ty = createTypeVariable(locator);
+        Type ty = createTypeVariable(locator, TVO_CanBindToLValue);
         buildDisjunctionForImplicitlyUnwrappedOptional(ty, refType, locator);
         addConstraint(ConstraintKind::Bind, boundType,
                       OptionalType::get(ty->getRValueType()), locator);
