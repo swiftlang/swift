@@ -23,6 +23,7 @@
 
 using namespace swift;
 using namespace llvm;
+using std::isnan;
 
 class ArithmeticExpr {
  public:
