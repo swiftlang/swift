@@ -57,6 +57,24 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0194][]
+
+  The new CaseIterable protocol describes types which have a static
+  “allCases” property that is used to describe all of the cases of the
+  type. Swift will synthesize this “allCases” property for enums that
+  have no associated values. For example:
+
+  ```swift
+  enum Suit: CaseIterable {
+    case heart
+    case club
+    case diamond
+    case spade
+  }
+
+  print(Suit.allCases) // prints [Suit.heart, Suit.club, Suit.diamond, Suit.spade]
+  ```
+
 * [SE-0185][]
 
   Protocol conformances are now able to be synthesized in extensions in the same
