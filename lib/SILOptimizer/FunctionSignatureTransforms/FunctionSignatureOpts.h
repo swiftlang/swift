@@ -86,12 +86,15 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(SILFunctionArgument *A)
+  ArgumentDescriptor(
+      SILFunctionArgument *A,
+      llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
       : Arg(A), PInfo(A->getKnownParameterInfo()), Index(A->getIndex()),
         Decl(A->getDecl()), IsEntirelyDead(false), WasErased(false),
         Explode(false), OwnedToGuaranteed(false),
         IsIndirectResult(A->isIndirectResult()), CalleeRelease(),
-        CalleeReleaseInThrowBlock(), ProjTree(A->getModule(), A->getType()) {
+        CalleeReleaseInThrowBlock(),
+        ProjTree(A->getModule(), A->getType(), Allocator) {
     if (!A->isIndirectResult()) {
       PInfo = Arg->getKnownParameterInfo();
     }
