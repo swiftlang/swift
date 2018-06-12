@@ -2556,17 +2556,18 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         FuncDecl *adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
 
         SmallVector<AutoDiffParameter, 4> parameters;
+        SourceLoc loc;
         for (auto paramValue : paramValues) {
           auto parameter = paramValue & 0x01
-            ? AutoDiffParameter::getSelfParameter(SourceLoc())
-            : AutoDiffParameter::getIndexParameter(SourceLoc(), paramValue>>1);
+            ? AutoDiffParameter::getSelfParameter(loc),
+            : AutoDiffParameter::getIndexParameter(loc, paramValue >> 1);
           parameters.push_back(parameter);
         }
         // TODO: Deserialize trailing where clause.
         auto diffAttr =
-          DifferentiableAttr::create(ctx, SourceLoc(), SourceRange(),
-                                     autodiffMode, SourceLoc(), parameters,
-                                     primal, adjoint, nullptr);
+          DifferentiableAttr::create(ctx, loc, SourceRange(), autodiffMode,
+                                     loc, parameters, primal, adjoint,
+                                     /*TrailingWhereClause*/ nullptr);
         diffAttr->setPrimalFunction(primalDecl);
         diffAttr->setAdjointFunction(adjointDecl);
         Attr = diffAttr;
