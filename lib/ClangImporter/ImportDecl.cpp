@@ -7341,6 +7341,21 @@ getSwiftNameFromClangName(StringRef replacement) {
   return SwiftContext.AllocateCopy(StringRef(renamed));
 }
 
+bool importer::isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl) {
+  // FIXME: Once UIKit removes the "nonswift" availability in their versioned
+  // API notes, this workaround can go away.
+  auto *constant = dyn_cast<clang::VarDecl>(decl);
+  if (!constant)
+    return false;
+
+  clang::DeclarationName name = constant->getDeclName();
+  const clang::IdentifierInfo *ident = name.getAsIdentifierInfo();
+  if (!ident)
+    return false;
+
+  return ident->isStr("UIEdgeInsetsZero") || ident->isStr("UIOffsetZero");
+}
+
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
     const clang::NamedDecl *ClangDecl,
@@ -7405,6 +7420,11 @@ void ClangImporter::Implementation::importAttributes(
 
       // Is this our special "availability(swift, unavailable)" attribute?
       if (Platform == "swift") {
+        // FIXME: Until Apple gets a chance to update UIKit's API notes, ignore
+        // the Swift-unavailability for certain properties.
+        if (isSpecialUIKitStructZeroProperty(ClangDecl))
+          continue;
+
         auto replacement = avail->getReplacement();
         StringRef swiftReplacement = "";
         if (!replacement.empty())
