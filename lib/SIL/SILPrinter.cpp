@@ -1239,15 +1239,15 @@ public:
     *this << ")";
 
     if (GI->getNumAttributes()) {
-      *this << " [";
+      *this << " {";
       interleave(GI->getAttributes(), [&](GraphOperationAttribute attr) {
         *this << attr.name.str();
-        *this << " = ";
+        *this << ": ";
         visitSymbolicValue(attr.value);
       }, [&] {
         *this << ", ";
       });
-      *this << "]";
+      *this << "}";
     }
 
     *this << " : ";

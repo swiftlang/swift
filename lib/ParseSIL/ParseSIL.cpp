@@ -2957,23 +2957,23 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     // Parse optional graph operation attributes.
     SmallVector<GraphOperationAttribute, 4> attributes;
-    SourceLoc lSquareLoc;
-    if (P.consumeIf(tok::l_square, lSquareLoc)) {
-      SourceLoc rSquareLoc;
+    SourceLoc lBraceLoc;
+    if (P.consumeIf(tok::l_brace, lBraceLoc)) {
+      SourceLoc rBraceLoc;
       ParserStatus status =
-        P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
+        P.parseList(tok::r_brace, lBraceLoc, rBraceLoc,
                     /*AllowSepAfterLast*/ false,
-                    diag::sil_graph_op_expected_rsquare,
+                    diag::sil_graph_op_expected_rbrace,
                     SyntaxKind::Unknown,
                     [&]() -> ParserStatus {
         // Parse an attribute.
         Identifier attrName;
-        if (parseSILIdentifier(attrName, lSquareLoc,
+        if (parseSILIdentifier(attrName, lBraceLoc,
                                diag::sil_graph_op_expected_attr_name))
           return makeParserError();
         SymbolicValue attrValue;
-        if (!P.consumeIf(tok::equal)) {
-          P.diagnose(P.Tok, diag::expected_equal_in_sil_instr);
+        if (!P.consumeIf(tok::colon)) {
+          P.diagnose(P.Tok, diag::sil_graph_op_expected_colon_after_attr_name);
           return makeParserError();
         }
         if (parseSymbolicValue(attrValue, *this, B))
@@ -2986,7 +2986,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     }
 
     // Parse graph operation result types.
-    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":"))
+    if (P.parseToken(tok::colon,
+                     diag::sil_graph_op_expected_colon_before_result_types))
       return true;
     SmallVector<SILType, 4> resultTypes;
     SILType temp;

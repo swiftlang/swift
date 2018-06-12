@@ -5336,16 +5336,16 @@ graph_op
 
   sil-instruction ::= 'graph_op' string-literal
                       '(' (sil-operand (',' sil-operand)*)? ')'
-                      '[' (sil-graph-op-attr (',' sil-graph-op-attr)*)? ']'
+                      ('{' (sil-graph-op-attr (',' sil-graph-op-attr)*)? '}')?
                       ':' sil-type (',' sil-type)*
-  sil-graph-op-attr ::= sil-identifier '=' sil-symbolic-value
+  sil-graph-op-attr ::= sil-identifier ':' sil-symbolic-value
   sil-symbolic-value ::= i[0-9]+ int-literal |
                          f(32|64) float-literal |
                          sil-type |
                          '[' (sil-symbolic-value (',' sil-symbolic-value)*)? ']'
 
   %add = graph_op "tf.Add"(%x : $Tensor<Float>, %y : $Tensor<Float>) \
-    [T = $Float] : $Tensor<Float>
+    {T: $Float} : $Tensor<Float>
 
 Represents a graph program operation.
 
