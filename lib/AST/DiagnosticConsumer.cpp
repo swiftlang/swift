@@ -189,7 +189,7 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
       Kind == DiagnosticKind::Error;
 }
 
-bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
+bool FileSpecificDiagnosticConsumer::finishProcessing() {
   tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation();
 
   // Deliberately don't use std::any_of here because we don't want early-exit
@@ -197,7 +197,7 @@ bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
 
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second && subConsumer.second->finishProcessing(SM);
+    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
   return hadError;
 }
 
