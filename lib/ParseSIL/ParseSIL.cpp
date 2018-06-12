@@ -891,10 +891,10 @@ void SILParser::convertRequirements(SILFunction *F,
 /// Parse a SIL constant value (one of the following categories):
 /// - An integer datatype and literal (i32 42).
 /// - A floating point datatype and literal (f64 3.14).
-///   - The literal value may be in either decimal or the hexadecimal format
-///     used by the 'float_literal' instruction.
+///   - The literal value may be in either decimal format or the hexadecimal
+///     format used by the 'float_literal' instruction.
 /// - A metatype (the instance type is parsed) ($Float).
-/// - An aggregate ([i32 1, i64 2, f32 3]).
+/// - An aggregate ([i32 1, i64 2, f32 3.0]).
 /// Returns true on error.
 static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
                                SILBuilder &B) {
