@@ -694,7 +694,7 @@ bool importer::isUnavailableInSwift(
     }
 
     if (platformAvailability.deprecatedAsUnavailableFilter) {
-      clang::VersionTuple version = attr->getDeprecated();
+      llvm::VersionTuple version = attr->getDeprecated();
       if (version.empty())
         continue;
       if (platformAvailability.deprecatedAsUnavailableFilter(
