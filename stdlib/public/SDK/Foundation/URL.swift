@@ -893,6 +893,18 @@ public struct URL : ReferenceConvertible, Equatable {
             return self
         }
     }
+ 
+    //Return a specific value in query string URL path simply
+    //
+    //Example: swift:\\host.com?version=4.0
+    //this function can fetch 'version' of value
+    func fetch(key:String) -> String? {
+        if let uri = URLComponents(string: self.absoluteString){
+            return uri.queryItems?.first(where: {$0.name == key})?.value
+        }
+        return nil
+    }
+    
     
     /// Returns a URL constructed by removing any path extension.
     ///
