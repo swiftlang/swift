@@ -73,7 +73,7 @@ void Evaluator::printDependencies(const AnyRequest &request,
   auto cachedValue = cache.find(request);
   if (cachedValue != cache.end()) {
     out << " -> ";
-    PrintEscapedString(cachedValue->second.getAsString(), out);
+    printEscapedString(cachedValue->second.getAsString(), out);
   }
 
   if (!visited.insert(request).second) {
@@ -195,12 +195,12 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
     const auto &request = allRequests[i];
     out << "  " << getNodeName(request);
     out << " [label=\"";
-    PrintEscapedString(request.getAsString(), out);
+    printEscapedString(request.getAsString(), out);
 
     auto cachedValue = cache.find(request);
     if (cachedValue != cache.end()) {
       out << " -> ";
-      PrintEscapedString(cachedValue->second.getAsString(), out);
+      printEscapedString(cachedValue->second.getAsString(), out);
     }
     out << "\"];\n";
   }
