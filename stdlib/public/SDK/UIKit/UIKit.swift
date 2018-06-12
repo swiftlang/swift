@@ -21,22 +21,6 @@ import _SwiftUIKitOverlayShims
 // UIGeometry
 //===----------------------------------------------------------------------===//
 
-extension UIEdgeInsets {
-  @available(swift, obsoleted: 4.2) // in 4.2 it is provided by the apinotes
-  public static var zero: UIEdgeInsets {
-    @_transparent // @fragile
-    get { return UIEdgeInsets(top: 0.0, left: 0.0, bottom: 0.0, right: 0.0) }
-  }
-}
-
-extension UIOffset {
-  @available(swift, obsoleted: 4.2) // in 4.2 it is provided by the apinotes
-  public static var zero: UIOffset {
-    @_transparent // @fragile
-    get { return UIOffset(horizontal: 0.0, vertical: 0.0) }
-  }
-}
-
 extension UIEdgeInsets : Equatable {
   @_transparent // @fragile
   public static func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
