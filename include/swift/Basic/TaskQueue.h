@@ -33,7 +33,7 @@ namespace sys {
 
 class Task; // forward declared to allow for platform-specific implementations
 
-using ProcessId = llvm::sys::ProcessInfo::ProcessId;
+using ProcessId = llvm::sys::procid_t;
 
 /// \brief Indicates how a TaskQueue should respond to the task finished event.
 enum class TaskFinishedResponse {
