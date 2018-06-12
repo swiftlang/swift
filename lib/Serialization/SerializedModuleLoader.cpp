@@ -163,6 +163,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
       if(err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
             ctx, moduleID.second, moduleName, archName, currPath);
+        return false;
       }
     }
     if (!err)
@@ -192,6 +193,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
       if (err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
             ctx, moduleID.second, moduleName, archName, currPath);
+        return false;
       }
 
       return !err;
