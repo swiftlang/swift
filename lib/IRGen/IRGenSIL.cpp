@@ -885,6 +885,11 @@ public:
     llvm_unreachable("gradient is not valid in canonical SIL");
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitGraphOperationInst(GraphOperationInst *i) {
+    llvm_unreachable("graph_op is not valid in canonical SIL");
+  }
+
   void visitFunctionRefInst(FunctionRefInst *i);
   void visitAllocGlobalInst(AllocGlobalInst *i);
   void visitGlobalAddrInst(GlobalAddrInst *i);

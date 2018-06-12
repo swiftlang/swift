@@ -1176,6 +1176,87 @@ public:
     *this << ") : ";
     *this << BI->getType();
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitSymbolicValue(SymbolicValue v) {
+    switch (v.getKind()) {
+    case SymbolicValue::Integer: {
+      APInt intValue = v.getIntegerValue();
+      *this << "i" << intValue.getBitWidth() << " " << intValue;
+      return;
+    }
+    case SymbolicValue::Float: {
+      APFloat floatValue = v.getFloatValue();
+      *this << "f" << APFloat::getSizeInBits(floatValue.getSemantics()) << " ";
+
+      APInt bits = floatValue.bitcastToAPInt();
+      *this << "0x" << bits.toString(16, /*Signed*/ false);
+      *this << " ";
+
+      SmallString<12> decimal;
+      floatValue.toString(decimal);
+      *this << "/* " << decimal << " */";
+      return;
+    }
+    case SymbolicValue::String:
+      // TODO: Uncomment when `getStringValue` is implemented.
+      // *this << v.getStringValue();
+      llvm_unreachable("`SymbolicValue.getStringValue` is unimplemented");
+      break;
+    case SymbolicValue::Metatype: {
+      auto metatype = cast<AnyMetatypeType>(v.getMetatypeValue());
+      *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
+      break;
+    }
+    case SymbolicValue::Aggregate:
+      *this << "[";
+      interleave(v.getAggregateValue(), [&](SymbolicValue element) {
+        visitSymbolicValue(element);
+      }, [&] {
+        *this << ", ";
+      });
+      *this << "]";
+      break;
+    case SymbolicValue::Function:
+    case SymbolicValue::Address:
+    case SymbolicValue::UninitMemory:
+    case SymbolicValue::Unknown:
+      llvm_unreachable("Unimplemented SymbolicValue case");
+      break;
+    }
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void visitGraphOperationInst(GraphOperationInst *GI) {
+    *this << QuotedString(GI->getName().str());
+
+    *this << "(";
+    interleave(GI->getArguments(), [&](SILValue v) {
+      *this << getIDAndType(v);
+    }, [&] {
+      *this << ", ";
+    });
+    *this << ")";
+
+    if (GI->getNumAttributes()) {
+      *this << " {";
+      interleave(GI->getAttributes(), [&](GraphOperationAttribute attr) {
+        *this << attr.name.str();
+        *this << ": ";
+        visitSymbolicValue(attr.value);
+      }, [&] {
+        *this << ", ";
+      });
+      *this << "}";
+    }
+
+    *this << " : ";
+    interleave(GI->getResultTypes(), [&](SILType type) {
+      *this << type;
+    }, [&] {
+      *this << ", ";
+    });
+  }
   
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
     if (AGI->getReferencedGlobal()) {

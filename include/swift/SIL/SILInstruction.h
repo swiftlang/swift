@@ -29,6 +29,8 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -51,6 +53,8 @@ class MultipleValueInstruction;
 class MultipleValueInstructionResult;
 class DestructureTupleInst;
 class DestructureStructInst;
+// SWIFT_ENABLE_TENSORFLOW
+class GraphOperationInst;
 class NonValueInstruction;
 class SILBasicBlock;
 class SILBuilder;
@@ -7977,6 +7981,128 @@ inline DestructureTupleInst *DestructureTupleResult::getParent() {
   auto *Parent = MultipleValueInstructionResult::getParent();
   return cast<DestructureTupleInst>(Parent);
 }
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// A result for the graph_op instruction. See documentation for
+/// graph_op for more information.
+class GraphOperationResult final : public MultipleValueInstructionResult {
+public:
+  GraphOperationResult(unsigned Index, SILType Type,
+                       ValueOwnershipKind OwnershipKind)
+  : MultipleValueInstructionResult(ValueKind::GraphOperationResult, Index,
+                                   Type, OwnershipKind) {}
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::GraphOperationResult;
+  }
+
+  GraphOperationInst *getParent() {
+    auto *Parent = MultipleValueInstructionResult::getParent();
+    return cast<GraphOperationInst>(Parent);
+  };
+
+  const GraphOperationInst *getParent() const {
+    return const_cast<GraphOperationResult *>(this)->getParent();
+  }
+};
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// A graph operation attribute. Attributes have a name and a constant value.
+struct GraphOperationAttribute {
+  Identifier name;
+  SymbolicValue value;
+};
+
+/// SWIFT_ENABLE_TENSORFLOW
+/// A graph operation. This instruction will be extracted to a graph program
+/// via graph program extraction passes.
+class GraphOperationInst final
+  : public InstructionBase<
+               SILInstructionKind::GraphOperationInst,
+               MultipleValueInstruction>,
+    public MultipleValueInstructionTrailingObjects<
+               GraphOperationInst, GraphOperationResult,
+               InitialTrailingObjects<>,
+               FinalTrailingObjects<Operand, GraphOperationAttribute>> {
+  friend TrailingObjects;
+
+  /// The name of the graph operation.
+  Identifier Name;
+  /// The number of operands.
+  unsigned NumOperands;
+  /// The number of attributes.
+  unsigned NumAttributes;
+
+  GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
+                     ArrayRef<SILValue> arguments,
+                     ArrayRef<GraphOperationAttribute> attrs,
+                     ArrayRef<SILType> resultTypes,
+                     ArrayRef<ValueOwnershipKind> resultOwnerships) :
+    InstructionBase(loc),
+    MultipleValueInstructionTrailingObjects(this, resultTypes,
+                                            resultOwnerships),
+    Name(name), NumOperands(arguments.size()), NumAttributes(attrs.size()) {
+      auto allOperands = getAllOperands();
+      for (unsigned i : indices(arguments))
+        new (&allOperands[i]) Operand(this, arguments[i]);
+      std::uninitialized_copy(attrs.begin(), attrs.end(),
+                              getAttributes().data());
+    }
+
+public:
+  using MultipleValueInstructionTrailingObjects::numTrailingObjects;
+  using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
+
+  ~GraphOperationInst() {
+    for (auto &operand : getAllOperands())
+      operand.~Operand();
+  }
+
+  static GraphOperationInst *create(SILModule &M, SILDebugLocation loc,
+                                    Identifier name,
+                                    ArrayRef<SILValue> arguments,
+                                    ArrayRef<GraphOperationAttribute> attrs,
+                                    ArrayRef<SILType> resultTypes);
+
+  Identifier getName() const { return Name; }
+  unsigned getNumOperands() const { return NumOperands; }
+  unsigned getNumAttributes() const { return NumAttributes; }
+
+  unsigned numTrailingObjects(OverloadToken<Operand>) const {
+    return NumOperands;
+  }
+
+  ArrayRef<Operand> getAllOperands() const {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  MutableArrayRef<Operand> getAllOperands() {
+    return { getTrailingObjects<Operand>(), NumOperands };
+  }
+
+  OperandValueArrayRef getArguments() const {
+    return OperandValueArrayRef(getAllOperands());
+  }
+
+  ArrayRef<GraphOperationAttribute> getAttributes() const {
+    return { getTrailingObjects<GraphOperationAttribute>(), NumAttributes };
+  }
+
+  MutableArrayRef<GraphOperationAttribute> getAttributes() {
+    return { getTrailingObjects<GraphOperationAttribute>(), NumAttributes };
+  }
+
+  Optional<GraphOperationAttribute> getAttribute(StringRef name) {
+    for (auto attr : getAttributes())
+      if (attr.name.is(name))
+        return attr;
+    return None;
+  };
+
+  static bool classof(const SILNode *N) {
+    return N->getKind() == SILNodeKind::GraphOperationInst;
+  }
+};
 
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.

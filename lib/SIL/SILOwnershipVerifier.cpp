@@ -198,6 +198,7 @@ static bool isOwnershipForwardingValueKind(SILNodeKind K) {
   case SILNodeKind::DestructureTupleInst:
   // SWIFT_ENABLE_TENSORFLOW
   case SILNodeKind::GradientInst:
+  case SILNodeKind::GraphOperationInst:
     return true;
   default:
     return false;
@@ -687,6 +688,7 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_ANY_OWNERSHIP_INST(Gradient)
+FORWARD_ANY_OWNERSHIP_INST(GraphOperation)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.

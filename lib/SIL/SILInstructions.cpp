@@ -2463,3 +2463,24 @@ DestructureTupleInst *DestructureTupleInst::create(SILModule &M,
   return ::new (Buffer)
       DestructureTupleInst(M, Loc, Operand, Types, OwnershipKinds);
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+GraphOperationInst *GraphOperationInst::create(
+    SILModule &M, SILDebugLocation loc, Identifier name,
+    ArrayRef<SILValue> arguments, ArrayRef<GraphOperationAttribute> attributes,
+    ArrayRef<SILType> resultTypes) {
+  llvm::SmallVector<ValueOwnershipKind, 4> resultOwnerships;
+  for (auto resultType : resultTypes) {
+    auto ownership = resultType.isTrivial(M)
+      ? ValueOwnershipKind::Trivial : ValueOwnershipKind::Owned;
+    resultOwnerships.push_back(ownership);
+  }
+
+  unsigned size =
+    totalSizeToAlloc<MultipleValueInstruction *, GraphOperationResult, Operand,
+                     GraphOperationAttribute>(
+      1, resultTypes.size(), arguments.size(), attributes.size());
+  void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
+  return ::new (buffer) GraphOperationInst(M, loc, name, arguments, attributes,
+                                           resultTypes, resultOwnerships);
+}

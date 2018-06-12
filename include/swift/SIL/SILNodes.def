@@ -218,7 +218,9 @@ ABSTRACT_VALUE(MultipleValueInstructionResult, ValueBase)
   MULTIPLE_VALUE_INST_RESULT(BeginApplyResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureStructResult, MultipleValueInstructionResult)
   MULTIPLE_VALUE_INST_RESULT(DestructureTupleResult, MultipleValueInstructionResult)
-  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, DestructureTupleResult)
+  // SWIFT_ENABLE_TENSORFLOW
+  MULTIPLE_VALUE_INST_RESULT(GraphOperationResult, MultipleValueInstructionResult)
+  VALUE_RANGE(MultipleValueInstructionResult, BeginApplyResult, GraphOperationResult)
 
 VALUE(SILUndef, ValueBase)
 
@@ -666,10 +668,13 @@ MULTIPLE_VALUE_INST(DestructureStructInst, destructure_struct,
                     SILInstruction, None, DoesNotRelease)
 MULTIPLE_VALUE_INST(DestructureTupleInst, destructure_tuple,
                     SILInstruction, None, DoesNotRelease)
-INST_RANGE(MultipleValueInstruction, BeginApplyInst, DestructureTupleInst)
+// SWIFT_ENABLE_TENSORFLOW
+MULTIPLE_VALUE_INST(GraphOperationInst, graph_op,
+                    SILInstruction, None, DoesNotRelease)
+INST_RANGE(MultipleValueInstruction, BeginApplyInst, GraphOperationInst)
 
-NODE_RANGE(SILInstruction, AllocStackInst, DestructureTupleInst)
-NODE_RANGE(SILNode, SILPHIArgument, DestructureTupleInst)
+NODE_RANGE(SILInstruction, AllocStackInst, GraphOperationInst)
+NODE_RANGE(SILNode, SILPHIArgument, GraphOperationInst)
 
 #undef SINGLE_VALUE_INST_RANGE
 #undef INST_RANGE
