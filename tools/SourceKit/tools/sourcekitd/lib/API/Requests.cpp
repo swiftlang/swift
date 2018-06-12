@@ -322,6 +322,15 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     ::exit(1);
   }
 
+  if (ReqUID == RequestTestNotification) {
+    static UIdent TestNotification("source.notification.test");
+    ResponseBuilder RespBuilder;
+    auto Dict = RespBuilder.getDictionary();
+    Dict.set(KeyNotification, TestNotification);
+    sourcekitd::postNotification(RespBuilder.createResponse());
+    return Rec(ResponseBuilder().createResponse());
+  }
+
   if (ReqUID == RequestDemangle) {
     SmallVector<const char *, 8> MangledNames;
     bool Failed = Req.getStringArray(KeyNames, MangledNames, /*isOptional=*/true);
