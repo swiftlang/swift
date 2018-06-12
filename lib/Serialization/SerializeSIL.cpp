@@ -922,6 +922,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                              Args);
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GraphOperationInst: {
+    llvm_unreachable("Unimplemented");
+  }
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for

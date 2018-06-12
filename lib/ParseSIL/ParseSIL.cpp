@@ -26,6 +26,8 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
+/// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -882,6 +884,159 @@ void SILParser::convertRequirements(SILFunction *F,
     llvm_unreachable("Unsupported requirement kind");
   }
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Parse a SIL constant value (one of the following categories):
+/// - An integer datatype and literal (i32 42).
+/// - A floating point datatype and literal (f64 3.14).
+///   - The literal value may be in either decimal format or the hexadecimal
+///     format used by the 'float_literal' instruction.
+/// - A metatype (the instance type is parsed) ($Float).
+/// - An aggregate ([i32 1, i64 2, f32 3.0]).
+///   - Aggregates values represent constant arrays/structs/tuples.
+/// Returns true on error.
+static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
+                               SILBuilder &B) {
+  auto &P = SP.P;
+  auto &allocator = B.getModule().getASTContext().getAllocator();
+
+  if (P.Tok.is(tok::identifier)) {
+    // Bitwidth of the integer/floating point literal.
+    unsigned width;
+    // Handle integer literals.
+    if (P.Tok.getText().startswith("i")) {
+      // Parse integer datatype.
+      P.consumeStartingCharacterOfCurrentToken();
+      if (SP.parseInteger(width, diag::sil_const_expected_int_datatype))
+        return true;
+
+      // Parse integer value.
+      bool negative = false;
+      if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
+        negative = true;
+        P.consumeToken();
+      }
+      APInt intValue(width, 0);
+      if (SP.parseInteger(intValue, diag::sil_const_expected_int_value))
+        return true;
+
+      // Negate and truncate value, if necessary.
+      if (negative)
+        intValue = -intValue;
+      if (intValue.getBitWidth() != width)
+        intValue = intValue.zextOrTrunc(width);
+
+      value = SymbolicValue::getInteger(intValue, allocator);
+      return false;
+    }
+    // Handle floating point literals.
+    if (P.Tok.getText().startswith("f")) {
+      // Parse floating point datatype.
+      auto datatypeToken = P.Tok;
+      P.consumeStartingCharacterOfCurrentToken();
+      if (SP.parseInteger(width, diag::sil_const_expected_fp_datatype))
+        return true;
+
+      // Parse floating point value.
+      // Handle hexadecimal case.
+      if (P.Tok.is(tok::integer_literal) && P.Tok.getText().startswith("0x")) {
+        APInt bits(width, 0);
+        P.Tok.getText().getAsInteger(0, bits);
+        P.consumeToken(tok::integer_literal);
+        if (bits.getBitWidth() != width)
+          bits = bits.zextOrTrunc(width);
+        switch (width) {
+          case 32: {
+            APFloat floatValue(APFloat::IEEEsingle(), bits);
+            value = SymbolicValue::getFloat(floatValue, allocator);
+            return false;
+          }
+          case 64: {
+            APFloat floatValue(APFloat::IEEEdouble(), bits);
+            value = SymbolicValue::getFloat(floatValue, allocator);
+            return false;
+          }
+          default:
+            P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
+            return true;
+        }
+      }
+      // Handle decimal case.
+      bool negative = false;
+      if (P.Tok.isAnyOperator() && P.Tok.getText() == "-") {
+        negative = true;
+        P.consumeToken();
+      }
+      if (!P.Tok.is(tok::floating_literal)) {
+        P.diagnose(P.Tok, diag::sil_const_expected_fp_value);
+        return true;
+      }
+      double tmpValue;
+      P.Tok.getText().getAsDouble(tmpValue);
+      P.consumeToken(tok::floating_literal);
+
+      APFloat floatValue((float) 0);
+      switch (width) {
+      case 32:
+        floatValue = APFloat((float) tmpValue);
+        break;
+      case 64:
+        floatValue = APFloat(tmpValue);
+        break;
+      default:
+        P.diagnose(datatypeToken, diag::sil_const_expected_fp_datatype);
+        return true;
+      }
+      if (negative)
+        floatValue.changeSign();
+      value = SymbolicValue::getFloat(floatValue, allocator);
+      return false;
+    }
+  }
+  // Handle string literals.
+  if (P.Tok.is(tok::string_literal)) {
+    // TODO: Uncomment when `getStringValue` is implemented.
+    // StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    // value = SymbolicValue::getStringValue(rawString, allocator);
+    // return false;
+    P.diagnose(P.Tok, diag::sil_graph_op_unhandled_attr_value);
+    return true;
+  }
+  // Handle metatypes (the instance type is parsed).
+  if (P.Tok.is(tok::sil_dollar)) {
+    SILType temp;
+    if (SP.parseSILType(temp))
+      return true;
+    auto metatype = CanMetatypeType::get(temp.getSwiftRValueType());
+    value = SymbolicValue::getMetatype(metatype);
+    return false;
+  }
+  // Handle aggregate literals.
+  if (P.Tok.is(tok::l_square)) {
+    SourceLoc lSquareLoc = P.consumeToken(tok::l_square);
+    SourceLoc rSquareLoc;
+
+    SmallVector<SymbolicValue, 8> elements;
+    ParserStatus status =
+      P.parseList(tok::r_square, lSquareLoc, rSquareLoc,
+                  /*AllowSepAfterLast*/ false,
+                  diag::sil_const_aggregate_expected_rsquare,
+                  SyntaxKind::Unknown,
+                  [&]() -> ParserStatus {
+      SymbolicValue element;
+      if (parseSymbolicValue(element, SP, B))
+        return makeParserError();
+      elements.push_back(element);
+      return makeParserSuccess();
+    });
+    if (status.isError())
+      return true;
+    value = SymbolicValue::getAggregate(elements, allocator);
+    return false;
+  }
+  P.diagnose(P.Tok, diag::sil_graph_op_expected_attr_value);
+  return true;
+};
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// Parse an adjoint attribute, e.g. `[differentiable wrt 0, 1 adjoint @other]`.
@@ -2782,6 +2937,90 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createBuiltin(InstLoc, Id, ResultTy, subMap, Args);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  case SILInstructionKind::GraphOperationInst: {
+    // Parse graph operation name.
+    if (P.Tok.isNot(tok::string_literal)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "graph_op name");
+      return true;
+    }
+    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    Identifier name = P.Context.getIdentifier(rawString);
+    P.consumeToken(tok::string_literal);
+
+    // Parse graph operation arguments.
+    if (P.Tok.isNot(tok::l_paren)) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(");
+      return true;
+    }
+    SmallVector<SILValue, 4> arguments;
+    SourceLoc lParenLoc = P.consumeToken(tok::l_paren);
+    SourceLoc rParenLoc;
+    ParserStatus status =
+      P.parseList(tok::r_paren, lParenLoc, rParenLoc,
+                  /*AllowSepAfterLast*/ false,
+                  diag::sil_graph_op_expected_rparen,
+                  SyntaxKind::TuplePatternElementList,
+                  [&]() -> ParserStatus {
+        SILValue value;
+        if (parseTypedValueRef(value, B))
+          return makeParserError();
+        arguments.push_back(value);
+        return makeParserSuccess();
+      });
+    if (status.isError())
+      return true;
+
+    // Parse optional graph operation attributes.
+    SmallVector<GraphOperationAttribute, 4> attributes;
+    SourceLoc lBraceLoc;
+    if (P.consumeIf(tok::l_brace, lBraceLoc)) {
+      SourceLoc rBraceLoc;
+      ParserStatus status =
+        P.parseList(tok::r_brace, lBraceLoc, rBraceLoc,
+                    /*AllowSepAfterLast*/ false,
+                    diag::sil_graph_op_expected_rbrace,
+                    SyntaxKind::Unknown,
+                    [&]() -> ParserStatus {
+        // Parse an attribute.
+        Identifier attrName;
+        if (parseSILIdentifier(attrName, lBraceLoc,
+                               diag::sil_graph_op_expected_attr_name))
+          return makeParserError();
+        SymbolicValue attrValue;
+        if (!P.consumeIf(tok::colon)) {
+          P.diagnose(P.Tok, diag::sil_graph_op_expected_colon_after_attr_name);
+          return makeParserError();
+        }
+        if (parseSymbolicValue(attrValue, *this, B))
+          return makeParserError();
+        attributes.push_back({ attrName, attrValue });
+        return makeParserSuccess();
+      });
+      if (status.isError())
+        return true;
+    }
+
+    // Parse graph operation result types.
+    if (P.parseToken(tok::colon,
+                     diag::sil_graph_op_expected_colon_before_result_types))
+      return true;
+    SmallVector<SILType, 4> resultTypes;
+    SILType temp;
+    while (true) {
+      if (parseSILType(temp))
+        return true;
+      resultTypes.push_back(temp);
+      if (!P.consumeIf(tok::comma))
+        break;
+    }
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createGraphOperation(InstLoc, name, arguments, attributes,
+                                       resultTypes);
     break;
   }
   case SILInstructionKind::OpenExistentialAddrInst:

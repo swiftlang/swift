@@ -1614,6 +1614,21 @@ void SILCloner<ImplClass>::visitDestructureTupleInst(
                                           getOpValue(Inst->getOperand())));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitGraphOperationInst(GraphOperationInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto arguments =
+    getOpValueArray<4>(OperandValueArrayRef(Inst->getArguments()));
+  SmallVector<SILType, 4> resultTypes;
+  for (auto result : Inst->getResults())
+    resultTypes.push_back(result->getType());
+  doPostProcess(Inst,
+      getBuilder().createGraphOperation(getOpLocation(Inst->getLoc()),
+                                        Inst->getName(), arguments,
+                                        Inst->getAttributes(), resultTypes));
+}
+
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitClassMethodInst(ClassMethodInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
