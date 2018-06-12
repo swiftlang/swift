@@ -1438,8 +1438,6 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
-  // SWIFT_ENABLE_TENSORFLOW
-  using DifferentiableDeclAttrLayout = BCRecordLayout<Differentiable_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,
@@ -1494,6 +1492,17 @@ namespace decls_block {
     Specialize_DECL_ATTR,
     BCFixed<1>, // exported flag
     BCFixed<1> // specialization kind
+  >;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiableDeclAttrLayout = BCRecordLayout<
+    Differentiable_DECL_ATTR,
+    BCFixed<1>, // Differentiation mode ('forward' or 'reverse').
+    IdentifierIDField, // Primal name.
+    DeclIDField, // Primal function declaration.
+    IdentifierIDField, // Adjoint name.
+    DeclIDField, // Adjoint function declaration.
+    BCArray<BCFixed<32>> // Differentiation parameters.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \

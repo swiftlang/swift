@@ -2178,8 +2178,6 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
   case DAK_ObjCRuntimeName:
   case DAK_RestatedObjCConformance:
   case DAK_ClangImporterSynthesizedType:
-  // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Differentiable:
     llvm_unreachable("cannot serialize attribute");
 
   case DAK_Count:
@@ -2335,6 +2333,42 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
                                          (unsigned)SA->isExported(),
                                          (unsigned)SA->getSpecializationKind());
     writeGenericRequirements(SA->getRequirements(), DeclTypeAbbrCodes);
+    return;
+  }
+
+  case DAK_Differentiable: {
+    auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
+    auto attr = cast<DifferentiableAttr>(DA);
+
+    IdentifierID primalName = 0;
+    DeclID primalRef = 0;
+    if (auto primal = attr->getPrimal()) {
+      primalName = addDeclBaseNameRef(primal->Name.getBaseName());
+      primalRef = addDeclRef(attr->getPrimalFunction());
+    }
+    auto adjointName = addDeclBaseNameRef(attr->getAdjoint().Name.getBaseName());
+    auto adjointRef = addDeclRef(attr->getAdjointFunction());
+
+    SmallVector<uint32_t, 4> parameters;
+    for (auto param : attr->getParameters()) {
+      switch (param.getKind()) {
+      // The self parameter is uniquely identified by 0x01.
+      case AutoDiffParameter::Kind::Self:
+        parameters.push_back(1);
+        break;
+      // Index parameters are left-shifted by 1.
+      case AutoDiffParameter::Kind::Index:
+        parameters.push_back(param.getIndex() << 1);
+        break;
+      }
+    }
+
+    DifferentiableDeclAttrLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, (unsigned) attr->getMode(), primalName,
+      primalRef, adjointName, adjointRef, parameters);
+    // TODO: Serialize trailing where clause.
+    // Type-checking where clause should be done first (mimicking the
+    // @_specialize attribute).
     return;
   }
   }

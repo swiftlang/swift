@@ -2528,6 +2528,50 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         break;
       }
 
+      case decls_block::Differentiable_DECL_ATTR: {
+        AutoDiffMode autodiffMode = AutoDiffMode::Reverse;
+        unsigned autodiffModeValue;
+        uint64_t primalNameId;
+        DeclID primalDeclId;
+        uint64_t adjointNameId;
+        DeclID adjointDeclId;
+        ArrayRef<uint64_t> paramValues;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+          scratch, autodiffModeValue, primalNameId, primalDeclId, adjointNameId,
+          adjointDeclId, paramValues);
+        autodiffMode = autodiffModeValue
+          ? AutoDiffMode::Reverse
+          : AutoDiffMode::Forward;
+
+        using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
+        Optional<FuncSpecifier> primal;
+        FuncDecl *primalDecl = nullptr;
+        if (primalNameId != 0 && primalDeclId != 0) {
+          primal = { getIdentifier(primalNameId), DeclNameLoc() };
+          primalDecl = cast<FuncDecl>(getDecl(primalDeclId));
+        }
+        FuncSpecifier adjoint = { getIdentifier(adjointNameId), DeclNameLoc() };
+        FuncDecl *adjointDecl = cast<FuncDecl>(getDecl(adjointDeclId));
+
+        SmallVector<AutoDiffParameter, 4> parameters;
+        for (auto paramValue : paramValues) {
+          auto parameter = paramValue & 0x01
+            ? AutoDiffParameter::getSelfParameter(SourceLoc())
+            : AutoDiffParameter::getIndexParameter(SourceLoc(), paramValue>>1);
+          parameters.push_back(parameter);
+        }
+        // TODO: Deserialize trailing where clause.
+        auto diffAttr =
+          DifferentiableAttr::create(ctx, SourceLoc(), SourceRange(),
+                                     autodiffMode, SourceLoc(), parameters,
+                                     primal, adjoint, nullptr);
+        diffAttr->setPrimalFunction(primalDecl);
+        diffAttr->setAdjointFunction(adjointDecl);
+        Attr = diffAttr;
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \
