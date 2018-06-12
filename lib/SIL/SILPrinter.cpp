@@ -2712,6 +2712,15 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
           !D->isImplicit()) {
         if (isa<AccessorDecl>(D))
           continue;
+
+        // skip to visit ASTPrinter to avoid sil-opt prints duplicated import declarations
+        if (auto importDecl = dyn_cast<ImportDecl>(D)) {
+          StringRef importName = importDecl->getModule()->getName().str();
+          if (importName == BUILTIN_NAME ||
+              importName == STDLIB_NAME ||
+              importName == SWIFT_SHIMS_NAME)
+            continue;
+        }
         D->print(OS, Options);
         OS << "\n\n";
       }
