@@ -1166,7 +1166,7 @@ public extension Tensor {
       let offset: Tensor<Int32> = Tensor<Int32>(
         Raw.scatterNd(
           indices: scatterIndices,
-          updates: boundSize,
+          updates: Tensor<Float>(boundSize),
           shape: rankTensor.rankLifted()
         )
       )

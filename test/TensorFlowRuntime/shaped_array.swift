@@ -7,6 +7,9 @@
 import TensorFlow
 import StdlibUnittest
 
+// TODO(SR-7983): Investigate why this is necessary.
+import SwiftOnoneSupport
+
 var ShapedArrayTests = TestSuite("ShapedArrayTests")
 
 // TODO: add full Collection scalar test suite.

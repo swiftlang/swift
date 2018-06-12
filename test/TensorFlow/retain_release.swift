@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -o -
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify | %FileCheck %s
 
-// FIXME(b/78371828): Should this test work with optimized_stdlib?
-// UNSUPPORTED: optimized_stdlib
-
 import TensorFlow
 
 // Unit tests on generating balanced retain/release SIL instructions.
