@@ -1016,7 +1016,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   // Determine the type of the value, opening up that type if necessary.
   bool wantInterfaceType = !varDecl->getDeclContext()->isLocalContext();
   Type valueType =
-      getUnopenedTypeOfReference(varDecl, Type(), DC, base, wantInterfaceType);
+      getUnopenedTypeOfReference(varDecl, Type(), useDC, base, wantInterfaceType);
 
   assert(!valueType->hasUnboundGenericType() &&
          !valueType->hasTypeParameter());
