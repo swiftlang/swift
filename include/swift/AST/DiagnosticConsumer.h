@@ -100,7 +100,7 @@ public:
                                 const DiagnosticInfo &Info) = 0;
 
   /// \returns true if an error occurred while finishing-up.
-  virtual bool finishProcessing(SourceManager &SM) { return false; }
+  virtual bool finishProcessing() { return false; }
 
   /// In batch mode, any error causes failure for all primary files, but
   /// anyone consulting .dia files will only see an error for a particular
@@ -202,7 +202,7 @@ public:
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-  bool finishProcessing(SourceManager &) override;
+  bool finishProcessing() override;
 
 private:
   /// In batch mode, any error causes failure for all primary files, but
