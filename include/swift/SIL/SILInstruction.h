@@ -7996,7 +7996,11 @@ public:
     return N->getKind() == SILNodeKind::GraphOperationResult;
   }
 
-  GraphOperationInst *getParent();
+  GraphOperationInst *getParent() {
+    auto *Parent = MultipleValueInstructionResult::getParent();
+    return cast<GraphOperationInst>(Parent);
+  };
+
   const GraphOperationInst *getParent() const {
     return const_cast<GraphOperationResult *>(this)->getParent();
   }
@@ -8099,13 +8103,6 @@ public:
     return N->getKind() == SILNodeKind::GraphOperationInst;
   }
 };
-
-// SWIFT_ENABLE_TENSORFLOW
-// Out of line to work around forward declaration issues.
-inline GraphOperationInst *GraphOperationResult::getParent() {
-  auto *Parent = MultipleValueInstructionResult::getParent();
-  return cast<GraphOperationInst>(Parent);
-}
 
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.

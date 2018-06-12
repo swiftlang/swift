@@ -895,6 +895,7 @@ void SILParser::convertRequirements(SILFunction *F,
 ///     format used by the 'float_literal' instruction.
 /// - A metatype (the instance type is parsed) ($Float).
 /// - An aggregate ([i32 1, i64 2, f32 3.0]).
+///   - Aggregates values represent constant arrays/structs/tuples.
 /// Returns true on error.
 static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
                                SILBuilder &B) {
