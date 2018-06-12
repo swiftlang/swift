@@ -6,6 +6,7 @@
 
 import TensorFlow
 import StdlibUnittest
+import SwiftOnoneSupport
 
 var ShapedArrayTests = TestSuite("ShapedArrayTests")
 

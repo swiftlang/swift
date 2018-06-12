@@ -7,6 +7,7 @@
 import StdlibUnittest
 import CTensorFlow
 import TensorFlow
+import SwiftOnoneSupport
 
 var RuntimeTests = TestSuite("SyncRuntime")
 
