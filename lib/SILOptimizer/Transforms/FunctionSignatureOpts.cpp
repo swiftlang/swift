@@ -1275,11 +1275,12 @@ public:
     }
 
     // Allocate the argument and result descriptors.
+    llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
     auto Args = F->begin()->getFunctionArguments();
-    for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-      ArgumentDescList.emplace_back(Args[i]);
+    for (unsigned i : indices(Args)) {
+      ArgumentDescList.emplace_back(Args[i], Allocator);
     }
     for (SILResultInfo IR : F->getLoweredFunctionType()->getResults()) {
       ResultDescList.emplace_back(IR);
