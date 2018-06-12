@@ -211,7 +211,7 @@ void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
   SILFunction *f = getFunction(thunk, ForDefinition);
   f->setThunk(IsThunk);
   if (thunk.asForeign().isClangGenerated())
-    f->setSerialized(IsSerialized);
+    f->setSerialized(IsSerializable);
   preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
