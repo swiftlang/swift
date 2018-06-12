@@ -1383,6 +1383,10 @@ namespace importer {
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
+/// Identifies certain UIKit constants that used to have overlay equivalents,
+/// but are now renamed using the swift_name attribute.
+bool isSpecialUIKitStructZeroProperty(const clang::NamedDecl *decl);
+
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
 static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
