@@ -141,7 +141,7 @@ public func testExitBranch2(i: Int) {
   }
 
   x += x    // expected-warning {{value implicitly copied to the host}}
-  print(x) // expected-note {{value used here}}
+  print(x)  // expected-note {{value used here}}
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testExitBranch2{{.*}}
