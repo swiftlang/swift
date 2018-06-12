@@ -1603,10 +1603,12 @@ giveUpFastPath:
       uint8_t rawKind;
       XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, None,
                                                         rawKind);
+      if (values.empty())
+        break;
 
-      if (values.size() == 1) {
+      if (!values.front()->getBaseName().isOperator()) {
+        pathTrace.addAccessor(rawKind);
         if (auto storage = dyn_cast<AbstractStorageDecl>(values.front())) {
-          pathTrace.addAccessor(rawKind);
           switch (rawKind) {
           case Getter:
             values.front() = storage->getGetter();
@@ -1631,9 +1633,8 @@ giveUpFastPath:
             error();
             return nullptr;
           }
-
-          break;
         }
+        break;
       }
 
       pathTrace.addOperatorFilter(rawKind);
@@ -1745,9 +1746,8 @@ giveUpFastPath:
 
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
-    return llvm::make_error<llvm::StringError>(
-        "result is ambiguous",
-        std::error_code(EINVAL, std::generic_category()));
+    return llvm::make_error<XRefError>("result is ambiguous", pathTrace,
+                                       getXRefDeclNameForError());
   }
 
   return values.front();
