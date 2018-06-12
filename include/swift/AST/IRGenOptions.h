@@ -103,6 +103,9 @@ public:
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
+  /// \brief Whether we're generating code for the integrated REPL.
+  unsigned IntegratedREPL : 1;
+  
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -182,6 +185,7 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
+        IntegratedREPL(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
         EmitStackPromotionChecks(false), PrintInlineTree(false),
