@@ -82,36 +82,38 @@ openModuleFiles(StringRef DirName, StringRef ModuleFilename,
 }
 
 static void addDiagnosticInfoForArchitectureMismatch(ASTContext &ctx,
-                             SourceLoc sourceLocation,
-                             llvm::SmallString<64> moduleName,
-                             llvm::SmallString<16> archName,
-                             llvm::SmallString<128> directoryPath) {
+                                                     SourceLoc sourceLocation,
+                                                     StringRef moduleName,
+                                                     StringRef archName,
+                                                     StringRef directoryPath) {
 
   std::error_code errorCode;
-  llvm::Twine twineDirPath(directoryPath);
-  llvm::sys::fs::directory_iterator directoryIterator(twineDirPath,
-                                                      errorCode,
+  llvm::sys::fs::directory_iterator directoryIterator(directoryPath, errorCode,
                                                       true);
   llvm::sys::fs::directory_iterator endIterator;
 
-  if(errorCode) {
-      return;
-    }
+  if (errorCode) {
+    return;
+  }
 
   std::string foundArchs;
-  for (; directoryIterator != endIterator; directoryIterator.increment(errorCode)) {
+  for (; directoryIterator != endIterator;
+       directoryIterator.increment(errorCode)) {
+    if (errorCode) {
+      return;
+    }
     auto entry = *directoryIterator;
-    llvm::StringRef filePath(entry.path());
-    llvm::StringRef extension = llvm::sys::path::extension(filePath);
-    if(extension.startswith(".") &&
-       extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
-        foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "")
-                                + llvm::sys::path::stem(filePath).str();
+    StringRef filePath(entry.path());
+    StringRef extension = llvm::sys::path::extension(filePath);
+    if (extension.startswith(".") &&
+        extension.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+      foundArchs = foundArchs + (foundArchs.length() > 0 ? ", " : "") +
+                   llvm::sys::path::stem(filePath).str();
     }
   }
 
-  ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch,
-                     moduleName, archName, foundArchs);
+  ctx.Diags.diagnose(sourceLocation, diag::sema_no_import_arch, moduleName,
+                     archName, foundArchs);
 }
 
 static bool
@@ -158,15 +160,10 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
 
-    if(err == std::errc::no_such_file_or_directory) {
-      addDiagnosticInfoForArchitectureMismatch(ctx,
-                                               moduleID.second,
-                                               moduleName,
-                                               archName,
-                                               currPath);
-    }
-
-    return false;
+      if(err == std::errc::no_such_file_or_directory) {
+        addDiagnosticInfoForArchitectureMismatch(
+            ctx, moduleID.second, moduleName, archName, currPath);
+      }
     }
     if (!err)
       return true;
@@ -179,12 +176,24 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
 
     auto tryFrameworkImport = [&](StringRef frameworkPath) -> bool {
       currPath = frameworkPath;
-      llvm::sys::path::append(currPath, moduleFramework.str(),
+      llvm::sys::path::append(currPath, moduleFramework.str());
+      // Check if the framework directory exists
+      if (!llvm::sys::fs::is_directory(currPath)) {
+        return false;
+      }
+
+      llvm::sys::path::append(currPath,
                               "Modules", moduleFilename.str());
       auto err = openModuleFiles(currPath,
                                  archFile.str(), archDocFile.str(),
                                  moduleBuffer, moduleDocBuffer,
                                  scratch);
+
+      if (err == std::errc::no_such_file_or_directory) {
+        addDiagnosticInfoForArchitectureMismatch(
+            ctx, moduleID.second, moduleName, archName, currPath);
+      }
+
       return !err;
     };
 
