@@ -720,11 +720,6 @@ Driver::buildCompilation(const ToolChain &TC,
   const bool ContinueBuildingAfterErrors =
       BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
 
-  // Issue a remark to facilitate recognizing the use of batch mode in the build
-  // log.
-  if (BatchMode)
-    Diags.diagnose(SourceLoc(), diag::remark_using_batch_mode);
-
   if (Diags.hadAnyError())
     return nullptr;
 
