@@ -242,6 +242,17 @@ Type TypeChecker::getRawType(EnumDecl *enumDecl) {
   return Context.evaluator(EnumRawTypeRequest(enumDecl));
 }
 
+Type TypeChecker::getInheritedType(
+                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                         unsigned index) {
+  return Context.evaluator(InheritedTypeRequest(decl, index));
+}
+
+void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
+  ProtocolRequirementTypeResolver resolver;
+  validateWhereClauses(proto, &resolver);
+}
+
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                                        GenericTypeResolver *resolver) {
   TypeResolutionOptions options;
@@ -266,24 +277,7 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
   ITC.satisfy(requestInheritedProtocols(protocol));
-
-  ProtocolRequirementTypeResolver resolver;
-  validateWhereClauses(protocol, &resolver);
-}
-
-void TypeChecker::resolveInheritanceClause(
-       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
-  IterativeTypeChecker ITC(*this);
-  unsigned numInherited;
-  if (auto ext = decl.dyn_cast<ExtensionDecl *>()) {
-    numInherited = ext->getInherited().size();
-  } else {
-    numInherited = decl.get<TypeDecl *>()->getInherited().size();
-  }
-
-  for (unsigned i = 0; i != numInherited; ++i) {
-    ITC.satisfy(requestResolveInheritedClauseEntry({ decl, i }));
-  }
+  resolveTrailingWhereClause(protocol);
 }
 
 /// check the inheritance clause of a type declaration or extension thereof.

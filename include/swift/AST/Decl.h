@@ -1661,6 +1661,9 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
+
   /// Whether we have fully checked the extension.
   bool hasValidSignature() const {
     return hasValidationStarted() && !isBeingValidated();
@@ -2495,6 +2498,9 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
 
   /// Whether we already type-checked the inheritance clause.
   bool checkedInheritanceClause() const {

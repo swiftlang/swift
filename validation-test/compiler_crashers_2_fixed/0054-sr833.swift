@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 public class A <T> {
     public init() {}

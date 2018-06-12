@@ -1579,11 +1579,11 @@ public:
   void validateWhereClauses(ProtocolDecl *protocol,
                             GenericTypeResolver *resolver);
 
-  /// Resolve the types in the inheritance clause of the given
-  /// declaration context, which will be a nominal type declaration or
-  /// extension declaration.
-  void resolveInheritanceClause(
-         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override;
+  /// Get a specific inherited type from the given declaration.
+  Type getInheritedType(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                        unsigned index) override;
+
+  void resolveTrailingWhereClause(ProtocolDecl *proto) override;
 
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl,
