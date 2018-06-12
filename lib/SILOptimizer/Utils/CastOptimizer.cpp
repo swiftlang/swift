@@ -1434,6 +1434,8 @@ static bool optimizeStaticallyKnownProtocolConformance(
                                                       SourceType, Conformances);
           auto Projection =
               B.createProjectExistentialBox(Loc, Src->getType(), AllocBox);
+          // This needs to be a copy_addr (for now) because we must handle
+          // address-only types.
           B.createCopyAddr(Loc, Src, Projection, IsTake, IsInitialization);
           B.createStore(Loc, AllocBox, Dest,
                         swift::StoreOwnershipQualifier::Unqualified);

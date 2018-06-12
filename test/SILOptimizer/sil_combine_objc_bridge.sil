@@ -202,6 +202,8 @@ enum AddressOnlyError : Error {
   case none
 }
 
+// Test that we emit a copy_addr for the address-only value initialization.
+
 // CHECK-LABEL: sil @unconditional_checked_cast_addr_address_only_type
 // CHECK: alloc_stack $Error
 // CHECK: alloc_stack $AddressOnlyError
