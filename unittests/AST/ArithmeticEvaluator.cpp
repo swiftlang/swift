@@ -23,7 +23,6 @@
 
 using namespace swift;
 using namespace llvm;
-using std::isnan;
 
 class ArithmeticExpr {
  public:
@@ -325,34 +324,34 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   // Evaluate when there is a cycle.
   UncachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(isnan(evaluator(UncachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
   EXPECT_TRUE(UncachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
-  EXPECT_TRUE(isnan(evaluator(UncachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(UncachedEvaluationRule(product))));
   UncachedEvaluationRule::brokeCycle = false;
   EXPECT_FALSE(UncachedEvaluationRule::brokeCycle);
 
   // Evaluate when there is a cycle.
   evaluator.clearCache();
   InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
   EXPECT_TRUE(InternallyCachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
   InternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(isnan(evaluator(InternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(InternallyCachedEvaluationRule(product))));
   EXPECT_FALSE(InternallyCachedEvaluationRule::brokeCycle);
 
   // Evaluate when there is a cycle.
   evaluator.clearCache();
   ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
   EXPECT_TRUE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Cycle-breaking result is cached.
   ExternallyCachedEvaluationRule::brokeCycle = false;
-  EXPECT_TRUE(isnan(evaluator(ExternallyCachedEvaluationRule(product))));
+  EXPECT_TRUE(std::isnan(evaluator(ExternallyCachedEvaluationRule(product))));
   EXPECT_FALSE(ExternallyCachedEvaluationRule::brokeCycle);
 
   // Dependency printing.
