@@ -5885,19 +5885,32 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // We consider the number of arguments to decide whether we'd go with it or
   // stay with the original one.
   if (fnExpr != callExpr->getFn()) {
-    size_t numArgs = 1;
-    auto arg = callExpr->getArg();
-    if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-      numArgs = tuple->getNumElements();
+    bool isInstanceMethodAsCurriedMemberOnType = false;
+    if (!calleeInfo.empty()) {
+      auto &&cand = calleeInfo[0];
+      auto decl = cand.getDecl();
+      if (decl && decl->isInstanceMember() && cand.level == 0 &&
+          cand.getParameters().size() == 1)
+        isInstanceMethodAsCurriedMemberOnType = true;
     }
 
-    if (!acceptNumArgs(calleeInfo, numArgs)) {
-      CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
-                                         hasTrailingClosure, CS);
-      if (acceptNumArgs(calleeInfoOrig, numArgs)) {
-        fnExpr = callExpr->getFn();
-        fnType = getFuncType(CS.getType(fnExpr));
-        calleeInfo = calleeInfoOrig;
+    // In terms of instance method as curried member on type, we should not
+    // take the number of arguments into account.
+    if (!isInstanceMethodAsCurriedMemberOnType) {
+      size_t numArgs = 1;
+      auto arg = callExpr->getArg();
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        numArgs = tuple->getNumElements();
+      }
+
+      if (!acceptNumArgs(calleeInfo, numArgs)) {
+        CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
+                                           hasTrailingClosure, CS);
+        if (acceptNumArgs(calleeInfoOrig, numArgs)) {
+          fnExpr = callExpr->getFn();
+          fnType = getFuncType(CS.getType(fnExpr));
+          calleeInfo = calleeInfoOrig;
+        }
       }
     }
   }
