@@ -727,7 +727,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                    ExistentialRepresentation::Boxed, *this);
     ManagedValue mv = F(SGFContext(&init));
     if (!mv.isInContext()) {
-      mv.forwardInto(*this, loc, init.getAddress());
+      mv.ensurePlusOne(*this, loc).forwardInto(*this, loc, init.getAddress());
       init.finishInitialization(*this);
     }
     

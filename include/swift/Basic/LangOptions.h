@@ -342,8 +342,8 @@ namespace swift {
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
     /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
     /// Returns true if the given platform condition argument represents

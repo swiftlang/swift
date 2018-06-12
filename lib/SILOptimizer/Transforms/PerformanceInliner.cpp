@@ -924,7 +924,7 @@ public:
 } // end anonymous namespace
 
 /// Create an inliner pass that does not inline functions that are marked with
-/// the @_semantics, @effects or global_init attributes.
+/// the @_semantics, @_effects or global_init attributes.
 SILTransform *swift::createEarlyInliner() {
   return new SILPerformanceInlinerPass(
     InlineSelection::NoSemanticsAndGlobalInit, "Early");
@@ -937,7 +937,7 @@ SILTransform *swift::createPerfInliner() {
 }
 
 /// Create an inliner pass that inlines all functions that are marked with
-/// the @_semantics, @effects or global_init attributes.
+/// the @_semantics, @_effects or global_init attributes.
 SILTransform *swift::createLateInliner() {
   return new SILPerformanceInlinerPass(InlineSelection::Everything, "Late");
 }

@@ -4395,9 +4395,6 @@ namespace {
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {
-          if (auto typeResolver = Impl.getTypeResolver())
-            typeResolver->resolveDeclSignature(singleResult);
-
           // Skip versioned variants.
           const DeclAttributes &attrs = singleResult->getAttrs();
           if (attrs.isUnavailableInSwiftVersion(languageVersion))
@@ -5620,7 +5617,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     // argument label
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
-            VarDecl::Specifier::Let, SourceLoc(), SourceLoc(), argNames.front(),
+            VarDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), Impl.SwiftContext.TheEmptyTupleType,
             dc);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);

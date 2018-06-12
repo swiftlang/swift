@@ -1591,7 +1591,8 @@ SubstitutionMap getApplySubstitutionsFromParsed(
   }
 
   bool failed = false;
-  SubstitutionMap subMap = genericSig->getSubstitutionMap(
+  auto subMap = SubstitutionMap::get(
+    genericSig,
     [&](SubstitutableType *type) -> Type {
       auto genericParam = dyn_cast<GenericTypeParamType>(type);
       if (!genericParam) return nullptr;
@@ -2582,7 +2583,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         continue;
       if (P.consumeIf(tok::r_paren))
         break;
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(' or ',");
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ")' or ',");
       return true;
     }
     

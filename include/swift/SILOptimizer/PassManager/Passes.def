@@ -256,7 +256,7 @@ PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
-PASS(SimplifyCFG, "-simplify-cfg",
+PASS(SimplifyCFG, "simplify-cfg",
      "SIL CFG Simplification")
 PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")

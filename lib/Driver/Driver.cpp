@@ -285,6 +285,28 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
   return nullptr;
 }
 
+std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
+  const auto &ArgList = C.getArgs();
+  unsigned NumberOfParallelCommands = 1;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_j)) {
+    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+      return nullptr;
+    }
+  }
+
+  const bool DriverSkipExecution =
+    ArgList.hasArg(options::OPT_driver_skip_execution,
+                   options::OPT_driver_print_jobs);
+  if (DriverSkipExecution) {
+    return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
+  } else {
+    return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
+                                             C.getStatsReporter());
+  }
+}
+
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   SmallVector<const Arg *, 32> interestingArgs;
   interestingArgs.reserve(args.size());
@@ -637,9 +659,6 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution,
-                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
@@ -720,11 +739,6 @@ Driver::buildCompilation(const ToolChain &TC,
   const bool ContinueBuildingAfterErrors =
       BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
 
-  // Issue a remark to facilitate recognizing the use of batch mode in the build
-  // log.
-  if (BatchMode)
-    Diags.diagnose(SourceLoc(), diag::remark_using_batch_mode);
-
   if (Diags.hadAnyError())
     return nullptr;
 
@@ -791,15 +805,6 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
-  unsigned NumberOfParallelCommands = 1;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
-    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-      return nullptr;
-    }
-  }
-
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
     return nullptr;
@@ -829,12 +834,10 @@ Driver::buildCompilation(const ToolChain &TC,
                       StartTime,
                       LastBuildTime,
                       DriverFilelistThreshold,
-                      NumberOfParallelCommands,
                       Incremental,
                       BatchMode,
                       DriverBatchSeed,
                       DriverForceOneBatchRepartition,
-                      DriverSkipExecution,
                       SaveTemps,
                       ShowDriverTimeCompilation,
                       std::move(StatsReporter)));
@@ -1195,14 +1198,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 13), "OSX");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 14), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(11, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(12, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(4, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(5, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1431,10 +1434,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           sys::TaskQueue queue;
           queue.addTask(xcrunPath->c_str(), args);
           queue.execute(nullptr,
-                        [&OI](sys::ProcessId PID,
-                              int returnCode,
-                              StringRef output,
-                              StringRef errors,
+                        [&OI](sys::ProcessId PID, int returnCode,
+                              StringRef output, StringRef errors,
+                              sys::TaskProcessInformation ProcInfo,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();

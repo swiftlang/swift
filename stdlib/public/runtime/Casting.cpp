@@ -21,7 +21,6 @@
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
-#include "stddef.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
@@ -41,6 +40,7 @@
 #include "SwiftValue.h"
 #endif
 
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
 
@@ -196,7 +196,6 @@ swift::swift_dynamicCastFailure(const Metadata *sourceType,
                            targetType, targetName.c_str(), message);
 }
 
-#if SWIFT_OBJC_INTEROP
 // Objective-C bridging helpers.
 namespace {
   struct _ObjectiveCBridgeableWitnessTable;
@@ -227,7 +226,6 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
                const Metadata *targetType,
                const _ObjectiveCBridgeableWitnessTable *targetBridgeWitness,
                DynamicCastFlags flags);
-#endif
 
 /// A convenient method for failing out of a dynamic cast.
 static bool _fail(OpaqueValue *srcValue, const Metadata *srcType,
@@ -663,6 +661,16 @@ static bool _dynamicCastFromAnyHashable(OpaqueValue *destination,
 /******************************** Existentials ********************************/
 /******************************************************************************/
 
+#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool swift_swiftValueConformsTo(const Metadata *destinationType);
+
+#define _bridgeAnythingToObjectiveC                                 \
+  MANGLE_SYM(s27_bridgeAnythingToObjectiveCyyXlxlF)
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
+HeapObject *_bridgeAnythingToObjectiveC(OpaqueValue *src, const Metadata *srcType);
+#endif
+
 /// Perform a dynamic cast to an existential type.
 static bool _dynamicCastToExistential(OpaqueValue *dest,
                                       OpaqueValue *src,
@@ -757,6 +765,15 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(true);
         return true;
       }
+#else // !SWIFT_OBJC_INTEROP -- _SwiftValue is a native class
+	  bool isMetatype = kind == MetadataKind::ExistentialMetatype || kind == MetadataKind::Metatype;
+	  if (!isMetatype && (isTargetTypeAnyObject || swift_swiftValueConformsTo(targetType))) {
+		  auto object = _bridgeAnythingToObjectiveC(src, srcType);
+		  swift_retain(object);
+		  destExistential->Value = object;
+		  maybeDeallocateSource(true);
+		  return true;
+	  }
 #endif
 
       return _fail(src, srcType, targetType, flags);
@@ -805,7 +822,6 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
 
     case MetadataKind::Enum:
     case MetadataKind::Optional:
-#if SWIFT_OBJC_INTEROP
       // If the source type is bridged to Objective-C, try to bridge.
       if (auto srcBridgeWitness = findBridgeWitness(srcDynamicType)) {
         bool success = _dynamicCastValueToClassExistentialViaObjCBridgeable(
@@ -818,7 +834,6 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(success);
         return success;
       }
-#endif
       LLVM_FALLTHROUGH;
 
     default:
@@ -1181,7 +1196,6 @@ swift_dynamicCastMetatypeUnconditionalImpl(const Metadata *sourceType,
 /********************************** Classes ***********************************/
 /******************************************************************************/
 
-#if SWIFT_OBJC_INTEROP
 /// Do a dynamic cast to the target class.
 static void *_dynamicCastUnknownClass(void *object,
                                       const Metadata *targetType,
@@ -1194,7 +1208,6 @@ static void *_dynamicCastUnknownClass(void *object,
 
   return const_cast<void*>(swift_dynamicCastUnknownClass(object, targetType));
 }
-#endif
 
 static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
                                              void *object,
@@ -1873,7 +1886,13 @@ checkDynamicCastFromOptional(OpaqueValue *dest,
 /**************************** Bridging _SwiftValue ****************************/
 /******************************************************************************/
 
-#if SWIFT_OBJC_INTEROP
+#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool swift_unboxFromSwiftValueWithType(OpaqueValue *source,
+                                       OpaqueValue *result,
+                                       const Metadata *destinationType);
+#endif
+
 /// Try to unbox a _SwiftValue box to perform a dynamic cast.
 static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
                                           OpaqueValue *src,
@@ -1891,6 +1910,13 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
       return false;
   }
   
+#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class:
+  if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
+    return true;
+  }
+#endif
+  
+#if SWIFT_OBJC_INTEROP // _SwiftValue is an ObjC class:
   id srcObject;
   memcpy(&srcObject, src, sizeof(id));
   
@@ -1930,10 +1956,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
       objc_release((id)srcSwiftValue);
     return true;
   }
+#endif
   
   return false;
 }
-#endif
 
 /******************************************************************************/
 /******************************** Collections *********************************/
@@ -2228,7 +2254,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   if (!srcType)
     return unwrapResult.success;
 
-#if SWIFT_OBJC_INTEROP
   // A class or AnyObject reference may point to a _SwiftValue box.
   {
     auto innerFlags = flags - DynamicCastFlags::Unconditional
@@ -2243,7 +2268,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
       // (for example, casting _SwiftValue to NSObject will be successful)
     }
   }
-#endif
 
   switch (targetType->getKind()) {
   // Handle wrapping an Optional target.
@@ -2252,7 +2276,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
     // unwrapping the target. This handles an optional source wrapped within an
     // existential that Optional conforms to (Any).
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
-#if SWIFT_OBJC_INTEROP
       // If coming from AnyObject, we may want to bridge.
       if (isAnyObjectExistentialType(srcExistentialType)) {
         if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
@@ -2262,7 +2285,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
                                                            flags);
         }
       }
-#endif
       return _dynamicCastFromExistential(dest, src, srcExistentialType,
                                          targetType, flags);
     }
@@ -2327,7 +2349,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
-#if SWIFT_OBJC_INTEROP
       // If the source type is bridged to Objective-C, try to bridge.
       if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
         return _dynamicCastValueToClassViaObjCBridgeable(dest, src, srcType,
@@ -2335,7 +2356,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
                                                          srcBridgeWitness,
                                                          flags);
       }
-#endif
       return _fail(src, srcType, targetType, flags);
     }
 
@@ -2377,7 +2397,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
         return _dynamicCastToAnyHashable(dest, src, srcType, targetType, flags);
       }
 
-#if SWIFT_OBJC_INTEROP
       // If the target type is bridged to Objective-C, try to bridge.
       if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
         return _dynamicCastClassToValueViaObjCBridgeable(dest, src, srcType,
@@ -2386,6 +2405,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
                                                          flags);
       }
       
+#if SWIFT_OBJC_INTEROP
       // If the source is an NSError, and the target is a bridgeable
       // Error, try to bridge.
       if (tryDynamicCastNSErrorToValue(dest, src, srcType, targetType, flags)) {
@@ -2471,7 +2491,6 @@ static inline bool swift_isClassOrObjCExistentialTypeImpl(const Metadata *T) {
 /********************************** Bridging **********************************/
 /******************************************************************************/
 
-#if SWIFT_OBJC_INTEROP
 //===----------------------------------------------------------------------===//
 // Bridging to and from Objective-C
 //===----------------------------------------------------------------------===//
@@ -2692,6 +2711,13 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   return success;
 }
 
+#if !SWIFT_OBJC_INTEROP // _SwiftValue is a native class:
+
+
+
+#endif // !_SWIFT_OBJC_INTEROP
+
+#if SWIFT_OBJC_INTEROP
 static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
                                                 const Metadata *srcType,
                                                 bool consume) {
@@ -2792,6 +2818,7 @@ id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   return bridgeAnythingNonVerbatimToObjectiveC(src, srcType,
                                                /*consume*/shouldConsume);
 }
+#endif
 
 //===--- Bridging helpers for the Swift stdlib ----------------------------===//
 // Functions that must discover and possibly use an arbitrary type's
@@ -2799,10 +2826,12 @@ id _bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 // documentation.
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_OBJC_INTEROP
 #define BRIDGING_CONFORMANCE_SYM \
   MANGLE_SYM(s19_BridgeableMetatypeVs21_ObjectiveCBridgeablesWP)
 
 extern "C" const _ObjectiveCBridgeableWitnessTable BRIDGING_CONFORMANCE_SYM;
+#endif
 
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
@@ -2815,16 +2844,20 @@ findBridgeWitness(const Metadata *T) {
   // that looks like a metatype value if the metatype can be bridged.
   switch (T->getKind()) {
   case MetadataKind::Metatype: {
+#if SWIFT_OBJC_INTEROP
     auto metaTy = static_cast<const MetatypeMetadata *>(T);
     if (metaTy->InstanceType->isAnyClass())
       return &BRIDGING_CONFORMANCE_SYM;
+#endif
     break;
   }
   case MetadataKind::ExistentialMetatype: {
+#if SWIFT_OBJC_INTEROP
     auto existentialMetaTy =
       static_cast<const ExistentialMetatypeMetadata *>(T);
     if (existentialMetaTy->isObjC())
       return &BRIDGING_CONFORMANCE_SYM;
+#endif
     break;
   }
 
@@ -2853,6 +2886,8 @@ const Metadata *_getBridgedNonVerbatimObjectiveCType(
   
   return nullptr;
 }
+
+#if SWIFT_OBJC_INTEROP
 
 // @_silgen_name("_bridgeNonVerbatimFromObjectiveCToAny")
 // func _bridgeNonVerbatimFromObjectiveCToAny(
@@ -2890,7 +2925,6 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
       return true;
     }
   }
-  
   // Check if the value is a box containing a value of the desired type.
   if (auto srcBox = getAsSwiftValue((id)sourceValue)) {
     const Metadata *sourceType;
@@ -2922,6 +2956,7 @@ _bridgeNonVerbatimFromObjectiveC(
   OpaqueValue *destValue,
   const Metadata *nativeType_
 ) {
+  
   if (tryBridgeNonVerbatimFromObjectiveCUniversal(sourceValue, nativeType,
                                                   destValue))
     return;
@@ -2999,6 +3034,8 @@ _bridgeNonVerbatimFromObjectiveCConditional(
     destValue, nativeType, nativeType, bridgeWitness);
 }
 
+#endif // SWIFT_OBJC_INTEROP
+
 // func _isBridgedNonVerbatimToObjectiveC<T>(_: T.Type) -> Bool
 // Called by inlined stdlib code.
 #define _isBridgedNonVerbatimToObjectiveC \
@@ -3011,7 +3048,6 @@ bool _isBridgedNonVerbatimToObjectiveC(const Metadata *value,
   auto bridgeWitness = findBridgeWitness(T);
   return (bool)bridgeWitness;
 }
-#endif
 
 // func _isClassOrObjCExistential<T>(x: T.Type) -> Bool
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -3039,6 +3075,55 @@ SWIFT_RUNTIME_STDLIB_API
 bool swift_isOptionalType(const Metadata *type) {
   return type->getKind() == MetadataKind::Optional;
 }
+
+#if !SWIFT_OBJC_INTEROP
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_isOptional(OpaqueValue *src, const Metadata *type) {
+  return swift_isOptionalType(type);
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+HeapObject *_swift_extractDynamicValue(OpaqueValue *value, const Metadata *self) {
+  OpaqueValue *outValue;
+  const Metadata *outType;
+  bool canTake = false;
+  
+  findDynamicValueAndType(value, self, outValue, outType, canTake,
+                          /*isAnyObject*/ true,
+                          /*isExistentialMetatype*/ true);
+
+  if (!outType || (outType != self && outType->isAnyClass())) {
+    HeapObject *object = *(reinterpret_cast<HeapObject**>(outValue));
+    swift_retain(object);
+    return object;
+  }
+  
+  return nullptr;
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
+  OpaqueValue *src, const Metadata *srcType) {
+  assert(!swift_isClassOrObjCExistentialTypeImpl(srcType));
+  
+  OpaqueValue *outValue;
+  const Metadata *outType;
+  bool canTake = false;
+  
+  findDynamicValueAndType(src, srcType, outValue, outType, canTake,
+                          /*isAnyObject*/ false,
+                          /*isExistentialMetatype*/ true);
+  
+  auto bridgeWitness = findBridgeWitness(outType);
+  if (bridgeWitness) {
+    auto bridgedObject =
+      bridgeWitness->bridgeToObjectiveC(outValue, outType, bridgeWitness);
+    return bridgedObject;
+  } else {
+    return nullptr;
+  }
+}
+#endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"

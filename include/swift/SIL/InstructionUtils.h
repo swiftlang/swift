@@ -111,6 +111,10 @@ bool isIncidentalUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
+/// Return true when the instruction represents added instrumentation for
+/// run-time sanitizers.
+bool isSanitizerInstrumentation(SILInstruction *Instruction);
+
 /// If V is a convert_function or convert_escape_to_noescape return its operand
 /// recursively.
 SILValue stripConvertFunctions(SILValue V);

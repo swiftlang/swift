@@ -28,7 +28,42 @@ using namespace swift;
 using namespace ownership;
 
 //===----------------------------------------------------------------------===//
-//                  DIMemoryObjectInfo Implementation
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
+                                      DIElementUseInfo &UseInfo) {
+  // The MUI must be used on an alloc_box, alloc_stack, or global_addr. If we
+  // have an alloc_stack or a global_addr, there is nothing further to do.
+  if (isa<AllocStackInst>(MUI->getOperand()) ||
+      isa<GlobalAddrInst>(MUI->getOperand()) ||
+      isa<SILArgument>(MUI->getOperand()) ||
+      // FIXME: We only support pointer to address here to not break LLDB. It is
+      // important that long term we get rid of this since this is a situation
+      // where LLDB is breaking SILGen/DI invariants by not creating a new
+      // independent stack location for the pointer to address.
+      isa<PointerToAddressInst>(MUI->getOperand()))
+    return;
+
+  // Otherwise, we assume that we have a project_box. This is a hard cast to
+  // ensure that we catch any new patterns emitted by SILGen and assert.
+  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
+  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
+
+  // Treat destroys of the container as load+destroys of the original value.
+  //
+  // TODO: This should really be tracked separately from other destroys so that
+  // we distinguish the lifetime of the container from the value itself.
+  for (auto *Op : ABI->getUses()) {
+    SILInstruction *User = Op->getUser();
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+      UseInfo.trackDestroy(User);
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                     DIMemoryObjectInfo Implementation
 //===----------------------------------------------------------------------===//
 
 static unsigned getElementCountRec(SILModule &Module, SILType T,
@@ -62,19 +97,9 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
 }
 
 static std::pair<SILType, bool>
-computeMemorySILType(SILInstruction *MemoryInst) {
+computeMemorySILType(MarkUninitializedInst *MemoryInst) {
   // Compute the type of the memory object.
-  if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
-    assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
-           "analyzing multi-field boxes not implemented");
-    return {ABI->getBoxType()->getFieldType(MemoryInst->getModule(), 0), false};
-  }
-
-  if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    return {ASI->getElementType(), false};
-  }
-
-  auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+  auto *MUI = MemoryInst;
   SILType MemorySILType = MUI->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
@@ -89,7 +114,7 @@ computeMemorySILType(SILInstruction *MemoryInst) {
   return {MemorySILType, VDecl->isLet()};
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SingleValueInstruction *MI)
+DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
     : MemoryInst(MI) {
   auto &Module = MI->getModule();
 
@@ -352,9 +377,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
-  if (auto *MUI = dyn_cast<MarkUninitializedInst>(MemoryInst))
-    if (MUI->isVar())
-      return MUI->getLoc().getAsASTNode<VarDecl>();
+  if (MemoryInst->isVar())
+    return MemoryInst->getLoc().getAsASTNode<VarDecl>();
 
   // Otherwise, we can't.
   return nullptr;
@@ -387,23 +411,6 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
   // Otherwise, we miscounted elements?
   assert(Element == 0 && "Element count problem");
   return false;
-}
-
-void DIMemoryObjectInfo::collectRetainCountInfo(
-    DIElementUseInfo &OutVar) const {
-  if (isa<MarkUninitializedInst>(MemoryInst))
-    return;
-
-  // Collect information about the retain count result as well.
-  for (auto *Op : MemoryInst->getUses()) {
-    auto *User = Op->getUser();
-
-    // If this is a release or dealloc_stack, then remember it as such.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-        isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
-      OutVar.trackDestroy(User);
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -535,17 +542,11 @@ public:
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
       collectClassSelfUses();
-      TheMemory.collectRetainCountInfo(UseInfo);
       return;
     }
 
-    if (auto *ABI = TheMemory.getContainer()) {
-      collectContainerUses(ABI);
-    } else {
-      collectUses(TheMemory.getAddress(), 0);
-    }
-
-    TheMemory.collectRetainCountInfo(UseInfo);
+    collectUses(TheMemory.MemoryInst, 0);
+    gatherDestroysOfContainer(TheMemory.MemoryInst, UseInfo);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -558,7 +559,6 @@ public:
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
-  void collectContainerUses(AllocBoxInst *ABI);
   void collectClassSelfUses();
   void collectClassSelfUses(SILValue ClassPointer, SILType MemorySILType,
                             llvm::SmallDenseMap<VarDecl *, unsigned> &EN);
@@ -670,29 +670,6 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   collectUses(SEAI, BaseEltNo);
 }
 
-void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
-  for (auto *Op : ABI->getUses()) {
-    auto *User = Op->getUser();
-
-    // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
-        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
-      continue;
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
-      collectUses(PBI, PBI->getFieldIndex());
-      continue;
-    }
-
-    // Other uses of the container are considered escapes of the values.
-    for (unsigned Field : indices(ABI->getBoxType()->getLayout()->getFields())) {
-      addElementUses(Field,
-                     ABI->getBoxType()->getFieldType(ABI->getModule(), Field),
-                     User, DIUseKind::Escape);
-    }
-  }
-}
-
 /// Return the underlying accessed pointer value. This peeks through
 /// begin_access patterns such as:
 ///
@@ -704,21 +681,6 @@ static SILValue getAccessedPointer(SILValue Pointer) {
     return Access->getSource();
 
   return Pointer;
-}
-
-/// Returns true when the instruction represents added instrumentation for
-/// run-time sanitizers.
-static bool isSanitizerInstrumentation(SILInstruction *Instruction,
-                                       ASTContext &Ctx) {
-  auto *BI = dyn_cast<BuiltinInst>(Instruction);
-  if (!BI)
-    return false;
-
-  Identifier Name = BI->getName();
-  if (Name == Ctx.getIdentifier("tsanInoutAccess"))
-    return true;
-
-  return false;
 }
 
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
@@ -900,9 +862,32 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
+      
       // If this is an @inout parameter, it is like both a load and store.
-      case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable: {
+        // FIXME: The @inout_aliasable convention is used for indirect captures
+        // of both 'let' and 'var' variables. Using a more specific convention
+        // for 'let' properties like @in_guaranteed unfortunately exposes bugs
+        // elsewhere in the pipeline. A 'let' capture cannot really be mutated
+        // by the callee, and this is enforced by sema, so we can consider it
+        // a nonmutating use.
+        bool isLet = true;
+        
+        for (unsigned i = 0; i < TheMemory.NumElements; ++i) {
+          if (!TheMemory.isElementLetProperty(i)) {
+            isLet = false;
+            break;
+          }
+        }
+        
+        if (isLet) {
+          addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
+          continue;
+        }
+        
+        LLVM_FALLTHROUGH;
+      }
+      case ParameterConvention::Indirect_Inout: {
         // If we're in the initializer for a struct, and this is a call to a
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
@@ -977,7 +962,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Sanitizer instrumentation is not user visible, so it should not
     // count as a use and must not affect compile-time diagnostics.
-    if (isSanitizerInstrumentation(User, Module.getASTContext()))
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // Otherwise, the use is something complicated, it escapes.
@@ -1092,10 +1077,9 @@ void ElementUseCollector::collectClassSelfUses() {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
-  if (MUI->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(TheMemory.getAddress(), TheMemory.MemorySILType,
-                         EltNumbering);
+  auto *MemoryInst = TheMemory.MemoryInst;
+  if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
+    collectClassSelfUses(MemoryInst, TheMemory.MemorySILType, EltNumbering);
     return;
   }
 
@@ -1112,7 +1096,7 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  SmallVector<Operand *, 8> Uses(MemoryInst->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1123,7 +1107,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MUI->getParent()) {
+          if (Arg->getParent() == MemoryInst->getParent()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1138,7 +1122,7 @@ void ElementUseCollector::collectClassSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MUI)
+          if (LI->getOperand() == MemoryInst)
             continue;
 
         // Any other store needs to be recorded.
@@ -1548,7 +1532,7 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
   assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
-  auto *MUI = cast<MarkUninitializedInst>(TheMemory.MemoryInst);
+  auto *MUI = TheMemory.MemoryInst;
 
   // The number of stores of the initial 'self' argument into the self box
   // that we saw.
@@ -1670,20 +1654,8 @@ void DelegatingClassInitElementUseCollector::collectClassInitSelfUses() {
   assert(StoresOfArgumentToSelf == 1 &&
          "The 'self' argument should have been stored into the box exactly once");
 
-  // The MUI must be used on an alloc_box or alloc_stack instruction. If we have
-  // an alloc_stack, there is nothing further to do.
-  if (isa<AllocStackInst>(MUI->getOperand()))
-    return;
-
-  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
-  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
-
-  for (auto Op : ABI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
-      UseInfo.trackDestroy(User);
-    }
-  }
+  // Gather the uses of the
+  gatherDestroysOfContainer(MUI, UseInfo);
 }
 
 void DelegatingClassInitElementUseCollector::
@@ -1792,16 +1764,14 @@ void swift::ownership::collectDIElementUsesFrom(
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
     assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
-    auto *MUI = cast<MarkUninitializedInst>(MemoryInfo.MemoryInst);
-    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo, MUI);
-    MemoryInfo.collectRetainCountInfo(UseInfo);
+    collectValueTypeDelegatingInitUses(MemoryInfo, UseInfo,
+                                       MemoryInfo.MemoryInst);
     return;
   }
 
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     DelegatingClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
-    MemoryInfo.collectRetainCountInfo(UseInfo);
     return;
   }
 

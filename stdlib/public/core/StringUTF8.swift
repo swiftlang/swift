@@ -168,7 +168,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(atEncodedOffset n: Int) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -187,7 +187,7 @@ extension String {
           return UTF8View._fillBuffer(from: &i)}
       )
 
-      return Index(encodedOffset: n, .utf8(buffer: buffer))
+      return Index(encodedOffset: n, transcodedOffset: 0, buffer: buffer)
     }
 
     @inline(__always)
@@ -233,7 +233,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(after i: Index) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -241,12 +241,12 @@ extension String {
       var j = i
 
       // Ensure j's cache is utf8
-      if _slowPath(j._cache.utf8 == nil) {
+      if _slowPath(j.utf8Buffer == nil) {
         j = _nonASCIIIndex(atEncodedOffset: j.encodedOffset)
         precondition(j != endIndex, "Index out of bounds")
       }
 
-      let buffer = j._cache.utf8._unsafelyUnwrappedUnchecked
+      let buffer = j.utf8Buffer._unsafelyUnwrappedUnchecked
 
       var scalarLength16 = 1
       let b0 = buffer.first._unsafelyUnwrappedUnchecked
@@ -258,13 +258,13 @@ extension String {
       }
       else {
         // Number of bytes consumed in this scalar
-        let n8 = j._transcodedOffset + 1
+        let n8 = j.transcodedOffset + 1
         // If we haven't reached a scalar boundary...
         if _fastPath(n8 < leading1s) {
           // Advance to the next position in this scalar
           return Index(
             encodedOffset: j.encodedOffset,
-            transcodedOffset: n8, .utf8(buffer: buffer))
+            transcodedOffset: n8, buffer: buffer)
         }
         // We reached a scalar boundary; compute the underlying utf16's width
         // based on the number of utf8 code units
@@ -275,7 +275,8 @@ extension String {
       if _fastPath(!nextBuffer.isEmpty) {
         return Index(
           encodedOffset: j.encodedOffset + scalarLength16,
-          .utf8(buffer: nextBuffer))
+          transcodedOffset: 0,
+          buffer: nextBuffer)
       }
       // If nothing left in the buffer, refill it.
       return _nonASCIIIndex(atEncodedOffset: j.encodedOffset + scalarLength16)
@@ -292,15 +293,16 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(before i: Index) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
-      if i._transcodedOffset != 0 {
-        _sanityCheck(i._cache.utf8 != nil)
-        var r = i
-        r._compoundOffset = r._compoundOffset &- 1
-        return r
+      if i.transcodedOffset != 0 {
+        _sanityCheck(i.utf8Buffer != nil)
+        return Index(
+          encodedOffset: i.encodedOffset,
+          transcodedOffset: i.transcodedOffset &- 1,
+          buffer: i.utf8Buffer._unsafelyUnwrappedUnchecked)
       }
 
       // Handle the scalar boundary the same way as the not-a-utf8-index case.
@@ -312,8 +314,7 @@ extension String {
       return Index(
         encodedOffset: i.encodedOffset &- (u8.count < 4 ? 1 : 2),
         transcodedOffset: u8.count &- 1,
-        .utf8(buffer: String.Index._UTF8Buffer(u8))
-      )
+        buffer: String.Index._UTF8Buffer(u8))
     }
 
     @inlinable // FIXME(sil-serialize-all)
@@ -325,7 +326,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIDistance(from i: Index, to j: Index) -> Int {
       let forwards = j >= i
@@ -338,7 +339,7 @@ extension String {
         start = j
         end = i
       }
-      let countAbs = end._transcodedOffset - start._transcodedOffset
+      let countAbs = end.transcodedOffset - start.transcodedOffset
         + _gutsNonASCIIUTF8Count(start.encodedOffset..<end.encodedOffset)
       return forwards ? countAbs : -countAbs
     }
@@ -374,16 +375,16 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIISubscript(position: Index) -> UTF8.CodeUnit {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
       var j = position
       while true {
-        if case .utf8(let buffer) = j._cache {
+        if let buffer = j.utf8Buffer {
           _onFastPath()
           return buffer[
-            buffer.index(buffer.startIndex, offsetBy: j._transcodedOffset)]
+            buffer.index(buffer.startIndex, offsetBy: j.transcodedOffset)]
         }
         j = _nonASCIIIndex(atEncodedOffset: j.encodedOffset)
         precondition(j < endIndex, "Index out of bounds")
@@ -473,8 +474,8 @@ extension String {
   @available(swift, obsoleted: 4.0,
     message: "Please use non-failable String.init(_:UTF8View) instead")
   public init?(_ utf8: UTF8View) {
-    if utf8.startIndex._transcodedOffset != 0
-      || utf8.endIndex._transcodedOffset != 0
+    if utf8.startIndex.transcodedOffset != 0
+      || utf8.endIndex.transcodedOffset != 0
       || utf8._legacyPartialCharacters.start
       || utf8._legacyPartialCharacters.end {
       return nil
@@ -627,10 +628,9 @@ internal func _utf8Count(_ utf16CU: UInt16, prev: UInt16) -> Int {
 }
 
 extension String.UTF8View {
-  @usableFromInline
-  internal static func _count<Source: Sequence>(fromUTF16 source: Source) -> Int
-  where Source.Element == Unicode.UTF16.CodeUnit
-  {
+  internal static func _count<Source: RandomAccessCollection>(
+    fromUTF16 source: Source
+  ) -> Int where Source.Element == Unicode.UTF16.CodeUnit {
     var result = 0
     var prev: Unicode.UTF16.CodeUnit = 0
     for u in source {
@@ -648,7 +648,7 @@ extension String.UTF8View {
   }
 
   @inline(never)
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal func _gutsNonASCIIUTF8Count(
     _ range: Range<Int>
@@ -702,17 +702,14 @@ extension String.UTF8View.Index {
   ///   - sourcePosition: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
   @inlinable // FIXME(sil-serialize-all)
-  public init?(_ sourcePosition: String.Index, within target: String.UTF8View) {
-    switch sourcePosition._cache {
-    case .utf8:
-      self.init(encodedOffset: sourcePosition.encodedOffset,
-        transcodedOffset:sourcePosition._transcodedOffset, sourcePosition._cache)
-
-    default:
-      guard String.UnicodeScalarView(target._guts)._isOnUnicodeScalarBoundary(
-        sourcePosition) else { return nil }
-      self.init(encodedOffset: sourcePosition.encodedOffset)
+  public init?(_ idx: String.Index, within target: String.UTF8View) {
+    guard idx.isUTF8 ||
+          String.UnicodeScalarView(target._guts)._isOnUnicodeScalarBoundary(idx)
+    else {
+      return nil
     }
+
+    self = idx
   }
 }
 
@@ -794,23 +791,23 @@ extension String.UTF8View {
         r.upperBound.encodedOffset == _guts.count) ||
       r.upperBound.samePosition(in: wholeString) == nil)
 
-    if r.upperBound._transcodedOffset == 0 {
+    if r.upperBound.transcodedOffset == 0 {
       return String.UTF8View(
         _guts._extractSlice(
         r.lowerBound.encodedOffset..<r.upperBound.encodedOffset),
-        legacyOffsets: (r.lowerBound._transcodedOffset, 0),
+        legacyOffsets: (r.lowerBound.transcodedOffset, 0),
         legacyPartialCharacters: legacyPartialCharacters)
     }
 
-    let b0 = r.upperBound._cache.utf8!.first!
+    let b0 = r.upperBound.utf8Buffer!.first!
     let scalarLength8 = (~b0).leadingZeroBitCount
     let scalarLength16 = scalarLength8 == 4 ? 2 : 1
     let coreEnd = r.upperBound.encodedOffset + scalarLength16
     return String.UTF8View(
       _guts._extractSlice(r.lowerBound.encodedOffset..<coreEnd),
       legacyOffsets: (
-        r.lowerBound._transcodedOffset,
-        r.upperBound._transcodedOffset - scalarLength8),
+        r.lowerBound.transcodedOffset,
+        r.upperBound.transcodedOffset - scalarLength8),
       legacyPartialCharacters: legacyPartialCharacters)
   }
 

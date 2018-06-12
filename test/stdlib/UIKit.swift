@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 3 %s -o %t/a.out3 && %target-run %t/a.out3
 // RUN: %target-build-swift -swift-version 4 %s -o %t/a.out4 && %target-run %t/a.out4
+// RUN: %target-build-swift -swift-version 4.2 %s -o %t/a.out4_2 && %target-run %t/a.out4_2
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=macosx
 // REQUIRES: objc_interop
@@ -17,58 +18,42 @@ import StdlibUnittestFoundationExtras
 
 #if !os(watchOS) && !os(tvOS)
 private func printDevice(_ o: UIDeviceOrientation) -> String {
-  var s = "\(o.isPortrait) \(UIDeviceOrientationIsPortrait(o)), "
-  s += "\(o.isLandscape) \(UIDeviceOrientationIsLandscape(o)), "
-  s += "\(o.isFlat), \(o.isValidInterfaceOrientation) "
-  s += "\(UIDeviceOrientationIsValidInterfaceOrientation(o))"
-  return s
+  return "\(o.isPortrait) \(o.isLandscape) \(o.isFlat) \(o.isValidInterfaceOrientation)"
 }
 
 private func printInterface(_ o: UIInterfaceOrientation) -> String {
-  return "\(o.isPortrait) \(UIInterfaceOrientationIsPortrait(o)), " +
-    "\(o.isLandscape) \(UIInterfaceOrientationIsLandscape(o))"
+  return "\(o.isPortrait) \(o.isLandscape)"
 }
 
 UIKitTests.test("UIDeviceOrientation") {
-  expectEqual("false false, false false, false, false false",
-    printDevice(.unknown))
-
-  expectEqual("true true, false false, false, true true",
-    printDevice(.portrait))
-
-  expectEqual("true true, false false, false, true true",
-    printDevice(.portraitUpsideDown))
-
-  expectEqual("false false, true true, false, true true",
-    printDevice(.landscapeLeft))
-
-  expectEqual("false false, true true, false, true true",
-    printDevice(.landscapeRight))
-
-  expectEqual("false false, false false, true, false false",
-    printDevice(.faceUp))
-
-  expectEqual("false false, false false, true, false false",
-    printDevice(.faceDown))
+  expectEqual("false false false false", printDevice(.unknown))
+  expectEqual("true false false true", printDevice(.portrait))
+  expectEqual("true false false true", printDevice(.portraitUpsideDown))
+  expectEqual("false true false true", printDevice(.landscapeLeft))
+  expectEqual("false true false true", printDevice(.landscapeRight))
+  expectEqual("false false true false", printDevice(.faceUp))
+  expectEqual("false false true false", printDevice(.faceDown))
+#if !swift(>=4.2)
+  // Orientation functions should still be available
+  _ = UIDeviceOrientationIsLandscape
+  _ = UIDeviceOrientationIsPortrait
+  _ = UIDeviceOrientationIsValidInterfaceOrientation
+#endif
 }
 
 UIKitTests.test("UIInterfaceOrientation") {
-  expectEqual("false false, false false",
-    printInterface(.unknown))
-
-  expectEqual("true true, false false",
-    printInterface(.portrait))
-
-  expectEqual("true true, false false",
-    printInterface(.portraitUpsideDown))
-
-  expectEqual("false false, true true",
-    printInterface(.landscapeLeft))
-
-  expectEqual("false false, true true",
-    printInterface(.landscapeRight))
-}
+  expectEqual("false false", printInterface(.unknown))
+  expectEqual("true false", printInterface(.portrait))
+  expectEqual("true false", printInterface(.portraitUpsideDown))
+  expectEqual("false true", printInterface(.landscapeLeft))
+  expectEqual("false true", printInterface(.landscapeRight))
+#if !swift(>=4.2)
+  // Orientation functions should still be available
+  _ = UIInterfaceOrientationIsLandscape
+  _ = UIInterfaceOrientationIsPortrait
 #endif
+}
+#endif // !os(watchOS) && !os(tvOS)
 
 UIKitTests.test("UIEdgeInsets") {
   let insets = [
@@ -77,6 +62,18 @@ UIKitTests.test("UIEdgeInsets") {
     UIEdgeInsets.zero
   ]
   checkEquatable(insets, oracle: { $0 == $1 })
+  expectFalse(UIEdgeInsetsEqualToEdgeInsets(insets[0], insets[1]))
+}
+
+UIKitTests.test("NSDirectionalEdgeInsets") {
+  guard #available(iOS 11.0, tvOS 11.0, watchOS 5.0, *) else { return }
+  let insets = [
+    NSDirectionalEdgeInsets(top: 1.0, leading: 2.0, bottom: 3.0, trailing: 4.0),
+    NSDirectionalEdgeInsets(top: 1.0, leading: 2.0, bottom: 3.1, trailing: 4.0),
+    NSDirectionalEdgeInsets.zero
+  ]
+  checkEquatable(insets, oracle: { $0 == $1 })
+  // NSDirectionalEdgeInsetsEqualToDirectionalEdgeInsets was never exposed in Swift
 }
 
 UIKitTests.test("UIOffset") {
@@ -86,7 +83,27 @@ UIKitTests.test("UIOffset") {
     UIOffset.zero
   ]
   checkEquatable(offsets, oracle: { $0 == $1 })
+  expectFalse(UIOffsetEqualToOffset(offsets[0], offsets[1]))
 }
+
+#if os(iOS) || os(tvOS)
+UIKitTests.test("UIFloatRange") {
+  guard #available(iOS 9.0, tvOS 9.0, *) else { return }
+  #if swift(>=4.2)
+    let zero = UIFloatRange.zero
+  #else
+    let zero = UIFloatRangeZero
+  #endif
+
+  let ranges = [
+    UIFloatRange(minimum: 1.0, maximum: 2.0),
+    UIFloatRange(minimum: 1.0, maximum: 3.0),
+    zero
+  ]
+  checkEquatable(ranges, oracle: { $0 == $1 })
+  expectFalse(UIFloatRangeIsEqualToRange(ranges[0], ranges[1]))
+}
+#endif
 
 UIKitTests.test("UIFont.Weight") {
   guard #available(iOS 8.2, *) else { return }
@@ -207,8 +224,11 @@ UIKitTests.test("UIContentSizeCategory comparison") {
 #if os(iOS) || os(watchOS) || os(tvOS)
 UIKitTests.test("UIFontMetrics scaling") {
     if #available(iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
-        let metrics = UIFontTextStyle.headline.metrics
+        let metrics = UIFont.TextStyle.headline.metrics
         expectTrue(metrics != nil)
+#if !swift(>=4.2)
+        _ = UIFontTextStyle.headline.metrics
+#endif
     }
 }
 #endif
@@ -250,6 +270,22 @@ UIKitTests.test("NSItemProviderReadingWriting support") {
   }
 }
 
+#endif
+
+#if os(iOS)
+UIKitTests.test("UIPrintError compatibility") {
+  #if swift(>=4.2)
+  _ = UIPrintError.Code.notAvailable
+  _ = UIPrintError.Code.noContent
+  _ = UIPrintError.Code.unknownImageFormat
+  _ = UIPrintError.Code.jobFailed
+  #else
+  _ = UIPrintingNotAvailableError
+  _ = UIPrintNoContentError
+  _ = UIPrintUnknownImageFormatError
+  _ = UIPrintJobFailedError
+  #endif
+}
 #endif
 
 

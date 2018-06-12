@@ -570,3 +570,25 @@ func registerAnsible() {
   // CHECK: function_ref @$S11objc_thunks15registerAnsibleyyFyyycSgcfU_
   Ansible.anseAsync({ completion in completion!() })
 }
+@_silgen_name("noescape")
+func noescape(f: @convention(block) () -> ())
+
+// CHECK: sil hidden @$S11objc_thunks21testObjCNoescapeThunkyyF : $@convention(thin) () -> () {
+// CHECK: [[REABSTRACT:%.*]] = function_ref @$SIeg_IyB_TR
+// CHECK: init_block_storage_header {{.*}} : $*@block_storage @callee_guaranteed () -> (), invoke [[REABSTRACT]]
+// CHECK: return
+func testObjCNoescapeThunk() {
+  noescape {
+  }
+}
+
+// Noescape verification relies on there not being a retain/release in order to
+// work in the presence of a objective c throwing implementation function.
+// CHECK: sil {{.*}} @$SIeg_IyB_TR
+// CHECK: bb0([[T0:%.*]] : @trivial $*@block_storage @callee_guaranteed () -> ()):
+// CHECK-NEXT:  [[T1:%.*]] = project_block_storage [[T0]]
+// CHECK-NEXT:  [[T2:%.*]] = load_borrow [[T1]]
+// CHECK-NEXT:  [[T3:%.*]] = apply [[T2]]()
+// CHECK-NEXT:  [[T4:%.*]] = tuple ()
+// CHECK-NEXT:  end_borrow [[T2]] from [[T1]]
+// CHECK-NEXT:  return [[T4]]

@@ -3495,19 +3495,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   if (isObjC())
     return true;
 
-  // Resolve the protocol's type.
-  if (resolver && !hasInterfaceType())
-    resolver->resolveDeclSignature(this);
-
   for (auto member : getMembers()) {
-    if (auto vd = dyn_cast<ValueDecl>(member)) {
-      if (resolver && !vd->hasInterfaceType())
-        resolver->resolveDeclSignature(vd);
-    }
-
-    if (member->isInvalid())
-      continue;
-
     // Check for associated types.
     if (isa<AssociatedTypeDecl>(member)) {
       // An existential type cannot be used if the protocol has an
@@ -3523,6 +3511,9 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
         if (accessor->getAccessorKind() == AccessorKind::IsMaterializeForSet)
           continue;
       }
+
+      if (resolver && !valueMember->hasInterfaceType())
+        resolver->resolveDeclSignature(valueMember);
 
       if (!isAvailableInExistential(valueMember)) {
         Bits.ProtocolDecl.ExistentialTypeSupported = false;
@@ -4375,8 +4366,9 @@ ParamDecl::ParamDecl(Specifier specifier,
             /*IsCaptureList*/false, parameterNameLoc, parameterName, ty, dc),
   ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
   SpecifierLoc(specifierLoc) {
-    assert(specifier != Specifier::Var &&
-           "'var' cannot appear on parameters; you meant 'inout'");
+
+  assert(specifier != Specifier::Var &&
+         "'var' cannot appear on parameters; you meant 'inout'");
   Bits.ParamDecl.IsTypeLocImplicit = false;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);

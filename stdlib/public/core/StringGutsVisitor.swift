@@ -54,7 +54,7 @@ extension String {
   }
 
   @usableFromInline
-  @effects(readonly)
+  @_effects(readonly)
   @inline(never) // @_outlined
   func _visitOpaque<Result>(
     range: (Range<Int>, performBoundsCheck: Bool)? = nil,
@@ -141,7 +141,7 @@ extension String {
   }
 
   @usableFromInline // @opaque
-  @effects(readonly)
+  @_effects(readonly)
   @inline(never)
   func _visitOpaque<T, Result>(
     range: (Range<Int>, performBoundsCheck: Bool)?,

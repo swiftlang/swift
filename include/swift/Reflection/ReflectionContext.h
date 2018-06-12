@@ -108,7 +108,7 @@ public:
   }
 
   void dumpAllSections(std::ostream &OS) {
-    getBuilder().dumpAllSections();
+    getBuilder().dumpAllSections(OS);
   }
 
 #if defined(__APPLE__) && defined(__MACH__)

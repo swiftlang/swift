@@ -94,7 +94,7 @@ public struct Bool {
   /// method to generate a random Boolean value when you are using a custom
   /// random number generator.
   ///
-  ///     let flippedHeads = Boolean.random(using: &myGenerator)
+  ///     let flippedHeads = Bool.random(using: &myGenerator)
   ///     if flippedHeads {
   ///         print("Heads, you win!")
   ///     } else {
@@ -116,7 +116,7 @@ public struct Bool {
   ///
   /// This method returns `true` and `false` with equal probability.
   ///
-  ///     let flippedHeads = Boolean.random()
+  ///     let flippedHeads = Bool.random()
   ///     if flippedHeads {
   ///         print("Heads, you win!")
   ///     } else {
@@ -205,7 +205,7 @@ extension Bool: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine((self ? 1 : 0) as UInt8)
   }

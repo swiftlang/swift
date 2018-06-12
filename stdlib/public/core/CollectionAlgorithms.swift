@@ -253,33 +253,32 @@ extension MutableCollection {
   ///   collection match `belongsInSecondPartition`, the returned index is
   ///   equal to the collection's `endIndex`.
   ///
-  /// - Complexity: O(*n*)
+  /// - Complexity: O(*n*) where n is the length of the collection.
   @inlinable
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-
-    var pivot = startIndex
-    while true {
-      if pivot == endIndex {
-        return pivot
-      }
-      if try belongsInSecondPartition(self[pivot]) {
-        break
-      }
-      formIndex(after: &pivot)
-    }
-
-    var i = index(after: pivot)
-    while i < endIndex {
-      if try !belongsInSecondPartition(self[i]) {
-        swapAt(i, pivot)
-        formIndex(after: &pivot)
-      }
-      formIndex(after: &i)
-    }
-    return pivot
+    return try _halfStablePartition(isSuffixElement: belongsInSecondPartition)
   }
+
+  /// Moves all elements satisfying `isSuffixElement` into a suffix of the
+  /// collection, returning the start position of the resulting suffix.
+  ///
+  /// - Complexity: O(*n*) where n is the length of the collection.
+  @inlinable
+  internal mutating func _halfStablePartition(
+    isSuffixElement: (Element) throws -> Bool
+  ) rethrows -> Index {
+    guard var i = try firstIndex(where: isSuffixElement)
+    else { return endIndex }
+    
+    var j = index(after: i)
+    while j != endIndex {
+      if try !isSuffixElement(self[j]) { swapAt(i, j); formIndex(after: &i) }
+      formIndex(after: &j)
+    }
+    return i
+  }  
 }
 
 extension MutableCollection where Self : BidirectionalCollection {

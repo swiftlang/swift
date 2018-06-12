@@ -2577,7 +2577,11 @@ extension ${Range}
     // Compute delta, the distance between the lower and upper bounds. This
     // value may not representable by the type Bound if Bound is signed, but
     // is always representable as Bound.Magnitude.
+%   if 'Closed' in Range:
     var delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
+%   else:
+    let delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
+%   end
 %   if 'Closed' in Range:
     // Subtle edge case: if the range is the whole set of representable values,
     // then adding one to delta to account for a closed range will overflow.
@@ -3883,7 +3887,7 @@ extension ${Self} : Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
@@ -3903,7 +3907,7 @@ extension ${Self} : Hashable {
     % end
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     // FIXME(hasher): Note that the AnyHashable concern applies here too,
     // because hashValue uses top-level hashing.
@@ -4046,6 +4050,7 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 % end
 
 extension ${Self} {
+  @inlinable
   public static func _random<R: RandomNumberGenerator>(
     using generator: inout R
   ) -> ${Self} {

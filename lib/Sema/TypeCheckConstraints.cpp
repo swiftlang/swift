@@ -2805,10 +2805,7 @@ static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
       types[origType] = replacement;
       return replacement;
     },
-    [&](CanType origType, Type substType, ProtocolDecl *conformedProtocol)
-      -> Optional<ProtocolConformanceRef> {
-      return ProtocolConformanceRef(conformedProtocol);
-    });
+    MakeAbstractConformanceForGenericType());
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
@@ -2881,8 +2878,7 @@ bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
 
 bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
-  return (Context.LangOpts.EnableObjCInterop &&
-          typesSatisfyConstraint(type1, type2,
+  return (typesSatisfyConstraint(type1, type2,
                                  /*openArchetypes=*/false,
                                  ConstraintKind::BridgingConversion,
                                  dc, unwrappedIUO));
@@ -3394,9 +3390,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
   
   // Check for a bridging conversion.
-  // Anything bridges to AnyObject in ObjC interop mode.
-  if (Context.LangOpts.EnableObjCInterop
-      && toType->isAnyObject())
+  // Anything bridges to AnyObject.
+  if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
   
   // Do this check later in Swift 3 mode so that we check for NSNumber and

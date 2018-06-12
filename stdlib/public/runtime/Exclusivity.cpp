@@ -91,7 +91,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   constexpr unsigned maxAccessDescriptionLength = 50;
   char message[maxMessageLength];
   snprintf(message, sizeof(message),
-           "Simultaneous accesses to 0x%tx, but modification requires "
+           "Simultaneous accesses to 0x%" PRIxPTR ", but modification requires "
            "exclusive access",
            reinterpret_cast<uintptr_t>(pointer));
   fprintf(stderr, "%s.\n", message);
@@ -102,7 +102,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   fprintf(stderr, "%s ", oldAccess);
   if (oldPC) {
     dumpStackTraceEntry(0, oldPC, /*shortOutput=*/true);
-    fprintf(stderr, " (0x%tx).\n", reinterpret_cast<uintptr_t>(oldPC));
+    fprintf(stderr, " (0x%" PRIxPTR ").\n", reinterpret_cast<uintptr_t>(oldPC));
   } else {
     fprintf(stderr, "<unknown>.\n");
   }

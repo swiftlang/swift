@@ -1094,7 +1094,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   }
 
   /// The key's hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
@@ -1104,7 +1104,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self.rawValue)
   }
@@ -1180,7 +1180,7 @@ public enum EncodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .invalidValue(_, let c): context = c
@@ -1290,7 +1290,7 @@ public enum DecodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .keyNotFound(_,   let c): context = c

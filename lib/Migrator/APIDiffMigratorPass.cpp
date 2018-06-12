@@ -250,6 +250,19 @@ static ValueDecl* getReferencedDecl(Expr *E) {
   }
 }
 
+struct ConversionFunctionInfo {
+  Expr *ExpressionToWrap;
+  SmallString<256> Buffer;
+  unsigned FuncNameStart;
+  unsigned FuncNameEnd;
+  ConversionFunctionInfo(Expr *ExpressionToWrap):
+    ExpressionToWrap(ExpressionToWrap) {}
+  StringRef getFuncDef() const { return Buffer.str(); }
+  StringRef getFuncName() const {
+    return Buffer.substr(FuncNameStart, FuncNameEnd - FuncNameStart);
+  }
+};
+
 struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   APIDiffItemStore DiffStore;
@@ -328,20 +341,53 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
-  std::set<std::string> InsertedFunctions;
+  std::vector<ConversionFunctionInfo> HelperFuncInfo;
   SourceLoc FileEndLoc;
+
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
-    ASTMigratorPass(Editor, SF, Opts),
-    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {
-      SmallVector<Decl*, 16> TopDecls;
-      SF->getTopLevelDecls(TopDecls);
-      for (auto *D: TopDecls) {
-        if (auto *FD = dyn_cast<FuncDecl>(D)) {
-          InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
-        }
+    ASTMigratorPass(Editor, SF, Opts), DiffStore(Diags),
+    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {}
+
+  ~APIDiffMigratorPass() {
+    Editor.disableCache();
+    SWIFT_DEFER { Editor.enableCache(); };
+
+    // Collect inserted functions to avoid re-insertion.
+    std::set<std::string> InsertedFunctions;
+    SmallVector<Decl*, 16> TopDecls;
+    SF->getTopLevelDecls(TopDecls);
+    for (auto *D: TopDecls) {
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
       }
     }
+    for (auto &Cur: HelperFuncInfo) {
+      // Avoid wrapping nil expression.
+      if (isNilExpr(Cur.ExpressionToWrap))
+        continue;
+
+      // Avoid wrapping a single expression with multiple conversion functions.
+      auto count = std::count_if(HelperFuncInfo.begin(), HelperFuncInfo.end(),
+        [&] (ConversionFunctionInfo &Info) {
+          return Info.ExpressionToWrap->getSourceRange() ==
+            Cur.ExpressionToWrap->getSourceRange();
+        });
+      if (count > 1)
+        continue;
+      assert(count == 1);
+      auto FuncName = Cur.getFuncName();
+
+      // Avoid inserting the helper function if it's already present.
+      if (!InsertedFunctions.count(FuncName)) {
+        Editor.insert(FileEndLoc, Cur.getFuncDef());
+        InsertedFunctions.insert(FuncName);
+      }
+      Editor.insertBefore(Cur.ExpressionToWrap->getStartLoc(),
+        (Twine(FuncName) + "(").str());
+      Editor.insertAfterToken(Cur.ExpressionToWrap->getEndLoc(), ")");
+    }
+  }
 
   void run() {
     if (Opts.APIDigesterDataStorePaths.empty())
@@ -737,12 +783,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     if (!Kind.hasValue())
       return false;
-    if (Kind && !isNilExpr(WrapperTarget)) {
-      SmallString<256> Buffer;
-      auto Func = insertHelperFunction(*Kind, LeftComment, RightComment, Buffer,
-        FromString);
-      Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
-      Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    if (Kind) {
+      insertHelperFunction(*Kind, LeftComment, RightComment, FromString,
+        WrapperTarget);
     }
     if (!Rename.empty()) {
       replaceExpr(Reference, Rename);
@@ -751,8 +794,6 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   bool handleAssignDestMigration(Expr *E) {
-    Editor.disableCache();
-    SWIFT_DEFER { Editor.enableCache(); };
     auto *ASE = dyn_cast<AssignExpr>(E);
     if (!ASE || !ASE->getDest() || !ASE->getSrc())
       return false;
@@ -771,14 +812,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return wrapAttributeReference(E, E, false);
   }
 
-  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
-                                 StringRef NewType,
-                                 SmallString<256> &Buffer, bool FromString) {
-    llvm::raw_svector_ostream OS(Buffer);
+  void insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
+                            StringRef NewType, bool FromString,
+                            Expr *Wrappee) {
+    HelperFuncInfo.emplace_back(Wrappee);
+    ConversionFunctionInfo &Info = HelperFuncInfo.back();
+    llvm::raw_svector_ostream OS(Info.Buffer);
     OS << "\n";
     OS << "// Helper function inserted by Swift 4.2 migrator.\n";
     OS << "fileprivate func ";
-    unsigned FuncNameStart = Buffer.size();
+    Info.FuncNameStart = Info.Buffer.size();
     OS << (FromString ? "convertTo" : "convertFrom");
     SmallVector<std::string, 8> Segs;
     StringRef guard = "\tguard let input = input else { return nil }\n";
@@ -835,24 +878,17 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     for (auto P: Parts)
       OS << P;
     OS << Segs[1];
-    auto FuncName = Buffer.str().substr(FuncNameStart);
-    if (!InsertedFunctions.count(FuncName)) {
-      if (FromString) {
-        OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
-        OS << Segs[4] << "\n}\n";
-      } else {
-        OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
-        OS << Segs[5] << "\n}\n";
-      }
-      Editor.insert(FileEndLoc, OS.str());
-      InsertedFunctions.insert(FuncName);
+    Info.FuncNameEnd = Info.Buffer.size();
+    if (FromString) {
+      OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
+      OS << Segs[4] << "\n}\n";
+    } else {
+      OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
+      OS << Segs[5] << "\n}\n";
     }
-    return FuncName;
   }
 
   void handleStringRepresentableArg(ValueDecl *FD, Expr *Arg, Expr *Call) {
-    Editor.disableCache();
-    SWIFT_DEFER { Editor.enableCache(); };
     NodeAnnotation Kind;
     StringRef RawType;
     StringRef NewAttributeType;
@@ -880,19 +916,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (AllArgs.size() <= ArgIdx)
         return;
       WrapTarget = AllArgs[ArgIdx].ArgExp;
-      // Avoid wrapping nil literal.
-      if (isNilExpr(WrapTarget))
-        return;
     }
     assert(WrapTarget);
-    SmallString<256> Buffer;
-    auto FuncName = insertHelperFunction(Kind, RawType, NewAttributeType, Buffer,
-                                         FromString);
-    Editor.insert(WrapTarget->getStartLoc(), (Twine(FuncName) + "(").str());
-    Editor.insertAfterToken(WrapTarget->getEndLoc(), ")");
+    insertHelperFunction(Kind, RawType, NewAttributeType, FromString, WrapTarget);
   }
 
   bool walkToExprPre(Expr *E) override {
+    if (E->getSourceRange().isInvalid())
+      return false;
     if (handleQualifiedReplacement(E))
       return false;
     if (handleAssignDestMigration(E))

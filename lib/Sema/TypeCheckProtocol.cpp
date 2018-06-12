@@ -27,6 +27,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3628,8 +3629,10 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   if (Proto->isSpecificProtocol(KnownProtocolKind::ObjectiveCBridgeable)) {
     auto nominal = Adoptee->getAnyNominal();
     if (!TC.Context.isTypeBridgedInExternalModule(nominal)) {
+      auto clangLoader = TC.Context.getClangModuleLoader();
       if (nominal->getParentModule() != DC->getParentModule() &&
-          !isInOverlayModuleForImportedModule(DC, nominal)) {
+          !(clangLoader &&
+            clangLoader->isInOverlayModuleForImportedModule(DC, nominal))) {
         auto nominalModule = nominal->getParentModule();
         TC.diagnose(Loc, diag::nonlocal_bridged_to_objc, nominal->getName(),
                     Proto->getName(), nominalModule->getName());

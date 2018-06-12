@@ -226,6 +226,7 @@ SIMPLE_DECL_ATTR(objcMembers, ObjCMembers,
 CONTEXTUAL_SIMPLE_DECL_ATTR(__consuming, Consuming,
   OnFunc | OnAccessor |
   DeclModifier |
+  UserInaccessible |
   NotSerialized, 40)
 CONTEXTUAL_SIMPLE_DECL_ATTR(mutating, Mutating,
   OnFunc | OnAccessor |
@@ -269,7 +270,7 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
   DeclModifier |
   NotSerialized, 49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
-DECL_ATTR(effects, Effects,
+DECL_ATTR(_effects, Effects,
   OnAbstractFunction |
   UserInaccessible,
   50)
@@ -320,7 +321,7 @@ DECL_ATTR(_cdecl, CDecl,
   LongAttribute | UserInaccessible,
   63)
 SIMPLE_DECL_ATTR(usableFromInline, UsableFromInline,
-  OnAbstractFunction | OnVar | OnSubscript | OnNominalType |
+  OnAbstractFunction | OnVar | OnSubscript | OnNominalType | OnTypeAlias |
   LongAttribute,
   64)
 SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,

@@ -18,8 +18,48 @@ import StdlibUnittest
 //===--- Rotate -----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+public protocol CollectionAlgorithms : Collection
+where SubSequence : CollectionAlgorithms
+{
+  func lastIndex(where predicate: (Element) throws->Bool) rethrows -> Index?
+  func _indexAfterLastIndex(
+    where predicate: (Element) throws->Bool
+  ) rethrows -> Index?
+}
+
+extension Collection {
+  public func lastIndex(
+    where predicate: (Element) throws->Bool
+  ) rethrows -> Index? {
+    return try indices.reduce(nil) {
+      r, i in try predicate(self[i]) ? i as Optional : r
+    }
+  }
+
+  public func _indexAfterLastIndex(
+    where predicate: (Element) throws->Bool
+  ) rethrows -> Index? {
+    return try lastIndex(where: predicate).map { index(after: $0) }
+  }
+}
+
+extension BidirectionalCollection {
+  public func lastIndex(
+    where predicate: (Element) throws->Bool
+  ) rethrows -> Index? {
+    return try indices.reversed().first { try predicate(self[$0]) }
+  }
+
+  public func _indexAfterLastIndex(
+    where predicate: (Element) throws->Bool
+  ) rethrows -> Index? {
+    return try self.reversed().firstIndex(where: predicate)?.base
+  }
+}
+
 // In the stdlib, this would simply be MutableCollection
-public protocol MutableCollectionAlgorithms : MutableCollection
+public protocol MutableCollectionAlgorithms
+  : MutableCollection, CollectionAlgorithms
   where SubSequence : MutableCollectionAlgorithms
 {
   /// Rotates the elements of the collection so that the element
@@ -36,7 +76,8 @@ public protocol MutableCollectionAlgorithms : MutableCollection
 extension Array : MutableCollectionAlgorithms {  }
 extension ArraySlice : MutableCollectionAlgorithms {  }
 
-extension Slice : MutableCollectionAlgorithms where Base: MutableCollection { }
+extension Slice : MutableCollectionAlgorithms, CollectionAlgorithms
+  where Base: MutableCollection { }
 
 /// In the stdlib, this would simply be MutableCollection
 extension MutableCollectionAlgorithms {
@@ -516,64 +557,55 @@ extension Collection {
 //===--- Stable Partition -------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension BidirectionalCollection
-  where Self : MutableCollectionAlgorithms {
+extension Collection
+where Self : MutableCollectionAlgorithms {
 
   @discardableResult
   mutating func stablePartition(
-    choosingStartGroupBy p: (Element) -> Bool
-  ) -> Index {
-    return _stablePartition(
-      distance: distance(from: startIndex, to: endIndex),
-      choosingStartGroupBy: p
-    )
+    isSuffixElement: (Element) throws -> Bool
+  ) rethrows -> Index {
+        return try stablePartition(
+            count: count, isSuffixElement: isSuffixElement)
   }
 
-  mutating func _stablePartition(
-    distance n: Int,
-    choosingStartGroupBy p: (Element) -> Bool
-  ) -> Index {
-    assert(n >= 0)
-    assert(n == distance(from: startIndex, to: endIndex))
-    if n == 0 { return startIndex }
-    if n == 1 {
-      return p(self[startIndex]) ? endIndex : startIndex
+    /// Moves all elements satisfying `isSuffixElement` into a suffix of the collection,
+    /// preserving their relative order, returning the start of the resulting suffix.
+    ///
+    /// - Complexity: O(n) where n is the number of elements.
+    /// - Precondition: `n == self.count`
+    fileprivate mutating func stablePartition(
+        count n: Int, isSuffixElement: (Element) throws-> Bool
+    ) rethrows -> Index {
+        if n == 0 { return startIndex }
+        if n == 1 {
+            return try isSuffixElement(self[startIndex]) ? startIndex : endIndex
+        }
+        let h = n / 2, i = index(startIndex, offsetBy: h)
+        let j = try self[..<i].stablePartition(
+            count: h, isSuffixElement: isSuffixElement)
+        let k = try self[i...].stablePartition(
+            count: n - h, isSuffixElement: isSuffixElement)
+        return self[j..<k].rotate(shiftingToStart: i)
     }
-
-    // divide and conquer.
-    let d = n / numericCast(2)
-    let m = index(startIndex, offsetBy: d)
-
-    // TTTTTTTTT s FFFFFFF m ?????????????
-    let s = self[..<m]._stablePartition(
-      distance: numericCast(d), choosingStartGroupBy: p)
-
-    // TTTTTTTTT s FFFFFFF m TTTTTTT e FFFFFFFF
-    let e = self[m...]._stablePartition(
-      distance: numericCast(n - d), choosingStartGroupBy: p)
-
-    // TTTTTTTTT s TTTTTTT m  FFFFFFF e FFFFFFFF
-    return self[s..<e].rotate(shiftingToStart: m)
-  }
 }
 
 extension Collection {
-  func stablyPartitioned(
-    choosingStartGroupBy p: (Element) -> Bool
-  ) -> [Element] {
-    var a = Array(self)
-    a.stablePartition(choosingStartGroupBy: p)
-    return a
-  }
+    func stablyPartitioned(
+        isSuffixElement p: (Element) -> Bool
+    ) -> [Element] {
+        var a = Array(self)
+        a.stablePartition(isSuffixElement: p)
+        return a
+    }
 }
 
 extension LazyCollectionProtocol
-  where Element == Elements.Element {
-  func stablyPartitioned(
-    choosingStartGroupBy p: (Element) -> Bool
-  ) -> LazyCollection<[Element]> {
-    return elements.stablyPartitioned(choosingStartGroupBy: p).lazy
-  }
+where Element == Elements.Element {
+    func stablyPartitioned(
+        isSuffixElement p: (Element) -> Bool
+    ) -> LazyCollection<[Element]> {
+        return elements.stablyPartitioned(isSuffixElement: p).lazy
+    }
 }
 
 extension Collection {
@@ -722,41 +754,41 @@ suite.test("stablePartition") {
         let subrange = a[p..<q]
 
         for modulus in 1...5 {
-          let f = { $0 % modulus == 0 }
+          let f = { $0 % modulus != 0 }
           let notf = { !f($0) }
 
           var b = a
           b.reserveCapacity(b.count)  // guarantee unique storage
           let id = address(b)
 
-          var r = b[p..<q].stablePartition(choosingStartGroupBy: f)
-          expectEqual(b[..<p], prefix)
-          expectEqual(b.suffix(from:q), suffix)
-          expectEqual(b[p..<r], ArraySlice(subrange.filter(f)))
-          expectEqual(b[r..<q], ArraySlice(subrange.filter(notf)))
-          expectEqual(address(b), id)
-
-          b = a
-          r = b[p..<q].stablePartition(choosingStartGroupBy: notf)
+          var r = b[p..<q].stablePartition(isSuffixElement: f)
           expectEqual(b[..<p], prefix)
           expectEqual(b.suffix(from:q), suffix)
           expectEqual(b[p..<r], ArraySlice(subrange.filter(notf)))
           expectEqual(b[r..<q], ArraySlice(subrange.filter(f)))
+          expectEqual(address(b), id)
+
+          b = a
+          r = b[p..<q].stablePartition(isSuffixElement: notf)
+          expectEqual(b[..<p], prefix)
+          expectEqual(b.suffix(from:q), suffix)
+          expectEqual(b[p..<r], ArraySlice(subrange.filter(f)))
+          expectEqual(b[r..<q], ArraySlice(subrange.filter(notf)))
         }
       }
 
       for modulus in 1...5 {
-        let f = { $0 % modulus == 0 }
+        let f = { $0 % modulus != 0 }
         let notf = { !f($0) }
         var b = a
-        var r = b.stablePartition(choosingStartGroupBy: f)
-        expectEqual(b[..<r], ArraySlice(a.filter(f)))
-        expectEqual(b[r...], ArraySlice(a.filter(notf)))
-
-        b = a
-        r = b.stablePartition(choosingStartGroupBy: notf)
+        var r = b.stablePartition(isSuffixElement: f)
         expectEqual(b[..<r], ArraySlice(a.filter(notf)))
         expectEqual(b[r...], ArraySlice(a.filter(f)))
+
+        b = a
+        r = b.stablePartition(isSuffixElement: notf)
+        expectEqual(b[..<r], ArraySlice(a.filter(f)))
+        expectEqual(b[r...], ArraySlice(a.filter(notf)))
       }
     }
   }

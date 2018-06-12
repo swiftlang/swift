@@ -1232,6 +1232,7 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       case ChunkKind::TypeAnnotation:
       case ChunkKind::CallParameterClosureType:
       case ChunkKind::DeclAttrParamColon:
+      case ChunkKind::OptionalMethodCallTail:
         continue;
       case ChunkKind::ThrowsKeyword:
       case ChunkKind::RethrowsKeyword:
@@ -1543,17 +1544,11 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(funcType->getParams(), FD,
-                    /*level*/ FD->isInstanceMember() ? 1 : 0, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(funcType->getParams(), FD,
+                      /*level*/ FD->isInstanceMember() ? 1 : 0);
   
-  bool OneArg = defaultMap.size() == 1;
-  if (defaultMap.size() > 1) {
-    auto NonDefault = std::count(defaultMap.begin(), defaultMap.end() - 1, false);
-    OneArg = (NonDefault == 0);
-  }
-
-  if (OneArg) {
+  if (defaultMap.size() - defaultMap.count() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
       if (auto Fn = param.getType()->getAs<AnyFunctionType>()) {
@@ -2591,7 +2586,7 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           Optional<Type> BaseType, Optional<Type> Result,
-                          bool IsOnMetatype = true,
+                          bool IsOnType = true,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD, BaseType);
@@ -2601,14 +2596,10 @@ public:
                                       ->castTo<AnyFunctionType>();
 
     bool needInit = false;
-    if (!IsOnMetatype) {
+    if (!IsOnType) {
       assert(addName.empty());
-      assert(isa<ConstructorDecl>(CurrDeclContext) &&
-             "can call super.init only inside a constructor");
       needInit = true;
-    } else if (addName.empty() && HaveDot &&
-               Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-      // This case is querying the init function as member
+    } else if (addName.empty() && HaveDot) {
       needInit = true;
     }
 
@@ -2638,7 +2629,6 @@ public:
         addTypeAnnotation(Builder, MemberType);
         return;
       }
-      assert(ConstructorType);
 
       if (!HaveLParen)
         Builder.addLeftParen();
@@ -2692,7 +2682,7 @@ public:
         if (shouldHideDeclFromCompletionResults(init))
           continue;
         addConstructorCall(cast<ConstructorDecl>(init), Reason, type, None,
-                           /*IsOnMetatype=*/true, name);
+                           /*IsOnType=*/true, name);
       }
     }
   }
@@ -2943,43 +2933,40 @@ public:
           return;
         }
 
-        if (auto MT = ExprType->getRValueType()->getAs<AnyMetatypeType>()) {
-          if (HaveDot) {
-            Type Ty;
-            for (Ty = MT; Ty && Ty->is<AnyMetatypeType>();
-                 Ty = Ty->getAs<AnyMetatypeType>()->getInstanceType());
-            assert(Ty && "Cannot find instance type.");
-
-            // Add init() as member of the metatype.
-            if (Reason == DeclVisibilityKind::MemberOfCurrentNominal) {
-              if (IsStaticMetatype || CD->isRequired() ||
-                  !Ty->is<ClassType>())
-                addConstructorCall(CD, Reason, None, None);
-            }
-            return;
-          }
-        }
-
         if (auto MT = ExprType->getAs<AnyMetatypeType>()) {
-          if (HaveDot)
-            return;
+          Type Ty = MT->getInstanceType();
+          assert(Ty && "Cannot find instance type.");
 
-          // If instance type is type alias, showing users that the constructed
+          // If instance type is type alias, show users that the constructed
           // type is the typealias instead of the underlying type of the alias.
           Optional<Type> Result = None;
-          if (auto AT = MT->getInstanceType()) {
-            if (!CD->getInterfaceType()->is<ErrorType>() &&
-                (isa<NameAliasType>(AT.getPointer()) &&
-                 AT->getDesugaredType() ==
-                   CD->getResultInterfaceType().getPointer()))
-              Result = AT;
+          if (!CD->getInterfaceType()->is<ErrorType>() &&
+              isa<NameAliasType>(Ty.getPointer()) &&
+              Ty->getDesugaredType() ==
+                CD->getResultInterfaceType().getPointer()) {
+            Result = Ty;
           }
-          addConstructorCall(CD, Reason, None, Result);
+          // If the expression type is not a static metatype or an archetype, the base
+          // is not a type. Direct call syntax is illegal on values, so we only add
+          // initializer completions if we do not have a left parenthesis and either
+          // the initializer is required, the base type's instance type is not a class,
+          // or this is a 'self' or 'super' reference.
+          if (IsStaticMetatype || Ty->is<ArchetypeType>())
+            addConstructorCall(CD, Reason, None, Result, /*isOnType*/true);
+          else if ((IsSelfRefExpr || IsSuperRefExpr || !Ty->is<ClassType>() ||
+                    CD->isRequired()) && !HaveLParen)
+            addConstructorCall(CD, Reason, None, Result, /*isOnType*/false);
+          return;
         }
-        if (IsSuperRefExpr || IsSelfRefExpr) {
-          if (!isa<ConstructorDecl>(CurrDeclContext))
+        if (!HaveLParen) {
+          auto CDC = dyn_cast<ConstructorDecl>(CurrDeclContext);
+          if (!CDC)
             return;
-          addConstructorCall(CD, Reason, None, None, /*IsOnMetatype=*/false);
+          // We do not want 'init' completions for 'self' in non-convenience
+          // initializers and for 'super' in convenience initializers.
+          if ((IsSelfRefExpr && CDC->isConvenienceInit()) ||
+              ((IsSuperRefExpr && !CDC->isConvenienceInit())))
+            addConstructorCall(CD, Reason, None, None, /*IsOnType=*/false);
         }
         return;
       }
@@ -4150,7 +4137,6 @@ public:
                              CurrDeclContext, TypeResolver.get(),
                              IncludeInstanceMembers);
     addKeyword("Type", MetaBase);
-    addKeyword("self", BaseType, SemanticContextKind::CurrentNominal);
   }
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
@@ -4859,6 +4845,11 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
       // Treat keywords that could be the start of a pattern specially.
       return;
     }
+    // FIXME: __consuming should not appear in CodeCompletion until it is
+    // finalized in a language proposal.
+    if (Name == "__consuming")
+      return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});

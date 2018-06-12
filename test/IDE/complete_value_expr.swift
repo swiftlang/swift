@@ -7,6 +7,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_OBJECT_NO_DOT_2 | %FileCheck %s -check-prefix=FOO_OBJECT_NO_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_DOT_1 | %FileCheck %s -check-prefix=FOO_STRUCT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_NO_DOT_1 | %FileCheck %s -check-prefix=FOO_STRUCT_NO_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_META_1 | %FileCheck %s -check-prefix=FOO_STRUCT_META
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FOO_STRUCT_META_2 | %FileCheck %s -check-prefix=FOO_STRUCT_META
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_0 | %FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICITLY_CURRIED_FUNC_1 | %FileCheck %s -check-prefix=IMPLICITLY_CURRIED_FUNC_1
@@ -132,6 +134,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_TA_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_TA
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_3 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_INIT_4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_INIT_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
@@ -500,6 +504,21 @@ func testMetatypeExpr() {
 func testMetatypeExprWithoutDot() {
   FooStruct#^FOO_STRUCT_NO_DOT_1^#
 }
+
+struct NoMetaCompletions {
+  static var foo: Int = 0
+  class func bar() {}
+  typealias Foo = Int
+}
+func testMetatypeCompletions() {
+  NoMetaCompletions.Type.#^FOO_STRUCT_META_1^#
+}
+func testMetatypeCompletionsWithoutDot() {
+  NoMetaCompletions.Type#^FOO_STRUCT_META_2^#
+}
+// FOO_STRUCT_META-NOT: Decl
+// FOO_STRUCT_META: Keyword[self]/CurrNominal: {{self|.self}}[#NoMetaCompletions.Type.Type#]; name=self
+// FOO_STRUCT_META-NOT: Decl
 
 func testImplicitlyCurriedFunc(_ fs: inout FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
@@ -1620,11 +1639,13 @@ func testProtExtInit1() {
 
 func testProtExtInit2<S: P4 where S.T : P1>() {
   S(#^PROTOCOL_EXT_INIT_2^#
+  S.#^PROTOCOL_EXT_INIT_3^#
+  S#^PROTOCOL_EXT_INIT_4^#
 }
 
-// PROTOCOL_EXT_INIT_2: Begin completions
-// PROTOCOL_EXT_INIT_2: Decl[Constructor]/Super:            ['(']{#x: Int#}[')'][#P4#]{{; name=.+$}}
-// PROTOCOL_EXT_INIT_2: End completions
+// PROTOCOL_EXT_INIT_2: Decl[Constructor]/Super: ['(']{#x: Int#}[')'][#P4#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_3: Decl[Constructor]/Super: init({#x: Int#})[#P4#]{{; name=.+$}}
+// PROTOCOL_EXT_INIT_4: Decl[Constructor]/Super: ({#x: Int#})[#P4#]{{; name=.+$}}
 
 extension P4 where Self.T == OnlyMe {
   final func test1() {

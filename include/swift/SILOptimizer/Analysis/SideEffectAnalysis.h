@@ -406,8 +406,8 @@ public:
   }
 
 protected:
-  /// Set the side-effects of a function, which has an @effects attribute.
-  /// Returns true if \a F has an @effects attribute which could be handled.
+  /// Set the side-effects of a function, which has an @_effects attribute.
+  /// Returns true if \a F has an @_effects attribute which could be handled.
   bool setDefinedEffects(SILFunction *F);
 
   /// Set the side-effects of a semantic call.

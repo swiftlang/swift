@@ -61,13 +61,13 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case SubscriptMember:
     case SubscriptResult:
     case ConstructorMember:
-    case RvalueAdjustment:
+    case LValueConversion:
+    case RValueAdjustment:
     case ClosureResult:
     case ParentType:
     case InstanceType:
     case SequenceIteratorProtocol:
     case GeneratorElementType:
-    case ArrayElementType:
     case ScalarToTuple:
     case AutoclosureResult:
     case GenericArgument:
@@ -115,10 +115,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   for (auto elt : getPath()) {
     out << " -> ";
     switch (elt.getKind()) {
-    case ArrayElementType:
-      out << "array element";
-      break;
-
     case Archetype:
       out << "archetype '" << elt.getArchetype()->getString() << "'";
       break;
@@ -197,7 +193,11 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "parent type";
       break;
 
-    case RvalueAdjustment:
+    case LValueConversion:
+      out << "@lvalue-to-inout conversion";
+      break;
+
+    case RValueAdjustment:
       out << "rvalue adjustment";
       break;
 

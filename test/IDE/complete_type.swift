@@ -1024,7 +1024,7 @@ func testTypeIdentifierGeneric3<
 
 // TYPE_IDENTIFIER_GENERIC_3: Begin completions
 // TYPE_IDENTIFIER_GENERIC_3-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
-// TYPE_IDENTIFIER_GENERIC_3-NEXT: Keyword/CurrNominal:          self[#GenericFoo#]
+// TYPE_IDENTIFIER_GENERIC_3-NOT: Keyword/CurrNominal:    self[#GenericFoo#]
 // TYPE_IDENTIFIER_GENERIC_3-NEXT: End completions
 
 func testTypeIdentifierIrrelevant1() {

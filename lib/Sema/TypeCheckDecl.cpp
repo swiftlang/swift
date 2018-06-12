@@ -1134,7 +1134,7 @@ static void validatePatternBindingEntry(TypeChecker &tc,
         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class)
+          tc.diagnose(binding, diag::class_var_not_in_class, false)
             .fixItReplace(binding->getStaticLoc(), "static");
           tc.diagnose(NTD, diag::extended_type_declared_here);
         }
@@ -3790,6 +3790,48 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   }
 
   if (isInvalid) PGD->setInvalid();
+}
+
+void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
+  // Only members of classes can override other declarations.
+  if (!VD->getDeclContext()->getAsClassOrClassExtensionContext())
+    return;
+
+  // Types that aren't associated types cannot be overridden.
+  if (isa<TypeDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
+    return;
+
+  // FIXME: We should check for the 'override' or 'required' keywords
+  // here, to short-circuit checking in the common case.
+
+  // FIXME: We should perform more minimal validation.
+  validateDeclForNameLookup(VD);
+}
+
+void TypeChecker::resolveIsObjC(ValueDecl *VD) {
+  // Short-circuit this operation if we already know that the entity is @objc.
+  if (VD->isObjC()) return;
+
+  auto dc = VD->getDeclContext();
+  if (dc->getAsClassOrClassExtensionContext()) {
+    // Members of classes can be @objc.
+  }
+  else if (isa<ClassDecl>(VD)) {
+    // Classes can be @objc.
+
+    // Protocols and enums can also be @objc, but this is covered by the
+    // isObjC() check at the beginning.
+  }
+  else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
+    // Members of @objc protocols are @objc.
+  }
+  else {
+    // Cannot be @objc; do nothing.
+    return;
+  }
+
+  // FIXME: Narrow this computation to just the @objc bits.
+  validateDeclForNameLookup(VD);
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
@@ -7194,7 +7236,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
               ->getAsNominalTypeOrNominalTypeExtensionContext()) {
         if (!isa<ClassDecl>(NTD)) {
           if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            diagnose(FD, diag::class_func_not_in_class)
+            diagnose(FD, diag::class_func_not_in_class, false)
                 .fixItReplace(FD->getStaticLoc(), "static");
             diagnose(NTD, diag::extended_type_declared_here);
           }
@@ -7945,8 +7987,10 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         validateAccessControl(typealias);
 
         ProtocolRequirementTypeResolver resolver;
+        TypeResolutionOptions options =
+          TypeResolutionFlags::TypeAliasUnderlyingType;
         if (validateType(typealias->getUnderlyingTypeLoc(),
-                         typealias, TypeResolutionOptions(), &resolver)) {
+                         typealias, options, &resolver)) {
           typealias->setInvalid();
           typealias->getUnderlyingTypeLoc().setInvalidType(Context);
         }
@@ -8294,15 +8338,12 @@ static Type formExtensionInterfaceType(TypeChecker &tc, ExtensionDecl *ext,
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
-      subMap = typealiasSig->getSubstitutionMap(
-                              [](SubstitutableType *type) -> Type {
-                                return Type(type);
-                              },
-                              [](CanType dependentType,
-                                 Type replacementType,
-                                 ProtocolDecl *proto) {
-                                return ProtocolConformanceRef(proto);
-                              });
+      subMap = SubstitutionMap::get(
+          typealiasSig,
+          [](SubstitutableType *type) -> Type {
+            return Type(type);
+          },
+          MakeAbstractConformanceForGenericType());
 
       mustInferRequirements = true;
     }

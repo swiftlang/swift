@@ -66,10 +66,10 @@ ERROR(super_not_in_class_method,none,
 
 ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "
-      "use 'static' to declare a static method", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 method", (bool))
 ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
-      "use 'static' to declare a static property", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 property", (bool))
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
@@ -86,6 +86,9 @@ NOTE(profile_read_error,none,
 
 ERROR(generic_signature_not_minimal,none,
       "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+
+ERROR(attr_only_on_parameters, none,
+      "'%0' may only be used on parameters", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

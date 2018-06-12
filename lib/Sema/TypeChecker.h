@@ -581,6 +581,7 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
   options -= TypeResolutionFlags::EnumCase;
+  options -= TypeResolutionFlags::SubscriptParameters;
   options -= TypeResolutionFlags::ImmediateOptionalTypeArgument;
   options -= TypeResolutionFlags::AllowIUO;
   if (!preserveSIL) options -= TypeResolutionFlags::SILType;
@@ -1377,6 +1378,12 @@ public:
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);
   }
+
+  /// Resolve the "overridden" declaration of the given declaration.
+  virtual void resolveOverriddenDecl(ValueDecl *VD) override;
+
+  /// Resolve the "is Objective-C" bit for the given declaration.
+  virtual void resolveIsObjC(ValueDecl *VD) override;
 
   virtual void bindExtension(ExtensionDecl *ext) override;
 

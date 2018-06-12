@@ -22,7 +22,7 @@ var x: Int
 
 // CHECK-MUTATING-ATTR: mutating func
 
-// CHECK-HIDE-ATTR-NOT: @effects
+// CHECK-HIDE-ATTR-NOT: @_effects
 // CHECK-HIDE-ATTR-NOT: @semantics
 // CHECK-HIDE-ATTR-NOT: @inline
 

@@ -1,0 +1,7 @@
+---
+Name: SomeKit
+SwiftVersions:
+- Version: 4
+  Functions:
+  - Name: someKitOtherGlobalFunc
+    SwiftPrivate: false

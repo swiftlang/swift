@@ -30,7 +30,7 @@ class Nonfinal<T> {
 extension Nonfinal: Encodable where T: Encodable {}
 
 func doEquality<T: Equatable>(_: T) {}
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S23synthesized_conformance8equalityyyF"()
+// CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$S23synthesized_conformance8equalityyyF"()
 public func equality() {
     // CHECK: [[Struct_Equatable:%.*]] = call i8** @"$S23synthesized_conformance6StructVySiGACyxGs9EquatableAAsAFRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$S23synthesized_conformance10doEqualityyyxs9EquatableRzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Struct_Equatable]])
@@ -41,7 +41,7 @@ public func equality() {
 }
 
 func doEncodable<T: Encodable>(_: T) {}
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S23synthesized_conformance9encodableyyF"()
+// CHECK-LABEL: define{{( dllexport| protected)?}} swiftcc void @"$S23synthesized_conformance9encodableyyF"()
 public func encodable() {
     // CHECK: [[Struct_Encodable:%.*]] = call i8** @"$S23synthesized_conformance6StructVySiGACyxGs9EncodableAAs9DecodableRzsAFRzlWl"()
     // CHECK-NEXT: call swiftcc void @"$S23synthesized_conformance11doEncodableyyxs0D0RzlF"(%swift.opaque* noalias nocapture {{%.*}}, %swift.type* {{%.*}}, i8** [[Struct_Encodable]])

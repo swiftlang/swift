@@ -79,3 +79,24 @@ public func dontCrash() {
     queue.sync { }
   }
 }
+
+@_silgen_name("getDispatchQueue")
+func getDispatchQueue() -> DispatchQueue
+
+// We must not release the closure after calling super.deinit.
+// CHECK: sil hidden @$S27closure_lifetime_fixup_objc1CCfD : $@convention(method) (@owned C) -> () {
+// CHECK: bb0([[SELF:%.*]] : $C):
+// CHECK:   [[F:%.*]] = function_ref @$S27closure_lifetime_fixup_objc1CCfdyyXEfU_
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]](%0)
+// CHECK:   [[OPT:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[PA]]
+// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.foreign
+// CHECK:   release_value [[OPT]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:   [[SUPER:%.*]] = upcast [[SELF]] : $C to $NSObject               // user: %34
+// CHECK-NEXT:   apply [[DEINIT]]([[SUPER]]) : $@convention(objc_method) (NSObject) -> ()
+// CHECK-NEXT:   [[T:%.*]] = tuple ()
+// CHECK-NEXT:   return [[T]] : $()
+class C: NSObject {
+  deinit {
+    getDispatchQueue().sync(execute: { _ = self })
+  }
+}

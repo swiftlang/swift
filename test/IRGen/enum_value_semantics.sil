@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-objc-%target-os
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize --check-prefix=CHECK-%target-os --check-prefix=CHECK-native-%target-os
 
 // REQUIRES: CPU=x86_64
 
@@ -134,9 +135,16 @@ enum GenericFixedLayout<T> {
 // --                         0x250007
 // CHECK:   i8* inttoptr (i64 2424839 to i8*),
 // CHECK:   i8* inttoptr (i64 8 to i8*),
-// --                         on Darwin, first 4GB are unmapped: 0x7ffffffc
-// --                         on Linux, only safe to assume first 4KB: 0x7fd
-// CHECK:   i8* inttoptr (i64 {{2045|2147483644}} to i8*)
+// -- On Darwin, the first 4 GiB are unmapped: 0x7ffffffc
+// -- Otherwise, one can only assume the first page (4 KiB) is unmapped: 0xffd
+// CHECK-ios:       i8* inttoptr (i64 2147483644 to i8*)
+// CHECK-macosx:    i8* inttoptr (i64 2147483644 to i8*)
+// CHECK-watchos:   i8* inttoptr (i64 2147483644 to i8*)
+// CHECK-darwin:    i8* inttoptr (i64 2147483644 to i8*)
+// CHECK-objc-linux-gnu:   i8* inttoptr (i64 2045 to i8*)
+// CHECK-native-linux-gnu: i8* inttoptr (i64 4093 to i8*)
+// CHECK-objc-windows:     i8* inttoptr (i64 2045 to i8*)
+// CHECK-native-windows:   i8* inttoptr (i64 4093 to i8*)
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwxs" to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwxg" to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S20enum_value_semantics23SinglePayloadNontrivialOwug" to i8*),
@@ -277,8 +285,10 @@ bb0(%0 : $SinglePayloadNontrivial):
 // CHECK-NEXT: [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK-NEXT: switch i64 %2, label %[[RELEASE_PAYLOAD:[0-9]+]] [
 // CHECK:        i64 0, label %[[DONE:[0-9]+]]
-// CHECK:        i64 2, label %[[DONE]]
-// CHECK:        i64 4, label %[[DONE]]
+// CHECK-native:      i64 1, label %[[DONE]]
+// CHECK-native:      i64 2, label %[[DONE]]
+// CHECK-objc:        i64 2, label %[[DONE]]
+// CHECK-objc:        i64 4, label %[[DONE]]
 // CHECK:      ]
 
 // CHECK:      ; <label>:[[RELEASE_PAYLOAD]]

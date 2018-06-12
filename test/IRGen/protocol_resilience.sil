@@ -25,7 +25,7 @@ import resilient_protocol
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol22OtherResilientProtocolMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol22OtherResilientProtocolMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
@@ -133,7 +133,7 @@ protocol InternalProtocol {
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol24ProtocolWithRequirementsMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
@@ -151,10 +151,10 @@ protocol InternalProtocol {
 
 // CHECK-SAME: internal constant {
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
 // CHECK-SAME: @secondWitness
 
 // CHECK-SAME: }
@@ -169,7 +169,8 @@ protocol InternalProtocol {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
-
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    store
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   // CHECK-NEXT: ret void
@@ -180,6 +181,8 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultD(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    store
 
 sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
@@ -220,6 +223,8 @@ bb0(%0 : $*Self):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultE(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    store
 
 sil @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):
@@ -260,6 +265,8 @@ bb0(%0 : $@thick Self.Type):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultF(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    store
 
 sil @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):

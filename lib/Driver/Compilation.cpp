@@ -108,12 +108,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          llvm::sys::TimePoint<> StartTime,
                          llvm::sys::TimePoint<> LastBuildTime,
                          size_t FilelistThreshold,
-                         unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
                          bool ForceOneBatchRepartition,
-                         bool SkipTaskExecution,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter)
@@ -127,8 +125,6 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     LastBuildTime(LastBuildTime),
-    NumberOfParallelCommands(NumberOfParallelCommands),
-    SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     OutputCompilationRecordForModuleOnlyBuild(
         OutputCompilationRecordForModuleOnlyBuild),
@@ -358,7 +354,8 @@ namespace driver {
         break;
       case OutputLevel::Parseable:
         BeganCmd->forEachContainedJobAndPID(Pid, [&](const Job *J, Job::PID P) {
-          parseable_output::emitBeganMessage(llvm::errs(), *J, P);
+          parseable_output::emitBeganMessage(llvm::errs(), *J, P,
+                                             TaskProcessInformation(Pid));
         });
         break;
       }
@@ -474,8 +471,10 @@ namespace driver {
         if (Comp.ShowJobLifecycle)
           llvm::outs() << "  ==> Unpacked batch constituent finished: "
                        << LogJob(J) << "\n";
-        auto r = taskFinished(llvm::sys::ProcessInfo::InvalidPid, ReturnCode, Output,
-                              Errors, (void *)J);
+        auto r = taskFinished(
+            llvm::sys::ProcessInfo::InvalidPid, ReturnCode, Output, Errors,
+            TaskProcessInformation(llvm::sys::ProcessInfo::InvalidPid),
+            (void *)J);
         if (r != TaskFinishedResponse::ContinueExecution)
           res = r;
       }
@@ -485,9 +484,10 @@ namespace driver {
     /// Callback which will be called immediately after a task has finished
     /// execution. Determines if execution should continue, and also schedule
     /// any additional Jobs which we now know we need to run.
-    TaskFinishedResponse
-    taskFinished(ProcessId Pid, int ReturnCode, StringRef Output,
-                 StringRef Errors, void *Context) {
+    TaskFinishedResponse taskFinished(ProcessId Pid, int ReturnCode,
+                                      StringRef Output, StringRef Errors,
+                                      TaskProcessInformation ProcInfo,
+                                      void *Context) {
       const Job *FinishedCmd = (const Job *)Context;
 
       if (Pid != llvm::sys::ProcessInfo::InvalidPid) {
@@ -509,11 +509,11 @@ namespace driver {
           break;
         case OutputLevel::Parseable:
           // Parseable output was requested.
-          FinishedCmd->forEachContainedJobAndPID(
-              Pid, [&](const Job *J, Job::PID P) {
-                parseable_output::emitFinishedMessage(llvm::errs(), *J, P,
-                                                      ReturnCode, Output);
-              });
+          FinishedCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
+                                                          Job::PID P) {
+            parseable_output::emitFinishedMessage(llvm::errs(), *J, P,
+                                                  ReturnCode, Output, ProcInfo);
+          });
           break;
         }
       }
@@ -570,9 +570,10 @@ namespace driver {
       return TaskFinishedResponse::ContinueExecution;
     }
 
-    TaskFinishedResponse
-    taskSignalled(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                  StringRef Errors, void *Context, Optional<int> Signal) {
+    TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
+                                       StringRef Output, StringRef Errors,
+                                       void *Context, Optional<int> Signal,
+                                       TaskProcessInformation ProcInfo) {
       const Job *SignalledCmd = (const Job *)Context;
 
       if (Comp.ShowDriverTimeCompilation) {
@@ -581,11 +582,11 @@ namespace driver {
 
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
-        SignalledCmd->forEachContainedJobAndPID(
-            Pid, [&](const Job *J, Job::PID P) {
-              parseable_output::emitSignalledMessage(llvm::errs(), *J, P,
-                                                     ErrorMsg, Output, Signal);
-            });
+        SignalledCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
+                                                         Job::PID P) {
+          parseable_output::emitSignalledMessage(llvm::errs(), *J, P, ErrorMsg,
+                                                 Output, Signal, ProcInfo);
+        });
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.
@@ -614,14 +615,9 @@ namespace driver {
     }
 
   public:
-    PerformJobsState(Compilation &Comp)
-      : Comp(Comp),
-        ActualIncrementalTracer(Comp.Stats.get()) {
-      if (Comp.SkipTaskExecution)
-        TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
-      else
-        TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands,
-                               Comp.Stats.get()));
+    PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
+      : Comp(Comp), ActualIncrementalTracer(Comp.Stats.get()),
+        TQ(std::move(TaskQueue)) {
       if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
@@ -884,7 +880,7 @@ namespace driver {
         return;
       }
 
-      size_t NumPartitions = Comp.NumberOfParallelCommands;
+      size_t NumPartitions = TQ->getNumberOfParallelTasks();
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
       bool PretendTheCommandLineIsTooLongOnce =
@@ -924,12 +920,11 @@ namespace driver {
       do {
         using namespace std::placeholders;
         // Ask the TaskQueue to execute.
-        if (TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
-                                  _1, _2),
-                        std::bind(&PerformJobsState::taskFinished, this,
-                                  _1, _2, _3, _4, _5),
-                        std::bind(&PerformJobsState::taskSignalled, this,
-                                  _1, _2, _3, _4, _5, _6))) {
+        if (TQ->execute(std::bind(&PerformJobsState::taskBegan, this, _1, _2),
+                        std::bind(&PerformJobsState::taskFinished, this, _1, _2,
+                                  _3, _4, _5, _6),
+                        std::bind(&PerformJobsState::taskSignalled, this, _1,
+                                  _2, _3, _4, _5, _6, _7))) {
           if (Result == EXIT_SUCCESS) {
             // FIXME: Error from task queue while Result == EXIT_SUCCESS most
             // likely means some fork/exec or posix_spawn failed; TaskQueue saw
@@ -1216,8 +1211,9 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
   return ok;
 }
 
-int Compilation::performJobsImpl(bool &abnormalExit) {
-  PerformJobsState State(*this);
+int Compilation::performJobsImpl(bool &abnormalExit,
+                                 std::unique_ptr<TaskQueue> &&TQ) {
+  PerformJobsState State(*this, std::move(TQ));
 
   State.scheduleInitialJobs();
   State.scheduleAdditionalJobs();
@@ -1225,7 +1221,7 @@ int Compilation::performJobsImpl(bool &abnormalExit) {
   State.runTaskQueueToCompletion();
   State.checkUnfinishedJobs();
 
-  if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
+  if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
     State.populateInputInfoMap(InputInfo);
     checkForOutOfDateInputs(Diags, InputInfo);
@@ -1316,7 +1312,7 @@ static bool writeAllSourcesFile(DiagnosticEngine &diags, StringRef path,
   return true;
 }
 
-int Compilation::performJobs() {
+int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   if (AllSourceFilesPath)
     if (!writeAllSourcesFile(Diags, AllSourceFilesPath, getInputFiles()))
       return EXIT_FAILURE;
@@ -1330,12 +1326,12 @@ int Compilation::performJobs() {
     return performSingleCommand(Jobs.front().get());
   }
 
-  if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
+  if (!TaskQueue::supportsParallelExecution() && TQ->getNumberOfParallelTasks() > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
   bool abnormalExit;
-  int result = performJobsImpl(abnormalExit);
+  int result = performJobsImpl(abnormalExit, std::move(TQ));
 
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {

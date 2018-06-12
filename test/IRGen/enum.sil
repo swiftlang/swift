@@ -1,5 +1,7 @@
-// Please put -enable-objc-interop tests in enum_objc.sil
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime-%target-ptrsize
+// #if directives don't work with SIL keywords, therefore please put ObjC tests
+// in `enum_objc.sil`.
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -1120,8 +1122,10 @@ enum SinglePayloadClass {
 // CHECK-64: entry:
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-objc-64:   i64 2, label {{%.*}}
+// CHECK-objc-64:   i64 4, label {{%.*}}
+// CHECK-native-64: i64 1, label {{%.*}}
+// CHECK-native-64: i64 2, label {{%.*}}
 // CHECK-64:   ]
 // CHECK-64: ; <label>
 // CHECK-64:   inttoptr [[WORD]] %0 to %T4enum1CC*
@@ -1163,11 +1167,14 @@ enum SinglePayloadClassProtocol {
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-objc-64:     i64 2, label {{%.*}}
+// CHECK-objc-64:     i64 4, label {{%.*}}
+// CHECK-native-64:   i64 1, label {{%.*}}
+// CHECK-native-64:   i64 2, label {{%.*}}
 // CHECK-64:   ]
 
-// CHECK-64:   inttoptr i64 %0 to %swift.refcounted*
+// CHECK-objc-64:     inttoptr i64 %0 to %objc_object*
+// CHECK-native-64:   inttoptr i64 %0 to %swift.refcounted*
 // CHECK-64:   inttoptr i64 %1 to i8**
 
 // CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i32, i32) {{.*}} {
@@ -1177,7 +1184,8 @@ enum SinglePayloadClassProtocol {
 // CHECK-32:     i32 2, label {{%.*}}
 // CHECK-32:   ]
 
-// CHECK-32:   inttoptr i32 %0 to %swift.refcounted*
+// CHECK-objc-32:     inttoptr i32 %0 to %objc_object*
+// CHECK-native-32:   inttoptr i32 %0 to %swift.refcounted*
 // CHECK-32:   inttoptr i32 %1 to i8**
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
@@ -2437,7 +2445,8 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // Check that payloads get properly masked in nested single-payload enums.
 // rdar://problem/18841262
 // CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i64, i64)
-// CHECK-64:         icmp eq i64 %0, 2
+// CHECK-objc-64:       icmp eq i64 %0, 2
+// CHECK-native-64:     icmp eq i64 %0, 1
 // CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i32, i32)
 // CHECK-32:         icmp eq i32 %0, 1
 enum Optionable<T> {
@@ -2458,8 +2467,8 @@ struct ContainsUnownedObjC {
   unowned let x: C
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned() {{.*}} {
-// CHECK-64:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-32:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
   %a = enum $Optionable<ContainsUnowned>, #Optionable.none!enumelt
@@ -2468,8 +2477,8 @@ entry:
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned_objc() {{.*}} {
-// CHECK-64:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-32:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
   %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.none!enumelt

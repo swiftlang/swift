@@ -3944,6 +3944,12 @@ ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
                                     Type type,
                                     ArchetypeResolutionKind resolutionKind,
                                     bool wantExactPotentialArchetype) {
+  // An error type is best modeled as an unresolved potential archetype, since
+  // there's no way to be sure what it is actually meant to be.
+  if (type->is<ErrorType>()) {
+    return ResolvedType::forUnresolved(nullptr);
+  }
+
   // The equivalence class of a generic type is known directly.
   if (auto genericParam = type->getAs<GenericTypeParamType>()) {
     unsigned index = GenericParamKey(genericParam).findIndexIn(
@@ -5460,6 +5466,9 @@ public:
 
       return Action::Continue;
     }
+
+    if (!ty->isSpecialized())
+      return Action::Continue;
 
     // Infer from generic nominal types.
     auto decl = ty->getAnyNominal();
@@ -7455,6 +7464,12 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 GenericSignature *GenericSignatureBuilder::computeRequirementSignature(
                                                      ProtocolDecl *proto) {
   GenericSignatureBuilder builder(proto->getASTContext());
+
+  if (!proto->hasInterfaceType()) {
+    // FIXME: Overkill.
+    if (auto lazyResolver = proto->getASTContext().getLazyResolver())
+      lazyResolver->resolveDeclSignature(proto);
+  }
 
   // Add the 'self' parameter.
   auto selfType =

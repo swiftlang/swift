@@ -512,8 +512,26 @@ SwiftInvocationRef
 SwiftASTManager::getInvocation(ArrayRef<const char *> OrigArgs,
                                StringRef PrimaryFile,
                                std::string &Error) {
+
+  DiagnosticEngine Diags(Impl.SourceMgr);
+  EditorDiagConsumer CollectDiagConsumer;
+  Diags.addConsumer(CollectDiagConsumer);
+
   CompilerInvocation CompInvok;
-  if (initCompilerInvocation(CompInvok, OrigArgs, PrimaryFile, Error)) {
+  if (initCompilerInvocation(CompInvok, OrigArgs, Diags, PrimaryFile, Error)) {
+    // We create a traced operation here to represent the failure to parse
+    // arguments since we cannot reach `createAST` where that would normally
+    // happen.
+    trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
+    if (TracedOp.enabled()) {
+      trace::SwiftInvocation TraceInfo;
+      trace::initTraceInfo(TraceInfo, PrimaryFile, OrigArgs);
+      TracedOp.setDiagnosticProvider(
+        [&CollectDiagConsumer](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          CollectDiagConsumer.getAllDiagnostics(diags);
+        });
+      TracedOp.start(TraceInfo);
+    }
     return nullptr;
   }
 
@@ -794,13 +812,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   for (auto &Content : Contents)
     Stamps.push_back(Content.Stamp);
 
-  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
-  trace::SwiftInvocation TraceInfo;
-  if (TracedOp.enabled()) {
-    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
-                         InvokRef->Impl.Opts.Args);
-  }
-
   ASTUnitRef ASTRef = new ASTUnit(++ASTUnitGeneration, MgrImpl.Stats);
   for (auto &Content : Contents) {
     if (Content.Snapshot)
@@ -808,9 +819,19 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   }
   auto &CompIns = ASTRef->Impl.CompInst;
   auto &Consumer = ASTRef->Impl.CollectDiagConsumer;
-
   // Display diagnostics to stderr.
   CompIns.addDiagnosticConsumer(&Consumer);
+
+  trace::TracedOperation TracedOp(trace::OperationKind::PerformSema);
+  trace::SwiftInvocation TraceInfo;
+  if (TracedOp.enabled()) {
+    trace::initTraceInfo(TraceInfo, InvokRef->Impl.Opts.PrimaryFile,
+                         InvokRef->Impl.Opts.Args);
+    TracedOp.setDiagnosticProvider(
+        [&Consumer](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          Consumer.getAllDiagnostics(diags);
+        });
+  }
 
   CompilerInvocation Invocation;
   InvokRef->Impl.Opts.applyToSubstitutingInputs(
@@ -874,12 +895,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
   // processing. This is to avoid unnecessary typechecking that can occur if the
   // TypeResolver is set before.
   ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
-
-  if (TracedOp.enabled()) {
-    SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
-    Consumer.getAllDiagnostics(Diagnostics);
-    TracedOp.finish(Diagnostics);
-  }
 
   return ASTRef;
 }

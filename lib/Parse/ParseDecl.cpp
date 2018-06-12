@@ -1537,15 +1537,17 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
   
-  auto checkInvalidAttrName = [&](StringRef invalidName, StringRef correctName,
-                              DeclAttrKind kind, Diag<StringRef, StringRef> diag) {
+  auto checkInvalidAttrName = [&](StringRef invalidName,
+                                  StringRef correctName,
+                                  DeclAttrKind kind,
+                                  Optional<Diag<StringRef, StringRef>> diag = None) {
     if (DK == DAK_Count && Tok.getText() == invalidName) {
-      // We renamed @availability to @available, so if we see the former,
-      // treat it as the latter and emit a Fix-It.
       DK = kind;
-      
-      diagnose(Tok, diag, invalidName, correctName)
+
+      if (diag) {
+        diagnose(Tok, *diag, invalidName, correctName)
             .fixItReplace(Tok.getLoc(), correctName);
+      }
     }
   };
 
@@ -1556,14 +1558,17 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // Check if attr is inlineable, and suggest inlinable instead
   checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
 
-  // In Swift 5 and above, these become hard errors. Otherwise, emit a
-  // warning for compatibility.
-  if (!Context.isSwiftVersionAtLeast(5)) {
+  // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
+  // warning for compatibility. Otherwise, don't diagnose at all.
+  if (Context.isSwiftVersionAtLeast(5)) {
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
+  } else if (Context.isSwiftVersionAtLeast(4, 2)) {
     checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
     checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
-    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
@@ -2673,10 +2678,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     return makeParserErrorResult<Decl>();
   }
 
-  if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
-      Tok.is(tok::code_complete)) {
-    DeclResult = makeParserCodeCompletionStatus();
-    if (CodeCompletion) {
+  if (DeclResult.isParseError() && Tok.is(tok::code_complete)) {
+    if (MayNeedOverrideCompletion && CodeCompletion) {
       // If we need to complete an override, collect the keywords already
       // specified so that we do not duplicate them in code completion
       // strings.
@@ -2698,6 +2701,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       CodeCompletion->completeNominalMemberBeginning(Keywords);
     }
+
+    DeclResult = makeParserCodeCompletionStatus();
+    consumeToken(tok::code_complete);
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
@@ -4157,7 +4163,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Give syntax node an empty statement list.
     SyntaxParsingContext StmtListContext(SyntaxContext,
                                          SyntaxKind::CodeBlockItemList);
-    diagnose(Tok, diag::computed_property_no_accessors);
+    diagnose(Tok, diag::computed_property_no_accessors, /*subscript*/Indices != nullptr);
     return true;
   }
 
@@ -4807,7 +4813,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_var_not_in_class)
+        diagnose(Tok, diag::class_var_not_in_class, 
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
     }
   }
@@ -5193,7 +5200,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-        diagnose(Tok, diag::class_func_not_in_class)
+        diagnose(Tok, diag::class_func_not_in_class,
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
 
         StaticSpelling = StaticSpellingKind::KeywordStatic;

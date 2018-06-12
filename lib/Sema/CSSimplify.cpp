@@ -102,8 +102,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
   
   auto params = levelTy->getParams();
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, decl, parameterDepth, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, decl, parameterDepth);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
@@ -126,7 +126,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallVectorImpl<bool> &defaultMap,
+                   const llvm::SmallBitVector &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
@@ -441,7 +441,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (defaultMap[paramIdx])
+      if (defaultMap.test(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -701,8 +701,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   SmallVector<AnyFunctionType::Param, 4> params;
   AnyFunctionType::decomposeInput(paramType, params);
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, callee, calleeLevel);
   
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
@@ -1032,8 +1032,8 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
     return matchTypes(argType, paramType, kind, flags, locator);
   }
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(type1, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(type1, callee, calleeLevel);
   
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
@@ -1488,6 +1488,16 @@ ConstraintSystem::matchTypesBindTypeVar(
   if (!isBindable(typeVar, type))
     return formUnsolvedResult();
 
+  // Since member lookup doesn't check requirements
+  // it might sometimes return types which are not
+  // visible in the current context e.g. typealias
+  // defined in constrained extension, substitution
+  // of which might produce error type for base, so
+  // assignement should thead lightly and just fail
+  // if it encounters such types.
+  if (type->hasError())
+    return getTypeMatchFailure(locator);
+
   // Equal constraints allow mixed LValue/RValue bindings, but
   // if we bind a type to a type variable that can bind to
   // LValues as part of simplifying the Equal constraint we may
@@ -1925,7 +1935,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         cast<LValueType>(desugar2)->getObjectType(),
                         ConstraintKind::Equal, subflags,
                         locator.withPathElement(
-                          ConstraintLocator::ArrayElementType));
+                          ConstraintLocator::LValueConversion));
     
     case TypeKind::InOut:
       // If the RHS is an inout type, the LHS must be an @lvalue type.
@@ -1936,7 +1946,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       return matchTypes(cast<InOutType>(desugar1)->getObjectType(),
                         cast<InOutType>(desugar2)->getObjectType(),
                         ConstraintKind::Equal, subflags,
-                  locator.withPathElement(ConstraintLocator::ArrayElementType));
+                  locator.withPathElement(ConstraintLocator::LValueConversion));
 
     case TypeKind::UnboundGeneric:
       llvm_unreachable("Unbound generic type should have been opened");
@@ -2299,11 +2309,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
   if (concrete && kind >= ConstraintKind::OperatorArgumentConversion) {
     // If the RHS is an inout type, the LHS must be an @lvalue type.
-    if (auto *iot = type2->getAs<InOutType>()) {
-      return matchTypes(type1, LValueType::get(iot->getObjectType()),
-                        kind, subflags,
-                        locator.withPathElement(
-                                ConstraintLocator::ArrayElementType));
+    if (auto *lvt = type1->getAs<LValueType>()) {
+      if (auto *iot = type2->getAs<InOutType>()) {
+        return matchTypes(lvt->getObjectType(), iot->getObjectType(),
+                          kind, subflags,
+                          locator.withPathElement(
+                                  ConstraintLocator::LValueConversion));
+      }
     }
   }
 
@@ -2337,7 +2349,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         return matchTypes(iot->getObjectType(), lvt->getObjectType(),
                           ConstraintKind::Bind, subflags,
                           locator.withPathElement(
-                            ConstraintLocator::ArrayElementType));
+                            ConstraintLocator::LValueConversion));
       }
     }
   }
@@ -3627,11 +3639,6 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                                              Type type2,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator) {
-  // There's no bridging without ObjC interop, so we shouldn't have set up
-  // bridging constraints without it.
-  assert(TC.Context.LangOpts.EnableObjCInterop
-         && "bridging constraint w/o ObjC interop?!");
-  
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   /// Form an unresolved result.
@@ -5076,14 +5083,11 @@ void ConstraintSystem::addExplicitConversionConstraint(
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 
-  // Bridging.
-  if (getASTContext().LangOpts.EnableObjCInterop) {
-    // The source type can be explicitly converted to the destination type.
-    Constraint *bridgingConstraint =
-      Constraint::create(*this, ConstraintKind::BridgingConversion,
-                         fromType, toType, locatorPtr);
-    constraints.push_back(bridgingConstraint);
-  }
+  // The source type can be explicitly converted to the destination type.
+  Constraint *bridgingConstraint =
+  Constraint::create(*this, ConstraintKind::BridgingConversion,
+                     fromType, toType, locatorPtr);
+  constraints.push_back(bridgingConstraint);
 
   if (allowFixes && shouldAttemptFixes()) {
     Constraint *downcastConstraint =
@@ -5094,8 +5098,8 @@ void ConstraintSystem::addExplicitConversionConstraint(
   }
 
   addDisjunctionConstraint(constraints, locator,
-    getASTContext().LangOpts.EnableObjCInterop && allowFixes ? RememberChoice
-                                                             : ForgetChoice);
+                           allowFixes ? RememberChoice
+                                      : ForgetChoice);
 }
 
 ConstraintSystem::SolutionKind
