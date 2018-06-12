@@ -251,10 +251,10 @@ bool DiagnosticEngine::isDiagnosticPointsToFirstBadToken(DiagID ID) const {
   return storedDiagnosticInfos[(unsigned) ID].pointsToFirstBadToken;
 }
 
-bool DiagnosticEngine::finishProcessing(SourceManager &SM) {
+bool DiagnosticEngine::finishProcessing() {
   bool hadError = false;
   for (auto &Consumer : Consumers) {
-    hadError |= Consumer->finishProcessing(SM);
+    hadError |= Consumer->finishProcessing();
   }
   return hadError;
 }

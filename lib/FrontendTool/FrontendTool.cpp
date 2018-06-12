@@ -405,7 +405,7 @@ private:
     }
   }
 
-  bool finishProcessing(SourceManager &) override {
+  bool finishProcessing() override {
     std::error_code EC;
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
@@ -1659,7 +1659,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   auto finishDiagProcessing = [&](int retValue) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing(Instance->getSourceMgr());
+    bool err = Instance->getDiags().finishProcessing();
     return retValue ? retValue : err;
   };
 
