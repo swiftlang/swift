@@ -336,6 +336,13 @@ func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
   // CHECK: call void @llvm.dbg.declare(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
+func testGenericCompatibilityAliasMangling(generic_obj: SwiftGenericNameAlias<NSNumber>) {
+  // CHECK: call void @llvm.dbg.declare(metadata %TSo20SwiftGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+}
+
+func testConstrGenericCompatibilityAliasMangling(constr_generic_obj: SwiftConstrGenericNameAlias<NSNumber>) {
+  // CHECK: call void @llvm.dbg.declare(metadata %TSo26SwiftConstrGenericNameTestCySo8NSNumberCG** {{%.+}}, metadata ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
+}
 
 // CHECK: linkonce_odr hidden {{.*}} @"$SSo1BC3intABSgs5Int32V_tcfcTO"
 // CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
@@ -347,3 +354,8 @@ func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
 // CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
 
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$SSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})

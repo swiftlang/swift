@@ -4966,6 +4966,12 @@ namespace {
                     Impl.importSourceLoc(decl->getLocation()),
                     /*genericparams=*/nullptr, dc);
 
+      if (auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl)) {
+        typealias->setGenericEnvironment(GTD->getGenericEnvironment());
+        if (GTD->isGeneric())
+          typealias->setGenericParams(GTD->getGenericParams()->clone(typealias));
+      }
+
       typealias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
       return typealias;
     }
