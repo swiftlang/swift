@@ -1673,6 +1673,36 @@ ERROR(expr_expected_function_to_differentiate,none,
 ERROR(gradient_expr_expected_parameter,none,
       "expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+//------------------------------------------------------------------------------
+// Graph operation related parsing diagnostics
+//------------------------------------------------------------------------------
+ERROR(sil_graph_op_expected_attr_name,PointsToFirstBadToken,
+      "expected 'graph_op' attribute name", ())
+ERROR(sil_graph_op_expected_attr_value,PointsToFirstBadToken,
+      "expected 'graph_op' attribute value", ())
+ERROR(sil_graph_op_unhandled_attr_value,PointsToFirstBadToken,
+      "unhandled 'graph_op' attribute value", ())
+ERROR(sil_graph_op_expected_rparen,PointsToFirstBadToken,
+      "expected ')' in 'graph_op' argument list", ())
+ERROR(sil_graph_op_expected_rbrace,PointsToFirstBadToken,
+      "expected '}' in 'graph_op' attribute list", ())
+ERROR(sil_graph_op_expected_colon_after_attr_name,PointsToFirstBadToken,
+      "expected ':' after 'graph_op' attribute name", ())
+ERROR(sil_graph_op_expected_colon_before_result_types,PointsToFirstBadToken,
+      "expected ':' before 'graph_op' result types", ())
+
+ERROR(sil_const_expected_int_datatype,PointsToFirstBadToken,
+      "expected integer datatype ('i[0-9]+', e.g. 'i32')", ())
+ERROR(sil_const_expected_int_value,PointsToFirstBadToken,
+      "expected integer value in SIL constant value", ())
+ERROR(sil_const_expected_fp_datatype,PointsToFirstBadToken,
+      "expected floating point datatype ('f32' or 'f64')", ())
+ERROR(sil_const_expected_fp_value,PointsToFirstBadToken,
+      "expected floating point value in SIL constant value", ())
+ERROR(sil_const_aggregate_expected_rsquare,PointsToFirstBadToken,
+      "expected ']' at end of aggregate 'SymbolicValue'", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
