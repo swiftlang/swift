@@ -2336,6 +2336,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto abbrCode = DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
     auto attr = cast<DifferentiableAttr>(DA);

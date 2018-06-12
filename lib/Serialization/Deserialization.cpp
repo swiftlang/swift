@@ -2528,6 +2528,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         break;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         AutoDiffMode autodiffMode = AutoDiffMode::Reverse;
         unsigned autodiffModeValue;
