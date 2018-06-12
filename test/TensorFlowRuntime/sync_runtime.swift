@@ -8,6 +8,9 @@ import StdlibUnittest
 import CTensorFlow
 import TensorFlow
 
+// TODO(SR-7983): Investigate why this is necessary.
+import SwiftOnoneSupport
+
 var RuntimeTests = TestSuite("SyncRuntime")
 
 _RuntimeConfig.usesSynchronousExecution = true

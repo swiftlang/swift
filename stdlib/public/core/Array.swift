@@ -756,6 +756,10 @@ extension Array: ExpressibleByArrayLiteral {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   @inlinable
+  // SWIFT_ENABLE_TENSORFLOW
+  // FIXME: We can probably remove @_transparent once constexpr folding is
+  // more fleshed out.
+  @_transparent
   public init(arrayLiteral elements: Element...) {
     self = elements
   }
