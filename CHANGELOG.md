@@ -225,11 +225,10 @@ Swift 4.2
 * [SE-0143][]
 
   The standard library types `Optional`, `Array`, `ArraySlice`,
-  `ContiguousArray`, `Dictionary`, `DictionaryLiteral`, `Range`, and
-  `ClosedRange` now conform to the `Hashable` protocol when their element or
-  bound types (as the case may be) conform to `Hashable`.  This makes
-  synthesized `Hashable` implementations available for types that include stored
-  properties of these types.
+  `ContiguousArray`, `Dictionary`, `Range`, and `ClosedRange` now conform to the
+  `Hashable` protocol when their element or bound types (as the case may be)
+  conform to `Hashable`.  This makes synthesized `Hashable` implementations
+  available for types that include stored properties of these types.
 
 * [SE-0196][]
   
@@ -7138,6 +7137,8 @@ Swift 1.0
 [SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
 [SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
 [SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
+[SE-0213]: <https://github.com/apple/swift-evolution/blob/master/proposals/0213-literal-init-via-coercion.md>
+[SE-0214]: <https://github.com/apple/swift-evolution/blob/master/proposals/0214-DictionaryLiteral.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
