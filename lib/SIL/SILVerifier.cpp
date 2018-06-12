@@ -1185,7 +1185,17 @@ public:
     if (isAutoDiffBuiltinInst(BI))
       checkAutoDiffBuiltinInst(BI);
   }
-  
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void checkGraphOperationInst(GraphOperationInst *GI) {
+    llvm::DenseSet<Identifier> attributeNames;
+    for (auto attr : GI->getAttributes()) {
+      require(attributeNames.insert(attr.name).second,
+              "Duplicate attribute name '" + attr.name.str() + "'");
+      require(attr.value.isConstant(), "Invalid graph operation attribute");
+    }
+  }
+
   void checkFunctionRefInst(FunctionRefInst *FRI) {
     auto fnType = requireObjectType(SILFunctionType, FRI,
                                     "result of function_ref");

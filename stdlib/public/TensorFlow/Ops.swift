@@ -904,13 +904,13 @@ public extension Tensor where Scalar : Numeric & Comparable {
   /// Returns the index of the maximum value of the flattened scalars.
   @_inlineable @inline(__always)
   func argmax() -> Int32 {
-    return self.flattened().argmax(squeezingAxis: 0).scalarized()
+    return _TFGetScalarOrDie(flattened().argmax(squeezingAxis: 0).handle)
   }
 
   /// Returns the index of the minimum value of the flattened scalars.
   @_inlineable @inline(__always)
   func argmin() -> Int32 {
-    return self.flattened().argmin(squeezingAxis: 0).scalarized()
+    return _TFGetScalarOrDie(flattened().argmin(squeezingAxis: 0).handle)
   }
 }
 
@@ -920,7 +920,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func mean() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.mean(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.mean(self, reductionIndices: axes).handle)
   }
 
   // NOTE: This overload is necessary, otherwise `sum()` would refer
@@ -928,7 +928,7 @@ public extension Tensor where Scalar : Numeric {
   @_inlineable @inline(__always)
   func sum() -> Scalar {
     let axes = Tensor<Int32>(rangeFrom: 0, to: rank, stride: 1)
-    return Raw.sum(self, reductionIndices: axes).scalarized()
+    return _TFGetScalarOrDie(Raw.sum(self, reductionIndices: axes).handle)
   }
 
   /// Returns the arithmetic mean along the specified axes. The reduced
@@ -1166,7 +1166,7 @@ public extension Tensor {
       let offset: Tensor<Int32> = Tensor<Int32>(
         Raw.scatterNd(
           indices: scatterIndices,
-          updates: boundSize,
+          updates: Tensor<Float>(boundSize),
           shape: rankTensor.rankLifted()
         )
       )
