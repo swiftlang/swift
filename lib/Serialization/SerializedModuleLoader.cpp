@@ -160,7 +160,7 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
                             moduleBuffer, moduleDocBuffer,
                             scratch);
 
-      if(err == std::errc::no_such_file_or_directory) {
+      if (err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
             ctx, moduleID.second, moduleName, archName, currPath);
         return false;
@@ -183,12 +183,9 @@ findModule(ASTContext &ctx, AccessPathElem moduleID,
         return false;
       }
 
-      llvm::sys::path::append(currPath,
-                              "Modules", moduleFilename.str());
-      auto err = openModuleFiles(currPath,
-                                 archFile.str(), archDocFile.str(),
-                                 moduleBuffer, moduleDocBuffer,
-                                 scratch);
+      llvm::sys::path::append(currPath, "Modules", moduleFilename.str());
+      auto err = openModuleFiles(currPath, archFile.str(), archDocFile.str(),
+                                 moduleBuffer, moduleDocBuffer, scratch);
 
       if (err == std::errc::no_such_file_or_directory) {
         addDiagnosticInfoForArchitectureMismatch(
