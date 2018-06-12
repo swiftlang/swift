@@ -75,11 +75,10 @@ func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
 
 func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
 
-// GEN_T_ASSOC_E: Begin completions, 3 items
-// GEN_T_ASSOC_E: Decl[AssociatedType]/Super:     E; name=E
-// GEN_T_ASSOC_E-NOT: Decl[AssociatedType]/Super: E; name=E
-// GEN_T_ASSOC_E-DAG: Keyword/None:               Type[#T.Type#];
-// GEN_T_ASSOC_E-DAG: Keyword/CurrNominal:        self[#T#];
+// GEN_T_ASSOC_E: Begin completions, 2 items
+// GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-NOT:  Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-NEXT: Keyword/None:               Type[#T.Type#];
 // GEN_T_ASSOC_E: End completions
 
 protocol Assoc {
