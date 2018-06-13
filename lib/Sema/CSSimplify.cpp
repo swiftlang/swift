@@ -4956,10 +4956,49 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 }
 
 void
+ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator) {
+  // If this is a subscript with a KeyPath expression, add a constraint that
+  // connects the subscript's root type to the root type of the KeyPath.
+  SmallVector<LocatorPathElt, 4> path;
+  Expr *anchor = locator.getLocatorParts(path);
+  
+  auto subscript = dyn_cast_or_null<SubscriptExpr>(anchor);
+  if (!subscript)
+    return;
+  
+  assert(path.size() == 1 && path[0].getKind() == ConstraintLocator::SubscriptMember);
+  auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
+  if (!indexTuple || indexTuple->getNumElements() != 1)
+    return;
+  
+  auto keyPathExpr = dyn_cast<KeyPathExpr>(indexTuple->getElement(0));
+  if (!keyPathExpr)
+    return;
+  
+  auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
+  if (!typeVar)
+    return;
+  
+  SmallVector<Constraint *, 4> constraints;
+  CG.gatherConstraints(typeVar, constraints,
+                       ConstraintGraph::GatheringKind::EquivalenceClass);
+  
+  for (auto constraint : constraints) {
+    if (constraint->getKind() == ConstraintKind::KeyPath &&
+        constraint->getLocator()->getAnchor() == keyPathExpr) {
+      auto keyPathRootTy = constraint->getSecondType();
+      addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(), keyPathRootTy, locator);
+    }
+  }
+}
+
+void
 ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
                                               Type root, Type value,
                                               ConstraintLocatorBuilder locator,
                                               bool isFavored) {
+  addKeyPathApplicationRootConstraint(root, locator);
+  
   switch (simplifyKeyPathApplicationConstraint(keypath, root, value,
                                                TMF_GenerateConstraints,
                                                locator)) {
