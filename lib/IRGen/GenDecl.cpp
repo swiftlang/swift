@@ -2593,12 +2593,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // binary, then we ought to be able to directly relative-reference the
   // symbol. However, some platforms don't have the necessary relocations to
   // represent a relative reference to an undefined symbol, so conservatively
-  // produce an indirect reference in this case. Also, some JIT modes
-  // incrementally add new definitions that refer back to existing ones
+  // produce an indirect reference in this case. Also, the integrated REPL
+  // incrementally adds new definitions that refer back to existing ones
   // relatively, so always use indirect references in this situation.
   auto entry = GlobalVars[entity];
   if (forceIndirectness == ConstantReference::Direct &&
-      !IRGen.Opts.UseJIT &&
+      !IRGen.Opts.IntegratedREPL &&
       (!entity.isAvailableExternally(*this) || isDefinition(entry))) {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its
