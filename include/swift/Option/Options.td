@@ -473,6 +473,10 @@ def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Verify the binary representation of debug output.">;
 
+def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit the compiler invocation in the debug info.">;
+
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,

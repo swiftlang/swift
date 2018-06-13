@@ -769,7 +769,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
              "unknown -g<kind> option");
 
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-      if (Args.hasArg(options::OPT_use_dwarf_debug_flags)) {
+      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
         ArgStringList RenderedArgs;
         for (auto A : Args)
           A->render(Args, RenderedArgs);

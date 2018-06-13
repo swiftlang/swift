@@ -197,9 +197,11 @@ protected:
                                           const llvm::opt::ArgList &args,
                                           StringRef extraEntry = "") const;
 
-  /// Specific toolchains should override this to indicate whether the
-  /// compilation flags should be written into DWARF debug info.
-  virtual bool usesDWARFDebugFlags() const { return false; }
+  /// Specific toolchains should override this to provide additional conditions
+  /// under which the compiler invocation should be written into debug info. For
+  /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
+  /// set to match the behavior of Clang.
+  virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
 
 public:
   virtual ~ToolChain() = default;
