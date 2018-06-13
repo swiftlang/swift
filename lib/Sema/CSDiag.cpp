@@ -1382,7 +1382,7 @@ diagnoseUnviableLookupResults(MemberLookupResult &result, Type baseObjTy,
 
     // TODO: This should handle tuple member lookups, like x.1231 as well.
     if (memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
-      diagnose(loc, diag::type_not_subscriptable, baseObjTy)
+      diagnose(loc, diag::could_not_find_value_subscript, baseObjTy)
         .highlight(baseRange);
     } else if (memberName.getBaseName() == "deinit") {
       // Specialised diagnostic if trying to access deinitialisers

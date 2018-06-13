@@ -62,8 +62,8 @@ ERROR(ambiguous_member_overload_set,none,
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
       (Type, Type))
-ERROR(type_not_subscriptable,none,
-      "type %0 has no subscript members",
+ERROR(could_not_find_value_subscript,none,
+      "value of type %0 has no subscripts",
       (Type))
 
 ERROR(could_not_find_tuple_member,none,
