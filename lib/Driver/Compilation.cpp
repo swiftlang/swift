@@ -45,6 +45,8 @@
 
 #include "CompilationRecord.h"
 
+#include <signal.h>
+
 #define DEBUG_TYPE "batch-mode"
 
 // Batch-mode has a sub-mode for testing that randomizes batch partitions,
@@ -459,6 +461,35 @@ namespace driver {
       }
     }
 
+    /// Check to see if a job produced a zero-length serialized diagnostics
+    /// file, which is used to indicate batch-constituents that were batched
+    /// together with a failing constituent but did not, themselves, produce any
+    /// errors.
+    bool jobWasBatchedWithFailingJobs(const Job *J) const {
+      auto DiaPath =
+        J->getOutput().getAnyOutputForType(file_types::TY_SerializedDiagnostics);
+      if (DiaPath.empty())
+        return false;
+      if (!llvm::sys::fs::is_regular_file(DiaPath))
+        return false;
+      uint64_t Size;
+      auto EC = llvm::sys::fs::file_size(DiaPath, Size);
+      if (EC)
+        return false;
+      return Size == 0;
+    }
+
+    /// If a batch-constituent job happens to be batched together with a job
+    /// that exits with an error, the batch-constituent may be considered
+    /// "cancelled".
+    bool jobIsCancelledBatchConstituent(int ReturnCode,
+                                        const Job *ContainerJob,
+                                        const Job *ConstituentJob) {
+      return ReturnCode != 0 &&
+        isBatchJob(ContainerJob) &&
+        jobWasBatchedWithFailingJobs(ConstituentJob);
+    }
+
     /// Unpack a \c BatchJob that has finished into its constituent \c Job
     /// members, and call \c taskFinished on each, propagating any \c
     /// TaskFinishedResponse other than \c
@@ -480,6 +511,26 @@ namespace driver {
           res = r;
       }
       return res;
+    }
+
+    void
+    emitParseableOutputForEachFinishedJob(ProcessId Pid, int ReturnCode,
+                                          StringRef Output,
+                                          const Job *FinishedCmd) {
+      FinishedCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
+                                                      Job::PID P) {
+        if (jobIsCancelledBatchConstituent(ReturnCode, FinishedCmd, J)) {
+          // Simulate SIGINT-interruption to parseable-output consumer for any
+          // constituent of a failing batch job that produced no errors of its
+          // own.
+          parseable_output::emitSignalledMessage(llvm::errs(), *J, P,
+                                                 "cancelled batch constituent",
+                                                 "", SIGINT);
+        } else {
+          parseable_output::emitFinishedMessage(llvm::errs(), *J, P, ReturnCode,
+                                                Output);
+        }
+      });
     }
 
     /// Callback which will be called immediately after a task has finished
@@ -508,12 +559,8 @@ namespace driver {
             llvm::errs() << Output;
           break;
         case OutputLevel::Parseable:
-          // Parseable output was requested.
-          FinishedCmd->forEachContainedJobAndPID(
-              Pid, [&](const Job *J, Job::PID P) {
-                parseable_output::emitFinishedMessage(llvm::errs(), *J, P,
-                                                      ReturnCode, Output);
-              });
+          emitParseableOutputForEachFinishedJob(Pid, ReturnCode, Output,
+                                                FinishedCmd);
           break;
         }
       }
