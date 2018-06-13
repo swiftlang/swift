@@ -1906,6 +1906,30 @@ static void VisitNodeInOut(
   }
 }
 
+static void VisitNodeExistentialMetatype(ASTContext *ast,
+                                         Demangle::NodePointer cur_node,
+                                         VisitNodeResult &result) {
+  VisitNodeResult type_result;
+  Optional<MetatypeRepresentation> metatype_repr;
+
+  for (auto &child : *cur_node) {
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, child, type_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (type_result.HasSingleType())
+    result._types.push_back(
+        ExistentialMetatypeType::get(type_result._types[0], metatype_repr));
+  else
+    result._error = stringWithFormat(
+        "instance type for existential metatype cannot be uniquely resolved");
+}
+
 static void VisitNodeMetatype(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2357,6 +2381,10 @@ static void VisitNode(
 
   case Demangle::Node::Kind::InOut:
     VisitNodeInOut(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::ExistentialMetatype:
+    VisitNodeExistentialMetatype(ast, node, result);
     break;
 
   case Demangle::Node::Kind::Metatype:

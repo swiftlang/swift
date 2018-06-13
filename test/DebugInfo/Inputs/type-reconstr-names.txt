@@ -6,4 +6,5 @@ $Ss10CollectionP7Element ---> Can't resolve type of $Ss10CollectionP7Element
 $Ss15ContiguousArrayV9formIndex5afterySiz_tFSS_Tg5 ---> (inout Int) -> ()
 $S12TypeReconstr8PatatinoaySiGD ---> Patatino<Int>
 $S7ElementQzD ---> τ_0_0.Element
-$S13EyeCandySwift21_previousUniqueNumber33_ADC08935D64EA4F796440E7335798735LLs6UInt64Vvp -> UInt64
+$S13EyeCandySwift21_previousUniqueNumber33_ADC08935D64EA4F796440E7335798735LLs6UInt64Vvp ---> UInt64
+$SSayypXpG ---> Array<Any.Type>
