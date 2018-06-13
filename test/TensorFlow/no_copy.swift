@@ -186,7 +186,7 @@ struct Classifier {
       let dz2 = pred - labels
       let dw2 = h1.transposed(withPermutations: 1, 0) • dz2
       let db2 = dz2.sum(squeezingAxes: 0)
-      let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
+      let dz1 = matmul(dz2, w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
       let dw1 = images.transposed(withPermutations: 1, 0) • dz1
       let db1 = dz1.sum(squeezingAxes: 0)
 
