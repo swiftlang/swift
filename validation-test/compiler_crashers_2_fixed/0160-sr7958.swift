@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: not %target-swift-frontend %s -emit-ir
 
 func foo<U>(_ x: U?) {
   _ = "\(anyLabelHere: x)"
