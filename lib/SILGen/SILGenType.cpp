@@ -610,8 +610,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *genericEnv = witness.getSyntheticEnvironment();
 
   // The type of the witness thunk.
-  auto input = reqtOrigTy->getInput().subst(reqtSubMap)->getCanonicalType();
-  auto result = reqtOrigTy->getResult().subst(reqtSubMap)->getCanonicalType();
+  auto substReqtTy =
+        cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubMap)->getCanonicalType());
 
   // If there's something to map to for the witness thunk, the conformance
   // should be phrased in the same terms. This particularly applies to classes
@@ -632,10 +632,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
     auto *genericSig = genericEnv->getGenericSignature();
     reqtSubstTy = CanGenericFunctionType::get(
         genericSig->getCanonicalSignature(),
-        input, result, reqtOrigTy->getExtInfo());
+        substReqtTy->getParams(), substReqtTy.getResult(),
+        reqtOrigTy->getExtInfo());
   } else {
-    reqtSubstTy = CanFunctionType::get(
-        input, result, reqtOrigTy->getExtInfo());
+    reqtSubstTy = CanFunctionType::get(substReqtTy->getParams(),
+                                       substReqtTy.getResult(),
+                                       reqtOrigTy->getExtInfo());
   }
 
   // FIXME: this needs to pull out the conformances/witness-tables for any
