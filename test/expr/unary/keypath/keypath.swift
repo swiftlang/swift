@@ -499,6 +499,41 @@ func sr6744() {
     _ = get(for: \.value)
 }
 
+func sr7380() {
+  _ = ""[keyPath: \.count]
+  _ = ""[keyPath: \String.count]
+
+  let arr1 = [1]
+  _ = arr1[keyPath: \.[0]]
+  _ = arr1[keyPath: \[Int].[0]]
+
+  let dic1 = [1:"s"]
+  _ = dic1[keyPath: \.[1]]
+  _ = dic1[keyPath: \[Int: String].[1]]
+
+  var arr2 = [1]
+  arr2[keyPath: \.[0]] = 2
+  arr2[keyPath: \[Int].[0]] = 2
+
+  var dic2 = [1:"s"]
+  dic2[keyPath: \.[1]] = ""
+  dic2[keyPath: \[Int: String].[1]] = ""
+
+  _ = [""][keyPath: \.[0]]
+  _ = [""][keyPath: \[String].[0]]
+
+  _ = ["": ""][keyPath: \.["foo"]]
+  _ = ["": ""][keyPath: \[String: String].["foo"]]
+
+  class A {
+    var a: String = ""
+  }
+  _ = A()[keyPath: \.a]
+  _ = A()[keyPath: \A.a]
+  A()[keyPath: \.a] = ""
+  A()[keyPath: \A.a] = ""
+}
+
 struct VisibilityTesting {
   private(set) var x: Int
   fileprivate(set) var y: Int
