@@ -329,6 +329,11 @@ public:
                            const Metadata *type,
                            const ProtocolDescriptor *protocol,
                            const WitnessTable **conformance);
+
+  void _swift_getFieldAt(
+      const Metadata *type, unsigned index,
+      std::function<void(llvm::StringRef name, FieldType type)> callback);
+
 } // end namespace swift
 
 // ADT uses report_bad_alloc_error to report an error when it can't allocate
