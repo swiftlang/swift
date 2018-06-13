@@ -942,9 +942,9 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
                                          bool hasKeywordArguments) {
   // There are two cases to check.
   // 1. `dynamicallyCall(withArguments:)`.
-  //    In this case, the method is valid if the argument has type `C` where
-  //    `C` conforms to `ExpressibleByArrayLiteral`.
-  //    `C.ArrayLiteralElement` and the return type can be arbitrary.
+  //    In this case, the method is valid if the argument has type `A` where
+  //    `A` conforms to `ExpressibleByArrayLiteral`.
+  //    `A.ArrayLiteralElement` and the return type can be arbitrary.
   // 2. `dynamicallyCall(withKeywordArguments:)`
   //    In this case, the method is valid if the argument has type `D` where
   //    `D` conforms to `ExpressibleByDictionaryLiteral` and `D.Key` conforms to
@@ -979,7 +979,6 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *funcDecl, DeclContext *DC,
   auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
   return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
                                ConformanceCheckOptions()).hasValue();
-
 }
 
 /// Returns true if a declaration has a valid implementation of a
