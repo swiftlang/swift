@@ -481,36 +481,74 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
       /*unsatisfiedDependency*/nullptr);
 }
 
-Type ConstraintSystem::openUnboundGenericType(
-       Type type,
-       ConstraintLocatorBuilder locator) {
-  assert(!type->hasTypeParameter());
+static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
+                                       ConstraintLocatorBuilder locator) {
+  // If this is a type defined inside of constrainted extension, let's add all
+  // of the generic requirements to the constraint system to make sure that it's
+  // something we can use.
+  GenericTypeDecl *decl = nullptr;
+  Type parentTy;
+  SubstitutionMap subMap;
 
-  // If this is a generic typealias defined inside of constrainted extension,
-  // let's add all of the generic requirements to the constraint system to
-  // make sure that it's something we can use.
   if (auto *NAT = dyn_cast<NameAliasType>(type.getPointer())) {
-    auto *decl = NAT->getDecl();
-    auto *extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
-    auto parentTy = NAT->getParent();
+    decl = NAT->getDecl();
+    parentTy = NAT->getParent();
+    subMap = NAT->getSubstitutionMap();
+  } else if (auto *AGT = type->getAs<AnyGenericType>()) {
+    decl = AGT->getDecl();
+    parentTy = AGT->getParent();
+    // the context substitution map is fine here, since we can't be adding more
+    // info than that, unlike a typealias
+  }
 
+  // If this decl is generic, the constraints are handled when the generic
+  // parameters are applied, so we don't have to handle them here (which makes
+  // getting the right substitution maps easier).
+  if (decl && !decl->isGeneric()) {
+    auto extension = dyn_cast<ExtensionDecl>(decl->getDeclContext());
     if (parentTy && extension && extension->isConstrainedExtension()) {
-      auto subMap = NAT->getSubstitutionMap();
       auto contextSubMap = parentTy->getContextSubstitutionMap(
           extension->getParentModule(),
           extension->getAsNominalTypeOrNominalTypeExtensionContext());
+      if (!subMap) {
+        // The substitution map wasn't set above, meaning we should grab the map
+        // for the extension itself.
+        subMap = parentTy->getContextSubstitutionMap(
+            extension->getParentModule(), extension);
+      }
 
-      if (auto *signature = NAT->getGenericSignature()) {
-        openGenericRequirements(
+      if (auto *signature = decl->getGenericSignature()) {
+        cs.openGenericRequirements(
             extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
             [&](Type type) {
+              // Why do we look in two substitution maps? We have to use the
+              // context substitution map to find types, because we need to
+              // avoid thinking about them when handling the constraints, or all
+              // the requirements in the signature become tautologies (if the
+              // extension has 'T == Int', subMap will map T -> Int, so the
+              // requirement becomes Int == Int no matter what the actual types
+              // are here). However, we need the conformances for the extension
+              // because the requirements might look like `T: P, T.U: Q`, where
+              // U is an associated type of protocol P.
               return type.subst(QuerySubstitutionMap{contextSubMap},
                                 LookUpConformanceInSubstitutionMap(subMap),
                                 SubstFlags::UseErrorType);
             });
       }
     }
+
+    // And now make sure sure the parent is okay, for things like X<T>.Y.Z.
+    if (parentTy) {
+      checkNestedTypeConstraints(cs, parentTy, locator);
+    }
   }
+}
+
+Type ConstraintSystem::openUnboundGenericType(
+    Type type, ConstraintLocatorBuilder locator) {
+  assert(!type->hasTypeParameter());
+
+  checkNestedTypeConstraints(*this, type, locator);
 
   if (!type->hasUnboundGenericType())
     return type;
