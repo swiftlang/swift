@@ -616,6 +616,12 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
 
   // Handle versioned API notes for Swift 3 and later. This is the common case.
   if (version > ImportNameVersion::swift2()) {
+    // FIXME: Until Apple gets a chance to update UIKit's API notes, always use
+    // the new name for certain properties.
+    if (auto *namedDecl = dyn_cast<clang::NamedDecl>(decl))
+      if (importer::isSpecialUIKitStructZeroProperty(namedDecl))
+        version = ImportNameVersion::swift4_2();
+
     const auto *activeAttr = decl->getAttr<clang::SwiftNameAttr>();
     const clang::SwiftNameAttr *result = activeAttr;
     clang::VersionTuple bestSoFar;
