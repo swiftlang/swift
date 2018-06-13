@@ -4525,7 +4525,6 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
     // It's the stdlib Array<T>.
     return BGT->getGenericArgs()[0];
   }
-  assert(T->hasError());
   return T;
 }
 

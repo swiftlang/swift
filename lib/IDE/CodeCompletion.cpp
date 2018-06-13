@@ -1638,20 +1638,14 @@ private:
 
   void foundFunction(const AnyFunctionType *AFT) {
     FoundFunctionCalls = true;
-    Type In = AFT->getInput();
-    if (!In)
+    auto Params = AFT->getParams();
+    if (Params.empty())
       return;
-    if (In->hasParenSugar()) {
+    if (Params.size() == 1 && !Params[0].hasLabel()) {
       FoundFunctionsWithoutFirstKeyword = true;
       return;
     }
-    TupleType *InTuple = In->getAs<TupleType>();
-    if (!InTuple)
-      return;
-    auto Elements = InTuple->getElements();
-    if (Elements.empty())
-      return;
-    if (!Elements[0].hasName())
+    if (!Params[0].hasLabel())
       FoundFunctionsWithoutFirstKeyword = true;
   }
 
@@ -1983,8 +1977,14 @@ public:
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
+      SmallVector<AnyFunctionType::Param, 8> erasedParams;
+      for (const auto &param : genericFuncType->getParams()) {
+        auto erasedTy = eraseArchetypes(M, param.getPlainType(), genericSig);
+        erasedParams.emplace_back(erasedTy, param.getLabel(),
+                                  param.getParameterFlags());
+      }
       return GenericFunctionType::get(genericSig,
-          eraseArchetypes(M, genericFuncType->getInput(), genericSig),
+          erasedParams,
           eraseArchetypes(M, genericFuncType->getResult(), genericSig),
           genericFuncType->getExtInfo());
     }
@@ -2144,59 +2144,6 @@ public:
     }
   }
 
-  void addPatternFromTypeImpl(CodeCompletionResultBuilder &Builder, Type T,
-                              Identifier Label, bool IsTopLevel, bool IsVarArg) {
-    if (auto *TT = T->getAs<TupleType>()) {
-      if (!Label.empty()) {
-        Builder.addTextChunk(Label.str());
-        Builder.addTextChunk(": ");
-      }
-      if (!IsTopLevel || !HaveLParen)
-        Builder.addLeftParen();
-      else
-        Builder.addAnnotatedLeftParen();
-      bool NeedComma = false;
-      for (auto TupleElt : TT->getElements()) {
-        if (NeedComma)
-          Builder.addComma();
-        Type EltT = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
-                                        : TupleElt.getType();
-        addPatternFromTypeImpl(Builder, EltT, TupleElt.getName(), false,
-                               TupleElt.isVararg());
-        NeedComma = true;
-      }
-      Builder.addRightParen();
-      return;
-    }
-    if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-      if (IsTopLevel && !HaveLParen)
-        Builder.addLeftParen();
-      else if (IsTopLevel)
-        Builder.addAnnotatedLeftParen();
-      Builder.addCallParameter(Identifier(), PT->getUnderlyingType(),
-                               /*IsVarArg*/ false, IsTopLevel,
-                               PT->getParameterFlags().isInOut(),
-                               /*isIUO*/ false);
-      if (IsTopLevel)
-        Builder.addRightParen();
-      return;
-    }
-
-    if (IsTopLevel && !HaveLParen)
-      Builder.addLeftParen();
-    else if (IsTopLevel)
-      Builder.addAnnotatedLeftParen();
-
-    Builder.addCallParameter(Label, T, IsVarArg, IsTopLevel, /*isInOut*/ false,
-                             /*isIUO*/ false);
-    if (IsTopLevel)
-      Builder.addRightParen();
-  }
-
-  void addPatternFromType(CodeCompletionResultBuilder &Builder, Type T) {
-    addPatternFromTypeImpl(Builder, T, Identifier(), true, /*isVarArg*/false);
-  }
-
   static bool hasInterestingDefaultValues(const AbstractFunctionDecl *func) {
     if (!func) return false;
 
@@ -2225,12 +2172,7 @@ public:
 
       // FIXME: Hack because we don't know which parameter list we're
       // actually working with.
-      unsigned expectedNumParams;
-      if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer()))
-        expectedNumParams = TT->getNumElements();
-      else
-        expectedNumParams = 1;
-
+      const unsigned expectedNumParams = AFT->getParams().size();
       if (expectedNumParams != BodyParams->size()) {
         // Adjust to the "self" list if that is present, otherwise give up.
         if (expectedNumParams == 1 && AFD->getImplicitSelfDecl())
@@ -2272,64 +2214,36 @@ public:
       llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
     };
 
-    // Do not desugar AFT->getInput(), as we want to treat (_: (a,b)) distinctly
-    // from (a,b) for code-completion.
-    if (auto *TT = dyn_cast<TupleType>(AFT->getInput().getPointer())) {
-      bool NeedComma = false;
-      // Iterate over the tuple type fields, corresponding to each parameter.
-      for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-        // If we should skip this argument, do so.
-        if (shouldSkipArg(i)) continue;
+    bool NeedComma = false;
+    // Iterate over each parameter.
+    for (unsigned i = 0, e = AFT->getParams().size(); i != e; ++i) {
+      // If we should skip this argument, do so.
+      if (shouldSkipArg(i)) continue;
 
-        const auto &TupleElt = TT->getElement(i);
-        auto ParamType = TupleElt.isVararg() ? TupleElt.getVarargBaseTy()
-                                             : TupleElt.getType();
-        auto Name = TupleElt.getName();
+      const auto &Param = AFT->getParams()[i];
+      auto ParamType = Param.isVariadic()
+                     ? ParamDecl::getVarargBaseTy(Param.getPlainType())
+                     : Param.getPlainType();
 
-        if (NeedComma)
-          Builder.addComma();
-        if (BodyParams) {
-          auto *PD = BodyParams->get(i);
-          // If we have a local name for the parameter, pass in that as well.
-          auto argName = PD->getArgumentName();
-          auto bodyName = PD->getName();
-          auto isIUO =
-              PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-          Builder.addCallParameter(argName, bodyName, ParamType,
-                                   TupleElt.isVararg(), true,
-                                   TupleElt.isInOut(), isIUO);
-        } else {
-          Builder.addCallParameter(Name, ParamType, TupleElt.isVararg(),
-                                   /*TopLevel*/ true, TupleElt.isInOut(),
-                                   /*isIUO*/ false);
-        }
-        modifiedBuilder = true;
-        NeedComma = true;
-      }
-    } else if (!shouldSkipArg(0)) {
-      // If it's not a tuple, it could be a unary function.
-      Type T = AFT->getInput();
-      bool isInOut = false;
-      if (auto *PT = dyn_cast<ParenType>(T.getPointer())) {
-        // Only unwrap the paren sugar, if it exists.
-        T = PT->getUnderlyingType();
-        isInOut = PT->getParameterFlags().isInOut();
-      }
-
-      modifiedBuilder = true;
+      if (NeedComma)
+        Builder.addComma();
       if (BodyParams) {
-        auto *PD = BodyParams->get(0);
+        auto *PD = BodyParams->get(i);
+        // If we have a local name for the parameter, pass in that as well.
         auto argName = PD->getArgumentName();
         auto bodyName = PD->getName();
         auto isIUO =
             PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-        Builder.addCallParameter(argName, bodyName, T,
-                                 /*IsVarArg*/ false, /*Toplevel*/ true, isInOut,
-                                 isIUO);
-      } else
-        Builder.addCallParameter(Identifier(), T, /*IsVarArg*/ false,
-                                 /*TopLevel*/ true, isInOut,
-                                 /*isIUO*/ false);
+        Builder.addCallParameter(argName, bodyName, ParamType,
+                                 Param.isVariadic(), /*TopLevel*/true,
+                                 Param.isInOut(), isIUO);
+      } else {
+        Builder.addCallParameter(Param.getLabel(), ParamType,
+                                 Param.isVariadic(), /*TopLevel*/ true,
+                                 Param.isInOut(), /*isIUO*/ false);
+      }
+      modifiedBuilder = true;
+      NeedComma = true;
     }
 
     return modifiedBuilder;
@@ -2520,38 +2434,32 @@ public:
         return;
       }
 
-      Type FirstInputType = FunctionType->castTo<AnyFunctionType>()->getInput();
-
+      auto AFT = FunctionType->castTo<AnyFunctionType>();
       if (IsImplicitlyCurriedInstanceMethod) {
-        bool isInOut = false;
-        if (auto PT = dyn_cast<ParenType>(FirstInputType.getPointer())) {
-          FirstInputType = PT->getUnderlyingType();
-          isInOut = PT->getParameterFlags().isInOut();
-        }
-
         Builder.addLeftParen();
-        Builder.addCallParameter(Ctx.Id_self, FirstInputType,
-                                 /*IsVarArg*/ false, /*TopLevel*/ true, isInOut,
+        auto SelfParam = AFT->getParams()[0];
+        Builder.addCallParameter(Ctx.Id_self, SelfParam.getPlainType(),
+                                 /*IsVarArg*/ false, /*TopLevel*/ true,
+                                 SelfParam.isInOut(),
                                  /*isIUO*/ false);
         Builder.addRightParen();
       } else if (trivialTrailingClosure) {
         Builder.addBraceStmtWithCursor(" { code }");
       } else {
         Builder.addLeftParen();
-        auto AFT = FunctionType->castTo<AnyFunctionType>();
         addParamPatternFromFunction(Builder, AFT, FD, includeDefaultArgs);
         Builder.addRightParen();
         addThrows(Builder, AFT, FD);
       }
 
-      Type ResultType = FunctionType->castTo<AnyFunctionType>()->getResult();
+      Type ResultType = AFT->getResult();
 
       // Build type annotation.
       {
         llvm::raw_svector_ostream OS(TypeStr);
         for (unsigned i = FirstIndex + 1, e = FD->getParameterLists().size();
              i != e; ++i) {
-          ResultType->castTo<AnyFunctionType>()->getInput()->print(OS);
+          ResultType->castTo<AnyFunctionType>()->printParams(OS);
           ResultType = ResultType->castTo<AnyFunctionType>()->getResult();
           OS << " -> ";
         }
@@ -3818,7 +3726,9 @@ public:
           unboxType(Ele.getType());
         }
       } else if (auto FT = T->getAs<FunctionType>()) {
-        unboxType(FT->getInput());
+        for (const auto &Param : FT->getParams()) {
+          unboxType(Param.getType());
+        }
         unboxType(FT->getResult());
       } else if (auto NTD = T->getNominalOrBoundGenericNominal()){
         if (HandledDecls.insert(NTD).second)
@@ -3925,40 +3835,37 @@ public:
     }
   }
 
+  using FunctionParams = ArrayRef<AnyFunctionType::Param>;
+
   static void collectArgumentExpectation(unsigned Position, bool HasName,
-                                         ArrayRef<Type> Types, SourceLoc Loc,
+                                         ArrayRef<FunctionParams> Candidates,
+                                         SourceLoc Loc,
                                          std::vector<Type> &ExpectedTypes,
                                          std::vector<StringRef> &ExpectedNames) {
     SmallPtrSet<TypeBase *, 4> seenTypes;
     SmallPtrSet<const char *, 4> seenNames;
 
-    for (auto Type : Types) {
-      if (auto TT = Type->getAs<TupleType>()) {
-        if (Position >= TT->getElements().size()) {
-          continue;
-        }
-        auto Ele = TT->getElement(Position);
-        if (Ele.hasName() && !HasName) {
-          if (seenNames.insert(Ele.getName().get()).second)
-            ExpectedNames.push_back(Ele.getName().str());
-        } else {
-          if (seenTypes.insert(Ele.getType().getPointer()).second)
-            ExpectedTypes.push_back(Ele.getType());
-        }
-      } else if (Position == 0) {
-        // The only param.
-        TypeBase *T = Type->getDesugaredType();
-        if (seenTypes.insert(T).second)
-          ExpectedTypes.push_back(T);
+    for (auto Params : Candidates) {
+      if (Position >= Params.size()) {
+        continue;
+      }
+      const auto &Ele = Params[Position];
+      if (Ele.hasLabel() && !HasName) {
+        if (seenNames.insert(Ele.getLabel().get()).second)
+          ExpectedNames.push_back(Ele.getLabel().str());
+      } else {
+        if (seenTypes.insert(Ele.getType().getPointer()).second)
+          ExpectedTypes.push_back(Ele.getType());
       }
     }
   }
 
   bool lookupArgCompletionsAtPosition(unsigned Position, bool HasName,
-                                      ArrayRef<Type> Types, SourceLoc Loc) {
+                                      ArrayRef<FunctionParams> Candidates,
+                                      SourceLoc Loc) {
     std::vector<Type> ExpectedTypes;
     std::vector<StringRef> ExpectedNames;
-    collectArgumentExpectation(Position, HasName, Types, Loc, ExpectedTypes,
+    collectArgumentExpectation(Position, HasName, Candidates, Loc, ExpectedTypes,
                                ExpectedNames);
     addArgNameCompletionResults(ExpectedNames);
     if (!ExpectedTypes.empty()) {
@@ -4006,23 +3913,23 @@ public:
   }
 
   static bool collectionInputTypes(DeclContext &DC, CallExpr *callExpr,
-                                   SmallVectorImpl<Type> &possibleTypes) {
+                                   SmallVectorImpl<FunctionParams> &candidates) {
     auto *fnExpr = callExpr->getFn();
 
     if (auto type = fnExpr->getType()) {
       if (auto *funcType = type->getAs<AnyFunctionType>())
-        possibleTypes.push_back(funcType->getInput());
+        candidates.push_back(funcType->getParams());
     } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
       if (auto *decl = DRE->getDecl()) {
         auto declType = decl->getInterfaceType();
         if (auto *funcType = declType->getAs<AnyFunctionType>())
-          possibleTypes.push_back(funcType->getInput());
+          candidates.push_back(funcType->getParams());
       }
     } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
       for (auto *decl : OSRE->getDecls()) {
         auto declType = decl->getInterfaceType();
         if (auto *funcType = declType->getAs<AnyFunctionType>())
-          possibleTypes.push_back(funcType->getInput());
+          candidates.push_back(funcType->getParams());
       }
     } else {
       ConcreteDeclRef ref = nullptr;
@@ -4034,17 +3941,17 @@ public:
         return false;
 
       if (auto *AFT = (*fnType)->getAs<AnyFunctionType>())
-        possibleTypes.push_back(AFT->getInput());
+        candidates.push_back(AFT->getParams());
     }
 
-    return !possibleTypes.empty();
+    return !candidates.empty();
   }
 
   static bool collectPossibleArgTypes(DeclContext &DC, CallExpr *CallE,
                                       Expr *CCExpr,
-                                      SmallVectorImpl<Type> &PossibleTypes,
+                                      SmallVectorImpl<FunctionParams> &Candidates,
                                       unsigned &Position, bool &HasName) {
-    if (!collectionInputTypes(DC, CallE, PossibleTypes))
+    if (!collectionInputTypes(DC, CallE, Candidates))
       return false;
 
     if (auto *tuple = dyn_cast<TupleExpr>(CallE->getArg())) {
@@ -4070,20 +3977,21 @@ public:
   collectArgumentExpectation(DeclContext &DC, CallExpr *CallE, Expr *CCExpr,
                              std::vector<Type> &ExpectedTypes,
                              std::vector<StringRef> &ExpectedNames) {
-    SmallVector<Type, 2> PossibleTypes;
+    SmallVector<FunctionParams, 4> Candidates;
     unsigned Position;
     bool HasName;
-    if (collectPossibleArgTypes(DC, CallE, CCExpr, PossibleTypes, Position,
+    if (collectPossibleArgTypes(DC, CallE, CCExpr, Candidates, Position,
                                 HasName)) {
-      collectArgumentExpectation(Position, HasName, PossibleTypes,
-                                 CCExpr->getStartLoc(), ExpectedTypes, ExpectedNames);
+      collectArgumentExpectation(Position, HasName, Candidates,
+                                 CCExpr->getStartLoc(), ExpectedTypes,
+                                 ExpectedNames);
       return !ExpectedTypes.empty() || !ExpectedNames.empty();
     }
     return false;
   }
 
   bool getCallArgCompletions(DeclContext &DC, CallExpr *CallE, Expr *CCExpr) {
-    SmallVector<Type, 2> PossibleTypes;
+    SmallVector<FunctionParams, 4> PossibleTypes;
     unsigned Position;
     bool HasName;
     bool hasPossibleArgTypes = collectPossibleArgTypes(DC, CallE, CCExpr,

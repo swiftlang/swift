@@ -3898,6 +3898,17 @@ void Type::print(ASTPrinter &Printer, const PrintOptions &PO) const {
     TypePrinter(Printer, PO).visit(*this);
 }
 
+void AnyFunctionType::printParams(raw_ostream &OS, const
+                                  PrintOptions &PO) const {
+  StreamPrinter Printer(OS);
+  printParams(Printer, PO);
+}
+void AnyFunctionType::printParams(ASTPrinter &Printer,
+                                  const PrintOptions &PO) const {
+  TypePrinter(Printer, PO).visitAnyFunctionTypeParams(getParams(),
+                                                      /*printLabels*/true);
+}
+
 void LayoutConstraintInfo::print(raw_ostream &OS,
                                  const PrintOptions &PO) const {
   StreamPrinter Printer(OS);
