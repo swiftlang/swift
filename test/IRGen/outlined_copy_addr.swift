@@ -58,3 +58,20 @@ func testIt<P: BaseProt>(_ f: GenericError<P>?) {
 func dontCrash<P: BaseProt>(_ f: GenericError<P>) {
   testIt(f)
 }
+
+protocol Baz : class {
+}
+extension Baz {
+  static func crash(setup: ((Self) -> ())?){
+  }
+}
+class Foobar {
+  public static func dontCrash()() -> Baz? {
+     let cls : Baz.Type = Foobar1.self
+     // This used to crash because we tried to outline the optional consume with
+     // an opened payload existential type.
+     cls.crash(setup: { (arg:  Baz) -> () in  })
+     return nil
+  }
+}
+class Foobar1 : Foobar, Baz { }
