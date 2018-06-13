@@ -1075,7 +1075,8 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
     return;
   Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
   if (!PD.empty()) {
-    if (!IRGenOpts.DWARFDebugFlags.empty()) IRGenOpts.DWARFDebugFlags += " ";
+    if (!IRGenOpts.DWARFDebugFlags.empty())
+      IRGenOpts.DWARFDebugFlags += " ";
     IRGenOpts.DWARFDebugFlags += ("-private-discriminator " + PD.str()).str();
   }
 }
