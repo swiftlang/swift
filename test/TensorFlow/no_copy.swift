@@ -167,8 +167,8 @@ struct Classifier {
   var b2 = Tensor<Float>(zeros: [1, 10])
 
   func prediction(for input: Tensor<Float>) -> Tensor<Float> {
-    let h1 = sigmoid(input ⊗ w1 + b1)
-    return sigmoid(h1 ⊗ w2 + b2)
+    let h1 = sigmoid(input • w1 + b1)
+    return sigmoid(h1 • w2 + b2)
   }
 
   mutating func train(images: Tensor<Float>, labels: Tensor<Float>,
@@ -177,17 +177,17 @@ struct Classifier {
     var epochCount = epochCount
     repeat {
       // Forward pass
-      let z1 = images ⊗ w1 + b1
+      let z1 = images • w1 + b1
       let h1 = sigmoid(z1)
-      let z2 = h1 ⊗ w2 + b2
+      let z2 = h1 • w2 + b2
       let pred = sigmoid(z2)
 
       // Backward pass
       let dz2 = pred - labels
-      let dw2 = h1.transposed(withPermutations: 1, 0) ⊗ dz2
+      let dw2 = h1.transposed(withPermutations: 1, 0) • dz2
       let db2 = dz2.sum(squeezingAxes: 0)
       let dz1 = dz2.dot(w2.transposed(withPermutations: 1, 0)) * h1 * (1 - h1)
-      let dw1 = images.transposed(withPermutations: 1, 0) ⊗ dz1
+      let dw1 = images.transposed(withPermutations: 1, 0) • dz1
       let db1 = dz1.sum(squeezingAxes: 0)
 
       // Gradient descent

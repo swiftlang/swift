@@ -33,7 +33,7 @@ public func postdom_crash1(w1: Tensor<Float>, inputBatch: Tensor<Float>) {
   // expected-warning @-2 {{'inputBatch' implicitly copied to the accelerator}}
   let iterationCount = 1000
   for _ in 0..<iterationCount {
-    _ = inputBatch ⊗ w1  // expected-note 2 {{value used here}}
+    _ = inputBatch • w1  // expected-note 2 {{value used here}}
   }
 }
 
@@ -91,10 +91,10 @@ public func testStraightLineXORTraining() {
 
   // Training loop
   for _ in 0..<iterationCount {
-    let mmul1 = inputBatch ⊗ w1
+    let mmul1 = inputBatch • w1
     let l1 = mmul1 + b1
     let o1 = sigmoid(l1)
-    let mmul2 = o1 ⊗ w2
+    let mmul2 = o1 • w2
     let l2 = mmul2 + b2
     let pred = sigmoid(l2)
 
@@ -109,15 +109,15 @@ public func testStraightLineXORTraining() {
     let dL2 = dPred * pred * (1 - pred)
     let dMmul2 = dL2
     let dB2 = dL2
-    let dO1 = dMmul2 ⊗ w2.transposed(withPermutations: 1, 0)
-    let dW2 = o1.transposed(withPermutations: 1, 0) ⊗ dMmul2
+    let dO1 = dMmul2 • w2.transposed(withPermutations: 1, 0)
+    let dW2 = o1.transposed(withPermutations: 1, 0) • dMmul2
     let dL1 = dO1 * l1 * (1 - l1)
     let dMmul1 = dL1
     let dB1 = dL1
 
     // Statically detected shape mismatch!
     // expected-error @+1 {{(op: 'MatMul') with input shapes: [4,2], [4,4]}}
-    let dW1 = inputBatch ⊗ dMmul1
+    let dW1 = inputBatch • dMmul1
 
     // Descent
     w1 -= (dW1 * learningRate)
