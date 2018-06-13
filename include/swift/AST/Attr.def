@@ -379,10 +379,8 @@ SIMPLE_DECL_ATTR(_usableFromInline, UsableFromInlineImport,
   77)
 
 // SWIFT_ENABLE_TENSORFLOW
-// FIXME: Make it serialized
 DECL_ATTR(differentiable, Differentiable,
-          OnFunc | LongAttribute | NotSerialized,
-          /* Not serialized */ 78)
+          OnFunc | LongAttribute, 78)
 
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnFunc | OnConstructor, /* Not serialized */ 79)
