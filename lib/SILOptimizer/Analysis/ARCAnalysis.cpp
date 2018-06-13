@@ -581,8 +581,8 @@ findMatchingRetains(SILBasicBlock *BB) {
   // OK. we've found the return value, now iterate on the CFG to find all the
   // post-dominating retains.
   //
-  // The ConsumedArgToEpilogueReleaseMatcher finds the final releases
-  // in the following way. 
+  // The ConsumedResultToEpilogueRetainMatcher finds the final releases
+  // in the following way.
   //
   // 1. If an instruction, which is not releaseinst nor releasevalue, that
   // could decrement reference count is found. bail out.
