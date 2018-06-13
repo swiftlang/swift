@@ -6085,6 +6085,12 @@ static bool applyTypeToClosureExpr(ConstraintSystem &cs,
   // If we found an explicit ClosureExpr, update its type.
   if (auto CE = dyn_cast<ClosureExpr>(expr)) {
     cs.setType(CE, toType);
+
+    // If this is not a single-expression closure, write the type into the
+    // ClosureExpr directly here, since the visitor won't.
+    if (!CE->hasSingleExpressionBody())
+      CE->setType(toType);
+
     return true;
   }
 
@@ -7427,7 +7433,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       }
       
       case DeclTypeCheckingSemantics::WithoutActuallyEscaping: {
-        // Resolve into a MakeTemporarilyEscapingExpr.
+        // Resolve into a MakeTemporarilyEscapableExpr.
         auto arg = cast<TupleExpr>(apply->getArg());
         assert(arg->getNumElements() == 2 && "should have two arguments");
         auto nonescaping = arg->getElements()[0];
