@@ -2083,6 +2083,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
   // representable as well. Because type arguments are not actually
   // translated separately, whether they are trivially representable
   // or bridged representable doesn't impact our final result.
+  ForeignRepresentableKind resultKind = result.getKind();
   if (auto boundGenericType = type->getAs<BoundGenericType>()) {
     for (auto typeArg : boundGenericType->getGenericArgs()) {
       // Type arguments cannot be optional.
@@ -2099,8 +2100,22 @@ getForeignRepresentable(Type type, ForeignLanguage language,
       // And must be representable either an object or bridged.
       switch (typeArg->getForeignRepresentableIn(language, dc).first) {
       case ForeignRepresentableKind::None:
-      case ForeignRepresentableKind::StaticBridged:
         return failure();
+
+      case ForeignRepresentableKind::StaticBridged:
+        switch (resultKind) {
+        case ForeignRepresentableKind::Bridged:
+        case ForeignRepresentableKind::BridgedError:
+          resultKind = ForeignRepresentableKind::StaticBridged;
+          break;
+
+        case swift::ForeignRepresentableKind::StaticBridged:
+        case swift::ForeignRepresentableKind::None:
+        case ForeignRepresentableKind::Object:
+        case ForeignRepresentableKind::Trivial:
+          break;
+        }
+        break;
 
       case ForeignRepresentableKind::Trivial:
         // FIXME: We allow trivially-representable cases that also
@@ -2127,7 +2142,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     }
   }
 
-  return { result.getKind(), result.getConformance() };
+  return { resultKind, result.getConformance() };
 }
 
 std::pair<ForeignRepresentableKind, ProtocolConformance *>

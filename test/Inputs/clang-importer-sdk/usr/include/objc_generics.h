@@ -113,3 +113,9 @@ typedef id <Fungible> FungibleObject;
 
 @interface Third : Second<Third *>
 @end
+
+typedef void (^ _Nonnull BlockPointerType)(void);
+
+@interface HasBlockArray : NSObject
+- (NSArray<BlockPointerType> * _Nonnull)blockArray;
+@end
