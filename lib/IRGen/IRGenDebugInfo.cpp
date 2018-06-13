@@ -157,7 +157,7 @@ public:
                                      bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name);
+                        unsigned Depth, unsigned Index, StringRef AssocType);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
@@ -616,9 +616,13 @@ private:
     if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
       return BumpAllocatedString(DbgTy.getDecl()->getName().str());
 
+    Type Ty = DbgTy.getType();
+    if (!Ty->hasTypeParameter())
+      Ty = Ty->mapTypeOutOfContext();
+
     Mangle::ASTMangler Mangler;
     std::string Name = Mangler.mangleTypeForDebugger(
-        DbgTy.getType(), DbgTy.getDeclContext(), DbgTy.getGenericEnvironment());
+        Ty, DbgTy.getDeclContext(), DbgTy.getGenericEnvironment());
     return BumpAllocatedString(Name);
   }
 
@@ -1308,15 +1312,13 @@ private:
       return getOrCreateDesugaredType(CanTy, DbgTy);
     }
 
+    case TypeKind::DependentMember:
     case TypeKind::GenericTypeParam: {
-      auto *ParamTy = cast<GenericTypeParamType>(BaseTy);
       // FIXME: Provide a more meaningful debug type.
-      return DBuilder.createUnspecifiedType(ParamTy->getName().str());
-    }
-    case TypeKind::DependentMember: {
-      auto *MemberTy = cast<DependentMemberType>(BaseTy);
-      // FIXME: Provide a more meaningful debug type.
-      return DBuilder.createUnspecifiedType(MemberTy->getName().str());
+      return DBuilder.createStructType(
+          Scope, MangledName, File, 0, SizeInBits, AlignInBits, Flags,
+          nullptr, nullptr,
+          llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
     }
 
     // The following types exist primarily for internal use by the type
@@ -2028,8 +2030,8 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
 }
 
 void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Value *Metadata,
-                                          StringRef Name) {
+                                          llvm::Value *Metadata, unsigned Depth,
+                                          unsigned Index, StringRef AssocType) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
@@ -2038,12 +2040,16 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
-  auto TName = BumpAllocatedString(("$swift.type." + Name).str());
+  llvm::SmallString<8> Buf;
+  static const char *Tau = u8"\u03C4_";
+  llvm::raw_svector_ostream OS(Buf);
+  OS << '$' << Tau << Depth << '_' << Index << AssocType;
   auto DbgTy = DebugTypeInfo::getMetadata(
       getMetadataType()->getDeclaredInterfaceType().getPointer(),
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, DS, nullptr, TName, 0,
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
+                          nullptr, OS.str().str(), 0,
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2155,9 +2161,10 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 }
 
 void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                                      StringRef Name) {
-  static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
-                                                            Name);
+                                      unsigned Depth, unsigned Index,
+                                      StringRef AssocType) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(
+      IGF, Metadata, Depth, Index, AssocType);
 }
 
 llvm::DIBuilder &IRGenDebugInfo::getBuilder() {

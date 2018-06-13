@@ -353,7 +353,18 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
     return;
 
   // Emit debug info for the metadata.
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, name);
+  llvm::SmallString<8> AssocType;
+  auto *oocTy = type->mapTypeOutOfContext().getPointer();
+  {
+    llvm::raw_svector_ostream OS(AssocType);
+    while (auto *dependentMemberType = dyn_cast<DependentMemberType>(oocTy)) {
+      OS << '.' << dependentMemberType->getName();
+      oocTy = dependentMemberType->getBase().getPointer();
+    }
+  }
+  auto *typeParam = cast<GenericTypeParamType>(oocTy);
+  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam->getDepth(),
+                                      typeParam->getIndex(), AssocType);
 }
 
 void
