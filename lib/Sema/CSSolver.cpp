@@ -1417,12 +1417,6 @@ bool ConstraintSystem::solve(Expr *const expr,
   // Set up solver state.
   SolverState state(expr, *this);
 
-  // Simplify any constraints left active after constraint generation
-  // and optimization. Return if the resulting system has no
-  // solutions.
-  if (failedConstraint || simplify())
-    return true;
-
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
 
