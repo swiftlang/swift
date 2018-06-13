@@ -2629,10 +2629,11 @@ private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
     std::string mangledName(Mangler.mangleTypeForDebugger(
-        T, DC, DC->getGenericEnvironmentOfContext()));
+                              T->mapTypeOutOfContext(), DC,
+        DC->getGenericEnvironmentOfContext()));
     std::string Error;
-    Type ReconstructedType =
-        getTypeFromMangledSymbolname(Ctx, mangledName, Error);
+    Type ReconstructedType = DC->mapTypeIntoContext(
+        getTypeFromMangledSymbolname(Ctx, mangledName, Error));
     Stream << "type: ";
     if (ReconstructedType) {
       ReconstructedType->print(Stream);

@@ -18,6 +18,9 @@ extension Collection where Element: Equatable {
       var results = [SubSequence]()
       return results
   }
+  func foo(_ x: Iterator.Element) {
+    print(x)
+  }
 }
 
 class Foo<T> {
