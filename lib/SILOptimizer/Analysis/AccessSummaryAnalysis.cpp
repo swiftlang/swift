@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
@@ -487,6 +488,12 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
   for (Operand *Use : I->getUses()) {
     SILInstruction *User = Use->getUser();
     if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
+      continue;
+
+    // Ignore sanitizer instrumentation when looking for a single projection
+    // user. This ensures that we're able to find a single projection subpath
+    // even when sanitization is enabled.
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // We have more than a single user so bail.
