@@ -2417,6 +2417,9 @@ private:
     // pass the entire tuple indirectly, but if it's not
     // materializable, the convention is actually to break it up
     // into materializable chunks.  See the comment in SILType.cpp.
+    //
+    // FIXME: Once -swift-version 3 code generation goes away, we
+    // can simplify this.
     if (isUnmaterializableTupleType(substArgType)) {
       assert(origParamType.isTypeParameter());
       emitExpanded(std::move(arg), origParamType);
@@ -2441,10 +2444,19 @@ private:
     SILParameterInfo param = claimNextParameter();
     ArgSpecialDest *specialDest = claimNextSpecialDest();
 
+    // Unwrap InOutType here.
+    assert(isa<InOutType>(substArgType) == param.isIndirectInOut());
+    if (auto inoutType = dyn_cast<InOutType>(substArgType))
+      substArgType = inoutType.getObjectType();
+
     // Make sure we use the same value category for these so that we
     // can hereafter just use simple equality checks to test for
     // abstraction.
     SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
+    if (param.isIndirectInOut()) {
+      loweredSubstArgType =
+        SILType::getPrimitiveAddressType(loweredSubstArgType.getASTType());
+    }
     SILType loweredSubstParamType =
       SILType::getPrimitiveType(param.getType(),
                                 loweredSubstArgType.getCategory());
@@ -2453,7 +2465,6 @@ private:
     // inout type.
     if (param.isIndirectInOut()) {
       assert(!specialDest);
-      assert(isa<InOutType>(substArgType));
       emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
                 origParamType, substArgType);
       return;
@@ -2641,10 +2652,9 @@ private:
         auto address = std::move(arg).asKnownRValue(SGF).getAsSingleValue(
             SGF, arg.getKnownRValueLocation());
         assert(address.isLValue());
-        auto substObjectType = cast<InOutType>(substType).getObjectType();
         return LValue::forAddress(address, None,
-                                  AbstractionPattern(substObjectType),
-                                  substObjectType);
+                                  AbstractionPattern(substType),
+                                  substType);
       } else {
         auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
                                   getSemanticsProvidingExpr());
