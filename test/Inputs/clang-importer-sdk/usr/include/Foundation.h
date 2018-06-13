@@ -1153,11 +1153,12 @@ void takeNullableId(__nullable id);
 @interface I
 @end
 
-@protocol OptionalMethods
+@protocol OptionalRequirements
 @optional
 - (Coat *)optional;
+@property NSString *name;
 @end
 
 @interface IUOProperty
-@property (readonly) id<OptionalMethods> iuo;
+@property (readonly) id<OptionalRequirements> iuo;
 @end
