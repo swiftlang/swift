@@ -100,7 +100,16 @@ public:
                                 const DiagnosticInfo &Info) = 0;
 
   /// \returns true if an error occurred while finishing-up.
-  virtual bool finishProcessing(SourceManager &) { return false; }
+  virtual bool finishProcessing() { return false; }
+
+  /// In batch mode, any error causes failure for all primary files, but
+  /// anyone consulting .dia files will only see an error for a particular
+  /// primary in that primary's serialized diagnostics file. For other
+  /// primaries' serialized diagnostics files, do something to signal the driver
+  /// what happened. This is only meaningful for SerializedDiagnosticConsumers,
+  /// so here's a placeholder.
+
+  virtual void informDriverOfIncompleteBatchModeCompilation() {}
 };
   
 /// \brief DiagnosticConsumer that discards all diagnostics.
@@ -193,13 +202,14 @@ public:
                         ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 
-  bool finishProcessing(SourceManager &) override;
+  bool finishProcessing() override;
 
 private:
   /// In batch mode, any error causes failure for all primary files, but
   /// Xcode will only see an error for a particular primary in that primary's
-  /// serialized diagnostics file. So, emit errors for all other primaries here.
-  void addNonSpecificErrors(SourceManager &SM);
+  /// serialized diagnostics file. So, tell the subconsumers to inform the
+  /// driver of incomplete batch mode compilation.
+  void tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const;
 
   void computeConsumersOrderedByRange(SourceManager &SM);
 
