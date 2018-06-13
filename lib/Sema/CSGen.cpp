@@ -1709,9 +1709,18 @@ namespace {
       if (!optTy)
         return Type();
 
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getSubExpr()), optTy,
-                       CS.getConstraintLocator(expr));
+      // Prior to Swift 5, 'try?' always adds an additional layer of optionality,
+      // even if the sub-expression was already optional.
+      if (CS.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5)) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         CS.getType(expr->getSubExpr()), optTy,
+                         CS.getConstraintLocator(expr));
+      }
+      else {
+        CS.addConstraint(ConstraintKind::OptionalObject,
+                         optTy, CS.getType(expr->getSubExpr()),
+                         CS.getConstraintLocator(expr));
+      }
       return optTy;
     }
 

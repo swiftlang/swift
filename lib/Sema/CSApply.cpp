@@ -2808,6 +2808,11 @@ namespace {
     }
 
     Expr *visitOptionalTryExpr(OptionalTryExpr *expr) {
+      if (cs.getTypeChecker().getLangOpts().isSwiftVersionAtLeast(5) == false) {
+        // Nothing to do for Swift 4 and earlier!
+        return simplifyExprType(expr);
+      }
+      
       Type subExprType = cs.getType(expr->getSubExpr());
       Type targetType = simplifyType(subExprType);
       
@@ -3777,8 +3782,7 @@ namespace {
         break;
       }
       
-      auto simplifiedType = simplifyType(cs.getType(expr));
-      return handleOptionalBindingsForCast(expr, simplifiedType,
+      return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
                                          OptionalBindingsCastKind::Conditional);
     }
 
