@@ -252,3 +252,20 @@ public struct AdoptViaCombinedProtocol : ProtoWithReqs, ReqProvider2 {
   // expected-error@-1 {{method 'foo()' must be declared public because it matches a requirement in public protocol 'ProtoWithReqs'}} {{none}}
   public typealias Assoc = Int
 }
+
+public protocol PublicInitProto {
+  var value: Int { get }
+  init(value: Int)
+}
+public struct NonPublicInitStruct: PublicInitProto {
+  public var value: Int
+  init(value: Int) {
+// expected-error@-1 {{initializer 'init(value:)' must be declared public because it matches a requirement in public protocol 'PublicInitProto'}}
+// expected-note@-2 {{mark the initializer as 'public' to satisfy the requirement}}
+    self.value = value
+  }
+}
+public struct NonPublicMemberwiseInitStruct: PublicInitProto {
+// expected-error@-1 {{initializer 'init(value:)' must be declared public because it matches a requirement in public protocol 'PublicInitProto'}}
+  public var value: Int
+}
