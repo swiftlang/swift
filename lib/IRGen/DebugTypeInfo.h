@@ -62,8 +62,7 @@ public:
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
                                         GenericEnvironment *GE, VarDecl *Decl,
-                                        swift::Type Ty, const TypeInfo &Info,
-                                        bool Unwrap);
+                                        swift::Type Ty, const TypeInfo &Info);
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
