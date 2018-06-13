@@ -71,7 +71,7 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 /// \returns True if running as a subcommand.
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
-                                  const ArrayRef<const char *> &Args,
+                                  const ArrayRef<const char *> Args,
                                   bool &isRepl) {
   assert(!Args.empty());
 
@@ -113,7 +113,7 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 extern int apinotes_main(ArrayRef<const char *> Args);
 
 static int run_driver(StringRef ExecName,
-                       const ArrayRef<const char *> &argv) {
+                       const ArrayRef<const char *> argv) {
   // Handle integrated tools.
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
