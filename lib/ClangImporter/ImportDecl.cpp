@@ -5188,18 +5188,6 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   if (!typeDecl)
     return nullptr;
 
-  // Deliberately use an UnboundGenericType to avoid having to translate over
-  // generic parameters.
-  Type underlyingType;
-  if (auto *underlyingAlias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (underlyingAlias->isGeneric())
-      underlyingType = underlyingAlias->getUnboundGenericType();
-    else
-      underlyingType = Impl.getSugaredTypeReference(underlyingAlias);
-  } else {
-    underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
-  }
-
   auto dc = Impl.importDeclContextOf(decl,
                                      compatibilityName.getEffectiveContext());
   if (!dc)
@@ -5210,7 +5198,15 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
       decl, AccessLevel::Public, Impl.importSourceLoc(decl->getLocStart()),
       SourceLoc(), compatibilityName.getDeclName().getBaseIdentifier(),
       Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
-  alias->setUnderlyingType(underlyingType);
+
+  auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
+  if (GTD && !isa<ProtocolDecl>(GTD)) {
+    alias->setGenericEnvironment(GTD->getGenericEnvironment());
+    if (GTD->isGeneric())
+      alias->setGenericParams(GTD->getGenericParams()->clone(alias));
+  }
+
+  alias->setUnderlyingType(Impl.getSugaredTypeReference(typeDecl));
 
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
