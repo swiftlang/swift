@@ -4849,11 +4849,16 @@ static bool isClangSubModule(ModuleDecl *TheModule) {
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink) {
-  auto AddKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind) {
+  auto AddKeyword = [&](StringRef Name, CodeCompletionKeywordKind Kind,
+                        Optional<DeclAttrKind> DAK) {
     if (Name == "let" || Name == "var") {
       // Treat keywords that could be the start of a pattern specially.
       return;
     }
+
+    // Remove user inaccessible keywords.
+    if (DAK.hasValue() && DeclAttribute::isUserInaccessible(*DAK)) return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Keyword,
         SemanticContextKind::None, {});
@@ -4861,18 +4866,18 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
     Builder.addTextChunk(Name);
   };
 
-#define DECL_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
+#define DECL_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw, None);
 #include "swift/Syntax/TokenKinds.def"
 
   // Context-sensitive keywords.
-  auto AddCSKeyword = [&](StringRef Name) {
-    AddKeyword(Name, CodeCompletionKeywordKind::None);
+  auto AddCSKeyword = [&](StringRef Name, DeclAttrKind Kind) {
+    AddKeyword(Name, CodeCompletionKeywordKind::None, Kind);
   };
 
-#define CONTEXTUAL_CASE(KW) AddCSKeyword(#KW);
-#define CONTEXTUAL_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
-#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, ...) CONTEXTUAL_CASE(KW)
-#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
+#define CONTEXTUAL_CASE(KW, CLASS) AddCSKeyword(#KW, DAK_##CLASS);
+#define CONTEXTUAL_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
+#define CONTEXTUAL_DECL_ATTR_ALIAS(KW, CLASS) CONTEXTUAL_CASE(KW, CLASS)
+#define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, CLASS, ...) CONTEXTUAL_CASE(KW, CLASS)
 #include <swift/AST/Attr.def>
 #undef CONTEXTUAL_CASE
 
