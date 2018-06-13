@@ -1004,6 +1004,7 @@ public:
     IRGenOpts.OptMode = OptimizationMode::NoOptimization;
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
+    IRGenOpts.IntegratedREPL = true;
     IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;
 
     if (!ParseStdlib) {
