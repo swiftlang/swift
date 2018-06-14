@@ -278,7 +278,7 @@ struct StructImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "indirect struct fields not implemented");
       
       *outName = name.data();
@@ -319,7 +319,7 @@ struct EnumImpl : ReflectionMirrorImpl {
     bool indirect = false;
     
     const char *caseName = nullptr;
-    swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
+    _swift_getFieldAt(type, tag, [&](llvm::StringRef name, FieldType info) {
       caseName = name.data();
       payloadType = info.getType();
       indirect = info.isIndirect();
@@ -435,7 +435,7 @@ struct ClassImpl : ReflectionMirrorImpl {
 
     Any result;
     
-    swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
+    _swift_getFieldAt(type, i, [&](llvm::StringRef name, FieldType fieldInfo) {
       assert(!fieldInfo.isIndirect() && "class indirect properties not implemented");
       
       auto *bytes = *reinterpret_cast<char * const *>(value);
