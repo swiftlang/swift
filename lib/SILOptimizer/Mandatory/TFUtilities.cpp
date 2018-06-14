@@ -1433,8 +1433,15 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
     changed |= operands[i] != inst->getOperand(i);
 
   if (configuration) {
-    changed |= configuration->handleDevicePlacement(
-        opName, opDevice, /*inst,*/ B, inst->getLoc(), operands, name);
+    if (!opDevice.empty()) {
+      // User code should not specify this pseudo device.
+      // FIXME: Issue diagnostics over an invalid device string.
+      assert(opDevice != ALL_DEVICES);
+    } else {
+      changed = true;
+    }
+    configuration->handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
+                                         operands, name);
   }
 
   // If everything is already copasetic, just return our existing instruction.
