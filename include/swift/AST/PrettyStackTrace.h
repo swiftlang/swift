@@ -20,6 +20,7 @@
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
 namespace swift {
@@ -146,6 +147,15 @@ public:
   }
 
   void print(llvm::raw_ostream &out) const override;
+};
+
+class PrettyStackTraceSelector : public llvm::PrettyStackTraceEntry {
+  ObjCSelector Selector;
+  const char *Action;
+public:
+  PrettyStackTraceSelector(const char *action, ObjCSelector S)
+    : Selector(S), Action(action) {}
+  void print(llvm::raw_ostream &OS) const override;
 };
 
 } // end namespace swift
