@@ -1696,15 +1696,8 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
-  swift::ModuleDecl *M = IGM.Context.getModule(D->getModulePath());
-  if (!M &&
-      D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
-    M = IGM.Context.TheBuiltinModule;
-  if (!M) {
-    assert(M && "Could not find module for import decl.");
-    return;
-  }
-  ModuleDecl::ImportedModule Imported = {D->getModulePath(), M};
+  assert(D->getModule() && "compiler-synthesized ImportDecl is incomplete");
+  ModuleDecl::ImportedModule Imported = {D->getModulePath(), D->getModule()};
   auto DIMod = getOrCreateModule(Imported);
   auto L = getDebugLoc(*this, D);
   auto *File = getOrCreateFile(L.Filename);
