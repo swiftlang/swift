@@ -66,7 +66,7 @@ extension Baz {
   }
 }
 class Foobar {
-  public static func dontCrash()() -> Baz? {
+  public static func dontCrash() -> Baz? {
      let cls : Baz.Type = Foobar1.self
      // This used to crash because we tried to outline the optional consume with
      // an opened payload existential type.
