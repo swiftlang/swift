@@ -2,8 +2,8 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
+// UNSUPPORTED: OS=watchos
 
-// REQUIRES: rdar40799651
 
 import Network
 import Foundation
