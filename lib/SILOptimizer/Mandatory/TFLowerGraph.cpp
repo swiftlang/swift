@@ -54,6 +54,10 @@ static const char TPU_CLUSTER_ATTR_VALUE[] = "TPUReplicate/cluster";
 // FIXME: Tune the default value for performance, and/or make it configurable.
 static const int NAMED_TENSOR_QUEUE_CAPACITY = 1;
 
+// The send device incarnation for TF sends/recvs.
+// FIXME: revisit whether using a fixed value is good enough.
+static const int DEVICE_INCARNATION_ID = 1;
+
 /// When generating a TF TPU graph, call this function to place an eligible TF
 /// graph node onto TPU device. Some nodes such as Placeholder and
 /// Dataset/Iterator nodes are not eligible for TPU.
@@ -191,7 +195,8 @@ namespace {
 struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   SILFunction &SILFn;
   // The TF device to which the generated graph is targeting.
-  DeviceType thisDeviceType;
+  const DeviceType thisDeviceType;
+  const std::string thisDeviceTypeStr;
   const GraphGlobalConfiguration &configuration;
   TF_Graph *resultGraph;
   TF_Status *status;
@@ -225,6 +230,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
                   TF_Graph *resultGraph, TF_Status *status)
       : SILFn(fn),
         thisDeviceType(thisDeviceType),
+        thisDeviceTypeStr(getDeviceString(thisDeviceType)),
         configuration(configuration),
         resultGraph(resultGraph),
         status(status) {}
@@ -496,17 +502,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   void visitStringLiteralInst(StringLiteralInst *inst) {}
 
   void visitBuiltinInst(BuiltinInst *inst);
-  void visitBuiltinTFSendInst(BuiltinInst *inst);
-  void visitBuiltinTFReceiveInst(BuiltinInst *inst);
 
-  /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
-  ///
-  /// FIXME: Dissolve this builtin into a set of finer-grained, composer
-  /// features.
-  void visitTFDataset(BuiltinInst *inst);
-  bool createDatasetIteratorNodesWithInfeedEnqueue();
-
-  void visitTFOpInst(BuiltinInst *inst);
   void visitTupleInst(TupleInst *inst);
   void visitTupleExtractInst(TupleExtractInst *inst);
   void visitUncheckedRefCastInst(UncheckedRefCastInst *inst);
@@ -534,6 +530,25 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   void lowerSequenceRegion(SequenceSESERegion *r);
   void lowerWhileLoopRegion(WhileLoopSESERegion *r);
   void lowerConditionalRegion(ConditionalSESERegion *r);
+
+ private:  // Helpers for lowering.
+  /// Create a stack of TF dataset and iterator nodes up to IteratorGetNext.
+  ///
+  /// FIXME: Dissolve this builtin into a set of finer-grained, composable
+  /// features.
+  void visitTFDataset(BuiltinInst *inst);
+  bool createDatasetIteratorNodesWithInfeedEnqueue();
+
+  void visitTFOpInst(BuiltinInst *inst);
+
+  void visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo, BuiltinInst *inst);
+  void visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo,
+                                    BuiltinInst *inst);
+  // D2D means device-to-device.
+  void visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo,
+                                     BuiltinInst *inst);
+  void visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo,
+                                     BuiltinInst *inst);
 };
 }
 
@@ -577,9 +592,9 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       auto lineCol = SM.getLineAndColumn(ds->Loc.getSourceLoc());
       auto fnName = F->getName();
 
-      // Drop ".tf_partition" suffix off function names.
-      if (fnName.endswith(".tf_partition"))
-        fnName = fnName.drop_back(strlen(".tf_partition"));
+      // Drop ".device_partition" suffix off function names.
+      if (fnName.endswith(".device_partition"))
+        fnName = fnName.drop_back(strlen(".device_partition"));
 
       name += "." + fnName.str() + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
@@ -684,10 +699,6 @@ void TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
   // handle it directly.
   if (inst->getName().str() == "tf_tensor_to_i1")
     return;
-  if (inst->getName().str().startswith("tensorflowReceive_"))
-    return visitBuiltinTFReceiveInst(inst);
-  if (inst->getName().str().startswith("tensorflowSend_"))
-    return visitBuiltinTFSendInst(inst);
   if (inst->getName().str().startswith(
           "__tfop_tfc.makeIteratorGetNextWithDatasets"))
     return visitTFDataset(inst);
@@ -793,32 +804,30 @@ static void decodeShapeArray(SILInstruction *inst,
   }
 }
 
-void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
+void TFGraphLowering::visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo,
+                                                 BuiltinInst *inst) {
   auto &graphFn = getCurrentGraphFunction();
   // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
   // the while cond function.
   if (!graphFn.shouldLowerEffectfulOps) return;
 
-  // Decode the tensor id from the builtin name.
-  // Example: builtin "tensorflowSend_0"<TensorHandle<Float>>(...) : $()
-  int tensorId = -1;
-  {
-    auto name = inst->getName().str();
-    auto tensorIdStr = name.substr(strlen("tensorflowSend_"));
-    bool isInt = llvm::to_integer(tensorIdStr, tensorId, 10);
-    assert(isInt);
-  }
+  // Type check and process the parameters.
+  // SendToHost has type <T> (input$T, tensorId$int, device$str) -> ()
+  assert(inst->getNumResults() == 1);
+  assert(inst->getNumOperands() == 3);
+  assert(tfopInfo.isInput(0));
 
-  // Type check and process the parameter.
   TF_Output inputOp;
   TF_DataType inputType;
   {
-    assert(inst->getNumOperands() == 1);
     auto operand = inst->getOperand(0);
     inputOp = getOperandValue(operand);
     if (!inputOp.oper) return;  // Error occurred.
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
+  int tensorId = tfopInfo.getIntAttrOperand(1, "tensorId");
+  assert(tfopInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+         "SendToHost must run on CPU device");
 
   // Add enqueue to the local graph function, and the corresponding dequeue to
   // the top level function, so that caller can dequeue tensors via SessionRun.
@@ -886,26 +895,24 @@ void TFGraphLowering::visitBuiltinTFSendInst(BuiltinInst *inst) {
   }
 }
 
-void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
+void TFGraphLowering::visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo,
+                                                   BuiltinInst *inst) {
   auto &graphFn = getCurrentGraphFunction();
   // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
   // the while cond function.
   if (!graphFn.shouldLowerEffectfulOps) return;
 
-  // Decode the tensor id from the builtin name.
-  // Example: builtin "tensorflowReceive_0"<TensorHandle<Float>>(...) : $()
-  int tensorId = -1;
-  {
-    auto name = inst->getName().str();
-    auto tensorIdStr = name.substr(strlen("tensorflowReceive_"));
-    bool isInt = llvm::to_integer(tensorIdStr, tensorId, 10);
-    assert(isInt);
-  }
+  // Type check and process the parameters.
+  // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
+  assert(inst->getNumResults() == 1);
+  assert(inst->getNumOperands() == 2);
 
-  // Type check and process the result.
+  int tensorId = tfopInfo.getIntAttrOperand(0, "tensorId");
+  assert(tfopInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+         "SendToHost must run on CPU device");
+
   TF_DataType outputType;
   {
-    assert(inst->getNumOperands() == 0);
     assert(inst->getNumResults() == 1);
     outputType =
         getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
@@ -989,6 +996,72 @@ void TFGraphLowering::visitBuiltinTFReceiveInst(BuiltinInst *inst) {
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return;
   }
+}
+
+void TFGraphLowering::visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo,
+                                                    BuiltinInst *inst) {
+  // Signature: "__tfop_tfc.D2DTensorRecv,transferId,srcDevice,device"
+  assert(inst->getNumResults() == 1);
+  assert(inst->getNumOperands() == 3);
+
+  int transferId = tfopInfo.getIntAttrOperand(0, "transferId");
+  auto srcDevice = tfopInfo.getStringAttrOperand(1, "srcDevice");
+  auto thisDevice = thisDeviceTypeStr;
+  assert(tfopInfo.getDeviceString() == thisDevice);
+  auto opName = "tf_recv_" + llvm::itostr(transferId);
+  auto &graphFn = getCurrentGraphFunction();
+  auto *desc = TF_NewOperation(graphFn.getGraph(), "_Recv", opName.c_str());
+  TF_SetDevice(desc, thisDevice.c_str());
+
+  auto outputFromRecvVal = inst->getResults()[0];
+  auto tfType =
+      getTensorFlowDataType(outputFromRecvVal->getType(), inst->getLoc());
+  assert(tfType > 0);
+  TF_SetAttrType(desc, "tensor_type", (TF_DataType)tfType);
+
+  auto tensorName = "tensor_transfer_" + llvm::itostr(transferId);
+  TF_SetAttrString(desc, "tensor_name", tensorName.data(), tensorName.size());
+  TF_SetAttrString(desc, "send_device", srcDevice.data(), srcDevice.size());
+  TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
+  TF_SetAttrString(desc, "recv_device", thisDevice.data(), thisDevice.size());
+  auto *recvOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
+                                  /*isEligibleForTPU*/ false, status);
+  if (checkStatus(getUserSourceLocation(inst->getDebugLocation()))) return;
+  addValueMapping({inst, 0}, {recvOp, 0});
+}
+
+void TFGraphLowering::visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo,
+                                                    BuiltinInst *inst) {
+  // Signature: "__tfop_tfc.D2DTensorSend,$in,transferId,destDevice,device"
+  assert(inst->getNumResults() == 1);
+  assert(inst->getNumOperands() == 4);
+
+  assert(tfopInfo.isInput(0));
+  auto inputToSendVal = inst->getOperand(0);
+  auto inputToSendOp = getOperandValue(inputToSendVal);
+  if (!inputToSendOp.oper) return;  // Error occurred.
+
+  int transferId = tfopInfo.getIntAttrOperand(1, "transferId");
+  auto destDevice = tfopInfo.getStringAttrOperand(2, "destDevice");
+  auto thisDevice = thisDeviceTypeStr;
+  assert(tfopInfo.getDeviceString() == thisDevice);
+  auto opName = "tf_send_" + llvm::itostr(transferId);
+  auto &graphFn = getCurrentGraphFunction();
+  auto *desc = TF_NewOperation(graphFn.getGraph(), "_Send", opName.c_str());
+  TF_SetDevice(desc, thisDevice.c_str());
+  TF_AddInput(desc, inputToSendOp);
+  auto tfType =
+      getTensorFlowDataType(inputToSendVal->getType(), inst->getLoc());
+  assert(tfType > 0);
+  TF_SetAttrType(desc, "T", (TF_DataType)tfType);
+  auto tensorName = "tensor_transfer_" + llvm::itostr(transferId);
+  TF_SetAttrString(desc, "tensor_name", tensorName.data(), tensorName.size());
+  TF_SetAttrString(desc, "send_device", thisDevice.data(), thisDevice.size());
+  TF_SetAttrInt(desc, "send_device_incarnation", DEVICE_INCARNATION_ID);
+  TF_SetAttrString(desc, "recv_device", destDevice.data(), destDevice.size());
+  /* sendOp = */ graphFn.finishOp(desc, /*hasSideEffects*/ true,
+                                  /*isEligibleForTPU*/ false, status);
+  checkStatus(getUserSourceLocation(inst->getDebugLocation()));
 }
 
 void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
@@ -1109,6 +1182,20 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
 ///
 void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
+
+  // Swift host <-> TF device sends/recvs.
+  if (tfopInfo.opName == "tfc.RecvFromHost")
+    return visitBuiltinRecvFromHostInst(tfopInfo, inst);
+  else if (tfopInfo.opName == "tfc.SendToHost")
+    return visitBuiltinSendToHostInst(tfopInfo, inst);
+
+  // Device-to-device sends/recvs.
+  if (tfopInfo.opName == "tfc.D2DTensorRecv")
+    return visitBuiltinD2DTensorRecvInst(tfopInfo, inst);
+  else if (tfopInfo.opName == "tfc.D2DTensorSend")
+    return visitBuiltinD2DTensorSendInst(tfopInfo, inst);
+
+  // Handle other TF ops.
   auto &graphFn = getCurrentGraphFunction();
 
   // The name label we put on the op is summarized from the "stack trace" of
@@ -1214,6 +1301,9 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         if (name != DEVICE_ATTR) {
           TF_SetAttrString(op, name.c_str(), value.data(), value.size());
         } else {
+          if (value.str() == ALL_DEVICES) {
+            value = thisDeviceTypeStr;
+          }
           if (value.str() != DEFAULT_TPU_DEVICE) {
             TF_SetDevice(op, value.str().c_str());
           } else {
@@ -2127,7 +2217,7 @@ bool TFGraphLowering::buildGraphNodesForTopLevelFunctionCall(
     assert(thisDeviceType == DeviceType::TPU);
     markNodeAsTPUReplicated(funcDesc);
   } else {
-    TF_SetDevice(funcDesc, getDeviceString(thisDeviceType).c_str());
+    TF_SetDevice(funcDesc, thisDeviceTypeStr.c_str());
   }
 
   // FIXME: Revisit how to enable infeed outside the context of dataset /
@@ -2422,24 +2512,6 @@ static std::vector<char> serializeGraphProtoBuf(SILFunction &SILFn,
   return std::vector<char>(bufPtr, bufPtr + buffer->length);
 }
 
-namespace {
-class GraphPartitioner : public SILInstructionVisitor<GraphPartitioner> {
-  SILFunction &srcFn;
-  const GraphGlobalConfiguration &configuration;
-
- public:
-  GraphPartitioner(SILFunction &srcFn,
-                   const GraphGlobalConfiguration &configuration)
-      : srcFn(srcFn), configuration(configuration) {}
-
-  /// Returns a function extracted from `fn`, specialized on `deviceType`.
-  SILFunction *extractFunctionForDevice(DeviceType deviceType) {
-    // FIXME: Add real impl.
-    return &srcFn;
-  }
-};
-} // end anonymous namespace
-
 #endif // SWIFT_ENABLE_TENSORFLOW
 
 /// Gets a function name that can be used as a TF op name.
@@ -2489,10 +2561,11 @@ std::vector<char> tf::lowerTFGraph(
     TF_DeleteGraph(resultGraph);
   };
 
-  GraphPartitioner partitioner(*fn, configuration);
+  DevicePartitioner partitioner(*fn, configuration);
   entryFnBaseName = getTFCompatibleFuncName(fn);
   unsigned helperFuncId = 0;
   for (const auto deviceType : configuration.usedDeviceTypes) {
+    assert(deviceType != DeviceType::ALL);
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
     bool isPrimaryFn = deviceType == configuration.deviceType;
 
@@ -2521,12 +2594,22 @@ std::vector<char> tf::lowerTFGraph(
     // The func op type is `fnName`, with the caller node name being
     // based on `funcNodeBaseName`.
     std::string funcNodeBaseName = entryFnBaseName;
+    if (!isPrimaryFn) {
+      funcNodeBaseName += "_helper_" + llvm::utostr(helperFuncId);
+      ++helperFuncId;
+      assert(inputTypes.empty());
+      assert(outputTypes.empty());
+    }
 
     // Create the graph function for the top level code.
     if (graphGen.buildGraphNodesForTopLevelFunctionCall(
             fnName.str(), funcNodeBaseName, isPrimaryFn, inputTypes,
             outputTypes))
       return {};
+
+    // Remove the partitioned function so it doesn't go through the normal
+    // compiler flow.
+    perDeviceFn->getModule().eraseFunction(perDeviceFn);
   }
 
   // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.
