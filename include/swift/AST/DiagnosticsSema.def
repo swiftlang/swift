@@ -3465,8 +3465,6 @@ ERROR(objc_invalid_with_generic_params,none,
 ERROR(objc_convention_invalid,none,
       "%0 is not representable in Objective-C, so it cannot be used"
       " with '@convention(%1)'", (Type, StringRef))
-ERROR(function_type_no_parens,none,
-      "single argument function types require parentheses", ())
 WARNING(paren_void_probably_void,none,
       "when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?", ())
 NOTE(not_objc_empty_protocol_composition,none,

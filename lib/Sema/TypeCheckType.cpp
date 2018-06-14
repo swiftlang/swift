@@ -2032,7 +2032,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(TAK_autoclosure);
     }
     
-    auto *FuncTyInput = dyn_cast<TupleTypeRepr>(fnRepr->getArgsTypeRepr());
+    auto *FuncTyInput = fnRepr->getArgsTypeRepr();
     if ((!FuncTyInput || FuncTyInput->getNumElements() != 0)
         && attrs.has(TAK_autoclosure)) {
       TC.diagnose(attrs.getLoc(TAK_autoclosure),
@@ -2206,43 +2206,18 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
-  if (!isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
-      !repr->isWarnedAbout()) {
-    auto args = repr->getArgsTypeRepr();
-
-    bool isVoid = false;
-    if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(args)) {
-      if (Void->getIdentifier().str() == "Void") {
-        isVoid = true;
-      }
-    }
-    if (isVoid) {
-      TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
-        .fixItReplace(args->getStartLoc(), "()");
-    } else {
-      TC.diagnose(args->getStartLoc(), diag::function_type_no_parens)
-        .highlight(args->getSourceRange())
-        .fixItInsert(args->getStartLoc(), "(")
-        .fixItInsertAfter(args->getEndLoc(), ")");
-    }
-    
-    // Don't emit this warning three times when in generics.
-    repr->setWarned();
-  } else if (isa<TupleTypeRepr>(repr->getArgsTypeRepr()) &&
-             !repr->isWarnedAbout()) {
+  if (!repr->isWarnedAbout()) {
     // If someone wrote (Void) -> () in Swift 3, they probably meant
     // () -> (), but (Void) -> () is (()) -> () so emit a warning
     // asking if they meant () -> ().
     auto args = repr->getArgsTypeRepr();
-    if (const auto Tuple = dyn_cast<TupleTypeRepr>(args)) {
-      if (Tuple->getNumElements() == 1) {
-        if (const auto Void =
-            dyn_cast<SimpleIdentTypeRepr>(Tuple->getElementType(0))) {
-          if (Void->getIdentifier().str() == "Void") {
-            TC.diagnose(args->getStartLoc(), diag::paren_void_probably_void)
-              .fixItReplace(args->getSourceRange(), "()");
-            repr->setWarned();
-          }
+    if (args->getNumElements() == 1) {
+      if (const auto Void =
+          dyn_cast<SimpleIdentTypeRepr>(args->getElementType(0))) {
+        if (Void->getIdentifier().str() == "Void") {
+          TC.diagnose(args->getStartLoc(), diag::paren_void_probably_void)
+            .fixItReplace(args->getSourceRange(), "()");
+          repr->setWarned();
         }
       }
     }
@@ -2390,29 +2365,20 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                        &*resolveSILFunctionGenericParams);
     }
     
-    if (auto tuple = dyn_cast<TupleTypeRepr>(repr->getArgsTypeRepr())) {
-      // SIL functions cannot be variadic.
-      if (tuple->hasEllipsis()) {
-        TC.diagnose(tuple->getEllipsisLoc(), diag::sil_function_ellipsis);
-      }
-      // SIL functions cannot have parameter names.
-      for (auto &element : tuple->getElements()) {
-        if (element.UnderscoreLoc.isValid())
-          TC.diagnose(element.UnderscoreLoc, diag::sil_function_input_label);
-      }
+    auto argsTuple = repr->getArgsTypeRepr();
+    // SIL functions cannot be variadic.
+    if (argsTuple->hasEllipsis()) {
+      TC.diagnose(argsTuple->getEllipsisLoc(), diag::sil_function_ellipsis);
+    }
+    // SIL functions cannot have parameter names.
+    for (auto &element : argsTuple->getElements()) {
+      if (element.UnderscoreLoc.isValid())
+        TC.diagnose(element.UnderscoreLoc, diag::sil_function_input_label);
+    }
 
-      for (auto elt : tuple->getElements()) {
-        auto param = resolveSILParameter(elt.Type,
-                         options | TypeResolutionFlags::ImmediateFunctionInput);
-        params.push_back(param);
-        if (!param.getType()) return nullptr;
-
-        if (param.getType()->hasError())
-          hasError = true;
-      }
-    } else {
-      SILParameterInfo param = resolveSILParameter(repr->getArgsTypeRepr(),
-                         options | TypeResolutionFlags::ImmediateFunctionInput);
+    for (auto elt : argsTuple->getElements()) {
+      auto param = resolveSILParameter(elt.Type,
+                       options | TypeResolutionFlags::ImmediateFunctionInput);
       params.push_back(param);
       if (!param.getType()) return nullptr;
 

@@ -90,6 +90,9 @@ ERROR(generic_signature_not_minimal,none,
 ERROR(attr_only_on_parameters, none,
       "'%0' may only be used on parameters", (StringRef))
 
+ERROR(function_type_no_parens,none,
+      "single argument function types require parentheses", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

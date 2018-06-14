@@ -1264,7 +1264,7 @@ bb0(%0 : $AnyObject):
 // CHECK: bb0
 // CHECK-NEXT: unchecked_ref_cast
 // CHECK-NEXT: return
-sil @unchecked_ref_cast_upcast_combine : $@convention(thin) E -> Builtin.NativeObject {
+sil @unchecked_ref_cast_upcast_combine : $@convention(thin) (E) -> Builtin.NativeObject {
 bb0(%0 : $E):
   %1 = upcast %0 : $E to $B
   %2 = unchecked_ref_cast %1 : $B to $Builtin.NativeObject

@@ -34,6 +34,7 @@ namespace swift {
   class DeclContext;
   class GenericEnvironment;
   class IdentTypeRepr;
+  class TupleTypeRepr;
   class TypeDecl;
 
 enum class TypeReprKind : uint8_t {
@@ -467,7 +468,9 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 
 /// \brief A function type.
 /// \code
-///   Foo -> Bar
+///   (Foo) -> Bar
+///   (Foo, Bar) -> Baz
+///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
   // These three are only used in SIL mode, which is the only time
@@ -475,13 +478,13 @@ class FunctionTypeRepr : public TypeRepr {
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
 
-  TypeRepr *ArgsTy;
+  TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
   SourceLoc ArrowLoc;
   SourceLoc ThrowsLoc;
 
 public:
-  FunctionTypeRepr(GenericParamList *genericParams, TypeRepr *argsTy,
+  FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
                    SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
     : TypeRepr(TypeReprKind::Function),
       GenericParams(genericParams),
@@ -498,7 +501,7 @@ public:
     GenericEnv = genericEnv;
   }
 
-  TypeRepr *getArgsTypeRepr() const { return ArgsTy; }
+  TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool throws() const { return ThrowsLoc.isValid(); }
 
@@ -511,7 +514,7 @@ public:
   static bool classof(const FunctionTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return ArgsTy->getStartLoc(); }
+  SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
   SourceLoc getLocImpl() const { return ArrowLoc; }
 

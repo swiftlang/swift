@@ -1461,7 +1461,7 @@ private:
     bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
-        if (auto *TTR = dyn_cast_or_null<TupleTypeRepr>(FTR->getArgsTypeRepr())) {
+        if (auto *TTR = FTR->getArgsTypeRepr()) {
           for (auto &ArgElt : TTR->getElements()) {
             CharSourceRange NR;
             CharSourceRange TR;
