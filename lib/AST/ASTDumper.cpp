@@ -774,7 +774,9 @@ namespace {
     void visitSourceFile(const SourceFile &SF) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      PrintWithColorRAII(OS, ASTNodeColor) << "source_file";
+      PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
+      PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
+      
       for (Decl *D : SF.Decls) {
         if (D->isImplicit())
           continue;
