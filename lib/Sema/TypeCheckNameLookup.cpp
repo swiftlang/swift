@@ -447,7 +447,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType});
+        result.Results.push_back({typeDecl, memberType, nullptr});
 
       continue;
     }
@@ -492,7 +492,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
-      result.Results.push_back({typeDecl, memberType});
+      result.Results.push_back({typeDecl, memberType, nullptr});
   }
 
   if (result.Results.empty()) {
@@ -521,7 +521,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // Use the type witness.
       auto concrete = conformance->getConcrete();
-      Type memberType = concrete->getTypeWitness(assocType, this);
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
@@ -529,11 +528,14 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      assert(memberType && "Missing type witness?");
+      auto typeDecl = concrete->getTypeWitnessAndDecl(assocType, this).second;
 
-      // If we haven't seen this type result yet, add it to the result set.
+      assert(typeDecl && "Missing type witness?");
+
+      auto memberType =
+          substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({assocType, memberType});
+        result.Results.push_back({typeDecl, memberType, assocType});
     }
   }
 

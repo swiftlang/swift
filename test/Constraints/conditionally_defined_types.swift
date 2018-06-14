@@ -45,6 +45,14 @@ let _ = SameType<Y>.Decl3.self // expected-error {{'SameType<Y>.Decl3.Type' requ
 let _ = SameType<Y>.Decl4<X>.self // expected-error {{'SameType<Y>.Decl4' requires the types 'Y' and 'X' be equivalent}}
 let _ = SameType<Y>.Decl5<X>.self // expected-error {{'SameType<Y>.Decl5' requires the types 'Y' and 'X' be equivalent}}
 
+extension SameType: AssociatedType where T == X {}
+
+// (Y first here, because there were issues caused by running associated type
+// inference for the first time)
+let _ = SameType<Y>.T.self // expected-error {{'SameType<Y>.T.Type' (aka 'X.Type') requires the types 'Y' and 'X' be equivalent}}
+
+let _ = SameType<X>.T.self
+
 struct Conforms<T> {}
 extension Conforms where T: P {
     typealias TypeAlias1 = T
@@ -75,6 +83,12 @@ let _ = Conforms<Y>.Decl2.self // expected-error {{type 'Y' does not conform to 
 let _ = Conforms<Y>.Decl3.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
 let _ = Conforms<Y>.Decl4<X>.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
 let _ = Conforms<Y>.Decl5<X>.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
+
+extension Conforms: AssociatedType where T: P {}
+
+let _ = Conforms<Y>.T.self // expected-error {{type 'Y' does not conform to protocol 'P'}}
+
+let _ = Conforms<X>.T.self
 
 // Now, even more nesting!
 

@@ -155,6 +155,9 @@ public:
 struct LookupTypeResultEntry {
   TypeDecl *Member;
   Type MemberType;
+  /// The associated type that the Member/MemberType were inferred for, but only
+  /// if inference happened when creating this entry.
+  AssociatedTypeDecl *InferredAssociatedType;
 };
 
 /// The result of name lookup for types.
