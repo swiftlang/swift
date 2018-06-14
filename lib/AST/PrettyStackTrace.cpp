@@ -221,3 +221,7 @@ void PrettyStackTraceGenericSignature::print(llvm::raw_ostream &out) const {
   }
   out << '\n';
 }
+
+void PrettyStackTraceSelector::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << " '" << Selector << "'";
+}
