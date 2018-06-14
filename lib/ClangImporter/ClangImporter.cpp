@@ -2772,6 +2772,11 @@ void ClangImporter::loadObjCMethods(
     if (objcMethod->getClassInterface() != objcClass)
       continue;
 
+    // If we found a property accessor, import the property.
+    if (objcMethod->isPropertyAccessor())
+      (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
+                            Impl.CurrentVersion);
+
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
                         Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
       foundMethods.push_back(method);
