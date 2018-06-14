@@ -265,21 +265,14 @@ public func matmul<Scalar : Numeric>(
   return Raw.matMul(left, right)
 }
 
-infix operator ⊗ : MultiplicationPrecedence
+infix operator • : MultiplicationPrecedence
 
 public extension Tensor where Scalar : Numeric {
-  @_inlineable @inline(__always)
-  @available(*, renamed: "matmul(_:_:)")
-  func dot(_ other: Tensor) -> Tensor {
-    return matmul(self, other)
-  }
-
   /// Performs matrix multiplication between two tensors and produces the
   /// result.
   @_inlineable @inline(__always)
-  @available(*, renamed: "matmul(_:_:)")
-  static func ⊗ (lhs: Tensor, rhs: Tensor) -> Tensor {
-    return lhs.dot(rhs)
+  static func • (lhs: Tensor, rhs: Tensor) -> Tensor {
+    return matmul(lhs, rhs)
   }
 }
 

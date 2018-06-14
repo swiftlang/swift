@@ -26,7 +26,7 @@ TensorTests.testAllBackends("XWPlusB") {
   // Shape: 2
   let b = Tensor<Float>([0.5, 0.5])
   // Do xW+b!
-  let result = x ⊗ w + b
+  let result = x • w + b
   expectEqual([1, 2], result.shape)
   expectEqual([12.5, 6.5], result.scalars)
 }
