@@ -3015,6 +3015,14 @@ namespace {
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_arrayLiteral });
 
+      // Coerce the array elements to be rvalues, so that other type-checker
+      // code that attempts to peephole the AST doesn't have to re-load the
+      // elements (and break the invariant that lvalue nodes only get their
+      // access kind set once).
+      for (auto &element : expr->getElements()) {
+        element = cs.coerceToRValue(element);
+      }
+
       // Restructure the argument to provide the appropriate labels in the
       // tuple.
       SmallVector<TupleTypeElt, 4> typeElements;
