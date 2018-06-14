@@ -4493,7 +4493,6 @@ public:
     TC.computeAccessLevel(ED);
 
     checkUnsupportedNestedType(ED);
-
     TC.validateDecl(ED);
     TC.DeclsToFinalize.remove(ED);
     ED->setHasValidatedLayout();
@@ -4518,6 +4517,8 @@ public:
       checkEnumRawValues(TC, ED);
     }
 
+    ED->getAllConformances();
+
     TC.checkDeclCircularity(ED);
     TC.ConformanceContexts.push_back(ED);
   }
@@ -4539,6 +4540,8 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
+
+    SD->getAllConformances();
 
     TC.checkDeclCircularity(SD);
     TC.ConformanceContexts.push_back(SD);
@@ -4764,6 +4767,8 @@ public:
       }
 
     }
+
+    CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
     checkAccessControl(TC, CD);
