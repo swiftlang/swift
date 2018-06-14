@@ -2156,20 +2156,20 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
       llvm_unreachable("Not an Objective-C entry point");
 
-    case AccessorKind::IsGetter:
+    case AccessorKind::Get:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 5, var->getFullName() };
 
       return { 6, Identifier() };
 
-    case AccessorKind::IsSetter:
+    case AccessorKind::Set:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 7, var->getFullName() };
       return { 8, Identifier() };

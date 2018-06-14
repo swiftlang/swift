@@ -568,16 +568,14 @@ private:
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
+  struct AccessorRecord {
+    SmallVector<serialization::DeclID, 8> IDs;
+  };
+
   /// Sets the accessors for \p storage based on \p rawStorageKind.
   void configureStorage(AbstractStorageDecl *storage,
                         unsigned rawStorageKind,
-                        serialization::DeclID getter,
-                        serialization::DeclID setter,
-                        serialization::DeclID materializeForSet,
-                        serialization::DeclID addressor,
-                        serialization::DeclID mutableAddressor,
-                        serialization::DeclID willSet,
-                        serialization::DeclID didSet);
+                        AccessorRecord &accessors);
 
 public:
   /// Loads a module from the given memory buffer.

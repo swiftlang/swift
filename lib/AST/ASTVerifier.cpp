@@ -2966,19 +2966,19 @@ public:
       }
 
       switch (FD->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();
         }
         break;
 
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
           Out << "addressor does not have an addressor kind\n";
           abort();

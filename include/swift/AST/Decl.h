@@ -3949,23 +3949,15 @@ public:
 // Note that the values of these enums line up with %select values in
 // diagnostics.
 enum class AccessorKind {
-  /// \brief This is a getter for a property or subscript.
-  IsGetter = 0,
-  /// \brief This is a setter for a property or subscript.
-  IsSetter = 1,
-  /// \brief This is a willSet specifier for a property.
-  IsWillSet = 2,
-  /// \brief This is a didSet specifier for a property.
-  IsDidSet = 3,
-  /// \brief This is a materializeForSet accessor for a property.
-  IsMaterializeForSet = 4,
-  /// \brief This is an address-family accessor for a property or
-  /// subscript.  It also has an addressor kind.
-  IsAddressor = 5,
-  /// \brief This is a mutableAddress-family accessor for a property
-  /// or subscript.  It also has an addressor kind.
-  IsMutableAddressor = 6,
+#define ACCESSOR(ID) ID,
+#define LAST_ACCESSOR(ID) Last = ID
+#include "swift/AST/AccessorKinds.def"
 };
+
+static inline IntRange<AccessorKind> allAccessorKinds() {
+  return IntRange<AccessorKind>(AccessorKind(0),
+                                AccessorKind(unsigned(AccessorKind::Last) + 1));
+}
 
 /// The safety semantics of this addressor.
 enum class AddressorKind : uint8_t {
@@ -5735,15 +5727,15 @@ public:
     return AddressorKind(Bits.AccessorDecl.AddressorKind);
   }
 
-  bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
-  bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
+  bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
+  bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
   bool isMaterializeForSet() const {
-    return getAccessorKind() == AccessorKind::IsMaterializeForSet;
+    return getAccessorKind() == AccessorKind::MaterializeForSet;
   }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();
-    return kind == AccessorKind::IsAddressor
-        || kind == AccessorKind::IsMutableAddressor;
+    return kind == AccessorKind::Address
+        || kind == AccessorKind::MutableAddress;
   }
 
   /// isGetterOrSetter - Determine whether this is specifically a getter or
@@ -5753,8 +5745,8 @@ public:
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   bool isObservingAccessor() const {
-    return getAccessorKind() == AccessorKind::IsDidSet ||
-           getAccessorKind() == AccessorKind::IsWillSet;
+    return getAccessorKind() == AccessorKind::DidSet ||
+           getAccessorKind() == AccessorKind::WillSet;
   }
 
   static bool classof(const Decl *D) {

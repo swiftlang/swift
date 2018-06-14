@@ -352,25 +352,25 @@ private:
       if (ValueDecl *VD = accessor->getStorage()) {
         const char *Kind;
         switch (accessor->getAccessorKind()) {
-        case AccessorKind::IsGetter:
+        case AccessorKind::Get:
           Kind = ".get";
           break;
-        case AccessorKind::IsSetter:
+        case AccessorKind::Set:
           Kind = ".set";
           break;
-        case AccessorKind::IsWillSet:
+        case AccessorKind::WillSet:
           Kind = ".willset";
           break;
-        case AccessorKind::IsDidSet:
+        case AccessorKind::DidSet:
           Kind = ".didset";
           break;
-        case AccessorKind::IsMaterializeForSet:
+        case AccessorKind::MaterializeForSet:
           Kind = ".materialize";
           break;
-        case AccessorKind::IsAddressor:
+        case AccessorKind::Address:
           Kind = ".addressor";
           break;
-        case AccessorKind::IsMutableAddressor:
+        case AccessorKind::MutableAddress:
           Kind = ".mutableAddressor";
           break;
         }

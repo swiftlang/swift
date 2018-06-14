@@ -46,15 +46,15 @@ using namespace swift::Mangle;
 static StringRef getCodeForAccessorKind(AccessorKind kind,
                                         AddressorKind addressorKind) {
   switch (kind) {
-  case AccessorKind::IsGetter:
+  case AccessorKind::Get:
     return "g";
-  case AccessorKind::IsSetter:
+  case AccessorKind::Set:
     return "s";
-  case AccessorKind::IsWillSet:
+  case AccessorKind::WillSet:
     return "w";
-  case AccessorKind::IsDidSet:
+  case AccessorKind::DidSet:
     return "W";
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Address:
     // 'l' is for location. 'A' was taken.
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
@@ -69,7 +69,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "lp";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
       llvm_unreachable("bad combo");
@@ -83,7 +83,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "aP";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     return "m";
   }
   llvm_unreachable("bad accessor kind");

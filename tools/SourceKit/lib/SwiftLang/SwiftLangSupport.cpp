@@ -212,19 +212,19 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            AccessorKind AccKind,
                                            bool IsRef) {
   switch (AccKind) {
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
-  case AccessorKind::IsGetter:
+  case AccessorKind::Get:
     return IsRef ? KindRefAccessorGetter : KindDeclAccessorGetter;
-  case AccessorKind::IsSetter:
+  case AccessorKind::Set:
     return IsRef ? KindRefAccessorSetter : KindDeclAccessorSetter;
-  case AccessorKind::IsWillSet:
+  case AccessorKind::WillSet:
     return IsRef ? KindRefAccessorWillSet : KindDeclAccessorWillSet;
-  case AccessorKind::IsDidSet:
+  case AccessorKind::DidSet:
     return IsRef ? KindRefAccessorDidSet : KindDeclAccessorDidSet;
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Address:
     return IsRef ? KindRefAccessorAddress : KindDeclAccessorAddress;
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   }

@@ -284,31 +284,31 @@ void SILDeclRef::print(raw_ostream &OS) const {
       isDot = false;
     } else {
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsWillSet:
+      case AccessorKind::WillSet:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!willSet";
         break;
-      case AccessorKind::IsDidSet:
+      case AccessorKind::DidSet:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!didSet";
         break;
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!getter";
         break;
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!setter";
         break;
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::MaterializeForSet:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!materializeForSet";
         break;
-      case AccessorKind::IsAddressor:
+      case AccessorKind::Address:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!addressor";
         break;
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::MutableAddress:
         printValueDecl(accessor->getStorage(), OS);
         OS << "!mutableAddressor";
         break;
