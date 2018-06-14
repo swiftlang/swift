@@ -190,6 +190,7 @@ extension Equatable {
   ///   - rhs: Another value to compare.
   @_inlineable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
   }

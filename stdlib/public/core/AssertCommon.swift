@@ -21,6 +21,7 @@ import SwiftShims
 
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent
+@compilerEvaluable
 public // @testable
 func _isDebugAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
@@ -33,6 +34,7 @@ func _isDebugAssertConfiguration() -> Bool {
 @_inlineable // FIXME(sil-serialize-all)
 @_versioned
 @_transparent
+@compilerEvaluable
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
@@ -43,6 +45,7 @@ internal func _isReleaseAssertConfiguration() -> Bool {
 
 @_inlineable // FIXME(sil-serialize-all)
 @_transparent
+@compilerEvaluable
 public // @testable
 func _isFastAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
