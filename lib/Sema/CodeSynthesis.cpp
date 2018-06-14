@@ -1881,12 +1881,21 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    // Computed and static properties are not initialized.
-    for (auto var : decl->getStoredProperties()) {
-      if (var->isImplicit())
+    for (auto member : decl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+      
+      // Implicit, computed, and static properties are not initialized.
+      // The exception is lazy properties, which due to batch mode we may or
+      // may not have yet finalized, so they may currently be "stored" or
+      // "computed" in the current AST state.
+      if (var->isImplicit() || var->isStatic())
         continue;
       tc.validateDecl(var);
-      
+      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+        continue;
+
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.

@@ -3207,6 +3207,8 @@ ERROR(unsupported_recursive_struct,none,
       "contains it",
       (Type))
 
+WARNING(enum_non_well_founded,none,
+        "enum containing only recursive cases is impossible to instantiate", ())
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
 ERROR(unsupported_infinitely_sized_type,none,
