@@ -902,10 +902,6 @@ ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
                   llvm::function_ref<ParserStatus()> callback) {
-  auto TokIsStringInterpolationEOF = [&]() -> bool {
-    return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
-  };
-  
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -916,10 +912,6 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (Tok.is(RightK)) {
     ListContext.reset();
     RightLoc = consumeToken(RightK);
-    return makeParserSuccess();
-  }
-  if (TokIsStringInterpolationEOF()) {
-    RightLoc = Tok.getLoc();
     return makeParserSuccess();
   }
 
@@ -941,7 +933,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
     // If the lexer stopped with an EOF token whose spelling is ")", then this
     // is actually the tuple that is a string literal interpolation context.
     // Just accept the ")" and build the tuple as we usually do.
-    if (TokIsStringInterpolationEOF()) {
+    if (Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren) {
       RightLoc = Tok.getLoc();
       return Status;
     }
