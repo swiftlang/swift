@@ -19,6 +19,7 @@ set(MANDATORY_SOURCES
   Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFConstExpr.cpp
   Mandatory/TFDeabstraction.cpp
+  Mandatory/TFDevicePartition.cpp
   Mandatory/TFLowerGraph.cpp
   Mandatory/TFPartition.cpp
   Mandatory/TFUtilities.cpp

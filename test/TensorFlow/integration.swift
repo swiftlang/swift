@@ -25,11 +25,11 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NEXT:   %5 = metatype $@thick Float.Type
 // CHECK-NEXT:   %6 = string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT:   %7 = builtin "__tfop_Sub,$in,$in,T,device"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>, %5 : $@thick Float.Type, %6 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK-NEXT:   %8 = builtin "tensorflowSend_0"<TensorHandle<Float>>(%7 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:   %9 = metatype $@thick Float.Type
-// CHECK-NEXT:   %10 = string_literal utf8 "/device:CPU:0"
-// CHECK-NEXT:   %11 = builtin "__tfop_Add,$in,$in,T,device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %9 : $@thick Float.Type, %10 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK-NEXT:   return %11 : $TensorHandle<Float>
+// CHECK:        builtin "__tfop_tfc.SendToHost,$in,tensorId,device"<TensorHandle<Float>>(
+// CHECK-NEXT:   metatype $@thick Float.Type
+// CHECK-NEXT:   string_literal utf8 "/device:CPU:0"
+// CHECK:        [[RESULT:%.*]] = builtin "__tfop_Add,$in,$in,T,device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
+// CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testTensor{{.*}}
@@ -152,7 +152,7 @@ public func testExitBranch2(i: Int) {
 
 // CHECK:      bb1:
 // CHECK:        builtin "__tfop_Add,$in,$in,T,device"(
-// CHECK-NEXT:   builtin "tensorflowSend_0"<TensorHandle<Float>>(
+// CHECK:        builtin "__tfop_tfc.SendToHost
 // CHECK-NEXT:   br bb2
 
 // CHECK: bb2:
@@ -306,15 +306,15 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:  %6 = unchecked_ref_cast %5 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 
 // CHECK:       %9 = builtin "__tfop_Add,$in,$in,T,device"(%1 : $TensorHandle<Float>, %6 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:  %10 = builtin "tensorflowSend_1"<TensorHandle<Float>>(%9 : $TensorHandle<Float>) : $()
-// CHECK-NEXT:  %11 = float_literal $Builtin.FPIEEE32, 0x40000000
-// CHECK-NEXT:  %12 = integer_literal $Builtin.Int32, 1
-// CHECK:       %14 = builtin "__tfop_Const,dtype$dtype,value$tensor,device"(%12 : $Builtin.Int32, %11 : $Builtin.FPIEEE32, {{.*}}) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %15 = builtin "tensorflowReceive_0"<TensorHandle<Builtin.FPIEEE32>>() : $TensorHandle<Builtin.FPIEEE32>
-// CHECK:       %17 = builtin "__tfop_Add,$in,$in,device"(%15 : $TensorHandle<Builtin.FPIEEE32>, %14 : $TensorHandle<Builtin.FPIEEE32>, {{.*}}) : $TensorHandle<Builtin.FPIEEE32>
-// CHECK-NEXT:  %18 = unchecked_ref_cast %17 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
-// CHECK:       %21 = builtin "__tfop_Add,$in,$in,T,device"(%18 : $TensorHandle<Float>, %18 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:  return %21 : $TensorHandle<Float>
+// CHECK:       builtin "__tfop_tfc.SendToHost
+// CHECK-NEXT:  float_literal $Builtin.FPIEEE32, 0x40000000
+// CHECK-NEXT:  integer_literal $Builtin.Int32, 1
+// CHECK:       builtin "__tfop_Const,dtype$dtype,value$tensor,device"(
+// CHECK:       builtin "__tfop_tfc.RecvFromHost
+// CHECK:       builtin "__tfop_Add,$in,$in,device"(
+// CHECK-NEXT:  unchecked_ref_cast {{.*}} : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+// CHECK:       builtin "__tfop_Add,$in,$in,T,device"(
+// CHECK-NEXT:  return
 // CHECK-NEXT:}
 
 
