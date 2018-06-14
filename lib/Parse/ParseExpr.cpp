@@ -1907,50 +1907,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
-        
-        if (auto tuple = dyn_cast<TupleExpr>(Exprs.back())) {
-          // If parseExprList() returns a TupleExpr instead of a ParenExpr, 
-          // the interpolation must have had an argument label, or the wrong 
-          // number of elements, or both. Reject these.
-          if (tuple->getNumElements() > 1) {
-            SourceLoc StartLoc = tuple->getStartLoc();
-            SourceLoc SecondExprLoc = tuple->getElement(1)->getStartLoc();
-            SourceLoc EndLoc = tuple->getEndLoc();
-            
-            diagnose(SecondExprLoc, diag::string_interpolation_single_expr);
-            diagnose(StartLoc, diag::string_interpolation_form_tuple)
-              .fixItInsert(StartLoc, "(")
-              .fixItInsertAfter(EndLoc, ")");
-              
-            Exprs.back() =
-              new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
-                                      /*hasTrailingClosure=*/false);
-          } else if (tuple->getNumElements() == 1 && 
-                   !tuple->getElementName(0).empty()) {
-            SourceLoc NameStart = tuple->getElementNameLoc(0);
-            SourceLoc ArgStart = tuple->getElement(0)->getStartLoc();
-            
-            diagnose(NameStart, diag::string_interpolation_keyword_argument)
-              .fixItRemoveChars(NameStart, ArgStart);
-            
-            Exprs.back() =
-              new (Context) ParenExpr(tuple->getLParenLoc(), tuple->getElement(0), 
-                                      tuple->getRParenLoc(), /*hasTrailingClosure=*/false);
-          } else if (tuple->getNumElements() == 0 && !Status.isError()) {
-            SourceLoc StartLoc = tuple->getStartLoc();
-            SourceLoc EndLoc = tuple->getEndLoc();
-            SourceLoc SlashLoc = StartLoc.getAdvancedLocOrInvalid(-1);
-            
-            diagnose(EndLoc, diag::string_interpolation_single_expr);
-            diagnose(SlashLoc, diag::string_interpolation_delete_empty)
-            .fixItRemoveChars(SlashLoc, EndLoc.getAdvancedLocOrInvalid(1));
-            
-            auto Error = new (Context) ErrorExpr(SourceRange(EndLoc, EndLoc));
-            Exprs.back() =
-            new (Context) ParenExpr(SourceLoc(), Error, SourceLoc(), 
-                                    /*hasTrailingClosure=*/false);
-          } 
-        }
 
         if (!Tok.is(tok::eof)) {
           diagnose(Tok, diag::string_interpolation_extra);
