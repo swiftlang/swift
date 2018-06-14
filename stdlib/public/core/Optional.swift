@@ -135,6 +135,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// Creates an instance that stores the given value.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public init(_ some: Wrapped) { self = .some(some) }
 
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
@@ -159,6 +160,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
+  @compilerEvaluable
   public func map<U>(
     _ transform: (Wrapped) throws -> U
   ) rethrows -> U? {
@@ -190,6 +192,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @inlinable
+  @compilerEvaluable
   public func flatMap<U>(
     _ transform: (Wrapped) throws -> U?
   ) rethrows -> U? {
@@ -212,6 +215,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// initializer behind the scenes.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public init(nilLiteral: ()) {
     self = .none
   }
@@ -359,6 +363,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @inlinable
+  @compilerEvaluable
   public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     switch (lhs, rhs) {
     case let (l?, r?):
@@ -404,6 +409,7 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
   @inlinable
+  @compilerEvaluable
   public static func !=(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
     return !(lhs == rhs)
   }
@@ -429,6 +435,7 @@ public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public init(nilLiteral: ()) {
   }
 }
@@ -466,6 +473,7 @@ extension Optional {
   ///   - rhs: A value to match against `nil`.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
@@ -501,6 +509,7 @@ extension Optional {
   ///   - rhs: A `nil` literal.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some(_):
@@ -533,6 +542,7 @@ extension Optional {
   ///   - rhs: A `nil` literal.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
     case .some(_):
@@ -565,6 +575,7 @@ extension Optional {
   ///   - rhs: A value to compare to `nil`.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
@@ -597,6 +608,7 @@ extension Optional {
   ///   - rhs: A value to compare to `nil`.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @compilerEvaluable
   public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
     case .some(_):
@@ -641,6 +653,7 @@ extension Optional {
 ///     type as the `Wrapped` type of `optional`.
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
+@compilerEvaluable
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
   switch optional {
@@ -695,6 +708,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///     `optional` have the same type.
 @inlinable // FIXME(sil-serialize-all)
 @_transparent
+@compilerEvaluable
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {
   switch optional {

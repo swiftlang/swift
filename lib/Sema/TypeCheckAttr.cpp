@@ -2606,6 +2606,16 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   attr->setAdjointFunction(resolvedAdjoint);
 }
 
+static bool
+compilerEvaluableAllowedInExtensionDecl(ExtensionDecl *extensionDecl) {
+  auto extendedTypeKind = extensionDecl->getExtendedType()->getKind();
+  return extendedTypeKind == TypeKind::Enum ||
+         extendedTypeKind == TypeKind::Protocol ||
+         extendedTypeKind == TypeKind::Struct ||
+         extendedTypeKind == TypeKind::BoundGenericEnum ||
+         extendedTypeKind == TypeKind::BoundGenericStruct;
+}
+
 void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // Check that the function is defined in an allowed context.
   // TODO(marcrasi): In many cases, we can probably generate a more informative
@@ -2617,11 +2627,26 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   case DeclContextKind::AbstractFunctionDecl:
     // Nested functions are okay.
     break;
+  case DeclContextKind::ExtensionDecl:
+    // Enum, Protocol, and Struct extensions are okay. For Enums and Structs
+    // extensions, the extended type must be compiler-representable.
+    // TODO(marcrasi): Check that the extended type is compiler-representable.
+    if (!compilerEvaluableAllowedInExtensionDecl(
+            cast<ExtensionDecl>(declContext))) {
+      TC.diagnose(D, diag::compiler_evaluable_bad_context);
+      attr->setInvalid();
+      return;
+    }
+    break;
   case DeclContextKind::FileUnit:
     // Top level functions are okay.
     break;
   case DeclContextKind::GenericTypeDecl:
     switch (cast<GenericTypeDecl>(declContext)->getKind()) {
+    case DeclKind::Enum:
+      // Enums are okay, if they are compiler-representable.
+      // TODO(marcrasi): Check that it's compiler-representable.
+      break;
     case DeclKind::Struct:
       // Structs are okay, if they are compiler-representable.
       // TODO(marcrasi): Check that it's compiler-representable.

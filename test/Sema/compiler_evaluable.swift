@@ -7,7 +7,7 @@ protocol AProtocol {
 
 extension AProtocol {
   @compilerEvaluable
-  func extensionFunc() {} // expected-error{{@compilerEvaluable functions not allowed here}}
+  func extensionFunc() {}
 }
 
 class AClass {
@@ -16,6 +16,11 @@ class AClass {
 
   @compilerEvaluable
   func classFunc() {} // expected-error{{@compilerEvaluable functions not allowed here}}
+}
+
+extension AClass {
+  @compilerEvaluable
+  func extensionFunc() {} // expected-error{{@compilerEvaluable functions not allowed here}}
 }
 
 struct AStruct {
@@ -34,9 +39,66 @@ struct AStruct {
     @compilerEvaluable
     set(prop) {}
   }
+
+  subscript(i: Int) -> Int {
+    @compilerEvaluable
+    get {}
+
+    @compilerEvaluable
+    set(v) {}
+  }
+}
+
+extension AStruct {
+  @compilerEvaluable
+  func extensionFunc() {}
+}
+
+struct AGenericStruct<T> {
+  @compilerEvaluable
+  init() {}
+
+  @compilerEvaluable
+  func structFunc() {}
+}
+
+extension AGenericStruct {
+  @compilerEvaluable
+  func extensionFunc() {}
+}
+
+enum AEnum {
+  case thing1
+  case thing2
+
+  @compilerEvaluable
+  func enumFunc() {}
+}
+
+extension AEnum {
+  @compilerEvaluable
+  func extensionFunc() {}
+}
+
+enum AGenericEnum<T> {
+  case thing1
+  case thing2
+
+  @compilerEvaluable
+  func enumFunc() {}
+}
+
+extension AGenericEnum {
+  @compilerEvaluable
+  func extensionFunc() {}
 }
 
 func aFunction() {
+  @compilerEvaluable
+  func functionFunc() {}
+}
+
+func aGenericFunction<T>(t: T) {
   @compilerEvaluable
   func functionFunc() {}
 }
