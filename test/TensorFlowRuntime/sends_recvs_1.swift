@@ -10,10 +10,9 @@ import StdlibUnittest
 
 var SendsRecvsTests = TestSuite("SendsRecvs")
 
-// FIXME: Add GPU and TPU Support.
+// FIXME: Add TPU Support.
 @inline(never)
 func test1Send() {
-#if !CUDA
   var a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -21,13 +20,26 @@ func test1Send() {
   // This one should not be a send.
   print(a.toHost())
   expectEqual(2, a.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test1Send", test1Send)
 
 @inline(never)
+func test1SendWithParam() {
+  func _test1SendWithParam(x: Float) {
+    var a = Tensor<Float>(x)
+    // One send.
+    print(a.toHost())
+    a += 1
+    // This one should not be a send.
+    print(a.toHost())
+    expectEqual(2, a.scalar)
+  }
+  _test1SendWithParam(x: 1.0)
+}
+SendsRecvsTests.testCPU("test1SendWithParam", test1SendWithParam)
+
+@inline(never)
 func test2Sends() {
-#if !CUDA
   var a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -38,13 +50,11 @@ func test2Sends() {
   // This one should not be a send.
   print(a.toHost())
   expectEqual(6, a.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test2Sends", test2Sends)
 
 @inline(never)
 func testSendsInALoop() {
-#if !CUDA
   let maxCount = 3
   var count = 0
   var a = Tensor<Float>(0.0)
@@ -59,31 +69,26 @@ func testSendsInALoop() {
   // This is not a send.
   print("final a = \(a.toHost())")
   expectEqual(3 * 2, a.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
 
 func test1RecvFloatScalar() {
-#if !CUDA
   let x = Tensor<Float>(1.0)
   let y = x.scalar! + 2.0
 
   let z = Tensor<Float>(y)
   let result = z + z
   expectEqual(6, result.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test1RecvFloatScalar", test1RecvFloatScalar)
 
 func test1RecvIntScalar() {
-#if !CUDA
   let x = Tensor<Int32>(1)
   let y = x.scalar! + 2
 
   let z = Tensor<Int32>(y)
   let result = z + z
   expectEqual(6, result.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test1RecvIntScalar", test1RecvIntScalar)
 
@@ -93,7 +98,6 @@ func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
 }
 
 func test1RecvFloatTensor() {
-#if !CUDA
   let a = Tensor<Float>(1.0)
   // One send.
   print(a.toHost())
@@ -102,7 +106,6 @@ func test1RecvFloatTensor() {
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test1RecvFloatTensor", test1RecvFloatTensor)
 
@@ -112,7 +115,6 @@ func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
 }
 
 func test1RecvIntTensor() {
-#if !CUDA
   let a = Tensor<Int64>(1)
   // One send.
   print(a.toHost())
@@ -121,7 +123,6 @@ func test1RecvIntTensor() {
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)
-#endif //!CUDA
 }
 SendsRecvsTests.testCPU("test1RecvIntTensor", test1RecvIntTensor)
 

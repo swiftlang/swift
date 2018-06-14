@@ -612,7 +612,8 @@ static const char *markingStr[]{
 /// Scan the specified function, looking for logic that configures the current
 /// graph.
 static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
-  GraphGlobalConfiguration result;
+  DeviceType deviceType = DeviceType::CPU;
+  bool isTPUInfeedEnabled = false;
 
   SILInstruction *firstFound = nullptr;
   SmallVector<SILInstruction *, 4> configureInsts;
@@ -642,12 +643,12 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
       // we recheck the opcode here.
       if (tfopInfo->opName == "tfc.configureTPU") {
         // Decode: tfc.configureTPU(isInfeedEnabled: bool)
-        result.deviceType = DeviceType::TPU;
+        deviceType = DeviceType::TPU;
         auto infeedEnabled =
           cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
-        result.isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
       } else if (tfopInfo->opName == "tfc.configureGPU") {
-        result.deviceType = DeviceType::GPU;
+        deviceType = DeviceType::GPU;
       } else {
         llvm_unreachable("unknown device configuration op");
       }
@@ -659,15 +660,14 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
     // At most one of these test-only flags should be set.
     assert (!TFTargetTPU || !TFTargetGPU);
     if (TFTargetTPU)
-      result.deviceType = DeviceType::TPU;
+      deviceType = DeviceType::TPU;
     if (TFTargetGPU)
-      result.deviceType = DeviceType::GPU;
+      deviceType = DeviceType::GPU;
   }
-  result.usedDeviceTypes.insert(result.deviceType);
 
   if (firstFound) {
     if (auto *outs = getTFDumpIntermediateStream()) {
-      *outs << "Targeting device " << getDeviceString(result.deviceType)
+      *outs << "Targeting device " << getDeviceString(deviceType)
             << " for accelerator program, based on config: \n";
       firstFound->print(*outs);
     }
@@ -681,7 +681,7 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
     recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
   }
 
-  return result;
+  return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
 }
 
 class TFFunctionPartition {
@@ -768,6 +768,7 @@ public:
     StringLiteralInst *programPlaceholder;
     IntegerLiteralInst *programLengthPlaceholder;
     StringLiteralInst *entryFunctionBaseNamePlaceholder;
+    IntegerLiteralInst *helperFunctionCountPlaceholder;
 
     /// This is the "TensorFlow.TensorComputation" object returned by the
     /// '_swift_tfc_StartTensorComputation' runtime API entrypoint.  This is
@@ -2329,9 +2330,12 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     break;
   }
   }
-  bool devicePlaced = FP.configuration.handleDevicePlacement(
-      opInfo.first, /*opDevice*/"", /*inst,*/ B, loc, operands, opName);
-  assert(devicePlaced);
+  // To minimize sends/recvs, place promoted scalars on all devices. If they are
+  // consumed only on some devices, the promoted scalars on those other devices
+  // should get pruned away in the later graph lowering pass.
+  FP.configuration.handleDevicePlacement(
+      opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
+      operands, opName);
 
   auto result =
     B.createBuiltin(loc, B.getASTContext().getIdentifier(opName),
@@ -2397,17 +2401,27 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
   return createSomeIntegerValue(value, B, loc, intDecl, ILI);
 }
 
-// Create a "tensorflowReceive" builtin as a placeholder for the subsequent
-// graph lowering pass to generate the appropriate TF graph nodes.
+/// Add a RecvFromHost builtin to the accelerator function, as a placeholder for
+/// the subsequent graph lowering pass to generate the appropriate TF graph
+/// nodes to receive tensors from Swift host.
+///
+/// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
 static SILValue createDeviceReceive(SILBuilder &B, SILLocation loc,
-                                    SILType valueTy, int idNumber) {
+                                    SILType valueTy, unsigned idNumber,
+                                    GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
-
-  auto name = ctx.getIdentifier("tensorflowReceive_" + llvm::itostr(idNumber));
-
-  // tensorflowReceive has type <T> () -> T
+  auto opType = "tfc.RecvFromHost";
+  std::string instName = std::string("__tfop_") + opType + ",tensorId";
+  SmallVector<SILValue, 2> operands;
+  auto tensorIdAttr = B.createIntegerLiteral(
+      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
+  operands.push_back(tensorIdAttr);
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
+                                      instName);
+  auto name = ctx.getIdentifier(instName);
   return B.createBuiltin(loc, name, valueTy,
-                         Substitution(valueTy.getSwiftRValueType(), {}), {});
+                         Substitution(valueTy.getSwiftRValueType(), {}),
+                         operands);
 }
 
 // Returns a Substitution based on the conformance spec of `fn`, which must have
@@ -2477,16 +2491,30 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
                        /*isNonThrowing*/ false);
 }
 
-static void createDeviceSend(SILBuilder &B, SILLocation loc, SILValue value,
-                             unsigned idNumber) {
+/// Add a SendToHost builtin to the accelerator function, as a placeholder for
+/// the subsequent graph lowering pass to generate the appropriate TF graph
+/// nodes to send tensors to Swift host.
+///
+// SendToHost has type <T> (input$T, tensorId$int, device$string) -> ()
+void createDeviceSend(SILBuilder &B, SILLocation loc, SILValue value,
+                      unsigned idNumber,
+                      GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
-  auto name = ctx.getIdentifier("tensorflowSend_" + llvm::utostr(idNumber));
+  auto opType = "tfc.SendToHost";
+  std::string instName = std::string("__tfop_") + opType + ",$in,tensorId";
 
-  // tensorflowSend has type <T> (T) -> ()
+  SmallVector<SILValue, 3> operands;
+  operands.push_back(value);
+  auto tensorIdAttr = B.createIntegerLiteral(
+      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
+  operands.push_back(tensorIdAttr);
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
+                                      instName);
+  auto name = ctx.getIdentifier(instName);
   B.createBuiltin(loc, name, voidTy,
                   Substitution(value->getType().getSwiftRValueType(), {}),
-                  {value});
+                  operands);
 }
 
 // Create a call to runtime API @_swift_tfc_SendTensorHandle() for the host
@@ -2625,8 +2653,8 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   for (auto result : inst.getResults()) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
-    this->ValueMap[result] =
-        createDeviceReceive(BA, loc, remapType(result->getType()), nextSendID);
+    this->ValueMap[result] = createDeviceReceive(
+        BA, loc, remapType(result->getType()), nextSendID, FP.configuration);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>, before
     // sending that value to device. We pass such a function reference to
@@ -2684,7 +2712,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createDeviceSend(BA, loc, remapValue(value), nextSendID);
+  createDeviceSend(BA, loc, remapValue(value), nextSendID, FP.configuration);
 
   // Create the receive in the host code.
   auto newVal =
@@ -3226,7 +3254,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     diagnose(ctx, fn.getLocation().getSourceLoc(),
              diag::tf_internal_error,
              "'_swift_tfc_' entrypoints not found in TensorFlow module");
-    return { nullptr, nullptr, nullptr, nullptr, SILValue() };
+    return { nullptr, nullptr, nullptr, nullptr, nullptr, SILValue() };
   }
 
   // Create various types and SIL types that we'll be using below.
@@ -3278,14 +3306,16 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   auto entryFunctionBaseName = B.createStruct(loc, int8PointerSILType,
                                           { entryFunctionBaseNamePlaceholder });
 
-  // Pass a length of zero for now, it will be filled in later.
+  // Pass zero as a place holder for now; they will be filled in later.
   IntegerLiteralInst *programLengthPlaceholder = nullptr;
   auto programLength = createIntValue(0, B, loc, &programLengthPlaceholder);
-
-  // See the number of helper functions here based on the # devices involved in
-  // this TF program.
+  // We cannot yet use `configuration.usedDeviceTypes` to set
+  // `helperFunctionCount`, because Swift<->TF tensor transfers are handled in
+  // the later PartitionCloner logic, which could be adding a TF CPU device as
+  // the impl (queueing) mechanism for such tensor transfers.
+  IntegerLiteralInst *helperFunctionCountPlaceholder = nullptr;
   auto helperFunctionCount =
-    createIntValue(configuration.usedDeviceTypes.size() - 1, B, loc);
+      createIntValue(0, B, loc, &helperFunctionCountPlaceholder);
 
   // We pass the list of N tensor arguments as a pointer + length of
   // CTensorHandle values, i.e.:
@@ -3507,6 +3537,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     programPlaceholder,
     programLengthPlaceholder,
     entryFunctionBaseNamePlaceholder,
+    helperFunctionCountPlaceholder,
     tensorComputation
   };
 }
@@ -3830,12 +3861,21 @@ public:
       auto name =
           B.createStringLiteral(fn->getLocation(), StringRef(entryFnBaseName),
                                 StringLiteralInst::Encoding::UTF8);
+      // Set the number of helper functions here based on the # devices involved
+      // in this TF program.
+      auto helperFunctionCount = B.createIntegerLiteral(
+          fn->getLocation(),
+          tensorProgram.helperFunctionCountPlaceholder->getType(),
+          partitioner.configuration.usedDeviceTypes.size() - 1);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
       tensorProgram.programPlaceholder->eraseFromParent();
       tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
       tensorProgram.programLengthPlaceholder->eraseFromParent();
       tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
       tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
+      tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
+          helperFunctionCount);
+      tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
     }
 
     if (auto outs = getTFDumpIntermediateStream()) {
