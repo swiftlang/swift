@@ -463,8 +463,7 @@ public:
     // See if the repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver,
-                                       nullptr);
+                                       /*diagnoseErrors*/false, &resolver);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -582,8 +581,7 @@ public:
       // See first if the entire repr resolves to a type.
       Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                             /*diagnoseErrors*/false, &resolver,
-                                             nullptr);
+                                      /*diagnoseErrors*/false, &resolver);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 

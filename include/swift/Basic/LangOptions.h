@@ -157,9 +157,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the iterative type checker.
-    bool IterativeTypeChecker = false;
-
     /// \brief Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 

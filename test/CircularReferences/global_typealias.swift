@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -iterative-type-checker
+// RUN: %target-typecheck-verify-swift
 
 typealias A = B // expected-note{{type declared here}}
 typealias C = D

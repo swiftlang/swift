@@ -17,7 +17,6 @@
 #ifndef TYPECHECKING_H
 #define TYPECHECKING_H
 
-#include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -450,38 +449,9 @@ public:
 
 /// The result of `checkGenericRequirement`.
 enum class RequirementCheckResult {
-  Success, Failure, UnsatisfiedDependency, SubstitutionFailure
+  Success, Failure, SubstitutionFailure
 };
 
-class ConformsToProtocolResult {
-  Optional<ProtocolConformanceRef> Data;
-  RequirementCheckResult State;
-
-  ConformsToProtocolResult(Optional<ProtocolConformanceRef> data,
-                           RequirementCheckResult state)
-      : Data(data), State(state) {}
-
-public:
-  static ConformsToProtocolResult unsatisfiedDependency() {
-    return ConformsToProtocolResult(
-        None, RequirementCheckResult::UnsatisfiedDependency);
-  }
-  static ConformsToProtocolResult failure() {
-    return ConformsToProtocolResult(None, RequirementCheckResult::Failure);
-  }
-  static ConformsToProtocolResult success(ProtocolConformanceRef ref) {
-    return ConformsToProtocolResult(ref, RequirementCheckResult::Success);
-  }
-
-  RequirementCheckResult getStatus() const { return State; }
-  bool hasUnsatisfiedDependency() const {
-    return getStatus() == RequirementCheckResult::UnsatisfiedDependency;
-  }
-  ProtocolConformanceRef getConformance() const {
-    assert(getStatus() == RequirementCheckResult::Success);
-    return *Data;
-  }
-};
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
@@ -1069,8 +1039,7 @@ public:
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
                              bool diagnoseErrors,
-                             GenericTypeResolver *resolver,
-                             UnsatisfiedDependency *unsatisfiedDependency);
+                             GenericTypeResolver *resolver);
 
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
@@ -1096,8 +1065,7 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
                     TypeResolutionOptions options = None,
-                    GenericTypeResolver *resolver = nullptr,
-                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+                    GenericTypeResolver *resolver = nullptr);
 
   /// Check for unsupported protocol types in the given declaration.
   void checkUnsupportedProtocolType(Decl *decl);
@@ -1123,14 +1091,10 @@ public:
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
-  /// \param unsatisfiedDependency When non-null, used to check whether
-  /// dependencies have been satisfied appropriately.
-  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, DeclContext *DC,
                    TypeResolutionOptions options,
-                   GenericTypeResolver *resolver = nullptr,
-                   UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+                   GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D);
   void validateDecl(OperatorDecl *decl);
@@ -1206,8 +1170,7 @@ public:
   Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
-                             GenericTypeResolver *resolver,
-                             UnsatisfiedDependency *unsatisfiedDependency);
+                             GenericTypeResolver *resolver);
 
   /// Apply generic arguments to the given type.
   ///
@@ -1230,8 +1193,7 @@ public:
                                     GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
                                     ArrayRef<Type> genericArgs,
-                                    GenericTypeResolver *resolver,
-                                    UnsatisfiedDependency *unsatisfiedDependency);
+                                    GenericTypeResolver *resolver);
 
   /// \brief Substitute the given base type into the type of the given nested type,
   /// producing the effective type that the nested type will have.
@@ -1555,8 +1517,6 @@ public:
   /// \param requirements The requirements against which the generic arguments
   /// should be checked.
   /// \param substitutions Substitutions from interface types of the signature.
-  /// \param unsatisfiedDependency Optional callback for reporting unsatisfied
-  /// dependencies.
   /// \param conformanceOptions The flags to use when checking conformance
   /// requirement.
   /// \param listener The generic check listener used to pick requirements and
@@ -1567,7 +1527,6 @@ public:
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
-      UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
@@ -2075,12 +2034,6 @@ public:
                                      ConformanceCheckOptions options,
                                      SourceLoc ComplainLoc = SourceLoc());
 
-  /// A version of the above meant for use with the iterative type checker.
-  ConformsToProtocolResult
-  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
-                     ConformanceCheckOptions options, SourceLoc ComplainLoc,
-                     UnsatisfiedDependency *unsatisfiedDependency);
-
   /// Mark the given protocol conformance as "used" from the given declaration
   /// context.
   void markConformanceUsed(ProtocolConformanceRef conformance,
@@ -2126,16 +2079,14 @@ public:
                                      bool anySingleRequirement = false);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  bool useObjectiveCBridgeableConformances(
-                        DeclContext *dc, Type type,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+  void useObjectiveCBridgeableConformances(
+                        DeclContext *dc, Type type);
 
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".
-  bool useObjectiveCBridgeableConformancesOfArgs(
-                        DeclContext *dc, BoundGenericType *bound,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+  void useObjectiveCBridgeableConformancesOfArgs(
+                        DeclContext *dc, BoundGenericType *bound);
 
   /// Mark any _BridgedNSError/_BridgedStoredNSError/related
   /// conformances in the given type as "used".

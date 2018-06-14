@@ -3167,7 +3167,6 @@ class EnumDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> RawType;
   } LazySemanticInfo;
 
-  friend class IterativeTypeChecker;
   friend class EnumRawTypeRequest;
   friend class TypeChecker;
 
@@ -3417,7 +3416,6 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> Superclass;
   } LazySemanticInfo;
 
-  friend class IterativeTypeChecker;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
 
