@@ -2151,10 +2151,8 @@ bool DisjunctionChoice::isSymmetricOperator() const {
   if (paramList->size() != 2)
     return true;
 
-  auto firstType =
-      paramList->get(0)->getInterfaceType()->getWithoutSpecifierType();
-  auto secondType =
-      paramList->get(1)->getInterfaceType()->getWithoutSpecifierType();
+  auto firstType = paramList->get(0)->getInterfaceType();
+  auto secondType = paramList->get(1)->getInterfaceType();
   return firstType->isEqual(secondType);
 }
 

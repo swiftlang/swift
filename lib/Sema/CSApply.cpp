@@ -5779,7 +5779,7 @@ Expr *ExprRewriter::coerceCallArguments(
     
       for (size_t i = 0; i < params.size(); i++) {
         if (auto dotExpr = dyn_cast<DotSyntaxCallExpr>(argElts[i])) {
-          auto paramTy = params[i].getType()->getWithoutSpecifierType();
+          auto paramTy = params[i].getType();
           auto argTy = cs.getType(dotExpr)->getWithoutSpecifierType();
           if (!paramTy->isEqual(argTy)) {
             allParamsMatch = false;

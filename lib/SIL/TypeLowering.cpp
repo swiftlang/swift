@@ -1301,7 +1301,7 @@ TypeConverter::~TypeConverter() {
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
     CanType mappedType = ti.second->getLoweredType().getASTType();
-    if (srcType == mappedType || isa<InOutType>(srcType))
+    if (srcType == mappedType)
       ti.second->~TypeLowering();
   }
 }
@@ -1440,25 +1440,10 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   
   assert((!key.isDependent() || getCurGenericContext())
          && "dependent type outside of generic context?!");
-  
+  assert(!substType->is<InOutType>());
+
   if (auto existing = find(key))
     return *existing;
-
-  // inout types are a special case for lowering, because they get
-  // completely removed and represented as 'address' SILTypes.
-  if (isa<InOutType>(substType)) {
-    // Derive SILType for InOutType from the object type.
-    CanType substObjectType = substType.getWithoutSpecifierType();
-    AbstractionPattern origObjectType = origType.getWithoutSpecifierType();
-
-    SILType loweredType = getLoweredType(origObjectType, substObjectType)
-      .getAddressType();
-
-    auto *theInfo = new (*this, key.isDependent())
-      TrivialTypeLowering(loweredType);
-    insert(key, theInfo);
-    return *theInfo;
-  }
 
   // Lower the type.
   CanType loweredSubstType =

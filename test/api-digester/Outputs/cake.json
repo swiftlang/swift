@@ -583,8 +583,9 @@
             },
             {
               "kind": "TypeNominal",
-              "name": "InOut",
-              "printedName": "inout Hasher"
+              "name": "Hasher",
+              "printedName": "Hasher",
+              "usr": "s:s6HasherV"
             }
           ]
         },
