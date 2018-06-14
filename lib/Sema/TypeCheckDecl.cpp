@@ -275,8 +275,8 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 }
 
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestInheritedProtocols(protocol));
+  for (unsigned i : indices(protocol->getInherited()))
+    (void)protocol->getInheritedType(i);
   resolveTrailingWhereClause(protocol);
 }
 

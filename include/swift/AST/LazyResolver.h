@@ -77,9 +77,6 @@ public:
   /// Resolve the raw type of the given enum.
   virtual Type getRawType(EnumDecl *enumDecl) = 0;
 
-  /// Resolve the inherited protocols of a given protocol.
-  virtual void resolveInheritedProtocols(ProtocolDecl *protocol) = 0;
-
   /// Get a specific inherited type from the given declaration.
   virtual Type getInheritedType(
                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,

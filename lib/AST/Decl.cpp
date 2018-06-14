@@ -3280,8 +3280,8 @@ bool ProtocolDecl::requiresClassSlow() {
   //
   // FIXME: Use the requirement signature if available.
   Bits.ProtocolDecl.RequiresClass = false;
-  for (auto inherited : getInherited()) {
-    auto type = inherited.getType();
+  for (unsigned i : indices(getInherited())) {
+    Type type = getInheritedType(i);
     assert(type && "Should have type checked inheritance clause by now");
     if (type->isExistentialType()) {
       auto layout = type->getExistentialLayout();

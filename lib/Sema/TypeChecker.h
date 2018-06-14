@@ -1572,7 +1572,7 @@ public:
   Type getRawType(EnumDecl *enumDecl) override;
 
   /// Resolve the inherited protocols of a given protocol.
-  void resolveInheritedProtocols(ProtocolDecl *protocol) override;
+  void resolveInheritedProtocols(ProtocolDecl *protocol);
 
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
