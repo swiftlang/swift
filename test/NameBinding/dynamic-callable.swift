@@ -79,7 +79,7 @@ func testFunction(a: CallableReturningFunction) {
 //===----------------------------------------------------------------------===//
 
 // Arguments' type may not be variadic.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid1' to have either a valid, non-generic 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 struct Invalid1 {
   func dynamicallyCall(withArguments arguments: [Int]...) -> Int {
@@ -88,7 +88,7 @@ struct Invalid1 {
 }
 
 // Keyword arguments' key type must be ExpressibleByStringLiteral.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid2' to have either a valid, non-generic 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 struct Invalid2 {
   func dynamicallyCall(
@@ -117,7 +117,7 @@ func testInvalidKeywordCall(x: Invalid3, y: InvalidProtocol & AnyObject) {
 
 // References to overloads are currently not supported.
 // Eventually, they may be contextually disambiguated.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Ambiguity' to have either a valid, non-generic 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'Ambiguity' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 struct Ambiguity {
   // expected-error @+1 {{@dynamicCallable attribute does not support ambiguous method 'dynamicallyCall(withArguments:)'}}
@@ -144,7 +144,7 @@ func NotAllowedOnFunc() {}
 // @dynamicCallable cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicCallable attribute requires 'InvalidBase' to have either a valid, non-generic 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{@dynamicCallable attribute requires 'InvalidBase' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 class InvalidBase {}
 

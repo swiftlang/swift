@@ -992,8 +992,8 @@ NOTE(unbound_generic_parameter_explicit_fix,none,
      "explicitly specify the generic arguments to fix this issue", ())
 
 ERROR(invalid_dynamic_callable_type,none,
-      "@dynamicCallable attribute requires %0 to have either a valid, "
-      "non-generic 'dynamicallyCall(withArguments:)' method or "
+      "@dynamicCallable attribute requires %0 to have either a valid "
+      "'dynamicallyCall(withArguments:)' method or "
       "'dynamicallyCall(withKeywordArguments:)' method", (Type))
 ERROR(missing_dynamic_callable_kwargs_method,none,
       "@dynamicCallable type %0 cannot be applied with keyword arguments; "
