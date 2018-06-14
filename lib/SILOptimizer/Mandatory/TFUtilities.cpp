@@ -617,14 +617,13 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       //  %0 = string_literal utf8 "foo"
       //  // function_ref specialized String.init(
       //       _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
-      // function_ref @$SSS21_builtinStringLiteral... : $@convention(thin) (
+      //  function_ref @$SSS21_builtinStringLiteral... : $@convention(thin) (
       //       Builtin.RawPointer...) -> @owned String
-      // %4 = apply %3(%0, ...
+      //  %4 = apply %3(%0, ...
       // So we want to follow the first func arg of the ApplyInst (%0 above).
       if (auto *ai = dyn_cast<ApplyInst>(str)) {
         // If the ApplyInst does not have such an operand, we bail with failure.
         if (ai->getNumOperands() < 2) return nullptr;
-
         str = ai->getOperand(1);
         continue;
       }
