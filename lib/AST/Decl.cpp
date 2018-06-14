@@ -372,9 +372,24 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getSourceRange();
 
 SourceRange Decl::getSourceRangeIncludingAttrs() const {
   auto Range = getSourceRange();
+
+  // Attributes on AccessorDecl are syntactically belong to PatternBindingDecl.
+  if (isa<AccessorDecl>(this) || isa<VarDecl>(this))
+    return Range;
+
+  // Attributes on PatternBindingDecls are attached to VarDecls in AST.
+  if (const PatternBindingDecl *PBD = dyn_cast<PatternBindingDecl>(this)) {
+    for (auto Entry : PBD->getPatternList())
+      Entry.getPattern()->forEachVariable([&](VarDecl *VD) {
+        for (auto Attr : VD->getAttrs())
+          if (Attr->getRange().isValid())
+            Range.widen(Attr->getRangeWithAt());
+      });
+  }
+
   for (auto Attr : getAttrs()) {
     if (Attr->getRange().isValid())
-      Range.widen(Attr->getRange());
+      Range.widen(Attr->getRangeWithAt());
   }
   return Range;
 }
