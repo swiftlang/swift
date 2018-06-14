@@ -13,6 +13,7 @@ import Foundation
 import objc_ext
 import TestProtocols
 import ObjCIRExtras
+import objc_generics
 
 // CHECK: @"\01L_selector_data(method:withFloat:)" = private global [18 x i8] c"method:withFloat:\00"
 // CHECK: @"\01L_selector_data(method:withDouble:)" = private global [19 x i8] c"method:withDouble:\00"
@@ -336,6 +337,11 @@ func testCompatibilityAliasMangling(obj: SwiftNameAlias) {
   // CHECK: call void @llvm.dbg.declare(metadata %TSo13SwiftNameTestC** {{%.+}}, metadata ![[SWIFT_NAME_ALIAS_VAR:[0-9]+]], metadata !DIExpression())
 }
 
+// CHECK-LABEL: S7objc_ir22testBlocksWithGenerics3hbaypSo13HasBlockArrayC_tF
+func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
+  // CHECK: {{call swiftcc.*SSo13HasBlockArrayC05blockC0SayyycGyFTcTO}}
+  return hba.blockArray
+}
 
 // CHECK: linkonce_odr hidden {{.*}} @"$SSo1BC3intABSgs5Int32V_tcfcTO"
 // CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
