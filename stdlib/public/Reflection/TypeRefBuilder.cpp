@@ -160,6 +160,7 @@ TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       auto CandidateMangledName = FD.getMangledTypeName(TypeRefOffset);
       auto NormalizedName = normalizeReflectionName(Dem, CandidateMangledName);
       FieldTypeInfoCache[NormalizedName] = {&FD, &Info};
+      Dem.clear();
     }
   }
 
