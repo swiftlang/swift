@@ -686,10 +686,16 @@ private:
 
     unsigned origParamIndex = NextOrigParamIndex++;
 
+    bool isInout = false;
+    if (auto inoutType = dyn_cast<InOutType>(substType)) {
+      isInout = true;
+      substType = inoutType.getObjectType();
+      origType = origType.getWithoutSpecifierType();
+    }
+
     auto &substTL = M.Types.getTypeLowering(origType, substType);
     ParameterConvention convention;
-    if (isa<InOutType>(substType)) {
-      assert(origType.isTypeParameter() || origType.getAs<InOutType>());
+    if (isInout) {
       convention = ParameterConvention::Indirect_Inout;
     } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
       if (forSelf && rep == SILFunctionTypeRepresentation::WitnessMethod)

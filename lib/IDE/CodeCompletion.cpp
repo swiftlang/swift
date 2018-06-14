@@ -2104,10 +2104,10 @@ public:
     setClangDeclKeywords(VD, Pairs, Builder);
     // Add a type annotation.
     Type VarType = getTypeOfMember(VD);
-    if (VD->getName() == Ctx.Id_self) {
-      // Strip inout from 'self'.  It is useful to show inout for function
-      // parameters.  But for 'self' it is just noise.
-      VarType = VarType->getInOutObjectType();
+    if (VD->getName() != Ctx.Id_self && VD->isInOut()) {
+      // It is useful to show inout for function parameters.
+      // But for 'self' it is just noise.
+      VarType = InOutType::get(VarType);
     }
     auto DynamicOrOptional =
         IsDynamicLookup || VD->getAttrs().hasAttribute<OptionalAttr>();

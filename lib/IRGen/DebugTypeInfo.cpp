@@ -63,16 +63,11 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(DeclContext *DC,
 DebugTypeInfo DebugTypeInfo::getLocalVariable(DeclContext *DC,
                                               GenericEnvironment *GE,
                                               VarDecl *Decl, swift::Type Ty,
-                                              const TypeInfo &Info,
-                                              bool Unwrap) {
+                                              const TypeInfo &Info) {
 
   auto DeclType =
       Decl->hasInterfaceType() ? Decl->getInterfaceType() : Decl->getType();
   auto RealType = Ty;
-  if (Unwrap) {
-    DeclType = DeclType->getInOutObjectType();
-    RealType = RealType->getInOutObjectType();
-  }
 
   // DynamicSelfType is also sugar as far as debug info is concerned.
   auto Sugared = DeclType;

@@ -3671,7 +3671,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   if (VarDecl *Decl = i->getDecl()) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-        RealTy, getTypeInfo(SILVal->getType()), /*Unwrap=*/false);
+        RealTy, getTypeInfo(SILVal->getType()));
   } else if (i->getFunction()->isBare() &&
              !SILTy.hasArchetype() && !Name.empty()) {
     // Preliminary support for .sil debug information.
@@ -3713,16 +3713,10 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
-  // Unwrap implicitly indirect types and types that are passed by
-  // reference only at the SIL level and below.
-  //
-  // FIXME: Should this check if the lowered SILType is address only
-  // instead? Otherwise optionals of archetypes etc will still have
-  // 'Unwrap' set to false.
-  bool Unwrap = VarInfo->Constant || SILTy.is<ArchetypeType>();
+
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, getTypeInfo(SILVal->getType()), Unwrap);
+      RealType, getTypeInfo(SILVal->getType()));
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
@@ -4011,7 +4005,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type, false);
+      RealType, type);
 
   // FIXME: This is working around the inverse special case in LLDB.
   if (DbgTy.isImplicitlyIndirect())
@@ -4208,7 +4202,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(
       CurSILFn->getDeclContext(), CurSILFn->getGenericEnvironment(), Decl,
-      RealType, type, /*Unwrap=*/false);
+      RealType, type);
 
   if (isInlinedGeneric(Decl, i->getDebugScope()))
     return;
