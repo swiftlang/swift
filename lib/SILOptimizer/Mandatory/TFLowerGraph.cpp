@@ -596,7 +596,26 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       if (fnName.endswith(".device_partition"))
         fnName = fnName.drop_back(strlen(".device_partition"));
 
-      name += "." + fnName.str() + "." + llvm::utostr(lineCol.first);
+      // Separate functions using '/' so that TensorBoard can treat it as a
+      // hierarchical separator.
+      //
+      // When the SIL function is backed by a Swift decl, use the decl name
+      // instead.
+      //
+      // TODO: We will need a qualified lookup path and a full decl name for
+      // disambiguation.
+      std::string funcName;
+      if (AbstractFunctionDecl *afd =
+          dyn_cast_or_null<AbstractFunctionDecl>(SILFn.getDeclContext())) {
+        SmallVector<char, 8> name;
+        funcName = afd->getEffectiveFullName()
+          .getString(name, /*skipEmptyArgumentNames*/ true).str();
+        escapeOpName(funcName);
+      } else {
+        funcName = fnName.str();
+      }
+
+      name += "/" + funcName + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
