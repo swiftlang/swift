@@ -200,7 +200,7 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
+  Evaluator evaluator(diags, /*shouldDiagnoseCycles=*/true);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
   EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
@@ -320,7 +320,7 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags);
+  Evaluator evaluator(diags, /*shouldDiagnoseCycles=*/true);
 
   // Evaluate when there is a cycle.
   UncachedEvaluationRule::brokeCycle = false;

@@ -107,6 +107,9 @@ class Evaluator {
   /// diagnostics will be emitted.
   DiagnosticEngine &diags;
 
+  /// Whether to diagnose cycles or ignore them completely.
+  bool shouldDiagnoseCycles;
+
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<AnyRequest> activeRequests;
@@ -128,7 +131,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags);
+  Evaluator(DiagnosticEngine &diags, bool shouldDiagnoseCycles);
 
   /// Evaluate the given request and produce its result,
   /// consulting/populating the cache as required.
