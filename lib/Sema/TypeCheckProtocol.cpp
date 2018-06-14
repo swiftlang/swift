@@ -214,17 +214,17 @@ static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
   // allow them as protocol requirements someday.
 
   switch (reqtKind) {
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get:
+  case AccessorKind::Address:
     return false;
 
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::Set:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::MaterializeForSet:
     return true;
 
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     llvm_unreachable("willSet/didSet protocol requirement?");
   }
   llvm_unreachable("bad accessor kind");
@@ -446,12 +446,12 @@ swift::matchWitness(
     // Validate that the 'mutating' bit lines up for getters and setters.
     if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
                       witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::IsGetter),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::Get),
                               MatchKind::MutatingConflict);
     
     if (req->isSettable(req->getDeclContext()) &&
         checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::IsSetter),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::Set),
                               MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.
@@ -4914,17 +4914,17 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   if (auto *accessor = dyn_cast<AccessorDecl>(witness)) {
     accessorKind = accessor->getAccessorKind();
     switch (*accessorKind) {
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::MaterializeForSet:
       // These accessors are never exposed to Objective-C.
       return result;
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
       // These accessors are folded into the setter.
       return result;
-    case AccessorKind::IsGetter:
-    case AccessorKind::IsSetter:
+    case AccessorKind::Get:
+    case AccessorKind::Set:
       // These are found relative to the main decl.
       name = accessor->getStorage()->getFullName();
       break;

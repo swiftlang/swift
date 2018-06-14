@@ -1783,14 +1783,14 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     auto *FD = cast<FuncDecl>(c.getDecl());
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
         break;
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
+      case AccessorKind::MaterializeForSet:
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
     }

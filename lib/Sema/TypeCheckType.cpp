@@ -3568,8 +3568,8 @@ bool TypeChecker::isRepresentableInObjC(
     }
 
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
         // willSet/didSet implementations are never exposed to objc, they are
         // always directly dispatched from the synthesized setter.
       if (Diagnose) {
@@ -3578,16 +3578,16 @@ bool TypeChecker::isRepresentableInObjC(
       }
       return false;
 
-    case AccessorKind::IsGetter:
-    case AccessorKind::IsSetter:
+    case AccessorKind::Get:
+    case AccessorKind::Set:
       return true;
 
-    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::MaterializeForSet:
       // materializeForSet is synthesized, so never complain about it
       return false;
 
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
       if (Diagnose) {
         diagnose(accessor->getLoc(), diag::objc_addressor);
         describeObjCReason(*this, accessor, Reason);

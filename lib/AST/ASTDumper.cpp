@@ -294,13 +294,12 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 }
 static StringRef getAccessorKindString(AccessorKind value) {
   switch (value) {
-    case AccessorKind::IsGetter: return "getter";
-    case AccessorKind::IsSetter: return "setter";
-    case AccessorKind::IsWillSet: return "willSet";
-    case AccessorKind::IsDidSet: return "didSet";
-    case AccessorKind::IsMaterializeForSet: return "materializeForSet";
-    case AccessorKind::IsAddressor: return "addressor";
-    case AccessorKind::IsMutableAddressor: return "mutableAddressor";
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  case AccessorKind::Address: return "address";
+  case AccessorKind::MutableAddress: return "mutableAddress";
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");

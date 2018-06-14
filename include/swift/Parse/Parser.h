@@ -878,12 +878,9 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
-    AccessorDecl *Get = nullptr;
-    AccessorDecl *Set = nullptr;
-    AccessorDecl *Addressor = nullptr;
-    AccessorDecl *MutableAddressor = nullptr;
-    AccessorDecl *WillSet = nullptr;
-    AccessorDecl *DidSet = nullptr;
+
+#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
+#include "swift/AST/AccessorKinds.def"
 
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,

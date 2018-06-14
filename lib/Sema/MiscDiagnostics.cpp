@@ -1610,7 +1610,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           // it is about to get overwritten.
           if (isStore &&
               DRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
-              Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
+              Accessor->getAccessorKind() == AccessorKind::WillSet) {
             TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
           }
         }
@@ -1645,7 +1645,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           // it is about to get overwritten.
           if (isStore &&
               MRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
-              Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
+              Accessor->getAccessorKind() == AccessorKind::WillSet) {
               TC.diagnose(subExpr->getLoc(), diag::store_in_willset,
                           Var->getName());
           }
@@ -2391,7 +2391,7 @@ public:
     // the containing property so if newValue isn't used but the getter is used
     // an error can be reported.
     if (auto FD = dyn_cast<AccessorDecl>(AFD)) {
-      if (FD->getAccessorKind() == AccessorKind::IsSetter) {
+      if (FD->getAccessorKind() == AccessorKind::Set) {
         if (auto getter = dyn_cast<VarDecl>(FD->getStorage())) {
           auto arguments = FD->getParameterLists().back();
           VarDecls[arguments->get(0)] = 0;
@@ -2638,7 +2638,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     // more annoying than it is useful.
     if (auto param = dyn_cast<ParamDecl>(var)) {
       auto FD = dyn_cast<AccessorDecl>(param->getDeclContext());
-      if (FD && FD->getAccessorKind() == AccessorKind::IsSetter) {
+      if (FD && FD->getAccessorKind() == AccessorKind::Set) {
         auto getter = dyn_cast<VarDecl>(FD->getStorage());
         if ((access & RK_Read) == 0 && AssociatedGetter == getter) {
           if (auto DRE = AssociatedGetterDeclRef) {
@@ -3509,21 +3509,21 @@ public:
         auto bestAccessor = dyn_cast<AccessorDecl>(bestMethod);
         if (bestAccessor) {
           switch (bestAccessor->getAccessorKind()) {
-          case AccessorKind::IsGetter:
+          case AccessorKind::Get:
             out << "getter: ";
             name = bestAccessor->getStorage()->getFullName();
             break;
 
-          case AccessorKind::IsSetter:
-          case AccessorKind::IsWillSet:
-          case AccessorKind::IsDidSet:
+          case AccessorKind::Set:
+          case AccessorKind::WillSet:
+          case AccessorKind::DidSet:
             out << "setter: ";
             name = bestAccessor->getStorage()->getFullName();
             break;
 
-          case AccessorKind::IsMaterializeForSet:
-          case AccessorKind::IsAddressor:
-          case AccessorKind::IsMutableAddressor:
+          case AccessorKind::MaterializeForSet:
+          case AccessorKind::Address:
+          case AccessorKind::MutableAddress:
             llvm_unreachable("cannot be @objc");
           }
         } else {

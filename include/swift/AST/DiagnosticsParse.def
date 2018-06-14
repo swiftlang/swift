@@ -265,7 +265,7 @@ ERROR(conflicting_property_addressor,none,
       "%select{variable|subscript}0 already has a "
       "%select{addressor|mutable addressor}1", (unsigned, unsigned))
 ERROR(expected_accessor_name,none,
-      "expected %select{%error|setter|willSet|didSet}0 parameter name",
+      "expected %select{%error|setter|%error|willSet|didSet}0 parameter name",
       (unsigned))
 ERROR(expected_rparen_set_name,none,
       "expected ')' after setter parameter name",())

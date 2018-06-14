@@ -1610,19 +1610,19 @@ giveUpFastPath:
         pathTrace.addAccessor(rawKind);
         if (auto storage = dyn_cast<AbstractStorageDecl>(values.front())) {
           switch (rawKind) {
-          case Getter:
+          case Get:
             values.front() = storage->getGetter();
             break;
-          case Setter:
+          case Set:
             values.front() = storage->getSetter();
             break;
           case MaterializeForSet:
             values.front() = storage->getMaterializeForSetFunc();
             break;
-          case Addressor:
+          case Address:
             values.front() = storage->getAddressor();
             break;
-          case MutableAddressor:
+          case MutableAddress:
             values.front() = storage->getMutableAddressor();
             break;
           case WillSet:
@@ -2057,17 +2057,10 @@ getActualOptionalTypeKind(uint8_t raw) {
 static Optional<swift::AccessorKind>
 getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
-#define CASE(RAWKIND, KIND) \
-  case serialization::AccessorKind::RAWKIND: return swift::AccessorKind::KIND;
-  CASE(Getter, IsGetter)
-  CASE(Setter, IsSetter)
-  CASE(WillSet, IsWillSet)
-  CASE(DidSet, IsDidSet)
-  CASE(MaterializeForSet, IsMaterializeForSet)
-  CASE(Addressor, IsAddressor)
-  CASE(MutableAddressor, IsMutableAddressor)
+#define ACCESSOR(ID) \
+  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
+#include "swift/AST/AccessorKinds.def"
   }
-#undef CASE
 
   return None;
 }
@@ -2132,41 +2125,58 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   return None;
 }
 
+static Optional<AbstractStorageDecl::StorageKindTy>
+getActualStorageKind(unsigned raw) {
+  switch (serialization::StorageKind(raw)) {
+#define CASE(KIND)                       \
+  case serialization::StorageKind::KIND: \
+    return AbstractStorageDecl::KIND;
+  CASE(Stored)
+  CASE(StoredWithTrivialAccessors)
+  CASE(StoredWithObservers)
+  CASE(InheritedWithObservers)
+  CASE(Computed)
+  CASE(ComputedWithMutableAddress)
+  CASE(Addressed)
+  CASE(AddressedWithTrivialAccessors)
+  CASE(AddressedWithObservers)
+#undef CASE
+  }
+  return None;
+}
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
-                                  serialization::DeclID getter,
-                                  serialization::DeclID setter,
-                                  serialization::DeclID materializeForSet,
-                                  serialization::DeclID addressor,
-                                  serialization::DeclID mutableAddressor,
-                                  serialization::DeclID willSet,
-                                  serialization::DeclID didSet) {
+                                  AccessorRecord &rawIDs) {
+#define ACCESSOR(ID) \
+  AccessorDecl *ID = nullptr;
+#include "swift/AST/AccessorKinds.def"
+
+  for (DeclID id : rawIDs.IDs) {
+    auto accessor = cast_or_null<AccessorDecl>(getDecl(id));
+    switch (accessor->getAccessorKind()) {
+#define ACCESSOR(ID) \
+    case AccessorKind::ID: ID = accessor; continue;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
+  }
+
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  auto makeAddressed = [&] {
-    decl->makeAddressed(beginLoc,
-                        cast_or_null<AccessorDecl>(getDecl(addressor)),
-                        cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                        endLoc);
-  };
-
   auto addTrivialAccessors = [&] {
-    decl->addTrivialAccessors(
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)));
+    decl->addTrivialAccessors(Get, Set, MaterializeForSet);
   };
 
   auto setObservingAccessors = [&] {
-    decl->setObservingAccessors(
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)));
+    decl->setObservingAccessors(Get, Set, MaterializeForSet);
   };
 
-  switch ((StorageKind) rawStorageKind) {
+  // TODO: detect and propagate deserialization errors
+  using StorageKind = AbstractStorageDecl::StorageKindTy;
+  auto storageKind = *getActualStorageKind(rawStorageKind);
+  switch (storageKind) {
   case StorageKind::Stored:
     return;
 
@@ -2175,55 +2185,39 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
     return;
 
   case StorageKind::StoredWithObservers:
-    decl->makeStoredWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
+    decl->makeStoredWithObservers(beginLoc, WillSet, DidSet, endLoc);
     setObservingAccessors();
     return;
 
   case StorageKind::InheritedWithObservers:
-    decl->makeInheritedWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
+    decl->makeInheritedWithObservers(beginLoc, WillSet, DidSet, endLoc);
     setObservingAccessors();
     return;
 
   case StorageKind::Addressed:
-    makeAddressed();
-    return;
-
   case StorageKind::AddressedWithTrivialAccessors:
-    makeAddressed();
-    addTrivialAccessors();
+    decl->makeAddressed(beginLoc, Address, MutableAddress, endLoc);
+    if (storageKind == StorageKind::AddressedWithTrivialAccessors)
+      addTrivialAccessors();
     return;
 
   case StorageKind::AddressedWithObservers:
     decl->makeAddressedWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(addressor)),
-                       cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
+                                     Address, MutableAddress,
+                                     WillSet, DidSet,
+                                     endLoc);
     setObservingAccessors();
     return;
 
   case StorageKind::Computed:
-    decl->makeComputed(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)),
-                       endLoc);
+    decl->makeComputed(beginLoc, Get, Set, MaterializeForSet, endLoc);
     return;
 
   case StorageKind::ComputedWithMutableAddress:
     decl->makeComputedWithMutableAddress(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)),
-                       cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                       endLoc);
+                                         Get, Set, MaterializeForSet,
+                                         MutableAddress,
+                                         endLoc);
     return;
   }
   llvm_unreachable("bad storage kind");
@@ -2949,23 +2943,22 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned rawSpecifier;
+    unsigned rawSpecifier, numAccessors;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
-    DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
-    DeclID addressorID, mutableAddressorID, overriddenID;
-    ArrayRef<uint64_t> dependencyIDs;
+    AccessorRecord accessors;
+    DeclID overriddenID;
+    ArrayRef<uint64_t> accessorAndDependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
-                                       storageKind, interfaceTypeID,
-                                       getterID, setterID, materializeForSetID,
-                                       addressorID, mutableAddressorID,
-                                       willSetID, didSetID, overriddenID,
+                                       storageKind, numAccessors,
+                                       interfaceTypeID,
+                                       overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
-                                       dependencyIDs);
+                                       accessorAndDependencyIDs);
 
     Identifier name = getIdentifier(nameID);
 
@@ -2975,7 +2968,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return llvm::make_error<OverrideError>(name);
     }
 
-    for (TypeID dependencyID : dependencyIDs) {
+    // Exctract the accessor IDs.
+    for (DeclID accessorID : accessorAndDependencyIDs.slice(0, numAccessors)) {
+      accessors.IDs.push_back(accessorID);
+    }
+    accessorAndDependencyIDs = accessorAndDependencyIDs.slice(numAccessors);
+
+    for (TypeID dependencyID : accessorAndDependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
         // Stored properties in classes still impact class object layout because
@@ -3031,8 +3030,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
-                     addressorID, mutableAddressorID, willSetID, didSetID);
+    configureStorage(var, storageKind, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       var->setAccess(*accessLevel);
@@ -3798,24 +3796,19 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isImplicit, isObjC, isGetterMutating, isSetterMutating;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
-    DeclID getterID, setterID, materializeForSetID;
-    DeclID addressorID, mutableAddressorID, willSetID, didSetID;
+    AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     uint8_t rawStorageKind;
-    unsigned numArgNames;
+    unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC,
                                              isGetterMutating, isSetterMutating,
-                                             rawStorageKind,
+                                             rawStorageKind, numAccessors,
                                              genericEnvID,
                                              interfaceTypeID,
-                                             getterID, setterID,
-                                             materializeForSetID,
-                                             addressorID, mutableAddressorID,
-                                             willSetID, didSetID,
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel, numArgNames,
                                              argNameAndDependencyIDs);
@@ -3824,6 +3817,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
       argNames.push_back(getIdentifier(argNameID));
     DeclName name(ctx, DeclBaseName::createSubscript(), argNames);
+    argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numArgNames);
+
+    // Exctract the accessor IDs.
+    for (DeclID accessorID : argNameAndDependencyIDs.slice(0, numAccessors)) {
+      accessors.IDs.push_back(accessorID);
+    }
+    argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numAccessors);
 
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
@@ -3831,7 +3831,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return llvm::make_error<OverrideError>(name);
     }
 
-    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
+    for (TypeID dependencyID : argNameAndDependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3858,9 +3858,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     subscript->setIndices(readParameterList());
 
-    configureStorage(subscript, rawStorageKind,
-                     getterID, setterID, materializeForSetID,
-                     addressorID, mutableAddressorID, willSetID, didSetID);
+    configureStorage(subscript, rawStorageKind, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       subscript->setAccess(*accessLevel);

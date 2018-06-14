@@ -1551,17 +1551,17 @@ void TypeChecker::computeAccessLevel(ValueDecl *D) {
     AbstractStorageDecl *storage = accessor->getStorage();
     if (storage->hasAccess()) {
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsAddressor:
+      case AccessorKind::Get:
+      case AccessorKind::Address:
         accessor->setAccess(storage->getFormalAccess());
         break;
-      case AccessorKind::IsSetter:
-      case AccessorKind::IsMutableAddressor:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::Set:
+      case AccessorKind::MutableAddress:
+      case AccessorKind::MaterializeForSet:
         accessor->setAccess(storage->getSetterFormalAccess());
         break;
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
         // These are only needed to synthesize the setter.
         accessor->setAccess(AccessLevel::Private);
         break;
@@ -5980,8 +5980,8 @@ public:
     // which is synthesized to be as available as both the getter and
     // the setter.
     if (overrideFn->isMaterializeForSet()) {
-      if (accessorOverrideAlreadyDiagnosed(AccessorKind::IsGetter) ||
-          accessorOverrideAlreadyDiagnosed(AccessorKind::IsSetter)) {
+      if (accessorOverrideAlreadyDiagnosed(AccessorKind::Get) ||
+          accessorOverrideAlreadyDiagnosed(AccessorKind::Set)) {
         return true;
       }
     }
@@ -6194,15 +6194,15 @@ public:
 
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.
-        if ((kind == AccessorKind::IsSetter ||
-             kind == AccessorKind::IsMaterializeForSet) &&
+        if ((kind == AccessorKind::Set ||
+             kind == AccessorKind::MaterializeForSet) &&
             !baseASD->isSetterAccessibleFrom(overridingASD->getDeclContext()))
           return;
 
         // A materializeForSet for an override of storage with a
         // forced static dispatch materializeForSet is not itself an
         // override.
-        if (kind == AccessorKind::IsMaterializeForSet &&
+        if (kind == AccessorKind::MaterializeForSet &&
             baseAccessor->hasForcedStaticDispatch())
           return;
 
@@ -6217,9 +6217,9 @@ public:
                        baseASD->isObjC());
       };
 
-      recordAccessorOverride(AccessorKind::IsGetter);
-      recordAccessorOverride(AccessorKind::IsSetter);
-      recordAccessorOverride(AccessorKind::IsMaterializeForSet);
+      recordAccessorOverride(AccessorKind::Get);
+      recordAccessorOverride(AccessorKind::Set);
+      recordAccessorOverride(AccessorKind::MaterializeForSet);
     } else {
       llvm_unreachable("Unexpected decl");
     }
@@ -6754,11 +6754,11 @@ bool checkDynamicSelfReturn(TypeChecker &TC, FuncDecl *func) {
 Type buildAddressorResultType(TypeChecker &TC,
                               AccessorDecl *addressor,
                               Type valueType) {
-  assert(addressor->getAccessorKind() == AccessorKind::IsAddressor ||
-         addressor->getAccessorKind() == AccessorKind::IsMutableAddressor);
+  assert(addressor->getAccessorKind() == AccessorKind::Address ||
+         addressor->getAccessorKind() == AccessorKind::MutableAddress);
 
   Type pointerType =
-    (addressor->getAccessorKind() == AccessorKind::IsAddressor)
+    (addressor->getAccessorKind() == AccessorKind::Address)
       ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
       : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
   if (!pointerType) return Type();
@@ -7298,15 +7298,15 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Propagate the value type into the correct position.
       switch (accessor->getAccessorKind()) {
       // For getters, set the result type to the value type.
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
         break;
 
       // For setters and observers, set the old/new value parameter's type
       // to the value type.
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsSetter: {
+      case AccessorKind::DidSet:
+      case AccessorKind::WillSet:
+      case AccessorKind::Set: {
         auto newValueParam = valueParams->get(0);
         newValueParam->setType(valueTy);
         newValueParam->setInterfaceType(valueIfaceTy);
@@ -7315,8 +7315,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
 
       // Addressor result types can get complicated because of the owner.
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         if (Type resultType =
               buildAddressorResultType(*this, accessor, valueIfaceTy)) {
           accessor->getBodyResultTypeLoc().setType(resultType, true);
@@ -7324,7 +7324,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         break;
 
       // These don't mention the value types directly.
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::MaterializeForSet:
         break;
       }
     }
