@@ -1329,7 +1329,17 @@ void TFFunctionPartition::markArgument(SILArgument *arg, SILInstruction *user) {
 /// Determine whether we are able to move the specified instruction across
 /// arbitrary other instructions.  This is basically "side effect free" in the
 /// most liberal sense.
-static bool canMoveInstruction(SILInstruction *inst) {
+///
+/// If `plusZeroTensorOperand` and `*plusZeroTensorOperand` are both non-NULL,
+/// when the call returns true, it points to a TensorHandle-typed operand `o`
+/// where `inst` takes that operand at +0. In that case, simply sinking `inst`
+/// can lead to `operand` being deallocated before `inst`. As such, in order for
+/// caller to sink `inst`, caller should generate a pair of retain/release on
+/// `o` to wrap `inst`, and sink `inst` along with the release.
+static bool canMoveInstruction(SILInstruction *inst,
+                               SILValue *plusZeroTensorOperand) {
+  if (plusZeroTensorOperand) *plusZeroTensorOperand = SILValue();
+
   // Instructions that SIL knows are always side-effect-free can generally be
   // moved.
   if (inst->getMemoryBehavior() == SILInstruction::MemoryBehavior::None) {
@@ -1346,11 +1356,18 @@ static bool canMoveInstruction(SILInstruction *inst) {
   if (isa<PartialApplyInst>(inst))
     return true;
 
+  SILValue tensorOperand;
   switch (classifyInst(inst)) {
   case PartitioningClass::GetScalarOrDie:
-  case PartitioningClass::Hoistable:
   case PartitioningClass::ExplicitSend:
   case PartitioningClass::ExplicitReceive:
+    // For the these functions, we know its first parameter is a TensorHandle,
+    // with @guaranteed calling convention.
+    tensorOperand = inst->getOperand(1);
+    if (plusZeroTensorOperand)
+      *plusZeroTensorOperand = tensorOperand;
+    LLVM_FALLTHROUGH;
+  case PartitioningClass::Hoistable:
     return true;
   default:
     return false;
@@ -1372,7 +1389,7 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate inputs dominate the start point.
-  if (canMoveInstruction(inst)) {
+  if (canMoveInstruction(inst, /*plusZeroTensorOperand*/ nullptr)) {
     // We can hoist one of these instructions if all of their operands are
     // hoistable.
     for (auto &op : inst->getAllOperands()) {
@@ -1408,7 +1425,8 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
 
   // In general, we need to check to see if we have a chain of side-effect free
   // instructions whose ultimate results can all be sunk after the endpoint.
-  if (canMoveInstruction(inst)) {
+  SILValue plusZeroTensorOperand;
+  if (canMoveInstruction(inst, &plusZeroTensorOperand)) {
     // Make sure the end point is dominated by any operands.
     //
     // TODO: We could make this more aggressive through various techniques, e.g.
@@ -1425,12 +1443,25 @@ static bool sinkValueAfterEndPoint(SILInstruction *inst,
 
     // If all of the uses are sunk after the end point, then this
     // instruction can be too.
+    if (plusZeroTensorOperand) {
+      SILBuilder B(inst);
+      B.createStrongRetain(inst->getLoc(), plusZeroTensorOperand,
+                           Atomicity::Atomic);
+    }
 
     // The tensorEndPoint is the first non-tensor instruction in the program.
     // Insert our sunk instruction immediately before it, and this instruction
     // becomes the new end point.
     inst->moveBefore(tensorEndPoint);
     tensorEndPoint = inst;
+    if (plusZeroTensorOperand) {
+      // Create strong_release right after `inst`.
+      SILBuilder B(inst);
+      auto *releaseInst =
+          B.createStrongRelease(tensorEndPoint->getLoc(), plusZeroTensorOperand,
+                                Atomicity::Atomic);
+      releaseInst->moveAfter(inst);
+    }
     return true;
   }
 
@@ -3024,7 +3055,11 @@ bool PartitionCloner::finalizeOriginal() {
     assert(isa<ApplyInst>(ecm) && ecm->getResults().size() == 1 &&
            ecm->getNumOperands() == 2 && "unknown copy in/out instruction");
     auto callee = ecm->getOperand(1);
-    ecm->getResults()[0]->replaceAllUsesWith(ecm->getOperand(1));
+    // `ecm` takes `callee` at +0 and returns a result at +1, so we need to
+    // issue a retain to balance the removal of `ecm`.
+    SILBuilder B(ecm);
+    B.createStrongRetain(ecm->getLoc(), callee, Atomicity::Atomic);
+    ecm->getResults()[0]->replaceAllUsesWith(callee);
     ecm->eraseFromParent();
 
     if (callee->use_empty())  // Remove the function_ref too.
