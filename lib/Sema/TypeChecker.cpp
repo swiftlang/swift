@@ -942,8 +942,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    diagnose(member.first, diag::found_candidate_type,
-             member.second);
+    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
   }
 }
 

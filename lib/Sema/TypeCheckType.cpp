@@ -123,7 +123,7 @@ static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                                                   TC.Context.getIdentifier(
                                                     name));
     if (lookup)
-      cached = lookup.back().second;
+      cached = lookup.back().MemberType;
   }
   return cached;
 }
@@ -203,7 +203,7 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
   if (auto result = TC.lookupMemberType(dc, ModuleType::get(module), TypeName,
                                         lookupOptions)) {
     for (auto pair : result) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.first)) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.Member)) {
         cache = nominal->getDeclaredType();
         return cache;
       }
@@ -934,14 +934,14 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                                  relookupOptions);
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
-    const TypeDecl *first = inaccessibleMembers.front().first;
+    const TypeDecl *first = inaccessibleMembers.front().Member;
     tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
                 comp->getIdentifier(), first->getFormalAccess());
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
     for (auto lookupResult : inaccessibleMembers)
-      tc.diagnose(lookupResult.first, diag::kind_declared_here,
+      tc.diagnose(lookupResult.Member, diag::kind_declared_here,
                   DescriptiveDeclKind::Type);
 
     // Don't try to recover here; we'll get more access-related diagnostics
@@ -1403,8 +1403,8 @@ static Type resolveNestedIdentTypeComponent(
     if (!member)
       return ErrorType::get(TC.Context);
   } else {
-    memberType = memberTypes.back().second;
-    member = memberTypes.back().first;
+    memberType = memberTypes.back().MemberType;
+    member = memberTypes.back().Member;
     comp->setValue(member, nullptr);
   }
 
