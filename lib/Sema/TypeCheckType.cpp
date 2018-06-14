@@ -123,7 +123,7 @@ static Type getStdlibType(TypeChecker &TC, Type &cached, DeclContext *dc,
                                                   TC.Context.getIdentifier(
                                                     name));
     if (lookup)
-      cached = lookup.back().second;
+      cached = lookup.back().MemberType;
   }
   return cached;
 }
@@ -203,7 +203,7 @@ static Type getObjectiveCNominalType(TypeChecker &TC,
   if (auto result = TC.lookupMemberType(dc, ModuleType::get(module), TypeName,
                                         lookupOptions)) {
     for (auto pair : result) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.first)) {
+      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.Member)) {
         cache = nominal->getDeclaredType();
         return cache;
       }
@@ -934,14 +934,14 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                                  relookupOptions);
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
-    const TypeDecl *first = inaccessibleMembers.front().first;
+    const TypeDecl *first = inaccessibleMembers.front().Member;
     tc.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
                 comp->getIdentifier(), first->getFormalAccess());
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
     for (auto lookupResult : inaccessibleMembers)
-      tc.diagnose(lookupResult.first, diag::kind_declared_here,
+      tc.diagnose(lookupResult.Member, diag::kind_declared_here,
                   DescriptiveDeclKind::Type);
 
     // Don't try to recover here; we'll get more access-related diagnostics
@@ -1254,7 +1254,8 @@ static Type resolveNestedIdentTypeComponent(
               bool diagnoseErrors,
               GenericTypeResolver *resolver,
               UnsatisfiedDependency *unsatisfiedDependency) {
-  auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType) {
+  auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
+                                        AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
     if (TC.isUnsupportedMemberTypeAccess(parentTy, member)) {
       if (diagnoseErrors) {
@@ -1285,20 +1286,21 @@ static Type resolveNestedIdentTypeComponent(
       }
     }
 
+    // Diagnose a bad conformance reference if we need to.
+    if (inferredAssocType && diagnoseErrors && memberType &&
+        memberType->hasError()) {
+      maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
+                                     inferredAssocType);
+    }
+
     // If we found a reference to an associated type or other member type that
     // was marked invalid, just return ErrorType to silence downstream errors.
     if (member->isInvalid())
       return ErrorType::get(TC.Context);
 
-    // Diagnose a bad conformance reference if we need to.
-    if (isa<AssociatedTypeDecl>(member) && diagnoseErrors &&
-        memberType && memberType->hasError()) {
-      maybeDiagnoseBadConformanceRef(TC, DC, parentTy, comp->getLoc(),
-                                     cast<AssociatedTypeDecl>(member));
-    }
-
     // At this point, we need to have resolved the type of the member.
-    if (!memberType || memberType->hasError()) return memberType;
+    if (!memberType || memberType->hasError())
+      return memberType;
 
     // If there are generic arguments, apply them now.
     if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
@@ -1335,7 +1337,7 @@ static Type resolveNestedIdentTypeComponent(
   if (auto *typeDecl = comp->getBoundDecl()) {
     auto memberType = TC.substMemberTypeWithBase(DC->getParentModule(),
                                                  typeDecl, parentTy);
-    return maybeDiagnoseBadMemberType(typeDecl, memberType);
+    return maybeDiagnoseBadMemberType(typeDecl, memberType, nullptr);
   }
 
   // Phase 1: Find and bind the component decl.
@@ -1390,6 +1392,7 @@ static Type resolveNestedIdentTypeComponent(
   // If we didn't find anything, complain.
   Type memberType;
   TypeDecl *member = nullptr;
+  AssociatedTypeDecl *inferredAssocType = nullptr;
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
@@ -1403,12 +1406,13 @@ static Type resolveNestedIdentTypeComponent(
     if (!member)
       return ErrorType::get(TC.Context);
   } else {
-    memberType = memberTypes.back().second;
-    member = memberTypes.back().first;
+    memberType = memberTypes.back().MemberType;
+    member = memberTypes.back().Member;
+    inferredAssocType = memberTypes.back().InferredAssociatedType;
     comp->setValue(member, nullptr);
   }
 
-  return maybeDiagnoseBadMemberType(member, memberType);
+  return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
 }
 
 static Type resolveIdentTypeComponent(
