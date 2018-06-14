@@ -1226,6 +1226,10 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
       return true;
     if (value->isStatic() != isStatic)
       return true;
+
+    if (value->getAttrs().hasAttribute<ForbidSerializingReferenceAttr>())
+      return true;
+
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
