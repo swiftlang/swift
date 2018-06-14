@@ -676,8 +676,8 @@ ERROR(unspaced_unary_operator,none,
 ERROR(use_unresolved_identifier,none,
       "use of unresolved %select{identifier|operator}1 %0", (DeclName, bool))
 ERROR(use_unresolved_identifier_corrected,none,
-      "use of unresolved %select{identifier|operator}1 %0; did you mean %2?",
-      (DeclName, bool, DeclName))
+      "use of unresolved %select{identifier|operator}1 %0; did you mean '%2'?",
+      (DeclName, bool, StringRef))
 NOTE(confusable_character,none,
       "%select{identifier|operator}0 '%1' contains possibly confused characters; "
       "did you mean to use '%2'?",

@@ -355,3 +355,13 @@ class C6 {
     if x == x && x = x { } // expected-error{{expression is not assignable: '&&' returns immutable value}}
   }
 }
+
+_ = 1..<1 // OK
+_ = 1…1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
+_ = 1….1 // expected-error {{use of unresolved operator '…'; did you mean '...'?}} {{6-9=...}}
+_ = 1.…1 // expected-error {{use of unresolved operator '.…'; did you mean '...'?}} {{6-10=...}}
+_ = 1…<1 // expected-error {{use of unresolved operator '…<'; did you mean '..<'?}} {{6-10=..<}}
+_ = 1..1 // expected-error {{use of unresolved operator '..'; did you mean '...'?}} {{6-8=...}}
+_ = 1....1 // expected-error {{use of unresolved operator '....'; did you mean '...'?}} {{6-10=...}}
+_ = 1...<1 // expected-error {{use of unresolved operator '...<'; did you mean '..<'?}} {{6-10=..<}}
+_ = 1....<1 // expected-error {{use of unresolved operator '....<'; did you mean '..<'?}} {{6-11=..<}}
