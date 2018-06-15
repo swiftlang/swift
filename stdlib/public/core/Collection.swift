@@ -1893,6 +1893,10 @@ extension Collection where Self.Index == DefaultIndex<Self> {
     return j
   }
 
+  func distance(from start: Index, to end: Index) -> Int {
+    return start.distance(to: end)
+  }
+  
   // DWA WORKAROUND: for https://bugs.swift.org/browse/SR-7605 from Nate Cook
 #if false
   public func formIndex(after i: inout DefaultIndex<Self>) {
