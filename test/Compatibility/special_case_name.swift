@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 // https://bugs.swift.org/browse/SR-1660
 
@@ -11,7 +11,6 @@ enum DayOfTheWeek : Int {
 }
 
 let _: DayOfTheWeek = DayOfTheWeek.init
-// expected-error@-1 {{cannot convert value of type '(Int) -> DayOfTheWeek?' to specified type 'DayOfTheWeek'}}
 
 let _: DayOfTheWeek = DayOfTheWeek.`init`
 
