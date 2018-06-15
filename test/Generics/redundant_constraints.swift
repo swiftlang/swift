@@ -6,10 +6,10 @@ protocol P2 {}
 struct S01<T : Any> {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
-struct S02<T> where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+struct S02<T> where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{15-29=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
-struct S04<T : P1> where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+struct S04<T : P1> where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{20-34=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
 struct S05<T : Any> where T : P1 {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
@@ -18,43 +18,43 @@ struct S05<T : Any> where T : P1 {} // expected-warning {{redundant conformance 
 struct S06<T : Any> where T : Any {}
 // expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
-// expected-warning@-3 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-3 {{redundant conformance constraint 'T': 'Any'}} {{21-35=}}
 // expected-note@-4 {{all types implicitly conform to 'Any'}}
 
 struct S07<T> where T : Any, T : P1 {}
-// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}} {{21-30=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 struct S08<T> where T : P1, T : Any {}
-// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}} {{27-36=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 struct S09<T> where T : P1, T : Any, T : P2 {}
-// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}} {{29-38=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 struct S10<T> where T : P1, T : P2, T : Any {}
-// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}} {{35-44=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
 
 struct S11<T, U> {}
-extension S11 where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+extension S11 where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{15-29=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
-extension S11 where T : Any, T : P1 {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+extension S11 where T : Any, T : P1 {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{21-30=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
 extension S11 where T : Any, U : Any {}
-// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-1 {{redundant conformance constraint 'T': 'Any'}} {{21-30=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
-// expected-warning@-3 {{redundant conformance constraint 'U': 'Any'}}
+// expected-warning@-3 {{redundant conformance constraint 'U': 'Any'}} {{28-37=}}
 // expected-note@-4 {{all types implicitly conform to 'Any'}}
 
 
 protocol P3 {
   // expected-warning@-1 {{redundant conformance constraint 'Self.X1': 'Any'}}
   // expected-note@-2 {{all types implicitly conform to 'Any'}}
-  // expected-warning@-3 {{redundant conformance constraint 'Self.X2': 'Any'}}
+  // expected-warning@-3 {{redundant conformance constraint 'Self.X2': 'Any'}} {{21-35=}}
   // expected-note@-4 {{all types implicitly conform to 'Any'}}
 
   associatedtype X1 : Any
@@ -66,13 +66,13 @@ protocol P4 {
   // expected-note@-2 {{all types implicitly conform to 'Any'}}
   // expected-warning@-3 {{redundant conformance constraint 'Self.X1': 'Any'}}
   // expected-note@-4 {{all types implicitly conform to 'Any'}}
-  // expected-warning@-5 {{redundant conformance constraint 'Self.X2': 'Any'}}
+  // expected-warning@-5 {{redundant conformance constraint 'Self.X2': 'Any'}} {{27-37=}}
   // expected-note@-6 {{all types implicitly conform to 'Any'}}
-  // expected-warning@-7 {{redundant conformance constraint 'Self.X2': 'Any'}}
+  // expected-warning@-7 {{redundant conformance constraint 'Self.X2': 'Any'}} {{35-45=}}
   // expected-note@-8 {{all types implicitly conform to 'Any'}}
-  // expected-warning@-9 {{redundant conformance constraint 'Self.X3': 'Any'}}
+  // expected-warning@-9 {{redundant conformance constraint 'Self.X3': 'Any'}} {{27-37=}}
   // expected-note@-10 {{all types implicitly conform to 'Any'}}
-  // expected-warning@-11 {{redundant conformance constraint 'Self.X3': 'Any'}}
+  // expected-warning@-11 {{redundant conformance constraint 'Self.X3': 'Any'}} {{37-47=}}
   // expected-note@-12 {{all types implicitly conform to 'Any'}}
 
   associatedtype X1 : Any, Any
@@ -95,24 +95,24 @@ protocol P7 : Any, Any {}
 func f1<T : Any>(_ x: T) {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
-func f2<T>(_ x: T) where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+func f2<T>(_ x: T) where T : Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{20-34=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
 typealias AnyAlias = Any
-func f3<T>(_ x: T) where T : AnyAlias {} // expected-warning {{redundant conformance constraint 'T': 'AnyAlias' (aka 'Any')}}
+func f3<T>(_ x: T) where T : AnyAlias {} // expected-warning {{redundant conformance constraint 'T': 'AnyAlias' (aka 'Any')}} {{20-39=}}
 // expected-note@-1 {{all types implicitly conform to 'AnyAlias' (aka 'Any')}}
 
 func f4<T : Any & Any>(_ x: T) {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
-func f5<T>(_ x: T) where T : Any & Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
+func f5<T>(_ x: T) where T : Any & Any {} // expected-warning {{redundant conformance constraint 'T': 'Any'}} {{20-40=}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}
 
 typealias AnyAnyAlias = Any & Any
 func f6<T : AnyAnyAlias>(_ x: T) where T : Any {}
 // expected-warning@-1 {{redundant conformance constraint 'T': 'AnyAnyAlias' (aka 'Any')}}
 // expected-note@-2 {{all types implicitly conform to 'AnyAnyAlias' (aka 'Any')}}
-// expected-warning@-3 {{redundant conformance constraint 'T': 'Any'}}
+// expected-warning@-3 {{redundant conformance constraint 'T': 'Any'}} {{34-48=}}
 // expected-note@-4 {{all types implicitly conform to 'Any'}}
 
 // Don't specifically warn on 'Any & P' constraints.

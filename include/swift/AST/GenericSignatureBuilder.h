@@ -1282,6 +1282,12 @@ public:
   /// Retrieve the source range for the requirement, if any.
   SourceRange getSourceRange() const;
 
+  /// Retrieve the source range suitable for removing the requirement, if any.
+  /// Unlike \c getSourceRange(), this range includes everything that needs to
+  /// be removed to keep the program syntactically valid (e.g. the 'where'
+  /// keyword and commas).
+  SourceRange getRemovalRange() const;
+
   /// Compare two requirement sources to determine which has the more
   /// optimal path.
   ///
@@ -1457,6 +1463,12 @@ public:
 
   /// Retrieve the source range for this requirement, if any.
   SourceRange getSourceRange() const;
+
+  /// Retrieve the source range suitable for removing the requirement, if any.
+  /// Unlike \c getSourceRange(), this range includes everything that needs to
+  /// be removed to keep the program syntactically valid (e.g. the 'where'
+  /// keyword and commas).
+  SourceRange getRemovalRange() const;
 
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;

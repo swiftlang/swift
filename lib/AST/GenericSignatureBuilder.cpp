@@ -1479,6 +1479,14 @@ SourceRange RequirementSource::getSourceRange() const {
   return SourceRange();
 }
 
+SourceRange RequirementSource::getRemovalRange() const {
+  if (auto requirementRepr = getRequirementRepr())
+    return requirementRepr->getRemovalRange();
+
+  // FIX-ME: Handle removal ranges for inherited types.
+  return SourceRange();
+}
+
 /// Compute the path length of a requirement source, counting only the number
 /// of \c ProtocolRequirement elements.
 static unsigned sourcePathLength(const RequirementSource *source) {
@@ -1723,6 +1731,23 @@ SourceRange FloatingRequirementSource::getSourceRange() const {
   if (auto *typeRepr = storage.dyn_cast<const TypeRepr *>())
     return typeRepr->getSourceRange();
 
+  return SourceRange();
+}
+
+SourceRange FloatingRequirementSource::getRemovalRange() const {
+  // If this is a source for a protocol requirement, get the removal range
+  // for that requirement.
+  if (kind == Kind::AbstractProtocol)
+    if (auto *written = protocolReq.written.dyn_cast<const RequirementRepr *>())
+      return written->getRemovalRange();
+
+  if (auto *requirement = storage.dyn_cast<const RequirementRepr *>())
+    return requirement->getRemovalRange();
+
+  if (auto *source = storage.dyn_cast<const RequirementSource *>())
+    return source->getRemovalRange();
+
+  // FIX-ME: Handle removal ranges for inherited types.
   return SourceRange();
 }
 
@@ -4840,7 +4865,8 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
     Diags.diagnose(diagLoc, diag::redundant_conformance_constraint,
                    subjectType, constraintType)
-         .highlight(source.getSourceRange());
+         .highlight(source.getSourceRange())
+         .fixItRemove(source.getRemovalRange());
     Diags.diagnose(diagLoc, diag::all_types_implicitly_conform_to,
                    constraintType);
   }
