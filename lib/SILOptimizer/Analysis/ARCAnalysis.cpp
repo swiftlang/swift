@@ -498,22 +498,24 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
   findMatchingRetains(&*BB);
 }
 
-bool
-ConsumedResultToEpilogueRetainMatcher::
-isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs) {
+bool ConsumedResultToEpilogueRetainMatcher::isTransitiveSuccessorsRetainFree(
+    const llvm::DenseSet<SILBasicBlock *> &BBs) {
   // For every block with retain, we need to check the transitive
   // closure of its successors are retain-free.
   for (auto &I : EpilogueRetainInsts) {
-    auto *CBB = I->getParent();
-    for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+    for (auto &Succ : I->getParent()->getSuccessors()) {
+      if (BBs.count(Succ))
         continue;
       return false;
     }
   }
+
+  // FIXME: We are iterating over a DenseSet. That can lead to non-determinism
+  // and is in general pretty inefficient since we are iterating over a hash
+  // table.
   for (auto CBB : BBs) {
     for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+      if (BBs.count(Succ))
         continue;
       return false;
     }
