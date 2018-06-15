@@ -45,3 +45,12 @@ func foo(_ c: Container) -> String {
 }
 
 class C: BarForwardDeclaredClass {}
+
+func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
+  _ = AwesomeCityAttribute(rawValue: "somevalue")
+  _ = AwesomeCityAttribute.init(rawValue: "somevalue")
+  _ = a.rawValue
+  _ = Wrapper.Attribute(rawValue: "somevalue")
+  _ = Wrapper.Attribute.init(rawValue: "somevalue")
+  _ = b.rawValue
+}
