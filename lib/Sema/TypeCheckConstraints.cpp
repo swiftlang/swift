@@ -1474,6 +1474,53 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
 
+    auto diagnoseMissingParens = [](TypeChecker &TC, TypeRepr *tyR) {
+      bool isVoid = false;
+      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
+        if (Void->getIdentifier().str() == "Void") {
+          isVoid = true;
+        }
+      }
+
+      if (isVoid) {
+        TC.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+            .fixItReplace(tyR->getStartLoc(), "()");
+      } else {
+        TC.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+            .highlight(tyR->getSourceRange())
+            .fixItInsert(tyR->getStartLoc(), "(")
+            .fixItInsertAfter(tyR->getEndLoc(), ")");
+      }
+    };
+
+    auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
+      if (!E)
+        return nullptr;
+      if (auto *TyE = dyn_cast<TypeExpr>(E)) {
+        auto ArgRepr = TyE->getTypeRepr();
+        if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
+          return TTyRepr;
+        diagnoseMissingParens(TC, ArgRepr);
+        return TupleTypeRepr::create(TC.Context, {ArgRepr},
+                                     ArgRepr->getSourceRange());
+      }
+      if (auto *TE = dyn_cast<TupleExpr>(E))
+        if (TE->getNumElements() == 0)
+          return TupleTypeRepr::createEmpty(TC.Context, TE->getSourceRange());
+
+      // When simplifying a type expr like "(P1 & P2) -> (P3 & P4) -> Int",
+      // it may have been folded at the same time; recursively simplify it.
+      if (auto ArgsTypeExpr = simplifyTypeExpr(E)) {
+        auto ArgRepr = ArgsTypeExpr->getTypeRepr();
+        if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
+          return TTyRepr;
+        diagnoseMissingParens(TC, ArgRepr);
+        return TupleTypeRepr::create(TC.Context, {ArgRepr},
+                                     ArgRepr->getSourceRange());
+      }
+      return nullptr;
+    };
+
     auto extractTypeRepr = [&](Expr *E) -> TypeRepr * {
       if (!E)
         return nullptr;
@@ -1490,12 +1537,14 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       return nullptr;
     };
 
-    TypeRepr *ArgsTypeRepr = extractTypeRepr(AE->getArgsExpr());
+    TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
       TC.diagnose(AE->getArgsExpr()->getLoc(),
                   diag::expected_type_before_arrow);
-      ArgsTypeRepr =
-        new (TC.Context) ErrorTypeRepr(AE->getArgsExpr()->getSourceRange());
+      auto ArgRange = AE->getArgsExpr()->getSourceRange();
+      auto ErrRepr =
+          new (TC.Context) ErrorTypeRepr(ArgRange);
+      ArgsTypeRepr = TupleTypeRepr::create(TC.Context, {ErrRepr}, ArgRange);
     }
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());

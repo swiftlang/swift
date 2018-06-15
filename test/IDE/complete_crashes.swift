@@ -140,7 +140,7 @@ func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
-// FLIP_CURRIED: Pattern/CurrModule: ['(']{#Int#}, {#Int#}[')'][#(Int) -> ()#]
+// FLIP_CURRIED: Pattern/CurrModule: ['(']{#(Int, Int)#}[')'][#(Int) -> ()#]
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {
