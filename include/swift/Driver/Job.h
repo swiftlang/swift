@@ -274,8 +274,8 @@ private:
   /// Response file path
   const char *ResponseFilePath;
 
-  /// Argument vector containing a single argument pointing to the response file
-  /// path with the '@' prefix.
+  /// This contains a single argument pointing to the response file path with
+  /// the '@' prefix.
   /// The argument string must be kept alive as long as the Job is alive.
   const char *ResponseFileArg;
 
