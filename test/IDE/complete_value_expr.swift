@@ -116,6 +116,20 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_GENERICP3 | %FileCheck %s -check-prefix=PROTOCOL_EXT_GENERICP3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ4 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ5 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ6 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_TYPE3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_TYPE
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT1 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT2 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=NODUP_RESTATED_REQ_NODOT3 | %FileCheck %s -check-prefix=CHECK_NODUP_RESTATED_REQ_NODOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES1 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CHECK_PROT_OVERRIDES2 | %FileCheck %s -check-prefix=CHECK_PROT_OVERRIDES
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE1 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_CONCRETE2 | %FileCheck %s -check-prefix=PROTOCOL_EXT_P4_P1
@@ -1522,6 +1536,124 @@ func testGenericConforming3<T: P3>(x: T) {
 // PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP2()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP3-DAG: Decl[InstanceMethod]/Super:   extP3()[#Void#]{{; name=.+$}}
 // PROTOCOL_EXT_GENERICP3: End completions
+
+protocol NoDupReq1 {
+  func foo()
+  func roo(arg1: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq2 {
+  func foo()
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq3 {
+  func foo()
+  func roo(arg2: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+
+protocol NoDupReq4 {
+  func foo()
+  func roo(arg1: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq5: NoDupReq4 {
+  func foo()
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+protocol NoDupReq6: NoDupReq5 {
+  func foo()
+  func roo(arg2: Int)
+  subscript(arg: Bool) -> Bool {get}
+  var doo: Int {get}
+  associatedtype E
+}
+
+typealias NoDupReq23 = NoDupReq2 & NoDupReq3
+
+protocol Override {
+  func foo<T: NoDupReq1>(_ arg: T)
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+protocol Override2 {
+  func foo<T: NoDupReq1>(_ arg: T)
+}
+protocol Override3: Override2 {
+  func foo<T: NoDupReq2>(_ arg: T)
+}
+
+func checkRestatementNoDup1(_ arg: NoDupReq1 & NoDupReq2 & NoDupReq3) {
+  arg.#^NODUP_RESTATED_REQ1^#
+  arg#^NODUP_RESTATED_REQ_NODOT1^#
+}
+func checkRestatementNoDup2(_ arg: NoDupReq6) {
+  arg.#^NODUP_RESTATED_REQ2^#
+}
+func checkRestatementNoDup3<T: NoDupReq6>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ3^#
+  T.#^NODUP_RESTATED_REQ_TYPE1^#
+  arg#^NODUP_RESTATED_REQ_NODOT2^#
+}
+func checkRestatementNoDup4<T: NoDupReq1 & NoDupReq2 & NoDupReq3>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ4^#
+  T.#^NODUP_RESTATED_REQ_TYPE2^#
+}
+func checkRestatementNoDup5<T: NoDupReq1 & NoDupReq23>(_ arg: T) {
+  arg.#^NODUP_RESTATED_REQ5^#
+  T.#^NODUP_RESTATED_REQ_TYPE3^#
+}
+func checkRestatementNoDup6(_ arg: NoDupReq1 & NoDupReq23) {
+  arg.#^NODUP_RESTATED_REQ6^#
+  arg#^NODUP_RESTATED_REQ_NODOT3^#
+}
+func checkOverrideInclusion1(_ arg: Override) {
+  arg.#^CHECK_PROT_OVERRIDES1^#
+}
+func checkOverrideInclusion2(_ arg: Override3) {
+  arg.#^CHECK_PROT_OVERRIDES2^#
+}
+
+// CHECK_NODUP_RESTATED_REQ: Begin completions
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: roo({#arg1: Int#})[#Void#]
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: roo({#arg2: Int#})[#Void#]
+// CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ: End completions
+
+// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: End completions
+
+// CHECK_NODUP_RESTATED_REQ_TYPE: Begin completions
+// CHECK_NODUP_RESTATED_REQ_TYPE-DAG: Decl[InstanceMethod]/Super: foo({#self: [[ARG:.+]]#})[#() -> Void#]; name=foo([[ARG]])
+// CHECK_NODUP_RESTATED_REQ_TYPE-DAG: Decl[InstanceMethod]/Super: roo({#self: [[ARG]]#})[#(arg1: Int) -> Void#]; name=roo([[ARG]])
+// CHECK_NODUP_RESTATED_REQ_TYPE-DAG: Decl[AssociatedType]/Super: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE-DAG: Decl[InstanceMethod]/Super: roo({#self: [[ARG]]#})[#(arg2: Int) -> Void#]; name=roo([[ARG]])
+// CHECK_NODUP_RESTATED_REQ_TYPE-NOT: Decl[InstanceMethod]/Super: foo({#self: [[ARG:.+]]#})[#() -> Void#]; name=foo([[ARG]])
+// CHECK_NODUP_RESTATED_REQ_TYPE-NOT: Decl[AssociatedType]/Super: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE: End completions
+
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq1#})[#Void#]; name=foo(arg: NoDupReq1)
+// CHECK_PROT_OVERRIDES: Decl[InstanceMethod]/{{Super|CurrNominal}}: foo({#(arg): NoDupReq2#})[#Void#]; name=foo(arg: NoDupReq2)
 
 struct OnlyMe {}
 protocol P4 {
