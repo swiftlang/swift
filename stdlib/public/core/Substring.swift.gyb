@@ -483,8 +483,9 @@ extension Substring.${_View} : BidirectionalCollection {
   }
 }
 
-extension Substring {
   % if View == 'CharacterView':
+@available(swift, deprecated: 3.2)
+extension Substring {
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2, message:
     "Please use String or Substring directly")
@@ -496,8 +497,20 @@ extension Substring {
       _characters = newValue
     }
   }
+
+  /// Creates a Substring having the given content.
+  ///
+  /// - Complexity: O(1)
+  @inlinable // FIXME(sil-serialize-all)
+  @available(swift, deprecated: 3.2, message:
+    "Please use String or Substring directly")
+  public init(_ content: ${View}) {
+    self = content._wholeString[content.startIndex..<content.endIndex]
+  }
+}
   % end
 
+extension Substring {
   @inlinable // FIXME(sil-serialize-all)
   public var ${_property}: ${_View} {
     get {
@@ -508,6 +521,7 @@ extension Substring {
     }
   }
 
+  % if View != 'CharacterView':
   /// Creates a Substring having the given content.
   ///
   /// - Complexity: O(1)
@@ -515,6 +529,7 @@ extension Substring {
   public init(_ content: ${View}) {
     self = content._wholeString[content.startIndex..<content.endIndex]
   }
+  % end
 }
 
 extension String {
