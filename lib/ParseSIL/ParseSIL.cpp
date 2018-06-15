@@ -893,6 +893,7 @@ void SILParser::convertRequirements(SILFunction *F,
 /// - A floating point datatype and literal (f64 3.14).
 ///   - The literal value may be in either decimal format or the hexadecimal
 ///     format used by the 'float_literal' instruction.
+/// - A UTF-8 string literal ("foo").
 /// - A metatype (the instance type is parsed) ($Float).
 /// - An aggregate ([i32 1, i64 2, f32 3.0]).
 ///   - Aggregates values represent constant arrays/structs/tuples.
@@ -997,12 +998,10 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
   }
   // Handle string literals.
   if (P.Tok.is(tok::string_literal)) {
-    // TODO: Uncomment when `getStringValue` is implemented.
-    // StringRef rawString = P.Tok.getText().drop_front().drop_back();
-    // value = SymbolicValue::getStringValue(rawString, allocator);
-    // return false;
-    P.diagnose(P.Tok, diag::sil_graph_op_unhandled_attr_value);
-    return true;
+    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+    value = SymbolicValue::getString(rawString, allocator);
+    P.consumeToken();
+    return false;
   }
   // Handle metatypes (the instance type is parsed).
   if (P.Tok.is(tok::sil_dollar)) {

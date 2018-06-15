@@ -64,6 +64,9 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     getFloatValue().print(os);
     os << "\n";
     return;
+  case RK_String:
+    os << "string: \"" << getStringValue() << "\"\n";
+    return;
   case RK_Address: {
     os << "address indices = [";
     interleave(getAddressIndices(), [&](unsigned idx) { os << idx; },
@@ -99,6 +102,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Aggregate:    return Aggregate;
   case RK_Integer:      return Integer;
   case RK_Float:        return Float;
+  case RK_String:       return String;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -117,7 +121,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 
 namespace swift {
 /// This is a representation of an integer value, stored as a trailing array
-/// of words.  Elements of this value are bump pointer allocated.
+/// of words.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) APIntSymbolicValue final
   : private llvm::TrailingObjects<APIntSymbolicValue, uint64_t> {
     friend class llvm::TrailingObjects<APIntSymbolicValue, uint64_t>;
@@ -155,7 +159,6 @@ private:
 };
 } // end namespace swift
 
-
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
                                         llvm::BumpPtrAllocator &allocator) {
   // TODO: Could store these inline in the union in the common case.
@@ -163,7 +166,7 @@ SymbolicValue SymbolicValue::getInteger(const APInt &value,
     APIntSymbolicValue::create(value.getBitWidth(),
                                { value.getRawData(), value.getNumWords()},
                                allocator);
-  assert(intValue && "aggregate value must be present");
+  assert(intValue && "Integer value must be present");
   SymbolicValue result;
   result.representationKind = RK_Integer;
   result.value.integer = intValue;
@@ -185,8 +188,8 @@ APInt SymbolicValue::getIntegerValue() const {
 //===----------------------------------------------------------------------===//
 
 namespace swift {
-/// This is a representation of an integer value, stored as a trailing array
-/// of words.  Elements of this value are bump pointer allocated.
+/// This is a representation of a floating point value, stored as a trailing
+/// array of words.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) APFloatSymbolicValue final
   : private llvm::TrailingObjects<APFloatSymbolicValue, uint64_t> {
     friend class llvm::TrailingObjects<APFloatSymbolicValue, uint64_t>;
@@ -239,22 +242,85 @@ SymbolicValue SymbolicValue::getFloat(const APFloat &value,
     APFloatSymbolicValue::create(value.getSemantics(),
                                  { val.getRawData(), val.getNumWords()},
                                  allocator);
-  assert(fpValue && "aggregate value must be present");
+  assert(fpValue && "Floating point value must be present");
   SymbolicValue result;
   result.representationKind = RK_Float;
-  result.value.float_ = fpValue;
+  result.value.floatingPoint = fpValue;
   return result;
 }
-
 
 APFloat SymbolicValue::getFloatValue() const {
   assert(getKind() == Float);
 
   if (representationKind == RK_Float)
-    return value.float_->getValue();
+    return value.floatingPoint->getValue();
 
   assert(representationKind == RK_Inst);
   return cast<FloatLiteralInst>(value.inst)->getValue();
+}
+
+//===----------------------------------------------------------------------===//
+// Strings
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+/// This is a representation of an UTF-8 string, stored as a trailing array of
+/// bytes.  Elements of this value are bump-pointer allocated.
+struct alignas(uint64_t) StringSymbolicValue final
+  : private llvm::TrailingObjects<StringSymbolicValue, char> {
+    friend class llvm::TrailingObjects<StringSymbolicValue, char>;
+
+  /// The number of bytes in the trailing array.
+  const unsigned numBytes;
+
+  static StringSymbolicValue *create(const StringRef &string,
+                                     llvm::BumpPtrAllocator &allocator) {
+    auto size = StringSymbolicValue::totalSizeToAlloc<char>(string.size());
+    auto rawMem = allocator.Allocate(size, alignof(StringSymbolicValue));
+
+    // Placement initialize the StringSymbolicValue.
+    auto ilv = ::new (rawMem) StringSymbolicValue(string.size());
+    std::uninitialized_copy(string.begin(), string.end(),
+                            ilv->getTrailingObjects<char>());
+    return ilv;
+  }
+
+  StringRef getValue() const {
+    return {
+      getTrailingObjects<char>(), numTrailingObjects(OverloadToken<char>())
+    };
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<char>) const {
+    return numBytes;
+  }
+private:
+  StringSymbolicValue() = delete;
+  StringSymbolicValue(const StringSymbolicValue &) = delete;
+  StringSymbolicValue(unsigned numBytes) :
+    numBytes(numBytes) {}
+};
+} // end namespace swift
+
+SymbolicValue SymbolicValue::getString(const StringRef &string,
+                                       llvm::BumpPtrAllocator &allocator) {
+  auto stringValue = StringSymbolicValue::create(string, allocator);
+  assert(stringValue && "String value must be present");
+  SymbolicValue result;
+  result.representationKind = RK_String;
+  result.value.string = stringValue;
+  return result;
+}
+
+StringRef SymbolicValue::getStringValue() const {
+  assert(getKind() == String);
+
+  if (representationKind == RK_String)
+    return value.string->getValue();
+
+  assert(representationKind == RK_Inst);
+  return cast<StringLiteralInst>(value.inst)->getValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -263,7 +329,7 @@ APFloat SymbolicValue::getFloatValue() const {
 
 namespace swift {
 /// This is a representation of an address value, stored as a base pointer plus
-/// trailing array of indices.  Elements of this value are bump pointer
+/// trailing array of indices.  Elements of this value are bump-pointer
 /// allocated.
 struct alignas(SILValue) AddressSymbolicValue final
   : private llvm::TrailingObjects<AddressSymbolicValue, unsigned> {
