@@ -1111,17 +1111,25 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
 void IRGenModule::finishEmitAfterTopLevel() {
   // Emit the implicit import of the swift standard library.
+  // FIXME: We'd get the exact set of implicit imports if we went through the
+  // SourceFile's getImportedModules instead, but then we'd lose location info
+  // for the explicit imports.
   if (DebugInfo) {
-    std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
-      { Context.StdlibModuleName, swift::SourceLoc() }
-    };
+    if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
+      if (TheStdlib != getSwiftModule()) {
+        std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+          { Context.StdlibModuleName, swift::SourceLoc() }
+        };
 
-    auto Imp = ImportDecl::create(Context,
-                                  getSwiftModule(),
-                                  SourceLoc(),
-                                  ImportKind::Module, SourceLoc(),
-                                  AccessPath);
-    DebugInfo->emitImport(Imp);
+        auto Imp = ImportDecl::create(Context,
+                                      getSwiftModule(),
+                                      SourceLoc(),
+                                      ImportKind::Module, SourceLoc(),
+                                      AccessPath);
+        Imp->setModule(TheStdlib);
+        DebugInfo->emitImport(Imp);
+      }
+    }
   }
 }
 
