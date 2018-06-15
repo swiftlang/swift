@@ -273,7 +273,7 @@ struct alignas(uint64_t) StringSymbolicValue final
   /// The number of bytes in the trailing array.
   const unsigned numBytes;
 
-  static StringSymbolicValue *create(const StringRef &string,
+  static StringSymbolicValue *create(const StringRef string,
                                      llvm::BumpPtrAllocator &allocator) {
     auto size = StringSymbolicValue::totalSizeToAlloc<char>(string.size());
     auto rawMem = allocator.Allocate(size, alignof(StringSymbolicValue));
@@ -303,7 +303,8 @@ private:
 };
 } // end namespace swift
 
-SymbolicValue SymbolicValue::getString(const StringRef &string,
+// Returns a SymbolicValue representing a UTF-8 encoded string.
+SymbolicValue SymbolicValue::getString(const StringRef string,
                                        llvm::BumpPtrAllocator &allocator) {
   auto stringValue = StringSymbolicValue::create(string, allocator);
   assert(stringValue && "String value must be present");

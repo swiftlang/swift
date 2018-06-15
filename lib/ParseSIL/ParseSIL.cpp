@@ -1000,7 +1000,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
   if (P.Tok.is(tok::string_literal)) {
     StringRef rawString = P.Tok.getText().drop_front().drop_back();
     value = SymbolicValue::getString(rawString, allocator);
-    P.consumeToken();
+    P.consumeToken(tok::string_literal);
     return false;
   }
   // Handle metatypes (the instance type is parsed).

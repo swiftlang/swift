@@ -248,7 +248,8 @@ public:
 
   APFloat getFloatValue() const;
 
-  static SymbolicValue getString(const StringRef &string,
+  // Returns a SymbolicValue representing a UTF-8 encoded string.
+  static SymbolicValue getString(const StringRef string,
                                  llvm::BumpPtrAllocator &allocator);
 
   StringRef getStringValue() const;
