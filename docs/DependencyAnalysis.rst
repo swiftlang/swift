@@ -92,7 +92,7 @@ External Dependencies
 
 External dependencies, including imported Swift module files and Clang headers,
 are tracked using a special ``depends-external`` set. These dependencies refer
-to definitions that are external to the module. The Swift driver
+to files that are external to the module. The Swift driver
 interprets this set specially and decides whether or not the cross-module
 dependencies have changed.
 
