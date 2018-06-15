@@ -4554,15 +4554,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   return PrimaryVar;
 }
 
-static Optional<std::pair<AccessorDecl*, size_t>>
-findFirstNonNull(ArrayRef<AccessorDecl*> accessors) {
-  for (auto i : indices(accessors)) {
-    if (accessors[i])
-      return std::make_pair(accessors[i], i);
-  }
-  return None;
-}
-
 /// Record a bunch of parsed accessors into the given abstract storage decl.
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid, ParseDeclOptions flags,
