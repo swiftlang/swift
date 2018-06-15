@@ -3123,9 +3123,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
+  // If this is true, we're using type construction syntax (Foo()) rather
+  // than an explicit call to `init` (Foo.init()).
+  bool isImplicitInit = false;
   TypeBase *favoredType = nullptr;
   if (memberName.isSimpleName(DeclBaseName::createConstructor())) {
-    if (auto anchor = memberLocator->getAnchor()) {
+    SmallVector<LocatorPathElt, 2> parts;
+    if (auto *anchor = memberLocator->getAnchor()) {
+      auto path = memberLocator->getPath();
+      if (!path.empty())
+        if (path.back().getKind() == ConstraintLocator::ConstructorMember)
+          isImplicitInit = true;
+
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
         favoredType = getFavoredType(argExpr);
@@ -3339,6 +3348,20 @@ retry_after_fail:
     addChoice(getOverloadChoice(result.getValueDecl(),
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
+
+  // Backward compatibility hack. In Swift 4, `init` and init were
+  // the same name, so you could write "foo.init" to look up a
+  // method or property named `init`.
+  if (!TC.Context.isSwiftVersionAtLeast(5) &&
+      memberName.getBaseName() == DeclBaseName::createConstructor() &&
+      !isImplicitInit) {
+    auto &compatLookup = lookupMember(instanceTy,
+                                      TC.Context.getIdentifier("init"));
+    for (auto result : compatLookup)
+      addChoice(getOverloadChoice(result.getValueDecl(),
+                                  /*isBridged=*/false,
+                                  /*isUnwrappedOptional=*/false));
+  }
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.

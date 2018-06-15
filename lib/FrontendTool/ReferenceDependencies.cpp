@@ -354,11 +354,16 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
   llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
                        [](const TableEntryTy *lhs,
                           const TableEntryTy *rhs) -> int {
-    if (lhs->first.first == rhs->first.first)
-      return lhs->first.second.compare(rhs->first.second);
+    if (auto cmp = lhs->first.first->getName().compare(rhs->first.first->getName()))
+      return cmp;
 
-    if (lhs->first.first->getName() != rhs->first.first->getName())
-      return lhs->first.first->getName().compare(rhs->first.first->getName());
+    if (auto cmp = lhs->first.second.compare(rhs->first.second))
+      return cmp;
+
+    // We can have two entries with the same member name if one of them
+    // was the special 'init' name and the other is the plain 'init' token.
+    if (lhs->second != rhs->second)
+      return lhs->second ? -1 : 1;
 
     // Break type name ties by mangled name.
     auto lhsMangledName = mangleTypeAsContext(lhs->first.first);
