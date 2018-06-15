@@ -1283,8 +1283,9 @@ static ImportedType adjustTypeForConcreteImport(
   }
 
   // SwiftTypeConverter turns block pointers into @convention(block) types.
-  // In a bridgeable context, or in the direct structure of a typedef,
-  // we would prefer to instead use the default Swift convention.
+  // In some contexts, we bridge them to use the Swift function type
+  // representation. This includes typedefs of block types, which use the
+  // Swift function type representation.
   if (hint == ImportHint::Block) {
     if (canBridgeTypes(importKind)) {
       // Determine the function type representation we need.
