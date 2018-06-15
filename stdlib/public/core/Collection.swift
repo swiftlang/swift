@@ -1800,33 +1800,46 @@ extension Collection {
 }
 
 /// A default `Index` type for `Collection`s defined using `makeIterator`
-public enum DefaultIndex<Base: Swift.Sequence> : Comparable {
+public struct DefaultIndex<Base: Swift.Sequence> : Comparable {
 
-  init() { self = .end }
+  fileprivate enum _Representation {
+    /// An index of an element in the collection.
+    ///
+    /// The associated values are:
+    /// - The zero-based position in the collection, for `Comparable` purposes.
+    /// - The element itself, so that it only needs to be computed once.
+    /// - The state, immediately after generating the element at this index.
+    case element(Int, Base.Element, Base.Iterator)
+    
+    /// An index representing the end of the collection.
+    case end
+    
+    var isElement: Bool {
+      switch self {
+      case .element: return true
+      case .end: return false
+      }
+    }
+  }
+  
+  private var _value: _Representation
 
-  init(_ s: Base) {
+  fileprivate init() {
+    _value = .end
+  }
+
+  fileprivate init(_ s: Base) {
     var i = s.makeIterator()
     if let e = i.next() {
-      self = .element(0, e, i)
+      _value = .element(0, e, i)
     }
     else {
-      self = .end
+      _value = .end
     }
   }
 
-  /// An index of an element in the collection.
-  ///
-  /// The associated values are:
-  /// - The zero-based position in the collection, for `Comparable` purposes.
-  /// - The element itself, so that it only needs to be computed once.
-  /// - The state, immediately after generating the element at this index.
-  case element(Int, Base.Element, Base.Iterator)
-  
-  /// An index representing the end of the collection.
-  case end
-  
   public static func ==(lhs: DefaultIndex, rhs: DefaultIndex) -> Bool {
-    switch (lhs, rhs) {
+    switch (lhs._value, rhs._value) {
       case let (.element(l, _, _), .element(r, _, _)): return l == r
       case (.end, .end): return true
       default: return false
@@ -1834,7 +1847,7 @@ public enum DefaultIndex<Base: Swift.Sequence> : Comparable {
   }
   
   public static func < (lhs: DefaultIndex, rhs: DefaultIndex) -> Bool {
-    switch (lhs, rhs) {
+    switch (lhs._value, rhs._value) {
       case let (.element(l, _, _), .element(r, _, _)): return l < r
       case (.element, .end): return true
       default: return false
@@ -1842,12 +1855,12 @@ public enum DefaultIndex<Base: Swift.Sequence> : Comparable {
   }
 
   fileprivate mutating func stepForward() {
-    switch self {
+    switch _value {
       case .element(let pos, _, var iterator):
         if let e = iterator.next() {
-          self = .element(pos + 1, e, iterator)
+          self._value = .element(pos + 1, e, iterator)
         } else {
-          self = .end
+          self._value = .end
         }
       case .end:
         fatalError("Can't advance past end")
@@ -1855,19 +1868,19 @@ public enum DefaultIndex<Base: Swift.Sequence> : Comparable {
   }
 
   public func distance(to other: DefaultIndex) -> Int {
-    switch (self, other) {
+    switch (_value, other._value) {
       case (.end, .end): return 0
       case (.element(let l, _, _), .element(let r, _, _)): return r - l
       default: break
     }
     var i = self
     var n = 0
-    while i != .end { i.stepForward(); n += 1 }
+    while i._value.isElement { i.stepForward(); n += 1 }
     return n
   }
 
   fileprivate var element: Base.Element {
-    guard case .element(_, let e, _) = self else {
+    guard case .element(_, let e, _) = _value else {
       fatalError("Can't subscript at end")
     }
     return e
