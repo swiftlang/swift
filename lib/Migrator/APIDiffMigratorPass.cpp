@@ -275,6 +275,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   std::vector<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
     std::vector<APIDiffItem*> results;
+    if (!VD)
+      return results;
     auto addDiffItems = [&](ValueDecl *VD) {
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
@@ -921,8 +923,65 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     insertHelperFunction(Kind, RawType, NewAttributeType, FromString, WrapTarget);
   }
 
+  bool hasRevertRawRepresentableChange(ValueDecl *VD) {
+    for (auto Item: getRelatedDiffItems(VD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->DiffKind ==
+              NodeAnnotation::RevertTypeAliasDeclToRawRepresentable)
+          return true;
+      }
+    }
+    return false;
+  }
+
+  bool handleRevertRawRepresentable(Expr *E) {
+    // Change attribute.rawValue to attribute
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+      auto Found = false;
+      if (auto *Base = MRE->getBase()) {
+        if (hasRevertRawRepresentableChange(Base->getType()->getAnyNominal())) {
+          Found = true;
+        }
+      }
+      if (!Found)
+        return false;
+      auto NL = MRE->getNameLoc().getStartLoc();
+      auto DL = MRE->getDotLoc();
+      if (NL.isInvalid() || DL.isInvalid())
+        return false;
+      CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(SM, {DL, NL});
+      if (Range.str() == ".rawValue") {
+        Editor.remove(Range);
+        return true;
+      }
+    }
+
+    // Change attribute(rawValue: "value") to "value"
+    if (auto *CE = dyn_cast<CallExpr>(E)) {
+      auto Found = false;
+      if (auto *CRC = dyn_cast<ConstructorRefCallExpr>(CE->getFn())) {
+        if (auto *TE = dyn_cast<TypeExpr>(CRC->getBase())) {
+          if (hasRevertRawRepresentableChange(TE->getInstanceType()->getAnyNominal()))
+            Found = true;
+        }
+      }
+      if (!Found)
+        return false;
+      std::vector<CallArgInfo> AllArgs =
+        getCallArgInfo(SM, CE->getArg(), LabelRangeEndAt::LabelNameOnly);
+      if (AllArgs.size() == 1 && AllArgs.front().LabelRange.str() == "rawValue") {
+        Editor.replace(CE->getSourceRange(), Lexer::getCharSourceRangeFromSourceRange(SM,
+          AllArgs.front().ArgExp->getSourceRange()).str());
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
+      return false;
+    if (handleRevertRawRepresentable(E))
       return false;
     if (handleQualifiedReplacement(E))
       return false;
