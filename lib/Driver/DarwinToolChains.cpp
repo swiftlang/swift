@@ -451,3 +451,11 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   return II;
 }
+
+bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
+    return S[0] != '\0';
+  return false;
+}

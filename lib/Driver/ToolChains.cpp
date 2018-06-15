@@ -364,6 +364,11 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       Arguments.push_back("-index-system-modules");
   }
 
+  if (context.Args.hasArg(options::OPT_debug_info_store_invocation) ||
+      shouldStoreInvocationInDebugInfo()) {
+    Arguments.push_back("-debug-info-store-invocation");
+  }
+
   return II;
 }
 
