@@ -875,12 +875,13 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
         parseToken(tok::colon,
           diag::attr_differentiable_expected_colon_after_label, label))
       return true;
-    // Parse the name of the adjoint function.
+    // Parse the name of the function.
+    Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
+                        { label });
     result.Name =
       parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
-                              diag::attr_implements_expected_member_name,
-                              /*allowOperators=*/true,
-                              /*allowZeroArgCompoundNames=*/true);
+                               funcDiag, /*allowOperators=*/true,
+                               /*allowZeroArgCompoundNames=*/true);
     return !result.Name;
   };
 
