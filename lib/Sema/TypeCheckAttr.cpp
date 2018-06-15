@@ -2249,8 +2249,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto originalParamsTy = originalParams.getInterfaceType(ctx);
 
   // If the original function and the primal/adjoint have different parents, or
-  // if they both have no type context and are in different modules, then
-  // it's an error.
+  // if they both have no type context and are in different modules, then it's
+  // an error.
   // Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext
     = [&](FuncDecl *func) {
@@ -2268,17 +2268,19 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return original->getParent() == func->getParent();
   };
 
-  // If the original function is exported (i.e. it is public or @_versioned),
-  // then the primal/adjoint must also be exported.
+  // If the original function is exported (i.e. it is public or
+  // @usableFromInline), then the primal/adjoint must also be exported.
   // Returns true on error.
   using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
   auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
                                 bool isPrimal) {
-    auto originalAccess = original->getFormalAccess(/*useDC*/ nullptr,
-                                                    /*respectVersioned*/ true);
+    auto originalAccess =
+      original->getFormalAccess(/*useDC*/ nullptr,
+		                /*treatUsableFromInlineAsPublic*/ true);
     if (originalAccess < AccessLevel::Public) return false;
-    auto funcAccess = func->getFormalAccess(/*useDC*/ nullptr,
-                                            /*respectVersioned*/ true);
+    auto funcAccess =
+      func->getFormalAccess(/*useDC*/ nullptr,
+		            /*treatUsableFromInlineAsPublic*/ true);
     if (funcAccess >= AccessLevel::Public) return false;
     TC.diagnose(funcSpec.Loc.getBaseNameLoc(),
                 diag::differentiable_attr_invalid_access,
