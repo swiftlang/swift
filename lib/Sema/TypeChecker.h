@@ -506,9 +506,6 @@ enum class TypeResolutionFlags : unsigned {
   /// tuple type.  This is not set for multi-level tuple arguments.
   FunctionInput = 0x40,
 
-  /// Whether this is the immediate input type to a function type,
-  ImmediateFunctionInput = 0x80,
-
   /// Whether this is a variadic function input.
   VariadicFunctionInput = 0x100,
 
@@ -584,7 +581,6 @@ using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
   options -= TypeResolutionFlags::EnumCase;

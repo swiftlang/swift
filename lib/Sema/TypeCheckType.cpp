@@ -367,7 +367,6 @@ Type TypeChecker::resolveTypeInContext(
 static TypeResolutionOptions
 adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options -= TypeResolutionFlags::SILType;
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   options -= TypeResolutionFlags::AllowUnavailableProtocol;
@@ -1482,8 +1481,7 @@ static Type applyNonEscapingFromContext(DeclContext *DC,
   // Remember whether this is a function parameter.
   bool defaultNoEscape =
     !options.contains(TypeResolutionFlags::EnumCase) &&
-    (options.contains(TypeResolutionFlags::FunctionInput) ||
-     options.contains(TypeResolutionFlags::ImmediateFunctionInput));
+    options.contains(TypeResolutionFlags::FunctionInput);
 
   // Desugar here
   auto *funcTy = ty->castTo<FunctionType>();
@@ -1718,7 +1716,6 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   if (!isa<SpecifierTypeRepr>(repr) && !isa<TupleTypeRepr>(repr) &&
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<IdentTypeRepr>(repr)) {
-    options -= TypeResolutionFlags::ImmediateFunctionInput;
     options -= TypeResolutionFlags::FunctionInput;
     options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   }
@@ -1824,8 +1821,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   };
 
   // Remember whether this is a function parameter.
-  bool isParam = options.contains(TypeResolutionFlags::FunctionInput) ||
-                 options.contains(TypeResolutionFlags::ImmediateFunctionInput);
+  bool isParam = options.contains(TypeResolutionFlags::FunctionInput);
 
   bool isVariadicFunctionParam =
     !options.contains(TypeResolutionFlags::EnumCase) &&
@@ -1855,7 +1851,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           // The instance type is not a SIL type.
           auto instanceOptions = options;
           instanceOptions -= TypeResolutionFlags::SILType;
-          instanceOptions -= TypeResolutionFlags::ImmediateFunctionInput;
           instanceOptions -= TypeResolutionFlags::FunctionInput;
           instanceOptions -= TypeResolutionFlags::TypeAliasUnderlyingType;
 
@@ -2072,7 +2067,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   auto instanceOptions = options;
-  instanceOptions -= TypeResolutionFlags::ImmediateFunctionInput;
   instanceOptions -= TypeResolutionFlags::FunctionInput;
   instanceOptions -= TypeResolutionFlags::TypeAliasUnderlyingType;
 
@@ -2201,8 +2195,6 @@ bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
     bool requiresMappingOut,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
-  assert(options.contains(TypeResolutionFlags::ImmediateFunctionInput) &&
-         "can only resolve params when in ImmediateFunctionInput context");
   elements.reserve(inputRepr->getNumElements());
 
   const auto elementOptions = withoutContext(options, true)
@@ -2262,14 +2254,12 @@ bool TypeResolver::resolveASTFunctionTypeParams(
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   options -= TypeResolutionFlags::AllowIUO;
 
   SmallVector<AnyFunctionType::Param, 8> params;
-  if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(),
-                         options | TypeResolutionFlags::ImmediateFunctionInput,
+  if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
                          repr->getGenericEnvironment() != nullptr, params)) {
     return Type();
   }
@@ -2413,7 +2403,6 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           SILFunctionType::ExtInfo extInfo,
                                           ParameterConvention callee,
                                           TypeRepr *witnessMethodProtocol) {
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
 
@@ -2556,17 +2545,16 @@ SILYieldInfo TypeResolver::resolveSILYield(TypeAttributes &attrs,
                                            TypeResolutionOptions options) {
   AttributedTypeRepr attrRepr(attrs, repr);
   SILParameterInfo paramInfo =
-    resolveSILParameter(&attrRepr, options |
-                                   TypeResolutionFlags::ImmediateFunctionInput);
+    resolveSILParameter(&attrRepr,
+                        options | TypeResolutionFlags::FunctionInput);
   return SILYieldInfo(paramInfo.getType(), paramInfo.getConvention());
 }
 
 SILParameterInfo TypeResolver::resolveSILParameter(
                                  TypeRepr *repr,
                                  TypeResolutionOptions options) {
-  assert((options & TypeResolutionFlags::FunctionInput)
-         | (options & TypeResolutionFlags::ImmediateFunctionInput) &&
-         "Parameters should be marked as inputs");
+  assert(options.contains(TypeResolutionFlags::FunctionInput)
+         && "Parameters should be marked as inputs");
   auto convention = DefaultParameterConvention;
   Type type;
   bool hadError = false;
@@ -2734,8 +2722,7 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
   // function parameters.
   if ((options & TypeResolutionFlags::SubscriptParameters) ||
       (options & TypeResolutionFlags::EnumCase) ||
-        (!(options & TypeResolutionFlags::FunctionInput) &&
-         !(options & TypeResolutionFlags::ImmediateFunctionInput))) {
+        (!(options & TypeResolutionFlags::FunctionInput))) {
 
     decltype(diag::attr_only_on_parameters) diagID;
     if (options & TypeResolutionFlags::SubscriptParameters) {
@@ -2765,7 +2752,6 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
   }
 
   // Anything within the inout isn't a parameter anymore.
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
 
@@ -2889,8 +2875,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  assert(!options.contains(TypeResolutionFlags::ImmediateFunctionInput)
-         && "Parse params, dufus");
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
   
