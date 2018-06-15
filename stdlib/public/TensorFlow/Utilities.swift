@@ -63,6 +63,9 @@ func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
 // Type aliases
 //===----------------------------------------------------------------------===//
 
+// Before assigning a C pointer to one of the pointer type aliases below, caller
+// should check that the pointer is not NULL.
+
 /// The `TF_Session *` type.
 typealias CTFSession = OpaquePointer
 

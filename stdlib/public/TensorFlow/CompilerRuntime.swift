@@ -232,8 +232,12 @@ public final class _ExecutionContext {
     InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
                           _RuntimeConfig.tensorflowVerboseLogLevel)
 
-    let opts = TFE_NewContextOptions()
-    cContext = TFE_NewContext(opts, status)
+    guard let opts = TFE_NewContextOptions() else {
+      fatalError("ContextOptions object can never be nil.")
+    }
+    let ctx = TFE_NewContext(opts, status)
+    checkOk(status)
+    self.cContext = ctx!
     TFE_DeleteContextOptions(opts)
     checkOk(status)
 
