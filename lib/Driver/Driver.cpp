@@ -674,17 +674,14 @@ getDriverBatchCount(llvm::opt::InputArgList &ArgList,
 
 static bool computeIncremental(const llvm::opt::InputArgList *ArgList,
                                const bool ShowIncrementalBuildDecisions) {
-  {
-    const bool WasIncrementalRequested =
-    ArgList->hasArg(options::OPT_incremental);
-    if (!WasIncrementalRequested)
-      return false;
-  }
+  if (!ArgList->hasArg(options::OPT_incremental))
+    return false;
+
   const char *ReasonToDisable =
       ArgList->hasArg(options::OPT_whole_module_optimization)
           ? "is not compatible with whole module optimization."
           : ArgList->hasArg(options::OPT_embed_bitcode)
-                ? "is not currently compatible with embedding LLVM IR bitcode"
+                ? "is not currently compatible with embedding LLVM IR bitcode."
                 : nullptr;
 
   if (!ReasonToDisable)
@@ -709,9 +706,9 @@ computeWorkingDirectory(const llvm::opt::InputArgList *ArgList) {
 }
 
 static std::unique_ptr<UnifiedStatsReporter>
-computeStatsReporter(const llvm::opt::InputArgList *ArgList,
-                     const InputFileList &Inputs, const OutputInfo OI,
-                     StringRef DefaultTargetTriple) {
+createStatsReporter(const llvm::opt::InputArgList *ArgList,
+                    const InputFileList &Inputs, const OutputInfo OI,
+                    StringRef DefaultTargetTriple) {
   const Arg *A = ArgList->getLastArgNoClaim(options::OPT_stats_output_dir);
   if (!A)
     return nullptr;
@@ -886,7 +883,7 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool ShowDriverTimeCompilation =
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
-        computeStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
+        createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     
     C = llvm::make_unique<Compilation>(
         Diags, TC, OI, Level,
