@@ -189,41 +189,25 @@ void FileSpecificDiagnosticConsumer::handleDiagnostic(
       Kind == DiagnosticKind::Error;
 }
 
-bool FileSpecificDiagnosticConsumer::finishProcessing(SourceManager &SM) {
-  addNonSpecificErrors(SM);
+bool FileSpecificDiagnosticConsumer::finishProcessing() {
+  tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation();
 
   // Deliberately don't use std::any_of here because we don't want early-exit
   // behavior.
 
   bool hadError = false;
   for (auto &subConsumer : SubConsumers)
-    hadError |= subConsumer.second && subConsumer.second->finishProcessing(SM);
+    hadError |= subConsumer.second && subConsumer.second->finishProcessing();
   return hadError;
 }
 
-static void produceNonSpecificError(
-    FileSpecificDiagnosticConsumer::ConsumerSpecificInformation &info,
-    SourceManager &SM) {
-  Diagnostic diagnostic(
-      diag::error_compilation_stopped_by_errors_in_other_files);
-
-  // Stolen from DiagnosticEngine::emitDiagnostic
-  DiagnosticInfo Info;
-  Info.ID = diagnostic.getID();
-
-  info.consumer->handleDiagnostic(
-      SM, info.range.getStart(), DiagnosticKind::Error,
-      DiagnosticEngine::diagnosticStringFor(diagnostic.getID()), {}, Info);
-}
-
-void FileSpecificDiagnosticConsumer::addNonSpecificErrors(SourceManager &SM) {
+void FileSpecificDiagnosticConsumer::
+    tellSubconsumersToInformDriverOfIncompleteBatchModeCompilation() const {
   if (!HasAnErrorBeenConsumed)
     return;
   for (auto &info : ConsumersOrderedByRange) {
-    if (!info.hasAnErrorBeenEmitted && info.consumer) {
-      produceNonSpecificError(info, SM);
-      info.hasAnErrorBeenEmitted = true;
-    }
+    if (!info.hasAnErrorBeenEmitted && info.consumer)
+      info.consumer->informDriverOfIncompleteBatchModeCompilation();
   }
 }
 
