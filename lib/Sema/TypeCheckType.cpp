@@ -3360,7 +3360,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
     auto param = PL->get(ParamIndex);
-    
+
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
       if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
@@ -3369,10 +3369,22 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
           .highlight(param->getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
-      
+
       return false;
     }
-    
+
+    // Swift inout parameters are not representable in Objective-C.
+    if (param->isInOut()) {
+      if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
+        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
+                    getObjCDiagnosticAttrKind(Reason))
+          .highlight(param->getSourceRange());
+        describeObjCReason(TC, AFD, Reason);
+      }
+
+      return false;
+    }
+
     if (param->getType()->isRepresentableIn(
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
