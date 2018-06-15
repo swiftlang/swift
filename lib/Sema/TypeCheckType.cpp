@@ -3360,7 +3360,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
     auto param = PL->get(ParamIndex);
-    
+
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
       if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
@@ -3369,10 +3369,22 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
           .highlight(param->getSourceRange());
         describeObjCReason(TC, AFD, Reason);
       }
-      
+
       return false;
     }
-    
+
+    // Swift inout parameters are not representable in Objective-C.
+    if (param->isInOut()) {
+      if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
+        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
+                    getObjCDiagnosticAttrKind(Reason))
+          .highlight(param->getSourceRange());
+        describeObjCReason(TC, AFD, Reason);
+      }
+
+      return false;
+    }
+
     if (param->getType()->isRepresentableIn(
           ForeignLanguage::ObjectiveC,
           const_cast<AbstractFunctionDecl *>(AFD)))
@@ -3599,20 +3611,6 @@ bool TypeChecker::isRepresentableInObjC(
       return false;
     }
     llvm_unreachable("bad kind");
-  }
-
-  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    unsigned ExpectedParamPatterns = 1;
-    if (FD->getImplicitSelfDecl())
-      ExpectedParamPatterns++;
-    if (FD->getParameterLists().size() != ExpectedParamPatterns) {
-      if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
-                 getObjCDiagnosticAttrKind(Reason));
-        describeObjCReason(*this, AFD, Reason);
-      }
-      return false;
-    }
   }
 
   // As a special case, an initializer with a single, named parameter of type

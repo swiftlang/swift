@@ -3515,9 +3515,6 @@ WARNING(witness_swift3_objc_inference,none,
         (DescriptiveDeclKind, DeclName, Type))
 
 
-ERROR(objc_invalid_on_func_curried,none,
-      "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "
-      "cannot be represented in Objective-C", (unsigned))
 ERROR(objc_observing_accessor, none,
       "observing accessors are not allowed to be marked @objc", ())
 ERROR(objc_addressor, none,
@@ -3525,6 +3522,9 @@ ERROR(objc_addressor, none,
 ERROR(objc_invalid_on_func_variadic,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because it has a variadic "
       "parameter", (unsigned))
+ERROR(objc_invalid_on_func_inout,none,
+      "method cannot be %" OBJC_ATTR_SELECT "0 because inout "
+      "parameters cannot be represented in Objective-C", (unsigned))
 ERROR(objc_invalid_on_func_param_type,none,
       "method cannot be %" OBJC_ATTR_SELECT "1 because the type of the "
       "parameter %0 cannot be represented in Objective-C", (unsigned, unsigned))
