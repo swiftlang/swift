@@ -4887,9 +4887,6 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) 
   };
 #define STMT_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
 #include "swift/Syntax/TokenKinds.def"
-
-  // Throw is not marked as a STMT_KEYWORD.
-  AddKeyword("throw", CodeCompletionKeywordKind::kw_throw);
 }
 
 static void addLetVarKeywords(CodeCompletionResultSink &Sink) {
