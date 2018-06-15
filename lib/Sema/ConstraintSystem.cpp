@@ -1411,6 +1411,64 @@ ConstraintSystem::getTypeOfMemberReference(
   return { openedType, type };
 }
 
+// Performance hack: if there are two generic overloads, and one is
+// more specialized than the other, prefer the more-specialized one.
+static void tryOptimizeGenericDisjunction(ConstraintSystem &cs,
+                                          ArrayRef<OverloadChoice> choices,
+                                          OverloadChoice *&favoredChoice) {
+  if (favoredChoice || choices.size() != 2)
+    return;
+
+  const auto &choiceA = choices[0];
+  const auto &choiceB = choices[1];
+
+  if (!choiceA.isDecl() || !choiceB.isDecl())
+    return;
+
+  auto isViable = [](ValueDecl *decl) -> bool {
+    assert(decl);
+
+    auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
+    if (!AFD || !AFD->isGeneric())
+      return false;
+
+    auto funcType = AFD->getInterfaceType();
+    auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
+      if (auto objType = type->getOptionalObjectType())
+        return true;
+
+      return type->isAny();
+    });
+
+    // If function declaration references `Any` or `Any?` type
+    // let's not attempt it, because it's unclear
+    // without solving which overload is going to be better.
+    return !hasAnyOrOptional;
+  };
+
+  auto *declA = choiceA.getDecl();
+  auto *declB = choiceB.getDecl();
+
+  if (!isViable(declA) || !isViable(declB))
+    return;
+
+  auto &TC = cs.TC;
+  auto *DC = cs.DC;
+
+  switch (TC.compareDeclarations(DC, declA, declB)) {
+  case Comparison::Better:
+    favoredChoice = const_cast<OverloadChoice *>(&choiceA);
+    break;
+
+  case Comparison::Worse:
+    favoredChoice = const_cast<OverloadChoice *>(&choiceB);
+    break;
+
+  case Comparison::Unordered:
+    break;
+  }
+}
+
 void ConstraintSystem::addOverloadSet(Type boundType,
                                       ArrayRef<OverloadChoice> choices,
                                       DeclContext *useDC,
@@ -1424,6 +1482,8 @@ void ConstraintSystem::addOverloadSet(Type boundType,
     addBindOverloadConstraint(boundType, choices.front(), locator, useDC);
     return;
   }
+
+  tryOptimizeGenericDisjunction(*this, choices, favoredChoice);
 
   SmallVector<Constraint *, 4> overloads;
   
