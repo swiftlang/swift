@@ -707,9 +707,8 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   findMatchingReleases(&*BB);
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
+bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
+    ArrayRef<SILInstruction *> Insts, SILValue Base, SILValue Derived) {
   // We use projection path to analyze the relation.
   auto POp = ProjectionPath::getProjectionPath(Base, Derived);
   // We can not build a projection path from the base to the derived, bail out.
@@ -730,9 +729,8 @@ isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
   return false;
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-releaseArgument(ReleaseList Insts, SILValue Arg) {
+bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
+    ArrayRef<SILInstruction *> Insts, SILValue Arg) {
   // Reason about whether all parts are released.
   SILModule *Mod = &(*Insts.begin())->getModule();
 

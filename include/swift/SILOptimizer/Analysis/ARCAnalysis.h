@@ -46,9 +46,6 @@ bool isRetainInstruction(SILInstruction *II);
 /// Return true if this is a release instruction.
 bool isReleaseInstruction(SILInstruction *II);
 
-using RetainList = TinyPtrVector<SILInstruction *>;
-using ReleaseList = TinyPtrVector<SILInstruction *>;
-
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
                           AliasAnalysis *AA);
@@ -145,7 +142,7 @@ private:
 
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
-  RetainList EpilogueRetainInsts;
+  TinyPtrVector<SILInstruction *> EpilogueRetainInsts;
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -156,7 +153,9 @@ public:
   /// Finds matching releases in the provided block \p BB.
   void findMatchingRetains(SILBasicBlock *BB);
 
-  RetainList getEpilogueRetains() { return EpilogueRetainInsts; }
+  ArrayRef<SILInstruction *> getEpilogueRetains() const {
+    return EpilogueRetainInsts;
+  }
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
@@ -202,7 +201,9 @@ private:
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
   ArrayRef<SILArgumentConvention> ArgumentConventions;
-  llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
+
+  using InstListTy = TinyPtrVector<SILInstruction *>;
+  llvm::SmallMapVector<SILArgument *, InstListTy, 8> ArgInstMap;
 
   /// Set to true if we found some releases but not all for the argument.
   llvm::DenseSet<SILArgument *> FoundSomeReleases;
@@ -267,19 +268,17 @@ public:
     return getSingleReleaseForArgument(Arg);
   }
 
-  ReleaseList getReleasesForArgument(SILArgument *Arg) {
-    ReleaseList Releases;
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILArgument *Arg) {
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
-      return Releases;
-    return I->second; 
+      return {};
+    return I->second;
   }
 
-  ReleaseList getReleasesForArgument(SILValue V) {
-    ReleaseList Releases;
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILValue V) {
     auto *Arg = dyn_cast<SILArgument>(V);
     if (!Arg)
-      return Releases;
+      return {};
     return getReleasesForArgument(Arg);
   }
 
@@ -287,13 +286,14 @@ public:
   void recompute();
 
   bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
-    auto Pred = [&Inst](const std::pair<SILArgument *,
-                                        ReleaseList> &P) -> bool {
-      if (P.second.size() > 1)
-        return false;
-      return *P.second.begin() == Inst;
-    };
-    return count_if(ArgInstMap, Pred);
+    return count_if(
+        ArgInstMap,
+        [&Inst](const std::pair<SILArgument *, ArrayRef<SILInstruction *>> &P)
+            -> bool {
+          if (P.second.size() > 1)
+            return false;
+          return *P.second.begin() == Inst;
+        });
   }
 
   using iterator = decltype(ArgInstMap)::iterator;
@@ -322,11 +322,12 @@ private:
   /// between the releases values in \p Insts and \p Derived, it also bails
   /// out and return true if projection path can not be formed between Base
   /// and any one the released values.
-  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
+  bool isRedundantRelease(ArrayRef<SILInstruction *> Insts, SILValue Base,
+                          SILValue Derived);
 
   /// Return true if we have a release instruction for all the reference
   /// semantics part of \p Argument.
-  bool releaseArgument(ReleaseList Insts, SILValue Argument);
+  bool releaseArgument(ArrayRef<SILInstruction *> Insts, SILValue Argument);
 
   /// Walk the basic block and find all the releases that match to function
   /// arguments.

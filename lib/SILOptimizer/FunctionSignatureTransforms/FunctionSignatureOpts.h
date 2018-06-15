@@ -65,14 +65,14 @@ struct ArgumentDescriptor {
   /// Is this parameter an indirect result?
   bool IsIndirectResult;
 
-  /// If non-null, this is the release in the return block of the callee, which
-  /// is associated with this parameter if it is @owned. If the parameter is not
-  /// @owned or we could not find such a release in the callee, this is null.
-  ReleaseList CalleeRelease;
+  /// If non-empty, this is the set of releases in the return block of
+  /// the callee associated with this parameter if it is @owned. If it
+  /// is empty then we could not find any such releases.
+  TinyPtrVector<SILInstruction *> CalleeRelease;
 
-  /// The same as CalleeRelease, but the release in the throw block, if it is a
-  /// function which has a throw block.
-  ReleaseList CalleeReleaseInThrowBlock;
+  /// The same as CalleeRelease, but the releases are post-dominated
+  /// by the throw block, if it is a function which has a throw block.
+  TinyPtrVector<SILInstruction *> CalleeReleaseInThrowBlock;
 
   /// The projection tree of this arguments.
   ProjectionTree ProjTree;
