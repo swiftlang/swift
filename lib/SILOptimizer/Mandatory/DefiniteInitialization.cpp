@@ -1239,18 +1239,14 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
- 
 
   Diag<StringRef, bool> DiagMessage;
-  if (isa<MarkFunctionEscapeInst>(Inst)) {
-    if (Inst->getLoc().isASTNode<AbstractClosureExpr>())
-      DiagMessage = diag::variable_closure_use_uninit;
-    else
-      DiagMessage = diag::variable_function_use_uninit;
-  } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
-    DiagMessage = diag::variable_used_before_initialized;
-  } else {
+  if (Inst->getLoc().isASTNode<AbstractClosureExpr>()) {
     DiagMessage = diag::variable_closure_use_uninit;
+  } else if (isa<MarkFunctionEscapeInst>(Inst)) {
+    DiagMessage = diag::variable_function_use_uninit;
+  } else {
+    DiagMessage = diag::variable_used_before_initialized;
   }
 
   diagnoseInitError(Use, DiagMessage);
@@ -1708,10 +1704,11 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
   // If this is a load into a promoted closure capture, diagnose properly as
   // a capture.
   if ((isa<LoadInst>(Inst) || isa<LoadBorrowInst>(Inst)) &&
-      Inst->getLoc().isASTNode<AbstractClosureExpr>())
+      Inst->getLoc().isASTNode<AbstractClosureExpr>()) {
     diagnoseInitError(Use, diag::variable_closure_use_uninit);
-  else
+  } else {
     diagnoseInitError(Use, diag::variable_used_before_initialized);
+  }
 }
 
 /// handleSelfInitUse - When processing a 'self' argument on a class, this is
