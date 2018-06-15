@@ -4307,7 +4307,8 @@ public:
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
-    if (VD->hasObservers() && !VD->getGetter()->getBody())
+    if (VD->hasObservers() &&
+        (!VD->getGetter()->getBody() || !VD->getSetter()->getBody()))
       synthesizeObservingAccessors(VD, TC);
 
     // If this is a get+mutableAddress property, synthesize the setter body.

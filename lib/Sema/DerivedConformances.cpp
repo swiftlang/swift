@@ -272,7 +272,8 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->makeComputed(SourceLoc(), getter, nullptr, nullptr, SourceLoc());
+  property->setAccessors(VarDecl::Computed,
+                         SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }

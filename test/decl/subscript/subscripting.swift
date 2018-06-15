@@ -102,16 +102,16 @@ protocol ProtocolGetSet4 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet2 {
-  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet3 {
-  subscript(i: Int) -> Int { willSet didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet didSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet4 {
-  subscript(i: Int) -> Int { didSet willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet willSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 
 class DidSetInSubscript {
