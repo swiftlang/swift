@@ -3601,20 +3601,6 @@ bool TypeChecker::isRepresentableInObjC(
     llvm_unreachable("bad kind");
   }
 
-  if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-    unsigned ExpectedParamPatterns = 1;
-    if (FD->getImplicitSelfDecl())
-      ExpectedParamPatterns++;
-    if (FD->getParameterLists().size() != ExpectedParamPatterns) {
-      if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_curried,
-                 getObjCDiagnosticAttrKind(Reason));
-        describeObjCReason(*this, AFD, Reason);
-      }
-      return false;
-    }
-  }
-
   // As a special case, an initializer with a single, named parameter of type
   // '()' is always representable in Objective-C. This allows us to cope with
   // zero-parameter methods with selectors that are longer than "init". For
