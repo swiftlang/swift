@@ -974,8 +974,8 @@ namespace {
           // Convert the type arguments.
           for (auto typeArg : typeArgs) {
             Type importedTypeArg = Impl.importTypeIgnoreIUO(
-                typeArg, ImportTypeKind::BridgedValue, AllowNSUIntegerAsInt,
-                Bridging, OTK_None);
+                typeArg, ImportTypeKind::ObjCCollectionElement,
+                AllowNSUIntegerAsInt, Bridging, OTK_None);
             if (!importedTypeArg) {
               importedTypeArgs.clear();
               break;
@@ -1102,7 +1102,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCCollectionElement:
   case ImportTypeKind::Typedef:
     return true;
   }
@@ -1116,7 +1116,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Abstract:
   case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCCollectionElement:
   case ImportTypeKind::Variable:
   case ImportTypeKind::Result:
   case ImportTypeKind::Pointee:
@@ -1287,10 +1287,24 @@ static ImportedType adjustTypeForConcreteImport(
   // we would prefer to instead use the default Swift convention.
   if (hint == ImportHint::Block) {
     if (canBridgeTypes(importKind)) {
+      // Determine the function type representation we need.
+      //
+      // For Objective-C collection arguments, we cannot bridge from a block
+      // to a Swift function type, so force the block representation. Normally
+      // the mapped type will have a block representation (making this a no-op),
+      // but in cases where the Clang type was written as a typedef of a
+      // block type, that typedef will have a Swift function type
+      // representation. This code will then break down the imported type
+      // alias and produce a function type with block representation.
+      auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
+      if (importKind == ImportTypeKind::ObjCCollectionElement) {
+        requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
+      }
+
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
-      if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
-        einfo = einfo.withRepresentation(FunctionTypeRepresentation::Swift);
+      if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
+        einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
         importedType = fTy->withExtInfo(einfo);
       }
     }
