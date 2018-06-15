@@ -28,6 +28,7 @@ class SerializedSILLoader;
 
 struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
+struct StringSymbolicValue;
 struct AddressSymbolicValue;
 struct AggregateSymbolicValue;
 
@@ -79,15 +80,19 @@ class SymbolicValue {
     /// metatype value.
     RK_Inst,
 
-    /// This value is represented with a bump pointer allocated APInt.
+    /// This value is represented with a bump-pointer allocated APInt.
     /// TODO: We could store small integers into the union inline to avoid
     /// allocations if it ever matters.
     RK_Integer,
 
-    /// This value is represented with a bump pointer allocated APFloat.
+    /// This value is represented with a bump-pointer allocated APFloat.
     /// TODO: We could store small floats into the union inline to avoid
     /// allocations if it ever matters.
     RK_Float,
+
+    /// This value is represented with a bump-pointer allocated char array
+    /// representing a UTF-8 encoded string.
+    RK_String,
 
     /// This value is a pointer to a tracked memory location, along with zero
     /// or more indices (tuple indices, struct field indices, etc) into the
@@ -135,7 +140,11 @@ class SymbolicValue {
 
     /// When this SymbolicValue is of "Float" kind, this pointer stores
     /// information about the APFloat value it holds.
-    APFloatSymbolicValue *float_;
+    APFloatSymbolicValue *floatingPoint;
+
+    /// When this SymbolicValue is of "String" kind, this pointer stores
+    /// information about the StringRef value it holds.
+    StringSymbolicValue *string;
 
     /// When this SymbolicValue is of "Address" kind, this pointer stores
     /// info about the base and the indices for the address.
@@ -239,6 +248,13 @@ public:
 
   APFloat getFloatValue() const;
 
+  // Returns a SymbolicValue representing a UTF-8 encoded string.
+  static SymbolicValue getString(const StringRef string,
+                                 llvm::BumpPtrAllocator &allocator);
+
+  // Returns the UTF-8 encoded string underlying a SymbolicValue.
+  StringRef getStringValue() const;
+
   /// Get a SymbolicValue corresponding to a memory object with an optional
   /// list of indices into it.  This is used by (e.g.) a struct_element_addr
   /// of a stack_alloc.
@@ -261,9 +277,6 @@ public:
                                     llvm::BumpPtrAllocator &allocator);
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
-
-  // TODO: getStringValue.
-
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.
