@@ -109,7 +109,7 @@ enum class ImportTypeKind {
   Value,
 
   /// \brief Import the type of an Objective-C generic argument.
-  ObjCGenericArgument,
+  ObjCCollectionElement,
 
   /// \brief Import the declared type of a variable.
   Variable,
