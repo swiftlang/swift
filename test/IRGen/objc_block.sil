@@ -7,11 +7,11 @@ import Swift
 class Foo {}
 sil_vtable Foo {}
 
-sil @$S10objc_block3FooCfD : $Foo -> ()
+sil @$S10objc_block3FooCfD : $(Foo) -> ()
 
-sil @call_block : $@convention(thin) (@convention(block) Foo -> Foo, Foo) -> Foo {
-entry(%b : $@convention(block) Foo -> Foo, %x : $Foo):
-  %y = apply %b(%x) : $@convention(block) Foo -> Foo
+sil @call_block : $@convention(thin) (@convention(block) (Foo) -> Foo, Foo) -> Foo {
+entry(%b : $@convention(block) (Foo) -> Foo, %x : $Foo):
+  %y = apply %b(%x) : $@convention(block) (Foo) -> Foo
   return %y : $Foo
 }
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T10objc_block3FooC* @call_block(%objc_block*, %T10objc_block3FooC*) {{.*}} {

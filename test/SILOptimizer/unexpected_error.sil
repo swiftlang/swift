@@ -2,7 +2,7 @@
 import Swift
 
 // CHECK-LABEL: sil @unexpected_error : $@convention(thin) (Error) -> () {
-sil @unexpected_error : $@convention(thin) Error -> () {
+sil @unexpected_error : $@convention(thin) (Error) -> () {
 entry(%10 : $Error):
   // CHECK: builtin "unexpectedError"
   %11 = builtin "unexpectedError"(%10 : $Error) : $()
@@ -10,7 +10,7 @@ entry(%10 : $Error):
 }
 
 // CHECK-LABEL: sil @error_in_main : $@convention(thin) (Error) -> () {
-sil @error_in_main : $@convention(thin) Error -> () {
+sil @error_in_main : $@convention(thin) (Error) -> () {
 entry(%10 : $Error):
   // CHECK: builtin "errorInMain"
   %11 = builtin "errorInMain"(%10 : $Error) : $()

@@ -104,7 +104,7 @@ bb0:
 }
 
 sil public_external @createSIMDStruct : $@convention(c) () -> SIMDStruct
-sil public_external @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
+sil public_external @consumeSIMDStruct : $@convention(c) (SIMDStruct) -> ()
 
 // CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testSIMDStruct()
 // CHECK-x86_64:         call <3 x float> @createSIMDStruct
@@ -113,8 +113,8 @@ sil @testSIMDStruct : $() -> () {
 bb0:
   %f = function_ref @createSIMDStruct : $@convention(c) () -> SIMDStruct
   %x = apply %f() : $@convention(c) () -> SIMDStruct
-  %g = function_ref @consumeSIMDStruct : $@convention(c) SIMDStruct -> ()
-  %z = apply %g(%x) : $@convention(c) SIMDStruct -> ()
+  %g = function_ref @consumeSIMDStruct : $@convention(c) (SIMDStruct) -> ()
+  %z = apply %g(%x) : $@convention(c) (SIMDStruct) -> ()
   return undef : $()
 }
 

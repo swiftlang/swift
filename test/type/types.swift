@@ -165,9 +165,10 @@ class r21949448 {
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
 let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
-let _ : inout Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{18-18=)}}
+let _ : inout Int -> Float // expected-error {{'inout' may only be used on parameters}}
+// expected-error@-1 {{single argument function types require parentheses}} {{15-15=(}} {{18-18=)}}
 func testNoParenFunction(x: Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{32-32=)}}
-func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{38-38=)}}
+func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{35-35=(}} {{38-38=)}}
 
 func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{15-34=UnsafeRawPointer}}
 func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{15-39=UnsafeMutableRawPointer}}
@@ -180,7 +181,7 @@ class C {
   }
 }
 
-let _ : inout @convention(c) Int -> Int // expected-error {{'inout' may only be used on parameters}}
+let _ : inout @convention(c) (Int) -> Int // expected-error {{'inout' may only be used on parameters}}
 func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }}
                                    // expected-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}}
 
