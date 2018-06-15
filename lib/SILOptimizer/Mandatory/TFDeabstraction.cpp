@@ -1497,7 +1497,6 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   case SymbolicValue::Address:
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
-  case SymbolicValue::String:
   case SymbolicValue::Function:
     // TODO: Unsupported right now.
     return nullptr;
@@ -1511,6 +1510,9 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
     return B.createIntegerLiteral(loc, type, symVal.getIntegerValue());
   case SymbolicValue::Float:
     return B.createFloatLiteral(loc, type, symVal.getFloatValue());
+  case SymbolicValue::String:
+    return B.createStringLiteral(loc, symVal.getStringValue(),
+                                 StringLiteralInst::Encoding::UTF8);
   }
 }
 
