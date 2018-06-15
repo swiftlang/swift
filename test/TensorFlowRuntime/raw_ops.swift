@@ -86,6 +86,18 @@ RawOpsTests.testAllBackends("GreaterEqualOp") {
   testPointwiseBinaryOp(tfOp: Raw.greaterEqual, swiftOp: { $0 >= $1 })
 }
 
+RawOpsTests.testAllBackends("Conv2d") {
+  let inputTensor = Tensor<Float>(shape: [1, 1, 3, 3], repeating: 0.42)
+  let filter = Tensor<Float>(
+    shape: [1, 1, 3, 3],
+    scalars: [0, 1, 0, 1, 0, 1, 0, 1, 0])
+  let conv2D = Raw.conv2D(
+    inputTensor,
+    filter: filter,
+    strides: [1, 1, 1, 1],
+    padding: .same)
+}
+
 #if CPU && !CUDA
 runAllTestsWithRemoteSession()
 #else
