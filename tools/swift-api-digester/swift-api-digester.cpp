@@ -252,6 +252,7 @@ class SDKContext {
   llvm::BumpPtrAllocator Allocator;
   UpdatedNodesMap UpdateMap;
   NodeMap TypeAliasUpdateMap;
+  NodeMap RevertTypeAliasUpdateMap;
   TypeMemberDiffVector TypeMemberDiffs;
 public:
   llvm::BumpPtrAllocator &allocator() {
@@ -265,6 +266,9 @@ public:
   }
   NodeMap &getTypeAliasUpdateMap() {
     return TypeAliasUpdateMap;
+  }
+  NodeMap &getRevertTypeAliasUpdateMap() {
+    return RevertTypeAliasUpdateMap;
   }
   TypeMemberDiffVector &getTypeMemberDiffs() {
     return TypeMemberDiffs;
@@ -3793,6 +3797,27 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath) {
   return 0;
 }
 
+static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
+    const bool isRevert) {
+  for (auto Pair: AliasMap) {
+    auto UnderlyingType = Pair.first->getAs<SDKNodeDeclTypeAlias>()->
+      getUnderlyingType()->getPrintedName();
+    auto RawType = AliasMap[(SDKNode*)Pair.first]->getAs<SDKNodeDeclType>()->
+      getRawValueType()->getPrintedName();
+    if (isRevert) {
+      auto *D = Pair.second->getAs<SDKNodeDecl>();
+      AllItems.emplace_back(SDKNodeKind::DeclType,
+        NodeAnnotation::RevertTypeAliasDeclToRawRepresentable, "0",
+        D->getUsr(), "", RawType, UnderlyingType, D->getModuleName());
+    } else {
+      auto *D = Pair.first->getAs<SDKNodeDecl>();
+      AllItems.emplace_back(SDKNodeKind::DeclTypeAlias,
+        NodeAnnotation::TypeAliasDeclToRawRepresentable, "0",
+        D->getUsr(), "", UnderlyingType, RawType, D->getModuleName());
+    }
+  }
+}
+
 static int compareSDKs(StringRef LeftPath, StringRef RightPath,
                        StringRef DiffPath,
                        llvm::StringSet<> &IgnoredRemoveUsrs) {
@@ -3827,20 +3852,15 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
 
-  auto &AliasMap = Ctx.getTypeAliasUpdateMap();
   // Find type alias change first.
+  auto &AliasMap = Ctx.getTypeAliasUpdateMap();
   TypeAliasDiffFinder(LeftModule, RightModule, AliasMap).search();
+  populateAliasChanges(AliasMap, AllItems, /*IsRevert*/false);
 
-  for (auto Pair: AliasMap) {
-    auto Left = Pair.first->getAs<SDKNodeDeclTypeAlias>()->getUnderlyingType()->
-      getPrintedName();
-    auto Right = AliasMap[(SDKNode*)Pair.first]->getAs<SDKNodeDeclType>()->
-      getRawValueType()->getPrintedName();
-    auto *D = Pair.first->getAs<SDKNodeDecl>();
-    AllItems.emplace_back(SDKNodeKind::DeclTypeAlias,
-      NodeAnnotation::TypeAliasDeclToRawRepresentable, "0",
-      D->getUsr(), "", Left, Right, D->getModuleName());
-  }
+  // Find type alias revert change.
+  auto &RevertAliasMap = Ctx.getRevertTypeAliasUpdateMap();
+  TypeAliasDiffFinder(RightModule, LeftModule, RevertAliasMap).search();
+  populateAliasChanges(RevertAliasMap, AllItems, /*IsRevert*/true);
 
   AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
                                 [&](CommonDiffItem &Item) {
