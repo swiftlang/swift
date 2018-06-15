@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 protocol P1 {
   static func `init`(_: Int) // expected-note {{protocol requires function 'init' with type '(Int) -> ()'; do you want to add a stub?}}
@@ -27,7 +27,7 @@ struct S22 : P2 {
 }
 
 _ = S11(0) // expected-error {{argument passed to call that takes no arguments}}
-_ = S11.init(0) // expected-error {{argument passed to call that takes no arguments}}
+_ = S11.init(0)
 _ = S11.`init`(0)
 
 _ = S12(0)
@@ -35,7 +35,7 @@ _ = S12.init(0)
 _ = S12.`init`(0) // expected-error {{type 'S12' has no member 'init'}}
 
 _ = S21(0) // expected-error {{argument passed to call that takes no arguments}}
-_ = S21.init(0) // expected-error {{argument passed to call that takes no arguments}}
+_ = S21.init(0)
 _ = S21.`init`(0)
 
 _ = S22(0)
