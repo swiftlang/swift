@@ -19,6 +19,18 @@ public let UTF8Decode = [
       runFunction: run_UTF8Decode,
       tags: [.validation, .api, .String]),
     BenchmarkInfo(
+      name: "UTF8Decode_InitFromData",
+      runFunction: run_UTF8Decode_InitFromData,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitDecoding",
+      runFunction: run_UTF8Decode_InitDecoding,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "UTF8Decode_InitFromBytes",
+      runFunction: run_UTF8Decode_InitFromBytes,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
       name: "UTF8Decode_InitFromData_ascii",
       runFunction: run_UTF8Decode_InitFromData_ascii,
       tags: [.validation, .api, .String]),
@@ -47,6 +59,9 @@ let japanese = "日本語（にほんご、にっぽんご）は、主に日本�
 let emoji = "Panda 🐼, Dog 🐶, Cat 🐱, Mouse 🐭."
 
 let allStrings = [ascii, russian, japanese, emoji].map { Array($0.utf8) }
+let allStringsBytes: [UInt8] = Array(allStrings.joined())
+let allStringsData: Data = Data(allStringsBytes)
+
 
 @inline(never)
 public func run_UTF8Decode(_ N: Int) {
@@ -67,6 +82,28 @@ public func run_UTF8Decode(_ N: Int) {
       var utf8 = UTF8()
       while !isEmpty(utf8.decode(&it)) { }
     }
+  }
+}
+
+@inline(never)
+public func run_UTF8Decode_InitFromData(_ N: Int) {
+  let input = allStringsData
+  for _ in 0..<200*N {
+    blackHole(String(data: input, encoding: .utf8))
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitDecoding(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    blackHole(String(decoding: input, as: UTF8.self))
+  }
+}
+@inline(never)
+public func run_UTF8Decode_InitFromBytes(_ N: Int) {
+  let input = allStringsBytes
+  for _ in 0..<200*N {
+    blackHole(String(bytes: input, encoding: .utf8))
   }
 }
 
