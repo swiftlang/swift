@@ -999,6 +999,7 @@ namespace {
 
       // # of entries
       writer.write<uint16_t>(data.size());
+      assert(data.size() == static_cast<uint16_t>(data.size()));
 
       bool isModule = Writer.getLangOpts().isCompilingModule();
       for (auto &fullEntry : data) {
