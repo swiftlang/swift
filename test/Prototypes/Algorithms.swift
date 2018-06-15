@@ -9,57 +9,27 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-run-stdlib-swift
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -g -Onone -DUSE_STDLIBUNITTEST %s -o %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
+#if USE_STDLIBUNITTEST
 import Swift
 import StdlibUnittest
+#endif
 
 //===--- Rotate -----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-public protocol CollectionAlgorithms : Collection
-where SubSequence : CollectionAlgorithms
-{
-  func lastIndex(where predicate: (Element) throws->Bool) rethrows -> Index?
-  func _indexAfterLastIndex(
-    where predicate: (Element) throws->Bool
-  ) rethrows -> Index?
-}
-
-extension Collection {
-  public func lastIndex(
-    where predicate: (Element) throws->Bool
-  ) rethrows -> Index? {
-    return try indices.reduce(nil) {
-      r, i in try predicate(self[i]) ? i as Optional : r
-    }
-  }
-
-  public func _indexAfterLastIndex(
-    where predicate: (Element) throws->Bool
-  ) rethrows -> Index? {
-    return try lastIndex(where: predicate).map { index(after: $0) }
-  }
-}
-
-extension BidirectionalCollection {
-  public func lastIndex(
-    where predicate: (Element) throws->Bool
-  ) rethrows -> Index? {
-    return try indices.reversed().first { try predicate(self[$0]) }
-  }
-
-  public func _indexAfterLastIndex(
-    where predicate: (Element) throws->Bool
-  ) rethrows -> Index? {
-    return try self.reversed().firstIndex(where: predicate)?.base
-  }
-}
-
-// In the stdlib, this would simply be MutableCollection
-public protocol MutableCollectionAlgorithms
-  : MutableCollection, CollectionAlgorithms
+/// Provides customization points for `MutableCollection` algorithms.
+///
+/// If incorporated into the standard library, these requirements would just be
+/// part of `MutableCollection`.  In the meantime, you can declare conformance
+/// of a collection to `MutableCollectionAlgorithms` to get these customization
+/// points to be used from other algorithms defined on
+/// `MutableCollectionAlgorithms`.
+public protocol MutableCollectionAlgorithms : MutableCollection
   where SubSequence : MutableCollectionAlgorithms
 {
   /// Rotates the elements of the collection so that the element
@@ -72,15 +42,14 @@ public protocol MutableCollectionAlgorithms
   mutating func rotate(shiftingToStart middle: Index) -> Index
 }
 
-// In the stdlib, these conformances wouldn't be needed
+// Conformances of common collection types to MutableCollectionAlgorithms.
+// If rotate was a requirement of MutableCollection, these would not be needed.
 extension Array : MutableCollectionAlgorithms {  }
 extension ArraySlice : MutableCollectionAlgorithms {  }
-
-extension Slice : MutableCollectionAlgorithms, CollectionAlgorithms
+extension Slice : MutableCollectionAlgorithms
   where Base: MutableCollection { }
 
-/// In the stdlib, this would simply be MutableCollection
-extension MutableCollectionAlgorithms {
+extension MutableCollection {
   /// Swaps the elements of the two given subranges, up to the upper bound of
   /// the smaller subrange. The returned indices are the ends of the two ranges
   /// that were actually swapped.
@@ -557,55 +526,58 @@ extension Collection {
 //===--- Stable Partition -------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-extension Collection
-where Self : MutableCollectionAlgorithms {
-
+extension MutableCollectionAlgorithms {
+  /// Moves all elements satisfying `isSuffixElement` into a suffix of the
+  /// collection, preserving their relative order, and returns the start of the
+  /// resulting suffix.
+  ///
+  /// - Complexity: O(n) where n is the number of elements.
   @discardableResult
   mutating func stablePartition(
     isSuffixElement: (Element) throws -> Bool
   ) rethrows -> Index {
-        return try stablePartition(
-            count: count, isSuffixElement: isSuffixElement)
+    return try stablePartition(count: count, isSuffixElement: isSuffixElement)
   }
 
-    /// Moves all elements satisfying `isSuffixElement` into a suffix of the collection,
-    /// preserving their relative order, returning the start of the resulting suffix.
-    ///
-    /// - Complexity: O(n) where n is the number of elements.
-    /// - Precondition: `n == self.count`
-    fileprivate mutating func stablePartition(
-        count n: Int, isSuffixElement: (Element) throws-> Bool
-    ) rethrows -> Index {
-        if n == 0 { return startIndex }
-        if n == 1 {
-            return try isSuffixElement(self[startIndex]) ? startIndex : endIndex
-        }
-        let h = n / 2, i = index(startIndex, offsetBy: h)
-        let j = try self[..<i].stablePartition(
-            count: h, isSuffixElement: isSuffixElement)
-        let k = try self[i...].stablePartition(
-            count: n - h, isSuffixElement: isSuffixElement)
-        return self[j..<k].rotate(shiftingToStart: i)
+  /// Moves all elements satisfying `isSuffixElement` into a suffix of the
+  /// collection, preserving their relative order, and returns the start of the
+  /// resulting suffix.
+  ///
+  /// - Complexity: O(n) where n is the number of elements.
+  /// - Precondition: `n == self.count`
+  fileprivate mutating func stablePartition(
+    count n: Int, isSuffixElement: (Element) throws-> Bool
+  ) rethrows -> Index {
+    if n == 0 { return startIndex }
+    if n == 1 {
+      return try isSuffixElement(self[startIndex]) ? startIndex : endIndex
     }
+    let h = n / 2, i = index(startIndex, offsetBy: h)
+    let j = try self[..<i].stablePartition(
+      count: h, isSuffixElement: isSuffixElement)
+    let k = try self[i...].stablePartition(
+      count: n - h, isSuffixElement: isSuffixElement)
+    return self[j..<k].rotate(shiftingToStart: i)
+  }
 }
 
 extension Collection {
-    func stablyPartitioned(
-        isSuffixElement p: (Element) -> Bool
-    ) -> [Element] {
-        var a = Array(self)
-        a.stablePartition(isSuffixElement: p)
-        return a
-    }
+  func stablyPartitioned(
+    isSuffixElement p: (Element) -> Bool
+  ) -> [Element] {
+    var a = Array(self)
+    a.stablePartition(isSuffixElement: p)
+    return a
+  }
 }
 
 extension LazyCollectionProtocol
 where Element == Elements.Element {
-    func stablyPartitioned(
-        isSuffixElement p: (Element) -> Bool
-    ) -> LazyCollection<[Element]> {
-        return elements.stablyPartitioned(isSuffixElement: p).lazy
-    }
+  func stablyPartitioned(
+    isSuffixElement p: (Element) -> Bool
+  ) -> LazyCollection<[Element]> {
+    return elements.stablyPartitioned(isSuffixElement: p).lazy
+  }
 }
 
 extension Collection {
@@ -635,8 +607,59 @@ extension Collection {
   }
 }
 
+//===--- Minimal subset of StdlibUnittest for standalone testing ----------===//
+//===----------------------------------------------------------------------===//
+#if !USE_STDLIBUNITTEST
+class TestSuite {
+  let name: String
+  var tests: [(name: String, body: ()->())] = []
+  static var all: [TestSuite] = []
+  init(_ name: String) {
+    self.name = name
+    TestSuite.all.append(self)
+  }
+
+  func test(_ name: String, body: @escaping ()->()) {
+    tests.append((name, body))
+  }
+}
+
+func runAllTests() {
+  for s in TestSuite.all {
+    for (testName, f) in s.tests {
+      print("\(s.name)/\(testName)...")
+      f()
+      print("done.")
+    }
+  }
+}
+
+func expectEqual<T : Equatable>(
+  _ expected: T, _ x: T, file: StaticString = #file, line: UInt = #line
+) {
+  precondition(
+    x == expected, "Expected \(x) == \(expected)", file: file, line: line)
+}
+
+func expectGE<T: Comparable>(
+  _ a: T, _ b: T, _ message: @autoclosure ()->String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  precondition(a >= b, message(), file: file, line: line)
+}
+
+func expectLE<T: Comparable>(
+  _ a: T, _ b: T, _ message: @autoclosure ()->String = "",
+  file: StaticString = #file, line: UInt = #line
+) {
+  precondition(a <= b, message(), file: file, line: line)
+}
+#endif
+
+
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
+
 
 func address<T>(_ p: UnsafePointer<T>) -> UInt { return UInt(bitPattern: p )}
 
@@ -799,8 +822,8 @@ suite.test("partitionPoint") {
     for j in i..<11 {
       for k in i...j {
         let p = (i..<j).partitionPoint { $0 >= k }
-        expectGE(p, i)
-        expectLE(p, j)
+        expectGE(p, i, "\(p) >= \(i)")
+        expectLE(p, j, "\(p) <= \(j)")
         expectEqual(p, k)
       }
     }
