@@ -197,6 +197,59 @@ public func fatalError(
     flags: _fatalErrorFlags())
 }
 
+/// Reasons why code should die at runtime
+public struct FatalReason: CustomStringConvertible {
+  /// Die because this code branch should be unreachable.
+  public static let unreachable = FatalReason("Should never be reached during execution.")
+  
+  /// Die because this method or function has not yet been implemented.
+  public static let notImplemented = FatalReason("Not yet implemented.")
+  
+  /// Die because a default method must be overriden by a
+  /// subtype or extension.
+  public static let mustOverride = FatalReason("Must be overriden in subtype.")
+  
+  /// Die because this functionality should never be called,
+  /// typically to silence requirements.
+  public static let uncallable = FatalReason("Should never be called.")
+  
+  /// An underlying string-based cause for a fatal error.
+  public let reason: String
+  
+  /// Establishes a new instance of a `FatalReason` with a string-based explanation.
+  public init(_ reason: String) {
+    self.reason = reason
+  }
+  
+  /// Conforms to CustomStringConvertible, allowing reason to
+  /// print directly to complaint.
+  public var description: String {
+    return reason
+  }
+}
+
+/// Unconditionally prints a given message and stops execution.
+///
+/// - Parameters:
+///   - reason: A predefined `FatalReason`.
+///   - function: The name of the calling function to print with `message`. The
+///     default is the calling scope where `fatalError(because:, function:, file:, line:)`
+///     is called.
+///   - file: The file name to print with `message`. The default is the file
+///     where `fatalError(because:, function:, file:, line:)` is called.
+///   - line: The line number to print along with `message`. The default is the
+///     line number where `fatalError(because:, function:, file:, line:)` is called.
+@inlinable // FIXME(sil-serialize-all)
+@_transparent
+public func fatalError(
+  because reason: FatalReason,
+  function: StaticString = #function,
+  file: StaticString = #file,
+  line: UInt = #line
+  ) -> Never {
+  fatalError("\(function): \(reason)", file: file, line: line)
+}
+
 /// Library precondition checks.
 ///
 /// Library precondition checks are enabled in debug mode and release mode. When
