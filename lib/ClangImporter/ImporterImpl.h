@@ -108,8 +108,8 @@ enum class ImportTypeKind {
   /// \brief Import the type of a literal value.
   Value,
 
-  /// \brief Import the type of a literal value that can be bridged.
-  BridgedValue,
+  /// \brief Import the type of an Objective-C generic argument.
+  ObjCGenericArgument,
 
   /// \brief Import the declared type of a variable.
   Variable,

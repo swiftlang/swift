@@ -974,8 +974,8 @@ namespace {
           // Convert the type arguments.
           for (auto typeArg : typeArgs) {
             Type importedTypeArg = Impl.importTypeIgnoreIUO(
-                typeArg, ImportTypeKind::BridgedValue, AllowNSUIntegerAsInt,
-                Bridging, OTK_None);
+                typeArg, ImportTypeKind::ObjCGenericArgument,
+                AllowNSUIntegerAsInt, Bridging, OTK_None);
             if (!importedTypeArg) {
               importedTypeArgs.clear();
               break;
@@ -1102,7 +1102,7 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::CFUnretainedOutParameter:
   case ImportTypeKind::Property:
   case ImportTypeKind::PropertyWithReferenceSemantics:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCGenericArgument:
   case ImportTypeKind::Typedef:
     return true;
   }
@@ -1116,7 +1116,7 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::Abstract:
   case ImportTypeKind::Typedef:
   case ImportTypeKind::Value:
-  case ImportTypeKind::BridgedValue:
+  case ImportTypeKind::ObjCGenericArgument:
   case ImportTypeKind::Variable:
   case ImportTypeKind::Result:
   case ImportTypeKind::Pointee:
@@ -1287,10 +1287,19 @@ static ImportedType adjustTypeForConcreteImport(
   // we would prefer to instead use the default Swift convention.
   if (hint == ImportHint::Block) {
     if (canBridgeTypes(importKind)) {
+      // Determine the representation we need. For Objective-C generic
+      // arguments, we cannot bridge them to a block, so force a block
+      // representation even if our imported type thus far is a Swift
+      // function representation.
+      auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
+      if (importKind == ImportTypeKind::ObjCGenericArgument) {
+        requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
+      }
+
       auto fTy = importedType->castTo<FunctionType>();
       FunctionType::ExtInfo einfo = fTy->getExtInfo();
-      if (einfo.getRepresentation() != FunctionTypeRepresentation::Swift) {
-        einfo = einfo.withRepresentation(FunctionTypeRepresentation::Swift);
+      if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
+        einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
         importedType = fTy->withExtInfo(einfo);
       }
     }
