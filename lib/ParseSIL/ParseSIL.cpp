@@ -1229,11 +1229,11 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
 
 static Optional<AccessorKind> getAccessorKind(StringRef ident) {
   return llvm::StringSwitch<Optional<AccessorKind>>(ident)
-           .Case("getter", AccessorKind::IsGetter)
-           .Case("setter", AccessorKind::IsSetter)
-           .Case("addressor", AccessorKind::IsAddressor)
-           .Case("mutableAddressor", AccessorKind::IsMutableAddressor)
-           .Case("materializeForSet", AccessorKind::IsMaterializeForSet)
+           .Case("getter", AccessorKind::Get)
+           .Case("setter", AccessorKind::Set)
+           .Case("addressor", AccessorKind::Address)
+           .Case("mutableAddressor", AccessorKind::MutableAddress)
+           .Case("materializeForSet", AccessorKind::MaterializeForSet)
            .Default(None);
 }
 

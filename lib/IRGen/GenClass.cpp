@@ -1644,19 +1644,19 @@ namespace {
         return emitObjCMethodDescriptor(IGM, descriptors, method);
 
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         return emitObjCGetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         return emitObjCSetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
       llvm_unreachable("bad accessor kind");

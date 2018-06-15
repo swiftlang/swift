@@ -214,17 +214,17 @@ static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
   // allow them as protocol requirements someday.
 
   switch (reqtKind) {
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get:
+  case AccessorKind::Address:
     return false;
 
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::Set:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::MaterializeForSet:
     return true;
 
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     llvm_unreachable("willSet/didSet protocol requirement?");
   }
   llvm_unreachable("bad accessor kind");
@@ -446,12 +446,12 @@ swift::matchWitness(
     // Validate that the 'mutating' bit lines up for getters and setters.
     if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
                       witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::IsGetter),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::Get),
                               MatchKind::MutatingConflict);
     
     if (req->isSettable(req->getDeclContext()) &&
         checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::IsSetter),
+      return RequirementMatch(getStandinForAccessor(AccessorKind::Set),
                               MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.
@@ -3098,23 +3098,23 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   // Determine which of the candidates is viable.
-  SmallVector<std::pair<TypeDecl *, Type>, 2> viable;
+  SmallVector<LookupTypeResultEntry, 2> viable;
   SmallVector<std::pair<TypeDecl *, CheckTypeWitnessResult>, 2> nonViable;
   for (auto candidate : candidates) {
     // Skip nested generic types.
-    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.first))
+    if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member))
       if (genericDecl->getGenericParams())
         continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.
-    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.first))
+    if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(candidate.Member))
       if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
         continue;
 
     // Check this type against the protocol requirements.
-    if (auto checkResult = checkTypeWitness(TC, DC, Proto, assocType,
-                                            candidate.second)) {
-      nonViable.push_back({candidate.first, checkResult});
+    if (auto checkResult =
+            checkTypeWitness(TC, DC, Proto, assocType, candidate.MemberType)) {
+      nonViable.push_back({candidate.Member, checkResult});
     } else {
       viable.push_back(candidate);
     }
@@ -3132,10 +3132,10 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // If there is a single viable candidate, form a substitution for it.
   if (viable.size() == 1) {
-    auto interfaceType = viable.front().second;
+    auto interfaceType = viable.front().MemberType;
     if (interfaceType->hasArchetype())
       interfaceType = interfaceType->mapTypeOutOfContext();
-    recordTypeWitness(assocType, interfaceType, viable.front().first, true);
+    recordTypeWitness(assocType, interfaceType, viable.front().Member, true);
     return ResolveWitnessResult::Success;
   }
 
@@ -3151,7 +3151,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
                        assocType->getName());
 
         for (auto candidate : viable)
-          diags.diagnose(candidate.first, diag::protocol_witness_type);
+          diags.diagnose(candidate.Member, diag::protocol_witness_type);
       });
 
     return ResolveWitnessResult::ExplicitFailed;
@@ -4914,17 +4914,17 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
   if (auto *accessor = dyn_cast<AccessorDecl>(witness)) {
     accessorKind = accessor->getAccessorKind();
     switch (*accessorKind) {
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::MaterializeForSet:
       // These accessors are never exposed to Objective-C.
       return result;
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
       // These accessors are folded into the setter.
       return result;
-    case AccessorKind::IsGetter:
-    case AccessorKind::IsSetter:
+    case AccessorKind::Get:
+    case AccessorKind::Set:
       // These are found relative to the main decl.
       name = accessor->getStorage()->getFullName();
       break;

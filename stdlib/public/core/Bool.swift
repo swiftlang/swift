@@ -43,6 +43,7 @@
 ///         print(i)
 ///         i -= 1
 ///     }
+///     // error: 'Int' is not convertible to 'Bool'
 ///
 /// The correct approach in Swift is to compare the `i` value with zero in the
 /// `while` statement.

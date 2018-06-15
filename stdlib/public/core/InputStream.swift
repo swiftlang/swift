@@ -19,7 +19,7 @@ import SwiftShims
 /// Unicode [replacement characters][rc].
 ///
 /// [rc]:
-/// http://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+/// https://unicode.org/glossary/#replacement_character
 ///
 /// - Parameter strippingNewline: If `true`, newline characters and character
 ///   combinations are stripped from the result; otherwise, newline characters

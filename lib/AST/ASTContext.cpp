@@ -30,6 +30,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1401,6 +1402,7 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
+  PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
   for (auto &loader : getImpl().ModuleLoaders) {
     loader->loadExtensions(nominal, previousGeneration);
   }
@@ -1412,6 +1414,8 @@ void ASTContext::loadObjCMethods(
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  PrettyStackTraceSelector stackTraceSelector("looking for", selector);
+  PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
   for (auto &loader : getImpl().ModuleLoaders) {
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
@@ -2152,20 +2156,20 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
       llvm_unreachable("Not an Objective-C entry point");
 
-    case AccessorKind::IsGetter:
+    case AccessorKind::Get:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 5, var->getFullName() };
 
       return { 6, Identifier() };
 
-    case AccessorKind::IsSetter:
+    case AccessorKind::Set:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 7, var->getFullName() };
       return { 8, Identifier() };

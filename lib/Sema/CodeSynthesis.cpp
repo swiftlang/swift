@@ -160,7 +160,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::IsGetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Get, AddressorKind::NotAddressor, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
@@ -211,7 +211,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::IsSetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params, TypeLoc::withoutLoc(setterRetTy),
@@ -328,7 +328,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::IsMaterializeForSet, AddressorKind::NotAddressor, storage,
+      AccessorKind::MaterializeForSet, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       (genericParams
@@ -453,11 +453,11 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.
-  if (accessorKind != AccessorKind::IsGetter)
+  if (accessorKind != AccessorKind::Get)
     params = params.slice(1);
 
   // Ignore the materializeForSet callback storage parameter.
-  if (accessorKind == AccessorKind::IsMaterializeForSet)
+  if (accessorKind == AccessorKind::MaterializeForSet)
     params = params.slice(1);
   
   // Okay, everything else should be forwarded, build the expression.

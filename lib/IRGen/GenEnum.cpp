@@ -2327,6 +2327,29 @@ namespace {
         llvm_unreachable("ABI-inaccessible type cannot be loadable");
 
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            Explosion payloadCopy;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.copy(IGF, payloadValue, payloadCopy,
+                            IGF.getDefaultAtomicity());
+            (void)payloadCopy.claimAll();
+          }
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
+
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -2364,6 +2387,27 @@ namespace {
         llvm_unreachable("ABI-inaccessible type cannot be loadable");
 
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          // If we did, consume it.
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
+          }
+
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4069,6 +4113,22 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                Explosion tmp;
+                lti.copy(IGF, value, tmp, IGF.getDefaultAtomicity());
+                (void)tmp.claimAll(); // FIXME: repack if not bit-identical
+              });
+          return;
+        }
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4114,6 +4174,20 @@ namespace {
 
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                lti.consume(IGF, value, IGF.getDefaultAtomicity());
+              });
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;

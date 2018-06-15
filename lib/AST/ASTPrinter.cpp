@@ -1386,15 +1386,15 @@ bool PrintAST::shouldPrint(const Decl *D, bool Notify) {
 
 static bool isAccessorAssumedNonMutating(AccessorDecl *accessor) {
   switch (accessor->getAccessorKind()) {
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get:
+  case AccessorKind::Address:
     return true;
 
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
-  case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+  case AccessorKind::MaterializeForSet:
+  case AccessorKind::MutableAddress:
     return false;
   }
   llvm_unreachable("bad addressor kind");
@@ -2401,29 +2401,29 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   printDocumentationComment(decl);
   printAttributes(decl);
   switch (auto kind = decl->getAccessorKind()) {
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get:
+  case AccessorKind::Address:
     recordDeclLoc(decl,
       [&]{
-        Printer << (kind == AccessorKind::IsGetter
+        Printer << (kind == AccessorKind::Get
                       ? "get" : getAddressorLabel(decl));
       });
     Printer << " {";
     break;
-  case AccessorKind::IsDidSet:
-  case AccessorKind::IsMaterializeForSet:
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::DidSet:
+  case AccessorKind::MaterializeForSet:
+  case AccessorKind::MutableAddress:
     recordDeclLoc(decl,
       [&]{
-        Printer << (kind == AccessorKind::IsDidSet ? "didSet" :
-                    kind == AccessorKind::IsMaterializeForSet
+        Printer << (kind == AccessorKind::DidSet ? "didSet" :
+                    kind == AccessorKind::MaterializeForSet
                       ? "materializeForSet"
                       : getMutableAddressorLabel(decl));
       });
     Printer << " {";
     break;
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
     recordDeclLoc(decl,
       [&]{
         Printer << (decl->isSetter() ? "set" : "willSet");

@@ -176,12 +176,6 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
-  /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  unsigned DriverBatchSeed = 0;
-
-  /// Forces a repartition for testing.
-  bool DriverForceOneBatchRepartition = false;
-
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);

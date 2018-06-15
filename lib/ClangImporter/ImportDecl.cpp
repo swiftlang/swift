@@ -507,7 +507,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      rawValueDecl,
                      /*StaticLoc=*/SourceLoc(),
@@ -592,7 +592,7 @@ static AccessorDecl *makeStructRawValueGetter(
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      computedVar,
                      /*StaticLoc=*/SourceLoc(),
@@ -661,7 +661,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/importedFieldDecl->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
@@ -703,7 +703,7 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   auto setterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsSetter,
+                     AccessorKind::Set,
                      AddressorKind::NotAddressor,
                      importedFieldDecl,
                      /*StaticLoc=*/SourceLoc(),
@@ -1623,7 +1623,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
   auto thunk = AccessorDecl::create(C,
                      /*FuncLoc=*/loc,
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
@@ -1694,7 +1694,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto thunk = AccessorDecl::create(C,
                      /*FuncLoc=*/setter->getLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsSetter,
+                     AccessorKind::Set,
                      AddressorKind::NotAddressor,
                      subscript,
                      /*StaticLoc=*/SourceLoc(),
@@ -1868,7 +1868,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      errorDomainPropertyDecl,
                      /*StaticLoc=*/SourceLoc(),
@@ -4788,7 +4788,7 @@ namespace {
         return;
 
       AccessorDecl *setter = importAccessor(clangSetter,
-                                            original, AccessorKind::IsSetter,
+                                            original, AccessorKind::Set,
                                             original->getDeclContext());
       if (!setter)
         return;
@@ -4894,7 +4894,7 @@ namespace {
       // Import the getter.
       AccessorDecl *getter = nullptr;
       if (auto clangGetter = decl->getGetterMethodDecl()) {
-        getter = importAccessor(clangGetter, result, AccessorKind::IsGetter, dc);
+        getter = importAccessor(clangGetter, result, AccessorKind::Get, dc);
         if (!getter)
           return nullptr;
       }
@@ -4902,7 +4902,7 @@ namespace {
       // Import the setter, if there is one.
       AccessorDecl *setter = nullptr;
       if (auto clangSetter = decl->getSetterMethodDecl()) {
-        setter = importAccessor(clangSetter, result, AccessorKind::IsSetter, dc);
+        setter = importAccessor(clangSetter, result, AccessorKind::Set, dc);
         if (!setter)
           return nullptr;
       }
@@ -5933,7 +5933,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   // Import the getter.
   auto *swiftGetter = dyn_cast_or_null<AccessorDecl>(
       importFunctionDecl(getter, getterName, None,
-                         AccessorInfo{property, AccessorKind::IsGetter}));
+                         AccessorInfo{property, AccessorKind::Get}));
   if (!swiftGetter)
     return nullptr;
 
@@ -5947,7 +5947,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (setter) {
     swiftSetter = dyn_cast_or_null<AccessorDecl>(
         importFunctionDecl(setter, setterName, None,
-                           AccessorInfo{property, AccessorKind::IsSetter}));
+                           AccessorInfo{property, AccessorKind::Set}));
     if (!swiftSetter)
       return nullptr;
 
@@ -8334,7 +8334,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   auto func = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
                      /*AccessorKeywordLoc=*/SourceLoc(),
-                     AccessorKind::IsGetter,
+                     AccessorKind::Get,
                      AddressorKind::NotAddressor,
                      var,
                      /*StaticLoc=*/SourceLoc(),

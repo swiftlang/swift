@@ -1070,7 +1070,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::IsGetter, AddressorKind::NotAddressor, hashValueDecl,
+      AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,

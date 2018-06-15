@@ -3801,19 +3801,19 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   // default to mutating.  get/address default to
   // non-mutating.
   switch (Kind) {
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsGetter:
+  case AccessorKind::Address:
+  case AccessorKind::Get:
     break;
 
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
 
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("not parseable accessors");
   }
 
@@ -3829,7 +3829,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   bool isNameImplicit = name.empty();
   if (isNameImplicit) {
     const char *implName =
-      accessorKind == AccessorKind::IsDidSet ? "oldValue" : "newValue";
+      accessorKind == AccessorKind::DidSet ? "oldValue" : "newValue";
     name = P.Context.getIdentifier(implName);
   }
 
@@ -3862,8 +3862,8 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                                                     TypeLoc ElementTy) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
-  if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet &&
-      Kind != AccessorKind::IsDidSet)
+  if (Kind != AccessorKind::Set && Kind != AccessorKind::WillSet &&
+      Kind != AccessorKind::DidSet)
     return nullptr;
 
   SourceLoc StartLoc, NameLoc, EndLoc;
@@ -3887,8 +3887,8 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
       NameLoc = P.consumeToken();
 
       auto DiagID =
-         Kind == AccessorKind::IsSetter ? diag::expected_rparen_set_name :
-         Kind == AccessorKind::IsWillSet ? diag::expected_rparen_willSet_name :
+         Kind == AccessorKind::Set ? diag::expected_rparen_set_name :
+         Kind == AccessorKind::WillSet ? diag::expected_rparen_willSet_name :
           diag::expected_rparen_didSet_name;
       
       // Look for the closing ')'.
@@ -3960,58 +3960,33 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   }
 }
 
-static AddressorKind getImmutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeAddress")) {
-    return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("addressWithOwner")) {
-    return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("addressWithNativeOwner")) {
-    return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("addressWithPinnedNativeOwner")) {
-    return AddressorKind::NativePinning;
-  } else {
-    return AddressorKind::NotAddressor;
-  }
-}
-static AddressorKind getMutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeMutableAddress")) {
-    return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("mutableAddressWithOwner")) {
-    return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("mutableAddressWithNativeOwner")) {
-    return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("mutableAddressWithPinnedNativeOwner")) {
-    return AddressorKind::NativePinning;
-  } else {
-    return AddressorKind::NotAddressor;
-  }
-}
-
-/// Returns an accessor kind that 
+/// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               AddressorKind addressorKind) {
   switch (accessorKind) {
-  case AccessorKind::IsGetter: return "getter";
-  case AccessorKind::IsSetter: return "setter";
-  case AccessorKind::IsDidSet: return "didSet";
-  case AccessorKind::IsWillSet: return "willSet";
-  case AccessorKind::IsMaterializeForSet: return "materializeForSet";
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get: return "getter";
+  case AccessorKind::Set: return "setter";
+#define ACCESSOR(ID)
+#define OBJC_ACCESSOR(ID, KEYWORD) // treated specially above
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  case AccessorKind::Address:
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-    case AddressorKind::Unsafe: return "unsafeAddress";
-    case AddressorKind::Owning: return "addressWithOwner";
-    case AddressorKind::NativeOwning: return "addressWithNativeOwner";
-    case AddressorKind::NativePinning: return "addressWithPinnedNativeOwner";
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-    case AddressorKind::Unsafe: return "unsafeMutableAddress";
-    case AddressorKind::Owning: return "mutableAddressWithOwner";
-    case AddressorKind::NativeOwning: return "mutableAddressWithNativeOwner";
-    case AddressorKind::NativePinning: return "mutableAddressWithPinnedNativeOwner";
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad addressor kind");
   }
@@ -4025,15 +4000,15 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorDecl *previousDecl) {
   // Different addressor safety kinds still count as the same addressor.
   if (previousDecl->getAddressorKind() != addressorKind) {
-    assert(accessorKind == AccessorKind::IsAddressor ||
-           accessorKind == AccessorKind::IsMutableAddressor);
+    assert(accessorKind == AccessorKind::Address ||
+           accessorKind == AccessorKind::MutableAddress);
     P.diagnose(loc, diag::conflicting_property_addressor,
                unsigned(isSubscript),
-               unsigned(accessorKind == AccessorKind::IsMutableAddressor));
+               unsigned(accessorKind == AccessorKind::MutableAddress));
 
     // Be less specific about the previous definition.
     P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
-               accessorKind == AccessorKind::IsMutableAddressor
+               accessorKind == AccessorKind::MutableAddress
                  ? "mutable addressor" : "addressor");
     return;
   }
@@ -4092,23 +4067,23 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       AddressorKind addressorKind = AddressorKind::NotAddressor;
       AccessorDecl **TheDeclPtr;
       SourceLoc AccessorKeywordLoc = Tok.getLoc();
-      if (Tok.isContextualKeyword("get")) {
-        Kind = AccessorKind::IsGetter;
-        TheDeclPtr = &accessors.Get;
-      } else if (Tok.isContextualKeyword("set")) {
-        Kind = AccessorKind::IsSetter;
-        TheDeclPtr = &accessors.Set;
-      } else if (!Flags.contains(PD_InProtocol) &&
-                 (addressorKind = getImmutableAddressorKind(Tok))
-                   != AddressorKind::NotAddressor) {
-        Kind = AccessorKind::IsAddressor;
-        TheDeclPtr = &accessors.Addressor;
-      } else if (!Flags.contains(PD_InProtocol) &&
-                 (addressorKind = getMutableAddressorKind(Tok))
-                   != AddressorKind::NotAddressor) {
-        Kind = AccessorKind::IsMutableAddressor;
-        TheDeclPtr = &accessors.MutableAddressor;
-      } else {
+      if (false) {}
+#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define OBSERVING_ACCESSOR(ID, KEYWORD) // don't allow here
+#define SINGLETON_ACCESSOR(ID, KEYWORD)                 \
+      else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+        Kind = AccessorKind::ID;                        \
+        TheDeclPtr = &accessors.ID;                     \
+      }
+#define ANY_ADDRESSOR(ID, ADDRESSOR_ID, KEYWORD)        \
+      else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+        Kind = AccessorKind::ID;                        \
+        TheDeclPtr = &accessors.ID;                     \
+        addressorKind = AddressorKind::ADDRESSOR_ID;    \
+      }
+#include "swift/AST/AccessorKinds.def"
+      else {
         AccessorCtx.setTransparent();
         AccessorKeywordLoc = SourceLoc();
         diagnose(Tok, diag::expected_getset_in_protocol);
@@ -4192,27 +4167,22 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     AddressorKind addressorKind = AddressorKind::NotAddressor;
     AccessorDecl **TheDeclPtr;
     SourceLoc AccessorKeywordLoc =  Tok.getLoc();
-    if (Tok.isContextualKeyword("get")) {
-      Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &accessors.Get;
-    } else if (Tok.isContextualKeyword("set")) {
-      Kind = AccessorKind::IsSetter;
-      TheDeclPtr = &accessors.Set;
-    } else if (Tok.isContextualKeyword("willSet")) {
-      Kind = AccessorKind::IsWillSet;
-      TheDeclPtr = &accessors.WillSet;
-    } else if (Tok.isContextualKeyword("didSet")) {
-      Kind = AccessorKind::IsDidSet;
-      TheDeclPtr = &accessors.DidSet;
-    } else if ((addressorKind = getImmutableAddressorKind(Tok))
-                 != AddressorKind::NotAddressor) {
-      Kind = AccessorKind::IsAddressor;
-      TheDeclPtr = &accessors.Addressor;
-    } else if ((addressorKind = getMutableAddressorKind(Tok))
-                 != AddressorKind::NotAddressor) {
-      Kind = AccessorKind::IsMutableAddressor;
-      TheDeclPtr = &accessors.MutableAddressor;
-    } else {
+    if (false) {}
+#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define SINGLETON_ACCESSOR(ID, KEYWORD)               \
+    else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+      Kind = AccessorKind::ID;                        \
+      TheDeclPtr = &accessors.ID;                     \
+    }
+#define ANY_ADDRESSOR(ID, ADDRESSOR_ID, KEYWORD)      \
+    else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+      Kind = AccessorKind::ID;                        \
+      TheDeclPtr = &accessors.ID;                     \
+      addressorKind = AddressorKind::ADDRESSOR_ID;    \
+    }
+#include "swift/AST/AccessorKinds.def"
+    else {
       AccessorKeywordLoc = SourceLoc();
       // This is an implicit getter.  Might be not valid in this position,
       // though.  Anyway, go back to the beginning of the getter code to ensure
@@ -4230,7 +4200,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         // Don't signal an error since we recovered.
         return false;
       }
-      Kind = AccessorKind::IsGetter;
+      Kind = AccessorKind::Get;
       TheDeclPtr = &accessors.Get;
       isImplicitGet = true;
     }
@@ -4426,20 +4396,20 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 
   // Fill in the result type.
   switch (kind) {
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("should never be seen here");
 
   // These have non-trivial returns, so fill in error.
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::Get:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
     accessor->getBodyResultTypeLoc().setType(P.Context.TheErrorType, true);
     return;
 
   // These return void.
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     return;
   }
   llvm_unreachable("bad kind");
@@ -4449,13 +4419,9 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 /// Fill in various slots with type errors.
 static void fillInAccessorTypeErrors(Parser &P,
                                      Parser::ParsedAccessors &accessors) {
-  fillInAccessorTypeErrors(P, accessors.Get, AccessorKind::IsGetter);
-  fillInAccessorTypeErrors(P, accessors.Set, AccessorKind::IsSetter);
-  fillInAccessorTypeErrors(P, accessors.Addressor, AccessorKind::IsAddressor);
-  fillInAccessorTypeErrors(P, accessors.MutableAddressor,
-                           AccessorKind::IsMutableAddressor);
-  fillInAccessorTypeErrors(P, accessors.WillSet, AccessorKind::IsWillSet);
-  fillInAccessorTypeErrors(P, accessors.DidSet, AccessorKind::IsDidSet);
+#define ACCESSOR(ID) \
+  fillInAccessorTypeErrors(P, accessors.ID, AccessorKind::ID);
+#include "swift/AST/AccessorKinds.def"
 }
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
@@ -4548,8 +4514,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   }
 
   if (!TyLoc.hasLocation()) {
-    if (accessors.Get || accessors.Set || accessors.Addressor ||
-        accessors.MutableAddressor) {
+    if (accessors.Get || accessors.Set || accessors.Address ||
+        accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
         pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
@@ -4563,7 +4529,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
       DiagID = diag::let_cannot_be_observing_property;
-    else if (accessors.Addressor || accessors.MutableAddressor)
+    else if (accessors.Address || accessors.MutableAddress)
       DiagID = diag::let_cannot_be_addressed_property;
     else
       DiagID = diag::let_cannot_be_computed_property;
@@ -4619,40 +4585,47 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
   // Create an implicit accessor declaration.
   auto createImplicitAccessor =
-  [&](AccessorKind kind, AddressorKind addressorKind,
-      ParameterList *argList) -> AccessorDecl* {
+  [&](AccessorKind kind, AddressorKind addressorKind, ParameterList *argList) {
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
                                        staticLoc, flags, kind, addressorKind,
                                        storage, &P, SourceLoc());
     accessor->setImplicit();
     decls.push_back(accessor);
-    return accessor;
+
+    switch (kind) {
+#define ACCESSOR(ID)            \
+    case AccessorKind::ID:      \
+      ID = accessor;            \
+      return;
+#include "swift/AST/AccessorKinds.def"
+    }
+    llvm_unreachable("bad accessor kind");
   };
 
-  // 'address' is exclusive with 'get', and 'mutableAddress' is
-  // exclusive with 'set'.
-  if (Addressor || MutableAddressor) {
+  // 'address' is exclusive with 'get'/'read', and 'mutableAddress' is
+  // exclusive with 'set'/'modify'.
+  if (Address || MutableAddress) {
     // Require either a 'get' or an 'address' accessor if there's
     // a 'mutableAddress' accessor.  In principle, we could synthesize
     // 'address' from 'mutableAddress', but for now we'll enforce this.
-    if (!Addressor && !Get) {
-      P.diagnose(MutableAddressor->getLoc(),
+    if (!Address && !Get) {
+      P.diagnose(MutableAddress->getLoc(),
                  diag::mutableaddressor_without_address,
                  isa<SubscriptDecl>(storage));
 
-      Addressor = createImplicitAccessor(AccessorKind::IsAddressor,
-                                         AddressorKind::Unsafe,
-                                         nullptr);
+      createImplicitAccessor(AccessorKind::Address, AddressorKind::Unsafe,
+                             nullptr);
+    }
 
     // Don't allow both.
-    } else if (Addressor && Get) {
-      P.diagnose(Addressor->getLoc(), diag::addressor_with_getter,
-                 isa<SubscriptDecl>(storage));      
+    if (Address && Get) {
+      P.diagnose(Address->getLoc(), diag::addressor_with_getter,
+                 isa<SubscriptDecl>(storage));
       ignoreInvalidAccessor(Get);
     }
 
-    // Disallow mutableAddress+set.
+    // Disallow mutableAddress+{set,modify}.
     //
     // Currently we don't allow the address+set combination either.
     // In principle, this is an unnecessary restriction, and you can
@@ -4661,8 +4634,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // important.  (For example, we don't make any effort to optimize
     // them for polymorphic accesses.)
     if (Set) {
-      if (MutableAddressor) {
-        P.diagnose(MutableAddressor->getLoc(), diag::mutableaddressor_with_setter,
+      if (MutableAddress) {
+        P.diagnose(MutableAddress->getLoc(), diag::mutableaddressor_with_setter,
                    isa<SubscriptDecl>(storage));
       } else {
         P.diagnose(Set->getLoc(), diag::addressor_with_setter,
@@ -4679,38 +4652,37 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     ignoreInvalidAccessor(WillSet);
     ignoreInvalidAccessor(DidSet);
   }
-  
+
   // If this decl is invalid, mark any parsed accessors as invalid to avoid
   // tripping up later invariants.
   if (invalid) {
-    flagInvalidAccessor(Get);
-    flagInvalidAccessor(Set);
-    flagInvalidAccessor(Addressor);
-    flagInvalidAccessor(MutableAddressor);
-    flagInvalidAccessor(WillSet);
-    flagInvalidAccessor(DidSet);
+#define ACCESSOR(ID) flagInvalidAccessor(ID);
+#include "swift/AST/AccessorKinds.def"
   }
 
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
-    if (Get || Set) {
-      P.diagnose(Get ? Get->getLoc() : Set->getLoc(),
-                 diag::observingproperty_with_getset, bool(DidSet), bool(Set));
+    if (Get) {
+      P.diagnose(Get->getLoc(), diag::observingproperty_with_getset,
+                 bool(DidSet), /*getter*/0);
       ignoreInvalidAccessor(Get);
+    }
+    if (Set) {
+      P.diagnose(Set->getLoc(), diag::observingproperty_with_getset,
+                 bool(DidSet), /*setter*/1);
       ignoreInvalidAccessor(Set);
     }
 
-    if (Addressor) {
-      if (!MutableAddressor) {
+    if (Address) {
+      if (!MutableAddress) {
         P.diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
                    diag::observingproperty_without_mutableaddress,
                    bool(DidSet));
-        MutableAddressor =
-          createImplicitAccessor(AccessorKind::IsMutableAddressor,
-                                 AddressorKind::Unsafe, nullptr);
+        createImplicitAccessor(AccessorKind::MutableAddress,
+                               AddressorKind::Unsafe, nullptr);
       }
 
-      storage->makeAddressedWithObservers(LBLoc, Addressor, MutableAddressor,
+      storage->makeAddressedWithObservers(LBLoc, Address, MutableAddress,
                                           WillSet, DidSet, RBLoc);
     } else if (attrs.hasAttribute<OverrideAttr>()) {
       storage->makeInheritedWithObservers(LBLoc, WillSet, DidSet, RBLoc);
@@ -4720,44 +4692,44 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
     // Observing properties will have getters and setters synthesized by sema.
     // Create their prototypes now.
-    Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                 AddressorKind::NotAddressor, nullptr);
+    createImplicitAccessor(AccessorKind::Get,
+                           AddressorKind::NotAddressor, nullptr);
 
     auto argFunc = (WillSet ? WillSet : DidSet);
     auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
 
     auto argument = createSetterAccessorArgument(
-        argLoc, Identifier(), AccessorKind::IsSetter, P, elementTy);
+        argLoc, Identifier(), AccessorKind::Set, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
-    Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argList);
+    createImplicitAccessor(AccessorKind::Set,
+                           AddressorKind::NotAddressor, argList);
 
     storage->setObservingAccessors(Get, Set, nullptr);
     return;
   }
 
   // If we have addressors, at this point mark it as addressed.
-  if (Addressor) {
+  if (Address) {
     assert(!Get && !Set);
-    storage->makeAddressed(LBLoc, Addressor, MutableAddressor, RBLoc);
+    storage->makeAddressed(LBLoc, Address, MutableAddress, RBLoc);
     return;
   }
 
   // If this is a get+mutableAddress property, synthesize an implicit
   // setter and record what we've got.
-  if (MutableAddressor) {
+  if (MutableAddress) {
     assert(Get && !Set);
     auto argument =
-        createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
-                                     AccessorKind::IsSetter, P, elementTy);
+        createSetterAccessorArgument(MutableAddress->getLoc(), Identifier(),
+                                     AccessorKind::Set, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
-    Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argList);
+    createImplicitAccessor(AccessorKind::Set,
+                           AddressorKind::NotAddressor, argList);
 
     storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
-                                            MutableAddressor, RBLoc);
+                                            MutableAddress, RBLoc);
     return;
-  } 
+  }
 
   // Otherwise, this must be a get/set property.  The set is optional,
   // but get is not.
@@ -4768,14 +4740,14 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
       if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
       // Create a getter so we don't break downstream invariants by having a
       // setter without a getter.
-      Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                   AddressorKind::NotAddressor, nullptr);
+      createImplicitAccessor(AccessorKind::Get,
+                             AddressorKind::NotAddressor, nullptr);
     } else if (Set) {
       if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
       // Create a getter so we don't break downstream invariants by having a
       // setter without a getter.
-      Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                   AddressorKind::NotAddressor, nullptr);
+      createImplicitAccessor(AccessorKind::Get,
+                             AddressorKind::NotAddressor, nullptr);
     }
   }
 

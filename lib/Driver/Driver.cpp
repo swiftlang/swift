@@ -643,6 +643,35 @@ static bool getFilelistThreshold(DerivedArgList &Args, size_t &FilelistThreshold
   return false;
 }
 
+static unsigned
+getDriverBatchSeed(llvm::opt::InputArgList &ArgList,
+                   DiagnosticEngine &Diags) {
+  unsigned DriverBatchSeed = 0;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_seed)) {
+    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    }
+  }
+  return DriverBatchSeed;
+}
+
+static Optional<unsigned>
+getDriverBatchCount(llvm::opt::InputArgList &ArgList,
+                    DiagnosticEngine &Diags)
+{
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_count)) {
+    unsigned Count = 0;
+    if (StringRef(A->getValue()).getAsInteger(10, Count)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    } else {
+      return Count;
+    }
+  }
+  return None;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -663,13 +692,9 @@ Driver::buildCompilation(const ToolChain &TC,
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
-  if (const Arg *A = ArgList->getLastArg(options::OPT_driver_batch_seed)) {
-    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-    }
-  }
-  DriverForceOneBatchRepartition =
+  unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
+  Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+  bool DriverForceOneBatchRepartition =
       ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
@@ -837,6 +862,7 @@ Driver::buildCompilation(const ToolChain &TC,
                       Incremental,
                       BatchMode,
                       DriverBatchSeed,
+                      DriverBatchCount,
                       DriverForceOneBatchRepartition,
                       SaveTemps,
                       ShowDriverTimeCompilation,

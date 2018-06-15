@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 419; // Last change: Remove discriminator from LocalDeclTableInfo.
+const uint16_t VERSION_MINOR = 420; // Last change: accessor refactor
 
 using DeclIDField = BCFixed<31>;
 
@@ -188,15 +188,17 @@ using OperatorKindField = BCFixed<3>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum AccessorKind : uint8_t {
-  Getter = 0,
-  Setter,
+  Get = 0,
+  Set,
   WillSet,
   DidSet,
   MaterializeForSet,
-  Addressor,
-  MutableAddressor,
+  Address,
+  MutableAddress,
 };
 using AccessorKindField = BCFixed<3>;
+
+using AccessorCountField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -956,18 +958,12 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
+    AccessorCountField, // number of accessors
     TypeIDField,  // interface type
-    DeclIDField,  // getter
-    DeclIDField,  // setter
-    DeclIDField,  // materializeForSet
-    DeclIDField,  // addressor
-    DeclIDField,  // mutableAddressor
-    DeclIDField,  // willset
-    DeclIDField,  // didset
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
-    BCArray<TypeIDField> // dependencies
+    BCArray<TypeIDField> // accessors and dependencies
   >;
 
   using ParamLayout = BCRecordLayout<
@@ -1099,20 +1095,15 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
+    AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
-    DeclIDField, // getter
-    DeclIDField, // setter
-    DeclIDField, // materializeForSet
-    DeclIDField, // addressor
-    DeclIDField, // mutableAddressor
-    DeclIDField, // willSet
-    DeclIDField, // didSet
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
     BCArray<IdentifierIDField> // name components,
+                               // followed by DeclID accessors,
                                // followed by TypeID dependencies
     // Trailed by:
     // - generic parameters, if any
