@@ -20,6 +20,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
@@ -750,13 +751,16 @@ static void performNoReturnFunctionProcessing(SILFunction &Fn,
                                               SILFunctionTransform *T) {
   DEBUG(llvm::errs() << "*** No return function processing: " << Fn.getName()
                      << "\n");
-
+  bool Changed = false;
   for (auto &BB : Fn) {
     // Remove instructions from the basic block after a call to a noreturn
     // function.
-    simplifyBlocksWithCallsToNoReturn(BB, nullptr);
+    Changed |= simplifyBlocksWithCallsToNoReturn(BB, nullptr);
   }
-  T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  if (Changed) {
+    removeUnreachableBlocks(Fn);
+    T->invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+  }
 }
 
 static void diagnoseUnreachable(SILFunction &Fn) {
