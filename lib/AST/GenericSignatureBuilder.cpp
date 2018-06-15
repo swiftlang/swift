@@ -6292,7 +6292,7 @@ void GenericSignatureBuilder::checkConformanceConstraints(
     // Remove any self-derived constraints.
     removeSelfDerived(*this, entry.second, entry.first);
 
-    checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
+    checkConstraintList<ProtocolDecl *, Type>(
       genericParams, entry.second,
       [](const Constraint<ProtocolDecl *> &constraint) {
         return true;
@@ -6324,7 +6324,7 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       None,
       diag::redundant_conformance_constraint,
       diag::redundant_conformance_here,
-      [](ProtocolDecl *proto) { return proto; },
+      [](ProtocolDecl *proto) { return proto->getDeclaredType(); },
       /*removeSelfDerived=*/false);
   }
 }
