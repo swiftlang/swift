@@ -264,8 +264,8 @@ APFloat SymbolicValue::getFloatValue() const {
 //===----------------------------------------------------------------------===//
 
 namespace swift {
-/// This is a representation of an UTF-8 string, stored as a trailing array of
-/// bytes.  Elements of this value are bump-pointer allocated.
+/// This is a representation of an UTF-8 encoded string, stored as a trailing
+/// array of bytes.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) StringSymbolicValue final
   : private llvm::TrailingObjects<StringSymbolicValue, char> {
     friend class llvm::TrailingObjects<StringSymbolicValue, char>;
@@ -314,6 +314,7 @@ SymbolicValue SymbolicValue::getString(const StringRef string,
   return result;
 }
 
+// Returns the UTF-8 encoded string underlying a SymbolicValue.
 StringRef SymbolicValue::getStringValue() const {
   assert(getKind() == String);
 

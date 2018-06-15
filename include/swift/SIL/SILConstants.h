@@ -252,6 +252,7 @@ public:
   static SymbolicValue getString(const StringRef string,
                                  llvm::BumpPtrAllocator &allocator);
 
+  // Returns the UTF-8 encoded string underlying a SymbolicValue.
   StringRef getStringValue() const;
 
   /// Get a SymbolicValue corresponding to a memory object with an optional
