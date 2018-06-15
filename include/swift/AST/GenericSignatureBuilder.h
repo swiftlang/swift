@@ -1276,8 +1276,11 @@ public:
                                             ProtocolDecl *proto,
                                             bool &derivedViaConcrete) const;
 
-  /// Retrieve a source location that corresponds to the requirement.
+  /// Retrieve a source location that corresponds to the requirement, if any.
   SourceLoc getLoc() const;
+
+  /// Retrieve the source range for the requirement, if any.
+  SourceRange getSourceRange() const;
 
   /// Compare two requirement sources to determine which has the more
   /// optimal path.
@@ -1449,8 +1452,11 @@ public:
   const RequirementSource *getSource(GenericSignatureBuilder &builder,
                                      Type type) const;
 
-  /// Retrieve the source location for this requirement.
+  /// Retrieve the source location for this requirement, if any.
   SourceLoc getLoc() const;
+
+  /// Retrieve the source range for this requirement, if any.
+  SourceRange getSourceRange() const;
 
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;

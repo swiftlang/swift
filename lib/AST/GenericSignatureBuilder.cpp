@@ -1469,6 +1469,16 @@ SourceLoc RequirementSource::getLoc() const {
   return SourceLoc();
 }
 
+SourceRange RequirementSource::getSourceRange() const {
+  if (auto requirementRepr = getRequirementRepr())
+    return requirementRepr->getSourceRange();
+
+  if (auto *typeRepr = getTypeRepr())
+    return typeRepr->getSourceRange();
+
+  return SourceRange();
+}
+
 /// Compute the path length of a requirement source, counting only the number
 /// of \c ProtocolRequirement elements.
 static unsigned sourcePathLength(const RequirementSource *source) {
@@ -1695,6 +1705,25 @@ SourceLoc FloatingRequirementSource::getLoc() const {
   }
 
   return SourceLoc();
+}
+
+SourceRange FloatingRequirementSource::getSourceRange() const {
+  // If this is a source for a protocol requirement, get the source range
+  // for that requirement.
+  if (kind == Kind::AbstractProtocol)
+    if (auto *written = protocolReq.written.dyn_cast<const RequirementRepr *>())
+      return written->getSourceRange();
+
+  if (auto *requirement = storage.dyn_cast<const RequirementRepr *>())
+    return requirement->getSourceRange();
+
+  if (auto *source = storage.dyn_cast<const RequirementSource *>())
+    return source->getSourceRange();
+
+  if (auto *typeRepr = storage.dyn_cast<const TypeRepr *>())
+    return typeRepr->getSourceRange();
+
+  return SourceRange();
 }
 
 bool FloatingRequirementSource::isExplicit() const {
@@ -4146,20 +4175,29 @@ static ConstraintResult visitInherited(
          llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
-  std::function<void(Type, const TypeRepr *)> visitInherited;
+  std::function<void(Type, const TypeRepr *, bool)> visitInherited;
 
-  visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
-    // Decompose explicitly-written protocol compositions.
-    if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
-      if (auto compositionType
-            = inheritedType->getAs<ProtocolCompositionType>()) {
-        unsigned index = 0;
-        for (auto memberType : compositionType->getMembers()) {
-          visitInherited(memberType, composition->getTypes()[index]);
-          index++;
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  auto &ctx = typeDecl ? typeDecl->getASTContext() : extDecl->getASTContext();
+
+  visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr,
+                       bool skipDecomposition) {
+    if (!skipDecomposition) {
+      // Decompose explicitly-written protocol compositions.
+      if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
+        if (auto compositionType =
+                inheritedType->getAs<ProtocolCompositionType>()) {
+
+          unsigned index = 0;
+          for (auto memberType : compositionType->getMembers()) {
+            visitInherited(memberType, composition->getTypes()[index],
+                           skipDecomposition);
+            index++;
+          }
+
+          return;
         }
-
-        return;
       }
     }
 
@@ -4169,8 +4207,6 @@ static ConstraintResult visitInherited(
   };
 
   // Visit all of the inherited types.
-  auto typeDecl = decl.dyn_cast<TypeDecl *>();
-  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
   ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
                                               : extDecl->getInherited();
   for (unsigned index : indices(inheritedTypes)) {
@@ -4178,8 +4214,20 @@ static ConstraintResult visitInherited(
                                   : extDecl->getInheritedType(index);
     if (!inheritedType) continue;
 
+    // If the inherited type is 'Any', allow it to pass through verbatim, as
+    // GSB diagnoses redundant 'Any' constraints. The reason we do this check
+    // here instead of inside visitInherited is in order to avoid diagnosing on
+    // constraints such as ': Any & P'. This is because:
+    // - 1: It preserves parity with the behaviour for protocol composition
+    // constraints that appear in 'where' clauses (which aren't decomposed until
+    // after the redundant 'Any' diagnostic).
+    // - 2: The diagnosis of 'Any & ...' protocol composititions is better done
+    // as a separate broader diagnostic that warns on the usage of such
+    // compositions anywhere, not just in constraints.
+    bool skipDecomposition = inheritedType->isEqual(ctx.TheAnyType);
+
     const auto &inherited = inheritedTypes[index];
-    visitInherited(inheritedType, inherited.getTypeRepr());
+    visitInherited(inheritedType, inherited.getTypeRepr(), skipDecomposition);
   }
 
   return result;
@@ -4711,14 +4759,19 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     assert(constraintType && "No type to express resolved constraint?");
   }
 
+  auto getSubjectInterfaceTy = [&] {
+    if (auto subjectType = subject.dyn_cast<Type>())
+      return subjectType;
+
+    return subject.get<PotentialArchetype *>()->getDependentType(
+        getGenericParams());
+  };
+
   // Check whether we have a reasonable constraint type at all.
   if (!constraintType->isExistentialType() &&
       !constraintType->getClassOrBoundGenericClass()) {
     if (source.getLoc().isValid() && !constraintType->hasError()) {
-      auto subjectType = subject.dyn_cast<Type>();
-      if (!subjectType)
-        subjectType = subject.get<PotentialArchetype *>()
-                        ->getDependentType(getGenericParams());
+      auto subjectType = getSubjectInterfaceTy();
 
       Impl->HadAnyError = true;
       Diags.diagnose(source.getLoc(), diag::requires_conformance_nonprotocol,
@@ -4778,6 +4831,18 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     }
 
     return ConstraintResult::Resolved;
+  }
+
+  // An explicit 'Any' constraint is redundant.
+  if (source.isExplicit() && constraintType->isEqual(Context.TheAnyType)) {
+    auto subjectType = getSubjectInterfaceTy();
+    SourceLoc diagLoc = source.getLoc();
+
+    Diags.diagnose(diagLoc, diag::redundant_conformance_constraint,
+                   subjectType, constraintType)
+         .highlight(source.getSourceRange());
+    Diags.diagnose(diagLoc, diag::all_types_implicitly_conform_to,
+                   constraintType);
   }
 
   // Protocol requirements.
