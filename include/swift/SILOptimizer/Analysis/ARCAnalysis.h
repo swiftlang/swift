@@ -13,16 +13,17 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -181,7 +182,8 @@ public:
 private:
   /// Return true if all the successors of the EpilogueRetainInsts do not have
   /// a retain.
-  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
+  bool
+  isTransitiveSuccessorsRetainFree(const llvm::DenseSet<SILBasicBlock *> &BBs);
 
   /// Finds matching releases in the provided block \p BB.
   RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB,
