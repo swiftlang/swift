@@ -15,10 +15,13 @@ func foo(_ x: Float) -> Float {
   return x * x
 }
 
-// Primal returns custom checkpoints type.
-struct CheckpointsFoo {
-}
+// Original function must return non-Void type.
+@differentiable(reverse, adjoint: dvoid) // expected-error {{cannot differentiate void function 'void'}}
+func void(_ a: Float) {}
+func dvoid(_ a: Float, _ x: (), _ y: ()) -> Float { return 1 }
 
+// Primal returns custom checkpoints type.
+struct CheckpointsFoo {}
 func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) {
   return (CheckpointsFoo(), x * x)
 }
