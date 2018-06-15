@@ -2227,9 +2227,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto *original = cast<FuncDecl>(D);
   auto isInstanceMethod = original->isInstanceMember();
   auto selfDecl = original->getImplicitSelfDecl();
+  auto &ctx = original->getASTContext();
 
-  // If the original function has no parameters, there's nothing to
-  // differentiate with respect to.
+  // If the original function has no parameters or returns the empty tuple
+  // type, there's nothing to differentiate from or with-respect-to.
   auto &originalParams = *original->getParameterList(selfDecl ? 1 : 0);
   if (!isInstanceMethod && originalParams.size() == 0) {
     TC.diagnose(attr->getLocation(), diag::differentiable_attr_no_parameters,
@@ -2237,27 +2238,53 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       .highlight(original->getSourceRange());
     return;
   }
+  auto originalResultTy = original->getResultInterfaceType();
+  if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
+                original->getName())
+      .highlight(original->getSourceRange());
+    return;
+  }
 
-  auto originalParamsTy =
-    originalParams.getInterfaceType(original->getASTContext());
+  auto originalParamsTy = originalParams.getInterfaceType(ctx);
 
   // If the original function and the primal/adjoint have different parents, or
   // if they both have no type context and are in different modules, then
   // it's an error.
+  // Returns true on error.
   std::function<bool(FuncDecl *)> hasValidTypeContext
-    = [&](FuncDecl *decl) {
+    = [&](FuncDecl *func) {
     if (!original->getInnermostTypeContext() &&
-        !decl->getInnermostTypeContext() &&
-        original->getParentModule() == decl->getParentModule())
+        !func->getInnermostTypeContext() &&
+        original->getParentModule() == func->getParentModule())
       return true;
     if (auto typeCtx1 = original->getInnermostTypeContext()) {
-      if (auto typeCtx2 = decl->getInnermostTypeContext()) {
+      if (auto typeCtx2 = func->getInnermostTypeContext()) {
         auto type1 = typeCtx1->getDeclaredInterfaceType();
         auto type2 = typeCtx2->getDeclaredInterfaceType();
         return type1->isEqual(type2);
       }
     }
-    return original->getParent() == decl->getParent();
+    return original->getParent() == func->getParent();
+  };
+
+  // If the original function is exported (i.e. it is public or @_versioned),
+  // then the primal/adjoint must also be exported.
+  // Returns true on error.
+  using FuncSpecifier = DifferentiableAttr::FunctionSpecifier;
+  auto checkAccessControl = [&](FuncDecl *func, FuncSpecifier funcSpec,
+                                bool isPrimal) {
+    auto originalAccess = original->getFormalAccess(/*useDC*/ nullptr,
+                                                    /*respectVersioned*/ true);
+    if (originalAccess < AccessLevel::Public) return false;
+    auto funcAccess = func->getFormalAccess(/*useDC*/ nullptr,
+                                            /*respectVersioned*/ true);
+    if (funcAccess >= AccessLevel::Public) return false;
+    TC.diagnose(funcSpec.Loc.getBaseNameLoc(),
+                diag::differentiable_attr_invalid_access,
+                funcSpec.Name, original->getFullName(), isPrimal);
+    attr->setInvalid();
+    return true;
   };
 
   // Set lookup options.
@@ -2303,8 +2330,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       auto primalSelfDecl = primalCandidate->getImplicitSelfDecl();
       auto primalParams =
         primalCandidate->getParameterList(primalSelfDecl ? 1 : 0);
-      auto primalParamsTy =
-        primalParams->getInterfaceType(original->getASTContext());
+      auto primalParamsTy = primalParams->getInterfaceType(ctx);
       if (!primalParamsTy->isEqual(originalParamsTy))
         return false;
       auto originalCanGenSig = original->getGenericSignature()
@@ -2335,6 +2361,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       attr->setInvalid();
       return;
     }
+    // Check primal access control.
+    if (checkAccessControl(primal, primalSpecifier, /*isPrimal*/ true)) return;
     // Memorize the primal reference in the attribute.
     attr->setPrimalFunction(primal);
   }
@@ -2350,7 +2378,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       SmallVector<TupleTypeElt, 8> retElts;
       for (auto *param : originalParams)
         retElts.push_back(param->getInterfaceType());
-      retTy = TupleType::get(retElts, original->getASTContext());
+      retTy = TupleType::get(retElts, ctx);
     } else {
       retTy = originalParams[0]->getInterfaceType();
     }
@@ -2425,7 +2453,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // type.
     assert(retElts.size() > 0 && "There should be at least one return type");
     retTy = retElts.size() > 1
-      ? TupleType::get(retElts, original->getASTContext())
+      ? TupleType::get(retElts, ctx)
       : retElts[0].getType();
   }
 
@@ -2508,7 +2536,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto isValidAdjoint = [&](FuncDecl *adjointCandidate) {
     // Returns true if adjoint candidate has the expected type.
     auto adjointType = adjointCandidate->getInterfaceType()
-      ->getUnlabeledType(original->getASTContext());
+      ->getUnlabeledType(ctx);
     return adjointType->isEqual(expectedAdjointFnTy);
   };
 
@@ -2523,26 +2551,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setInvalid();
     return;
   }
+  // Check adjoint access control.
+  if (checkAccessControl(adjoint, adjointSpecifier, /*isPrimal*/ false))
+    return;
   // Done checking @differentiable attribute.
   // Memorize the adjoint reference in the attribute.
   attr->setAdjointFunction(adjoint);
-
-  // Check access control.
-  // If the original function is exported (i.e. it is public or @_versioned),
-  // then the adjoint must also be exported.
-  auto originalAccess = original->getFormalAccess(/*useDC*/ nullptr,
-                                                  /*respectVersioned*/ true);
-  if (originalAccess >= AccessLevel::Public) {
-    auto adjointAccess = adjoint->getFormalAccess(/*useDC*/ nullptr,
-                                                  /*respectVersioned*/ true);
-    if (adjointAccess < AccessLevel::Public) {
-      TC.diagnose(adjointNameLoc,
-                  diag::differentiable_attr_adjoint_invalid_access,
-                  adjointSpecifier.Name, original->getFullName());
-      attr->setInvalid();
-      return;
-    }
-  }
 }
 
 void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {

@@ -735,11 +735,12 @@ TypeChecker::lookupFuncDecl(
   // the type context.
   // This works around the fact that operators cannot be specified with a
   // qualified name (i.e. only `(+)` works, `Float.(+)` doesn't).
-  if (funcName.isOperator() && lookupContext->isTypeContext())
+  if (funcName.isOperator() && lookupContext->isTypeContext()) {
     if (auto tmp = lookupMember(lookupContext,
                                 lookupContext->getSelfTypeInContext(),
                                 funcName))
       results = tmp;
+  }
   // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
   // Swift 3. The code below is a workaround for resolving them.
   //
@@ -747,8 +748,8 @@ TypeChecker::lookupFuncDecl(
   // for Swift 3 compatibility, and floating point types use the
   // `@differentiable` attribute with static adjoint methods (such as
   // `_adjointAdd`).
-  else if (lookupContext->getASTContext().isSwiftVersion3()
-           && results.empty() && lookupContext->isTypeContext()) {
+  else if (lookupContext->getASTContext().isSwiftVersion3() &&
+           results.empty() && lookupContext->isTypeContext()) {
     results = lookupMember(lookupContext, lookupContext->getSelfTypeInContext(),
                            funcName);
   }
@@ -802,10 +803,7 @@ TypeChecker::lookupFuncDecl(
   if (wrongTypeContext) {
     assert(invalidTypeCtxDiagnostic &&
            "Type context diagnostic should've been specified");
-    diagnose(funcNameLoc,
-             diag::differentiable_attr_function_not_same_type_context,
-             funcName);
-    invalidTypeCtxDiagnostic.getValue()();
+    (*invalidTypeCtxDiagnostic)();
     return nullptr;
   }
   if (overloadNotFound) {
