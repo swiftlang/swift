@@ -1628,6 +1628,12 @@ namespace {
                                 TypeResolutionOptions options,
                                 FunctionType::ExtInfo extInfo
                                   = FunctionType::ExtInfo());
+    bool
+    resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
+                                 TypeResolutionOptions options,
+                                 bool requiresMappingOut,
+                                 SmallVectorImpl<AnyFunctionType::Param> &ps);
+
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
                                 SILCoroutineKind coroutineKind
@@ -2191,6 +2197,68 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   return ty;
 }
 
+bool TypeResolver::resolveASTFunctionTypeParams(
+    TupleTypeRepr *inputRepr, TypeResolutionOptions options,
+    bool requiresMappingOut,
+    SmallVectorImpl<AnyFunctionType::Param> &elements) {
+  assert(options.contains(TypeResolutionFlags::ImmediateFunctionInput) &&
+         "can only resolve params when in ImmediateFunctionInput context");
+  elements.reserve(inputRepr->getNumElements());
+
+  const auto elementOptions = withoutContext(options, true)
+                            | TypeResolutionFlags::FunctionInput;
+  for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
+    auto *eltTypeRepr = inputRepr->getElementType(i);
+
+    // If the element is a variadic parameter, resolve the parameter type as if
+    // it were in non-parameter position, since we want functions to be
+    // @escaping in this case.
+    auto thisElementOptions = elementOptions;
+    bool variadic = false;
+    if (inputRepr->hasEllipsis() &&
+        elements.size() == inputRepr->getEllipsisIndex()) {
+      thisElementOptions = withoutContext(elementOptions);
+      thisElementOptions |= TypeResolutionFlags::VariadicFunctionInput;
+      variadic = true;
+    }
+
+    Type ty = resolveType(eltTypeRepr, thisElementOptions);
+    if (!ty) return true;
+
+    if (ty->hasError()) {
+      elements.emplace_back(ErrorType::get(Context), Identifier(),
+                            ParameterTypeFlags());
+      continue;
+    }
+
+    // Parameters of polymorphic functions speak in terms of interface types.
+    if (requiresMappingOut) {
+      ty = ty->mapTypeOutOfContext();
+    }
+
+    ValueOwnership ownership;
+    switch (eltTypeRepr->getKind()) {
+    case TypeReprKind::Shared:
+      ownership = ValueOwnership::Shared;
+      break;
+    case TypeReprKind::InOut:
+      ownership = ValueOwnership::InOut;
+      break;
+    case TypeReprKind::Owned:
+      ownership = ValueOwnership::Owned;
+      break;
+    default:
+      ownership = ValueOwnership::Default;
+      break;
+    }
+    ParameterTypeFlags paramFlags =
+        ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
+    elements.emplace_back(ty->getInOutObjectType(), Identifier(), paramFlags);
+  }
+
+  return false;
+}
+
 Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           TypeResolutionOptions options,
                                           FunctionType::ExtInfo extInfo) {
@@ -2199,9 +2267,12 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   options -= TypeResolutionFlags::TypeAliasUnderlyingType;
   options -= TypeResolutionFlags::AllowIUO;
 
-  Type inputTy = resolveType(repr->getArgsTypeRepr(),
-                         options | TypeResolutionFlags::ImmediateFunctionInput);
-  if (!inputTy || inputTy->hasError()) return inputTy;
+  SmallVector<AnyFunctionType::Param, 8> params;
+  if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(),
+                         options | TypeResolutionFlags::ImmediateFunctionInput,
+                         repr->getGenericEnvironment() != nullptr, params)) {
+    return Type();
+  }
 
   Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->hasError()) return outputTy;
@@ -2229,13 +2300,12 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
-    inputTy = inputTy->mapTypeOutOfContext();
     outputTy = outputTy->mapTypeOutOfContext();
     return GenericFunctionType::get(genericEnv->getGenericSignature(),
-                                    inputTy, outputTy, extInfo);
+                                    params, outputTy, extInfo);
   }
 
-  auto fnTy = FunctionType::get(inputTy, outputTy, extInfo);
+  auto fnTy = FunctionType::get(params, outputTy, extInfo);
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
   switch (auto rep = extInfo.getRepresentation()) {
@@ -2246,7 +2316,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
         rep == AnyFunctionType::Representation::Block ? "block" : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
-      auto simpleFnTy = FunctionType::get(inputTy, outputTy, extInfo2);
+      auto simpleFnTy = FunctionType::get(params, outputTy, extInfo2);
       TC.diagnose(repr->getStartLoc(), diag::objc_convention_invalid,
                   simpleFnTy, strName);
     }
@@ -2382,7 +2452,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
 
     for (auto elt : argsTuple->getElements()) {
       auto param = resolveSILParameter(elt.Type,
-                       options | TypeResolutionFlags::ImmediateFunctionInput);
+                       options | TypeResolutionFlags::FunctionInput);
       params.push_back(param);
       if (!param.getType()) return nullptr;
 
@@ -2819,39 +2889,23 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
 Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
-  bool isImmediateFunctionInput = options.contains(
-                                   TypeResolutionFlags::ImmediateFunctionInput);
+  assert(!options.contains(TypeResolutionFlags::ImmediateFunctionInput)
+         && "Parse params, dufus");
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
   
-  // If this is the top level of a function input list, peel off the
-  // ImmediateFunctionInput marker and install a FunctionInput one instead.
+
   auto elementOptions = options;
   if (repr->isParenType()) {
     // We also want to disallow IUO within even a paren.
     elementOptions -= TypeResolutionFlags::AllowIUO;
-
-    // If we have a single ParenType, don't clear the context bits; we
-    // still want to parse the type contained therein as if it were in
-    // parameter position, meaning function types are not @escaping by
-    // default. We still want to reduce `ImmediateFunctionInput` to
-    // `FunctionInput` so that e.g. ((foo: Int)) -> Int is considered a
-    // tuple argument rather than a labeled Int argument.
-    if (isImmediateFunctionInput) {
-      elementOptions = withoutContext(elementOptions, true);
-      elementOptions |= TypeResolutionFlags::FunctionInput;
-    }
   } else {
     elementOptions = withoutContext(elementOptions, true);
-    if (isImmediateFunctionInput)
-      elementOptions |= TypeResolutionFlags::FunctionInput;
   }
 
-  bool complained = false;
-
   // Variadic tuples are not permitted.
-  if (repr->hasEllipsis() &&
-      !isImmediateFunctionInput) {
+  bool complained = false;
+  if (repr->hasEllipsis()) {
     TC.diagnose(repr->getEllipsisLoc(), diag::tuple_ellipsis);
     repr->removeEllipsis();
     complained = true;
@@ -2859,72 +2913,26 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
-    Type ty;
-    Identifier name;
-    bool variadic = false;
 
-    // If the element has a label, stash the label.
-    // FIXME: Preserve and serialize parameter names in function types, maybe
-    // with a new sugar type.
-    if (!isImmediateFunctionInput)
-      name = repr->getElementName(i);
-
-    // If the element is a variadic parameter, resolve the parameter type as if
-    // it were in non-parameter position, since we want functions to be
-    // @escaping in this case.
-    auto thisElementOptions = elementOptions;
-    if (repr->hasEllipsis() &&
-        elements.size() == repr->getEllipsisIndex()) {
-      thisElementOptions = withoutContext(elementOptions);
-      thisElementOptions |= TypeResolutionFlags::VariadicFunctionInput;
-      variadic = true;
-    }
-
-    ty = resolveType(tyR, thisElementOptions);
+    Type ty = resolveType(tyR, elementOptions);
     if (!ty || ty->hasError()) return ty;
 
-    // If the element is a variadic parameter, the underlying type is actually
-    // an ArraySlice of the element type.
-    if (variadic)
-      ty = TC.getArraySliceType(repr->getEllipsisLoc(), ty);
-
-    ParameterTypeFlags paramFlags;
-    if (isImmediateFunctionInput) {
-      ValueOwnership ownership;
-      switch (tyR->getKind()) {
-      case TypeReprKind::Shared:
-        ownership = ValueOwnership::Shared;
-        break;
-      case TypeReprKind::InOut:
-        ownership = ValueOwnership::InOut;
-        break;
-      case TypeReprKind::Owned:
-        ownership = ValueOwnership::Owned;
-        break;
-      default:
-        ownership = ValueOwnership::Default;
-        break;
-      }
-      paramFlags =
-          ParameterTypeFlags::fromParameterType(ty, variadic, ownership);
-    }
-    elements.emplace_back(ty->getInOutObjectType(), name, paramFlags);
+    elements.emplace_back(ty->getInOutObjectType(),
+                          repr->getElementName(i), ParameterTypeFlags());
   }
 
   // Single-element labeled tuples are not permitted outside of declarations
   // or SIL, either.
-  if (!isImmediateFunctionInput) {
-    if (elements.size() == 1 && elements[0].hasName()
-        && !(options & TypeResolutionFlags::SILType)) {
-      if (!complained) {
-        TC.diagnose(repr->getElementNameLoc(0),
-                    diag::tuple_single_element)
-          .fixItRemoveChars(repr->getElementNameLoc(0),
-                            repr->getElementType(0)->getStartLoc());
-      }
-
-      elements[0] = TupleTypeElt(elements[0].getType());
+  if (elements.size() == 1 && elements[0].hasName()
+      && !(options & TypeResolutionFlags::SILType)) {
+    if (!complained) {
+      TC.diagnose(repr->getElementNameLoc(0),
+                  diag::tuple_single_element)
+        .fixItRemoveChars(repr->getElementNameLoc(0),
+                          repr->getElementType(0)->getStartLoc());
     }
+
+    elements[0] = TupleTypeElt(elements[0].getType());
   }
 
   return TupleType::get(elements, Context);
