@@ -338,6 +338,15 @@ void Job::dump() const {
   printCommandLineAndEnvironment(llvm::errs());
 }
 
+ArrayRef<const char *> Job::getArgumentsForTaskExecution() const {
+  if (hasResponseFile()) {
+    writeArgsToResponseFile();
+    return getResponseFileArg();
+  } else {
+    return getArguments();
+  }
+}
+
 void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
                                          StringRef Terminator) const {
   printCommandLine(Stream, /*Terminator=*/"");

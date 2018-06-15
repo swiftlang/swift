@@ -310,6 +310,7 @@ public:
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
   const char * const &getResponseFileArg() const { return ResponseFileArg; }
   ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
+  ArrayRef<const char *> getArgumentsForTaskExecution() const;
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
