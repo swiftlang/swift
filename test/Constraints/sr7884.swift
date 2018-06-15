@@ -16,5 +16,5 @@ let _ = r! // expected-error {{cannot force unwrap value of non-optional type 'I
 // SR-7899
 func testLazySequence(_ lazySequence: LazySequence<[Int]>?) {
   let value = lazySequence?.compactMap({ $0 as? Int }).first // expected-warning {{conditional cast from 'Int' to 'Int' always succeeds}}
-  let _: Int = value!
+  let _: ((Int) throws -> Bool) throws -> Int? = value!
 }
