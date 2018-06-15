@@ -1461,26 +1461,18 @@ private:
     bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto *FTR = dyn_cast<FunctionTypeRepr>(T)) {
         FoundFunctionTypeRepr = true;
-        if (auto *TTR = FTR->getArgsTypeRepr()) {
-          for (auto &ArgElt : TTR->getElements()) {
-            CharSourceRange NR;
-            CharSourceRange TR;
-            auto name = ArgElt.Name;
-            if (!name.empty()) {
-              NR = CharSourceRange(ArgElt.NameLoc,
-                                   name.getLength());
-            }
-            SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
-                                                    ArgElt.Type->getEndLoc());
-            TR = CharSourceRange(SM, ArgElt.Type->getStartLoc(), SRE);
-            Info.Params.emplace_back(NR, TR);
-          }
-        } else if (FTR->getArgsTypeRepr()) {
+        for (auto &ArgElt : FTR->getArgsTypeRepr()->getElements()) {
+          CharSourceRange NR;
           CharSourceRange TR;
-          TR = CharSourceRange(SM, FTR->getArgsTypeRepr()->getStartLoc(),
-                               Lexer::getLocForEndOfToken(SM,
-                                        FTR->getArgsTypeRepr()->getEndLoc()));
-          Info.Params.emplace_back(CharSourceRange(), TR);
+          auto name = ArgElt.Name;
+          if (!name.empty()) {
+            NR = CharSourceRange(ArgElt.NameLoc,
+                                 name.getLength());
+          }
+          SourceLoc SRE = Lexer::getLocForEndOfToken(SM,
+                                                  ArgElt.Type->getEndLoc());
+          TR = CharSourceRange(SM, ArgElt.Type->getStartLoc(), SRE);
+          Info.Params.emplace_back(NR, TR);
         }
         if (auto *RTR = FTR->getResultTypeRepr()) {
           SourceLoc SRE = Lexer::getLocForEndOfToken(SM, RTR->getEndLoc());
