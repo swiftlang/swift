@@ -1311,8 +1311,10 @@ ValueAndGradientExpr::create(ASTContext &ctx, SourceLoc loc,
 
 AdjointExpr *
 AdjointExpr::create(ASTContext &ctx, SourceLoc loc, SourceLoc lParenLoc,
-                    Expr *originalExpr, SourceLoc rParenLoc) {
-  return new (ctx) AdjointExpr(loc, lParenLoc, originalExpr, rParenLoc);
+                    DeclName originalName, DeclNameLoc originalNameLoc,
+                    TypeRepr *baseType, SourceLoc rParenLoc) {
+  return new (ctx) AdjointExpr(loc, lParenLoc, originalName, originalNameLoc,
+                               TypeLoc(baseType, Type()), rParenLoc);
 }
 
 ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
