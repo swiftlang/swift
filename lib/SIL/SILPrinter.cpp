@@ -1199,14 +1199,12 @@ public:
       return;
     }
     case SymbolicValue::String:
-      // TODO: Uncomment when `getStringValue` is implemented.
-      // *this << v.getStringValue();
-      llvm_unreachable("`SymbolicValue.getStringValue` is unimplemented");
-      break;
+      *this << QuotedString(v.getStringValue());
+      return;
     case SymbolicValue::Metatype: {
       auto metatype = cast<AnyMetatypeType>(v.getMetatypeValue());
       *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
-      break;
+      return;
     }
     case SymbolicValue::Aggregate:
       *this << "[";
@@ -1216,13 +1214,12 @@ public:
         *this << ", ";
       });
       *this << "]";
-      break;
+      return;
     case SymbolicValue::Function:
     case SymbolicValue::Address:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
       llvm_unreachable("Unimplemented SymbolicValue case");
-      break;
     }
   }
 
