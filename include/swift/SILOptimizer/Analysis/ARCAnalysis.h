@@ -39,6 +39,7 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
+
 /// Return true if this is a retain instruction.
 bool isRetainInstruction(SILInstruction *II);
 
@@ -141,16 +142,11 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   AliasAnalysis *AA;
+
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
   RetainList EpilogueRetainInsts;
 
-  /// Return true if all the successors of the EpilogueRetainInsts do not have
-  /// a retain. 
-  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
-
-  /// Finds matching releases in the provided block \p BB.
-  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
@@ -182,6 +178,15 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+private:
+  /// Return true if all the successors of the EpilogueRetainInsts do not have
+  /// a retain.
+  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
+
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB,
+                                                  SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue
@@ -204,32 +209,6 @@ private:
 
   /// Eventually this will be used in place of HasBlock.
   SILBasicBlock *ProcessedBlock;
-
-  /// Return true if we have seen releases to part or all of \p Derived in
-  /// \p Insts.
-  /// 
-  /// NOTE: This function relies on projections to analyze the relation
-  /// between the releases values in \p Insts and \p Derived, it also bails
-  /// out and return true if projection path can not be formed between Base
-  /// and any one the released values.
-  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
-
-  /// Return true if we have a release instruction for all the reference
-  /// semantics part of \p Argument.
-  bool releaseArgument(ReleaseList Insts, SILValue Argument);
-
-  /// Walk the basic block and find all the releases that match to function
-  /// arguments. 
-  void collectMatchingReleases(SILBasicBlock *BB);
-
-  /// Walk the function and find all the destroy_addr instructions that match
-  /// to function arguments. 
-  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
-
-  /// For every argument in the function, check to see whether all epilogue
-  /// releases are found. Clear all releases for the argument if not all 
-  /// epilogue releases are found.
-  void processMatchingReleases();
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -334,6 +313,33 @@ public:
   unsigned size() const { return ArgInstMap.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+private:
+  /// Return true if we have seen releases to part or all of \p Derived in
+  /// \p Insts.
+  ///
+  /// NOTE: This function relies on projections to analyze the relation
+  /// between the releases values in \p Insts and \p Derived, it also bails
+  /// out and return true if projection path can not be formed between Base
+  /// and any one the released values.
+  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
+
+  /// Return true if we have a release instruction for all the reference
+  /// semantics part of \p Argument.
+  bool releaseArgument(ReleaseList Insts, SILValue Argument);
+
+  /// Walk the basic block and find all the releases that match to function
+  /// arguments.
+  void collectMatchingReleases(SILBasicBlock *BB);
+
+  /// Walk the function and find all the destroy_addr instructions that match
+  /// to function arguments.
+  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
+
+  /// For every argument in the function, check to see whether all epilogue
+  /// releases are found. Clear all releases for the argument if not all
+  /// epilogue releases are found.
+  void processMatchingReleases();
 };
 
 class ReleaseTracker {
