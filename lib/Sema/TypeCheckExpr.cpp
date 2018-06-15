@@ -735,12 +735,11 @@ TypeChecker::lookupFuncDecl(
   // the type context.
   // This works around the fact that operators cannot be specified with a
   // qualified name (i.e. only `(+)` works, `Float.(+)` doesn't).
-  if (funcName.isOperator() && lookupContext->isTypeContext()) {
-    auto tmp = lookupMember(lookupContext,
-                            lookupContext->getSelfTypeInContext(), funcName);
-    if (!tmp.empty())
+  if (funcName.isOperator() && lookupContext->isTypeContext())
+    if (auto tmp = lookupMember(lookupContext,
+                                lookupContext->getSelfTypeInContext(),
+                                funcName))
       results = tmp;
-  }
   // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
   // Swift 3. The code below is a workaround for resolving them.
   //
@@ -771,8 +770,7 @@ TypeChecker::lookupFuncDecl(
       continue;
     }
     if (hasValidTypeCtx.hasValue()) {
-      auto hasValidTypeContext = hasValidTypeCtx.getValue();
-      if (!hasValidTypeContext(funcDecl)) {
+      if (hasValidTypeCtx && !(*hasValidTypeCtx)(funcDecl)) {
         wrongTypeContext = true;
         continue;
       }
@@ -788,28 +786,33 @@ TypeChecker::lookupFuncDecl(
     }
     resolvedFuncDecl = funcDecl;
   }
-  // If function declaration could not be resolved, emit the appropriate
-  // diagnostic.
-  if (!resolvedFuncDecl) {
-    if (results.empty()) {
-      diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
-               funcName.isOperator());
-    } else if (ambiguousFuncDecl) {
-      ambiguousDiagnostic();
-    } else if (wrongTypeContext) {
-      assert(invalidTypeCtxDiagnostic &&
-             "Type context diagnostic should've been specified");
-      diagnose(funcNameLoc,
-               diag::differentiable_attr_function_not_same_type_context,
-               funcName);
-      invalidTypeCtxDiagnostic.getValue()();
-    } else if (overloadNotFound) {
-      overloadDiagnostic();
-    } else {
-      assert(notAFuncDecl && "Expected 'not a function' error");
-      notFunctionDiagnostic();
-    }
-  }
+  // If function declaration was resolved, return it.
+  if (resolvedFuncDecl) return resolvedFuncDecl;
 
-  return resolvedFuncDecl;
+  // Otherwise, emit the appropriate diagnostic and return nullptr.
+  if (results.empty()) {
+    diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
+             funcName.isOperator());
+    return nullptr;
+  }
+  if (ambiguousFuncDecl) {
+    ambiguousDiagnostic();
+    return nullptr;
+  }
+  if (wrongTypeContext) {
+    assert(invalidTypeCtxDiagnostic &&
+           "Type context diagnostic should've been specified");
+    diagnose(funcNameLoc,
+             diag::differentiable_attr_function_not_same_type_context,
+             funcName);
+    invalidTypeCtxDiagnostic.getValue()();
+    return nullptr;
+  }
+  if (overloadNotFound) {
+    overloadDiagnostic();
+    return nullptr;
+  }
+  assert(notAFuncDecl && "Expected 'not a function' error");
+  notFunctionDiagnostic();
+  return nullptr;
 }

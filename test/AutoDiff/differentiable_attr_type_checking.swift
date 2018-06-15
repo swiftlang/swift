@@ -16,9 +16,7 @@ func foo(_ x: Float) -> Float {
 }
 
 // Primal returns custom checkpoints type.
-struct CheckpointsFoo {
-}
-
+struct CheckpointsFoo {}
 func pfoo(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) {
   return (CheckpointsFoo(), x * x)
 }
