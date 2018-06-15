@@ -709,3 +709,107 @@ bool TypeChecker::isCompatibleWithVectorAutoDiff(Type type, DeclContext *DC) {
   }
   return false;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+// Returns the function declaration corresponding to the given function name and
+// lookup context. If the function declaration cannot be resolved, emits a
+// diagnostic and returns nullptr.
+FuncDecl *
+TypeChecker::lookupFuncDecl(
+    DeclName funcName, SourceLoc funcNameLoc, DeclContext *lookupContext,
+    const std::function<bool(FuncDecl *)> &isValidFuncDecl,
+    const std::function<void()> &overloadDiagnostic,
+    const std::function<void()> &ambiguousDiagnostic,
+    const std::function<void()> &notFunctionDiagnostic,
+    NameLookupOptions lookupOptions,
+    const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx,
+    const Optional<std::function<void()>> &invalidTypeCtxDiagnostic) {
+
+  FuncDecl *resolvedFuncDecl = nullptr;
+
+  // Perform lookup.
+  auto results =
+    lookupUnqualified(lookupContext, funcName, funcNameLoc, lookupOptions);
+
+  // If looking up an operator within a type context, look specifically within
+  // the type context.
+  // This works around the fact that operators cannot be specified with a
+  // qualified name (i.e. only `(+)` works, `Float.(+)` doesn't).
+  if (funcName.isOperator() && lookupContext->isTypeContext()) {
+    auto tmp = lookupMember(lookupContext,
+                            lookupContext->getSelfTypeInContext(), funcName);
+    if (!tmp.empty())
+      results = tmp;
+  }
+  // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
+  // Swift 3. The code below is a workaround for resolving them.
+  //
+  // This is necessary because the stdlib is compiled with `-swift-version 3`
+  // for Swift 3 compatibility, and floating point types use the
+  // `@differentiable` attribute with static adjoint methods (such as
+  // `_adjointAdd`).
+  else if (lookupContext->getASTContext().isSwiftVersion3()
+           && results.empty() && lookupContext->isTypeContext()) {
+    results = lookupMember(lookupContext, lookupContext->getSelfTypeInContext(),
+                           funcName);
+  }
+
+  // Initialize error flags.
+  bool notAFuncDecl = false;
+  bool wrongTypeContext = false;
+  bool ambiguousFuncDecl = false;
+  bool overloadNotFound = false;
+
+  // Filter lookup results.
+  for (auto choice : results) {
+    auto decl = choice.getValueDecl();
+    if (!decl) continue;
+
+    auto funcDecl = dyn_cast<FuncDecl>(decl);
+    if (!funcDecl) {
+      notAFuncDecl = true;
+      continue;
+    }
+    if (hasValidTypeCtx.hasValue()) {
+      auto hasValidTypeContext = hasValidTypeCtx.getValue();
+      if (!hasValidTypeContext(funcDecl)) {
+        wrongTypeContext = true;
+        continue;
+      }
+    }
+    if (!isValidFuncDecl(funcDecl)) {
+      overloadNotFound = true;
+      continue;
+    }
+    if (resolvedFuncDecl) {
+      ambiguousFuncDecl = true;
+      resolvedFuncDecl = nullptr;
+      break;
+    }
+    resolvedFuncDecl = funcDecl;
+  }
+  // If function declaration could not be resolved, emit the appropriate
+  // diagnostic.
+  if (!resolvedFuncDecl) {
+    if (results.empty()) {
+      diagnose(funcNameLoc, diag::use_unresolved_identifier, funcName,
+               funcName.isOperator());
+    } else if (ambiguousFuncDecl) {
+      ambiguousDiagnostic();
+    } else if (wrongTypeContext) {
+      assert(invalidTypeCtxDiagnostic &&
+             "Type context diagnostic should've been specified");
+      diagnose(funcNameLoc,
+               diag::differentiable_attr_function_not_same_type_context,
+               funcName);
+      invalidTypeCtxDiagnostic.getValue()();
+    } else if (overloadNotFound) {
+      overloadDiagnostic();
+    } else {
+      assert(notAFuncDecl && "Expected 'not a function' error");
+      notFunctionDiagnostic();
+    }
+  }
+
+  return resolvedFuncDecl;
+}

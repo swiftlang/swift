@@ -2435,6 +2435,9 @@ ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "attribute", (DeclName))
 ERROR(differentiable_attr_forward_mode_unsupported,none,
       "forward-mode automatic differentiation is not supported yet", ())
+ERROR(differentiable_attr_adjoint_invalid_access,none,
+      "adjoint %0 of public or @_versioned function %1 is required to either "
+      "be public or @_versioned", (DeclName, DeclName))
 
 ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
