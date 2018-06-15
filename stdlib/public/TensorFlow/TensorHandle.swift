@@ -151,6 +151,8 @@ internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
         cTensorHandle, ctx, context.cpuDeviceName, status
       )
       checkOk(status)
+      internalConsistencyCheck(ret != nil,
+                               "TFE_TensorHandleCopyToDevice() returned nil.")
       return ret!
     }
     defer { TFE_DeleteTensorHandle(hostHandle) }
