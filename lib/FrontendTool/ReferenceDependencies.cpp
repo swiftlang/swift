@@ -54,8 +54,9 @@ public:
   /// \param diags Where problems opening the file are emitted
   /// \param SF The SourceFile containing the code with the dependences
   /// \param depTracker The entities depended-upon
-  /// \param outputPath The path of the file where the dependencies are written
-  /// to \return true on error
+  /// \param outputPath Where the dependencies are written
+  ///
+  /// \return true on error
   static bool emit(DiagnosticEngine &diags, SourceFile *SF,
                    const DependencyTracker &depTracker, StringRef outputPath);
 
@@ -86,11 +87,6 @@ class ProvidesEmitter {
       : SF(SF), out(out) {}
 
 public:
-  /// Emit declarations
-  ///
-  /// \param SF Contains the declarations to emit
-  ///
-  /// \param out Where the declarations are emitted
   static void emit(const SourceFile *SF, llvm::raw_ostream &out);
 
 private:
@@ -163,8 +159,8 @@ private:
   void emit() const;
 
   void emitTopLevelNames(const ReferencedNameTracker *const tracker) const;
-  void emitMember(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
-  void emitNominal(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
+  void emitMembers(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
+  void emitNominalTypes(const ArrayRef<MemberTableEntryTy> sortedMembers) const;
   void emitDynamicLookup(const ReferencedNameTracker *const tracker) const;
   void emitExternal(const DependencyTracker &depTracker) const;
 
@@ -566,8 +562,8 @@ void DependsEmitter::emit() const {
     return lhsMangledName.compare(rhsMangledName);
   });
 
-  emitMember(sortedMembers);
-  emitNominal(sortedMembers);
+  emitMembers(sortedMembers);
+  emitNominalTypes(sortedMembers);
   emitDynamicLookup(tracker);
   emitExternal(depTracker);
 }
@@ -584,7 +580,7 @@ void DependsEmitter::emitTopLevelNames(
   }
 }
 
-void DependsEmitter::emitMember(
+void DependsEmitter::emitMembers(
     ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << dependsMember << ":\n";
   for (auto &entry : sortedMembers) {
@@ -605,7 +601,7 @@ void DependsEmitter::emitMember(
   }
 }
 
-void DependsEmitter::emitNominal(
+void DependsEmitter::emitNominalTypes(
     ArrayRef<MemberTableEntryTy> sortedMembers) const {
   out << dependsNominal << ":\n";
   for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {

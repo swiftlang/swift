@@ -125,7 +125,7 @@ private:
 
   /// A list of all external dependencies that cannot be resolved
   /// just from this dependency graph. They must be resolved from definitions
-  /// outside of this module.
+  /// in files that do not belong to this module.
   llvm::StringSet<> ExternalDependencies;
 
   /// The interface hash for each node. This determines if the interface of
