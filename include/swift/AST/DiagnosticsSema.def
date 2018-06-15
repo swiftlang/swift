@@ -2410,6 +2410,8 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(differentiable_attr_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_primal_overload_not_found,none,
       "%0 does not have expected parameters' type %1", (DeclName, Type))
 ERROR(differentiable_attr_adjoint_overload_not_found,none,
@@ -2428,13 +2430,17 @@ ERROR(differentiable_attr_cannot_diff_wrt_objects_or_existentials,none,
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
-      "%0 is not a function to be used as %select{primal|adjoint}1",
+      "%0 is not a function to be used as %select{adjoint|primal}1",
       (DeclName, bool))
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in @differentiable "
       "attribute", (DeclName))
 ERROR(differentiable_attr_forward_mode_unsupported,none,
       "forward-mode automatic differentiation is not supported yet", ())
+ERROR(differentiable_attr_invalid_access,none,
+      "%select{adjoint|primal}2 %0 is required to either be public or "
+      "@usableFromInline because the original function %1 is public or "
+      "@usableFromInline", (DeclName, DeclName, bool))
 
 ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
