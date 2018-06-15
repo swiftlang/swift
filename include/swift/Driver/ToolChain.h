@@ -123,8 +123,9 @@ protected:
     std::vector<FilelistInfo> FilelistInfos;
 
     // Not all platforms and jobs support the use of response files, so assume
-    // "false" by default. This can be overridden as needed on a per
-    // platform/job basis.
+    // "false" by default. If the executable specified in the InvocationInfo
+    // constructor supports response files, this can be overridden and set to
+    // "true".
     bool allowsResponseFiles = false;
 
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
