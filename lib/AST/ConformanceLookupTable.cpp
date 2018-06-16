@@ -817,6 +817,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   if (auto resolver = nominal->getASTContext().getLazyResolver()) {
     if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
       resolver->resolveExtension(ED);
+    } else {
+      resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
     }
   }
 
