@@ -136,6 +136,8 @@ namespace {
   };
 
   class SILSerializer {
+    using TypeID = serialization::TypeID;
+    
     Serializer &S;
     ASTContext &Ctx;
 

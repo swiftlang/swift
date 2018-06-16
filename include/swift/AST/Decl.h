@@ -1661,6 +1661,9 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
+
   /// Whether we have fully checked the extension.
   bool hasValidSignature() const {
     return hasValidationStarted() && !isBeingValidated();
@@ -2496,6 +2499,9 @@ public:
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
+
   /// Whether we already type-checked the inheritance clause.
   bool checkedInheritanceClause() const {
     return Bits.TypeDecl.CheckedInheritanceClause;
@@ -3162,6 +3168,8 @@ class EnumDecl final : public NominalTypeDecl {
   } LazySemanticInfo;
 
   friend class IterativeTypeChecker;
+  friend class EnumRawTypeRequest;
+  friend class TypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3278,14 +3286,11 @@ public:
   }
   
   /// Determine whether this enum declares a raw type in its inheritance clause.
-  bool hasRawType() const {
-    return (bool)LazySemanticInfo.RawType.getPointer();
-  }
+  bool hasRawType() const { return (bool)getRawType(); }
+
   /// Retrieve the declared raw type of the enum from its inheritance clause,
   /// or null if it has none.
-  Type getRawType() const {
-    return LazySemanticInfo.RawType.getPointer();
-  }
+  Type getRawType() const;
 
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) {
@@ -3413,6 +3418,8 @@ class ClassDecl final : public NominalTypeDecl {
   } LazySemanticInfo;
 
   friend class IterativeTypeChecker;
+  friend class SuperclassTypeRequest;
+  friend class TypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3428,7 +3435,7 @@ public:
   bool hasSuperclass() const { return (bool)getSuperclass(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
-  Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
+  Type getSuperclass() const;
 
   /// Retrieve the ClassDecl for the superclass of this class, or null if there
   /// is no superclass.

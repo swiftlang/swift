@@ -1587,12 +1587,12 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
     } else if (options.contains(TypeResolutionFlags::SILType)
                && !type->isLegalSILType()) {
       diagnose(Loc.getLoc(), diag::illegal_sil_type, type);
-      Loc.setType(ErrorType::get(Context), true);
+      Loc.setInvalidType(Context);
       return true;
     }
   }
 
-  Loc.setType(type, true);
+  Loc.setType(type);
   return type->hasError();
 }
 

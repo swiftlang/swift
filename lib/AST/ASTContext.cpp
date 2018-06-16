@@ -463,6 +463,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     SearchPathOpts(SearchPathOpts),
     SourceMgr(SourceMgr),
     Diags(Diags),
+    evaluator(Diags, /*shouldDiagnoseCycles=*/false),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -4246,7 +4247,7 @@ CanType ArchetypeType::getAnyOpened(Type existential) {
 }
 
 void TypeLoc::setInvalidType(ASTContext &C) {
-  TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
+  Ty = ErrorType::get(C);
 }
 
 namespace {

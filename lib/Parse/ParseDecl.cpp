@@ -4389,7 +4389,7 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   for (auto paramList : accessor->getParameterLists()) {
     for (auto param : *paramList) {
       if (param->getTypeLoc().isNull()) {
-        param->getTypeLoc().setType(P.Context.TheErrorType, true);
+        param->getTypeLoc().setInvalidType(P.Context);
       }
     }
   }
@@ -4403,7 +4403,7 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   case AccessorKind::Get:
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
-    accessor->getBodyResultTypeLoc().setType(P.Context.TheErrorType, true);
+    accessor->getBodyResultTypeLoc().setInvalidType(P.Context);
     return;
 
   // These return void.

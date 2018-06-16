@@ -2553,7 +2553,7 @@ namespace {
 
     Expr *visitTypeExpr(TypeExpr *expr) {
       auto toType = simplifyType(cs.getType(expr->getTypeLoc()));
-      expr->getTypeLoc().setType(toType, /*validated=*/true);
+      expr->getTypeLoc().setType(toType);
       cs.setType(expr, MetatypeType::get(toType));
       return expr;
     }
@@ -3299,7 +3299,7 @@ namespace {
       expr->setSubExpr(sub);
 
       // Set the type we checked against.
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      expr->getCastTypeLoc().setType(toType);
       auto fromType = cs.getType(sub);
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
@@ -3648,7 +3648,7 @@ namespace {
     Expr *visitCoerceExpr(CoerceExpr *expr, Optional<unsigned> choice) {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      expr->getCastTypeLoc().setType(toType);
       checkForImportedUsedConformances(toType);
 
       auto &tc = cs.getTypeChecker();
@@ -3718,7 +3718,7 @@ namespace {
       if (hasForcedOptionalResult(expr))
         toType = toType->getOptionalObjectType();
 
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      expr->getCastTypeLoc().setType(toType);
       checkForImportedUsedConformances(toType);
 
       // The subexpression is always an rvalue.
@@ -3800,7 +3800,7 @@ namespace {
       // Simplify the type we're casting to.
       auto toType = simplifyType(cs.getType(expr->getCastTypeLoc()));
       checkForImportedUsedConformances(toType);
-      expr->getCastTypeLoc().setType(toType, /*validated=*/true);
+      expr->getCastTypeLoc().setType(toType);
 
       // The subexpression is always an rvalue.
       auto &tc = cs.getTypeChecker();

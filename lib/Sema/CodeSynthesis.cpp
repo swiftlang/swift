@@ -657,7 +657,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Expr *Call = CallExpr::createImplicit(Ctx, UDE, { Nil }, { Ctx.Id_with });
 
   TypeLoc ResultTy;
-  ResultTy.setType(VD->getType(), true);
+  ResultTy.setType(VD->getType());
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {

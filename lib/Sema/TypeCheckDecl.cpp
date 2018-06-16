@@ -40,6 +40,7 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/Sema/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -232,14 +233,24 @@ static void addImplicitConformances(
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
-void TypeChecker::resolveSuperclass(ClassDecl *classDecl) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestTypeCheckSuperclass(classDecl));
+Type TypeChecker::getSuperclass(const ClassDecl *classDecl) {
+  return Context.evaluator(
+           SuperclassTypeRequest(const_cast<ClassDecl *>(classDecl)));
 }
 
-void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestTypeCheckRawType(enumDecl));
+Type TypeChecker::getRawType(EnumDecl *enumDecl) {
+  return Context.evaluator(EnumRawTypeRequest(enumDecl));
+}
+
+Type TypeChecker::getInheritedType(
+                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                         unsigned index) {
+  return Context.evaluator(InheritedTypeRequest(decl, index));
+}
+
+void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
+  ProtocolRequirementTypeResolver resolver;
+  validateWhereClauses(proto, &resolver);
 }
 
 void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
@@ -264,26 +275,9 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
 }
 
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
-  IterativeTypeChecker ITC(*this);
-  ITC.satisfy(requestInheritedProtocols(protocol));
-
-  ProtocolRequirementTypeResolver resolver;
-  validateWhereClauses(protocol, &resolver);
-}
-
-void TypeChecker::resolveInheritanceClause(
-       llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) {
-  IterativeTypeChecker ITC(*this);
-  unsigned numInherited;
-  if (auto ext = decl.dyn_cast<ExtensionDecl *>()) {
-    numInherited = ext->getInherited().size();
-  } else {
-    numInherited = decl.get<TypeDecl *>()->getInherited().size();
-  }
-
-  for (unsigned i = 0; i != numInherited; ++i) {
-    ITC.satisfy(requestResolveInheritedClauseEntry({ decl, i }));
-  }
+  for (unsigned i : indices(protocol->getInherited()))
+    (void)protocol->getInheritedType(i);
+  resolveTrailingWhereClause(protocol);
 }
 
 /// check the inheritance clause of a type declaration or extension thereof.
@@ -641,14 +635,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       ++i;
     }
-  }
-  // Set the superclass.
-  else if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
-    classDecl->setSuperclass(superclassTy);
-  } else if (auto enumDecl = dyn_cast<EnumDecl>(decl)) {
-    enumDecl->setRawType(superclassTy);
-  } else {
-    assert(!superclassTy || isa<AbstractTypeParamDecl>(decl));
   }
 }
 
@@ -4555,7 +4541,6 @@ public:
     TC.checkDeclAttributesEarly(ED);
 
     checkUnsupportedNestedType(ED);
-
     TC.validateDecl(ED);
     TC.DeclsToFinalize.remove(ED);
     ED->setHasValidatedLayout();
@@ -4580,6 +4565,8 @@ public:
       checkEnumRawValues(TC, ED);
     }
 
+    ED->getAllConformances();
+
     TC.checkDeclCircularity(ED);
     TC.ConformanceContexts.push_back(ED);
   }
@@ -4600,6 +4587,8 @@ public:
 
     TC.checkDeclAttributes(SD);
     checkAccessControl(TC, SD);
+
+    SD->getAllConformances();
 
     TC.checkDeclCircularity(SD);
     TC.ConformanceContexts.push_back(SD);
@@ -4824,6 +4813,8 @@ public:
       }
 
     }
+
+    CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
     checkAccessControl(TC, CD);
@@ -6562,19 +6553,13 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
     return;
   }
 
-  if (typeAlias->getDeclContext()->isModuleScopeContext() &&
-      typeAlias->getGenericParams() == nullptr) {
-    IterativeTypeChecker ITC(tc);
-    ITC.satisfy(requestResolveTypeDecl(typeAlias));
-  } else {
-    if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                        typeAlias, options)) {
-      typeAlias->setInvalid();
-      typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
-    }
-
-    typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
+  if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
+                      typeAlias, options)) {
+    typeAlias->setInvalid();
+    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
+
+  typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
 }
 
 
@@ -7058,8 +7043,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           // unresolved types we will need to deal with, and need to record the
           // appropriate substitutions for that environment. Wipe out the types
           // and validate them again.
-          aliasDecl->getUnderlyingTypeLoc().setType(Type(),
-                                                    /*validated=*/false);
+          aliasDecl->getUnderlyingTypeLoc().setType(Type());
           aliasDecl->setInterfaceType(Type());
 
           validateAccessControl(aliasDecl);
@@ -7343,7 +7327,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       switch (accessor->getAccessorKind()) {
       // For getters, set the result type to the value type.
       case AccessorKind::Get:
-        accessor->getBodyResultTypeLoc().setType(valueIfaceTy, true);
+        accessor->getBodyResultTypeLoc().setType(valueIfaceTy);
         break;
 
       // For setters and observers, set the old/new value parameter's type
@@ -7363,7 +7347,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       case AccessorKind::MutableAddress:
         if (Type resultType =
               buildAddressorResultType(*this, accessor, valueIfaceTy)) {
-          accessor->getBodyResultTypeLoc().setType(resultType, true);
+          accessor->getBodyResultTypeLoc().setType(resultType);
         }
         break;
 

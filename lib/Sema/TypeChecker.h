@@ -1572,25 +1572,25 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Resolve the superclass of the given class.
-  void resolveSuperclass(ClassDecl *classDecl) override;
+  /// Get the superclass of the given class.
+  Type getSuperclass(const ClassDecl *classDecl) override;
 
-  /// Resolve the raw type of the given enum.
-  void resolveRawType(EnumDecl *enumDecl) override;
+  /// Get the raw type of the given enum.
+  Type getRawType(EnumDecl *enumDecl) override;
 
   /// Resolve the inherited protocols of a given protocol.
-  void resolveInheritedProtocols(ProtocolDecl *protocol) override;
+  void resolveInheritedProtocols(ProtocolDecl *protocol);
 
   /// Validate a protocol's where clause, along with the where clauses of
   /// its associated types.
   void validateWhereClauses(ProtocolDecl *protocol,
                             GenericTypeResolver *resolver);
 
-  /// Resolve the types in the inheritance clause of the given
-  /// declaration context, which will be a nominal type declaration or
-  /// extension declaration.
-  void resolveInheritanceClause(
-         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl) override;
+  /// Get a specific inherited type from the given declaration.
+  Type getInheritedType(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                        unsigned index) override;
+
+  void resolveTrailingWhereClause(ProtocolDecl *proto) override;
 
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl,

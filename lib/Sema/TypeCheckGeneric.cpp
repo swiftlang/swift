@@ -451,7 +451,7 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
     return;
 
   // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
+  tl.setType(Type());
 }
 
 /// Revert the dependent types within the given generic parameter list.

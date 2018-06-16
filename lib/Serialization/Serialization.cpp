@@ -642,7 +642,7 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
   return id.first;
 }
 
-TypeID Serializer::addTypeRef(Type ty) {
+serialization::TypeID Serializer::addTypeRef(Type ty) {
   if (!ty)
     return 0;
 

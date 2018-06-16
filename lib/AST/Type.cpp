@@ -66,9 +66,9 @@ Type QuerySubstitutionMap::operator()(SubstitutableType *type) const {
   return subMap.lookupSubstitution(key);
 }
 
-void TypeLoc::setType(Type Ty, bool validated) {
+void TypeLoc::setType(Type Ty) {
   assert(!Ty || !Ty->hasTypeVariable());
-  TAndValidBit.setPointerAndInt(Ty, validated);
+  this->Ty = Ty;
 }
 
 bool TypeLoc::isError() const {
@@ -84,9 +84,7 @@ SourceRange TypeLoc::getSourceRange() const {
 
 TypeLoc TypeLoc::clone(ASTContext &ctx) const {
   if (TyR) {
-    TypeLoc result(TyR->clone(ctx));
-    result.TAndValidBit = this->TAndValidBit;
-    return result;
+    return TypeLoc(TyR->clone(ctx), Ty);
   }
   return *this;
 }
