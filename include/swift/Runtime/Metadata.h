@@ -721,12 +721,8 @@ void swift_getFieldAt(
 void verifyMangledNameRoundtrip(const Metadata *metadata);
 #endif
 
-#if !SWIFT_OBJC_INTEROP
-
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 const TypeContextDescriptor *swift_getTypeContextDescriptor(const Metadata *type);
-
-#endif // !SWIFT_OBJC_INTEROP
 
 } // end namespace swift
 

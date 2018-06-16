@@ -3844,6 +3844,11 @@ ERROR(resilience_decl_unavailable,
       "cannot be referenced from " FRAGILE_FUNC_KIND "3",
       (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
 
+WARNING(resilience_decl_unavailable_warn,
+        none, "%0 %1 is %select{private|fileprivate|internal|%error|%error}2 and "
+        "should not be referenced from " FRAGILE_FUNC_KIND "3",
+        (DescriptiveDeclKind, DeclName, AccessLevel, unsigned))
+
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,
