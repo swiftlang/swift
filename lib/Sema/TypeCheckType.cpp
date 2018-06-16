@@ -398,8 +398,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
                                         SourceLoc loc, DeclContext *dc,
                                         GenericIdentTypeRepr *generic,
                                         TypeResolutionOptions options,
-                                        GenericTypeResolver *resolver,
-                                 UnsatisfiedDependency *unsatisfiedDependency) {
+                                        GenericTypeResolver *resolver) {
   assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
          "should not touch generic arguments when resolving structure");
 
@@ -509,8 +508,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   for (auto tyR : genericArgs) {
     // Propagate failure.
     TypeLoc genericArg = tyR;
-    if (validateType(genericArg, dc, options, resolver,
-                     unsatisfiedDependency))
+    if (validateType(genericArg, dc, options, resolver))
       return ErrorType::get(Context);
 
     auto substTy = genericArg.getType();
@@ -523,8 +521,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   }
 
   auto result = applyUnboundGenericArguments(unboundType, genericDecl, loc,
-                                             dc, args, resolver,
-                                             unsatisfiedDependency);
+                                             dc, args, resolver);
   if (!result)
     return result;
 
@@ -546,8 +543,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     UnboundGenericType *unboundType, GenericTypeDecl *decl,
     SourceLoc loc, DeclContext *dc,
     ArrayRef<Type> genericArgs,
-    GenericTypeResolver *resolver,
-    UnsatisfiedDependency *unsatisfiedDependency) {
+    GenericTypeResolver *resolver) {
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
@@ -614,12 +610,9 @@ Type TypeChecker::applyUnboundGenericArguments(
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(*this, dc),
-                            unsatisfiedDependency);
+                            LookUpConformance(*this, dc));
 
     switch (result) {
-    case RequirementCheckResult::UnsatisfiedDependency:
-      return Type();
     case RequirementCheckResult::Failure:
     case RequirementCheckResult::SubstitutionFailure:
       return ErrorType::get(Context);
@@ -652,10 +645,8 @@ Type TypeChecker::applyUnboundGenericArguments(
   }
 
   if (isa<NominalTypeDecl>(decl) && resultType) {
-    if (useObjectiveCBridgeableConformancesOfArgs(
-          dc, resultType->castTo<BoundGenericType>(),
-          unsatisfiedDependency))
-      return Type();
+    (void)useObjectiveCBridgeableConformancesOfArgs(
+        dc, resultType->castTo<BoundGenericType>());
   }
 
   return resultType;
@@ -711,24 +702,16 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *fromDC,
                             GenericIdentTypeRepr *generic,
                             TypeResolutionOptions options,
-                            GenericTypeResolver *resolver,
-                            UnsatisfiedDependency *unsatisfiedDependency) {
+                            GenericTypeResolver *resolver) {
   assert(fromDC && "No declaration context for type resolution?");
 
   // Don't validate nominal type declarations during extension binding.
   if (!options.contains(TypeResolutionFlags::ExtensionBinding) ||
       !isa<NominalTypeDecl>(typeDecl)) {
-    // If we have a callback to report dependencies, do so.
-    if (unsatisfiedDependency) {
-      if ((*unsatisfiedDependency)(requestResolveTypeDecl(typeDecl)))
-        return nullptr;
-    } else {
-      // Validate the declaration.
-      TC.validateDeclForNameLookup(typeDecl);
-    }
+    // Validate the declaration.
+    TC.validateDeclForNameLookup(typeDecl);
 
-    // If we didn't bail out with an unsatisfiedDependency,
-    // and were not able to validate recursively, bail out.
+    // If we were not able to validate recursively, bail out.
     if (!typeDecl->hasInterfaceType()) {
       TC.diagnose(loc, diag::recursive_type_reference,
                   typeDecl->getDescriptiveKind(), typeDecl->getName());
@@ -761,7 +744,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (generic && !options.contains(TypeResolutionFlags::ResolveStructure)) {
     // Apply the generic arguments to the type.
     type = TC.applyGenericArguments(type, typeDecl, loc, fromDC, generic,
-                                    options, resolver, unsatisfiedDependency);
+                                    options, resolver);
     if (!type)
       return nullptr;
   }
@@ -817,8 +800,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 ComponentIdentTypeRepr *comp,
                                 TypeResolutionOptions options,
                                 NameLookupOptions lookupOptions,
-                                GenericTypeResolver *resolver,
-                                UnsatisfiedDependency *unsatisfiedDependency) {
+                                GenericTypeResolver *resolver) {
   // Unqualified lookup case.
   if (parentType.isNull()) {
     if (comp->getIdentifier() == tc.Context.Id_Self &&
@@ -1004,16 +986,14 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
                                   bool diagnoseErrors,
-                                  GenericTypeResolver *resolver,
-                                  UnsatisfiedDependency *unsatisfiedDependency);
+                                  GenericTypeResolver *resolver);
 
 static Type
 resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
                                  ComponentIdentTypeRepr *comp,
                                  TypeResolutionOptions options,
                                  bool diagnoseErrors,
-                                 GenericTypeResolver *resolver,
-                                 UnsatisfiedDependency *unsatisfiedDependency) {
+                                 GenericTypeResolver *resolver) {
   if (!DC->isInnermostContextGeneric())
     return Type();
 
@@ -1031,8 +1011,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
     comp->setValue(*matchingParam, nullptr);
     return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver,
-                                             unsatisfiedDependency);
+                                             diagnoseErrors, resolver);
   }
 
   // If we are inside an extension of a nested type, we have to visit
@@ -1050,8 +1029,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
     if (matchingParam != outerParams->end()) {
       comp->setValue(*matchingParam, nullptr);
       return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                               diagnoseErrors, resolver,
-                                               unsatisfiedDependency);
+                                               diagnoseErrors, resolver);
     }
   }
 
@@ -1063,14 +1041,6 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
       TC.Context.SourceMgr.rangeContainsTokenLoc(
         genericParams->getTrailingWhereClauseSourceRange(),
           comp->getIdLoc())) {
-    // We need to be able to perform qualified lookup into the given
-    // declaration context.
-    if (unsatisfiedDependency &&
-        (*unsatisfiedDependency)(
-          requestQualifiedLookupInDeclContext({ DC, comp->getIdentifier(),
-                comp->getIdLoc() })))
-      return Type();
-
     auto nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
     SmallVector<ValueDecl *, 4> decls;
     if (DC->lookupQualified(nominal->getDeclaredInterfaceType(),
@@ -1086,8 +1056,7 @@ resolveGenericSignatureComponent(TypeChecker &TC, DeclContext *DC,
 
         comp->setValue(typeDecl, DC);
         return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                                 diagnoseErrors, resolver,
-                                                 unsatisfiedDependency);
+                                                 diagnoseErrors, resolver);
       }
     }
   }
@@ -1105,8 +1074,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options,
                                   bool diagnoseErrors,
-                                  GenericTypeResolver *resolver,
-                                  UnsatisfiedDependency *unsatisfiedDependency){
+                                  GenericTypeResolver *resolver) {
   // Short-circuiting.
   if (comp->isInvalid()) return ErrorType::get(TC.Context);
 
@@ -1117,7 +1085,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     return resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                            comp->getDeclContext(), DC,
                            dyn_cast<GenericIdentTypeRepr>(comp), options,
-                           resolver, unsatisfiedDependency);
+                           resolver);
   }
 
   // Resolve the first component, which is the only one that requires
@@ -1143,8 +1111,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
   // parameters (only), then move up to the enclosing context.
   if (options.contains(TypeResolutionFlags::GenericSignature)) {
     Type type = resolveGenericSignatureComponent(
-      TC, DC, comp, options, diagnoseErrors, resolver,
-      unsatisfiedDependency);
+      TC, DC, comp, options, diagnoseErrors, resolver);
     if (type)
       return type;
 
@@ -1153,15 +1120,6 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
 
     lookupDC = DC->getParentForLookup();
   }
-
-  // We need to be able to perform unqualified lookup into the given
-  // declaration context.
-  if (unsatisfiedDependency &&
-      (*unsatisfiedDependency)(
-        requestUnqualifiedLookupInDeclContext({ lookupDC, 
-                                                comp->getIdentifier(),
-                                                comp->getIdLoc() })))
-    return Type();
 
   auto id = comp->getIdentifier();
 
@@ -1185,7 +1143,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
                                 foundDC, DC,
                                 dyn_cast<GenericIdentTypeRepr>(comp), options,
-                                resolver, unsatisfiedDependency);
+                                resolver);
 
     if (!type)
       return type;
@@ -1235,7 +1193,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
       return ErrorType::get(TC.Context);
 
     return diagnoseUnknownType(TC, DC, nullptr, SourceRange(), comp, options,
-                               lookupOptions, resolver, unsatisfiedDependency);
+                               lookupOptions, resolver);
   }
 
   comp->setValue(currentDecl, currentDC);
@@ -1252,8 +1210,7 @@ static Type resolveNestedIdentTypeComponent(
               ComponentIdentTypeRepr *comp,
               TypeResolutionOptions options,
               bool diagnoseErrors,
-              GenericTypeResolver *resolver,
-              UnsatisfiedDependency *unsatisfiedDependency) {
+              GenericTypeResolver *resolver) {
   auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
                                         AssociatedTypeDecl *inferredAssocType) {
     // Diagnose invalid cases.
@@ -1306,8 +1263,7 @@ static Type resolveNestedIdentTypeComponent(
     if (!options.contains(TypeResolutionFlags::ResolveStructure)) {
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
         return TC.applyGenericArguments(memberType, member, comp->getIdLoc(),
-                                        DC, genComp, options, resolver,
-                                        unsatisfiedDependency);
+                                        DC, genComp, options, resolver);
       }
     }
 
@@ -1349,23 +1305,6 @@ static Type resolveNestedIdentTypeComponent(
     isKnownNonCascading = isa<AbstractFunctionDecl>(DC);
   }
 
-  // We need to be able to perform qualified lookup into the given type.
-  if (unsatisfiedDependency) {
-    DeclContext *dc;
-    if (auto parentNominal = parentTy->getAnyNominal())
-      dc = parentNominal;
-    else if (auto parentModule = parentTy->getAs<ModuleType>())
-      dc = parentModule->getModule();
-    else
-      dc = nullptr;
-
-    if (dc &&
-        (*unsatisfiedDependency)(
-          requestQualifiedLookupInDeclContext({ dc, comp->getIdentifier(),
-                                                comp->getIdLoc() })))
-      return nullptr;
-  }
-
   NameLookupOptions lookupOptions = defaultMemberLookupOptions;
   if (isKnownNonCascading)
     lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -1400,8 +1339,7 @@ static Type resolveNestedIdentTypeComponent(
       return ErrorType::get(TC.Context);
 
     memberType = diagnoseUnknownType(TC, DC, parentTy, parentRange, comp,
-                                     options, lookupOptions, resolver,
-                                     unsatisfiedDependency);
+                                     options, lookupOptions, resolver);
     member = comp->getBoundDecl();
     if (!member)
       return ErrorType::get(TC.Context);
@@ -1420,24 +1358,21 @@ static Type resolveIdentTypeComponent(
               ArrayRef<ComponentIdentTypeRepr *> components,
               TypeResolutionOptions options,
               bool diagnoseErrors,
-              GenericTypeResolver *resolver,
-              UnsatisfiedDependency *unsatisfiedDependency) {
+              GenericTypeResolver *resolver) {
   auto comp = components.back();
 
   // The first component uses unqualified lookup.
   auto parentComps = components.slice(0, components.size()-1);
   if (parentComps.empty()) {
     return resolveTopLevelIdentTypeComponent(TC, DC, comp, options,
-                                             diagnoseErrors, resolver,
-                                             unsatisfiedDependency);
+                                             diagnoseErrors, resolver);
   }
 
   // All remaining components use qualified lookup.
 
   // Resolve the parent type.
   Type parentTy = resolveIdentTypeComponent(TC, DC, parentComps, options,
-                                            diagnoseErrors, resolver,
-                                            unsatisfiedDependency);
+                                            diagnoseErrors, resolver);
   if (!parentTy || parentTy->hasError()) return parentTy;
   
   SourceRange parentRange(parentComps.front()->getIdLoc(),
@@ -1447,8 +1382,7 @@ static Type resolveIdentTypeComponent(
   return resolveNestedIdentTypeComponent(TC, DC, parentTy,
                                          parentRange, comp,
                                          options, diagnoseErrors,
-                                         resolver,
-                                         unsatisfiedDependency);
+                                         resolver);
 }
 
 static bool diagnoseAvailability(IdentTypeRepr *IdType,
@@ -1510,16 +1444,14 @@ Type TypeChecker::resolveIdentifierType(
        IdentTypeRepr *IdType,
        TypeResolutionOptions options,
        bool diagnoseErrors,
-       GenericTypeResolver *resolver,
-       UnsatisfiedDependency *unsatisfiedDependency) {
+       GenericTypeResolver *resolver) {
   assert(resolver && "Missing generic type resolver");
 
   auto ComponentRange = IdType->getComponentRange();
   auto Components = llvm::makeArrayRef(ComponentRange.begin(),
                                        ComponentRange.end());
   Type result = resolveIdentTypeComponent(*this, DC, Components, options, 
-                                          diagnoseErrors, resolver,
-                                          unsatisfiedDependency);
+                                          diagnoseErrors, resolver);
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
@@ -1560,8 +1492,7 @@ Type TypeChecker::resolveIdentifierType(
 
 bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
                                TypeResolutionOptions options,
-                               GenericTypeResolver *resolver,
-                               UnsatisfiedDependency *unsatisfiedDependency) {
+                               GenericTypeResolver *resolver) {
   // FIXME: Verify that these aren't circular and infinite size.
   assert(!options.contains(TypeResolutionFlags::ResolveStructure) &&
          "ResolveStructure does not do full validation");
@@ -1575,12 +1506,8 @@ bool TypeChecker::validateType(TypeLoc &Loc, DeclContext *DC,
 
   Type type = Loc.getType();
   if (type.isNull()) {
-    type = resolveType(Loc.getTypeRepr(), DC, options, resolver,
-                       unsatisfiedDependency);
+    type = resolveType(Loc.getTypeRepr(), DC, options, resolver);
     if (!type) {
-      // If a dependency went unsatisfied, just return false.
-      if (unsatisfiedDependency) return false;
-
       type = ErrorType::get(Context);
 
       // Diagnose types that are illegal in SIL.
@@ -1605,13 +1532,11 @@ namespace {
     ASTContext &Context;
     DeclContext *DC;
     GenericTypeResolver *Resolver;
-    swift::UnsatisfiedDependency *UnsatisfiedDependency;
+
   public:
     TypeResolver(TypeChecker &tc, DeclContext *DC,
-                 GenericTypeResolver *resolver,
-                 swift::UnsatisfiedDependency *unsatisfiedDependency)
-      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver),
-        UnsatisfiedDependency(unsatisfiedDependency)
+                 GenericTypeResolver *resolver)
+      : TC(tc), Context(tc.Context), DC(DC), Resolver(resolver)
     {
       assert(resolver);
     }
@@ -1681,8 +1606,7 @@ namespace {
 
 Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
                               TypeResolutionOptions options,
-                              GenericTypeResolver *resolver,
-                              UnsatisfiedDependency *unsatisfiedDependency) {
+                              GenericTypeResolver *resolver) {
   PrettyStackTraceTypeRepr stackTrace(Context, "resolving", TyR);
 
   // Make sure we always have a resolver to use.
@@ -1690,7 +1614,7 @@ Type TypeChecker::resolveType(TypeRepr *TyR, DeclContext *DC,
   if (!resolver)
     resolver = &defaultResolver;
 
-  TypeResolver typeResolver(*this, DC, resolver, unsatisfiedDependency);
+  TypeResolver typeResolver(*this, DC, resolver);
   auto result = typeResolver.resolveType(TyR, options);
   
   // If we resolved down to an error, make sure to mark the typeRepr as invalid
@@ -1735,8 +1659,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
   case TypeReprKind::GenericIdent:
   case TypeReprKind::CompoundIdent:
     return TC.resolveIdentifierType(DC, cast<IdentTypeRepr>(repr), options,
-                                    /*diagnoseErrors*/ true, Resolver,
-                                    UnsatisfiedDependency);
+                                    /*diagnoseErrors*/ true, Resolver);
 
   case TypeReprKind::Function: {
     if (!(options & TypeResolutionFlags::SILType)) {
@@ -2747,7 +2670,7 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
       if (!TC.applyUnboundGenericArguments(
               unboundTy, dictDecl, repr->getStartLoc(), DC, args,
-              Resolver, UnsatisfiedDependency)) {
+              Resolver)) {
         return nullptr;
       }
 

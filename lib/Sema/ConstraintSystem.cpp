@@ -477,8 +477,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
   return TC.applyUnboundGenericArguments(
       unbound, unboundDecl,
       SourceLoc(), DC, arguments,
-      /*resolver*/nullptr,
-      /*unsatisfiedDependency*/nullptr);
+      /*resolver*/nullptr);
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
