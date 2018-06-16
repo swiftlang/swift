@@ -3941,10 +3941,6 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
 }
 #endif
 
-#if !SWIFT_OBJC_INTEROP
-
 const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
     return type->getTypeContextDescriptor();
 }
-
-#endif // !SWIFT_OBJC_INTEROP
