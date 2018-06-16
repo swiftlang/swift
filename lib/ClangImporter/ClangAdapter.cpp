@@ -345,6 +345,24 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::UShortAccum:
     case clang::BuiltinType::UAccum:
     case clang::BuiltinType::ULongAccum:
+    case clang::BuiltinType::ShortFract:
+    case clang::BuiltinType::Fract:
+    case clang::BuiltinType::LongFract:
+    case clang::BuiltinType::UShortFract:
+    case clang::BuiltinType::UFract:
+    case clang::BuiltinType::ULongFract:
+    case clang::BuiltinType::SatShortAccum:
+    case clang::BuiltinType::SatAccum:
+    case clang::BuiltinType::SatLongAccum:
+    case clang::BuiltinType::SatUShortAccum:
+    case clang::BuiltinType::SatUAccum:
+    case clang::BuiltinType::SatULongAccum:
+    case clang::BuiltinType::SatShortFract:
+    case clang::BuiltinType::SatFract:
+    case clang::BuiltinType::SatLongFract:
+    case clang::BuiltinType::SatUShortFract:
+    case clang::BuiltinType::SatUFract:
+    case clang::BuiltinType::SatULongFract:
     case clang::BuiltinType::Half:
     case clang::BuiltinType::LongDouble:
     case clang::BuiltinType::Float16:
