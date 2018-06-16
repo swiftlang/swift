@@ -18,6 +18,7 @@
 #ifndef SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 #define SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H
 
+#include "swift/Basic/ByteTreeSerialization.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Syntax/RawSyntax.h"
@@ -199,6 +200,113 @@ struct NullableTraits<RC<syntax::RawSyntax>> {
   }
 };
 } // end namespace json
+
+namespace byteTree {
+
+template <>
+struct WrapperTypeTraits<tok> {
+  static uint8_t numericValue(const tok &Value);
+
+  static void write(ByteTreeWriter &Writer, const tok &Value, unsigned Index) {
+    Writer.write(numericValue(Value), Index);
+  }
+};
+
+template <>
+  struct WrapperTypeTraits<syntax::SourcePresence> {
+  static uint8_t numericValue(const syntax::SourcePresence &Presence) {
+    switch (Presence) {
+    case syntax::SourcePresence::Missing: return 0;
+    case syntax::SourcePresence::Present: return 1;
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const syntax::SourcePresence &Presence, unsigned Index) {
+    Writer.write(numericValue(Presence), Index);
+  }
+};
+
+template <>
+struct ObjectTraits<ArrayRef<syntax::TriviaPiece>> {
+  static unsigned numFields(const ArrayRef<syntax::TriviaPiece> &Trivia) {
+    return Trivia.size();
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const ArrayRef<syntax::TriviaPiece> &Trivia) {
+    for (unsigned I = 0, E = Trivia.size(); I < E; ++I) {
+      Writer.write(Trivia[I], /*Index=*/I);
+    }
+  }
+};
+
+template <>
+struct ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>> {
+  static unsigned numFields(const ArrayRef<RC<syntax::RawSyntax>> &Layout) {
+    return Layout.size();
+  }
+
+  static void write(ByteTreeWriter &Writer,
+                    const ArrayRef<RC<syntax::RawSyntax>> &Layout);
+};
+
+template <>
+struct ObjectTraits<std::pair<tok, StringRef>> {
+  static unsigned numFields(const std::pair<tok, StringRef> &Pair) { return 2; }
+
+  static void write(ByteTreeWriter &Writer,
+                    const std::pair<tok, StringRef> &Pair) {
+    Writer.write(Pair.first, /*Index=*/0);
+    Writer.write(Pair.second, /*Index=*/1);
+  }
+};
+
+template <>
+struct ObjectTraits<syntax::RawSyntax> {
+  enum NodeKind { Token = 0, Layout = 1 };
+
+  static unsigned numFields(const syntax::RawSyntax &Syntax) {
+    switch (nodeKind(Syntax)) {
+    case Token:
+      return 6;
+    case Layout:
+      return 5;
+    }
+  }
+
+  static NodeKind nodeKind(const syntax::RawSyntax &Syntax) {
+    if (Syntax.isToken()) {
+      return Token;
+    } else {
+      return Layout;
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::RawSyntax &Syntax) {
+    auto Kind = nodeKind(Syntax);
+
+    Writer.write(static_cast<uint8_t>(Kind), /*Index=*/0);
+    Writer.write(Syntax.getPresence(), /*Index=*/1);
+    Writer.write(static_cast<uint32_t>(Syntax.getId()), /*Index=*/2);
+
+    switch (Kind) {
+    case Token:
+      Writer.write(std::make_pair(Syntax.getTokenKind(), Syntax.getTokenText()),
+                   /*Index=*/3);
+      Writer.write(Syntax.getLeadingTrivia(), /*Index=*/4);
+      Writer.write(Syntax.getTrailingTrivia(), /*Index=*/5);
+      break;
+    case Layout:
+      Writer.write(Syntax.getKind(), /*Index=*/3);
+      Writer.write(Syntax.getLayout(), /*Index=*/4);
+      break;
+    }
+  }
+};
+
+} // end namespace byteTree
+
 } // end namespace swift
 
 #endif /* SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H */

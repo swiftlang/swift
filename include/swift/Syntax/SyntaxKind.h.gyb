@@ -25,6 +25,7 @@
 #define SWIFT_SYNTAX_KIND_H
 
 #include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/ByteTreeSerialization.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -75,6 +76,35 @@ SyntaxKind getUnknownKind(SyntaxKind Kind);
 } // end namespace syntax
 
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind);
+
+namespace byteTree {
+
+template <>
+struct WrapperTypeTraits<syntax::SyntaxKind> {
+  // Explicitly spell out all SyntaxKinds to keep the serialized value stable
+  // even if its members get reordered or members get removed
+  static uint16_t numericValue(const syntax::SyntaxKind &Kind) {
+    switch (Kind) {
+    case syntax::SyntaxKind::Token:
+      return 0;
+    case syntax::SyntaxKind::Unknown:
+      return 1;
+% for name, nodes in grouped_nodes.items():
+%   for node in nodes:
+    case syntax::SyntaxKind::${node.syntax_kind}: 
+      return ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]};
+%   end
+% end
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::SyntaxKind &Kind,
+                    unsigned Index) {
+    Writer.write(numericValue(Kind), Index);
+  }
+};
+
+} // end namespace byteTree
 
 namespace json {
 
