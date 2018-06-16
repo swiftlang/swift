@@ -169,16 +169,11 @@ void IterativeTypeChecker::processTypeCheckSuperclass(
       break;
     }
   }
-
-  // Set the superclass type.
-  if (classDecl->isInvalid())
-    superclassType = ErrorType::get(getASTContext());
-  classDecl->setSuperclass(superclassType);
 }
 
 bool IterativeTypeChecker::breakCycleForTypeCheckSuperclass(
        ClassDecl *classDecl) {
-  classDecl->setSuperclass(ErrorType::get(getASTContext()));
+  classDecl->setSuperclass(Type());
   return true;
 }
 
@@ -215,13 +210,10 @@ void IterativeTypeChecker::processTypeCheckRawType(
     rawType = inherited.getType();
     break;
   }
-
-  // Set the raw type.
-  enumDecl->setRawType(rawType);
 }
 
 bool IterativeTypeChecker::breakCycleForTypeCheckRawType(EnumDecl *enumDecl) {
-  enumDecl->setRawType(ErrorType::get(getASTContext()));
+  enumDecl->setRawType(Type());
   return true;
 }
 

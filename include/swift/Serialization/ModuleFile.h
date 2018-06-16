@@ -50,6 +50,7 @@ class ModuleFile
   friend class SerializedASTFile;
   friend class SILDeserializer;
   using Status = serialization::Status;
+  using TypeID = serialization::TypeID;
 
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;

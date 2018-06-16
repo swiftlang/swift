@@ -4124,7 +4124,7 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
 /// Visit all of the types that show up in the list of inherited
 /// types.
 static ConstraintResult visitInherited(
-         ArrayRef<TypeLoc> inheritedTypes,
+         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
          llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
@@ -4151,8 +4151,17 @@ static ConstraintResult visitInherited(
   };
 
   // Visit all of the inherited types.
-  for (auto inherited : inheritedTypes) {
-    visitInherited(inherited.getType(), inherited.getTypeRepr());
+  auto typeDecl = decl.dyn_cast<TypeDecl *>();
+  auto extDecl = decl.dyn_cast<ExtensionDecl *>();
+  ArrayRef<TypeLoc> inheritedTypes = typeDecl ? typeDecl->getInherited()
+                                              : extDecl->getInherited();
+  for (unsigned index : indices(inheritedTypes)) {
+    Type inheritedType = typeDecl ? typeDecl->getInheritedType(index)
+                                  : extDecl->getInheritedType(index);
+    if (!inheritedType) continue;
+
+    const auto &inherited = inheritedTypes[index];
+    visitInherited(inheritedType, inherited.getTypeRepr());
   }
 
   return result;
@@ -4190,15 +4199,15 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
 
   if (!onlySameTypeConstraints) {
     // Add all of the inherited protocol requirements, recursively.
-    if (auto resolver = getLazyResolver())
-      resolver->resolveInheritedProtocols(proto);
-
     auto inheritedReqResult =
       addInheritedRequirements(proto, selfType.getUnresolvedType(), source,
                                proto->getModuleContext());
     if (isErrorResult(inheritedReqResult))
       return inheritedReqResult;
   }
+
+  if (auto resolver = getLazyResolver())
+    resolver->resolveTrailingWhereClause(proto);
 
   // Add any requirements in the where clause on the protocol.
   if (auto WhereClause = proto->getTrailingWhereClause()) {
@@ -5224,10 +5233,6 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
       decl->getInterfaceType()->is<ErrorType>())
     return ConstraintResult::Resolved;
 
-  // Walk the 'inherited' list to identify requirements.
-  if (auto resolver = getLazyResolver())
-    resolver->resolveInheritanceClause(decl);
-
   // Local function to get the source.
   auto getFloatingSource = [&](const TypeRepr *typeRepr, bool forInferred) {
     if (parentSource) {
@@ -5269,7 +5274,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
         UnresolvedHandlingKind::GenerateConstraints, inferForModule);
   };
 
-  return visitInherited(decl->getInherited(), visitType);
+  return visitInherited(decl, visitType);
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(

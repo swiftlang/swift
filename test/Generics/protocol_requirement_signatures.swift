@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck %s -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 // CHECK-LABEL: .P1@

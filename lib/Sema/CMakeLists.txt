@@ -51,6 +51,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckProtocolInference.cpp
   TypeCheckREPL.cpp
   TypeCheckRequest.cpp
+  TypeCheckRequests.cpp
   TypeCheckStmt.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp

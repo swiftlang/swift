@@ -32,7 +32,8 @@ std::string AnyRequest::getAsString() const {
   return result;
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags) : diags(diags) { }
+Evaluator::Evaluator(DiagnosticEngine &diags, bool shouldDiagnoseCycles)
+  : diags(diags), shouldDiagnoseCycles(shouldDiagnoseCycles) { }
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
   // If there is an active request, record it's dependency on this request.
@@ -44,7 +45,9 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
     return false;
   }
 
-  diagnoseCycle(request);
+  if (shouldDiagnoseCycles)
+    diagnoseCycle(request);
+
   return true;
 }
 

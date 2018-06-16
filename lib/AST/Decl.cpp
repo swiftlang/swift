@@ -942,6 +942,16 @@ ExtensionDecl::takeConformanceLoaderSlow() {
   return { contextInfo->loader, contextInfo->allConformancesData };
 }
 
+Type ExtensionDecl::getInheritedType(unsigned index) const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getInheritedType(const_cast<ExtensionDecl *>(this),
+                                          index);
+  }
+
+  return getInherited()[index].getType();
+}
+
 bool ExtensionDecl::isConstrainedExtension() const {
   // Non-generic extension.
   if (!getGenericSignature())
@@ -2261,6 +2271,16 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
   }
 }
 
+Type TypeDecl::getInheritedType(unsigned index) const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getInheritedType(const_cast<TypeDecl *>(this),
+                                          index);
+  }
+
+  return getInherited()[index].getType();
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -2751,6 +2771,15 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = false;
 }
 
+Type EnumDecl::getRawType() const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getRawType(const_cast<EnumDecl *>(this));
+  }
+
+  return LazySemanticInfo.RawType.getPointer();
+}
+
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
                        MutableArrayRef<TypeLoc> Inherited,
                        GenericParamList *GenericParams, DeclContext *Parent)
@@ -3151,10 +3180,8 @@ ProtocolDecl::getInheritedProtocols() const {
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
     SmallPtrSet<ProtocolDecl *, 4> known;
-    if (auto resolver = getASTContext().getLazyResolver())
-      resolver->resolveInheritanceClause(const_cast<ProtocolDecl *>(this));
-    for (auto inherited : getInherited()) {
-      if (auto type = inherited.getType()) {
+    for (unsigned index : indices(getInherited())) {
+      if (auto type = getInheritedType(index)) {
         // Only protocols can appear in the inheritance clause
         // of a protocol -- anything else should get diagnosed
         // elsewhere.
@@ -3253,8 +3280,8 @@ bool ProtocolDecl::requiresClassSlow() {
   //
   // FIXME: Use the requirement signature if available.
   Bits.ProtocolDecl.RequiresClass = false;
-  for (auto inherited : getInherited()) {
-    auto type = inherited.getType();
+  for (unsigned i : indices(getInherited())) {
+    Type type = getInheritedType(i);
     assert(type && "Should have type checked inheritance clause by now");
     if (type->isExistentialType()) {
       auto layout = type->getExistentialLayout();
@@ -5684,6 +5711,15 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
         return varDecl->getType();
 
   return {};
+}
+
+Type ClassDecl::getSuperclass() const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getSuperclass(this);
+  }
+
+  return LazySemanticInfo.Superclass.getPointer();
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {

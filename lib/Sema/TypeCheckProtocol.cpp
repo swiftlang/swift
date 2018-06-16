@@ -1662,6 +1662,17 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
     }
   }
 
+  // Redeclaration checking might mark a candidate as `invalid` and
+  // reset it's type to ErrorType, let's dig out original type to
+  // make the diagnostic better.
+  if (auto errorType = type->getAs<ErrorType>()) {
+    auto originalType = errorType->getOriginalType();
+    if (!originalType || !originalType->is<AnyFunctionType>())
+      return type;
+
+    type = originalType;
+  }
+
   return type->castTo<AnyFunctionType>()->getResult();
 }
 
@@ -3677,7 +3688,8 @@ static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
     if (Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable) &&
         DerivedConformance::derivesProtocolConformance(TC, DC, enumDecl,
                                                        Proto) &&
-        enumDecl->hasRawType()) {
+        enumDecl->hasRawType() &&
+        !enumDecl->getRawType()->is<ErrorType>()) {
 
       auto rawType = enumDecl->getRawType();
 

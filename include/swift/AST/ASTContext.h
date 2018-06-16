@@ -19,6 +19,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -217,6 +218,9 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  /// The request-evaluator that is used to process various requests.
+  Evaluator evaluator;
 
   /// The set of top-level modules we have loaded.
   /// This map is used for iteration, therefore it's a MapVector and not a

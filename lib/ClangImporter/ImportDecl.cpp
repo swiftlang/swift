@@ -5215,21 +5215,25 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   return alias;
 }
 
-static bool inheritanceListContainsProtocol(ArrayRef<TypeLoc> inherited,
-                                            const ProtocolDecl *proto) {
-  return llvm::any_of(inherited, [proto](TypeLoc type) -> bool {
-    if (!type.getType()->isExistentialType())
+namespace {
+  template<typename D>
+  bool inheritanceListContainsProtocol(D decl, const ProtocolDecl *proto) {
+    return llvm::any_of(range(decl->getInherited().size()),
+                        [decl, proto](unsigned index) -> bool {
+      Type type = decl->getInheritedType(index);
+      if (!type || !type->isExistentialType())
+        return false;
+
+      auto layout = type->getExistentialLayout();
+      for (auto protoTy : layout.getProtocols()) {
+        auto *protoDecl = protoTy->getDecl();
+        if (protoDecl == proto || protoDecl->inheritsFrom(proto))
+          return true;
+      }
+
       return false;
-
-    auto layout = type.getType()->getExistentialLayout();
-    for (auto protoTy : layout.getProtocols()) {
-      auto *protoDecl = protoTy->getDecl();
-      if (protoDecl == proto || protoDecl->inheritsFrom(proto))
-        return true;
-    }
-
-    return false;
-  });
+    });
+  }
 }
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
@@ -5238,9 +5242,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
                                                LazyResolver *resolver) {
   auto &ctx = nominal->getASTContext();
 
-  if (resolver)
-    resolver->resolveInheritanceClause(nominal);
-  if (inheritanceListContainsProtocol(nominal->getInherited(), proto))
+  if (inheritanceListContainsProtocol(nominal, proto))
     return true;
 
   for (auto attr : nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>())
@@ -5263,9 +5265,7 @@ static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
         extensionModule != foundationModule) {
       continue;
     }
-    if (resolver)
-      resolver->resolveInheritanceClause(extension);
-    if (inheritanceListContainsProtocol(extension->getInherited(), proto))
+    if (inheritanceListContainsProtocol(extension, proto))
       return true;
   }
 

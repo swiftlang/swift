@@ -5,7 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-protocol P{ a
-typealias e:A.eas ea}class A:Self.a{
-class a:A
+// RUN: not %target-swift-frontend %s -emit-ir
+protocol P{{}typealias e where f:A:protocol A:A}protocol A:P
