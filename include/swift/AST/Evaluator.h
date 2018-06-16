@@ -24,6 +24,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -39,6 +40,21 @@ using llvm::Optional;
 using llvm::None;
 
 class DiagnosticEngine;
+
+/// Pretty stack trace handler for an arbitrary request.
+template<typename Request>
+class PrettyStackTraceRequest : public llvm::PrettyStackTraceEntry {
+  const Request &request;
+
+public:
+  PrettyStackTraceRequest(const Request &request) : request(request) { }
+
+  void print(llvm::raw_ostream &out) const {
+    out << "While evaluating request ";
+    simple_display(out, request);
+    out << "\n";
+  }
+};
 
 /// Evaluation engine that evaluates and caches "requests", checking for cyclic
 /// dependencies along the way.
@@ -210,6 +226,7 @@ private:
     // them now anyway.
     dependencies[request].clear();
 
+    PrettyStackTraceRequest<Request> prettyStackTrace(request);
     return request(*this);
   }
 
