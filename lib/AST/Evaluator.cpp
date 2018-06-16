@@ -32,7 +32,8 @@ std::string AnyRequest::getAsString() const {
   return result;
 }
 
-Evaluator::Evaluator(DiagnosticEngine &diags, bool shouldDiagnoseCycles)
+Evaluator::Evaluator(DiagnosticEngine &diags,
+                     CycleDiagnosticKind shouldDiagnoseCycles)
   : diags(diags), shouldDiagnoseCycles(shouldDiagnoseCycles) { }
 
 bool Evaluator::checkDependency(const AnyRequest &request) {
@@ -45,8 +46,23 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
     return false;
   }
 
-  if (shouldDiagnoseCycles)
+  switch (shouldDiagnoseCycles) {
+  case CycleDiagnosticKind::NoDiagnose:
+    return true;
+
+  case CycleDiagnosticKind::DebugDiagnose: {
+    llvm::dbgs() << "===CYCLE DETECTED===\n";
+    llvm::DenseSet<AnyRequest> visited;
+    std::string prefixStr;
+    printDependencies(activeRequests.front(), llvm::dbgs(), visited,
+                      prefixStr, /*lastChild=*/true);
+    return true;
+  }
+
+  case CycleDiagnosticKind::FullDiagnose:
     diagnoseCycle(request);
+    return true;
+  }
 
   return true;
 }

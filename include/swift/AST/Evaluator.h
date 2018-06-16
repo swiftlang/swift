@@ -20,6 +20,7 @@
 
 #include "swift/AST/AnyRequest.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
@@ -124,7 +125,7 @@ class Evaluator {
   DiagnosticEngine &diags;
 
   /// Whether to diagnose cycles or ignore them completely.
-  bool shouldDiagnoseCycles;
+  CycleDiagnosticKind shouldDiagnoseCycles;
 
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
@@ -147,7 +148,7 @@ class Evaluator {
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
-  Evaluator(DiagnosticEngine &diags, bool shouldDiagnoseCycles);
+  Evaluator(DiagnosticEngine &diags, CycleDiagnosticKind shouldDiagnoseCycles);
 
   /// Evaluate the given request and produce its result,
   /// consulting/populating the cache as required.
