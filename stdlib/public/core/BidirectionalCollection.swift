@@ -249,7 +249,7 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to remove.
   @inlinable // protocol-only
   public mutating func removeLast(_ n: Int) {
@@ -281,7 +281,7 @@ extension BidirectionalCollection {
   /// - Returns: A subsequence that leaves off `n` elements from the end.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop.
   @inlinable // protocol-only
   public func dropLast(_ n: Int) -> SubSequence {
@@ -314,7 +314,7 @@ extension BidirectionalCollection {
   ///   most `maxLength` elements.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is equal to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is equal to
   ///   `maxLength`.
   @inlinable // protocol-only
   public func suffix(_ maxLength: Int) -> SubSequence {

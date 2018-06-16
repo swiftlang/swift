@@ -733,7 +733,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `BidirectionalCollection` protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> Int
 
@@ -991,7 +991,7 @@ extension Collection {
   ///   `BidirectionalCollection` protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the
   ///   resulting distance.
   @inlinable
   public func distance(from start: Index, to end: Index) -> Int {
@@ -1337,7 +1337,7 @@ extension Collection {
   ///   elements.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
   public func dropFirst(_ n: Int) -> SubSequence {
@@ -1365,7 +1365,7 @@ extension Collection {
   ///   at the end.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
   public func dropLast(_ n: Int) -> SubSequence {
@@ -1415,7 +1415,7 @@ extension Collection {
   ///   with at most `maxLength` elements.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the number of
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to select from the beginning of the collection.
   @inlinable
   public func prefix(_ maxLength: Int) -> SubSequence {

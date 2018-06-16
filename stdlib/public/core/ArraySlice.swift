@@ -931,9 +931,7 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: Amortized O(1) over many additions. If the array uses a
-  ///   bridged `NSArray` instance as its storage, the efficiency is
-  ///   unspecified.
+  /// - Complexity: O(1) on average, over many additions to the same array.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -956,7 +954,8 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the resulting array.
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many additions to the same array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)

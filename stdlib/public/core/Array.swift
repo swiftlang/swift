@@ -1140,8 +1140,6 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// - Parameter newElement: The element to append to the array.
   ///
   /// - Complexity: O(1) on average, over many additions to the same array.
-  ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   complexity is unspecified.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -1164,7 +1162,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many additions to the same array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -1269,10 +1268,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array. If the
-  ///   call to this method appends `newElement` to the array, the
-  ///   complexity is O(1) on average, over many additions to the same
-  ///   array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)

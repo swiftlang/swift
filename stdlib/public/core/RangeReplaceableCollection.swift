@@ -211,10 +211,8 @@ public protocol RangeReplaceableCollection : Collection
   /// - Parameter i: The position at which to insert the new element.
   ///   `index` must be a valid index into the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection. If the
-  ///   call to this method appends `newElement` to the collection, the
-  ///   complexity is O(1) on average, over many additions to the same
-  ///   collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   mutating func insert(_ newElement: __owned Element, at i: Index)
 
   /// Inserts the elements of a sequence into the collection at the specified
@@ -240,9 +238,8 @@ public protocol RangeReplaceableCollection : Collection
   ///   must be a valid index of the collection.
   ///
   /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
-  ///   *m* is the length of `newElements`. If the call to this method simply
-  ///   appends the contents of `newElements` to the collection, the complexity
-  ///   is O(*m*).
+  ///   *m* is the length of `newElements`. If `i == endIndex`, this method
+  ///   is equivalent to `append(contentsOf:)`.
   mutating func insert<S : Collection>(contentsOf newElements: __owned S, at i: Index)
     where S.Element == Element
 
@@ -473,10 +470,8 @@ extension RangeReplaceableCollection {
   /// - Parameter i: The position at which to insert the new element.
   ///   `index` must be a valid index into the collection.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the collection. If the
-  ///   call to this method appends `newElement` to the collection, the
-  ///   complexity is O(1) on average, over many additions to the same
-  ///   collection.
+  /// - Complexity: O(*n*), where *n* is the length of the collection. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(
     _ newElement: Element, at i: Index
@@ -507,9 +502,8 @@ extension RangeReplaceableCollection {
   ///   must be a valid index of the collection.
   ///
   /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
-  ///   *m* is the length of `newElements`. If the call to this method simply
-  ///   appends the contents of `newElements` to the collection, the complexity
-  ///   is O(*m*).
+  ///   *m* is the length of `newElements`. If `i == endIndex`, this method
+  ///   is equivalent to `append(contentsOf:)`.
   @inlinable
   public mutating func insert<C : Collection>(
     contentsOf newElements: C, at i: Index
