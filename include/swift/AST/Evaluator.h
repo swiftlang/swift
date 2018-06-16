@@ -288,7 +288,9 @@ public:
   /// the other overload.
   void printDependencies(const AnyRequest &request,
                          llvm::raw_ostream &out,
-                         llvm::DenseSet<AnyRequest> &visited,
+                         llvm::DenseSet<AnyRequest> &visitedAnywhere,
+                         llvm::SmallVectorImpl<AnyRequest> &visitedAlongPath,
+                         llvm::ArrayRef<AnyRequest> highlightPath,
                          std::string &prefixStr,
                          bool lastChild) const;
 

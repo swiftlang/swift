@@ -46,15 +46,18 @@ bool Evaluator::checkDependency(const AnyRequest &request) {
     return false;
   }
 
+  // Diagnose cycle.
   switch (shouldDiagnoseCycles) {
   case CycleDiagnosticKind::NoDiagnose:
     return true;
 
   case CycleDiagnosticKind::DebugDiagnose: {
-    llvm::dbgs() << "===CYCLE DETECTED===\n";
-    llvm::DenseSet<AnyRequest> visited;
+    llvm::errs() << "===CYCLE DETECTED===\n";
+    llvm::DenseSet<AnyRequest> visitedAnywhere;
+    llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
     std::string prefixStr;
-    printDependencies(activeRequests.front(), llvm::dbgs(), visited,
+    printDependencies(activeRequests.front(), llvm::errs(), visitedAnywhere,
+                      visitedAlongPath, activeRequests.getArrayRef(),
                       prefixStr, /*lastChild=*/true);
     return true;
   }
@@ -78,15 +81,31 @@ void Evaluator::diagnoseCycle(const AnyRequest &request) {
   llvm_unreachable("Diagnosed a cycle but it wasn't represented in the stack");
 }
 
-void Evaluator::printDependencies(const AnyRequest &request,
-                                  llvm::raw_ostream &out,
-                                  llvm::DenseSet<AnyRequest> &visited,
-                                  std::string &prefixStr,
-                                  bool lastChild) const {
+void Evaluator::printDependencies(
+                            const AnyRequest &request,
+                            llvm::raw_ostream &out,
+                            llvm::DenseSet<AnyRequest> &visitedAnywhere,
+                            llvm::SmallVectorImpl<AnyRequest> &visitedAlongPath,
+                            llvm::ArrayRef<AnyRequest> highlightPath,
+                            std::string &prefixStr,
+                            bool lastChild) const {
   out << prefixStr << " `--";
+
+  // Determine whether this node should be highlighted.
+  bool isHighlighted = false;
+  if (std::find(highlightPath.begin(), highlightPath.end(), request)
+        != highlightPath.end()) {
+    isHighlighted = true;
+    out.changeColor(llvm::buffer_ostream::Colors::GREEN);
+  }
 
   // Print this node.
   simple_display(out, request);
+
+  // Turn off the highlight.
+  if (isHighlighted) {
+    out.resetColor();
+  }
 
   // Print the cached value, if known.
   auto cachedValue = cache.find(request);
@@ -95,10 +114,19 @@ void Evaluator::printDependencies(const AnyRequest &request,
     PrintEscapedString(cachedValue->second.getAsString(), out);
   }
 
-  if (!visited.insert(request).second) {
-    // We've already seed this node, so we have a cyclic dependency.
-    out.changeColor(llvm::raw_ostream::RED);
-    out << " (cyclic dependency)\n";
+  if (!visitedAnywhere.insert(request).second) {
+    // We've already seed this node. Check whether it's part of a cycle.
+    if (std::find(visitedAlongPath.begin(), visitedAlongPath.end(), request)
+          != visitedAlongPath.end()) {
+      // We have a cyclic dependency.
+      out.changeColor(llvm::raw_ostream::RED);
+      out << " (cyclic dependency)\n";
+    } else {
+      // We have seen this node before, but it's not a cycle. Elide its
+      // children.
+      out << " (elided)\n";
+    }
+
     out.resetColor();
   } else if (dependencies.count(request) == 0) {
     // We have not seen this node before, so we don't know its dependencies.
@@ -107,7 +135,7 @@ void Evaluator::printDependencies(const AnyRequest &request,
     out.resetColor();
 
     // Remove from the visited set.
-    visited.erase(request);
+    visitedAnywhere.erase(request);
   } else {
     // Print children.
     out << "\n";
@@ -117,26 +145,33 @@ void Evaluator::printDependencies(const AnyRequest &request,
     prefixStr += (lastChild ? ' ' : '|');
     prefixStr += "  ";
 
+    // Note that this request is along the path.
+    visitedAlongPath.push_back(request);
+
     // Print the children.
     auto &dependsOn = dependencies.find(request)->second;
     for (unsigned i : indices(dependsOn)) {
-      printDependencies(dependsOn[i], out, visited, prefixStr,
-                        i == dependsOn.size()-1);
+      printDependencies(dependsOn[i], out, visitedAnywhere, visitedAlongPath,
+                        highlightPath, prefixStr, i == dependsOn.size()-1);
     }
 
     // Drop our changes to the prefix.
     prefixStr.erase(prefixStr.end() - 4, prefixStr.end());
 
-    // Remove from the visited set.
-    visited.erase(request);
+    // Remove from the visited set and path.
+    visitedAnywhere.erase(request);
+    assert(visitedAlongPath.back() == request);
+    visitedAlongPath.pop_back();
   }
 }
 
 void Evaluator::printDependencies(const AnyRequest &request,
                                   llvm::raw_ostream &out) const {
   std::string prefixStr;
-  llvm::DenseSet<AnyRequest> visited;
-  printDependencies(request, out, visited, prefixStr, /*lastChild=*/true);
+  llvm::DenseSet<AnyRequest> visitedAnywhere;
+  llvm::SmallVector<AnyRequest, 4> visitedAlongPath;
+  printDependencies(request, out, visitedAnywhere, visitedAlongPath, { },
+                    prefixStr, /*lastChild=*/true);
 }
 
 void Evaluator::dumpDependencies(const AnyRequest &request) const {
