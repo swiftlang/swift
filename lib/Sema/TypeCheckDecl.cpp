@@ -924,13 +924,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!other->isAccessibleFrom(currentDC))
       continue;
 
-    const auto markInvalid = [&current, &tc]() {
+    const auto markInvalid = [&current]() {
       current->setInvalid();
       if (auto *varDecl = dyn_cast<VarDecl>(current))
         if (varDecl->hasType())
-          varDecl->setType(ErrorType::get(tc.Context));
+          varDecl->setType(ErrorType::get(varDecl->getType()));
       if (current->hasInterfaceType())
-        current->setInterfaceType(ErrorType::get(tc.Context));
+        current->setInterfaceType(ErrorType::get(current->getInterfaceType()));
     };
 
     // Thwart attempts to override the same declaration more than once.
