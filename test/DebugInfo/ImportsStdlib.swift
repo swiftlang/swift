@@ -21,6 +21,7 @@
 // DWARF:   DW_AT_name ("NotTheStdlib")
 // DWARF:   DW_AT_LLVM_include_path
 
-// DWARF: file_names{{.*}} ImportsStdlib.swift
+// DWARF: file_names{{.*}}
+// DWARF-NEXT: "ImportsStdlib.swift"
 
 // NEGATIVE-DWARF-NOT: DW_AT_name ("Swift")
