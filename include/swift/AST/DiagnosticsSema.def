@@ -1325,7 +1325,7 @@ ERROR(unsupported_nested_protocol,none,
 // Type aliases
 ERROR(type_alias_underlying_type_access,none,
       "type alias %select{must be declared %select{"
-      "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
+      "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its underlying type uses "
@@ -1333,7 +1333,7 @@ ERROR(type_alias_underlying_type_access,none,
       (bool, AccessLevel, AccessLevel, bool))
 WARNING(type_alias_underlying_type_access_warn,none,
         "type alias %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
+        "%select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared "
         "%select{in this context|fileprivate|internal|public|open}1}0 "
         "because its underlying type uses "
@@ -1351,7 +1351,7 @@ ERROR(subscript_type_access,none,
       (bool, AccessLevel, AccessLevel, bool))
 WARNING(subscript_type_access_warn,none,
         "subscript %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
+        "%select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{index|element type}3 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
@@ -1369,7 +1369,7 @@ ERROR(function_type_access,none,
       (bool, AccessLevel, bool, AccessLevel, unsigned, bool))
 WARNING(function_type_access_warn,none,
         "%select{function|method|initializer}4 "
-        "%select{should be declared %select{private|fileprivate|internal|%error|%error}3"
+        "%select{should be declared %select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
@@ -1562,20 +1562,22 @@ NOTE(witness_fix_access,none,
      "mark the %0 as '%select{%error|fileprivate|internal|public|%error}1' to "
      "satisfy the requirement", (DescriptiveDeclKind, AccessLevel))
 
-ERROR(protocol_refine_access,none,
+ERROR(protocol_access,none,
       "%select{protocol must be declared %select{"
-      "%select{private|fileprivate|internal|%error|%error}2"
-      "|private or fileprivate}3 because it refines"
+      "%select{private|fileprivate|internal|%error|%error}1"
+      "|private or fileprivate}4 because %select{it refines|its 'where' clause uses}2"
       "|%select{in this context|fileprivate|internal|public|%error}1 "
-      "protocol cannot refine}0 "
-      "%select{a private|a fileprivate|an internal|%error|%error}2 protocol",
-      (bool, AccessLevel, AccessLevel, bool))
-WARNING(protocol_refine_access_warn,none,
+      "%select{protocol cannot refine|protocol's 'where' clause cannot use}2}0 "
+      "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
+      (bool, AccessLevel, bool, AccessLevel, bool))
+WARNING(protocol_access_warn,none,
         "%select{protocol should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2 because it refines"
-        "|%select{in this context|fileprivate|internal|public|%error}1 protocol should not "
-        "refine}0 %select{a private|a fileprivate|an internal|%error|%error}2 protocol",
-        (bool, AccessLevel, AccessLevel, bool))
+        "%select{private|fileprivate|internal|%error|%error}1 because "
+        "%select{it refines|its 'where' clause uses}2"
+        "|%select{in this context|fileprivate|internal|public|%error}1 "
+        "%select{protocol should not refine|protocol's 'where' clause should not use}2}0 "
+        "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
+        (bool, AccessLevel, bool, AccessLevel, bool))
 ERROR(protocol_property_must_be_computed_var,none,
       "immutable property requirement must be declared as 'var' with a "
       "'{ get }' specifier", ())
@@ -2119,7 +2121,7 @@ NOTE(enum_declares_rawrep_with_raw_type,none,
       "%0 declares raw type %1, which implies RawRepresentable", (Type, Type))
 ERROR(enum_raw_type_access,none,
       "enum %select{must be declared %select{"
-      "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
+      "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}1}0 "
       "because its raw type uses "
@@ -2127,7 +2129,7 @@ ERROR(enum_raw_type_access,none,
       (bool, AccessLevel, AccessLevel, bool))
 WARNING(enum_raw_type_access_warn,none,
         "enum %select{should be declared "
-        "%select{private|fileprivate|internal|%error|%error}2"
+        "%select{private|fileprivate|internal|%error|%error}1"
         "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
         "because its raw type uses "
         "%select{a private|a fileprivate|an internal|%error|%error}2 type",
@@ -3235,7 +3237,7 @@ ERROR(bool_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on Bool", ())
 ERROR(class_super_access,none,
       "class %select{must be declared %select{"
-      "%select{private|fileprivate|internal|%error|%error}2|private or fileprivate}3"
+      "%select{private|fileprivate|internal|%error|%error}1|private or fileprivate}3"
       "|cannot be declared %select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass "
       "%select{is %select{private|fileprivate|internal|%error|%error}2"
@@ -3244,7 +3246,7 @@ ERROR(class_super_access,none,
       (bool, AccessLevel, AccessLevel, bool, bool))
 WARNING(class_super_access_warn,none,
       "class %select{should be declared "
-      "%select{private|fileprivate|internal|%error|%error}2"
+      "%select{private|fileprivate|internal|%error|%error}1"
       "|should not be declared %select{in this context|fileprivate|internal|public|open}1}0 "
       "because its superclass "
       "%select{is %select{private|fileprivate|internal|%error|%error}2"

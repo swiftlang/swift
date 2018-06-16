@@ -1775,6 +1775,14 @@ static void checkTypeAccessImpl(
     }
   }
 
+  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
+  // access scope represented a private or fileprivate level.
+  if (!contextAccessScope.isPublic() &&
+      !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
+      TC.getLangOpts().isSwiftVersion3()) {
+    downgradeToWarning = DowngradeToWarning::Yes;
+  }
+
   const TypeRepr *complainRepr =
         TypeAccessScopeDiagnoser::findTypeWithScope(
             TL.getTypeRepr(),
@@ -1788,36 +1796,14 @@ static void checkTypeAccessImpl(
 /// TypeRepr representing the offending part of \p TL.
 ///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
-/// part of the type that caused the problem could not be found. The DeclContext
-/// is never null. The DowngradeToWarning parameter is a hack to deal with
-/// early versions of Swift 3 not diagnosing certain access violations.
+/// part of the type that caused the problem could not be found.
 static void checkTypeAccess(
     TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+  assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
-  if (isa<ParamDecl>(context)) {
-    context = dyn_cast<AbstractFunctionDecl>(DC);
-    if (!context)
-      context = dyn_cast<SubscriptDecl>(DC);
-    if (!context)
-      context = cast<EnumDecl>(DC);
-    DC = context->getDeclContext();
-  }
-
   AccessScope contextAccessScope = context->getFormalAccessScope();
-  checkTypeAccessImpl(TC, TL, contextAccessScope, DC,
-                      [=, &TC](AccessScope requiredAccessScope,
-                               const TypeRepr *offendingTR,
-                               DowngradeToWarning downgradeToWarning) {
-    if (!contextAccessScope.isPublic() &&
-        !isa<ModuleDecl>(contextAccessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      // Swift 3.0.0 mistakenly didn't diagnose any issues when the context
-      // access scope represented a private or fileprivate level.
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-    diagnose(requiredAccessScope, offendingTR, downgradeToWarning);
-  });
+  checkTypeAccessImpl(TC, TL, contextAccessScope, DC, diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -1837,6 +1823,33 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(complainRepr)) {
     const ValueDecl *VD = CITR->getBoundDecl();
     TC.diagnose(VD, diag::kind_declared_here, DescriptiveDeclKind::Type);
+  }
+}
+
+static void checkRequirementAccess(TypeChecker &TC,
+                                   ArrayRef<RequirementRepr> requirements,
+                                   AccessScope accessScope,
+                                   const DeclContext *useDC,
+                                   llvm::function_ref<CheckTypeAccessCallback> diagnose) {
+  for (auto &requirement : requirements) {
+    switch (requirement.getKind()) {
+    case RequirementReprKind::TypeConstraint:
+      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
+                          accessScope, useDC, diagnose);
+      checkTypeAccessImpl(TC, requirement.getConstraintLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    case RequirementReprKind::LayoutConstraint:
+      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    case RequirementReprKind::SameType:
+      checkTypeAccessImpl(TC, requirement.getFirstTypeLoc(),
+                          accessScope, useDC, diagnose);
+      checkTypeAccessImpl(TC, requirement.getSecondTypeLoc(),
+                          accessScope, useDC, diagnose);
+      break;
+    }
   }
 }
 
@@ -1883,50 +1896,18 @@ static void checkGenericParamAccess(TypeChecker &TC,
   }
   callbackACEK = ACEK::Requirement;
 
-  for (auto &requirement : params->getRequirements()) {
-    switch (requirement.getKind()) {
-    case RequirementReprKind::TypeConstraint:
-      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      checkTypeAccessImpl(TC, requirement.getConstraintLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    case RequirementReprKind::LayoutConstraint:
-      checkTypeAccessImpl(TC, requirement.getSubjectLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    case RequirementReprKind::SameType:
-      checkTypeAccessImpl(TC, requirement.getFirstTypeLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      checkTypeAccessImpl(TC, requirement.getSecondTypeLoc(),
-                          accessScope, owner->getDeclContext(),
-                          callback);
-      break;
-    }
-  }
+  checkRequirementAccess(TC, params->getRequirements(),
+                         accessScope, owner->getDeclContext(),
+                         callback);
 
   if (minAccessScope.isPublic())
     return;
-
-  // Swift 3.0.0 mistakenly didn't diagnose any issues when the context access
-  // scope represented a private or fileprivate level.
-  if (downgradeToWarning == DowngradeToWarning::No) {
-    if (!accessScope.isPublic() &&
-        !isa<ModuleDecl>(accessScope.getDeclContext()) &&
-        TC.getLangOpts().isSwiftVersion3()) {
-      downgradeToWarning = DowngradeToWarning::Yes;
-    }
-  }
 
   auto minAccess = minAccessScope.accessLevelForDiagnostics();
 
   bool isExplicit =
     owner->getAttrs().hasAttribute<AccessControlAttr>() ||
-    owner->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+    isa<ProtocolDecl>(owner->getDeclContext());
   auto diagID = diag::generic_param_access;
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::generic_param_access_warn;
@@ -1945,8 +1926,8 @@ static void checkGenericParamAccess(TypeChecker &TC,
                           owner->getFormalAccess());
 }
 
-/// Checks the given declaration's access to make sure it is valid given the way
-/// it is defined.
+/// Checks the given declaration's signature does not reference any other
+/// declarations that are less visible than the declaration itself.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
 static void checkAccessControl(TypeChecker &TC, const Decl *D) {
@@ -2001,7 +1982,8 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                             DowngradeToWarning downgradeToWarning) {
           auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
           bool isExplicit =
-            theVar->getAttrs().hasAttribute<AccessControlAttr>();
+            theVar->getAttrs().hasAttribute<AccessControlAttr>() ||
+            isa<ProtocolDecl>(theVar->getDeclContext());
           auto theVarAccess = isExplicit
             ? theVar->getFormalAccess()
             : typeAccessScope.requiredAccessForDiagnostics();
@@ -2042,7 +2024,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
         bool isExplicit =
           anyVar->getAttrs().hasAttribute<AccessControlAttr>() ||
-          anyVar->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+          isa<ProtocolDecl>(anyVar->getDeclContext());
         auto diagID = diag::pattern_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::pattern_type_access_warn;
@@ -2070,12 +2052,17 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
       auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
-      bool isExplicit = TAD->getAttrs().hasAttribute<AccessControlAttr>();
+      bool isExplicit =
+        TAD->getAttrs().hasAttribute<AccessControlAttr>() ||
+        isa<ProtocolDecl>(TAD->getDeclContext());
       auto diagID = diag::type_alias_underlying_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::type_alias_underlying_type_access_warn;
+      auto aliasAccess = isExplicit
+        ? TAD->getFormalAccess()
+        : typeAccessScope.requiredAccessForDiagnostics();
       auto diag = TC.diagnose(TAD, diagID,
-                              isExplicit, TAD->getFormalAccess(),
+                              isExplicit, aliasAccess,
                               typeAccess, isa<FileUnit>(TAD->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     });
@@ -2126,6 +2113,29 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
       }
     });
 
+    if (auto *trailingWhereClause = assocType->getTrailingWhereClause()) {
+      checkRequirementAccess(TC, trailingWhereClause->getRequirements(),
+                             assocType->getFormalAccessScope(),
+                             assocType->getDeclContext(),
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *thisComplainRepr,
+                                 DowngradeToWarning downgradeDiag) {
+        if (typeAccessScope.isChildOf(minAccessScope) ||
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+          minAccessScope = typeAccessScope;
+          complainRepr = thisComplainRepr;
+          accessControlErrorKind = ACEK_Requirement;
+          downgradeToWarning = downgradeDiag;
+
+          // Swift versions before 5.0 did not check requirements on the
+          // protocol's where clause, so emit a warning.
+          if (!TC.Context.isSwiftVersionAtLeast(5))
+            downgradeToWarning = DowngradeToWarning::Yes;
+        }
+      });
+    }
+
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       auto diagID = diag::associated_type_access;
@@ -2164,8 +2174,11 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         auto diagID = diag::enum_raw_type_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::enum_raw_type_access_warn;
+        auto enumDeclAccess = isExplicit
+          ? ED->getFormalAccess()
+          : typeAccessScope.requiredAccessForDiagnostics();
         auto diag = TC.diagnose(ED, diagID, isExplicit,
-                                ED->getFormalAccess(), typeAccess,
+                                enumDeclAccess, typeAccess,
                                 isa<FileUnit>(ED->getDeclContext()));
         highlightOffendingType(TC, diag, complainRepr);
       });
@@ -2224,8 +2237,11 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         if (downgradeToWarning == DowngradeToWarning::Yes ||
             outerDowngradeToWarning == DowngradeToWarning::Yes)
           diagID = diag::class_super_access_warn;
+        auto classDeclAccess = isExplicit
+          ? CD->getFormalAccess()
+          : typeAccessScope.requiredAccessForDiagnostics();
 
-        auto diag = TC.diagnose(CD, diagID, isExplicit, CD->getFormalAccess(),
+        auto diag = TC.diagnose(CD, diagID, isExplicit, classDeclAccess,
                                 typeAccess,
                                 isa<FileUnit>(CD->getDeclContext()),
                                 superclassLocIter->getTypeRepr() != complainRepr);
@@ -2238,6 +2254,12 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
+
+    // This must stay in sync with diag::protocol_access.
+    enum {
+      PCEK_Refine = 0,
+      PCEK_Requirement
+    } protocolControlErrorKind;
 
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
@@ -2255,19 +2277,47 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
              typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
           minAccessScope = typeAccessScope;
           complainRepr = thisComplainRepr;
+          protocolControlErrorKind = PCEK_Refine;
           downgradeToWarning = downgradeDiag;
         }
       });
     });
 
+    if (auto *trailingWhereClause = proto->getTrailingWhereClause()) {
+      checkRequirementAccess(TC, trailingWhereClause->getRequirements(),
+                             proto->getFormalAccessScope(),
+                             proto->getDeclContext(),
+                             [&](AccessScope typeAccessScope,
+                                 const TypeRepr *thisComplainRepr,
+                                 DowngradeToWarning downgradeDiag) {
+        if (typeAccessScope.isChildOf(minAccessScope) ||
+            (!complainRepr &&
+             typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+          minAccessScope = typeAccessScope;
+          complainRepr = thisComplainRepr;
+          protocolControlErrorKind = PCEK_Requirement;
+          downgradeToWarning = downgradeDiag;
+
+          // Swift versions before 5.0 did not check requirements on the
+          // protocol's where clause, so emit a warning.
+          if (!TC.Context.isSwiftVersionAtLeast(5))
+            downgradeToWarning = DowngradeToWarning::Yes;
+        }
+      });
+    }
+
     if (!minAccessScope.isPublic()) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       bool isExplicit = proto->getAttrs().hasAttribute<AccessControlAttr>();
-      auto diagID = diag::protocol_refine_access;
+      auto protoAccess = isExplicit
+          ? proto->getFormalAccess()
+          : minAccessScope.requiredAccessForDiagnostics();
+      auto diagID = diag::protocol_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
-        diagID = diag::protocol_refine_access_warn;
+        diagID = diag::protocol_access_warn;
       auto diag = TC.diagnose(proto, diagID,
-                              isExplicit, proto->getFormalAccess(), minAccess,
+                              isExplicit, protoAccess,
+                              protocolControlErrorKind, minAccess,
                               isa<FileUnit>(proto->getDeclContext()));
       highlightOffendingType(TC, diag, complainRepr);
     }
@@ -2283,7 +2333,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     bool problemIsElement = false;
 
     for (auto &P : *SD->getIndices()) {
-      checkTypeAccess(TC, P->getTypeLoc(), P,
+      checkTypeAccess(TC, P->getTypeLoc(), SD,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -2315,7 +2365,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
       auto minAccess = minAccessScope.accessLevelForDiagnostics();
       bool isExplicit =
         SD->getAttrs().hasAttribute<AccessControlAttr>() ||
-        SD->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+        isa<ProtocolDecl>(SD->getDeclContext());
       auto diagID = diag::subscript_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::subscript_type_access_warn;
@@ -2355,7 +2405,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
-        checkTypeAccess(TC, P->getTypeLoc(), P,
+        checkTypeAccess(TC, P->getTypeLoc(), fn,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *thisComplainRepr,
                             DowngradeToWarning downgradeDiag) {
@@ -2394,7 +2444,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
         : isTypeContext ? FK_Method : FK_Function;
       bool isExplicit =
         fn->getAttrs().hasAttribute<AccessControlAttr>() ||
-        fn->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+        isa<ProtocolDecl>(fn->getDeclContext());
       auto diagID = diag::function_type_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::function_type_access_warn;
@@ -2419,7 +2469,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
     if (!EED->hasAssociatedValues())
       return;
     for (auto &P : *EED->getParameterList()) {
-      checkTypeAccess(TC, P->getTypeLoc(), P,
+      checkTypeAccess(TC, P->getTypeLoc(), EED,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeToWarning) {
@@ -4436,7 +4486,6 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     TC.checkDeclAttributesEarly(TAD);
-    TC.computeAccessLevel(TAD);
 
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
@@ -4504,7 +4553,6 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     TC.checkDeclAttributesEarly(ED);
-    TC.computeAccessLevel(ED);
 
     checkUnsupportedNestedType(ED);
 
@@ -4538,7 +4586,6 @@ public:
 
   void visitStructDecl(StructDecl *SD) {
     TC.checkDeclAttributesEarly(SD);
-    TC.computeAccessLevel(SD);
 
     checkUnsupportedNestedType(SD);
 
@@ -4663,7 +4710,6 @@ public:
 
   void visitClassDecl(ClassDecl *CD) {
     TC.checkDeclAttributesEarly(CD);
-    TC.computeAccessLevel(CD);
 
     checkUnsupportedNestedType(CD);
 
@@ -4788,7 +4834,6 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     TC.checkDeclAttributesEarly(PD);
-    TC.computeAccessLevel(PD);
 
     checkUnsupportedNestedType(PD);
 
@@ -7220,7 +7265,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     checkDeclAttributesEarly(FD);
-    computeAccessLevel(FD);
 
     FD->setIsBeingValidated();
 
@@ -7520,7 +7564,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     CD->setIsBeingValidated();
 
     checkDeclAttributesEarly(CD);
-    computeAccessLevel(CD);
 
     // convenience initializers are only allowed on classes and in
     // extensions thereof.
@@ -7797,7 +7840,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SD->setIsBeingValidated(false);
 
     checkDeclAttributesEarly(SD);
-    computeAccessLevel(SD);
 
     validateAttributes(*this, SD);
 
