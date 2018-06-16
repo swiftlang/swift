@@ -520,10 +520,10 @@ protected:
     KnownProtocol : 8, // '8' for speed. This only needs 6.
 
     /// The number of requirements in the requirement signature.
-		NumRequirementsInSignature : 16,
+    NumRequirementsInSignature : 16,
 
-		/// Whether we are currently computing inherited protocols.
-		ComputingInheritedProtocols : 1
+    /// Whether we are currently computing inherited protocols.
+    ComputingInheritedProtocols : 1
   );
 
   SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,

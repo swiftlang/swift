@@ -3170,7 +3170,7 @@ ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
   Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   Bits.ProtocolDecl.HasMissingRequirements = false;
   Bits.ProtocolDecl.KnownProtocol = 0;
-	Bits.ProtocolDecl.ComputingInheritedProtocols = false;
+  Bits.ProtocolDecl.ComputingInheritedProtocols = false;
 }
 
 llvm::TinyPtrVector<ProtocolDecl *>
@@ -3181,10 +3181,10 @@ ProtocolDecl::getInheritedProtocols() const {
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
     SmallPtrSet<ProtocolDecl *, 4> known;
-		if (Bits.ProtocolDecl.ComputingInheritedProtocols) return result;
+    if (Bits.ProtocolDecl.ComputingInheritedProtocols) return result;
 
-		auto *self = const_cast<ProtocolDecl *>(this);
-		self->Bits.ProtocolDecl.ComputingInheritedProtocols = true;
+    auto *self = const_cast<ProtocolDecl *>(this);
+    self->Bits.ProtocolDecl.ComputingInheritedProtocols = true;
     for (unsigned index : indices(getInherited())) {
       if (auto type = getInheritedType(index)) {
         // Only protocols can appear in the inheritance clause
@@ -3200,7 +3200,7 @@ ProtocolDecl::getInheritedProtocols() const {
         }
       }
     }
-		self->Bits.ProtocolDecl.ComputingInheritedProtocols = false;
+    self->Bits.ProtocolDecl.ComputingInheritedProtocols = false;
     return result;
   }
 

@@ -253,6 +253,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_debug_cycles)) {
+    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
