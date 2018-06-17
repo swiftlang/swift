@@ -487,7 +487,7 @@ protected:
     HasValidatedLayout : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16+1,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -510,6 +510,9 @@ protected:
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
 
+    /// Whether we are currently computing inherited protocols.
+    ComputingInheritedProtocols : 1,
+
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
 
@@ -520,10 +523,7 @@ protected:
     KnownProtocol : 8, // '8' for speed. This only needs 6.
 
     /// The number of requirements in the requirement signature.
-    NumRequirementsInSignature : 16,
-
-    /// Whether we are currently computing inherited protocols.
-    ComputingInheritedProtocols : 1
+    NumRequirementsInSignature : 16
   );
 
   SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+3+1+1,
