@@ -18,6 +18,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Demangling/Demangle.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
@@ -99,6 +100,9 @@ namespace {
     llvm::Optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
   private:
     Type simplifyType(Type ty);
+    CanType simplifyType(CanType ty) {
+      return simplifyType(Type(ty))->getCanonicalType();
+    }
     SymbolicValue computeConstantValue(SILValue value);
     SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
 
@@ -126,12 +130,17 @@ initLoader(std::unique_ptr<SerializedSILLoader> &silLoader, SILModule &module) {
 
 
 // TODO: refactor this out somewhere sharable between autodiff and this code.
-static SILWitnessTable *
-lookupOrLinkWitnessTable(ProtocolConformanceRef confRef, SILModule &module,
+static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
+                                     SILModule &module,
                          std::unique_ptr<SerializedSILLoader> &silLoader) {
+  // Cannot resolve abstract conformances.
+  if (!confRef.isConcrete())
+    return;
+
   auto *conf = confRef.getConcrete();
   auto wtable = module.lookUpWitnessTable(conf);
-  if (wtable) return wtable;
+  if (wtable)
+    return;
 
   auto *decl =
     conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -143,7 +152,6 @@ lookupOrLinkWitnessTable(ProtocolConformanceRef confRef, SILModule &module,
   for (auto &entry : newTable->getEntries())
     if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
       entry.getMethodWitness().Witness->setLinkage(linkage);
-  return newTable;
 }
 
 /// Given the operand to a load, resolve it to a constant if possible.
@@ -271,14 +279,17 @@ SymbolicValue ConstExprFunctionCache::computeConstantValue(SILValue value) {
       module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     if (!fn) {
       // If that failed, try force loading it, and try again.
-      (void)lookupOrLinkWitnessTable(conf, wmi->getModule(),
-                                     evaluator.getSILLoader());
+      lookupOrLinkWitnessTable(conf, wmi->getModule(),
+                               evaluator.getSILLoader());
       fn = module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     }
 
     // If we were able to resolve it, then we can proceed.
     if (fn)
       return SymbolicValue::getFunction(fn);
+
+    DEBUG(llvm::errs() << "ConstExpr Unresolved witness: " << *value << "\n");
+    return SymbolicValue::getUnknown(value, UnknownReason::Default);
   }
 
   if (auto *builtin = dyn_cast<BuiltinInst>(value))
@@ -674,12 +685,19 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
     paramConstants.push_back(cst);
   }
 
+  // Get the substitution list of the call.  It is possible that the caller
+  // may pass more substitutions than the callee expects, because the callee
+  // only takes generic substitutions.
+  auto substitutions = apply->getSubstitutions();
+
+  // TODO: Figure this out.
+
   // Now that have successfully folded all of the parameters, we can evaluate
   // the call.
   SmallVector<SymbolicValue, 4> results;
   auto callResult =
-    evaluateAndCacheCall(*callee, apply->getSubstitutions(),
-                         paramConstants, results, numInstEvaluated, evaluator);
+    evaluateAndCacheCall(*callee, substitutions, paramConstants, results,
+                         numInstEvaluated, evaluator);
   if (callResult.hasValue())
     return callResult.getValue();
 
@@ -898,7 +916,8 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 llvm::Optional<SymbolicValue>
 ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
   // These are just markers.
-  if (isa<DebugValueInst>(inst) || isa<EndAccessInst>(inst) ||
+  if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst) ||
+      isa<EndAccessInst>(inst) ||
       // Constant have no important state.
       isa<DestroyAddrInst>(inst))
     return None;
@@ -1017,6 +1036,9 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
   unsigned nextBBArg = 0;
   const auto &argList = fn.front().getArguments();
 
+  DEBUG(llvm::errs() << "ConstExpr call fn: "
+        << Demangle::demangleSymbolAsString(fn.getName()) << "\n");
+
   for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i)
     cache.setValue(argList[nextBBArg++], SymbolicValue::getUninitMemory());
 
@@ -1036,7 +1058,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
 
   while (1) {
     SILInstruction *inst = &*nextInst++;
-    DEBUG(inst->dump());
+    DEBUG(llvm::errs() << "ConstExpr interpret: "; inst->dump());
 
     // Make sure we haven't exceeded our interpreter iteration cap.
     if (++numInstEvaluated > ConstExprLimit)
@@ -1077,6 +1099,8 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
       }
 
       // TODO: Handle caching of results.
+
+      DEBUG(llvm::errs() << "\n");
       return None;
     }
 
