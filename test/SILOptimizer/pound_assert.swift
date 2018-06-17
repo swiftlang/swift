@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
 
-
-
 func overflowTrap() {
   let _ = Int8(123231)
   //#assert(Int8(124) + 8 > 42)
@@ -63,4 +61,46 @@ func test_loops() {
   // TODO: xpected-error @+1 {{#assert condition not constant}}
   //#assert(loops2(a: 20000) > 42)
 }
+
+
+//===----------------------------------------------------------------------===//
+// Reduced testcase propagating substitutions around.
+
+protocol substitutionsP {
+  init<T: substitutionsP>(something: T)
+
+  func get() -> Int
+}
+
+struct substitutionsX : substitutionsP {
+  var state : Int
+  init<T: substitutionsP>(something: T) {
+    // BUG: expected-note @+1 {{could not fold operation}}
+    state = something.get()
+  }
+
+  func get() -> Int {
+    return state
+  }
+}
+
+struct substitutionsY : substitutionsP {
+  init() {}
+  init<T: substitutionsP>(something: T) {
+  }
+
+  func get() -> Int {
+    return 123
+  }
+}
+func substitutionsF<T: substitutionsP>(_: T.Type) -> T {
+  return T(something: substitutionsY())
+}
+
+func testProto() {
+  // BUG: expected-error @+1 {{#assert condition not constant}}
+  #assert(substitutionsF(substitutionsX.self).get() == 123)
+}
+
+//===----------------------------------------------------------------------===//
 
