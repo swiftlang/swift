@@ -67,7 +67,10 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_CollectionUpcastConversion:
       log << "collection upcast conversion";
       break;
-        
+
+    case SK_ArchetypeAsOptional:
+      log << "archetype inferred as optional";
+      break;
     case SK_ValueToOptional:
       log << "value to optional";
       break;

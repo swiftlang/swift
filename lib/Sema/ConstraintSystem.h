@@ -454,6 +454,9 @@ enum ScoreKind {
   SK_NonDefaultLiteral,
   /// An implicit upcast conversion between collection types.
   SK_CollectionUpcastConversion,
+  /// Archetype inferred to optional (inferring T in a
+  /// call to f<T>(...) as an optional type)
+  SK_ArchetypeAsOptional,
   /// A value-to-optional conversion.
   SK_ValueToOptional,
   /// A conversion to an empty existential type ('Any' or '{}').

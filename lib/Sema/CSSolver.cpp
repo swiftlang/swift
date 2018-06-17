@@ -664,6 +664,29 @@ bool ConstraintSystem::tryTypeVariableBindings(
         type = type->reconstituteSugar(/*recursive=*/false);
       }
 
+      // Penalize solutions that select optional bindings for
+      // archetypes. We would prefer solutions that, e.g. select
+      // overloads for which an optional argument matches an optional
+      // parameter.
+      if (type->getOptionalObjectType()) {
+        auto typeVarRep = getRepresentative(typeVar);
+        for (auto tv : CG[typeVarRep].getEquivalenceClass()) {
+          auto locator = tv->getImpl().getLocator();
+          if (!locator)
+            continue;
+
+          auto path = locator->getPath();
+          if (path.empty())
+            continue;
+
+          auto back = path.back();
+          if (back.getKind() == ConstraintLocator::Archetype) {
+            increaseScore(SK_ArchetypeAsOptional);
+            break;
+          }
+        }
+      }
+
       // FIXME: We want the locator that indicates where the binding came
       // from.
       addConstraint(ConstraintKind::Bind, typeVar, type,
@@ -2022,11 +2045,14 @@ bool ConstraintSystem::solveSimplified(
       auto &score = lastSolvedChoice->second;
       bool hasUnavailableOverloads = score.Data[SK_Unavailable] > 0;
       bool hasFixes = score.Data[SK_Fix] > 0;
+      bool inferredGenericParamAsOptional =
+          score.Data[SK_ArchetypeAsOptional] > 0;
 
       // Attempt to short-circuit disjunction only if score indicates
       // that there are no unavailable overload choices present in the
       // solution, and the solution does not involve fixes.
       if (!hasUnavailableOverloads && !hasFixes &&
+          !inferredGenericParamAsOptional &&
           shortCircuitDisjunctionAt(currentChoice, lastChoice, getASTContext()))
         break;
     }
