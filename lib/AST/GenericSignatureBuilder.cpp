@@ -4721,12 +4721,21 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         // type that makes sense to use here, but, in practice, all
         // getLookupConformanceFns used in here don't use that parameter anyway.
         auto dependentType = CanType();
-        auto conformance =
-            getLookupConformanceFn()(dependentType, subjectType, proto->getDecl());
 
-        // FIXME: diagnose if there's no conformance.
-        if (conformance) {
-          addConditionalRequirements(*this, *conformance, inferForModule);
+        auto D = getGenericParams().front()->getDecl();
+        auto DC = D ? D->getDeclContext() : nullptr;
+        auto NTD = DC ? DC->getAsNominalTypeOrNominalTypeExtensionContext()
+                      : nullptr;
+        auto subjectNTD = subjectType->getAnyNominal();
+
+        if (!NTD || !subjectNTD || NTD != subjectNTD) {
+          auto conformance =
+            getLookupConformanceFn()(dependentType, subjectType,
+                                     proto->getDecl());
+          // FIXME: diagnose if there's no conformance.
+          if (conformance) {
+            addConditionalRequirements(*this, *conformance, inferForModule);
+          }
         }
       }
     }
