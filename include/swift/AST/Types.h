@@ -2890,6 +2890,10 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
+  void printParams(raw_ostream &OS,
+                   const PrintOptions &PO = PrintOptions()) const;
+  void printParams(ASTPrinter &Printer, const PrintOptions &PO) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&

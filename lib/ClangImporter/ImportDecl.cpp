@@ -185,6 +185,15 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
   }
 }
 
+static void makeComputed(AbstractStorageDecl *storage,
+                         AccessorDecl *getter, AccessorDecl *setter) {
+  assert(getter);
+  AccessorDecl *buffer[] = { getter, setter };
+  auto accessors = llvm::makeArrayRef(buffer).slice(0, setter ? 2 : 1);
+  storage->setAccessors(AbstractStorageDecl::Computed,
+                        SourceLoc(), accessors, SourceLoc());
+}
+
 #ifndef NDEBUG
 static bool verifyNameMapping(MappedTypeNameKind NameMapping,
                               StringRef left, StringRef right) {
@@ -525,8 +534,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
 
   getterDecl->setAccess(AccessLevel::Public);
 
-  rawValueDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
-                             SourceLoc());
+  makeComputed(rawValueDecl, getterDecl, nullptr);
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -759,8 +767,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
                                         importedStructDecl,
                                         importedFieldDecl);
 
-  importedFieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
-                                  SourceLoc());
+  makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   auto containingField = indirectField->chain().front();
   VarDecl *anonymousFieldDecl = nullptr;
@@ -869,8 +876,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
                                         importedUnionDecl,
                                         importedFieldDecl);
 
-  importedFieldDecl->makeComputed(SourceLoc(), getterDecl, setterDecl, nullptr,
-                                  SourceLoc());
+  makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -1026,11 +1032,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                         importedFieldDecl,
                                         cSetterDecl);
 
-  importedFieldDecl->makeComputed(SourceLoc(),
-                                  getterDecl,
-                                  setterDecl,
-                                  nullptr,
-                                  SourceLoc());
+  makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
   // Don't bother synthesizing the body if we've already finished type-checking.
   if (Impl.hasFinishedTypeChecking())
@@ -1552,8 +1554,7 @@ static void makeStructRawValuedWithBridge(
   // Create the getter for the computed value variable.
   auto computedVarGetter = makeStructRawValueGetter(
       Impl, structDecl, computedVar, storedVar);
-  computedVar->makeComputed(SourceLoc(), computedVarGetter, nullptr, nullptr,
-                            SourceLoc());
+  makeComputed(computedVar, computedVarGetter, nullptr);
 
   // Create a pattern binding to describe the variable.
   Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
@@ -1882,10 +1883,7 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   swiftDecl->addMember(errorDomainPropertyDecl);
   swiftDecl->addMember(getterDecl);
-  errorDomainPropertyDecl->makeComputed(SourceLoc(), getterDecl,
-                                        /*Set=*/nullptr,
-                                        /*MaterializeForSet=*/nullptr,
-                                        SourceLoc());
+  makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
 
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
@@ -4910,7 +4908,7 @@ namespace {
       // Turn this into a computed property.
       // FIXME: Fake locations for '{' and '}'?
       result->setIsSetterMutating(false);
-      result->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
+      makeComputed(result, getter, setter);
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
       applyPropertyOwnership(result, decl->getPropertyAttributesAsWritten());
 
@@ -5961,8 +5959,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (swiftSetter) property->setIsSetterMutating(swiftSetter->isMutating());
 
   // Make this a computed property.
-  property->makeComputed(SourceLoc(), swiftGetter, swiftSetter, nullptr,
-                         SourceLoc());
+  makeComputed(property, swiftGetter, swiftSetter);
 
   // Make the property the alternate declaration for the getter.
   Impl.addAlternateDecl(swiftGetter, property);
@@ -6719,8 +6716,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
 
   subscript->setIsSetterMutating(false);
-  subscript->makeComputed(SourceLoc(), getterThunk, setterThunk, nullptr,
-                          SourceLoc());
+  makeComputed(subscript, getterThunk, setterThunk);
   auto indicesType = bodyParams->getType(C);
 
   AnyFunctionType *fnType;
@@ -8392,7 +8388,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   
   // Set the function up as the getter.
-  var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
+  makeComputed(var, func, nullptr);
 
   // Register this thunk as an external definition.
   registerExternalDecl(func);

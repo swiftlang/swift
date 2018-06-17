@@ -489,10 +489,6 @@ namespace {
   struct Accessors {
     StorageKind Kind;
     SmallVector<AccessorDecl *, 8> Decls;
-
-    void add(AccessorDecl *accessor) {
-      if (accessor) Decls.push_back(accessor);
-    }
   };
 } // end anonymous namespace
 
@@ -516,35 +512,9 @@ static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
   accessors.Kind = getRawStorageKind(storage->getStorageKind());
-  switch (auto storageKind = storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-    return accessors;
-
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    accessors.add(storage->getAddressor());
-    accessors.add(storage->getMutableAddressor());
-    if (storageKind == AbstractStorageDecl::Addressed)
-      return accessors;
-    goto getset;
-
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::AddressedWithObservers:
-    accessors.add(storage->getWillSetFunc());
-    accessors.add(storage->getDidSetFunc());
-    goto getset;
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::Computed:
-  getset:
-    accessors.add(storage->getGetter());
-    accessors.add(storage->getSetter());
-    accessors.add(storage->getMaterializeForSetFunc());
-    return accessors;
-  }
-  llvm_unreachable("bad storage kind");
+  auto decls = storage->getAllAccessorFunctions();
+  accessors.Decls.append(decls.begin(), decls.end());
+  return accessors;
 }
 
 DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {

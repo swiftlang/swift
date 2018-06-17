@@ -1,4 +1,6 @@
 // RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck -debug-cycles %s 2> %t.cycles
+// RUN: %FileCheck %s < %t.cycles
 
 class C : B { } // expected-error{{circular class inheritance 'C' -> 'B' -> 'A' -> 'C'}}
 class B : A { } // expected-note{{class 'B' declared here}}
@@ -37,3 +39,10 @@ class Outer3
     : Outer3.Inner<Int> {
   class Inner<T> {}
 }
+
+// CHECK: ===CYCLE DETECTED===
+// CHECK-NEXT: `--{{.*}}SuperclassTypeRequest
+// CHECK-NEXT:      `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Left@
+// CHECK-NEXT:          `--{{.*}}SuperclassTypeRequest
+// CHECK-NEXT:              `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Right@
+// CHECK-NEXT:                  `--{{.*}}SuperclassTypeRequest{{.*(cyclic dependency)}}

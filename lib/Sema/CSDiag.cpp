@@ -5208,10 +5208,8 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       env->getGenericSignature()->getGenericParams(),
       env->getGenericSignature()->getRequirements(),
       substitutionFn,
-      LookUpConformanceInModule{dc->getParentModule()}, nullptr,
+      LookUpConformanceInModule{dc->getParentModule()},
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
-
-  assert(result != RequirementCheckResult::UnsatisfiedDependency);
 
   // Note: If result is RequirementCheckResult::SubstitutionFailure, we did
   // not emit a diagnostic, so we must return false in that case.

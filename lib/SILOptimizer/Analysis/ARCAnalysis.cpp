@@ -498,22 +498,24 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
   findMatchingRetains(&*BB);
 }
 
-bool
-ConsumedResultToEpilogueRetainMatcher::
-isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs) {
+bool ConsumedResultToEpilogueRetainMatcher::isTransitiveSuccessorsRetainFree(
+    const llvm::DenseSet<SILBasicBlock *> &BBs) {
   // For every block with retain, we need to check the transitive
   // closure of its successors are retain-free.
   for (auto &I : EpilogueRetainInsts) {
-    auto *CBB = I->getParent();
-    for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+    for (auto &Succ : I->getParent()->getSuccessors()) {
+      if (BBs.count(Succ))
         continue;
       return false;
     }
   }
+
+  // FIXME: We are iterating over a DenseSet. That can lead to non-determinism
+  // and is in general pretty inefficient since we are iterating over a hash
+  // table.
   for (auto CBB : BBs) {
     for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+      if (BBs.count(Succ))
         continue;
       return false;
     }
@@ -707,9 +709,8 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   findMatchingReleases(&*BB);
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
+bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
+    ArrayRef<SILInstruction *> Insts, SILValue Base, SILValue Derived) {
   // We use projection path to analyze the relation.
   auto POp = ProjectionPath::getProjectionPath(Base, Derived);
   // We can not build a projection path from the base to the derived, bail out.
@@ -730,9 +731,8 @@ isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
   return false;
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-releaseArgument(ReleaseList Insts, SILValue Arg) {
+bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
+    ArrayRef<SILInstruction *> Insts, SILValue Arg) {
   // Reason about whether all parts are released.
   SILModule *Mod = &(*Insts.begin())->getModule();
 

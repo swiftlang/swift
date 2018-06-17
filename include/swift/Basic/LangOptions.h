@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
+#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -157,9 +158,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the iterative type checker.
-    bool IterativeTypeChecker = false;
-
     /// \brief Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
@@ -170,6 +168,10 @@ namespace swift {
     /// identifier reference with the provided prefix name.
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
+
+    /// \brief How to diagnose cycles encountered
+    CycleDiagnosticKind EvaluatorCycleDiagnostics =
+        CycleDiagnosticKind::NoDiagnose;
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.

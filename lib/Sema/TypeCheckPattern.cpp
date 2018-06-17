@@ -463,8 +463,7 @@ public:
     // See if the repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver,
-                                       nullptr);
+                                       /*diagnoseErrors*/false, &resolver);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -582,8 +581,7 @@ public:
       // See first if the entire repr resolves to a type.
       Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                             /*diagnoseErrors*/false, &resolver,
-                                             nullptr);
+                                      /*diagnoseErrors*/false, &resolver);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
@@ -962,12 +960,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
-    // If this is the top level of a function input list, peel off the
-    // ImmediateFunctionInput marker and install a FunctionInput one instead.
-    auto elementOptions = withoutContext(options);
-    if (options & TypeResolutionFlags::ImmediateFunctionInput)
-      elementOptions |= TypeResolutionFlags::FunctionInput;
-
+    const auto elementOptions = withoutContext(options);
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);

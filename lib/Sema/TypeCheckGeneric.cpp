@@ -1289,7 +1289,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
-    UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
@@ -1357,26 +1356,10 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         //        diagnose problems with conformances.
         auto result =
             conformsToProtocol(firstType, proto->getDecl(), dc,
-                               conformanceOptions, loc, unsatisfiedDependency);
+                               conformanceOptions, loc);
 
-        // Unsatisfied dependency case.
-        auto status = result.getStatus();
-        switch (status) {
-        case RequirementCheckResult::Failure:
-          // A failure at the top level is diagnosed elsewhere.
-          if (current.Parents.empty())
-            return status;
-
-          diagnostic = diag::type_does_not_conform_owner;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          requirementFailure = true;
-          break;
-        case RequirementCheckResult::UnsatisfiedDependency:
-        case RequirementCheckResult::SubstitutionFailure:
-          // pass it on up.
-          return status;
-        case RequirementCheckResult::Success: {
-          auto conformance = result.getConformance();
+        if (result) {
+          auto conformance = *result;
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,
@@ -1391,9 +1374,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           }
           continue;
         }
-        }
+
+        // A failure at the top level is diagnosed elsewhere.
+        if (current.Parents.empty())
+          return RequirementCheckResult::Failure;
 
         // Failure needs to emit a diagnostic.
+        diagnostic = diag::type_does_not_conform_owner;
+        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+        requirementFailure = true;
         break;
       }
 

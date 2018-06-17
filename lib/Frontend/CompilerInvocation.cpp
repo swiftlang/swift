@@ -210,7 +210,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
@@ -252,6 +251,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
     Opts.DebugForbidTypecheckPrefix = A->getValue();
+  }
+
+  if (Args.getLastArg(OPT_debug_cycles)) {
+    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {

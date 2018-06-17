@@ -2148,79 +2148,23 @@ getActualStorageKind(unsigned raw) {
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
                                   AccessorRecord &rawIDs) {
-#define ACCESSOR(ID) \
-  AccessorDecl *ID = nullptr;
-#include "swift/AST/AccessorKinds.def"
+  auto storageKind = getActualStorageKind(rawStorageKind);
+  if (!storageKind) return;
 
+  SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {
-    auto accessor = cast_or_null<AccessorDecl>(getDecl(id));
-    switch (accessor->getAccessorKind()) {
-#define ACCESSOR(ID) \
-    case AccessorKind::ID: ID = accessor; continue;
-#include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
+    auto accessor = dyn_cast_or_null<AccessorDecl>(getDecl(id));
+    if (!accessor) return;
+    accessors.push_back(accessor);
   }
+
+  if (*storageKind == AbstractStorageDecl::Stored && accessors.empty())
+    return;
 
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  auto addTrivialAccessors = [&] {
-    decl->addTrivialAccessors(Get, Set, MaterializeForSet);
-  };
-
-  auto setObservingAccessors = [&] {
-    decl->setObservingAccessors(Get, Set, MaterializeForSet);
-  };
-
-  // TODO: detect and propagate deserialization errors
-  using StorageKind = AbstractStorageDecl::StorageKindTy;
-  auto storageKind = *getActualStorageKind(rawStorageKind);
-  switch (storageKind) {
-  case StorageKind::Stored:
-    return;
-
-  case StorageKind::StoredWithTrivialAccessors:
-    addTrivialAccessors();
-    return;
-
-  case StorageKind::StoredWithObservers:
-    decl->makeStoredWithObservers(beginLoc, WillSet, DidSet, endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::InheritedWithObservers:
-    decl->makeInheritedWithObservers(beginLoc, WillSet, DidSet, endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::Addressed:
-  case StorageKind::AddressedWithTrivialAccessors:
-    decl->makeAddressed(beginLoc, Address, MutableAddress, endLoc);
-    if (storageKind == StorageKind::AddressedWithTrivialAccessors)
-      addTrivialAccessors();
-    return;
-
-  case StorageKind::AddressedWithObservers:
-    decl->makeAddressedWithObservers(beginLoc,
-                                     Address, MutableAddress,
-                                     WillSet, DidSet,
-                                     endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::Computed:
-    decl->makeComputed(beginLoc, Get, Set, MaterializeForSet, endLoc);
-    return;
-
-  case StorageKind::ComputedWithMutableAddress:
-    decl->makeComputedWithMutableAddress(beginLoc,
-                                         Get, Set, MaterializeForSet,
-                                         MutableAddress,
-                                         endLoc);
-    return;
-  }
-  llvm_unreachable("bad storage kind");
+  decl->setAccessors(*storageKind, beginLoc, accessors, endLoc);
 }
 
 template <typename T, typename ...Args>

@@ -37,7 +37,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "swift/Sema/TypeCheckRequests.h"
@@ -4310,7 +4309,8 @@ public:
 
     // If this is a willSet/didSet property, synthesize the getter and setter
     // decl.
-    if (VD->hasObservers() && !VD->getGetter()->getBody())
+    if (VD->hasObservers() &&
+        (!VD->getGetter()->getBody() || !VD->getSetter()->getBody()))
       synthesizeObservingAccessors(VD, TC);
 
     // If this is a get+mutableAddress property, synthesize the setter body.

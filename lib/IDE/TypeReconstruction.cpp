@@ -924,7 +924,8 @@ static void VisitNodeConstructor(
 
             // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
             // assert that in case we're dealing with broken code.
-            if (identifier_func->getInput()->is<AnyMetatypeType>() &&
+            if (identifier_func->getParams().size() == 1 &&
+                identifier_func->getParams()[0].getType()->is<AnyMetatypeType>() &&
                 identifier_func->getResult()->is<AnyFunctionType>()) {
               identifier_func =
                   identifier_func->getResult()->getAs<AnyFunctionType>();

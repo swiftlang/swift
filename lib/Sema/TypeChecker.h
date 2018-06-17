@@ -17,7 +17,6 @@
 #ifndef TYPECHECKING_H
 #define TYPECHECKING_H
 
-#include "swift/Sema/TypeCheckRequest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -450,132 +449,100 @@ public:
 
 /// The result of `checkGenericRequirement`.
 enum class RequirementCheckResult {
-  Success, Failure, UnsatisfiedDependency, SubstitutionFailure
+  Success, Failure, SubstitutionFailure
 };
 
-class ConformsToProtocolResult {
-  Optional<ProtocolConformanceRef> Data;
-  RequirementCheckResult State;
-
-  ConformsToProtocolResult(Optional<ProtocolConformanceRef> data,
-                           RequirementCheckResult state)
-      : Data(data), State(state) {}
-
-public:
-  static ConformsToProtocolResult unsatisfiedDependency() {
-    return ConformsToProtocolResult(
-        None, RequirementCheckResult::UnsatisfiedDependency);
-  }
-  static ConformsToProtocolResult failure() {
-    return ConformsToProtocolResult(None, RequirementCheckResult::Failure);
-  }
-  static ConformsToProtocolResult success(ProtocolConformanceRef ref) {
-    return ConformsToProtocolResult(ref, RequirementCheckResult::Success);
-  }
-
-  RequirementCheckResult getStatus() const { return State; }
-  bool hasUnsatisfiedDependency() const {
-    return getStatus() == RequirementCheckResult::UnsatisfiedDependency;
-  }
-  ProtocolConformanceRef getConformance() const {
-    assert(getStatus() == RequirementCheckResult::Success);
-    return *Data;
-  }
-};
 
 /// Flags that describe the context of type checking a pattern or
 /// type.
 enum class TypeResolutionFlags : unsigned {
   /// Whether to allow unspecified types within a pattern.
-  AllowUnspecifiedTypes = 0x01,
+  AllowUnspecifiedTypes = 1 << 0,
 
   /// Whether the given type can override the type of a typed pattern.
-  OverrideType = 0x04,
+  OverrideType = 1 << 1,
 
   /// Whether to allow unbound generic types.
-  AllowUnboundGenerics = 0x08,
+  AllowUnboundGenerics = 1 << 2,
 
   /// Whether we are validating the type for SIL.
-  SILType = 0x10,
+  SILType = 1 << 3,
 
   /// Whether we are parsing a SIL file.  Not the same as SILType,
   /// because the latter is not set if we're parsing an AST type.
-  SILMode = 0x20,
+  SILMode = 1 << 4,
 
   /// Whether we are in the input type of a function, or under one level of
   /// tuple type.  This is not set for multi-level tuple arguments.
-  FunctionInput = 0x40,
-
-  /// Whether this is the immediate input type to a function type,
-  ImmediateFunctionInput = 0x80,
+  FunctionInput = 1 << 5,
 
   /// Whether this is a variadic function input.
-  VariadicFunctionInput = 0x100,
+  VariadicFunctionInput = 1 << 6,
 
   /// Whether we are in the result type of a function body that is
   /// known to produce dynamic Self.
-  DynamicSelfResult = 0x200,
+  DynamicSelfResult = 1 << 7,
 
   /// Whether this is a resolution based on a non-inferred type pattern.
-  FromNonInferredPattern = 0x400,
+  FromNonInferredPattern = 1 << 8,
 
   /// Whether we are the variable type in a for/in statement.
-  EnumerationVariable = 0x800,
+  EnumerationVariable = 1 << 9,
 
   /// Whether we are looking only in the generic signature of the context
   /// we're searching, rather than the entire context.
-  GenericSignature = 0x1000,
+  GenericSignature = 1 << 10,
 
   /// Whether an unavailable protocol can be referenced.
-  AllowUnavailableProtocol = 0x2000,
+  AllowUnavailableProtocol = 1 << 11,
 
   /// Whether this type is the value carried in an enum case.
-  EnumCase = 0x4000,
+  EnumCase = 1 << 12,
 
   /// Whether this type is being used in an expression or local declaration.
   ///
   /// This affects what sort of dependencies are recorded when resolving the
   /// type.
-  InExpression = 0x8000,
+  InExpression = 1 << 13,
 
   /// Whether this type resolution is guaranteed not to affect downstream files.
-  KnownNonCascadingDependency = 0x10000,
+  KnownNonCascadingDependency = 1 << 14,
 
   /// Whether we should allow references to unavailable types.
-  AllowUnavailable = 0x20000,
+  AllowUnavailable = 1 << 15,
 
   /// Whether this is the payload subpattern of an enum pattern.
-  EnumPatternPayload = 0x40000,
+  EnumPatternPayload = 1 << 16,
 
   /// Whether we are binding an extension declaration, which limits
   /// the lookup.
-  ExtensionBinding = 0x80000,
+  ExtensionBinding = 1 << 17,
 
   /// Whether we are in the inheritance clause of a nominal type declaration
   /// or extension.
-  InheritanceClause = 0x100000,
+  InheritanceClause = 1 << 18,
 
   /// Whether we should resolve only the structure of the resulting
   /// type rather than its complete semantic properties.
-  ResolveStructure = 0x200000,
+  ResolveStructure = 1 << 19,
 
   /// Whether this is the type of an editor placeholder.
-  EditorPlaceholder = 0x400000,
+  EditorPlaceholder = 1 << 20,
 
   /// Whether we are in a type argument for an optional
-  ImmediateOptionalTypeArgument = 0x800000,
+  ImmediateOptionalTypeArgument = 1 << 21,
 
   /// Whether we are checking the underlying type of a typealias.
-  TypeAliasUnderlyingType = 0x1000000,
+  TypeAliasUnderlyingType = 1 << 22,
 
   /// Whether we are checking the parameter list of a subscript.
-  SubscriptParameters = 0x2000000,
+  SubscriptParameters = 1 << 23,
 
   /// Is it okay to resolve an IUO sigil ("!") here?
-  AllowIUO = 0x4000000,
+  AllowIUO = 1 << 24,
 
   /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
-  AllowIUODeprecated = 0x8000000,
+  AllowIUODeprecated = 1 << 25,
 };
 
 /// Option set describing how type resolution should work.
@@ -584,7 +551,6 @@ using TypeResolutionOptions = OptionSet<TypeResolutionFlags>;
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
 withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
-  options -= TypeResolutionFlags::ImmediateFunctionInput;
   options -= TypeResolutionFlags::FunctionInput;
   options -= TypeResolutionFlags::VariadicFunctionInput;
   options -= TypeResolutionFlags::EnumCase;
@@ -1069,8 +1035,7 @@ public:
                              IdentTypeRepr *IdType,
                              TypeResolutionOptions options,
                              bool diagnoseErrors,
-                             GenericTypeResolver *resolver,
-                             UnsatisfiedDependency *unsatisfiedDependency);
+                             GenericTypeResolver *resolver);
 
   /// Bind an UnresolvedDeclRefExpr by performing name lookup and
   /// returning the resultant expression.  Context is the DeclContext used
@@ -1096,8 +1061,7 @@ public:
   /// \returns true if type validation failed, or false otherwise.
   bool validateType(TypeLoc &Loc, DeclContext *DC,
                     TypeResolutionOptions options = None,
-                    GenericTypeResolver *resolver = nullptr,
-                    UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+                    GenericTypeResolver *resolver = nullptr);
 
   /// Check for unsupported protocol types in the given declaration.
   void checkUnsupportedProtocolType(Decl *decl);
@@ -1123,14 +1087,10 @@ public:
   /// \param resolver A resolver for generic types. If none is supplied, this
   /// routine will create a \c GenericTypeToArchetypeResolver to use.
   ///
-  /// \param unsatisfiedDependency When non-null, used to check whether
-  /// dependencies have been satisfied appropriately.
-  ///
   /// \returns a well-formed type or an ErrorType in case of an error.
   Type resolveType(TypeRepr *TyR, DeclContext *DC,
                    TypeResolutionOptions options,
-                   GenericTypeResolver *resolver = nullptr,
-                   UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+                   GenericTypeResolver *resolver = nullptr);
 
   void validateDecl(ValueDecl *D);
   void validateDecl(OperatorDecl *decl);
@@ -1206,8 +1166,7 @@ public:
   Type applyGenericArguments(Type type, TypeDecl *decl, SourceLoc loc,
                              DeclContext *dc, GenericIdentTypeRepr *generic,
                              TypeResolutionOptions options,
-                             GenericTypeResolver *resolver,
-                             UnsatisfiedDependency *unsatisfiedDependency);
+                             GenericTypeResolver *resolver);
 
   /// Apply generic arguments to the given type.
   ///
@@ -1230,8 +1189,7 @@ public:
                                     GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
                                     ArrayRef<Type> genericArgs,
-                                    GenericTypeResolver *resolver,
-                                    UnsatisfiedDependency *unsatisfiedDependency);
+                                    GenericTypeResolver *resolver);
 
   /// \brief Substitute the given base type into the type of the given nested type,
   /// producing the effective type that the nested type will have.
@@ -1555,8 +1513,6 @@ public:
   /// \param requirements The requirements against which the generic arguments
   /// should be checked.
   /// \param substitutions Substitutions from interface types of the signature.
-  /// \param unsatisfiedDependency Optional callback for reporting unsatisfied
-  /// dependencies.
   /// \param conformanceOptions The flags to use when checking conformance
   /// requirement.
   /// \param listener The generic check listener used to pick requirements and
@@ -1567,7 +1523,6 @@ public:
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
-      UnsatisfiedDependency *unsatisfiedDependency,
       ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
@@ -2075,12 +2030,6 @@ public:
                                      ConformanceCheckOptions options,
                                      SourceLoc ComplainLoc = SourceLoc());
 
-  /// A version of the above meant for use with the iterative type checker.
-  ConformsToProtocolResult
-  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
-                     ConformanceCheckOptions options, SourceLoc ComplainLoc,
-                     UnsatisfiedDependency *unsatisfiedDependency);
-
   /// Mark the given protocol conformance as "used" from the given declaration
   /// context.
   void markConformanceUsed(ProtocolConformanceRef conformance,
@@ -2126,16 +2075,14 @@ public:
                                      bool anySingleRequirement = false);
 
   /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
-  bool useObjectiveCBridgeableConformances(
-                        DeclContext *dc, Type type,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+  void useObjectiveCBridgeableConformances(
+                        DeclContext *dc, Type type);
 
   /// If this bound-generic type is bridged, mark any
   /// _ObjectiveCBridgeable conformances in the generic arguments of
   /// the given type as "used".
-  bool useObjectiveCBridgeableConformancesOfArgs(
-                        DeclContext *dc, BoundGenericType *bound,
-                        UnsatisfiedDependency *unsatisfiedDependency = nullptr);
+  void useObjectiveCBridgeableConformancesOfArgs(
+                        DeclContext *dc, BoundGenericType *bound);
 
   /// Mark any _BridgedNSError/_BridgedStoredNSError/related
   /// conformances in the given type as "used".

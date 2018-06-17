@@ -1576,7 +1576,7 @@ public:
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
           Out << "\nParameter type: ";
-          FT->getInput()->print(Out);
+          FT->printParams(Out);
           Out << "\n";
           E->dump(Out);
           abort();

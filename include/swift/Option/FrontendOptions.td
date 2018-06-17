@@ -157,9 +157,6 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
 
-def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
-  HelpText<"Enable the iterative type checker">;
-
 def disable_named_lazy_member_loading : Flag<["-"], "disable-named-lazy-member-loading">,
   HelpText<"Disable per-name lazy member loading">;
 
@@ -169,6 +166,9 @@ def debug_generic_signatures : Flag<["-"], "debug-generic-signatures">,
 def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-prefix">,
   HelpText<"Triggers llvm fatal_error if typechecker tries to typecheck a decl "
            "with the provided prefix name">;
+
+def debug_cycles : Flag<["-"], "debug-cycles">,
+  HelpText<"Print out debug dumps when cycles are detected in evaluation">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;

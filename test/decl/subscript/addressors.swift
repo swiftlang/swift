@@ -75,7 +75,7 @@ struct AddressorAndGet {
       return base
     }
     get {
-      return base.get()
+      return base.get() // expected-error {{value of type 'UnsafePointer<Int>' has no member 'get'}}
     }
   }
 }
@@ -198,7 +198,7 @@ struct RedundantAddressors2 {
 struct RedundantAddressors3 {
   var owner : Builtin.NativeObject
   subscript(index: Int) -> Int {
-    addressWithNativeOwner { return someValidAddress() } // expected-note {{previous definition of addressor is here}}
+    addressWithNativeOwner { return (someValidAddress(), owner) } // expected-note {{previous definition of addressor is here}}
     addressWithPinnedNativeOwner { return (someValidAddress(), owner)  } // expected-error {{subscript already has a addressor}}
   }
 }

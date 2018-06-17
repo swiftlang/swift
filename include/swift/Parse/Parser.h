@@ -878,6 +878,7 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
+    SmallVector<AccessorDecl*, 16> Accessors;
 
 #define ACCESSOR(ID) AccessorDecl *ID = nullptr;
 #include "swift/AST/AccessorKinds.def"
@@ -887,6 +888,17 @@ public:
                 const DeclAttributes &attrs,
                 TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
+
+    AbstractStorageDecl::StorageKindTy
+    classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
+             ParseDeclOptions flags, SourceLoc staticLoc,
+             const DeclAttributes &attrs,
+             TypeLoc elementTy, ParameterList *indices);
+
+    /// Add an accessor.  If there's an existing accessor of this kind,
+    /// return it.  The new accessor is still remembered but will be
+    /// ignored.
+    AccessorDecl *add(AccessorDecl *accessor);
   };
 
   void parseAccessorAttributes(DeclAttributes &Attributes);
@@ -898,15 +910,14 @@ public:
                        ParsedAccessors &accessors,
                        AbstractStorageDecl *storage,
                        SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SourceLoc VarLBLoc,
-                       SmallVectorImpl<Decl *> &Decls);
+                       SourceLoc StaticLoc, SourceLoc VarLBLoc);
   bool parseGetSet(ParseDeclOptions Flags,
                    GenericParamList *GenericParams,
                    ParameterList *Indices,
                    TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    AbstractStorageDecl *storage,
-                   SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
+                   SourceLoc StaticLoc);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
                        SourceLoc staticLoc, ParsedAccessors &accessors);
