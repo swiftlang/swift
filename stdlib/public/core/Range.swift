@@ -183,7 +183,41 @@ public struct Range<Bound : Comparable> {
 extension Range: Sequence
 where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Element = Bound
-  public typealias Iterator = IndexingIterator<Range<Bound>>
+  
+  /// The iterator for a countable `Range` instance.
+  @_fixed_layout
+  public struct Iterator: IteratorProtocol {
+    @usableFromInline
+    internal var _current: Bound
+    @usableFromInline
+    internal let _upperBound: Bound
+    @inlinable
+    public init(_current: Bound, _upperBound: Bound) { 
+      self._current = _current 
+      self._upperBound = _upperBound 
+    }
+
+    /// Advances to the next element and returns it, or `nil` if no next
+    /// element exists.
+    ///
+    /// Once `nil` has been returned, all subsequent calls return `nil`.
+    ///
+    /// - Returns: The next element in the underlying sequence, if a next
+    ///   element exists; otherwise, `nil`.
+    @inlinable
+    public mutating func next() -> Bound? {
+      if _current == _upperBound {
+        return nil
+      } else {
+        defer { _current = _current.advanced(by: 1) }
+        return _current
+      }
+    }
+  }
+  
+  public func makeIterator() -> Iterator { 
+    return Iterator(_current: lowerBound, _upperBound: upperBound)
+  }
 }
 
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
