@@ -639,6 +639,19 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           Type paramType1 = getAdjustedParamType(param1);
           Type paramType2 = getAdjustedParamType(param2);
 
+          // If we allowed this subtype comparison, it would always
+          // evaluate to true (barring other incompatible constraints
+          // on the type variable), since we would simply infer the
+          // type variable to have the optional type.
+          //
+          // That would make it impossible for us to establish the
+          // appropriate order between a function with parameters of
+          // type T and a function with parameters of type T?.
+          // FIXME:
+          if (paramType1->getOptionalObjectType() &&
+              paramType2->is<TypeVariableType>())
+            return false;
+
           // Check whether the first parameter is a subtype of the second.
           cs.addConstraint(ConstraintKind::Subtype,
                            paramType1, paramType2, locator);

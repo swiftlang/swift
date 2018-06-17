@@ -66,18 +66,22 @@ d = so_f1_x2
 
 // Overloading of class methods
 class ClassOverloadA<U> {
-  func f0<T : P1>(_ u: U, t: T) -> Int { return 0 }
+  func f0<T : P1>(_ u: U, t: T) -> Int { return 0 } // expected-note {{found this candidate}}
   func f1<T : P2>(_ u: U, t: T) -> Double { return 0 }
+  func f2<T : P1>(_ u: U, t: T) -> Int { return 0 }
 }
 
 class ClassOverloadB<U> : ClassOverloadA<U?> {
-  func f0<T : P2>(_ u: U?, t: T) -> Double { return 0 }
+  func f0<T : P2>(_ u: U?, t: T) -> Double { return 0 } // expected-note {{found this candidate}}
   func f1<T : P1>(_ u: U?, t: T) -> Int { return 0 }
+  func f2<T : P2>(_ u: U, t: T) -> Double { return 0 }
 }
 
 var co = ClassOverloadB<Int>()
 var co_f0_int_x1 = co.f0(5, t: x1)
 i = co_f0_int_x1
 var co_f0_int_x2 = co.f0(5, t: x2)
+// expected-error@-1 {{ambiguous use of 'f0(_:t:)'}}
+var co_f0_int_x2 = co.f2(5, t: x2)
 d = co_f0_int_x2
 
