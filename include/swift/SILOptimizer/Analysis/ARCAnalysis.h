@@ -13,16 +13,17 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ARCANALYSIS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILArgument.h"
-#include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -39,14 +40,12 @@ class SILFunction;
 } // end namespace swift
 
 namespace swift {
+
 /// Return true if this is a retain instruction.
 bool isRetainInstruction(SILInstruction *II);
 
 /// Return true if this is a release instruction.
 bool isReleaseInstruction(SILInstruction *II);
-
-using RetainList = TinyPtrVector<SILInstruction *>;
-using ReleaseList = TinyPtrVector<SILInstruction *>;
 
 /// \returns True if the user \p User decrements the ref count of \p Ptr.
 bool mayDecrementRefCount(SILInstruction *User, SILValue Ptr,
@@ -141,16 +140,11 @@ private:
   SILFunction *F;
   RCIdentityFunctionInfo *RCFI;
   AliasAnalysis *AA;
+
   // We use a list of instructions for now so that we can keep the same interface
   // and handle exploded retain_value later.
-  RetainList EpilogueRetainInsts;
+  TinyPtrVector<SILInstruction *> EpilogueRetainInsts;
 
-  /// Return true if all the successors of the EpilogueRetainInsts do not have
-  /// a retain. 
-  bool isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs);
-
-  /// Finds matching releases in the provided block \p BB.
-  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V);
 public:
   /// Finds matching releases in the return block of the function \p F.
   ConsumedResultToEpilogueRetainMatcher(RCIdentityFunctionInfo *RCFI,
@@ -160,7 +154,9 @@ public:
   /// Finds matching releases in the provided block \p BB.
   void findMatchingRetains(SILBasicBlock *BB);
 
-  RetainList getEpilogueRetains() { return EpilogueRetainInsts; }
+  ArrayRef<SILInstruction *> getEpilogueRetains() const {
+    return EpilogueRetainInsts;
+  }
 
   /// Recompute the mapping from argument to consumed arg.
   void recompute();
@@ -182,6 +178,16 @@ public:
   unsigned size() const { return EpilogueRetainInsts.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+private:
+  /// Return true if all the successors of the EpilogueRetainInsts do not have
+  /// a retain.
+  bool
+  isTransitiveSuccessorsRetainFree(const llvm::DenseSet<SILBasicBlock *> &BBs);
+
+  /// Finds matching releases in the provided block \p BB.
+  RetainKindValue findMatchingRetainsInBasicBlock(SILBasicBlock *BB,
+                                                  SILValue V);
 };
 
 /// A class that attempts to match owned arguments and corresponding epilogue
@@ -197,39 +203,15 @@ private:
   RCIdentityFunctionInfo *RCFI;
   ExitKind Kind;
   ArrayRef<SILArgumentConvention> ArgumentConventions;
-  llvm::SmallMapVector<SILArgument *, ReleaseList, 8> ArgInstMap;
+
+  using InstListTy = TinyPtrVector<SILInstruction *>;
+  llvm::SmallMapVector<SILArgument *, InstListTy, 8> ArgInstMap;
 
   /// Set to true if we found some releases but not all for the argument.
   llvm::DenseSet<SILArgument *> FoundSomeReleases;
 
   /// Eventually this will be used in place of HasBlock.
   SILBasicBlock *ProcessedBlock;
-
-  /// Return true if we have seen releases to part or all of \p Derived in
-  /// \p Insts.
-  /// 
-  /// NOTE: This function relies on projections to analyze the relation
-  /// between the releases values in \p Insts and \p Derived, it also bails
-  /// out and return true if projection path can not be formed between Base
-  /// and any one the released values.
-  bool isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived);
-
-  /// Return true if we have a release instruction for all the reference
-  /// semantics part of \p Argument.
-  bool releaseArgument(ReleaseList Insts, SILValue Argument);
-
-  /// Walk the basic block and find all the releases that match to function
-  /// arguments. 
-  void collectMatchingReleases(SILBasicBlock *BB);
-
-  /// Walk the function and find all the destroy_addr instructions that match
-  /// to function arguments. 
-  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
-
-  /// For every argument in the function, check to see whether all epilogue
-  /// releases are found. Clear all releases for the argument if not all 
-  /// epilogue releases are found.
-  void processMatchingReleases();
 
 public:
   /// Finds matching releases in the return block of the function \p F.
@@ -288,19 +270,17 @@ public:
     return getSingleReleaseForArgument(Arg);
   }
 
-  ReleaseList getReleasesForArgument(SILArgument *Arg) {
-    ReleaseList Releases;
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILArgument *Arg) {
     auto I = ArgInstMap.find(Arg);
     if (I == ArgInstMap.end())
-      return Releases;
-    return I->second; 
+      return {};
+    return I->second;
   }
 
-  ReleaseList getReleasesForArgument(SILValue V) {
-    ReleaseList Releases;
+  ArrayRef<SILInstruction *> getReleasesForArgument(SILValue V) {
     auto *Arg = dyn_cast<SILArgument>(V);
     if (!Arg)
-      return Releases;
+      return {};
     return getReleasesForArgument(Arg);
   }
 
@@ -308,13 +288,14 @@ public:
   void recompute();
 
   bool isSingleReleaseMatchedToArgument(SILInstruction *Inst) {
-    auto Pred = [&Inst](const std::pair<SILArgument *,
-                                        ReleaseList> &P) -> bool {
-      if (P.second.size() > 1)
-        return false;
-      return *P.second.begin() == Inst;
-    };
-    return count_if(ArgInstMap, Pred);
+    return count_if(
+        ArgInstMap,
+        [&Inst](const std::pair<SILArgument *, ArrayRef<SILInstruction *>> &P)
+            -> bool {
+          if (P.second.size() > 1)
+            return false;
+          return *P.second.begin() == Inst;
+        });
   }
 
   using iterator = decltype(ArgInstMap)::iterator;
@@ -334,6 +315,34 @@ public:
   unsigned size() const { return ArgInstMap.size(); }
 
   iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
+
+private:
+  /// Return true if we have seen releases to part or all of \p Derived in
+  /// \p Insts.
+  ///
+  /// NOTE: This function relies on projections to analyze the relation
+  /// between the releases values in \p Insts and \p Derived, it also bails
+  /// out and return true if projection path can not be formed between Base
+  /// and any one the released values.
+  bool isRedundantRelease(ArrayRef<SILInstruction *> Insts, SILValue Base,
+                          SILValue Derived);
+
+  /// Return true if we have a release instruction for all the reference
+  /// semantics part of \p Argument.
+  bool releaseArgument(ArrayRef<SILInstruction *> Insts, SILValue Argument);
+
+  /// Walk the basic block and find all the releases that match to function
+  /// arguments.
+  void collectMatchingReleases(SILBasicBlock *BB);
+
+  /// Walk the function and find all the destroy_addr instructions that match
+  /// to function arguments.
+  void collectMatchingDestroyAddresses(SILBasicBlock *BB);
+
+  /// For every argument in the function, check to see whether all epilogue
+  /// releases are found. Clear all releases for the argument if not all
+  /// epilogue releases are found.
+  void processMatchingReleases();
 };
 
 class ReleaseTracker {
