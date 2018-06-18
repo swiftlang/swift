@@ -272,7 +272,7 @@ public struct StaticString
       if isASCII {
         return String._fromASCII(buffer)
       } else {
-        return String._fromWellFormedUTF8CodeUnitSequence(buffer)
+        return String._fromWellFormedUTF8(buffer)
       }
     }
   }
