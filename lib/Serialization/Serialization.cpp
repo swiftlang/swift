@@ -603,6 +603,10 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
           isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
 
+  assert((!isDeclXRef(D) ||
+          !D->getAttrs().hasAttribute<ForbidSerializingReferenceAttr>()) &&
+         "cannot cross-reference this decl");
+
   assert((allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the NameAliasType)");
