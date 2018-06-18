@@ -1920,7 +1920,7 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
           // If we have more specific information about what went wrong, emit
           // notes.
           if (it->second.getKind() == SymbolicValue::Unknown)
-            it->second.emitUnknownDiagnosticNotes();
+            it->second.emitUnknownDiagnosticNotes(opInfo->inst->getLoc());
           break;
         }
 
