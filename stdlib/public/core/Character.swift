@@ -373,6 +373,7 @@ extension Character : CustomDebugStringConvertible {
 }
 
 extension Character {
+  @usableFromInline
   internal typealias _SmallUTF16 = _UIntBuffer<UInt64, Unicode.UTF16.CodeUnit>
 
   @inlinable // FIXME(sil-serialize-all)

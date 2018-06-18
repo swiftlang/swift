@@ -382,8 +382,11 @@ import SwiftShims
 @_fixed_layout
 public struct Dictionary<Key: Hashable, Value> {
 
+  @usableFromInline
   internal typealias _Self = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias _VariantBuffer = _VariantDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
 
   /// The element type of a dictionary: a tuple containing an individual
@@ -1835,6 +1838,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 internal class _RawNativeDictionaryStorage
   : _SwiftNativeNSDictionary, _NSDictionaryCore
 {
+  @usableFromInline
   internal typealias RawStorage = _RawNativeDictionaryStorage
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -2008,7 +2012,9 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   : _TypedNativeDictionaryStorage<Key, Value> {
 
+  @usableFromInline
   internal typealias FullContainer = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
 
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -2157,11 +2163,16 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 @_fixed_layout
 internal struct _NativeDictionaryBuffer<Key, Value> {
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias RawStorage = _RawNativeDictionaryStorage
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (Key, Value)
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
@@ -2406,8 +2417,10 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
 extension _NativeDictionaryBuffer where Key: Hashable
 {
+  @usableFromInline
   internal typealias HashTypedStorage =
     _HashableTypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2657,7 +2670,9 @@ extension _NativeDictionaryBuffer where Key: Hashable
 final internal class _NativeDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2739,9 +2754,13 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : _SwiftNativeNSDictionary, _NSDictionaryCore {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias BridgedBuffer = _NativeDictionaryBuffer<AnyObject, AnyObject>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
+  @usableFromInline
   internal typealias BridgedIndex = _NativeDictionaryIndex<AnyObject, AnyObject>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3038,11 +3057,16 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
     self.cocoaDictionary = cocoaDictionary
   }
 
+  @usableFromInline
   internal typealias Index = _CocoaDictionaryIndex
+  @usableFromInline
   internal typealias SequenceElement = (AnyObject, AnyObject)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (AnyObject, AnyObject)
 
+  @usableFromInline
   internal typealias Key = AnyObject
+  @usableFromInline
   internal typealias Value = AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3161,13 +3185,19 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
 @_frozen
 internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+  @usableFromInline
   internal typealias CocoaBuffer = _CocoaDictionaryBuffer
 #endif
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SelfType = _VariantDictionaryBuffer
 
   case native(NativeBuffer)
@@ -3389,6 +3419,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   // _HashBuffer conformance
   //
 
+  @usableFromInline
   internal typealias Index = DictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -4259,9 +4290,12 @@ extension _CocoaDictionaryIndex {
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum DictionaryIndexRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   typealias _Index = DictionaryIndex<Key, Value>
+  @usableFromInline
   typealias _NativeIndex = _Index._NativeIndex
 #if _runtime(_ObjC)
+  @usableFromInline
   typealias _CocoaIndex = _Index._CocoaIndex
 #endif
 
@@ -4292,8 +4326,10 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
+    @usableFromInline
     internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+    @usableFromInline
     internal typealias _CocoaIndex = _CocoaDictionaryIndex
 #endif
 
@@ -4423,6 +4459,7 @@ extension Dictionary.Index {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaDictionaryIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = (AnyObject, AnyObject)
 
   // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -4509,9 +4546,11 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
 @usableFromInline
 @_frozen // FIXME(sil-serialize-all)
 internal enum DictionaryIteratorRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   internal typealias _Iterator = DictionaryIterator<Key, Value>
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native buffer, we keep two indices to keep track of the iteration
@@ -4540,8 +4579,9 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 
   @usableFromInline

@@ -369,6 +369,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias _My = ManagedBufferPointer
 
   @inlinable // FIXME(sil-serialize-all)

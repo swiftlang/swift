@@ -13,6 +13,7 @@ extension String {
   /// A position of a character or code unit in a string.
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Index {
+    @usableFromInline
     internal typealias _UTF8Buffer = UTF8.EncodedScalar
 
     @usableFromInline // FIXME(sil-serialize-all)
