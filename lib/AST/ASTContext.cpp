@@ -753,8 +753,8 @@ CanType ASTContext::getAnyObjectType() const {
 /// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
 /// been imported.  Otherwise, this returns null.
 ClassDecl *ASTContext::getTensorHandleDecl() const {
-  if (Impl.TensorHandleDecl)
-    return Impl.TensorHandleDecl;
+  if (getImpl().TensorHandleDecl)
+    return getImpl().TensorHandleDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
   auto tfModule = getLoadedModule(getIdentifier("TensorFlow"));
@@ -767,7 +767,7 @@ ClassDecl *ASTContext::getTensorHandleDecl() const {
 
   for (auto result : results)
     if (auto CD = dyn_cast<ClassDecl>(result))
-      return Impl.TensorHandleDecl = CD;
+      return getImpl().TensorHandleDecl = CD;
   return nullptr;
 }
 

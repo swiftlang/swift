@@ -29,7 +29,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -1245,7 +1244,8 @@ static SILFunction *getOrCreateGradient(
           ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
         auto seedBufAccess = builder.createBeginAccess(
             loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-            /*noNestedConflict=*/false);
+            /*noNestedConflict=*/false,
+            /*fromBuiltin=*/false);
         auto seed = builder.createLoad(loc, seedBufAccess, loq);
         builder.createEndAccess(loc, seedBufAccess, /*aborted*/ false);
         args.push_back(seed);
