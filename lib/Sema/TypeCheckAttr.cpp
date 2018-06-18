@@ -1982,7 +1982,8 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+    if (TC.Context.isSwiftVersionAtLeast(4,2))
+      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
     return;
   }
 }
