@@ -227,4 +227,26 @@
     "RightComment": "AwesomeIntWrapper",
     "ModuleName": "bar"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "RevertTypeAliasDeclToRawRepresentable",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities20AwesomeCityAttributeV",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Cities"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeDecl",
+    "NodeAnnotation": "RevertTypeAliasDeclToRawRepresentable",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities7WrapperC9AttributeV",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Cities"
+  },
 ]

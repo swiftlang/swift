@@ -74,3 +74,17 @@ public enum FontWeight: Int {
   case Regular
   case Bold
 }
+
+public struct AwesomeCityAttribute: RawRepresentable {
+  public init?(rawValue: String) { self.rawValue = rawValue }
+  public var rawValue: String
+  public typealias RawValue = String
+}
+
+public class Wrapper {
+  public struct Attribute: RawRepresentable {
+    public init?(rawValue: String) { self.rawValue = rawValue }
+    public var rawValue: String
+    public typealias RawValue = String
+  }
+}
