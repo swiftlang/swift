@@ -1490,6 +1490,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 internal final class _KeyedEncodingContainerBox<
   Concrete : KeyedEncodingContainerProtocol
 > : _KeyedEncodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline
@@ -1663,6 +1664,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 internal final class _KeyedDecodingContainerBox<
   Concrete : KeyedDecodingContainerProtocol
 > : _KeyedDecodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline

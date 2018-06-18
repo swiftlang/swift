@@ -35,7 +35,8 @@
 /// which `ContiguousArray` shares most properties and methods.
 @_fixed_layout
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
-    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
 
   @usableFromInline
   internal var _buffer: _Buffer

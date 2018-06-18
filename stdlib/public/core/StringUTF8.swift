@@ -515,7 +515,9 @@ extension String.UTF8View : _SwiftStringView {
 extension String.UTF8View {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
+    @usableFromInline
     internal typealias _OutputBuffer = _ValidUTF8Buffer<UInt64>
+
     @usableFromInline
     internal let _guts: _StringGuts
     @usableFromInline

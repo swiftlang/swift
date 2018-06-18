@@ -43,6 +43,7 @@ class _SwiftRawStringStorage : _SwiftNativeNSString {
 }
 
 internal typealias _ASCIIStringStorage = _SwiftStringStorage<UInt8>
+@usableFromInline // FIXME(sil-serialize-all)
 internal typealias _UTF16StringStorage = _SwiftStringStorage<UTF16.CodeUnit>
 
 @_fixed_layout

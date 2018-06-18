@@ -209,6 +209,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   // MARK: Implementation
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Kind = KeyPathKind
   @inlinable // FIXME(sil-serialize-all)
   internal class var kind: Kind { return .readOnly }
@@ -650,6 +651,7 @@ internal final class ClassHolder<ProjectionType> {
 
   /// The type of the scratch record passed to the runtime to record
   /// accesses to guarantee exlcusive access.
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias AccessRecord = Builtin.UnsafeValueBuffer
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1036,8 +1038,10 @@ internal struct RawKeyPathComponent {
       as: UnsafeRawPointer.self)
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias ComputedArgumentLayoutFn = @convention(thin)
     (_ patternArguments: UnsafeRawPointer) -> (size: Int, alignmentMask: Int)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias ComputedArgumentInitializerFn = @convention(thin)
     (_ patternArguments: UnsafeRawPointer,
      _ instanceArguments: UnsafeMutableRawPointer) -> ()
@@ -2181,6 +2185,7 @@ internal func _getKeyPath_instantiateInline(
     unsafeBitCast(keyPathClass, to: OpaquePointer.self))
 }
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal typealias MetadataAccessor =
   @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
 

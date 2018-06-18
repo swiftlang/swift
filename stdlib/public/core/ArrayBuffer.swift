@@ -18,6 +18,7 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
+@usableFromInline
 internal typealias _ArrayBridgeStorage
   = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
 
@@ -520,6 +521,7 @@ extension _ArrayBuffer {
 
   //===--- private --------------------------------------------------------===//
   internal typealias Storage = _ContiguousArrayStorage<Element>
+  @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   @inlinable

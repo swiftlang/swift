@@ -299,9 +299,11 @@
 @_fixed_layout
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
-    internal typealias _Buffer = _ArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ArrayBuffer<Element>
   #else
-    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
   #endif
 
   @usableFromInline

@@ -93,10 +93,14 @@ internal let _registerSaveWords = _countGPRegisters
 #endif
 
 #if arch(s390x)
+@usableFromInline
 internal typealias _VAUInt = CUnsignedLongLong
+@usableFromInline
 internal typealias _VAInt  = Int64
 #else
+@usableFromInline
 internal typealias _VAUInt = CUnsignedInt
+@usableFromInline
 internal typealias _VAInt  = Int32
 #endif
 
