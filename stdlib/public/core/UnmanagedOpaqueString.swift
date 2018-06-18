@@ -93,6 +93,7 @@ extension _UnmanagedOpaqueString : Sequence {
   @usableFromInline
   @_fixed_layout
   struct Iterator : IteratorProtocol {
+    @usableFromInline
     internal typealias Element = UTF16.CodeUnit
 
 #if _runtime(_ObjC) // FIXME unify

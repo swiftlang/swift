@@ -116,7 +116,8 @@
 
 @_fixed_layout
 public struct ArraySlice<Element>: _DestructorSafeContainer {
-    internal typealias _Buffer = _SliceBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _SliceBuffer<Element>
 
   @usableFromInline
   internal var _buffer: _Buffer
