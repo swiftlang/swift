@@ -141,16 +141,17 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
 /// type of the \p Self.
 /// If the value is copied from another stack location, \p isCopied is set to
 /// true.
-SILInstruction *swift::findInitExistential(FullApplySite AI, SILValue Self,
+SILInstruction *swift::findInitExistential(Operand &openedUse,
                                            ArchetypeType *&OpenedArchetype,
                                            SILValue &OpenedArchetypeDef,
                                            bool &isCopied) {
+  SILValue Self = openedUse.get();
+  SILInstruction *User = openedUse.getUser();
   isCopied = false;
   if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
     // In case the Self operand is an alloc_stack where a copy_addr copies the
     // result of an open_existential_addr to this stack location.
-    if (SILValue Src =
-            getAddressOfStackInit(Instance, AI.getInstruction(), isCopied))
+    if (SILValue Src = getAddressOfStackInit(Instance, User, isCopied))
       Self = Src;
   }
 
@@ -194,4 +195,66 @@ SILInstruction *swift::findInitExistential(FullApplySite AI, SILValue Self,
     return nullptr;
   }
   return nullptr;
+}
+
+/// Derive a concrete type of self and conformance from the init_existential
+/// instruction.
+/// If successful, initializes a valid ConformanceAndConcreteType.
+ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &openedUse) {
+  // Try to find the init_existential, which could be used to
+  // determine a concrete type of the self.
+  // Returns: InitExistential, OpenedArchetype, OpenedArchetypeDef, isCopied.
+  InitExistential = findInitExistential(openedUse, OpenedArchetype,
+                                        OpenedArchetypeDef, isCopied);
+  if (!InitExistential)
+    return;
+
+  if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
+    ExistentialType = IE->getOperand()->getType().getASTType();
+    ExistentialConformances = IE->getConformances();
+    ConcreteType = IE->getFormalConcreteType();
+    ConcreteValue = IE;
+  } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
+    ExistentialType = IER->getType().getASTType();
+    ExistentialConformances = IER->getConformances();
+    ConcreteType = IER->getFormalConcreteType();
+    ConcreteValue = IER->getOperand();
+  } else if (auto IEM =
+                 dyn_cast<InitExistentialMetatypeInst>(InitExistential)) {
+    ExistentialType = IEM->getType().getASTType();
+    ExistentialConformances = IEM->getConformances();
+    ConcreteValue = IEM->getOperand();
+    ConcreteType = ConcreteValue->getType().getASTType();
+    while (auto InstanceType =
+               dyn_cast<ExistentialMetatypeType>(ExistentialType)) {
+      ExistentialType = InstanceType.getInstanceType();
+      ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
+    }
+  } else {
+    assert(!isValid());
+    return;
+  }
+  // Construct a single-generic-parameter substitution map directly to the
+  // ConcreteType with this existential's full list of conformances.
+  SILModule &M = InitExistential->getModule();
+  CanGenericSignature ExistentialSig =
+      M.getASTContext().getExistentialSignature(ExistentialType,
+                                                M.getSwiftModule());
+  ExistentialSubs = SubstitutionMap::get(ExistentialSig, {ConcreteType},
+                                         ExistentialConformances);
+  // If the concrete type is another existential, we're "forwarding" an
+  // opened existential type, so we must keep track of the original
+  // defining instruction.
+  if (ConcreteType->isOpenedExistential()) {
+    if (InitExistential->getTypeDependentOperands().empty()) {
+      auto op = InitExistential->getOperand(0);
+      assert(op->getType().hasOpenedExistential()
+             && "init_existential is supposed to have a typedef operand");
+      ConcreteTypeDef = cast<SingleValueInstruction>(op);
+    } else {
+      ConcreteTypeDef = cast<SingleValueInstruction>(
+          InitExistential->getTypeDependentOperands()[0].get());
+    }
+  }
+  assert(isValid());
 }

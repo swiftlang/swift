@@ -1930,8 +1930,6 @@ public:
     assert(hasSelfArgument() && "Must have a self argument");
     assert(getNumArguments() && "Should only be called when Callee has "
            "at least a self parameter.");
-    assert(hasSubstitutions() && "Should only be called when Callee has "
-           "substitutions.");
     ArrayRef<Operand> ops = this->getArgumentOperands();
     ArrayRef<Operand> opsWithoutSelf = ArrayRef<Operand>(&ops[0],
                                                          ops.size()-1);
