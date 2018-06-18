@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
 #include "swift/IDE/CodeCompletion.h"
@@ -776,4 +777,14 @@ CloseClangModuleFiles::~CloseClangModuleFiles() {
     if (!M->isSubModule() && M->getASTFile())
       M->getASTFile()->closeFile();
   }
+}
+
+void SourceKit::disableExpensiveSILOptions(SILOptions &Opts) {
+  // Disable the sanitizers.
+  Opts.Sanitizers = {};
+
+  // Disable PGO and code coverage.
+  Opts.GenerateProfile = false;
+  Opts.EmitProfileCoverageMapping = false;
+  Opts.UseProfile = "";
 }

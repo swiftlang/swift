@@ -39,6 +39,7 @@ namespace swift {
   class Type;
   class AbstractStorageDecl;
   class SourceFile;
+  class SILOptions;
   class ValueDecl;
   enum class AccessorKind;
 
@@ -531,6 +532,10 @@ public:
   CloseClangModuleFiles(swift::ClangModuleLoader &loader) : loader(loader) {}
   ~CloseClangModuleFiles();
 };
+
+
+/// Disable expensive SIL options which do not affect indexing or diagnostics.
+void disableExpensiveSILOptions(swift::SILOptions &Opts);
 
 } // namespace SourceKit
 
