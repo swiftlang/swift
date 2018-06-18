@@ -2616,7 +2616,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
                                       SILAccessEnforcement::Static,
-                                      /*noNestedConflict=*/false);
+                                      /*noNestedConflict=*/false,
+                                      /*fromBuiltin=*/false);
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
@@ -3108,7 +3109,8 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
 
   auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
                                     SILAccessEnforcement::Static,
-                                    /*noNestedConflict=*/false);
+                                    /*noNestedConflict=*/false,
+                                    /*fromBuiltin=*/false);
 
   Substitution sub(value->getType().getSwiftRValueType(), {});
   auto result = B.createApply(loc, fnRef, {sub}, { access, dtype },
@@ -3399,7 +3401,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // %1 = begin_access [read] [static] %0 : $*(CTensorHandle, CTensorHandle)
   auto access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Read,
                                     SILAccessEnforcement::Static,
-                                    /*noNestedConflict=*/false);
+                                    /*noNestedConflict=*/false,
+                                    /*fromBuiltin=*/false);
 
   // %2 = tuple_element_addr %1 : $*(CTensorHandle, CTensorHandle), 0
   SILValue firstPtr = access;
@@ -3469,7 +3472,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   // %1 = begin_access [write] [static] %0 : $*(CTensorHandle, CTensorHandle)
   access = B.createBeginAccess(loc, stackAlloc, SILAccessKind::Modify,
                                SILAccessEnforcement::Static,
-                               /*noNestedConflict=*/false);
+                               /*noNestedConflict=*/false,
+                               /*fromBuiltin=*/false);
 
   // %2 = tuple_element_addr %1 : $*(CTensorHandle, CTensorHandle), 0
   firstPtr = access;
