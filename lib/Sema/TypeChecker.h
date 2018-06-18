@@ -569,6 +569,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Is it okay to resolve an IUO sigil ("!") here with a deprecation warning?
   AllowIUODeprecated = 0x8000000,
+
+  /// Whether we are in a requirement of a generic declaration
+  GenericRequirement = 0x10000000
 };
 
 /// Option set describing how type resolution should work.

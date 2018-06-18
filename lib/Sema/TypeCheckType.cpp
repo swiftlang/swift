@@ -829,30 +829,32 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
           (nominal = nominalDC->getAsNominalTypeOrNominalTypeExtensionContext())) {
         // Attempt to refer to 'Self' within a non-protocol nominal
         // type. Fix this by replacing 'Self' with the nominal type name.
-
-        // Retrieve the nominal type and resolve it within this context.
         assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-        auto type = resolver->mapTypeIntoContext(
-          dc->getInnermostTypeContext()->getSelfInterfaceType());
-        if (type->hasError())
-          return type;
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         tc.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
           .fixItReplace(comp->getIdLoc(), name);
+
+        // If this is a requirement, replacing 'Self' with a valid type will
+        // result in additional unnecessary diagnostics (does not refer to a
+        // generic parameter or associated type). Simply return an error type.
+        if (options.contains(TypeResolutionFlags::GenericRequirement))
+          return ErrorType::get(tc.Context);
+
+        auto type = resolver->mapTypeIntoContext(
+          dc->getInnermostTypeContext()->getSelfInterfaceType());
+
         comp->overwriteIdentifier(nominal->getName());
         comp->setValue(nominal, nominalDC->getParent());
         return type;
-      } else {
-        // Attempt to refer to 'Self' from a free function.
-        tc.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
-                    dc->getParent()->isLocalContext());
-
-        return ErrorType::get(tc.Context);
       }
-    }
+      // Attempt to refer to 'Self' from a free function.
+      tc.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+                  dc->getParent()->isLocalContext());
 
+      return ErrorType::get(tc.Context);
+    }
 
     // Try ignoring access control.
     DeclContext *lookupDC = dc;
