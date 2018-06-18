@@ -217,3 +217,7 @@ module ConditionallyFoo {
   header "ConditionallyFoo.h"
   config_macros [exhaustive] WANT_FOO
 }
+
+module ForwardDeclarationsHelper {
+  header "ForwardDeclarationsHelper.h"
+}

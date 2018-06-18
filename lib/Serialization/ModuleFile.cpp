@@ -1464,6 +1464,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
+std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
+  assert(getStatus() != Status::Valid);
+
+  // Today, the only buffer that might have diagnostics in them is the input
+  // buffer, and even then only if it has imported module contents.
+  if (!importedHeaderInfo.contents.empty())
+    return std::move(ModuleInputBuffer);
+
+  return nullptr;
+}
+
 ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,

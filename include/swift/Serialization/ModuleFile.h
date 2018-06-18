@@ -619,6 +619,13 @@ public:
     return static_cast<Status>(Bits.Status);
   }
 
+  /// Transfers ownership of a buffer that might contain source code where
+  /// other parts of the compiler could have emitted diagnostics, to keep them
+  /// alive even if the ModuleFile is destroyed.
+  ///
+  /// Should only be called when getStatus() indicates a failure.
+  std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
+
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
