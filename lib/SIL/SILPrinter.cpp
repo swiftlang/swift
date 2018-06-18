@@ -1065,6 +1065,10 @@ public:
     printDebugVar(ABI->getVarInfo());
   }
 
+  void printSubstitutions(SubstitutionMap Subs) {
+    printSubstitutions(Subs.toList());
+  }
+
   void printSubstitutions(SubstitutionList Subs) {
     if (Subs.empty())
       return;

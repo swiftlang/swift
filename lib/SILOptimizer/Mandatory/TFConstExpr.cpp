@@ -12,12 +12,14 @@
 
 #define DEBUG_TYPE "TFConstExpr"
 #include "TFConstExpr.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILConstants.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILConstants.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
