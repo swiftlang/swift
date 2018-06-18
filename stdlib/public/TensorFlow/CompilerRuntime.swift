@@ -58,7 +58,7 @@ public func enableGPU() {
   #tfop("tfc.configureGPU") as Void
 }
 
-@_fixed_layout
+@_frozen
 public enum _ExecutionMode : Equatable {
   /// Classical TF interpreter backend, on CPU.
   case cpu
@@ -80,7 +80,7 @@ public enum _ExecutionMode : Equatable {
 
 /// The configuration for the compiler runtime.
 // TODO(hongm): Revisit the longer-term design.
-@_fixed_layout
+@_frozen
 public enum _RuntimeConfig {
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
@@ -106,7 +106,7 @@ public enum _RuntimeConfig {
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
   /// session, or a remote session with the specified server address (must start
   /// with "grpc://" in that case).
-  @_fixed_layout
+  @_frozen
   public enum RuntimeSession {
     case local
     case remote(grpcAddress: String)

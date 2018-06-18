@@ -66,7 +66,7 @@ let _: (Float, Vector) -> (Float, Vector) = #gradient(of: foo_generic_vector_and
 // CHECK: gradient [source 0] [wrt 0, 1] [preserving_result] [[FOO_3_THICK]] : $@callee_guaranteed (Float, Float) -> Float
 
 // CHECK: [[FOO_INDIR_RET:%.*]] = function_ref @foo_indir_ret
-// CHECK: gradient [source 0] [wrt 0, 1] {{%.*}} : $@callee_guaranteed (Float, Float, @owned Array<Int>) -> (@owned Array<Int>, @owned Array<Int>)
+// CHECK: gradient [source 0] [wrt 0, 1] {{%.*}} : $@callee_guaranteed (Float, Float, @guaranteed Array<Int>) -> (@owned Array<Int>, @owned Array<Int>)
 
 // CHECK: [[FOO_GENERIC_VECTOR:%.*]] = function_ref @foo_generic_vector
 // CHECK: gradient [source 0] [wrt 0, 1] {{%.*}} : $@callee_guaranteed (Vector, Vector) -> Vector

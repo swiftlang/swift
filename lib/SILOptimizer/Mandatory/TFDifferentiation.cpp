@@ -26,20 +26,22 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/SubstitutionMap.h"
-#include "swift/AST/SubstitutionList.h"
-#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionList.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -977,9 +979,8 @@ static void convertFromIntegerLiteral(intmax_t value,
   auto *ebilProto =
     astCtx.getProtocol(KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral);
   // `init(_builtinIntegerLiteral:)`
-  DeclName builtinLitInitName(astCtx, astCtx.Id_init, {
-    astCtx.getIdentifier("_builtinIntegerLiteral")
-  });
+  DeclName builtinLitInitName(astCtx, DeclBaseName::createConstructor(),
+                              {astCtx.getIdentifier("_builtinIntegerLiteral")});
   auto *initBILDecl =
     cast<ConstructorDecl>(ebilProto->lookupDirect(builtinLitInitName)[0]);
   SILDeclRef initBILDeclRef(initBILDecl);
@@ -1022,9 +1023,8 @@ static void convertFromIntegerLiteral(intmax_t value,
   // `ExpressibleByIntegerLiteral.init(integerLiteral: %4)`.
   auto *eilProto =
     astCtx.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  DeclName intLitInitName(astCtx, astCtx.Id_init, {
-    astCtx.getIdentifier("integerLiteral")
-  });
+  DeclName intLitInitName(astCtx, DeclBaseName::createConstructor(),
+                          {astCtx.getIdentifier("integerLiteral")});
   auto *initILDecl =
     cast<ConstructorDecl>(eilProto->lookupDirect(intLitInitName)[0]);
   SILDeclRef initILDeclRef(initILDecl);
@@ -1091,7 +1091,8 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
       CanMetatypeType::get(type, MetatypeRepresentation::Thick));
     auto *metatype = builder.createMetatype(loc, metatypeTy);
     // Call `init(_:)` through `VectorNumeric` protocol.
-    DeclName initName(astCtx, astCtx.Id_init, { Identifier() });
+    DeclName initName(astCtx, DeclBaseName::createConstructor(),
+                      {Identifier()});
     // Allocate buffer for passing the indirect scalar value.
     // %2 = alloc_stack $<scalar type>
     auto scalarValBuf =
@@ -1242,9 +1243,9 @@ static SILFunction *getOrCreateGradient(
       } else {
         auto loq = seedSILTy.isTrivial(module)
           ? LoadOwnershipQualifier::Trivial : LoadOwnershipQualifier::Take;
-        auto seedBufAccess =
-          builder.createBeginAccess(loc, seedBuf, SILAccessKind::Read,
-                                    SILAccessEnforcement::Static);
+        auto seedBufAccess = builder.createBeginAccess(
+            loc, seedBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
+            /*noNestedConflict=*/false);
         auto seed = builder.createLoad(loc, seedBufAccess, loq);
         builder.createEndAccess(loc, seedBufAccess, /*aborted*/ false);
         args.push_back(seed);

@@ -27,6 +27,6 @@ private func dbar1(_ x: Float, primal: Float, seed: Float) -> Float { return 1 }
 
 // Error: primal not exported.
 @differentiable(reverse, primal: pbar2(_:), adjoint: dbar2(_:checkpoints:originalValue:seed:)) // expected-error {{primal 'pbar2' is required to either be public or @usableFromInline because the original function 'bar2' is public or @usableFromInline}}
-@_versioned func bar2(_ x: Float) -> Float { return 1 }
+@usableFromInline func bar2(_ x: Float) -> Float { return 1 }
 func pbar2(_ x: Float) -> (checkpoints: CheckpointsFoo, originalValue: Float) { return (CheckpointsFoo(), 1) }
 func dbar2(_ x: Float, checkpoints: CheckpointsFoo, originalValue: Float, seed: Float) -> Float { return 1 }

@@ -247,7 +247,12 @@ void TFDeabstraction::inlineCalls() {
   // Use the mandatory inlining algorithm to expose call sites that contain
   // TensorFlow values as their argument or result lists.
   inlineForTFDeabstraction(fn,
-     [&](FullApplySite site, const SILFunction &callee) -> bool {
+     [&](FullApplySite site, SILFunction &callee) -> bool {
+       if (callee.empty() &&
+           !site.getModule().linkFunction(&callee,
+                                          SILModule::LinkingMode::LinkAll))
+         return nullptr;
+
        if (!shouldInline(site, callee))
          return false;
 

@@ -14,6 +14,7 @@
 #include "TFUtilities.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Module.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -1571,7 +1572,7 @@ bool TensorFunctionClassifier::shouldBePartitioned(SILFunction *fn) {
     return false;
 
   auto hasInlinableAttrs = [&](Decl *decl) -> bool {
-    if (decl->getAttrs().hasAttribute<InlineableAttr>())
+    if (decl->getAttrs().hasAttribute<InlinableAttr>())
       return true;
     return false;
   };

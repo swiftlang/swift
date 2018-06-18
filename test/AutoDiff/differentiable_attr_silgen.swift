@@ -30,7 +30,7 @@ public func foo_indir_ret<T>(_ x: Float, _ y: T) -> T {
   return y
 }
 
-// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T> (Float, @in T) -> @out T {
+// CHECK-LABEL: sil [reverse_differentiable source 0 wrt 0, 1 primal @foo_indir_ret adjoint @dfoo_indir_ret] @foo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $Float, %2 : $*T):
 
 @_silgen_name("dfoo_indir_ret")
@@ -38,7 +38,7 @@ public func dfoo_indir_ret<T>(_ x: Float, _ y: T, _ partial: T, _ seed: T) -> (F
   return (x, y)
 }
 
-// CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T> (Float, @in T, @in T, @in T) -> (Float, @out T) {
+// CHECK-LABEL: sil @dfoo_indir_ret : $@convention(thin) <T> (Float, @in_guaranteed T, @in_guaranteed T, @in_guaranteed T) -> (Float, @out T) {
 // CHECK: bb0(%0 : $*T, %1 : $Float, %2 : $*T, %3 : $*T, %4 : $*T):
 
 //===----------------------------------------------------------------------===//

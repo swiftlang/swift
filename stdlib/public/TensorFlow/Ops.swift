@@ -1234,7 +1234,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
 //===----------------------------------------------------------------------===//
 
 /// A padding scheme. Used by padding, convolution, and pooling ops.
-@_fixed_layout
+@_frozen
 public enum Padding {
   /// The "valid" padding scheme.
   case valid

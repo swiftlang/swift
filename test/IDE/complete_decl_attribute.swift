@@ -54,7 +54,7 @@ func method(){}
 @#^KEYWORD3^#
 class C {}
 
-// KEYWORD3:                  Begin completions, 9 items
+// KEYWORD3:                  Begin completions, 10 items
 // KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // SWIFT_ENABLE_TENSORFLOW
@@ -70,7 +70,7 @@ class C {}
 
 @#^KEYWORD4^#
 enum E {}
-// KEYWORD4:                  Begin completions, 4 items
+// KEYWORD4:                  Begin completions, 5 items
 // KEYWORD4-NEXT:             Keyword/None:                       available[#Enum Attribute#]; name=available{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
 // SWIFT_ENABLE_TENSORFLOW

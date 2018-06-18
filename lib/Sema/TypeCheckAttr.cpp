@@ -1011,7 +1011,7 @@ static bool hasValidDynamicCallableMethod(TypeChecker &TC,
   if (candidates.empty()) return false;
 
   // Filter valid candidates.
-  candidates.filter([&](LookupResultEntry entry) {
+  candidates.filter([&](LookupResultEntry entry, bool isOuter) {
     auto candidate = cast<FuncDecl>(entry.getValueDecl());
     return isValidDynamicCallableMethod(candidate, decl, TC, hasKeywordArgs);
   });
@@ -2231,6 +2231,7 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Forward mode is unsupported.
   if (attr->getMode() == AutoDiffMode::Forward) {

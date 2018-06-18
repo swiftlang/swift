@@ -151,7 +151,7 @@ public func sinkTensorToScalarCrash() {
 public extension Tensor {
   // This is a theoretical operation that takes a generic scalar value as an
   // attribute.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
     // expected-error @+1 {{op named 'ExampleOp' is not registered in TensorFlow}}
     return #tfop("ExampleOp", handle, axis: axis, axisType: T.self)

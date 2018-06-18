@@ -40,7 +40,7 @@ InlineCost instructionInlineCost(SILInstruction &I);
 /// Scan the given function body, mandatory inlining calls to callees that
 /// satisfy the specified predicate, including call sites exposed by inlining
 /// other functions.
-typedef std::function<bool (FullApplySite site, const SILFunction &callee)>
+typedef std::function<bool(FullApplySite site, SILFunction &callee)>
     ShouldMandatoryInlineFnPred;
 void inlineForTFDeabstraction(SILFunction &fn,
                               const ShouldMandatoryInlineFnPred &predicate);

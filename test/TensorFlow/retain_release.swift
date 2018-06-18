@@ -13,7 +13,7 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test3Adds{{.*}}
-// CHECK: sil shared @{{.*}}test3Adds{{.*}} : $@convention(thin)
+// CHECK: @{{.*}}test3Adds{{.*}} : $@convention(thin)
 
 // CHECK-NOT: retain
 // CHECK-NOT: release
@@ -52,7 +52,7 @@ public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorSingleUse{{.*}}
-// CHECK: sil shared @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) (@guaranteed Tensor<Int32>) -> () {
+// CHECK: @{{.*}}testAddsWithIntermediateTensorSingleUse{{.*}} : $@convention(thin) (@guaranteed Tensor<Int32>) -> () {
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
@@ -85,7 +85,7 @@ public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}testAddsWithIntermediateTensorMultiUses{{.*}}
-// CHECK: sil shared @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin)
+// CHECK: @{{.*}}testAddsWithIntermediateTensorMultiUses{{.*}} : $@convention(thin)
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
@@ -121,13 +121,7 @@ public func testBalancedRetainReleases() {
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 // CHECK: [[H:%.*]] = alloc_ref $TensorHandle<Float>
 //
-// TFPartition pass generates these 2 strong_retain's to balance retain/releases.
-// CHECK: strong_retain [[H]] : $TensorHandle<Float>
-// CHECK: strong_retain [[H]] : $TensorHandle<Float>
-//
-// CHECK: strong_release [[H]] : $TensorHandle<Float>
-// CHECK: strong_release [[H]] : $TensorHandle<Float>
-//
+// TFPartition pass generates this strong_retain to balance retain/releases.
 // CHECK: strong_retain [[H]] : $TensorHandle<Float>
 //
 // __tf_receive is called here
