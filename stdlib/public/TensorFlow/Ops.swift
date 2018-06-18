@@ -1244,12 +1244,12 @@ public enum Padding {
 
 internal extension Padding {
   @_versioned @_inlineable
-  var cName: String {
+  var raw: Raw.Padding {
     @inline(__always)
     get {
       switch self {
-      case .same: return "SAME"
-      case .valid: return "VALID"
+      case .same: return .same
+      case .valid: return .valid
       }
     }
   }
@@ -1276,9 +1276,11 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("Conv2D", handle, filter,
-                 strides: [strides.0, strides.1, strides.2, strides.3],
-                 padding: padding.cName)
+    return Raw.conv2D(
+      self,
+      filter: filter,
+      strides: [strides.0, strides.1, strides.2, strides.3],
+      padding: padding.raw)
   }
 
   /// Computes a 2-D max pooling, with the specified kernel sizes, strides, and
@@ -1299,8 +1301,11 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("MaxPoolV2", handle, Tensor<Int32>(kernelSize),
-                 Tensor<Int32>(strides), padding: padding.cName)
+    return Raw.maxPoolV2(
+      self,
+      ksize: Tensor<Int32>(kernelSize),
+      strides: Tensor<Int32>(strides),
+      padding: padding.raw)
   }
 
   /// Computes a 2-D average pooling, with the specified kernel sizes, strides,
@@ -1321,11 +1326,10 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop(
-      "AvgPool", handle,
+    return Raw.avgPool(
+      value: self,
       ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
       strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.cName
-    )
+      padding: padding.raw)
   }
 }
