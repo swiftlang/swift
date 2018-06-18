@@ -558,12 +558,27 @@ static void escapeOpName(std::string &name) {
   // Currently, invalid characters are simply replaced with underscores.
   // TODO: Use a more robust escaping transformation. It should handle unicode
   // characters (using llvm::UTF8 or some other means) and be reversible.
-  for (unsigned i = 0, n = name.size(); i < n; i++) {
-    char c = name[i];
-    if (!std::isalnum(c) && c != '.')
-      if (i == 0 || (i != '_' && i != '/'))
-        name[i] = '_';
+  for (auto i : indices(name)) {
+    char &c = name[i];
+    if (!llvm::isAlnum(c) && c != '.')
+      if (i == 0 || (c != '_' && c != '/'))
+        c = '_';
   }
+}
+
+/// Given a DeclName, returns an escaped (TF-compatible)
+/// name that replaces parentheses with '.' and colons with '_', for example:
+/// `foo(x:y:z:)` -> `foo.x_y_z_.`.
+static std::string escapeDeclName(DeclName name) {
+  SmallVector<char, 8> buffer;
+  auto newName = name.getString(buffer, /*skipEmptyArgumentNames*/ true);
+  for (char &c : buffer) {
+    if (c == '(' || c == ')')
+      c = '.';
+    if (c == ':')
+      c = '_';
+  }
+  return newName.str();
 }
 
 /// Produce a "stack trace" for the specified location, producing it in a form
@@ -571,6 +586,7 @@ static void escapeOpName(std::string &name) {
 std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
                                            const char *baseName) {
   std::string name = baseName;
+  auto *outerScope = loc.getScope();
 
   // Skip over internal implementation details of the Tensor library.
   loc = skipInternalLocations(loc);
@@ -598,24 +614,18 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
 
       // Separate functions using '/' so that TensorBoard can treat it as a
       // hierarchical separator.
-      //
-      // When the SIL function is backed by a Swift decl, use the decl name
-      // instead.
-      //
-      // TODO: We will need a qualified lookup path and a full decl name for
-      // disambiguation.
-      std::string funcName;
-      if (AbstractFunctionDecl *afd =
-          dyn_cast_or_null<AbstractFunctionDecl>(SILFn.getDeclContext())) {
-        SmallVector<char, 8> name;
-        funcName = afd->getEffectiveFullName()
-          .getString(name, /*skipEmptyArgumentNames*/ true).str();
-        escapeOpName(funcName);
-      } else {
-        funcName = fnName.str();
-      }
+      name += '/';
 
-      name += "/" + funcName + "." + llvm::utostr(lineCol.first);
+      // If the SIL function is backed by a Swift decl, use the decl name.
+      // Otherwise, use the SIL name.
+      std::string funcName;
+      auto *dc = SILFn.getDeclContext();
+      if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc))
+        funcName = escapeDeclName(afd->getEffectiveFullName());
+      else
+        funcName = fnName.str();
+
+      name += funcName + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
@@ -1118,7 +1128,6 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   StringRef filePath;
   if (dataSource != DatasetCreationContext::FAKE) {
     auto operand = inst->getOperand(1);
-    auto opInfo = tfopInfo.operandClasses[1];
     auto *sli = cast<StringLiteralInst>(operand);
     assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
     filePath = sli->getValue();
