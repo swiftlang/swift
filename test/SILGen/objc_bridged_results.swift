@@ -79,7 +79,7 @@ func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$Ss10DictionaryV10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxq_GSo12NSDictionaryCSgFZ
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$SSD10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxq_GSo12NSDictionaryCSgFZ
   // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable, Any>([[COCOA_VAL]], [[DICT_META]])
   // CHECK-NOT: destroy_value [[ARG]] : $Test

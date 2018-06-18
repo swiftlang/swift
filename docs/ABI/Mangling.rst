@@ -329,8 +329,10 @@ Types
   any-generic-type ::= protocol 'P'              // nominal protocol type
   any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
-  any-generic-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
-  any-generic-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
+  any-generic-type ::= standard-substitutions
+  
+  standard-substitutions ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
+  standard-substitutions ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
   KNOWN-TYPE-KIND ::= 'A'                    // Swift.AutoreleasingUnsafeMutablePointer
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
@@ -383,6 +385,7 @@ Types
   KNOWN-TYPE-KIND ::= 'z'                    // Swift.BinaryInteger
 
   protocol ::= context decl-name
+  protocol ::= standard-substitutions
 
   type ::= 'Bb'                              // Builtin.BridgeObject
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer

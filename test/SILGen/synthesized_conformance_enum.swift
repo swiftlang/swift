@@ -37,10 +37,10 @@ extension Enum: Equatable where T: Equatable {}
 
 extension Enum: Hashable where T: Hashable {}
 // CHECK-LABEL: // Enum<A>.hashValue.getter
-// CHECK-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAAs8HashableRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
+// CHECK-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAASkRzlE9hashValueSivg : $@convention(method) <T where T : Hashable> (@in_guaranteed Enum<T>) -> Int {
 
 // CHECK-LABEL: // Enum<A>.hash(into:)
-// CHECK-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAAs8HashableRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
+// CHECK-NEXT: sil hidden @$S28synthesized_conformance_enum4EnumOAASkRzlE4hash4intoys6HasherVz_tF : $@convention(method) <T where T : Hashable> (@inout Hasher, @in_guaranteed Enum<T>) -> () {
 
 extension NoValues: CaseIterable {}
 // CHECK-LABEL: // static NoValues.allCases.getter
@@ -56,9 +56,9 @@ extension NoValues: CaseIterable {}
 
 // CHECK-LABEL: sil_witness_table hidden <T where T : Hashable> Enum<T>: Hashable module synthesized_conformance_enum {
 // CHECK-NEXT:   base_protocol Equatable: <T where T : Equatable> Enum<T>: Equatable module synthesized_conformance_enum
-// CHECK-NEXT:   method #Hashable.hashValue!getter.1: <Self where Self : Hashable> (Self) -> () -> Int : @$S28synthesized_conformance_enum4EnumOyxGs8HashableAAsAERzlsAEP9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Enum<A>
-// CHECK-NEXT:   method #Hashable.hash!1: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$S28synthesized_conformance_enum4EnumOyxGs8HashableAAsAERzlsAEP4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Enum<A>
-// CHECK-NEXT:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> ((UInt64, UInt64)) -> Int : @$S28synthesized_conformance_enum4EnumOyxGs8HashableAAsAERzlsAEP13_rawHashValue4seedSis6UInt64V_AJt_tFTW	// protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Enum<A>
+// CHECK-NEXT:   method #Hashable.hashValue!getter.1: <Self where Self : Hashable> (Self) -> () -> Int : @$S28synthesized_conformance_enum4EnumOyxGSkAAsAERzlsAEP9hashValueSivgTW	// protocol witness for Hashable.hashValue.getter in conformance <A> Enum<A>
+// CHECK-NEXT:   method #Hashable.hash!1: <Self where Self : Hashable> (Self) -> (inout Hasher) -> () : @$S28synthesized_conformance_enum4EnumOyxGSkAAsAERzlsAEP4hash4intoys6HasherVz_tFTW	// protocol witness for Hashable.hash(into:) in conformance <A> Enum<A>
+// CHECK-NEXT:   method #Hashable._rawHashValue!1: <Self where Self : Hashable> (Self) -> ((UInt64, UInt64)) -> Int : @$S28synthesized_conformance_enum4EnumOyxGSkAAsAERzlsAEP13_rawHashValue4seedSis6UInt64V_AJt_tFTW	// protocol witness for Hashable._rawHashValue(seed:) in conformance <A> Enum<A>
 // CHECK-NEXT:   conditional_conformance (T: Hashable): dependent
 // CHECK-NEXT: }
 
