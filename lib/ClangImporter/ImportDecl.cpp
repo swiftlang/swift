@@ -4617,6 +4617,8 @@ namespace {
               "This Objective-C class has only been forward-declared; "
               "import its owning module to use it");
           result->getAttrs().add(attr);
+          result->getAttrs().add(
+              new (Impl.SwiftContext) ForbidSerializingReferenceAttr(true));
           return result;
         }
 
