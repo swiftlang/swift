@@ -19,7 +19,10 @@ func testFPToIntConversion() {
   _blackHole(UInt8(-2E2)) // expected-error {{negative literal '-2E2' cannot be converted to 'UInt8'}}
 
   _blackHole(Int8(1E6000)) // expected-error {{invalid conversion: '1E6000' overflows 'Int8'}}
+                           // expected-warning@-1 {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
+
   _blackHole(UInt8(1E6000)) // expected-error {{invalid conversion: '1E6000' overflows 'UInt8'}}
+                            // expected-warning@-1 {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
 
   _blackHole(Int16(3.2767E4))
   _blackHole(Int16(3.2768E4)) // expected-error {{invalid conversion: '3.2768E4' overflows 'Int16'}}
@@ -65,5 +68,126 @@ func testFPToIntConversion() {
   _blackHole(UInt64(-2E2)) // expected-error {{negative literal '-2E2' cannot be converted to 'UInt64'}}
 
   _blackHole(Int64(1E6000)) // expected-error {{invalid conversion: '1E6000' overflows 'Int64'}}
+                            // expected-warning@-1 {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
+
   _blackHole(UInt64(1E6000)) // expected-error {{invalid conversion: '1E6000' overflows 'UInt64'}}
+                             // expected-warning@-1 {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
+}
+
+func testFloatConvertOverflow() {
+  let f1: Float = 1E38
+  _blackHole(f1)
+  let f2: Float = 1E39 // expected-warning {{'1E39' overflows to inf during conversion to 'Float'}}
+  _blackHole(f2)
+  let f3: Float = 1234567891012345678912345671234561234512.0 // expected-warning {{'1234567891012345678912345671234561234512.0' overflows to inf during conversion to 'Float'}}
+  _blackHole(f3)
+  let f4: Float = 0.1234567891012345678912345671234561234512
+  _blackHole(f4)
+  let f5: Float32 = -3.4028236E+38 // expected-warning {{'-3.4028236E+38' overflows to -inf during conversion to 'Float32' (aka 'Float')}}
+  _blackHole(f5)
+
+  // Diagnositcs for Double truncations have architecture dependent
+  // messages. See _nonx86 and _x86 test files.
+  let d1: Double = 1E308
+  _blackHole(d1)
+  let d2: Double = 1234567891012345678912345671234561234512.0
+  _blackHole(d2)
+
+  // All warnings are disabled during explicit conversions.
+  // Except when the number is so large that it wouldn't even fit into largest
+  // FP type available.
+  _blackHole(Float(1E38))
+  _blackHole(Float(1E39))
+  _blackHole(Float(100000000000000000000000000000000000000000000000.0))
+  _blackHole(Double(1E308))
+  _blackHole(Float(1E6000)) // expected-warning {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
+  _blackHole(Float(-1E6000)) // expected-warning {{'-1E6000' overflows to -inf because its magnitude exceeds the limits of a float literal}}
+  _blackHole(Double(1E6000)) // expected-warning {{'1E6000' overflows to inf because its magnitude exceeds the limits of a float literal}}
+}
+
+func testFloatConvertUnderflow() {
+  let f0: Float =  0.500000006364665322827
+  _blackHole(f0)
+  let f1: Float = 1E-37
+  _blackHole(f1)
+  let f2: Float = 1E-39  // expected-warning {{'1E-39' underflows and loses precision during conversion to 'Float'}}
+  _blackHole(f2)
+  let f3: Float = 1E-45 // expected-warning {{'1E-45' underflows and loses precision during conversion to 'Float'}}
+  _blackHole(f3)
+
+  // A number close to 2^-150 (smaller than least non-zero float: 2^-149)
+  let f6: Float = 7.0064923E-46  // expected-warning {{'7.0064923E-46' underflows and loses precision during conversion to 'Float'}}
+  _blackHole(f6)
+
+  // Some cases where tininess doesn't cause extra imprecision.
+
+  // A number so close to 2^-130 that 2^-130 is its best approximation
+  // even in Float80.
+  let f4: Float = 7.3468396926392969248E-40
+  _blackHole(f4)
+  // A number very close to 2^-149.
+  let f5: Float = 1.4012984821624085566E-45
+  _blackHole(f5)
+
+  let f7: Float = 1.1754943E-38 // expected-warning {{'1.1754943E-38' underflows and loses precision during conversion to 'Float'}}
+  _blackHole(f7)
+  let f8: Float = 1.17549428E-38 // expected-warning {{'1.17549428E-38' underflows and loses precision during conversion to 'Float'}}
+  _blackHole(f8)
+
+  let d1: Double = 1E-307
+  _blackHole(d1)
+
+   // All warnings are disabled during explict conversions.
+  _blackHole(Float(1E-37))
+  _blackHole(Float(1E-39))
+  _blackHole(Float(1E-45))
+  _blackHole(Double(1E-307))
+}
+
+func testHexFloatImprecision() {
+  let f1: Float = 0x0.800000p-126
+  _blackHole(f1)
+  // Smallest Float subnormal number.
+  let f2: Float = 0x0.000002p-126
+  _blackHole(f2)
+  let f3: Float = 0x1.000002p-127 // expected-warning {{'0x1.000002p-127' loses precision during conversion to 'Float'}}
+  _blackHole(f3)
+  let f4: Float = 0x1.000001p-127 // expected-warning {{'0x1.000001p-127' loses precision during conversion to 'Float'}}
+  _blackHole(f4)
+  let f5: Float = 0x1.0000002p-126 // expected-warning {{'0x1.0000002p-126' loses precision during conversion to 'Float'}}
+  _blackHole(f5)
+
+  // In the following cases, the literal is truncated to a Float through a
+  // (lossless) conversion to Double. There should be no warnings here.
+  let t1: Double = 0x1.0000002p-126
+  _blackHole(Float(t1))
+  let t2: Double = 0x1.000001p-126
+  _blackHole(Float(t2))
+  let t3 = 0x1.000000fp25
+  _blackHole(Float(t3))
+
+  let d1: Double = 0x0.8p-1022
+  _blackHole(d1)
+  // Smallest non-zero number representable in Double.
+  let d2: Double = 0x0.0000000000001p-1022
+  _blackHole(d2)
+
+  // All warnings are disabled during explict conversions.
+  _blackHole(Float(0x1.000002p-126))
+  _blackHole(Float(0x1.0000002p-126))
+  _blackHole(Float(0x1.000002p-127))
+  _blackHole(Float(0x1.000001p-127))
+  _blackHole(Float(Double(0x1.000000fp25)))
+  _blackHole(Double(0x1p-1074))
+}
+
+func testFloatArithmetic() {
+  // Ignore inf and Nan during arithmetic operations.
+  // This may become a warning in the future.
+  let infV: Float = 3.0 / 0.0
+  _blackHole(infV)
+
+  let a: Float = 1E38
+  let b: Float = 10.0
+  _blackHole(a * b)
 }
