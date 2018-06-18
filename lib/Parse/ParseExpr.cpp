@@ -1905,8 +1905,17 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
       }
 
       Status |= E;
-      if (E.isNonNull()) {
-        Exprs.push_back(E.get());
+      if (auto expr = E.getPtrOrNull()) {
+        if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+          // This needs to be wrapped in a ParenExpr so it won't be interpreted
+          // as an argument list.
+          // FIXME: Do we want to warn/error about any of these cases?
+          expr = new (Context) ParenExpr(SourceLoc(), tuple, SourceLoc(), 
+                                         /*hasTrailingClosure=*/false);
+          expr->setImplicit();
+        }
+        
+        Exprs.push_back(expr);
 
         if (!Tok.is(tok::eof)) {
           diagnose(Tok, diag::string_interpolation_extra);
