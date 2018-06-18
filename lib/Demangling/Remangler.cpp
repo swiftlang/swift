@@ -621,13 +621,13 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     // Avoid using StringRef::split because its definition is not
     // provided in the header so that it requires linking with libSupport.a.
     size_t splitIdx = text.find('x');
-    auto Element = text.substr(splitIdx).substr(1);
-    if (Element == "RawPointer") {
+    auto element = text.substr(splitIdx).substr(1);
+    if (element == "RawPointer") {
       Buffer << 'p';
-    } else if (Element.consume_front("Float")) {
-      Buffer << 'f' << Element << '_';
-    } else if (Element.consume_front("Int")) {
-      Buffer << 'i' << Element << '_';
+    } else if (element.consume_front("Float")) {
+      Buffer << 'f' << element << '_';
+    } else if (element.consume_front("Int")) {
+      Buffer << 'i' << element << '_';
     } else {
       unreachable("unexpected builtin vector type");
     }

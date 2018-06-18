@@ -1230,13 +1230,13 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
     // provided in the header so that it requires linking with libSupport.a.
     size_t splitIdx = text.find('x');
     Out << 'v' << text.substr(0, splitIdx) << 'B';
-    auto Element = text.substr(splitIdx).substr(1);
-    if (Element == "RawPointer") {
+    auto element = text.substr(splitIdx).substr(1);
+    if (element == "RawPointer") {
       Out << 'p';
-    } else if (stripPrefix(Element, "Float")) {
-      Out << 'f' << Element << '_';
-    } else if (stripPrefix(Element, "Int")) {
-      Out << 'i' << Element << '_';
+    } else if (stripPrefix(element, "Float")) {
+      Out << 'f' << element << '_';
+    } else if (stripPrefix(element, "Int")) {
+      Out << 'i' << element << '_';
     } else {
       unreachable("unexpected builtin vector type");
     }
