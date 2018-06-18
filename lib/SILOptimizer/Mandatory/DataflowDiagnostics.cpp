@@ -142,7 +142,7 @@ static void diagnosePoundAssert(const SILInstruction *I, SILModule &M) {
     // If we have more specific information about what went wrong, emit
     // notes.
     if (value.getKind() == SymbolicValue::Unknown)
-      value.emitUnknownDiagnosticNotes();
+      value.emitUnknownDiagnosticNotes(builtinInst->getLoc());
     return;
   }
   assert(value.getKind() == SymbolicValue::Integer &&
