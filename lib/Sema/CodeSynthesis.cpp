@@ -2082,6 +2082,8 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
                                     ConstructorDecl *superclassCtor,
                                     DesignatedInitKind kind) {
+  auto &ctx = tc.Context;
+
   // FIXME: Inheriting initializers that have their own generic parameters
   if (superclassCtor->getGenericParams())
     return nullptr;
@@ -2098,14 +2100,12 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
       superclassCtor->getDeclContext()
           ->getAsNominalTypeOrNominalTypeExtensionContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }
 
   // Determine the initializer parameters.
-  auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
@@ -2113,39 +2113,22 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
+  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->getGenericSignatureOfContext()) {
-    auto *moduleDecl = classDecl->getParentModule();
-    auto subMap = superclassTyInContext->getContextSubstitutionMap(
-        moduleDecl,
-        superclassDecl,
-        classDecl->getGenericEnvironment());
+  auto *moduleDecl = classDecl->getParentModule();
+  auto subMap = superclassTy->getContextSubstitutionMap(
+      moduleDecl, superclassDecl);
 
-    for (auto *decl : *bodyParams) {
-      auto paramTy = decl->getInterfaceType()->getInOutObjectType();
-
-      // Apply the superclass substitutions to produce a contextual
-      // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subMap);
-      decl->setType(paramSubstTy);
-
-      // Map it to an interface type in terms of the derived class
-      // generic signature.
-      decl->setInterfaceType(paramSubstTy->mapTypeOutOfContext());
-    }
-  } else {
-    for (auto *decl : *bodyParams) {
-      if (!decl->hasType())
-        decl->setType(
-          classDecl->mapTypeIntoContext(
-            decl->getInterfaceType()->getInOutObjectType()));
-    }
+  for (auto *decl : *bodyParams) {
+    auto paramTy = decl->getInterfaceType()->getInOutObjectType();
+    auto substTy = paramTy.subst(subMap);
+    decl->setInterfaceType(substTy);
+    decl->setType(classDecl->mapTypeIntoContext(substTy));
   }
 
   // Create the initializer declaration, inheriting the name,
