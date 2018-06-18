@@ -1325,17 +1325,31 @@ extension Collection {
       return []
     }
 
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(n)
+    let result: ContiguousArray<T>
+    var p: UnsafeMutablePointer<T>
+    (result, p) = ContiguousArray<T>._allocateUninitialized(n)
 
     var i = self.startIndex
+    var initializedElements = 0
 
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+    do {
+      for _ in 0..<n {
+        (p + initializedElements).initialize(to: try transform(self[i]))
+
+        formIndex(after: &i)
+        initializedElements += 1
+      }
+    } catch {
+      // The buffer may not have been initialized entirely. Set its count to
+      // number of actually initialized items to avoid accessing uninitialized
+      // memory
+      result._buffer.count = initializedElements
+      throw error
     }
 
     _expectEnd(of: self, is: i)
+    _debugPrecondition(initializedElements == n,
+                       "buffer not completely initialized")
     return Array(result)
   }
 

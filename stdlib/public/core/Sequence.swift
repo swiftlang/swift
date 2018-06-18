@@ -822,15 +822,31 @@ extension Sequence {
     _ transform: (Element) throws -> T
   ) rethrows -> [T] {
     let initialCapacity = underestimatedCount
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(initialCapacity)
+    var result: ContiguousArray<T>
+    var p: UnsafeMutablePointer<T>
+    (result, p) = ContiguousArray<T>._allocateUninitialized(initialCapacity)
 
     var iterator = self.makeIterator()
 
-    // Add elements up to the initial capacity without checking for regrowth.
-    for _ in 0..<initialCapacity {
-      result.append(try transform(iterator.next()!))
+    var initializedElements = 0
+
+    // Initialize the initial capacity of the array without needing to regrow it
+    do {
+      for _ in 0..<initialCapacity {
+        (p + initializedElements).initialize(to: try transform(iterator.next()!))
+        initializedElements += 1
+      }
+    } catch {
+      // The buffer may not have been initialized entirely. Set its count to
+      // number of actually initialized items to avoid accessing uninitialized
+      // memory
+      result._buffer.count = initializedElements
+      throw error
     }
+
+    _debugPrecondition(initializedElements == initialCapacity,
+                       "buffer not completely initialized")
+
     // Add remaining elements, if any.
     while let element = iterator.next() {
       result.append(try transform(element))
