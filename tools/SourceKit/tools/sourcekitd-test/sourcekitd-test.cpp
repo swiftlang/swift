@@ -713,7 +713,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                        Opts.ReplaceText.getValue().c_str());
-    sourcekitd_request_dictionary_set_int64(Req, KeyLibSyntaxBasedProcessing, true);
     break;
 
   case SourceKitRequest::PrintAnnotations:
