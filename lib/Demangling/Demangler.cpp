@@ -1195,6 +1195,17 @@ NodePointer Demangler::popTypeList() {
 }
 
 NodePointer Demangler::popProtocol() {
+  if (NodePointer Type = popNode(Node::Kind::Type)) {
+    if (Type->getNumChildren() < 1)
+      return nullptr;
+
+    NodePointer Proto = Type->getChild(0);
+    if (Proto->getKind() != Node::Kind::Protocol)
+      return nullptr;
+
+    return Type;
+  }
+
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
   NodePointer Proto = createWithChildren(Node::Kind::Protocol, Ctx, Name);
