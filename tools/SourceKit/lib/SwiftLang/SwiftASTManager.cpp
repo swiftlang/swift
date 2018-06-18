@@ -464,6 +464,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
 
+  // Disable expensive SIL options to reduce time spent in SILGen.
+  disableExpensiveSILOptions(Invocation.getSILOptions());
+
   return false;
 }
 
