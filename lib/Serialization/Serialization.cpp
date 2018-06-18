@@ -1062,28 +1062,38 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   publicImportSet.insert(publicImports.begin(), publicImports.end());
 
   removeDuplicateImports(allImports);
+
   auto clangImporter =
     static_cast<ClangImporter *>(M->getASTContext().getClangModuleLoader());
-  ModuleDecl *importedHeaderModule = clangImporter->getImportedHeaderModule();
+  ModuleDecl *bridgingHeaderModule = clangImporter->getImportedHeaderModule();
+  ModuleDecl::ImportedModule bridgingHeaderImport{{}, bridgingHeaderModule};
+
+  // Make sure the bridging header module is always at the top of the import
+  // list, mimicking how it is processed before any module imports when
+  // compiling source files.
+  if (llvm::is_contained(allImports, bridgingHeaderImport)) {
+    off_t importedHeaderSize = 0;
+    time_t importedHeaderModTime = 0;
+    std::string contents;
+    if (!options.ImportedHeader.empty()) {
+      contents = clangImporter->getBridgingHeaderContents(
+          options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
+    }
+    assert(publicImportSet.count(bridgingHeaderImport));
+    ImportedHeader.emit(ScratchRecord,
+                        publicImportSet.count(bridgingHeaderImport),
+                        importedHeaderSize, importedHeaderModTime,
+                        options.ImportedHeader);
+    if (!contents.empty()) {
+      contents.push_back('\0');
+      ImportedHeaderContents.emit(ScratchRecord, contents);
+    }
+  }
+
   ModuleDecl *theBuiltinModule = M->getASTContext().TheBuiltinModule;
   for (auto import : allImports) {
-    if (import.second == theBuiltinModule)
-      continue;
-
-    if (import.second == importedHeaderModule) {
-      off_t importedHeaderSize = 0;
-      time_t importedHeaderModTime = 0;
-      std::string contents;
-      if (!options.ImportedHeader.empty())
-        contents = clangImporter->getBridgingHeaderContents(
-            options.ImportedHeader, importedHeaderSize, importedHeaderModTime);
-      ImportedHeader.emit(ScratchRecord, publicImportSet.count(import),
-                          importedHeaderSize, importedHeaderModTime,
-                          options.ImportedHeader);
-      if (!contents.empty()) {
-        contents.push_back('\0');
-        ImportedHeaderContents.emit(ScratchRecord, contents);
-      }
+    if (import.second == theBuiltinModule ||
+        import.second == bridgingHeaderModule) {
       continue;
     }
 
