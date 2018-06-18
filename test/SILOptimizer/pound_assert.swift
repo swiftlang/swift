@@ -1,8 +1,19 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
 
 func overflowTrap() {
-  let _ = Int8(123231)
-  //#assert(Int8(124) + 8 > 42)
+  let _ = Int8(123231)  // TODO: No warning?
+
+  // TODO: Generate a better error message for this, we end up in:
+  // sil [noinline] [_semantics "arc.programtermination_point"] [canonical] @$Ss18_fatalErrorMessage__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF
+
+  // expected-error @+2 {{#assert condition not constant}}
+  // expected-note @+1 {{could not fold operation}}
+  #assert(Int8(123231) > 42)
+
+  // FIXME: I don't see anything in the trace that looks like an overflow.  This
+  // should be diagnosed!
+  // expected-error @+1 {{assertion failed}}
+  #assert(Int8(124) + 8 > 42)
 }
 
 func isOne(_ x: Int) -> Bool {
@@ -44,6 +55,7 @@ func loops1(a: Int) -> Int {
   return x
 }
 
+
 // @constexpr
 func loops2(a: Int) -> Int {
   var x = 42
@@ -59,48 +71,69 @@ func test_loops() {
   #assert(loops1(a: 20000) > 42)
 
   // TODO: xpected-error @+1 {{#assert condition not constant}}
+  // FIXME: This crashes constexpr.
   //#assert(loops2(a: 20000) > 42)
 }
 
-
 //===----------------------------------------------------------------------===//
 // Reduced testcase propagating substitutions around.
-
-protocol substitutionsP {
-  init<T: substitutionsP>(something: T)
+protocol SubstitutionsP {
+  init<T: SubstitutionsP>(something: T)
 
   func get() -> Int
 }
 
-struct substitutionsX : substitutionsP {
+struct SubstitutionsX : SubstitutionsP {
   var state : Int
-  init<T: substitutionsP>(something: T) {
-    // BUG: expected-note @+1 {{could not fold operation}}
+  init<T: SubstitutionsP>(something: T) {
     state = something.get()
   }
-
   func get() -> Int {
+    fatalError()
+  }
+
+  func getState() -> Int {
     return state
   }
 }
 
-struct substitutionsY : substitutionsP {
+struct SubstitutionsY : SubstitutionsP {
   init() {}
-  init<T: substitutionsP>(something: T) {
+  init<T: SubstitutionsP>(something: T) {
   }
 
   func get() -> Int {
     return 123
   }
 }
-func substitutionsF<T: substitutionsP>(_: T.Type) -> T {
-  return T(something: substitutionsY())
+func substitutionsF<T: SubstitutionsP>(_: T.Type) -> T {
+  return T(something: SubstitutionsY())
 }
 
 func testProto() {
+  // This is because our memory representation is not correct.
   // BUG: expected-error @+1 {{#assert condition not constant}}
-  #assert(substitutionsF(substitutionsX.self).get() == 123)
+  #assert(substitutionsF(SubstitutionsX.self).getState() == 123)
 }
 
 //===----------------------------------------------------------------------===//
+// Generic thunk - partial_apply testcase.
+//===----------------------------------------------------------------------===//
 
+struct Transform<T> {
+  let fn: (T) -> T
+}
+func double(x: Int) -> Int {
+  return x + x
+}
+
+func testGenericThunk() {
+  let myTransform = Transform(fn: double)
+
+  // This is because we don't support partial application yet.
+  // TODO: expected-error @+1 {{#assert condition not constant}}
+  #assert(myTransform.fn(42) > 1)
+  // expected-note @-1{{could not fold operation}}
+}
+
+//===----------------------------------------------------------------------===//

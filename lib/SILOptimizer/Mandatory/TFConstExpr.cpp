@@ -30,7 +30,7 @@ ConstExprLimit("constexpr-limit", llvm::cl::init(512),
                               " constexpr function"));
 
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
@@ -57,11 +57,9 @@ namespace {
     /// function.  This is null for the top-level expression.
     SILFunction *fn;
 
-    /// If we have a function being analyzed, this is the substitution list for
-    /// the call to it.
-    SubstitutionList substitutions;
-
-    /// This is a mapping of substitutions.
+    /// substitutionMap specifies a mapping from all of the protocol and type
+    /// requirements in the generic signature down to concrete conformances and
+    /// concrete types.
     SubstitutionMap substitutionMap;
 
     /// This keeps track of the number of instructions we've evaluated.  If this
@@ -74,16 +72,10 @@ namespace {
 
   public:
     ConstExprFunctionCache(ConstExprEvaluator &evaluator, SILFunction *fn,
-                           SubstitutionList substitutions,
+                           SubstitutionMap substitutionMap,
                            unsigned &numInstEvaluated)
-      : evaluator(evaluator), fn(fn), substitutions(substitutions),
+      : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
         numInstEvaluated(numInstEvaluated) {
-
-      if (fn && !substitutions.empty()) {
-        auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-        if (signature)
-          substitutionMap = signature->getSubstitutionMap(substitutions);
-      }
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
@@ -685,18 +677,78 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
     paramConstants.push_back(cst);
   }
 
-  // Get the substitution list of the call.  It is possible that the caller
-  // may pass more substitutions than the callee expects, because the callee
-  // only takes generic substitutions.
-  auto substitutions = apply->getSubstitutions();
+  // Compute the substitution map for the callee, which maps from all of its
+  // generic requirements to concrete conformances and concrete types.
+  SubstitutionMap calleeSubMap;
 
-  // TODO: Figure this out.
+  auto calleeFnType = callee->getLoweredFunctionType();
+  if (auto signature = calleeFnType->getGenericSignature()){
+    ApplySite AI(apply);
+
+    // Get the substitution map of the call.  This maps from the callee's space
+    // into the caller's world.
+    auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
+    auto callSubMap =
+      requirementSig->getSubstitutionMap(apply->getSubstitutions());
+
+    // If we are invoking a witness method, then strip off one level of generic
+    // type parameter's index space, since Self will be bound to a concrete
+    // type.
+    if (calleeFnType->getRepresentation() ==
+        SILFunctionType::Representation::WitnessMethod) {
+      // FIXME: This doesn't work for Collection<>.makeIterator calling
+      // Collection.startIndex.getter on ClosedRange<Int>
+      callSubMap = SubstitutionMap::combineSubstitutionMaps
+        (callSubMap, callSubMap, CombineSubstitutionMaps::AtDepth,
+         0, 1, calleeFnType->getGenericSignature());
+    }
+
+    // The substitution map for the callee is the composition of the callers
+    // substitution map (which is always type/conformance to a concrete type
+    // or conformance, with the mapping introduced by the call itself.  This
+    // ensures that the callee's substitution map can map from its type
+    // namespace back to concrete types and conformances.
+#if 0
+    calleeSubMap = callSubMap.subst(substitutionMap);
+#else
+    calleeSubMap = signature->getSubstitutionMap(
+    [&](SubstitutableType *type) -> Type {
+      // First map the callee type back to the caller's world.
+      auto result = Type(type).subst(callSubMap);
+      // Then map from the caller's world onto a concrete type.
+      return simplifyType(result);
+    }, [&](CanType type, Type replacement, ProtocolType *proto)
+        -> Optional<ProtocolConformanceRef> {
+      auto confResult = callSubMap.lookupConformance(type, proto->getDecl());
+
+      assert(confResult.hasValue() &&
+            "ConstExpr evaluation should always resolve substitutions");
+      // If we resolved this all the way down to a concrete conformance, then
+      // we are done.
+      auto result = confResult.getValue();
+      if (result.isConcrete()) return result;
+
+      // Otherwise, we can use the callers substitution map to resolve it.
+      assert(!substitutionMap.empty() && "Should have submap for caller");
+      auto protocolDecl = result.getAbstract();
+
+      // Map the callee's type back to the caller's namespace.
+      auto callerType = Type(type).subst(callSubMap)->getCanonicalType();
+
+      // Look up the conformance in the caller's space.
+      confResult = substitutionMap.lookupConformance(callerType, protocolDecl);
+      assert(confResult.hasValue() && confResult.getValue().isConcrete() &&
+             "ConstExpr evaluation should always resolve substitutions");
+      return confResult.getValue();
+    });
+#endif
+  }
 
   // Now that have successfully folded all of the parameters, we can evaluate
   // the call.
   SmallVector<SymbolicValue, 4> results;
   auto callResult =
-    evaluateAndCacheCall(*callee, substitutions, paramConstants, results,
+    evaluateAndCacheCall(*callee, calleeSubMap, paramConstants, results,
                          numInstEvaluated, evaluator);
   if (callResult.hasValue())
     return callResult.getValue();
@@ -1005,8 +1057,11 @@ ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
   // If this fails, then we fail.
   if (inst->getNumResults() != 0) {
     auto result = getConstantValue(inst->getResults()[0]);
-    if (result.isConstant()) return None;
-    return result;
+    if (!result.isConstant())
+      return result;
+
+    DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+    return None;
   }
 
   DEBUG(llvm::errs() << "ConstExpr Unknown FS: " << *inst << "\n");
@@ -1018,14 +1073,15 @@ ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
 /// Evaluate a call to the specified function as if it were a constant
 /// expression, returning None and filling in `results` on success, or
 /// returning an 'Unknown' SymbolicValue on failure carrying the error.
+///
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
                      ConstExprEvaluator &evaluator) {
   assert(!fn.isExternalDeclaration() && "Can't analyze bodyless function");
-  ConstExprFunctionCache cache(evaluator, &fn, substitutions,
+  ConstExprFunctionCache cache(evaluator, &fn, substitutionMap,
                                numInstEvaluated);
 
   // TODO: implement caching.
@@ -1036,8 +1092,11 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
   unsigned nextBBArg = 0;
   const auto &argList = fn.front().getArguments();
 
-  DEBUG(llvm::errs() << "ConstExpr call fn: "
-        << Demangle::demangleSymbolAsString(fn.getName()) << "\n");
+  DEBUG(llvm::errs().changeColor(raw_ostream::SAVEDCOLOR, /*bold*/true)
+        << "\nConstExpr call fn: "
+        << Demangle::demangleSymbolAsString(fn.getName());
+        llvm::errs().resetColor()
+        << "\n");
 
   for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i)
     cache.setValue(argList[nextBBArg++], SymbolicValue::getUninitMemory());

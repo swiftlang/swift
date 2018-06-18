@@ -74,6 +74,14 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   }
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
+    if (elements.empty()) {
+      os << "agg: 0 elements []\n";
+      return;
+    } else if (elements.size() == 1) {
+      os << "agg: 1 elt: ";
+      elements[0].print(os, indent+2);
+      return;
+    }
     os << "agg: " << elements.size() << " element" << "s"[elements.size() == 1]
        << " [\n";
     for (auto elt : elements)
