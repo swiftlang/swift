@@ -1977,10 +1977,7 @@ void AttributeChecker::visitUsableFromInlineAttr(UsableFromInlineAttr *attr) {
 
   // On internal declarations, @inlinable implies @usableFromInline.
   if (VD->getAttrs().hasAttribute<InlinableAttr>()) {
-    if (attr->isImplicit())
-      attr->setInvalid();
-    else
-      diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
+    diagnoseAndRemoveAttr(attr, diag::inlinable_implies_usable_from_inline);
     return;
   }
 }
