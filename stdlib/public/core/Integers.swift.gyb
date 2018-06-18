@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -978,6 +978,10 @@ def unsafeOperationComment(operator):
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
   ///
+  /// This method is not a synonym for the masking addition operator (`&+`).
+  /// Use that operator instead of this method when you want to discard any
+  /// overflow that results from an addition operation.
+  ///
   /// - Parameter rhs: The value to add to this value.
   /// - Returns: The sum of this value and `rhs`.
 """,
@@ -994,6 +998,10 @@ def unsafeOperationComment(operator):
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
   ///
+  /// This method is not a synonym for the masking subtraction operator (`&-`).
+  /// Use that operator instead of this method when you want to discard any
+  /// overflow that results from a subtraction operation.
+  ///
   /// - Parameter rhs: The value to subtract from this value.
   /// - Returns: The result of subtracting `rhs` from this value.
 """,
@@ -1009,6 +1017,10 @@ def unsafeOperationComment(operator):
   ///
   /// In debug builds (`-Onone`) a runtime error is still triggered if the
   /// operation overflows.
+  ///
+  /// This method is not a synonym for the masking multiplication operator
+  /// (`&*`). Use that operator instead of this method when you want to discard
+  /// any overflow that results from an addition operation.
   ///
   /// - Parameter rhs: The value to multiply by this value.
   /// - Returns: The product of this value and `rhs`.
@@ -1839,6 +1851,10 @@ extension BinaryInteger {
 
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
+
+    // TODO(FIXME JIRA): All current stdlib types fit in small. Use a stack
+    // buffer instead of an array on the heap.
+
     var result: [UInt8] = []
     while value != 0 {
       let (quotient, remainder) = _quotientAndRemainder(value)
@@ -1849,7 +1865,11 @@ extension BinaryInteger {
     if isNegative {
       result.append(UInt8(("-" as Unicode.Scalar).value))
     }
-    return String._fromASCII(result.reversed())
+
+    result.reverse()
+    return result.withUnsafeBufferPointer {
+      return String._fromASCII($0)
+    }
   }
 
   /// A textual representation of this value.
@@ -2428,26 +2448,13 @@ ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
 
+  static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self
 }
 
 extension FixedWidthInteger {
   /// The empty bitset.
-  ///
-  /// The `allZeros` static property is the [identity element][] for bitwise OR
-  /// and XOR operations and the [fixed point][] for bitwise AND operations.
-  /// For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///
-  ///     // Identity
-  ///     x | .allZeros           // 0b00000101
-  ///     x ^ .allZeros           // 0b00000101
-  ///
-  ///     // Fixed point
-  ///     x & .allZeros           // 0b00000000
-  ///
-  /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
-  /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
@@ -2561,6 +2568,163 @@ ${assignmentOperatorComment(x.operator, False)}
 
   % end
 }
+
+% for Range in ['Range', 'ClosedRange']:
+%   exampleRange = '1..<100' if Range == 'Range' else '1...100'
+
+extension ${Range}
+  where Bound: FixedWidthInteger, Bound.Stride : SignedInteger,
+  Bound.Magnitude: UnsignedInteger
+{
+      
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:using:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    guard !isEmpty else {
+      return nil
+    }
+    // Compute delta, the distance between the lower and upper bounds. This
+    // value may not representable by the type Bound if Bound is signed, but
+    // is always representable as Bound.Magnitude.
+%   if 'Closed' in Range:
+    var delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
+%   else:
+    let delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
+%   end
+%   if 'Closed' in Range:
+    // Subtle edge case: if the range is the whole set of representable values,
+    // then adding one to delta to account for a closed range will overflow.
+    // If we used &+ instead, the result would be zero, which isn't helpful,
+    // so we actually need to handle this case separately.
+    if delta == Bound.Magnitude.max {
+      return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
+    }
+    // Need to widen delta to account for the right-endpoint of a closed range.
+    delta += 1
+%   end
+    // The mathematical result we want is lowerBound plus a random value in
+    // 0 ..< delta. We need to be slightly careful about how we do this
+    // arithmetic; the Bound type cannot generally represent the random value,
+    // so we use a wrapping addition on Bound.Magnitude. This will often
+    // overflow, but produces the correct bit pattern for the result when
+    // converted back to Bound.
+    return Bound(truncatingIfNeeded:
+      Bound.Magnitude(truncatingIfNeeded: lowerBound) &+
+      generator.next(upperBound: delta)
+    )
+  }
+  
+  /// Returns a random element of the range, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You can use this method to select a random element of a range when you
+  /// are using a custom random number generator. If you're generating a random
+  /// number, in most cases, you should prefer using the `random(in:)`
+  /// static method of the desired numeric type. That static method is available
+  /// for both integer and floating point types, and returns a non-optional
+  /// value.
+  ///
+  /// This method uses the default random generator, `Random.default`. Calling
+  /// `(${exampleRange}).randomElement()` is equivalent to calling
+  /// `(${exampleRange}).randomElement(using: &Random.default)`.
+  ///
+  /// - Returns: A random element of the range.
+%   if 'Closed' not in Range:
+  ///   If the range is empty, the method returns `nil`.
+%   else:
+  ///   This method never returns `nil`.
+%   end
+  @inlinable
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
+  }
+}
+
+extension FixedWidthInteger
+where Self.Stride : SignedInteger,
+      Self.Magnitude : UnsignedInteger {
+
+  /// Returns a random value within the specified range, using the given
+  /// generator as a source for randomness.
+  ///
+  /// Use this method to generate an integer within a specific range when you
+  /// are using a custom random number generator. This example creates three
+  /// new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}, using: &myGenerator))
+  ///     }
+  ///     // Prints "7"
+  ///     // Prints "44"
+  ///     // Prints "21"
+  ///
+  /// - Parameters:
+  ///   - range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///     `range` must not be empty.
+%   end
+  ///   - generator: The random number generator to use when creating the
+  ///     new random value.
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random<T: RandomNumberGenerator>(
+    in range: ${Range}<Self>,
+    using generator: inout T
+  ) -> Self {
+    _precondition(
+      !range.isEmpty,
+      "Can't get random value with an empty range"
+    )
+    return range.randomElement(using: &generator)!
+  }
+  
+  /// Returns a random value within the specified range.
+  ///
+  /// Use this method to generate an integer within a specific range. This
+  /// example creates three new values in the range `${exampleRange}`.
+  ///
+  ///     for _ in 1...3 {
+  ///         print(Int.random(in: ${exampleRange}))
+  ///     }
+  ///     // Prints "53"
+  ///     // Prints "64"
+  ///     // Prints "5"
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `Int.random(in: ${exampleRange})` above is equivalent to calling
+  /// `Int.random(in: ${exampleRange}, using: &Random.default)`.
+  ///
+  /// - Parameter range: The range in which to create a random value.
+%   if Range == 'Range':
+  ///   `range` must not be empty.
+%   end
+  /// - Returns: A random value within the bounds of `range`.
+  @inlinable
+  public static func random(in range: ${Range}<Self>) -> Self {
+    return Self.random(in: range, using: &Random.default)
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 //===--- Operators on FixedWidthInteger -----------------------------------===//
@@ -2902,6 +3066,26 @@ ${assignmentOperatorComment('&' + x.operator, True)}
 % end
 }
 
+extension FixedWidthInteger {
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> Self {
+    if bitWidth <= UInt64.bitWidth {
+      return Self(truncatingIfNeeded: generator.next() as UInt64)
+    }
+
+    let (quotient, remainder) = bitWidth.quotientAndRemainder(
+      dividingBy: UInt64.bitWidth
+    )
+    var tmp: Self = 0
+    for i in 0 ..< quotient + remainder.signum() {
+      let next: UInt64 = generator.next()
+      tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
+    }
+    return tmp
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -2963,7 +3147,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     // This check is potentially removable by the optimizer
     if source.bitWidth >= Self.bitWidth {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
@@ -3075,7 +3259,7 @@ extension SignedInteger where Self : FixedWidthInteger {
     if (source.bitWidth > Self.bitWidth) ||
        (source.bitWidth == Self.bitWidth && !T.isSigned) {
       _precondition(source <= Self.max,
-        "Not enough bits to represent a signed value")
+        "Not enough bits to represent the passed value")
     }
     self.init(truncatingIfNeeded: source)
   }
@@ -3760,7 +3944,12 @@ ${assignmentOperatorComment(x.operator, True)}
 %# end of concrete type: ${Self}
 
 extension ${Self} : Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(hasher): To correctly bridge `Set`s/`Dictionary`s containing
     // `AnyHashable`-boxed integers, all integer values are currently required
@@ -3780,7 +3969,7 @@ extension ${Self} : Hashable {
     % end
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     // FIXME(hasher): Note that the AnyHashable concern applies here too,
     // because hashValue uses top-level hashing.
@@ -3930,6 +4119,17 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
+
+extension ${Self} {
+  @inlinable
+  public static func _random<R: RandomNumberGenerator>(
+    using generator: inout R
+  ) -> ${Self} {
+    var result: ${Self} = 0
+    withUnsafeMutableBytes(of: &result) { generator._fill(bytes: $0) }
+    return result
+  }
+}
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 

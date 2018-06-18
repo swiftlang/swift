@@ -118,7 +118,7 @@
 /// Note that @_silgen_name implementations must also be marked SWIFT_CC(swift).
 ///
 /// SWIFT_RUNTIME_STDLIB_API functions are called by compiler-generated code
-/// or by @_inlineable Swift code.
+/// or by @inlinable Swift code.
 /// Such functions must be exported and must be supported forever as API.
 /// The function name should be prefixed with `swift_`.
 ///
@@ -130,7 +130,7 @@
 /// SWIFT_RUNTIME_STDLIB_INTERNAL functions are called only by the stdlib.
 /// Such functions are internal and are not exported.
 /// FIXME(sil-serialize-all): _INTERNAL functions are also exported for now
-/// until the tide of @_inlineable is rolled back.
+/// until the tide of @inlinable is rolled back.
 /// They really should be LLVM_LIBRARY_VISIBILITY, not SWIFT_RUNTIME_EXPORT.
 #define SWIFT_RUNTIME_STDLIB_API       SWIFT_RUNTIME_EXPORT
 #define SWIFT_RUNTIME_STDLIB_SPI       SWIFT_RUNTIME_EXPORT

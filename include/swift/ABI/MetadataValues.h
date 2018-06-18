@@ -54,9 +54,20 @@ enum class MetadataKind : uint32_t {
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
+  
+  /// The largest possible non-isa-pointer metadata kind value.
+  ///
+  /// This is included in the enumeration to prevent against attempts to
+  /// exhaustively match metadata kinds. Future Swift runtimes or compilers
+  /// may introduce new metadata kinds, so for forward compatibility, the
+  /// runtime must tolerate metadata with unknown kinds.
+  /// This specific value is not mapped to a valid metadata kind at this time,
+  /// however.
+  LastEnumerated = 2047,
 };
 
-const unsigned LastEnumeratedMetadataKind = 2047;
+const unsigned LastEnumeratedMetadataKind =
+  (unsigned)MetadataKind::LastEnumerated;
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
@@ -127,6 +138,8 @@ public:
   }
 
   /// True if the type requires out-of-line allocation of its storage.
+  /// This can be the case because the value requires more storage or if it is
+  /// not bitwise takable.
   bool isInlineStorage() const { return !(Data & IsNonInline); }
   constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
     return TargetValueWitnessFlags((Data & ~IsNonInline) |

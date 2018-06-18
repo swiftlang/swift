@@ -1,7 +1,6 @@
-
-// RUN: %target-swift-emit-silgen -module-name dynamic_self -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name dynamic_self -O %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-emit-ir -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-emit-silgen -module-name dynamic_self -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name dynamic_self -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
   func f() -> Self

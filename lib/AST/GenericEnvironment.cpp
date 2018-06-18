@@ -220,18 +220,9 @@ Type GenericEnvironment::getSugaredType(Type type) const {
 
 SubstitutionMap GenericEnvironment::getForwardingSubstitutionMap() const {
   auto *genericSig = getGenericSignature();
-  return genericSig->getSubstitutionMap(
-    QueryInterfaceTypeSubstitutions(this),
-    MakeAbstractConformanceForGenericType());
-}
-
-SubstitutionList
-GenericEnvironment::getForwardingSubstitutions() const {
-  auto *genericSig = getGenericSignature();
-
-  SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(getForwardingSubstitutionMap(), result);
-  return genericSig->getASTContext().AllocateCopy(result);
+  return SubstitutionMap::get(genericSig,
+                              QueryInterfaceTypeSubstitutions(this),
+                              MakeAbstractConformanceForGenericType());
 }
 
 std::pair<Type, ProtocolConformanceRef>

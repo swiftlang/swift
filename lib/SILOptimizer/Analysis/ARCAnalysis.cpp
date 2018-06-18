@@ -36,12 +36,14 @@ using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
 //===----------------------------------------------------------------------===//
 
 bool swift::isRetainInstruction(SILInstruction *I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I);
+  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
+         isa<UnownedRetainInst>(I);
 }
 
 
 bool swift::isReleaseInstruction(SILInstruction *I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I);
+  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
+         isa<UnownedReleaseInst>(I);
 }
 
 //===----------------------------------------------------------------------===//
@@ -496,22 +498,24 @@ void ConsumedResultToEpilogueRetainMatcher::recompute() {
   findMatchingRetains(&*BB);
 }
 
-bool
-ConsumedResultToEpilogueRetainMatcher::
-isTransitiveSuccessorsRetainFree(llvm::DenseSet<SILBasicBlock *> BBs) {
+bool ConsumedResultToEpilogueRetainMatcher::isTransitiveSuccessorsRetainFree(
+    const llvm::DenseSet<SILBasicBlock *> &BBs) {
   // For every block with retain, we need to check the transitive
   // closure of its successors are retain-free.
   for (auto &I : EpilogueRetainInsts) {
-    auto *CBB = I->getParent();
-    for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+    for (auto &Succ : I->getParent()->getSuccessors()) {
+      if (BBs.count(Succ))
         continue;
       return false;
     }
   }
+
+  // FIXME: We are iterating over a DenseSet. That can lead to non-determinism
+  // and is in general pretty inefficient since we are iterating over a hash
+  // table.
   for (auto CBB : BBs) {
     for (auto &Succ : CBB->getSuccessors()) {
-      if (BBs.find(Succ) != BBs.end())
+      if (BBs.count(Succ))
         continue;
       return false;
     }
@@ -579,8 +583,8 @@ findMatchingRetains(SILBasicBlock *BB) {
   // OK. we've found the return value, now iterate on the CFG to find all the
   // post-dominating retains.
   //
-  // The ConsumedArgToEpilogueReleaseMatcher finds the final releases
-  // in the following way. 
+  // The ConsumedResultToEpilogueRetainMatcher finds the final releases
+  // in the following way.
   //
   // 1. If an instruction, which is not releaseinst nor releasevalue, that
   // could decrement reference count is found. bail out.
@@ -705,9 +709,8 @@ void ConsumedArgToEpilogueReleaseMatcher::recompute() {
   findMatchingReleases(&*BB);
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
+bool ConsumedArgToEpilogueReleaseMatcher::isRedundantRelease(
+    ArrayRef<SILInstruction *> Insts, SILValue Base, SILValue Derived) {
   // We use projection path to analyze the relation.
   auto POp = ProjectionPath::getProjectionPath(Base, Derived);
   // We can not build a projection path from the base to the derived, bail out.
@@ -728,9 +731,8 @@ isRedundantRelease(ReleaseList Insts, SILValue Base, SILValue Derived) {
   return false;
 }
 
-bool
-ConsumedArgToEpilogueReleaseMatcher::
-releaseArgument(ReleaseList Insts, SILValue Arg) {
+bool ConsumedArgToEpilogueReleaseMatcher::releaseArgument(
+    ArrayRef<SILInstruction *> Insts, SILValue Arg) {
   // Reason about whether all parts are released.
   SILModule *Mod = &(*Insts.begin())->getModule();
 

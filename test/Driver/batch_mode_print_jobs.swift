@@ -10,9 +10,10 @@
 // RUN: touch %t/file-01.swift %t/file-02.swift %t/file-03.swift
 // RUN: echo 'public func main() {}' >%t/main.swift
 //
-// RUN: %swiftc_driver -enable-batch-mode -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift  -driver-print-jobs 2>%t/shouldBeEmpty1 | %FileCheck %s -check-prefix=CHECK-COMBINED
-// RUN: %swiftc_driver -enable-batch-mode -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift  -###  2>%t/shouldBeEmpty2 | %FileCheck %s  -check-prefix=CHECK-COMBINED
-// RUN: test -z "`cat %t/shouldBeEmpty1`"
-// RUN: test -z "`cat %t/shouldBeEmpty2`"
+// RUN: %swiftc_driver -enable-batch-mode -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift  -driver-print-jobs 2>%t/stderr1 | %FileCheck %s -check-prefix=CHECK-COMBINED
+// RUN: %swiftc_driver -enable-batch-mode -c -emit-module -module-name main -j 2 %t/file-01.swift %t/file-02.swift %t/file-03.swift %t/main.swift  -###  2>%t/stderr2 | %FileCheck %s  -check-prefix=CHECK-COMBINED
+// RUN: %FileCheck %s -allow-empty -check-prefix=NEGATIVE-CHECK-COMBINED <%t/stderr1
+// RUN: %FileCheck %s -allow-empty -check-prefix=NEGATIVE-CHECK-COMBINED <%t/stderr2
 //
 // CHECK-COMBINED: -primary-file {{.*}}/file-01.swift -primary-file {{.*}}/file-02.swift {{.*}}/file-03.swift {{.*}}/main.swift
+// NEGATIVE-CHECK-COMBINED-NOT: -primary-file {{.*}}/file-01.swift -primary-file {{.*}}/file-02.swift {{.*}}/file-03.swift {{.*}}/main.swift

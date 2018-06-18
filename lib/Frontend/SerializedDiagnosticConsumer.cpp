@@ -130,6 +130,8 @@ class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// \brief State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
   bool CalledFinishProcessing = false;
+  bool CompilationWasComplete = true;
+
 public:
   SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath)
       : State(new SharedState(serializedDiagnosticsPath)) {
@@ -169,9 +171,24 @@ public:
       return true;
     }
 
-    OS->write((char *)&State->Buffer.front(), State->Buffer.size());
-    OS->flush();
+    if (CompilationWasComplete) {
+      OS->write((char *)&State->Buffer.front(), State->Buffer.size());
+      OS->flush();
+    }
     return false;
+  }
+
+  /// In batch mode, if any error occurs, no primaries can be compiled.
+  /// Some primaries will have errors in their diagnostics files and so
+  /// a client (such as Xcode) can see that those primaries failed.
+  /// Other primaries will have no errors in their diagnostics files.
+  /// In order for the driver to distinguish the two cases without parsing
+  /// the diagnostics, the frontend emits a truncated diagnostics file
+  /// for the latter case.
+  /// The unfortunate aspect is that the truncation discards warnings, etc.
+  
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    CompilationWasComplete = false;
   }
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,

@@ -18,6 +18,7 @@ internal func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
 @_silgen_name("swift_reflectionMirror_count")
 internal func _getChildCount<T>(_: T, type: Any.Type) -> Int
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
 
 @usableFromInline // FIXME(sil-serialize-all)

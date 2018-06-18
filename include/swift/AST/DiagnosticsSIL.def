@@ -369,6 +369,14 @@ ERROR(non_borrowed_indirect_addressof,none,
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
 
+// Float-point to integer conversions
+ERROR(float_to_int_overflow, none,
+  "invalid%select{| implicit}2 conversion: '%0' overflows %1", (StringRef, Type, bool))
+
+ERROR(negative_fp_literal_overflow_unsigned, none,
+  "negative literal '%0' cannot be converted to %select{|unsigned }2%1",
+  (StringRef, Type, bool))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

@@ -1451,7 +1451,7 @@ emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
                           CanType substFormalType) {
   // Return if there's no abstraction.  (The first condition is just
   // a fast path.)
-  if (value.getType().getSwiftRValueType() == substFormalType ||
+  if (value.getType().getASTType() == substFormalType ||
       value.getType() == SGF.getLoweredType(substFormalType))
     return value;
 
@@ -1865,7 +1865,7 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2026,7 +2026,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
     bool hasElt = false;
     if (elt->hasAssociatedValues()) {
       eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
-      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+      hasElt = !eltTy.getASTType()->isVoid();
     }
 
     ConsumableManagedValue eltCMV, origCMV;
@@ -2573,7 +2573,7 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
   assert(value.getType().isTrivial(SGF.getModule()));
 
   // Get the enum type as an Any.Type value.
-  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
       CanMetatypeType::get(switchedValueSwiftType,
                            MetatypeRepresentation::Thick));
@@ -2588,10 +2588,25 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                       loweredRawType);
   auto materializedRawValue = rawValue.materialize(SGF, loc);
 
-  Substitution subs[] = {
-    {switchedValueSwiftType, /*Conformances*/None},
-    {enumDecl->getRawType(), /*Conformances*/None},
-  };
+  auto genericSig = diagnoseFailure->getGenericSignature();
+  auto subs = SubstitutionMap::get(
+      genericSig,
+      [&](SubstitutableType *type) -> Type {
+        auto genericParam = cast<GenericTypeParamType>(type);
+        assert(genericParam->getDepth() == 0);
+        assert(genericParam->getIndex() < 2);
+        switch (genericParam->getIndex()) {
+        case 0:
+          return switchedValueSwiftType;
+
+        case 1:
+          return enumDecl->getRawType();
+
+        default:
+          llvm_unreachable("wrong generic signature for expected case value");
+        }
+      },
+      LookUpConformanceInSignature(*genericSig));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
                                   {ManagedValue::forUnmanaged(metatype),
@@ -2610,15 +2625,17 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
   }
 
   // Get the switched-upon value's type.
-  CanType switchedValueSwiftType = value.getType().getSwiftRValueType();
+  CanType switchedValueSwiftType = value.getType().getASTType();
   SILType metatypeType = SGF.getLoweredType(
       CanMetatypeType::get(switchedValueSwiftType,
                            MetatypeRepresentation::Thick));
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
-  Substitution sub{switchedValueSwiftType, /*Conformances*/None};
-  auto genericArgsMap =
-      diagnoseFailure->getGenericSignature()->getSubstitutionMap(sub);
+  auto diagnoseSignature = diagnoseFailure->getGenericSignature();
+  auto genericArgsMap = SubstitutionMap::get(
+      diagnoseSignature,
+      [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
+      LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
                                   metatype,

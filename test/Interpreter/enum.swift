@@ -667,3 +667,33 @@ public func testCase(_ closure: @escaping (Int) -> ()) -> Indirect<(Int) -> ()> 
 
 // CHECK: payload((Function), other: (Function))
 print(testCase({ _ in }))
+
+
+enum MultiIndirectRef {
+  case empty
+  indirect case ind(Int)
+  case collection([Int])
+}
+
+struct Container {
+  var storage : MultiIndirectRef = .empty
+
+  mutating func adoptStyle(_ s: Int) {
+    storage = .ind(s)
+  }
+}
+
+func copyStorage(_ s: Int, _ x : Container) -> Container {
+  var c = x
+  c.adoptStyle(s)
+  return c
+}
+
+func testCase() {
+  let l = Container()
+  let c = copyStorage(5, l)
+  print(c)
+}
+
+// CHECK: Container(storage: a.MultiIndirectRef.ind(5))
+testCase()

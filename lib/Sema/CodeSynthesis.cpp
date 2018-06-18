@@ -160,7 +160,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::IsGetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Get, AddressorKind::NotAddressor, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
@@ -211,7 +211,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::IsSetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params, TypeLoc::withoutLoc(setterRetTy),
@@ -328,7 +328,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::IsMaterializeForSet, AddressorKind::NotAddressor, storage,
+      AccessorKind::MaterializeForSet, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       (genericParams
@@ -396,8 +396,9 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
+  // Okay, we have the getter; make the VD computed.
+  VD->setAccessors(AbstractStorageDecl::Computed,
+                   SourceLoc(), {Get}, SourceLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -453,11 +454,11 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.
-  if (accessorKind != AccessorKind::IsGetter)
+  if (accessorKind != AccessorKind::Get)
     params = params.slice(1);
 
   // Ignore the materializeForSet callback storage parameter.
-  if (accessorKind == AccessorKind::IsMaterializeForSet)
+  if (accessorKind == AccessorKind::MaterializeForSet)
     params = params.slice(1);
   
   // Okay, everything else should be forwarded, build the expression.
@@ -657,7 +658,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Expr *Call = CallExpr::createImplicit(Ctx, UDE, { Nil }, { Ctx.Id_with });
 
   TypeLoc ResultTy;
-  ResultTy.setType(VD->getType(), true);
+  ResultTy.setType(VD->getType());
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
@@ -817,7 +818,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
                                            TypeChecker &TC) {
   auto setter = storage->getSetter();
   assert(setter);
-  assert(!storage->getSetter()->getBody());
+  if (setter->getBody()) return;
   assert(storage->getStorageKind() ==
            AbstractStorageDecl::ComputedWithMutableAddress);
 
@@ -855,7 +856,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
 
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
+  VD->setAccessors(VarDecl::Computed, SourceLoc(), {Get, Set}, SourceLoc());
 
   // We've added some members to our containing class/extension, add them to
   // the members list.
@@ -898,22 +899,26 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
 /// (trivial) getter and the setter, which calls these.
 void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   assert(VD->hasObservers());
-  assert(VD->getGetter() && VD->getSetter() &&
-         !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
-         "willSet/didSet var already has a getter or setter");
+  assert(VD->getGetter() && VD->getSetter());
   
   auto &Ctx = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
+
+  // We have to be paranoid about the accessors already having bodies
+  // because there might be an (invalid) existing definition.
   
   // The getter is always trivial: just perform a (direct!) load of storage, or
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
-  synthesizeTrivialGetter(Get, VD, TC);
-  maybeMarkTransparent(Get, VD, TC);
+  if (!Get->hasBody()) {
+    synthesizeTrivialGetter(Get, VD, TC);
+    maybeMarkTransparent(Get, VD, TC);
+  }
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
+  if (Set->hasBody()) return;
   auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = Set->getParameterLists().back()->get(0);
 
@@ -1690,8 +1695,11 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         setter->setSelfAccessKind(SelfAccessKind::NonMutating);
         setter->setAccess(var->getFormalAccess());
       }
-      
-      var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
+
+      SmallVector<AccessorDecl*, 2> accessors;
+      accessors.push_back(getter);
+      if (setter) accessors.push_back(setter);
+      var->setAccessors(VarDecl::Computed, SourceLoc(), accessors, SourceLoc());
       
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
@@ -1738,11 +1746,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
             TC.diagnose(behavior->getLoc(),
                         diag::property_behavior_protocol_reqt_ambiguous,
                         TC.Context.Id_value);
-            TC.diagnose(valueProp->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(valueProp->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
-            TC.diagnose(foundVar->getLoc(),
-                        diag::property_behavior_protocol_reqt_here,
+            TC.diagnose(foundVar->getLoc(), diag::identifier_declared_here,
                         TC.Context.Id_value);
             break;
           }
@@ -1798,12 +1804,17 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     auto *setter = createSetterPrototype(var, newValueParam, TC);
 
     AccessorDecl *materializeForSet = nullptr;
-    if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
       materializeForSet = createMaterializeForSetPrototype(var,
                                                            getter, setter,
                                                            TC);
+    }
 
-    var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
+    SmallVector<AccessorDecl *, 3> accessors;
+    accessors.push_back(getter);
+    accessors.push_back(setter);
+    if (materializeForSet) accessors.push_back(materializeForSet);
+    var->setAccessors(VarDecl::Computed, SourceLoc(), accessors, SourceLoc());
 
     addMemberToContextIfNeeded(getter, dc, var);
     addMemberToContextIfNeeded(setter, dc, getter);
@@ -1883,12 +1894,21 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    // Computed and static properties are not initialized.
-    for (auto var : decl->getStoredProperties()) {
-      if (var->isImplicit())
+    for (auto member : decl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+      
+      // Implicit, computed, and static properties are not initialized.
+      // The exception is lazy properties, which due to batch mode we may or
+      // may not have yet finalized, so they may currently be "stored" or
+      // "computed" in the current AST state.
+      if (var->isImplicit() || var->isStatic())
         continue;
       tc.validateDecl(var);
-      
+      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+        continue;
+
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.
@@ -2026,9 +2046,18 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     }
   }
 
-  // Make sure the constructor is only as available as its superclass's
-  // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
+  // Inherit the @discardableResult attribute.
+  if (superclassCtor->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+    auto *clonedAttr = new (ctx) DiscardableResultAttr(/*implicit=*/true);
+    ctor->getAttrs().add(clonedAttr);
+  }
+
+  // If the superclass has its own availability, make sure the synthesized
+  // constructor is only as available as its superclass's constructor.
+  if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+    AvailabilityInference::applyInferredAvailableAttrs(
+        ctor, {classDecl, superclassCtor}, ctx);
+  }
 
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it

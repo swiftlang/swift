@@ -235,8 +235,6 @@ void NameBinder::addImport(
   ImportOptions options;
   if (ID->isExported())
     options |= SourceFile::ImportFlags::Exported;
-  if (ID->isUsableFromInline())
-    options |= SourceFile::ImportFlags::UsableFromInline;
   if (testableAttr)
     options |= SourceFile::ImportFlags::Testable;
   imports.push_back({ { ID->getDeclPath(), M }, options });
@@ -349,9 +347,10 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// performNameBinding - Once parsing is complete, this walks the AST to
 /// resolve names and do other top-level validation.
 ///
-/// At this parsing has been performed, but we still have UnresolvedDeclRefExpr
-/// nodes for unresolved value names, and we may have unresolved type names as
-/// well.  This handles import directives and forward references.
+/// At this point parsing has been performed, but we still have
+/// UnresolvedDeclRefExpr nodes for unresolved value names, and we may have
+/// unresolved type names as well. This handles import directives and forward
+/// references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
   SharedTimer timer("Name binding");
   // Make sure we skip adding the standard library imports if the

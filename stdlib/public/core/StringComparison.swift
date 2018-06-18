@@ -33,7 +33,7 @@ extension _StringGuts {
 // HACK: This gets rid of some retains/releases that was slowing down the
 // memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
-@effects(readonly)
+@_effects(readonly)
 @usableFromInline // @opaque
 internal
 func _compareUnicode(
@@ -70,7 +70,7 @@ func _compareUnicode(
 }
 
 @inline(never) // @outlined
-@effects(readonly)
+@_effects(readonly)
 @usableFromInline // @opaque
 internal
 func _compareUnicode(
@@ -120,25 +120,19 @@ func _compareUnicode(
 // TODO: coalesce many of these into a protocol to simplify the code
 
 extension _SmallUTF8String {
+  @inlinable
   func _compare(_ other: _SmallUTF8String) -> _Ordering {
 #if arch(i386) || arch(arm)
     _conditionallyUnreachable()
 #else
-    if _fastPath(self.isASCII && other.isASCII) {
-      // TODO: fast in-register comparison
-      return self.withUnmanagedASCII { selfView in
-        return other.withUnmanagedASCII { otherView in
-          return _Ordering(signedNotation: selfView.compareASCII(to: otherView))
-        }
-      }
+    // TODO: Ensure normality when adding UTF-8 support
+    _sanityCheck(self.isASCII && other.isASCII, "Need to ensure normality")
+    if self._storage == other._storage { return .equal }
+    for i in 0..<Swift.min(self.count, other.count) {
+      if self[i] < other[i] { return .less }
+      if self[i] > other[i] { return .greater }
     }
-
-    // TODO: fast in-register comparison
-    return self.withUnmanagedUTF16 { selfView in
-      return other.withUnmanagedUTF16 { otherView in
-        return selfView._compare(otherView)
-      }
-    }
+    return self.count < other.count ? .less : .greater
 #endif // 64-bit
   }
   func _compare(_contiguous other: _StringGuts) -> _Ordering {

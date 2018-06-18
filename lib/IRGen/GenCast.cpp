@@ -90,9 +90,9 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  SILType fromType,
                                                  SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
-  bool isMetatype = isa<MetatypeType>(fromType.getSwiftRValueType());
-  if (isMetatype) {
-    auto metaType = cast<MetatypeType>(toType.getSwiftRValueType());
+  auto isMetatype = false;
+  if (auto metaType = toType.getAs<MetatypeType>()) {
+    isMetatype = true;
     assert(metaType->getRepresentation() != MetatypeRepresentation::ObjC &&
            "not implemented");
     toType = IGF.IGM.getLoweredType(metaType.getInstanceType());
@@ -106,12 +106,12 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // TODO: use ObjC class references
   llvm::Value *targetMetadata;
   if ((targetMetadata =
-           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getSwiftRValueType(),
+           tryEmitConstantHeapMetadataRef(IGF.IGM, toType.getASTType(),
                                           /*allowUninitialized*/ false))) {
     // ok
   } else {
     targetMetadata
-      = emitClassHeapMetadataRef(IGF, toType.getSwiftRValueType(),
+      = emitClassHeapMetadataRef(IGF, toType.getASTType(),
                                  MetadataValueType::ObjCClass,
                                  MetadataState::Complete,
                                  /*allowUninitialized*/ false);
@@ -158,7 +158,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
   if (destClass && destClass->hasKnownSwiftImplementation()) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -173,7 +173,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // class-bounded archetype, use the most general cast entrypoint.
   } else if (toType.is<ArchetypeType>() ||
              destClass->getForeignClassKind()==ClassDecl::ForeignKind::CFType) {
-    metadataRef = IGF.emitTypeMetadataRef(toType.getSwiftRValueType());
+    metadataRef = IGF.emitTypeMetadataRef(toType.getASTType());
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
@@ -504,8 +504,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
                                   Explosion &ex) {
-  auto srcInstanceType = srcType.getSwiftRValueType();
-  auto destInstanceType = destType.getSwiftRValueType();
+  auto srcInstanceType = srcType.getASTType();
+  auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
            destInstanceType)) {
     destInstanceType = metatypeType.getInstanceType();

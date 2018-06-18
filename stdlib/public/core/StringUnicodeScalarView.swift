@@ -264,7 +264,6 @@ extension String {
       return String(_guts)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return "StringUnicodeScalarView(\(self.description.debugDescription))"
     }
@@ -369,7 +368,6 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*), where *n* is the capacity being reserved.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
@@ -377,7 +375,6 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// Appends the given Unicode scalar to the view.
   ///
   /// - Parameter c: The character to append to the string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Unicode.Scalar) {
     if _fastPath(_guts.isASCII && c.value <= 0x7f) {
       _guts.withMutableASCIIStorage(unusedCapacity: 1) { storage in
@@ -407,7 +404,6 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// - Parameter newElements: A sequence of Unicode scalar values.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting view.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append<S : Sequence>(contentsOf newElements: S)
   where S.Element == Unicode.Scalar {
     // FIXME: Keep ASCII storage if possible
@@ -451,7 +447,6 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
   ///   removes elements at the end of the string, the complexity is O(*n*),
   ///   where *n* is equal to `bounds.count`.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
@@ -532,7 +527,7 @@ extension String.UnicodeScalarView {
     if i == startIndex || i == endIndex {
       return true
     }
-    if i._transcodedOffset != 0 { return false }
+    if i.transcodedOffset != 0 { return false }
     let i2 = _toCoreIndex(i)
     if _fastPath(!UTF16.isTrailSurrogate(_guts[i2])) { return true }
     return i2 == 0 || !UTF16.isLeadSurrogate(_guts[i2 &- 1])
@@ -632,7 +627,6 @@ extension String.UnicodeScalarView {
   ///
   /// - Complexity: O(*n*) if the underlying string is bridged from
   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4)
   public subscript(r: Range<Index>) -> String.UnicodeScalarView {
     let rawSubRange: Range<Int> =

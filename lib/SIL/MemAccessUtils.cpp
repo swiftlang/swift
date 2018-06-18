@@ -43,8 +43,9 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
   }
 }
 
-AccessedStorage::AccessedStorage(SILValue base, Kind kind) : kind(kind) {
+AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   assert(base && "invalid storage base");
+  initKind(kind);
 
   switch (kind) {
   case Box:
@@ -81,7 +82,7 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) : kind(kind) {
 }
 
 const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
-  switch(kind) {
+  switch (getKind()) {
   case Box:
     return cast<AllocBoxInst>(value)->getLoc().getAsASTNode<VarDecl>();
 
@@ -125,8 +126,8 @@ const char *AccessedStorage::getKindName(AccessedStorage::Kind k) {
 }
 
 void AccessedStorage::print(raw_ostream &os) const {
-  os << getKindName(kind) << " ";
-  switch (kind) {
+  os << getKindName(getKind()) << " ";
+  switch (getKind()) {
   case Box:
   case Stack:
   case Nested:
@@ -261,7 +262,7 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
   }
 }
 
-AccessedStorage swift::findAccessedStorageOrigin(SILValue sourceAddr) {
+AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
   while (true) {
     const AccessedStorage &storage = findAccessedStorage(sourceAddr);
     if (!storage || storage.getKind() != AccessedStorage::Nested)
@@ -287,8 +288,7 @@ static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
 
 static bool isScratchBuffer(SILValue value) {
   // Special case unsafe value buffer access.
-  return isa<BuiltinUnsafeValueBufferType>(
-    value->getType().getSwiftRValueType());
+  return value->getType().is<BuiltinUnsafeValueBufferType>();
 }
 
 bool swift::memInstMustInitialize(Operand *memOper) {
@@ -598,4 +598,20 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::ValueMetatypeInst:
     return;
   }
+}
+
+SILBasicBlock::iterator swift::removeBeginAccess(BeginAccessInst *beginAccess) {
+  while (!beginAccess->use_empty()) {
+    Operand *op = *beginAccess->use_begin();
+
+    // Delete any associated end_access instructions.
+    if (auto endAccess = dyn_cast<EndAccessInst>(op->getUser())) {
+      endAccess->eraseFromParent();
+
+      // Forward all other uses to the original address.
+    } else {
+      op->set(beginAccess->getSource());
+    }
+  }
+  return beginAccess->getParent()->erase(beginAccess);
 }

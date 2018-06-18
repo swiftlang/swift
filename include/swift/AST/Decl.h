@@ -122,7 +122,8 @@ enum class DescriptiveDeclKind : uint8_t {
   PrecedenceGroup,
   TypeAlias,
   GenericTypeParam,
-  AssociatedType,  
+  AssociatedType,
+  Type,
   Enum,
   Struct,
   Class,
@@ -130,6 +131,7 @@ enum class DescriptiveDeclKind : uint8_t {
   GenericEnum,
   GenericStruct,
   GenericClass,
+  GenericType,
   Subscript,
   Constructor,
   Destructor,
@@ -149,6 +151,7 @@ enum class DescriptiveDeclKind : uint8_t {
   EnumElement,
   Module,
   MissingMember,
+  Requirement,
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -484,7 +487,7 @@ protected:
     HasValidatedLayout : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+2+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -506,6 +509,9 @@ protected:
     /// True if the protocol has requirements that cannot be satisfied (e.g.
     /// because they could not be imported from Objective-C).
     HasMissingRequirements : 1,
+
+    /// Whether we are currently computing inherited protocols.
+    ComputingInheritedProtocols : 1,
 
     /// The stage of the circularity check for this protocol.
     Circularity : 2,
@@ -1549,17 +1555,8 @@ public:
     return static_cast<ImportKind>(Bits.ImportDecl.ImportKind);
   }
 
-  // An exported import is visible to name lookup from other modules, and is
-  // autolinked when the containing module is autolinked.
   bool isExported() const {
     return getAttrs().hasAttribute<ExportedAttr>();
-  }
-
-  // A usable from inline import is autolinked but not visible to name lookup.
-  // This attribute is inferred when type checking inlinable and default
-  // argument bodies.
-  bool isUsableFromInline() const {
-    return getAttrs().hasAttribute<UsableFromInlineImportAttr>();
   }
 
   ModuleDecl *getModule() const { return Mod; }
@@ -1666,6 +1663,9 @@ public:
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
+
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
 
   /// Whether we have fully checked the extension.
   bool hasValidSignature() const {
@@ -2159,6 +2159,7 @@ class ValueDecl : public Decl {
   DeclName Name;
   SourceLoc NameLoc;
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
+  unsigned LocalDiscriminator = 0;
 
 private:
     bool isUsableFromInline() const;
@@ -2183,11 +2184,6 @@ protected:
   }
 
 public:
-  /// \brief Return true if this is a definition of a decl, not a forward
-  /// declaration (e.g. of a function) that is implemented outside of the
-  /// swift code.
-  bool isDefinition() const;
-
   /// \brief Return true if this protocol member is a protocol requirement.
   ///
   /// Asserts if this is not a member of a protocol.
@@ -2387,10 +2383,6 @@ public:
   /// of an enum or protocol.
   bool isInstanceMember() const;
 
-  /// needsCapture - Check whether referring to this decl from a nested
-  /// function requires capturing it.
-  bool needsCapture() const;
-
   /// Retrieve the context discriminator for this local value, which
   /// is the index of this declaration in the sequence of
   /// discriminated declarations with the same name in the current
@@ -2509,6 +2501,9 @@ public:
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
+
+  /// Retrieve one of the types listed in the "inherited" clause.
+  Type getInheritedType(unsigned index) const;
 
   /// Whether we already type-checked the inheritance clause.
   bool checkedInheritanceClause() const {
@@ -3175,7 +3170,8 @@ class EnumDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> RawType;
   } LazySemanticInfo;
 
-  friend class IterativeTypeChecker;
+  friend class EnumRawTypeRequest;
+  friend class TypeChecker;
 
 public:
   EnumDecl(SourceLoc EnumLoc, Identifier Name, SourceLoc NameLoc,
@@ -3292,14 +3288,11 @@ public:
   }
   
   /// Determine whether this enum declares a raw type in its inheritance clause.
-  bool hasRawType() const {
-    return (bool)LazySemanticInfo.RawType.getPointer();
-  }
+  bool hasRawType() const { return (bool)getRawType(); }
+
   /// Retrieve the declared raw type of the enum from its inheritance clause,
   /// or null if it has none.
-  Type getRawType() const {
-    return LazySemanticInfo.RawType.getPointer();
-  }
+  Type getRawType() const;
 
   /// Set the raw type of the enum from its inheritance clause.
   void setRawType(Type rawType) {
@@ -3426,7 +3419,8 @@ class ClassDecl final : public NominalTypeDecl {
     llvm::PointerIntPair<Type, 1, bool> Superclass;
   } LazySemanticInfo;
 
-  friend class IterativeTypeChecker;
+  friend class SuperclassTypeRequest;
+  friend class TypeChecker;
 
 public:
   ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
@@ -3442,7 +3436,7 @@ public:
   bool hasSuperclass() const { return (bool)getSuperclass(); }
 
   /// Retrieve the superclass of this class, or null if there is no superclass.
-  Type getSuperclass() const { return LazySemanticInfo.Superclass.getPointer(); }
+  Type getSuperclass() const;
 
   /// Retrieve the ClassDecl for the superclass of this class, or null if there
   /// is no superclass.
@@ -3963,23 +3957,17 @@ public:
 // Note that the values of these enums line up with %select values in
 // diagnostics.
 enum class AccessorKind {
-  /// \brief This is a getter for a property or subscript.
-  IsGetter = 0,
-  /// \brief This is a setter for a property or subscript.
-  IsSetter = 1,
-  /// \brief This is a willSet specifier for a property.
-  IsWillSet = 2,
-  /// \brief This is a didSet specifier for a property.
-  IsDidSet = 3,
-  /// \brief This is a materializeForSet accessor for a property.
-  IsMaterializeForSet = 4,
-  /// \brief This is an address-family accessor for a property or
-  /// subscript.  It also has an addressor kind.
-  IsAddressor = 5,
-  /// \brief This is a mutableAddress-family accessor for a property
-  /// or subscript.  It also has an addressor kind.
-  IsMutableAddressor = 6,
+#define ACCESSOR(ID) ID,
+#define LAST_ACCESSOR(ID) Last = ID
+#include "swift/AST/AccessorKinds.def"
 };
+
+const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
+
+static inline IntRange<AccessorKind> allAccessorKinds() {
+  return IntRange<AccessorKind>(AccessorKind(0),
+                                AccessorKind(NumAccessorKinds));
+}
 
 /// The safety semantics of this addressor.
 enum class AddressorKind : uint8_t {
@@ -4135,65 +4123,65 @@ public:
     /// return the address at which the object is stored.
     ComputedWithMutableAddress,
   };
+
+  static const size_t MaxNumAccessors = 255;
 private:
   AbstractStorageDecl *OverriddenDecl;
 
-  struct GetSetRecord;
-  
-  /// This is stored immediately before the GetSetRecord.
-  struct alignas(1 << 3) AddressorRecord {
-    AccessorDecl *Address = nullptr;        // User-defined address accessor
-    AccessorDecl *MutableAddress = nullptr; // User-defined mutableAddress accessor
+  /// A record of the accessors for the declaration.
+  class alignas(1 << 3) AccessorRecord final :
+      private llvm::TrailingObjects<AccessorRecord, AccessorDecl*> {
+    friend TrailingObjects;
 
-    GetSetRecord *getGetSet() {
-      // Relies on not-strictly-portable ABI layout assumptions.
-      return reinterpret_cast<GetSetRecord*>(this+1);
-    }
-  };
-  void configureAddressorRecord(AddressorRecord *record,
-                               AccessorDecl *addressor, AccessorDecl *mutableAddressor);
+    using AccessorIndex = uint8_t;
+    static const AccessorIndex InvalidIndex = 0;
 
-  struct alignas(1 << 3) GetSetRecord {
     SourceRange Braces;
-    AccessorDecl *Get = nullptr;       // User-defined getter
-    AccessorDecl *Set = nullptr;       // User-defined setter
-    AccessorDecl *MaterializeForSet = nullptr; // optional materializeForSet accessor
+    AccessorIndex NumAccessors;
 
-    AddressorRecord *getAddressors() {
-      // Relies on not-strictly-portable ABI layout assumptions.
-      return reinterpret_cast<AddressorRecord*>(this) - 1;
+    /// The storage capacity of this record for accessors.  Always includes
+    /// enough space for adding opaque accessors to the record, which are the
+    /// only accessors that should ever be added retroactively; hence this
+    /// field is only here for the purposes of safety checks.
+    AccessorIndex AccessorsCapacity;
+
+    /// Either 0, meaning there is no registered accessor of the given kind,
+    /// or the index+1 of the accessor in the accessors array.
+    AccessorIndex AccessorIndices[NumAccessorKinds];
+
+    AccessorRecord(SourceRange braces, ArrayRef<AccessorDecl*> accessors,
+                   AccessorIndex accessorsCapacity);
+  public:
+    static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
+                                  ArrayRef<AccessorDecl*> accessors);
+
+    SourceRange getBracesRange() const { return Braces; }
+
+    inline AccessorDecl *getAccessor(AccessorKind kind) const;
+
+    ArrayRef<AccessorDecl *> getAllAccessors() const {
+      return { getTrailingObjects<AccessorDecl*>(), NumAccessors };
     }
-  };
-  void configureGetSetRecord(GetSetRecord *getSetRecord,
-                             AccessorDecl *getter, AccessorDecl *setter,
-                             AccessorDecl *materializeForSet);
-  void configureSetRecord(GetSetRecord *getSetInfo,
-                          AccessorDecl *setter,
-                          AccessorDecl *materializeForSet);
 
-  struct ObservingRecord : GetSetRecord {
-    AccessorDecl *WillSet = nullptr;   // willSet(value):
-    AccessorDecl *DidSet = nullptr;    // didSet:
-  };
-  void configureObservingRecord(ObservingRecord *record,
-                                AccessorDecl *willSet, AccessorDecl *didSet);
+    void addOpaqueAccessor(AccessorDecl *accessor);
 
-  llvm::PointerIntPair<GetSetRecord*, 3, OptionalEnum<AccessLevel>> GetSetInfo;
+  private:
+    MutableArrayRef<AccessorDecl *> getAccessorsBuffer() {
+      return { getTrailingObjects<AccessorDecl*>(), NumAccessors };
+    }
+
+    bool registerAccessor(AccessorDecl *accessor, AccessorIndex index);
+  };
+
+  llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
   llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
-
-  ObservingRecord &getDidSetInfo() const {
-    assert(hasObservers());
-    return *static_cast<ObservingRecord*>(GetSetInfo.getPointer());
-  }
-  AddressorRecord &getAddressorInfo() const {
-    assert(hasAddressors());
-    return *GetSetInfo.getPointer()->getAddressors();
-  }
 
   void setStorageKind(StorageKindTy K) {
     Bits.AbstractStorageDecl.StorageKind = unsigned(K);
   }
+
+  void configureAccessor(AccessorDecl *accessor);
 
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
@@ -4322,54 +4310,25 @@ public:
     Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
   }
 
-  AccessorDecl *getAccessorFunction(AccessorKind accessor) const;
+  AccessorDecl *getAccessorFunction(AccessorKind kind) const {
+    if (auto info = Accessors.getPointer())
+      return info->getAccessor(kind);
+    return nullptr;
+  }
 
-  /// \brief Push all of the accessor functions associated with this VarDecl
-  /// onto `decls`.
-  void getAllAccessorFunctions(SmallVectorImpl<Decl *> &decls) const;
+  ArrayRef<AccessorDecl*> getAllAccessorFunctions() const {
+    if (const auto *info = Accessors.getPointer())
+      return info->getAllAccessors();
+    return {};
+  }
 
-  /// \brief Turn this into a computed variable, providing a getter and setter.
-  void makeComputed(SourceLoc LBraceLoc, AccessorDecl *Get, AccessorDecl *Set,
-                    AccessorDecl *MaterializeForSet, SourceLoc RBraceLoc);
-
-  /// \brief Turn this into a computed object, providing a getter and a mutable
-  /// addressor.
-  void makeComputedWithMutableAddress(SourceLoc lbraceLoc,
-                                      AccessorDecl *getter,
-                                      AccessorDecl *setter,
-                                      AccessorDecl *materializeForSet,
-                                      AccessorDecl *mutableAddressor,
-                                      SourceLoc rbraceLoc);
+  void setAccessors(StorageKindTy storageKind,
+                    SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
+                    SourceLoc rbraceLoc);
 
   /// \brief Add trivial accessors to this Stored or Addressed object.
   void addTrivialAccessors(AccessorDecl *Get, AccessorDecl *Set,
                            AccessorDecl *MaterializeForSet);
-
-  /// \brief Turn this into a stored-with-observers var, providing the
-  /// didSet/willSet specifiers.
-  void makeStoredWithObservers(SourceLoc LBraceLoc, AccessorDecl *WillSet,
-                               AccessorDecl *DidSet, SourceLoc RBraceLoc);
-
-  /// \brief Turn this into an inherited-with-observers var, providing
-  /// the didSet/willSet specifiers.
-  void makeInheritedWithObservers(SourceLoc LBraceLoc, AccessorDecl *WillSet,
-                                  AccessorDecl *DidSet, SourceLoc RBraceLoc);
-
-  /// \brief Turn this into an addressed var.
-  void makeAddressed(SourceLoc LBraceLoc, AccessorDecl *Addressor,
-                     AccessorDecl *MutableAddressor,
-                     SourceLoc RBraceLoc);
-
-  /// \brief Turn this into an addressed var with observing accessors.
-  void makeAddressedWithObservers(SourceLoc LBraceLoc, AccessorDecl *Addressor,
-                                  AccessorDecl *MutableAddressor,
-                                  AccessorDecl *WillSet, AccessorDecl *DidSet,
-                                  SourceLoc RBraceLoc);
-
-  /// \brief Specify the synthesized get/set functions for a
-  /// StoredWithObservers or AddressedWithObservers var.  This is used by Sema.
-  void setObservingAccessors(AccessorDecl *Get, AccessorDecl *Set,
-                             AccessorDecl *MaterializeForSet);
 
   /// \brief Add a setter to an existing Computed var.
   ///
@@ -4384,39 +4343,30 @@ public:
   /// This should only be used by Sema.
   void setMaterializeForSetFunc(AccessorDecl *materializeForSet);
 
-  /// \brief Specify the braces range without adding accessors.
-  ///
-  /// This is used to record the braces range if the accessors were rejected.
-  void setInvalidBracesRange(SourceRange BracesRange);
-
   SourceRange getBracesRange() const {
-    if (auto info = GetSetInfo.getPointer())
-      return info->Braces;
+    if (auto info = Accessors.getPointer())
+      return info->getBracesRange();
     return SourceRange();
   }
 
   /// \brief Retrieve the getter used to access the value of this variable.
   AccessorDecl *getGetter() const {
-    if (auto info = GetSetInfo.getPointer())
-      return info->Get;
-    return nullptr;
+    return getAccessorFunction(AccessorKind::Get);
   }
   
   /// \brief Retrieve the setter used to mutate the value of this variable.
   AccessorDecl *getSetter() const {
-    if (auto info = GetSetInfo.getPointer())
-      return info->Set;
-    return nullptr;
+    return getAccessorFunction(AccessorKind::Set);
   }
 
   AccessLevel getSetterFormalAccess() const {
     assert(hasAccess());
-    assert(GetSetInfo.getInt().hasValue());
-    return GetSetInfo.getInt().getValue();
+    assert(Accessors.getInt().hasValue());
+    return Accessors.getInt().getValue();
   }
 
   void setSetterAccess(AccessLevel accessLevel) {
-    assert(!GetSetInfo.getInt().hasValue());
+    assert(!Accessors.getInt().hasValue());
     overwriteSetterAccess(accessLevel);
   }
 
@@ -4425,19 +4375,18 @@ public:
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
   AccessorDecl *getMaterializeForSetFunc() const {
-    if (auto info = GetSetInfo.getPointer())
-      return info->MaterializeForSet;
-    return nullptr;
+    return getAccessorFunction(AccessorKind::MaterializeForSet);
   }
 
-  /// \brief Return the decl for the 'address' accessor if it
-  /// exists; this is only valid on a declaration with addressors.
-  AccessorDecl *getAddressor() const { return getAddressorInfo().Address; }
+  /// \brief Return the decl for the immutable addressor if it exists.
+  AccessorDecl *getAddressor() const {
+    return getAccessorFunction(AccessorKind::Address);
+  }
 
   /// \brief Return the decl for the 'mutableAddress' accessors if
   /// it exists; this is only valid on a declaration with addressors.
   AccessorDecl *getMutableAddressor() const {
-    return getAddressorInfo().MutableAddress;
+    return getAccessorFunction(AccessorKind::MutableAddress);
   }
 
   /// \brief Return the appropriate addressor for the given access kind.
@@ -4449,11 +4398,15 @@ public:
   
   /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
-  AccessorDecl *getWillSetFunc() const { return getDidSetInfo().WillSet; }
+  AccessorDecl *getWillSetFunc() const {
+    return getAccessorFunction(AccessorKind::WillSet);
+  }
 
   /// \brief Return the decl for the didSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
-  AccessorDecl *getDidSetFunc() const { return getDidSetInfo().DidSet; }
+  AccessorDecl *getDidSetFunc() const {
+    return getAccessorFunction(AccessorKind::DidSet);
+  }
 
   /// Given that this is an Objective-C property or subscript declaration,
   /// produce its getter selector.
@@ -5749,15 +5702,15 @@ public:
     return AddressorKind(Bits.AccessorDecl.AddressorKind);
   }
 
-  bool isGetter() const { return getAccessorKind() == AccessorKind::IsGetter; }
-  bool isSetter() const { return getAccessorKind() == AccessorKind::IsSetter; }
+  bool isGetter() const { return getAccessorKind() == AccessorKind::Get; }
+  bool isSetter() const { return getAccessorKind() == AccessorKind::Set; }
   bool isMaterializeForSet() const {
-    return getAccessorKind() == AccessorKind::IsMaterializeForSet;
+    return getAccessorKind() == AccessorKind::MaterializeForSet;
   }
   bool isAnyAddressor() const {
     auto kind = getAccessorKind();
-    return kind == AccessorKind::IsAddressor
-        || kind == AccessorKind::IsMutableAddressor;
+    return kind == AccessorKind::Address
+        || kind == AccessorKind::MutableAddress;
   }
 
   /// isGetterOrSetter - Determine whether this is specifically a getter or
@@ -5767,8 +5720,8 @@ public:
   bool isGetterOrSetter() const { return isGetter() || isSetter(); }
 
   bool isObservingAccessor() const {
-    return getAccessorKind() == AccessorKind::IsDidSet ||
-           getAccessorKind() == AccessorKind::IsWillSet;
+    return getAccessorKind() == AccessorKind::DidSet ||
+           getAccessorKind() == AccessorKind::WillSet;
   }
 
   static bool classof(const Decl *D) {
@@ -5790,6 +5743,16 @@ inline ParameterList **FuncDecl::getParameterListBuffer() {
     return reinterpret_cast<ParameterList**>(this+1);
   }
   return reinterpret_cast<ParameterList**>(static_cast<AccessorDecl*>(this)+1);
+}
+
+inline AccessorDecl *
+AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
+  if (auto optIndex = AccessorIndices[unsigned(kind)]) {
+    auto accessor = getAllAccessors()[optIndex - 1];
+    assert(accessor && accessor->getAccessorKind() == kind);
+    return accessor;
+  }
+  return nullptr;
 }
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare
@@ -6666,7 +6629,7 @@ NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
 
 inline void
 AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
-  GetSetInfo.setInt(accessLevel);
+  Accessors.setInt(accessLevel);
   if (auto setter = getSetter())
     setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())

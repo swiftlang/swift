@@ -29,7 +29,6 @@ namespace swift {
   struct SILDeclRef;
   class SILFunction;
   class SILType;
-  class Substitution;
 
 namespace irgen {
   class Callee;

@@ -30,6 +30,8 @@ protected:
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
+  bool shouldStoreInvocationInDebugInfo() const override;
+
 public:
   Darwin(const Driver &D, const llvm::Triple &Triple) : ToolChain(D, Triple) {}
   ~Darwin() = default;

@@ -20,10 +20,11 @@
 /// requires no extra work on your part.
 ///
 /// When creating an option set, include a `rawValue` property in your type
-/// declaration. The `rawValue` property must be of a type that conforms to
-/// the `FixedWidthInteger` protocol, such as `Int` or `UInt8`. Next, create
-/// unique options as static properties of your custom type using unique
-/// powers of two (1, 2, 4, 8, 16, and so forth) for each individual
+/// declaration. For your type to automatically receive default implementations
+/// for set-related operations, the `rawValue` property must be of a type that
+/// conforms to the `FixedWidthInteger` protocol, such as `Int` or `UInt8`.
+/// Next, create unique options as static properties of your custom type using
+/// unique powers of two (1, 2, 4, 8, 16, and so forth) for each individual
 /// property's raw value so that each property can be represented by a single
 /// bit of the type's raw value.
 ///

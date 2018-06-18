@@ -21,7 +21,9 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
@@ -69,7 +71,6 @@ class SILArgument;
 class SILUndef;
 class Stmt;
 class StringLiteralExpr;
-class Substitution;
 class ValueDecl;
 class VarDecl;
 class FunctionRefInst;
@@ -175,7 +176,7 @@ public:
   reverse_range getReversedValues() const;
 
   using type_range = llvm::iterator_range<
-    llvm::mapped_iterator<iterator, std::function<SILType(SILValue)>, SILType>>;
+    llvm::mapped_iterator<iterator, SILType(*)(SILValue), SILType>>;
   type_range getTypes() const;
 
   bool operator==(const SILInstructionResultArray &rhs);
@@ -201,18 +202,6 @@ private:
   /// Please do not use this outside of this class. It is only meant to speedup
   /// MultipleValueInstruction::getIndexOfResult(SILValue).
   const ValueBase *back() const;
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getStartOffset() const {
-    return empty() ? None : Optional<unsigned>(0);
-  }
-
-  /// Return the offset 1 past the end of the array or None if we are not
-  /// actually storing anything.
-  Optional<unsigned> getEndOffset() const {
-    return empty() ? None : Optional<unsigned>(size());
-  }
 };
 
 class SILInstructionResultArray::iterator {
@@ -224,7 +213,7 @@ class SILInstructionResultArray::iterator {
   SILInstructionResultArray Parent;
 
   /// The index into the parent array.
-  Optional<unsigned> Index;
+  unsigned Index;
 
 public:
   using difference_type = int;
@@ -234,34 +223,31 @@ public:
   using iterator_category = std::bidirectional_iterator_tag;
 
   iterator() = default;
-  iterator(const SILInstructionResultArray &Parent,
-           Optional<unsigned> Index = 0)
+  iterator(const SILInstructionResultArray &Parent, unsigned Index = 0)
       : Parent(Parent), Index(Index) {}
 
-  SILValue operator*() const { return Parent[Index.getValue()]; }
-  SILValue operator*() { return Parent[Index.getValue()]; }
+  SILValue operator*() const { return Parent[Index]; }
   SILValue operator->() const { return operator*(); }
-  SILValue operator->() { return operator*(); }
 
   iterator &operator++() {
-    ++Index.getValue();
+    ++Index;
     return *this;
   }
 
   iterator operator++(int) {
     iterator copy = *this;
-    ++Index.getValue();
+    ++Index;
     return copy;
   }
 
   iterator &operator--() {
-    --Index.getValue();
+    --Index;
     return *this;
   }
 
   iterator operator--(int) {
     iterator copy = *this;
-    --Index.getValue();
+    --Index;
     return copy;
   }
 
@@ -937,11 +923,12 @@ protected:
     if (!NumResults)
       return;
 
-    auto **ParentPtr =
-        this->template getTrailingObjects<MultipleValueInstruction *>();
+    auto **ParentPtr = this->TrailingObjects::template
+        getTrailingObjects<MultipleValueInstruction *>();
     *ParentPtr = static_cast<MultipleValueInstruction *>(Parent);
 
-    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    auto *DataPtr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     for (unsigned i : range(NumResults)) {
       ::new (&DataPtr[i]) DerivedResult(i, Types[i], OwnershipKinds[i],
                                         std::forward<Args>(OtherArgs)...);
@@ -954,7 +941,8 @@ protected:
   ~MultipleValueInstructionTrailingObjects() {
     if (!NumResults)
       return;
-    auto *DataPtr = this->template getTrailingObjects<DerivedResult>();
+    auto *DataPtr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     // We call the DerivedResult destructors to ensure that:
     //
     // 1. If our derived results have any stored data that need to be cleaned
@@ -968,7 +956,8 @@ protected:
 
 public:
   ArrayRef<DerivedResult> getAllResultsBuffer() const {
-    auto *ptr = this->template getTrailingObjects<DerivedResult>();
+    auto *ptr = this->TrailingObjects::template
+        getTrailingObjects<DerivedResult>();
     return { ptr, NumResults };
   }
 
@@ -1636,20 +1625,20 @@ class GenericSpecializationInformation {
   /// The original function that was specialized.
   SILFunction *Parent;
   /// Substitutions used to produce this specialization.
-  SubstitutionList Subs;
+  SubstitutionMap Subs;
 
   GenericSpecializationInformation(SILFunction *Caller, SILFunction *Parent,
-                                   SubstitutionList Subs);
+                                   SubstitutionMap Subs);
 
 public:
   static const GenericSpecializationInformation *create(SILFunction *Caller,
                                                         SILFunction *Parent,
-                                                        SubstitutionList Subs);
+                                                        SubstitutionMap Subs);
   static const GenericSpecializationInformation *create(SILInstruction *Inst,
                                                         SILBuilder &B);
   const SILFunction *getCaller() const { return Caller; }
   const SILFunction *getParent() const { return Parent; }
-  SubstitutionList getSubstitutions() const { return Subs; }
+  SubstitutionMap getSubstitutions() const { return Subs; }
 };
 
 class PartialApplyInst;
@@ -1685,41 +1674,35 @@ class ApplyInstBase<Impl, Base, false> : public Base {
   /// points to the specialization info of the inlined function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The number of tail-allocated substitutions, allocated after the operand
-  /// list's tail allocation.
-  unsigned NumSubstitutions: 31;
-
   /// Used for apply_inst instructions: true if the called function has an
   /// error result but is not actually throwing.
   unsigned NonThrowing: 1;
 
   /// The number of call arguments as required by the callee.
-  unsigned NumCallArguments;
+  unsigned NumCallArguments : 31;
 
   /// The total number of type-dependent operands.
   unsigned NumTypeDependentOperands;
 
+  /// The substitutions being applied to the callee.
+  SubstitutionMap Substitutions;
+
   Impl &asImpl() { return static_cast<Impl &>(*this); }
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
-
-  MutableArrayRef<Substitution> getSubstitutionsBuffer() {
-    return { asImpl().template getTrailingObjects<Substitution>(),
-             NumSubstitutions };
-  }
 
 protected:
   template <class... As>
   ApplyInstBase(SILInstructionKind kind, SILDebugLocation DebugLoc, SILValue callee,
-                SILType substCalleeType, SubstitutionList subs,
+                SILType substCalleeType, SubstitutionMap subs,
                 ArrayRef<SILValue> args,
                 ArrayRef<SILValue> typeDependentOperands,
                 const GenericSpecializationInformation *specializationInfo,
                 As... baseArgs)
       : Base(kind, DebugLoc, baseArgs...), SubstCalleeType(substCalleeType),
         SpecializationInfo(specializationInfo),
-        NumSubstitutions(subs.size()), NonThrowing(false),
-        NumCallArguments(args.size()),
-        NumTypeDependentOperands(typeDependentOperands.size()) {
+        NonThrowing(false), NumCallArguments(args.size()),
+        NumTypeDependentOperands(typeDependentOperands.size()),
+        Substitutions(subs) {
 
     // Initialize the operands.
     auto allOperands = getAllOperands();
@@ -1731,10 +1714,6 @@ protected:
       new (&allOperands[NumStaticOperands + args.size() + i])
         Operand(this, typeDependentOperands[i]);
     }
-
-    // Initialize the substitutions.
-    memcpy(getSubstitutionsBuffer().data(), subs.begin(),
-           sizeof(subs[0]) * subs.size());
   }
 
   ~ApplyInstBase() {
@@ -1744,10 +1723,6 @@ protected:
 
   template <class, class...>
   friend class llvm::TrailingObjects;
-
-  unsigned numTrailingObjects(OverloadToken<Substitution>) const {
-    return NumSubstitutions;
-  }
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return getNumAllOperands();
@@ -1818,13 +1793,12 @@ public:
   }
 
   /// True if this application has generic substitutions.
-  bool hasSubstitutions() const { return NumSubstitutions != 0; }
+  bool hasSubstitutions() const {
+    return Substitutions.hasAnySubstitutableParams();
+  }
 
   /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionList getSubstitutions() const {
-    return { asImpl().template getTrailingObjects<Substitution>(),
-             NumSubstitutions };
-  }
+  SubstitutionMap getSubstitutionMap() const { return Substitutions; }
 
   /// Return the total number of operands of this instruction.
   unsigned getNumAllOperands() const {
@@ -1920,7 +1894,6 @@ public:
   using super::getSubstCalleeType;
   using super::getSubstCalleeConv;
   using super::hasSubstitutions;
-  using super::getSubstitutions;
   using super::getNumArguments;
   using super::getArgument;
   using super::getArguments;
@@ -2015,12 +1988,12 @@ public:
 class ApplyInst final
     : public InstructionBase<SILInstructionKind::ApplyInst,
                              ApplyInstBase<ApplyInst, SingleValueInstruction>>,
-      public llvm::TrailingObjects<ApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<ApplyInst, Operand> {
   friend SILBuilder;
 
   ApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
             SILType SubstCalleeType, SILType ReturnType,
-            SubstitutionList Substitutions,
+            SubstitutionMap Substitutions,
             ArrayRef<SILValue> Args,
             ArrayRef<SILValue> TypeDependentOperands,
             bool isNonThrowing,
@@ -2028,7 +2001,7 @@ class ApplyInst final
 
   static ApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee,
-         SubstitutionList Substitutions, ArrayRef<SILValue> Args,
+         SubstitutionMap Substitutions, ArrayRef<SILValue> Args,
          bool isNonThrowing, Optional<SILModuleConventions> ModuleConventions,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
@@ -2047,12 +2020,12 @@ class PartialApplyInst final
     : public InstructionBase<SILInstructionKind::PartialApplyInst,
                              ApplyInstBase<PartialApplyInst,
                                            SingleValueInstruction>>,
-      public llvm::TrailingObjects<PartialApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<PartialApplyInst, Operand> {
   friend SILBuilder;
 
   PartialApplyInst(SILDebugLocation DebugLoc, SILValue Callee,
                    SILType SubstCalleeType,
-                   SubstitutionList Substitutions,
+                   SubstitutionMap Substitutions,
                    ArrayRef<SILValue> Args,
                    ArrayRef<SILValue> TypeDependentOperands,
                    SILType ClosureType,
@@ -2060,7 +2033,7 @@ class PartialApplyInst final
 
   static PartialApplyInst *
   create(SILDebugLocation DebugLoc, SILValue Callee, ArrayRef<SILValue> Args,
-         SubstitutionList Substitutions, ParameterConvention CalleeConvention,
+         SubstitutionMap Substitutions, ParameterConvention CalleeConvention,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
 
@@ -2106,7 +2079,7 @@ class BeginApplyInst final
           BeginApplyInst, BeginApplyResult,
           // These must be earlier trailing objects because their
           // count fields are initialized by an earlier base class.
-          InitialTrailingObjects<Operand, Substitution>> {
+          InitialTrailingObjects<Operand>> {
   friend SILBuilder;
 
   template <class, class...>
@@ -2121,7 +2094,7 @@ class BeginApplyInst final
                  SILType substCalleeType,
                  ArrayRef<SILType> allResultTypes,
                  ArrayRef<ValueOwnershipKind> allResultOwnerships,
-                 SubstitutionList substitutions,
+                 SubstitutionMap substitutions,
                  ArrayRef<SILValue> args,
                  ArrayRef<SILValue> typeDependentOperands,
                  bool isNonThrowing,
@@ -2129,7 +2102,7 @@ class BeginApplyInst final
 
   static BeginApplyInst *
   create(SILDebugLocation debugLoc, SILValue Callee,
-         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         SubstitutionMap substitutions, ArrayRef<SILValue> args,
          bool isNonThrowing, Optional<SILModuleConventions> moduleConventions,
          SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
          const GenericSpecializationInformation *specializationInfo);
@@ -2366,7 +2339,7 @@ private:
       ComputedPropertyId::ValueType IdValue;
     } Computed;
     // Valid if Kind == External
-    ArrayRef<Substitution> ExternalSubstitutions;
+    SubstitutionMap ExternalSubstitutions;
   };
   ArrayRef<Index> Indices;
   struct {
@@ -2398,7 +2371,7 @@ private:
   
   /// Constructor for external components
   KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
-                          ArrayRef<Substitution> substitutions,
+                          SubstitutionMap substitutions,
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
@@ -2559,7 +2532,7 @@ public:
     return (AbstractStorageDecl*)ValueAndKind.getPointer();
   }
   
-  ArrayRef<Substitution> getExternalSubstitutions() const {
+  SubstitutionMap getExternalSubstitutions() const {
     assert(getKind() == Kind::External
            && "not an external property");
     return ExternalSubstitutions;
@@ -2611,7 +2584,7 @@ public:
   
   static KeyPathPatternComponent
   forExternal(AbstractStorageDecl *externalDecl,
-              ArrayRef<Substitution> substitutions,
+              SubstitutionMap substitutions,
               ArrayRef<Index> indices,
               SILFunction *indicesEquals,
               SILFunction *indicesHash,
@@ -2700,29 +2673,27 @@ public:
 class KeyPathInst final
     : public InstructionBase<SILInstructionKind::KeyPathInst,
                              SingleValueInstruction>,
-      private llvm::TrailingObjects<KeyPathInst, Substitution, Operand> {
+      private llvm::TrailingObjects<KeyPathInst, Operand> {
   friend SILBuilder;
   friend TrailingObjects;
   
   KeyPathPattern *Pattern;
-  unsigned NumSubstitutions, NumOperands;
+  unsigned NumOperands;
+  SubstitutionMap Substitutions;
   
   static KeyPathInst *create(SILDebugLocation Loc,
                              KeyPathPattern *Pattern,
-                             SubstitutionList Subs,
+                             SubstitutionMap Subs,
                              ArrayRef<SILValue> Args,
                              SILType Ty,
                              SILFunction &F);
   
   KeyPathInst(SILDebugLocation Loc,
               KeyPathPattern *Pattern,
-              SubstitutionList Subs,
+              SubstitutionMap Subs,
               ArrayRef<SILValue> Args,
               SILType Ty);
   
-  size_t numTrailingObjects(OverloadToken<Substitution>) const {
-    return NumSubstitutions;
-  }
   size_t numTrailingObjects(OverloadToken<Operand>) const {
     return NumOperands;
   }
@@ -2736,11 +2707,8 @@ public:
   }
   MutableArrayRef<Operand> getAllOperands();
 
-  MutableArrayRef<Substitution> getSubstitutions();
-  SubstitutionList getSubstitutions() const {
-    return const_cast<KeyPathInst*>(this)->getSubstitutions();
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   void dropReferencedPattern();
   
   ~KeyPathInst();
@@ -2751,18 +2719,21 @@ public:
 class BuiltinInst final
     : public InstructionBaseWithTrailingOperands<
                                    SILInstructionKind::BuiltinInst, BuiltinInst,
-                                   SingleValueInstruction, Substitution> {
+                                   SingleValueInstruction> {
   friend SILBuilder;
 
   /// The name of the builtin to invoke.
   Identifier Name;
 
+  /// The substitutions.
+  SubstitutionMap Substitutions;
+
   BuiltinInst(SILDebugLocation DebugLoc, Identifier Name, SILType ReturnType,
-              SubstitutionList Substitutions, ArrayRef<SILValue> Args);
+              SubstitutionMap Substitutions, ArrayRef<SILValue> Args);
 
   static BuiltinInst *create(SILDebugLocation DebugLoc, Identifier Name,
                              SILType ReturnType,
-                             SubstitutionList Substitutions,
+                             SubstitutionMap Substitutions,
                              ArrayRef<SILValue> Args, SILModule &M);
 
 public:
@@ -2801,20 +2772,12 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return SILInstruction::Bits.BuiltinInst.NumSubstitutions != 0;
+    return Substitutions.hasAnySubstitutableParams();
   }
 
   /// Return the type parameters to the builtin.
-  SubstitutionList getSubstitutions() const {
-    return {getTrailingObjects<Substitution>(),
-            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
-  }
-  /// Return the type parameters to the builtin.
-  MutableArrayRef<Substitution> getSubstitutions() {
-    return {getTrailingObjects<Substitution>(),
-            SILInstruction::Bits.BuiltinInst.NumSubstitutions};
-  }
-  
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
+
   /// The arguments to the builtin.
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
@@ -3228,8 +3191,10 @@ enum class SILAccessKind : uint8_t {
   Deinit,
 
   // This enum is encoded.
-  Last = Deinit
+  Last = Deinit,
 };
+enum { NumSILAccessKindBits = 2 };
+
 StringRef getSILAccessKindName(SILAccessKind kind);
 
 /// Different kinds of exclusivity enforcement for accesses.
@@ -3267,12 +3232,14 @@ class BeginAccessInst
 
   BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
                   SILAccessKind accessKind, SILAccessEnforcement enforcement,
-                  bool noNestedConflict)
+                  bool noNestedConflict, bool fromBuiltin)
       : UnaryInstructionBase(loc, lvalue, lvalue->getType()) {
     SILInstruction::Bits.BeginAccessInst.AccessKind = unsigned(accessKind);
     SILInstruction::Bits.BeginAccessInst.Enforcement = unsigned(enforcement);
     SILInstruction::Bits.BeginAccessInst.NoNestedConflict =
       unsigned(noNestedConflict);
+    SILInstruction::Bits.BeginAccessInst.FromBuiltin =
+      unsigned(fromBuiltin);
 
     static_assert(unsigned(SILAccessKind::Last) < (1 << 2),
                   "reserve sufficient bits for serialized SIL");
@@ -3316,6 +3283,13 @@ public:
     SILInstruction::Bits.BeginAccessInst.NoNestedConflict = noNestedConflict;
   }
 
+  /// Return true if this access marker was emitted for a user-controlled
+  /// Builtin. Return false if this access marker was auto-generated by the
+  /// compiler to enforce formal access that derives from the language.
+  bool isFromBuiltin() const {
+    return SILInstruction::Bits.BeginAccessInst.FromBuiltin;
+  }
+  
   SILValue getSource() const {
     return getOperand();
   }
@@ -3396,7 +3370,8 @@ class BeginUnpairedAccessInst
   BeginUnpairedAccessInst(SILDebugLocation loc, SILValue addr, SILValue buffer,
                           SILAccessKind accessKind,
                           SILAccessEnforcement enforcement,
-                          bool noNestedConflict)
+                          bool noNestedConflict,
+                          bool fromBuiltin)
       : InstructionBase(loc), Operands(this, addr, buffer) {
     SILInstruction::Bits.BeginUnpairedAccessInst.AccessKind =
       unsigned(accessKind);
@@ -3404,6 +3379,8 @@ class BeginUnpairedAccessInst
       unsigned(enforcement);
     SILInstruction::Bits.BeginUnpairedAccessInst.NoNestedConflict =
       unsigned(noNestedConflict);
+    SILInstruction::Bits.BeginUnpairedAccessInst.FromBuiltin =
+      unsigned(fromBuiltin);
   }
 
 public:
@@ -3438,6 +3415,13 @@ public:
       noNestedConflict;
   }
 
+  /// Return true if this access marker was emitted for a user-controlled
+  /// Builtin. Return false if this access marker was auto-generated by the
+  /// compiler to enforce formal access that derives from the language.
+  bool isFromBuiltin() const {
+    return SILInstruction::Bits.BeginUnpairedAccessInst.FromBuiltin;
+  }
+
   SILValue getSource() const {
     return Operands[0].get();
   }
@@ -3466,11 +3450,13 @@ class EndUnpairedAccessInst
 
 private:
   EndUnpairedAccessInst(SILDebugLocation loc, SILValue buffer,
-                        SILAccessEnforcement enforcement, bool aborting = false)
+                        SILAccessEnforcement enforcement, bool aborting,
+                        bool fromBuiltin)
       : UnaryInstructionBase(loc, buffer) {
     SILInstruction::Bits.EndUnpairedAccessInst.Enforcement
       = unsigned(enforcement);
     SILInstruction::Bits.EndUnpairedAccessInst.Aborting = aborting;
+    SILInstruction::Bits.EndUnpairedAccessInst.FromBuiltin = fromBuiltin;
   }
 
 public:
@@ -3494,6 +3480,13 @@ public:
   void setEnforcement(SILAccessEnforcement enforcement) {
     SILInstruction::Bits.EndUnpairedAccessInst.Enforcement =
         unsigned(enforcement);
+  }
+
+  /// Return true if this access marker was emitted for a user-controlled
+  /// Builtin. Return false if this access marker was auto-generated by the
+  /// compiler to enforce formal access that derives from the language.
+  bool isFromBuiltin() const {
+    return SILInstruction::Bits.EndUnpairedAccessInst.FromBuiltin;
   }
 
   SILValue getBuffer() const {
@@ -3608,15 +3601,14 @@ public:
 /// This is only valid in Raw SIL.
 class MarkUninitializedBehaviorInst final
     : public InstructionBase<SILInstructionKind::MarkUninitializedBehaviorInst,
-                             SingleValueInstruction>,
-      private llvm::TrailingObjects<MarkUninitializedBehaviorInst, Substitution>
+                             SingleValueInstruction>
 {
   friend SILBuilder;
-  friend TrailingObjects;
 
   FixedOperandList<4> Operands;
-  unsigned NumInitStorageSubstitutions, NumSetterSubstitutions;
-  
+  SubstitutionMap InitStorageSubstitutions;
+  SubstitutionMap SetterSubstitutions;
+
   enum {
     // The initialization function for the storage.
     InitStorageFunc,
@@ -3628,26 +3620,22 @@ class MarkUninitializedBehaviorInst final
     Self,
   };
   
-  size_t numTrailingObjects(OverloadToken<Substitution>) {
-    return NumInitStorageSubstitutions + NumSetterSubstitutions;
-  }
-  
   MarkUninitializedBehaviorInst(SILDebugLocation DebugLoc,
                                 SILValue InitStorage,
-                                SubstitutionList InitStorageSubs,
+                                SubstitutionMap InitStorageSubs,
                                 SILValue Storage,
                                 SILValue Setter,
-                                SubstitutionList SetterSubs,
+                                SubstitutionMap SetterSubs,
                                 SILValue Self,
                                 SILType Ty);
   
   static MarkUninitializedBehaviorInst *create(SILModule &M,
                                          SILDebugLocation DebugLoc,
                                          SILValue InitStorage,
-                                         SubstitutionList InitStorageSubs,
+                                         SubstitutionMap InitStorageSubs,
                                          SILValue Storage,
                                          SILValue Setter,
-                                         SubstitutionList SetterSubs,
+                                         SubstitutionMap SetterSubs,
                                          SILValue Self,
                                          SILType Ty);
 
@@ -3655,8 +3643,8 @@ public:
   SILValue getInitStorageFunc() const {
     return Operands[InitStorageFunc].get();
   }
-  SubstitutionList getInitStorageSubstitutions() const {
-    return {getTrailingObjects<Substitution>(), NumInitStorageSubstitutions};
+  SubstitutionMap getInitStorageSubstitutions() const {
+    return InitStorageSubstitutions;
   }
   SILValue getStorage() const {
     return Operands[Storage].get();
@@ -3665,9 +3653,8 @@ public:
   SILValue getSetterFunc() const {
     return Operands[SetterFunc].get();
   }
-  SubstitutionList getSetterSubstitutions() const {
-    return {getTrailingObjects<Substitution>() + NumInitStorageSubstitutions,
-            NumSetterSubstitutions};
+  SubstitutionMap getSetterSubstitutions() const {
+    return SetterSubstitutions;
   }
   SILValue getSelf() const {
     return Operands[Self].get();
@@ -3768,7 +3755,7 @@ class LoadReferenceInstBase
     : public UnaryInstructionBase<K, SingleValueInstruction> {
   static SILType getResultType(SILType operandTy) {
     assert(operandTy.isAddress() && "loading from non-address operand?");
-    auto refType = cast<ReferenceStorageType>(operandTy.getSwiftRValueType());
+    auto refType = cast<ReferenceStorageType>(operandTy.getASTType());
     return SILType::getPrimitiveObjectType(refType.getReferentType());
   }
 
@@ -4517,13 +4504,13 @@ public:
   /// Returns the formal type of the source value.
   CanType getSourceType() const {
     // This instruction is only used with types that allow this.
-    return getOperand()->getType().getSwiftRValueType();
+    return getOperand()->getType().getASTType();
   }
 
   /// Returns the formal target type.
   CanType getTargetType() const {
     // This instruction is only used with types that allow this.
-    return getType().getSwiftRValueType();
+    return getType().getASTType();
   }
 };
 
@@ -4970,7 +4957,7 @@ public:
   }
 
   TupleType *getTupleType() const {
-    return getType().getSwiftRValueType()->castTo<TupleType>();
+    return getType().castTo<TupleType>();
   }
 
   /// Search the operands of this tuple for a unique non-trivial elt. If we find
@@ -5449,7 +5436,7 @@ public:
   }
 
   TupleType *getTupleType() const {
-    return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
+    return getOperand()->getType().castTo<TupleType>();
   }
 
   unsigned getNumTupleElts() const {
@@ -5482,7 +5469,7 @@ public:
 
 
   TupleType *getTupleType() const {
-    return getOperand()->getType().getSwiftRValueType()->castTo<TupleType>();
+    return getOperand()->getType().castTo<TupleType>();
   }
 };
 
@@ -5987,8 +5974,8 @@ public:
   /// instruction erases Decoder<T>.Type.Type to Printable.Type.Type,
   /// this method returns Decoder<T>.
   CanType getFormalErasedObjectType() const {
-    CanType exType = getType().getSwiftRValueType();
-    CanType concreteType = getOperand()->getType().getSwiftRValueType();
+    auto exType = getType().getASTType();
+    auto concreteType = getOperand()->getType().getASTType();
     while (auto exMetatype = dyn_cast<ExistentialMetatypeType>(exType)) {
       exType = exMetatype.getInstanceType();
       concreteType = cast<MetatypeType>(concreteType).getInstanceType();
@@ -6046,39 +6033,28 @@ class InitBlockStorageHeaderInst
   friend SILBuilder;
 
   enum { BlockStorage, InvokeFunction };
-  unsigned NumSubstitutions;
+  SubstitutionMap Substitutions;
   FixedOperandList<2> Operands;
   
-  Substitution *getSubstitutionsStorage() {
-    return reinterpret_cast<Substitution*>(Operands.asArray().end());
-  }
-  const Substitution *getSubstitutionsStorage() const {
-    return reinterpret_cast<const Substitution*>(Operands.asArray().end());
-  }
-
   InitBlockStorageHeaderInst(SILDebugLocation DebugLoc, SILValue BlockStorage,
                              SILValue InvokeFunction, SILType BlockType,
-                             SubstitutionList Subs)
+                             SubstitutionMap Subs)
       : InstructionBase(DebugLoc, BlockType),
-        NumSubstitutions(Subs.size()),
+        Substitutions(Subs),
         Operands(this, BlockStorage, InvokeFunction) {
-    memcpy(getSubstitutionsStorage(), Subs.begin(),
-           sizeof(Subs[0]) * Subs.size());
   }
   
   static InitBlockStorageHeaderInst *create(SILFunction &F,
                               SILDebugLocation DebugLoc, SILValue BlockStorage,
                               SILValue InvokeFunction, SILType BlockType,
-                              SubstitutionList Subs);
+                              SubstitutionMap Subs);
 public:
   /// Get the block storage address to be initialized.
   SILValue getBlockStorage() const { return Operands[BlockStorage].get(); }
   /// Get the invoke function to form the block around.
   SILValue getInvokeFunction() const { return Operands[InvokeFunction].get(); }
 
-  SubstitutionList getSubstitutions() const {
-    return {getSubstitutionsStorage(), NumSubstitutions};
-  }
+  SubstitutionMap getSubstitutions() const { return Substitutions; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
@@ -6686,29 +6662,35 @@ public:
 
   using succblock_iterator =
       TransformIterator<SILSuccessor *,
-                        std::function<SILBasicBlock *(const SILSuccessor &)>>;
+                        SILBasicBlock *(*)(const SILSuccessor &)>;
   using const_succblock_iterator = TransformIterator<
       const SILSuccessor *,
-      std::function<const SILBasicBlock *(const SILSuccessor &)>>;
+      const SILBasicBlock *(*)(const SILSuccessor &)>;
   succblock_iterator succblock_begin() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().begin(), F);
+    return succblock_iterator(getSuccessors().begin(),
+                              [](const SILSuccessor &succ) -> SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   succblock_iterator succblock_end() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().end(), F);
+    return succblock_iterator(getSuccessors().end(),
+                              [](const SILSuccessor &succ) -> SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   const_succblock_iterator succblock_begin() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().begin(), F);
+    return const_succblock_iterator(
+        getSuccessors().begin(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
   const_succblock_iterator succblock_end() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformIterator(getSuccessors().end(), F);
+    return const_succblock_iterator(
+        getSuccessors().end(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
 
   SILBasicBlock *getSingleSuccessorBlock() {
@@ -6731,23 +6713,26 @@ public:
 
   using SuccessorBlockListTy =
       TransformRange<SuccessorListTy,
-                     std::function<SILBasicBlock *(const SILSuccessor &)>>;
+                     SILBasicBlock *(*)(const SILSuccessor &)>;
   using ConstSuccessorBlockListTy =
-      TransformRange<ConstSuccessorListTy, std::function<const SILBasicBlock *(
-                                               const SILSuccessor &)>>;
+      TransformRange<ConstSuccessorListTy,
+                     const SILBasicBlock *(*)(const SILSuccessor &)>;
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   SuccessorBlockListTy getSuccessorBlocks() {
-    using FuncTy = std::function<SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return SuccessorBlockListTy(getSuccessors(),
+                                [](const SILSuccessor &succ) -> SILBasicBlock* {
+      return succ.getBB();
+    });
   }
 
   /// Return the range of SILBasicBlocks that are successors of this block.
   ConstSuccessorBlockListTy getSuccessorBlocks() const {
-    using FuncTy = std::function<const SILBasicBlock *(const SILSuccessor &)>;
-    FuncTy F(&SILSuccessor::getBB);
-    return makeTransformRange(getSuccessors(), F);
+    return ConstSuccessorBlockListTy(
+        getSuccessors(),
+        [](const SILSuccessor &succ) -> const SILBasicBlock * {
+      return succ.getBB();
+    });
   }
 
   DEFINE_ABSTRACT_NON_VALUE_INST_BOILERPLATE(TermInst)
@@ -7392,13 +7377,13 @@ public:
   /// Returns the formal type of the source value.
   CanType getSourceType() const {
     // This instruction is only used with types that allow this.
-    return getOperand()->getType().getSwiftRValueType();
+    return getOperand()->getType().getASTType();
   }
 
   /// Returns the formal target type.
   CanType getTargetType() const {
     // This instruction is only used with types that allow this.
-    return getCastType().getSwiftRValueType();
+    return getCastType().getASTType();
   }
 
   SILType getCastType() const { return DestTy; }
@@ -7447,13 +7432,13 @@ public:
   /// Returns the formal type of the source value.
   CanType getSourceType() const {
     // This instruction is only used with types that allow this.
-    return getOperand()->getType().getSwiftRValueType();
+    return getOperand()->getType().getASTType();
   }
 
   /// Returns the formal target type.
   CanType getTargetType() const {
     // This instruction is only used with types that allow this.
-    return getCastType().getSwiftRValueType();
+    return getCastType().getASTType();
   }
 
   SILType getCastType() const { return DestTy; }
@@ -7567,11 +7552,11 @@ public:
 class TryApplyInst final
     : public InstructionBase<SILInstructionKind::TryApplyInst,
                              ApplyInstBase<TryApplyInst, TryApplyInstBase>>,
-      public llvm::TrailingObjects<TryApplyInst, Operand, Substitution> {
+      public llvm::TrailingObjects<TryApplyInst, Operand> {
   friend SILBuilder;
 
   TryApplyInst(SILDebugLocation DebugLoc, SILValue callee,
-               SILType substCalleeType, SubstitutionList substitutions,
+               SILType substCalleeType, SubstitutionMap substitutions,
                ArrayRef<SILValue> args,
                ArrayRef<SILValue> TypeDependentOperands,
                SILBasicBlock *normalBB, SILBasicBlock *errorBB,
@@ -7579,7 +7564,7 @@ class TryApplyInst final
 
   static TryApplyInst *
   create(SILDebugLocation DebugLoc, SILValue callee,
-         SubstitutionList substitutions, ArrayRef<SILValue> args,
+         SubstitutionMap substitutions, ArrayRef<SILValue> args,
          SILBasicBlock *normalBB, SILBasicBlock *errorBB, SILFunction &F,
          SILOpenedArchetypesState &OpenedArchetypes,
          const GenericSpecializationInformation *SpecializationInfo);
@@ -7722,18 +7707,8 @@ public:
   }
 
   /// The substitutions used to bind the generic arguments of this function.
-  SubstitutionList getSubstitutions() const {
-    FOREACH_IMPL_RETURN(getSubstitutions());
-  }
-
-  /// Return a begin iterator for the substitution array.
-  auto subs_begin() const -> decltype(getSubstitutions().begin()) {
-    return getSubstitutions().begin();
-  }
-
-  /// Return an end iterator for the substitution array.
-  auto subs_end() const -> decltype(getSubstitutions().end()) {
-    return getSubstitutions().end();
+  SubstitutionMap getSubstitutionMap() const {
+    FOREACH_IMPL_RETURN(getSubstitutionMap());
   }
 
   /// The arguments passed to this instruction.
@@ -7784,8 +7759,15 @@ public:
     case SILInstructionKind::TryApplyInst:
       return 0;
     case SILInstructionKind::PartialApplyInst:
-      // The arguments to partial_apply are a suffix of the arguments to the
-      // the actually-called function.
+      // The arguments to partial_apply are a suffix of the partial_apply's
+      // callee. Note that getSubstCalleeConv is function type of the callee
+      // argument passed to this apply, not necessarilly the function type of
+      // the underlying callee function (i.e. it is based on the `getCallee`
+      // type, not the `getCalleeOrigin` type).
+      //
+      // pa1 = partial_apply f(c) : $(a, b, c)
+      // pa2 = partial_apply pa1(b) : $(a, b)
+      // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     default:
       llvm_unreachable("not implemented for this instruction!");
@@ -8319,6 +8301,15 @@ inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
   if (auto I = dyn_cast<SelectEnumAddrInst>(this))
     return I->getTrailingObjects<EnumElementDecl*>();
   llvm_unreachable("Unhandled SelectEnumInstBase subclass");
+}
+
+inline void SILSuccessor::pred_iterator::cacheBasicBlock() {
+  if (Cur != nullptr) {
+    Block = Cur->ContainingInst->getParent();
+    assert(Block != nullptr);
+  } else {
+    Block = nullptr;
+  }
 }
 
 } // end swift namespace

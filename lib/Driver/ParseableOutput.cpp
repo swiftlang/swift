@@ -13,6 +13,7 @@
 #include "swift/Driver/ParseableOutput.h"
 
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
 #include "swift/Frontend/FileTypes.h"
@@ -21,6 +22,7 @@
 
 using namespace swift::driver::parseable_output;
 using namespace swift::driver;
+using namespace swift::sys;
 using namespace swift;
 
 namespace {
@@ -155,9 +157,9 @@ public:
 };
 
 class TaskBasedMessage : public CommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
 public:
-  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
+  TaskBasedMessage(StringRef Kind, const Job &Cmd, int64_t Pid) :
       CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
 
   void provideMapping(swift::json::Output &out) override {
@@ -167,37 +169,44 @@ public:
 };
 
 class BeganMessage : public DetailedCommandBasedMessage {
-  ProcessId Pid;
+  int64_t Pid;
+  TaskProcessInformation ProcInfo;
+
 public:
-  BeganMessage(const Job &Cmd, ProcessId Pid) :
-      DetailedCommandBasedMessage("began", Cmd), Pid(Pid) {}
+  BeganMessage(const Job &Cmd, int64_t Pid, TaskProcessInformation ProcInfo)
+      : DetailedCommandBasedMessage("began", Cmd), Pid(Pid),
+        ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
     DetailedCommandBasedMessage::provideMapping(out);
     out.mapRequired("pid", Pid);
+    out.mapRequired("process", ProcInfo);
   }
 };
 
 class TaskOutputMessage : public TaskBasedMessage {
   std::string Output;
+  TaskProcessInformation ProcInfo;
+
 public:
-  TaskOutputMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
-                    StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
-                                        Output(Output) {}
+  TaskOutputMessage(StringRef Kind, const Job &Cmd, int64_t Pid,
+                    StringRef Output, TaskProcessInformation ProcInfo)
+      : TaskBasedMessage(Kind, Cmd, Pid), Output(Output), ProcInfo(ProcInfo) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskBasedMessage::provideMapping(out);
     out.mapOptional("output", Output, std::string());
+    out.mapRequired("process", ProcInfo);
   }
 };
 
 class FinishedMessage : public TaskOutputMessage {
   int ExitStatus;
 public:
-  FinishedMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                  int ExitStatus) : TaskOutputMessage("finished", Cmd, Pid,
-                                                      Output),
-                                    ExitStatus(ExitStatus) {}
+  FinishedMessage(const Job &Cmd, int64_t Pid, StringRef Output,
+                  TaskProcessInformation ProcInfo, int ExitStatus)
+      : TaskOutputMessage("finished", Cmd, Pid, Output, ProcInfo),
+        ExitStatus(ExitStatus) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -209,10 +218,11 @@ class SignalledMessage : public TaskOutputMessage {
   std::string ErrorMsg;
   Optional<int> Signal;
 public:
-  SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg, Optional<int> Signal) :
-      TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
-      Signal(Signal) {}
+  SignalledMessage(const Job &Cmd, int64_t Pid, StringRef Output,
+                   StringRef ErrorMsg, Optional<int> Signal,
+                   TaskProcessInformation ProcInfo)
+      : TaskOutputMessage("signalled", Cmd, Pid, Output, ProcInfo),
+        ErrorMsg(ErrorMsg), Signal(Signal) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -252,25 +262,27 @@ static void emitMessage(raw_ostream &os, Message &msg) {
   os << JSONString << '\n';
 }
 
-void parseable_output::emitBeganMessage(raw_ostream &os,
-                                        const Job &Cmd, ProcessId Pid) {
-  BeganMessage msg(Cmd, Pid);
+void parseable_output::emitBeganMessage(raw_ostream &os, const Job &Cmd,
+                                        int64_t Pid,
+                                        TaskProcessInformation ProcInfo) {
+  BeganMessage msg(Cmd, Pid, ProcInfo);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitFinishedMessage(raw_ostream &os,
-                                           const Job &Cmd, ProcessId Pid,
-                                           int ExitStatus, StringRef Output) {
-  FinishedMessage msg(Cmd, Pid, Output, ExitStatus);
+void parseable_output::emitFinishedMessage(raw_ostream &os, const Job &Cmd,
+                                           int64_t Pid, int ExitStatus,
+                                           StringRef Output,
+                                           TaskProcessInformation ProcInfo) {
+  FinishedMessage msg(Cmd, Pid, Output, ProcInfo, ExitStatus);
   emitMessage(os, msg);
 }
 
-void parseable_output::emitSignalledMessage(raw_ostream &os,
-                                            const Job &Cmd, ProcessId Pid,
-                                            StringRef ErrorMsg,
+void parseable_output::emitSignalledMessage(raw_ostream &os, const Job &Cmd,
+                                            int64_t Pid, StringRef ErrorMsg,
                                             StringRef Output,
-                                            Optional<int> Signal) {
-  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
+                                            Optional<int> Signal,
+                                            TaskProcessInformation ProcInfo) {
+  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal, ProcInfo);
   emitMessage(os, msg);
 }
 

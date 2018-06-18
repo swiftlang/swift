@@ -731,15 +731,19 @@ internal func _unsafeDowncastToAnyObject(fromAny any: Any) -> AnyObject {
   _sanityCheck(type(of: any) is AnyObject.Type
                || type(of: any) is AnyObject.Protocol,
                "Any expected to contain object reference")
-  // With a SIL instruction, we could more efficiently grab the object reference
-  // out of the Any's inline storage.
-
-  // On Linux, bridging isn't supported, so this is a force cast.
-#if _runtime(_ObjC)
+  // Ideally we would do something like this:
+  //
+  // func open<T>(object: T) -> AnyObject {
+  //   return unsafeBitCast(object, to: AnyObject.self)
+  // }
+  // return _openExistential(any, do: open)
+  //
+  // Unfortunately, class constrained protocol existentials conform to AnyObject
+  // but are not word-sized.  As a result, we cannot currently perform the
+  // `unsafeBitCast` on them just yet.  When they are word-sized, it would be
+  // possible to efficiently grab the object reference out of the inline
+  // storage.
   return any as AnyObject
-#else
-  return any as! AnyObject
-#endif
 }
 
 // Game the SIL diagnostic pipeline by inlining this into the transparent

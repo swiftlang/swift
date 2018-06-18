@@ -45,6 +45,10 @@ public protocol Decodable {
 }
 
 /// A type that can convert itself into and out of an external representation.
+///
+/// `Codable` is a type alias for the `Encodable` and `Decodable` protocols.
+/// When you use `Codable` as a type or a generic constraint, it matches
+/// any type that conforms to both protocols.
 public typealias Codable = Encodable & Decodable
 
 //===----------------------------------------------------------------------===//
@@ -1090,12 +1094,17 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   }
 
   /// The key's hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self.rawValue)
   }
@@ -1171,7 +1180,7 @@ public enum EncodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .invalidValue(_, let c): context = c
@@ -1281,7 +1290,7 @@ public enum DecodingError : Error {
   public var _userInfo: AnyObject? {
     // The error dictionary must be returned as an AnyObject. We can do this
     // only on platforms with bridging, unfortunately.
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    #if _runtime(_ObjC)
       let context: Context
       switch self {
       case .keyNotFound(_,   let c): context = c
@@ -1481,6 +1490,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 internal final class _KeyedEncodingContainerBox<
   Concrete : KeyedEncodingContainerProtocol
 > : _KeyedEncodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline
@@ -1654,6 +1664,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 internal final class _KeyedDecodingContainerBox<
   Concrete : KeyedDecodingContainerProtocol
 > : _KeyedDecodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline

@@ -19,9 +19,9 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
@@ -95,7 +95,6 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
-  class Substitution;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -186,19 +185,26 @@ class SILLayout; // From SIL
 /// DispatchQueues. Summary: if you think you need a global or static variable,
 /// you probably need to put it here instead.
 
-class ASTContext {
+class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
+
+  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+             SourceManager &SourceMgr, DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
   struct Implementation;
-  Implementation &Impl;
-  
+  Implementation &getImpl() const;
+
   friend ConstraintCheckerArenaRAII;
-public:
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+
+  void operator delete(void *Data) throw();
+
+  static ASTContext *get(LangOptions &langOpts,
+                         SearchPathOptions &SearchPathOpts,
+                         SourceManager &SourceMgr,
+                         DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// \brief The language options used for translation.
@@ -212,6 +218,9 @@ public:
 
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
+
+  /// The request-evaluator that is used to process various requests.
+  Evaluator evaluator;
 
   /// The set of top-level modules we have loaded.
   /// This map is used for iteration, therefore it's a MapVector and not a
@@ -883,8 +892,8 @@ public:
   /// This is usually the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
   /// check for isSwiftVersionAtLeast(5).
-  bool isSwiftVersionAtLeast(unsigned major) const {
-    return LangOpts.isSwiftVersionAtLeast(major);
+  bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
 
 private:

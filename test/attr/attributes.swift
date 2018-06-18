@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @unknown func f0() {} // expected-error{{unknown attribute 'unknown'}}
 @unknown(x,y) func f1() {} // expected-error{{unknown attribute 'unknown'}}

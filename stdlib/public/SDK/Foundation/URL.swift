@@ -586,7 +586,16 @@ public struct URL : ReferenceConvertible, Equatable {
     }
 
     /// Initializes a URL that refers to a location specified by resolving bookmark data.
+    @available(swift, obsoleted: 4.2)
     public init?(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws {
+        var stale : ObjCBool = false
+        _url = URL._converted(from: try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale))
+        bookmarkDataIsStale = stale.boolValue
+    }
+
+    /// Initializes a URL that refers to a location specified by resolving bookmark data.
+    @available(swift, introduced: 4.2)
+    public init(resolvingBookmarkData data: Data, options: BookmarkResolutionOptions = [], relativeTo url: URL? = nil, bookmarkDataIsStale: inout Bool) throws {
         var stale : ObjCBool = false
         _url = URL._converted(from: try NSURL(resolvingBookmarkData: data, options: options, relativeTo: url, bookmarkDataIsStale: &stale))
         bookmarkDataIsStale = stale.boolValue

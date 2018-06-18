@@ -745,7 +745,8 @@ internal struct _PrefixSequence<Base : IteratorProtocol>
 internal struct _DropWhileSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
 
-      typealias Element = Base.Element
+  @usableFromInline
+  typealias Element = Base.Element
 
   @usableFromInline
   internal var _iterator: Base

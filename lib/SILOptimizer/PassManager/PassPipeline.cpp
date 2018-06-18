@@ -71,6 +71,14 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
   P.addOwnershipModelEliminator();
 }
 
+/// Passes for performing definite initialization. Must be run together in this
+/// order.
+static void addDefiniteInitialization(SILPassPipelinePlan &P) {
+  P.addMarkUninitializedFixup();
+  P.addDefiniteInitialization();
+  P.addRawSILInstLowering();
+}
+
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
                                     const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
@@ -86,8 +94,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
 
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
-  P.addMarkUninitializedFixup();
-  P.addDefiniteInitialization();
+  addDefiniteInitialization(P);
   P.addClosureLifetimeFixup();
   P.addOwnershipModelEliminator();
   P.addMandatoryInlining();
@@ -380,6 +387,13 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionElimination();
   P.addDeadObjectElimination();
 
+  // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
+  // This is needed to fully optimize static small String constants.
+  P.addSimplifyCFG();
+  P.addSILCombine();
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+
   // Hoist globals out of loops.
   // Global-init functions should not be inlined GlobalOpt is done.
   P.addGlobalOpt();
@@ -450,8 +464,17 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
   // Try to hoist all releases, including epilogue releases. This should be
   // after FSO.
   P.addLateReleaseHoisting();
+}
 
-  // Has only an effect if the -assume-single-thread option is specified.
+// Run passes that
+// - should only run after all general SIL transformations.
+// - have no reason to run before any other SIL optimizations.
+// - don't require IRGen information.
+static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
+  // Optimize access markers for improved IRGen after all other optimizations.
+  P.addAccessEnforcementOpts();
+
+  // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();
 }
 
@@ -530,6 +553,8 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addLowLevelPassPipeline(P);
 
   addLateLoopOptPassPipeline(P);
+
+  addLastChanceOptPassPipeline(P);
 
   // Has only an effect if the -gsil option is specified.
   addSILDebugInfoGeneratorPipeline(P);

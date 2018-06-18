@@ -395,6 +395,8 @@ public:
 
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
+
+  const llvm::DataLayout &getClangDataLayout();
 };
 
 class ConstantReference {
@@ -979,7 +981,7 @@ public:
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             SubstitutionList subs,
+                                             SubstitutionMap subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
@@ -1025,6 +1027,8 @@ public:
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
   llvm::AttributeList getAllocAttrs();
+
+  bool isStandardLibrary() const;
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;

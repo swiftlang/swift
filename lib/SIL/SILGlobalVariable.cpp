@@ -86,6 +86,17 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           if (isa<LiteralInst>(bi->getArguments()[0]))
             return true;
           break;
+        case BuiltinValueKind::StringObjectOr:
+          // The first operand can be a string literal (i.e. a pointer), but the
+          // second operand must be a constant. This enables creating a
+          // a pointer+offset relocation.
+          // Note that StringObjectOr requires the or'd bits in the first
+          // operand to be 0, so the operation is equivalent to an addition.
+          if (isa<IntegerLiteralInst>(bi->getArguments()[1]))
+            return true;
+          break;
+        case BuiltinValueKind::ZExtOrBitCast:
+          return true;
         default:
           break;
       }
@@ -109,6 +120,7 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
     case SILInstructionKind::IntegerLiteralInst:
     case SILInstructionKind::FloatLiteralInst:
     case SILInstructionKind::ObjectInst:
+    case SILInstructionKind::ValueToBridgeObjectInst:
       return true;
     default:
       return false;

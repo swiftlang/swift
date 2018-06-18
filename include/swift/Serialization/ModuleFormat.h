@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 417; // SWIFT_ENABLE_TENSORFLOW: serialize @differentiable. 
+const uint16_t VERSION_MINOR = 421; // SWIFT_ENABLE_TENSORFLOW: serialize @differentiable. 
 
 using DeclIDField = BCFixed<31>;
 
@@ -192,15 +192,17 @@ using OperatorKindField = BCFixed<3>;
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
 enum AccessorKind : uint8_t {
-  Getter = 0,
-  Setter,
+  Get = 0,
+  Set,
   WillSet,
   DidSet,
   MaterializeForSet,
-  Addressor,
-  MutableAddressor,
+  Address,
+  MutableAddress,
 };
 using AccessorKindField = BCFixed<3>;
+
+using AccessorCountField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -599,7 +601,6 @@ namespace input_block {
   using ImportedModuleLayout = BCRecordLayout<
     IMPORTED_MODULE,
     BCFixed<1>, // exported?
-    BCFixed<1>, // usable from inlinable functions?
     BCFixed<1>, // scoped?
     BCBlob // module name, with submodule path pieces separated by \0s.
            // If the 'scoped' flag is set, the final path piece is an access
@@ -754,13 +755,6 @@ namespace decls_block {
     DeclIDField, // generic decl
     TypeIDField, // parent
     BCArray<TypeIDField> // generic arguments
-  >;
-
-  using BoundGenericSubstitutionLayout = BCRecordLayout<
-    BOUND_GENERIC_SUBSTITUTION,
-    TypeIDField,  // replacement
-    BCVBR<5>
-    // Trailed by protocol conformance info (if any)
   >;
 
   using GenericFunctionTypeLayout = BCRecordLayout<
@@ -968,18 +962,12 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
+    AccessorCountField, // number of accessors
     TypeIDField,  // interface type
-    DeclIDField,  // getter
-    DeclIDField,  // setter
-    DeclIDField,  // materializeForSet
-    DeclIDField,  // addressor
-    DeclIDField,  // mutableAddressor
-    DeclIDField,  // willset
-    DeclIDField,  // didset
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
-    BCArray<TypeIDField> // dependencies
+    BCArray<TypeIDField> // accessors and dependencies
   >;
 
   using ParamLayout = BCRecordLayout<
@@ -1111,20 +1099,15 @@ namespace decls_block {
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
     StorageKindField,   // StorageKind
+    AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
-    DeclIDField, // getter
-    DeclIDField, // setter
-    DeclIDField, // materializeForSet
-    DeclIDField, // addressor
-    DeclIDField, // mutableAddressor
-    DeclIDField, // willSet
-    DeclIDField, // didSet
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     BCVBR<5>,    // number of parameter name components
     BCArray<IdentifierIDField> // name components,
+                               // followed by DeclID accessors,
                                // followed by TypeID dependencies
     // Trailed by:
     // - generic parameters, if any

@@ -72,7 +72,7 @@
 /// optional chaining to access the `hasSuffix(_:)` method on a `String?`
 /// instance.
 ///
-///     if let isPNG = imagePaths["star"]?.hasSuffix(".png") {
+///     if imagePaths["star"]?.hasSuffix(".png") == true {
 ///         print("The star image is in PNG format")
 ///     }
 ///     // Prints "The star image is in PNG format"
@@ -416,7 +416,12 @@ extension Optional : Equatable where Wrapped : Equatable {
 }
 
 extension Optional: Hashable where Wrapped: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:

@@ -455,7 +455,7 @@ bool SILFunction::hasSelfMetadataParam() const {
   if (!silTy.isObject())
     return false;
 
-  auto selfTy = silTy.getSwiftRValueType();
+  auto selfTy = silTy.getASTType();
 
   if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
     selfTy = metaTy.getInstanceType();
@@ -511,18 +511,6 @@ void SILFunction::convertToDeclaration() {
   assert(isDefinition() && "Can only convert definitions to declarations");
   dropAllReferences();
   getBlocks().clear();
-}
-
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
-
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
-
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
 }
 
 SubstitutionMap SILFunction::getForwardingSubstitutionMap() {

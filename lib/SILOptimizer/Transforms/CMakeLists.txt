@@ -1,5 +1,6 @@
 set(TRANSFORMS_SOURCES
   Transforms/ARCCodeMotion.cpp
+  Transforms/AccessEnforcementOpts.cpp
   Transforms/AllocBoxToStack.cpp
   Transforms/ArrayCountPropagation.cpp
   Transforms/ArrayElementValuePropagation.cpp
@@ -11,7 +12,6 @@ set(TRANSFORMS_SOURCES
   Transforms/DeadObjectElimination.cpp
   Transforms/DeadStoreElimination.cpp
   Transforms/Devirtualizer.cpp
-  Transforms/FunctionSignatureOpts.cpp
   Transforms/GenericSpecializer.cpp
   Transforms/MergeCondFail.cpp
   Transforms/MarkUninitializedFixup.cpp

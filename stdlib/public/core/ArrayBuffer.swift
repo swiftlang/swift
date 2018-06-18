@@ -18,6 +18,7 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
+@usableFromInline
 internal typealias _ArrayBridgeStorage
   = _BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>
 
@@ -190,8 +191,8 @@ extension _ArrayBuffer {
   // checks one element. The reason for this is that the ARC optimizer does not
   // handle loops atm. and so can get blocked by the presence of a loop (over
   // the range). This loop is not necessary for a single element access.
-  @inlinable
   @inline(never)
+  @usableFromInline
   internal func _typeCheckSlowPath(_ index: Int) {
     if _fastPath(_isNative) {
       let element: AnyObject = cast(toBufferOf: AnyObject.self)._native[index]
@@ -389,8 +390,8 @@ extension _ArrayBuffer {
     return unsafeBitCast(_getElementSlowPath(i), to: Element.self)
   }
 
-  @inlinable
   @inline(never)
+  @inlinable // @specializable
   internal func _getElementSlowPath(_ i: Int) -> AnyObject {
     _sanityCheck(
       _isClassOrObjCExistential(Element.self),
@@ -520,6 +521,7 @@ extension _ArrayBuffer {
 
   //===--- private --------------------------------------------------------===//
   internal typealias Storage = _ContiguousArrayStorage<Element>
+  @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   @inlinable

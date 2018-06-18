@@ -30,9 +30,10 @@ protocol BadMembers2 {
 func badMembers2(_ a: BadMembers2) {
   a#^BAD_MEMBERS_2^#
 }
-// BAD_MEMBERS_2: Begin completions, 2 items
+// BAD_MEMBERS_2: Begin completions, 3 items
 // BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
 // BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_2-NEXT: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
 // BAD_MEMBERS_2-NEXT: End completions
 
 func globalFunc() {}
@@ -139,7 +140,7 @@ func flip<A, B, C>(_ f: A -> B -> C) -> B -> A -> C { }
 func rdar22688199() {
   let f = flip(curried)(#^RDAR_22688199^#
 }
-// FLIP_CURRIED: Pattern/CurrModule: ['(']{#Int#}, {#Int#}[')'][#(Int) -> ()#]
+// FLIP_CURRIED: Pattern/CurrModule: ['(']{#(Int, Int)#}[')'][#(Int) -> ()#]
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22836263
 func rdar22836263() {
@@ -220,10 +221,11 @@ protocol Bar_38149042 {
 func foo_38149042(bar: Bar_38149042) {
   _ = bar.foo? #^RDAR_38149042^# .x
 }
-// RDAR_38149042: Begin completions, 3 items
+// RDAR_38149042: Begin completions, 4 items
 // RDAR_38149042-DAG: Decl[InstanceVar]/CurrNominal:                  .x[#Int#]; name=x
 // RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']=== {#AnyObject?#}[#Bool#]; name==== AnyObject?
 // RDAR_38149042-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]: [' ']!== {#AnyObject?#}[#Bool#]; name=!== AnyObject?
+// RDAR_38149042-DAG: Keyword[self]/CurrNominal: .self[#Baz_38149042#]; name=self
 // RDAR_38149042: End completions
 
 // rdar://problem/38272904

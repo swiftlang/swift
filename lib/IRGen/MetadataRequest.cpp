@@ -432,9 +432,10 @@ llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
 ConstantReference
 irgen::tryEmitConstantTypeMetadataRef(IRGenModule &IGM, CanType type,
                                       SymbolReferenceKind refKind) {
+  if (IGM.isStandardLibrary())
+    return ConstantReference();
   if (!isTypeMetadataAccessTrivial(IGM, type))
     return ConstantReference();
-
   return IGM.getAddrOfTypeMetadata(type, refKind);
 }
 
@@ -890,9 +891,7 @@ namespace {
     }
 
     llvm::Value *getFunctionParameterRef(AnyFunctionType::CanParam &param) {
-      auto type = param.getType();
-      if (param.getParameterFlags().isInOut())
-        type = type->getInOutObjectType()->getCanonicalType();
+      auto type = param.getPlainType()->getCanonicalType();
       return IGF.emitAbstractTypeMetadataRef(type);
     }
 
@@ -1898,6 +1897,9 @@ namespace {
   /// not to cache the result as if it were the metadata for a formal type
   /// unless the type actually cannot possibly be a formal type, e.g. because
   /// it is one of the special lowered type kinds like SILFunctionType.
+  ///
+  /// NOTE: If you modify the special cases in this, you should update
+  /// isTypeMetadataForLayoutAccessible in SIL.cpp.
   class EmitTypeMetadataRefForLayout
     : public CanTypeVisitor<EmitTypeMetadataRefForLayout, llvm::Value *,
                             DynamicMetadataRequest> {
@@ -2051,7 +2053,7 @@ llvm::Value *
 IRGenFunction::emitTypeMetadataRefForLayout(SILType type,
                                             DynamicMetadataRequest request) {
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType(),
+  return EmitTypeMetadataRefForLayout(*this).visit(type.getASTType(),
                                                    request);
 }
 
@@ -2150,7 +2152,7 @@ namespace {
       // to the aggregate's.
       if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
                                              silTy, ResilienceExpansion::Maximal))
-        return visit(singletonFieldTy.getSwiftRValueType(), request);
+        return visit(singletonFieldTy.getASTType(), request);
 
       // If the type is fixed-layout, emit a copy of its layout.
       if (auto fixed = dyn_cast<FixedTypeInfo>(&ti))
@@ -2335,7 +2337,7 @@ llvm::Value *irgen::emitTypeLayoutRef(IRGenFunction &IGF, SILType type,
     DynamicMetadataRequest::getNonBlocking(MetadataState::LayoutComplete,
                                            collector);
   assert(request.canResponseStatusBeIgnored());
-  return EmitTypeLayoutRef(IGF).visit(type.getSwiftRValueType(), request);
+  return EmitTypeLayoutRef(IGF).visit(type.getASTType(), request);
 }
 
 /// Given a class metatype, produce the necessary heap metadata

@@ -21,7 +21,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
@@ -119,8 +118,7 @@ ProtocolConformanceRef::subst(Type origType,
 
   // Check the conformance map.
   if (auto result = conformances(origType->getCanonicalType(),
-                                 substType,
-                                 proto->getDeclaredType())) {
+                                 substType, proto)) {
     return *result;
   }
 
@@ -893,14 +891,9 @@ SpecializedProtocolConformance::getWitnessDeclRef(
   auto specializationMap = getSubstitutionMap();
 
   auto witnessDecl = baseWitness.getDecl();
-  auto witnessSig =
-    witnessDecl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
-
-  SmallVector<Substitution, 4> substSubs;
-  witnessSig->getSubstitutions(combinedMap, substSubs);
 
   // Fast path if the substitutions didn't change.
   if (combinedMap == baseWitness.getSubstitutions())
@@ -988,9 +981,8 @@ ProtocolConformance::subst(Type substType,
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
 
-      SubstitutionMap subMap;
-      if (auto *genericSig = getGenericSignature())
-        subMap = genericSig->getSubstitutionMap(subs, conformances);
+      auto subMap = SubstitutionMap::get(getGenericSignature(),
+                                         subs, conformances);
 
       return substType->getASTContext()
         .getSpecializedConformance(substType,
@@ -1090,8 +1082,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
     }
 
     // Enumerations with a raw type conform to RawRepresentable.
-    if (resolver)
-      resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
@@ -1256,42 +1246,6 @@ bool ProtocolConformance::isCanonical() const {
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
-}
-
-Substitution Substitution::getCanonicalSubstitution(bool *wasCanonical) const {
-  bool createdNewCanonicalConformances = false;
-  bool createdCanReplacement = false;
-  SmallVector<ProtocolConformanceRef, 4> newCanConformances;
-
-  CanType canReplacement = getReplacement()->getCanonicalType();
-
-  if (!getReplacement()->isCanonical()) {
-    createdCanReplacement = true;
-  }
-
-  for (auto conf : getConformances()) {
-    if (conf.isCanonical()) {
-      newCanConformances.push_back(conf);
-      continue;
-    }
-    newCanConformances.push_back(conf.getCanonicalConformanceRef());
-    createdNewCanonicalConformances = true;
-  }
-
-  ArrayRef<ProtocolConformanceRef> canConformances = getConformances();
-  if (createdNewCanonicalConformances) {
-    auto &C = canReplacement->getASTContext();
-    canConformances = C.AllocateCopy(newCanConformances);
-  }
-
-  if (createdCanReplacement || createdNewCanonicalConformances) {
-    if (wasCanonical)
-      *wasCanonical = false;
-    return Substitution(canReplacement, canConformances);
-  }
-  if (wasCanonical)
-    *wasCanonical = true;
-  return *this;
 }
 
 /// Check of all types used by the conformance are canonical.

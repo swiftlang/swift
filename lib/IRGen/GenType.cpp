@@ -1243,12 +1243,15 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   return *EmptyTI;
 }
 
-const TypeInfo &TypeConverter::getResilientStructTypeInfo() {
-  if (ResilientStructTI) return *ResilientStructTI;
-  ResilientStructTI = convertResilientStruct();
-  ResilientStructTI->NextConverted = FirstType;
-  FirstType = ResilientStructTI;
-  return *ResilientStructTI;
+const TypeInfo &
+TypeConverter::getResilientStructTypeInfo(IsABIAccessible_t isAccessible) {
+  auto &cache = isAccessible ? AccessibleResilientStructTI
+                             : InaccessibleResilientStructTI;
+  if (cache) return *cache;
+  cache = convertResilientStruct(isAccessible);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
 }
 
 /// Get the fragile type information for the given type, which may not
@@ -1298,7 +1301,7 @@ SILType IRGenModule::getLoweredType(Type subst) {
 /// unlike fetching the type info and asking it for the storage type,
 /// this operation will succeed for forward-declarations.
 llvm::PointerType *IRGenModule::getStoragePointerType(SILType T) {
-  return getStoragePointerTypeForLowered(T.getSwiftRValueType());
+  return getStoragePointerTypeForLowered(T.getASTType());
 }
 llvm::PointerType *IRGenModule::getStoragePointerTypeForUnlowered(Type T) {
   return getStorageTypeForUnlowered(T)->getPointerTo();
@@ -1312,7 +1315,7 @@ llvm::Type *IRGenModule::getStorageTypeForUnlowered(Type subst) {
 }
 
 llvm::Type *IRGenModule::getStorageType(SILType T) {
-  return getStorageTypeForLowered(T.getSwiftRValueType());
+  return getStorageTypeForLowered(T.getASTType());
 }
 
 /// Get the storage type for the given type.  Note that, unlike
@@ -1353,7 +1356,7 @@ IRGenModule::getTypeInfoForUnlowered(AbstractionPattern orig, CanType subst) {
 /// to have undergone SIL type lowering (or be one of the types for
 /// which that lowering is the identity function).
 const TypeInfo &IRGenModule::getTypeInfo(SILType T) {
-  return getTypeInfoForLowered(T.getSwiftRValueType());
+  return getTypeInfoForLowered(T.getASTType());
 }
 
 /// Get the fragile type information for the given type.
@@ -1365,17 +1368,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   auto entry = getTypeEntry(T);
   assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  auto &ti = *entry.get<const TypeInfo*>();
-  assert(ti.isComplete());
-  return ti;
-}
-
-const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  if (!entry.is<const TypeInfo*>()) return nullptr;
-  auto &ti = *entry.get<const TypeInfo*>();
-  if (!ti.isComplete()) return nullptr;
-  return &ti;
+  return *entry.get<const TypeInfo*>();
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
@@ -1449,8 +1442,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
     // The type we got should be lowered, so lower it like a SILType.
     contextTy = getGenericEnvironment()->mapTypeIntoContext(
                   IGM.getSILModule(),
-                  SILType::getPrimitiveAddressType(contextTy))
-      .getSwiftRValueType();
+                  SILType::getPrimitiveAddressType(contextTy)).getASTType();
   }
   
   // Fold archetypes to unique exemplars. Any archetype with the same

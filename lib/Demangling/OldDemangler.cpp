@@ -100,13 +100,21 @@ public:
 
   /// Return the next character without claiming it.  Asserts that
   /// there is at least one remaining character.
-  char peek() { return Text.front(); }
+  char peek() {
+    if (isEmpty()) {
+      // Return an otherwise unused character to prevent crashes for malformed
+      // symbols.
+      return '.';
+    }
+    return Text.front();
+  }
 
   /// Claim and return the next character.  Asserts that there is at
   /// least one remaining character.
   char next() {
     char c = peek();
-    advanceOffset(1);
+    if (!isEmpty())
+      advanceOffset(1);
     return c;
   }
 

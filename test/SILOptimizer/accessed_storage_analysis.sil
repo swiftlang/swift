@@ -386,3 +386,124 @@ bb1(%phi : $*Int):
   %v = tuple ()
   return %v : $()
 }
+
+// CHECK-LABEL: @testDirectlyAppliedNoEscape
+// CHECK:   [read] Stack %3 = alloc_stack $Int
+sil @testDirectlyAppliedNoEscape : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %s1 = alloc_stack $Int
+  store %0 to %s1 : $*Int
+  %s2 = alloc_stack $Int
+  store %0 to %s2 : $*Int
+  %f = function_ref @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%s2) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %npa = convert_escape_to_noescape %pa : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [dynamic] %s1 : $*Int
+  %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  strong_release %pa : $@callee_guaranteed (@inout Int) -> ()
+  dealloc_stack %s2 : $*Int
+  dealloc_stack %s1 : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// CHECK: @testDirectlyAppliedClosure
+// CHECK:   [read] Argument index: 1
+sil private @testDirectlyAppliedClosure : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %access = begin_access [read] [dynamic] %1 : $*Int
+  %l = load %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// Test directly recursive argument access.
+// CHECK-LABEL: @readRecursiveArgument
+// CHECK:   [read] Class %0 = argument of bb0 : $C
+// CHECK:   Field: @sil_stored var property: Int
+sil @readRecursiveArgument : $@convention(thin) (@guaranteed C, Int) -> Int {
+bb0(%0 : $C, %1 : $Int):
+  %propaddr = ref_element_addr %0 : $C, #C.property
+  %access = begin_access [read] [dynamic] %propaddr : $*Int
+  %val = load %access : $*Int
+  end_access %access : $*Int
+  %f = function_ref @readRecursiveArgument : $@convention(thin) (@guaranteed C, Int) -> Int
+  %call = apply %f(%0, %val) : $@convention(thin) (@guaranteed C, Int) -> Int
+  return %call : $Int
+}
+
+// Test a class argument access from an optional caller value.
+// CHECK-LABEL: @readOptionalArgumentInCallee
+// CHECK:   [read] Class   %1 = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+// CHECK:   Field: @sil_stored var property: Int
+sil @readOptionalArgumentInCallee : $@convention(thin) (@guaranteed Optional<C>) -> Int {
+bb0(%0 : $Optional<C>):
+  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  %f = function_ref @readOptionalArgumentInCalleeHelper : $@convention(thin) (@guaranteed C) -> Int
+  %call = apply %f(%c) : $@convention(thin) (@guaranteed C) -> Int
+  return %call : $Int
+}
+
+// CHECK-LABEL: @readOptionalArgumentInCalleeHelper
+// CHECK:   [read] Class %0 = argument of bb0 : $C
+// CHECK:   Field: @sil_stored var property: Int
+sil private @readOptionalArgumentInCalleeHelper : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : $C):
+  %propaddr = ref_element_addr %0 : $C, #C.property
+  %access = begin_access [read] [dynamic] %propaddr : $*Int
+  %val = load %access : $*Int
+  end_access %access : $*Int
+  return %val : $Int
+}
+
+// Test a mutually recursive function that requires argument
+// translation. This could cause iterator invalidation in the
+// AccessedStorage map if we're not careful.
+sil @readRecursiveOptionalArgument : $@convention(thin) (@guaranteed Optional<C>, @guaranteed C) -> Int {
+bb0(%0 : $Optional<C>, %1 : $C):
+  %propaddr = ref_element_addr %1 : $C, #C.property
+  %access = begin_access [read] [dynamic] %propaddr : $*Int
+  %val = load %access : $*Int
+  end_access %access : $*Int
+  %c = unchecked_enum_data %0 : $Optional<C>, #Optional.some!enumelt.1
+  %f = function_ref @readRecursiveOptionalArgument : $@convention(thin) (@guaranteed Optional<C>, @guaranteed C) -> Int
+  %call = apply %f(%0, %c) : $@convention(thin) (@guaranteed Optional<C>, @guaranteed C) -> Int
+  return %call : $Int
+}
+
+// CHECK-LABEL: @readIdentifiedArgCaller
+// CHECK:  [read] Stack   %1 = alloc_stack $Int                           // users: %5, %4, %2
+sil @readIdentifiedArgCaller : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %stack = alloc_stack $Int
+  store %0 to %stack : $*Int
+  %f = function_ref @readIdentifiedArg : $@convention(thin) (@in Int) -> Int
+  %call = apply %f(%stack) : $@convention(thin) (@in Int) -> Int
+  dealloc_stack %stack : $*Int
+  return %call : $Int
+}
+
+enum IndirectEnum {
+  indirect case V(Int)
+}
+
+// CHECK-LABEL: @readUnidentifiedArgCaller
+// CHECK:   unidentified accesses: read
+sil @readUnidentifiedArgCaller : $@convention(thin) (@guaranteed IndirectEnum, Int) -> Int {
+bb0(%0 : $IndirectEnum, %1 : $Int):
+  switch_enum %0 : $IndirectEnum, case #IndirectEnum.V!enumelt.1: bb2, default bb1
+
+bb1:
+  br bb3(%1 : $Int)
+
+bb2(%7 : ${ var Int }):
+  %8 = project_box %7 : ${ var Int }, 0
+  %f = function_ref @readIdentifiedArg : $@convention(thin) (@in Int) -> Int
+  %call = apply %f(%8) : $@convention(thin) (@in Int) -> Int
+  br bb3(%call : $Int)
+
+bb3(%result : $Int):
+  return %result : $Int
+}

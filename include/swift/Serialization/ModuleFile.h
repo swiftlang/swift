@@ -50,6 +50,7 @@ class ModuleFile
   friend class SerializedASTFile;
   friend class SILDeserializer;
   using Status = serialization::Status;
+  using TypeID = serialization::TypeID;
 
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
@@ -132,32 +133,20 @@ public:
     const StringRef RawPath;
 
   private:
+    unsigned IsExported : 1;
     const unsigned IsHeader : 1;
-    const unsigned IsExported : 1;
-    const unsigned IsUsableFromInline : 1;
     const unsigned IsScoped : 1;
 
-    Dependency(bool isHeader,
-               StringRef path, bool exported,
-               bool isUsableFromInline, bool isScoped)
-      : RawPath(path),
-        IsHeader(isHeader),
-        IsExported(exported),
-        IsUsableFromInline(isUsableFromInline),
-        IsScoped(isScoped) {
-      assert(!(IsExported && IsUsableFromInline));
-      assert(!(IsHeader && IsScoped));
-    }
+    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
+      : RawPath(path), IsExported(exported), IsHeader(isHeader),
+        IsScoped(isScoped) {}
 
   public:
-    Dependency(StringRef path, bool exported, bool isUsableFromInline,
-               bool isScoped)
-      : Dependency(false, path, exported, isUsableFromInline, isScoped) {}
+    Dependency(StringRef path, bool exported, bool isScoped)
+      : Dependency(path, false, exported, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(true, headerPath, exported,
-                        /*isUsableFromInline=*/false,
-                        /*isScoped=*/false);
+      return Dependency(headerPath, true, exported, false);
     }
 
     bool isLoaded() const {
@@ -165,7 +154,6 @@ public:
     }
 
     bool isExported() const { return IsExported; }
-    bool isUsableFromInline() const { return IsUsableFromInline; }
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
@@ -581,16 +569,14 @@ private:
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
+  struct AccessorRecord {
+    SmallVector<serialization::DeclID, 8> IDs;
+  };
+
   /// Sets the accessors for \p storage based on \p rawStorageKind.
   void configureStorage(AbstractStorageDecl *storage,
                         unsigned rawStorageKind,
-                        serialization::DeclID getter,
-                        serialization::DeclID setter,
-                        serialization::DeclID materializeForSet,
-                        serialization::DeclID addressor,
-                        serialization::DeclID mutableAddressor,
-                        serialization::DeclID willSet,
-                        serialization::DeclID didSet);
+                        AccessorRecord &accessors);
 
 public:
   /// Loads a module from the given memory buffer.
@@ -632,6 +618,13 @@ public:
   Status getStatus() const {
     return static_cast<Status>(Bits.Status);
   }
+
+  /// Transfers ownership of a buffer that might contain source code where
+  /// other parts of the compiler could have emitted diagnostics, to keep them
+  /// alive even if the ModuleFile is destroyed.
+  ///
+  /// Should only be called when getStatus() indicates a failure.
+  std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
 
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
@@ -855,13 +848,6 @@ public:
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.
   SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
-
-  /// Reads a substitution record from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a substitution, returns None.
-  Optional<Substitution> maybeReadSubstitution(llvm::BitstreamCursor &Cursor,
-                                               GenericEnvironment *genericEnv =
-                                                nullptr);
 
   /// Recursively reads a protocol conformance from the given cursor.
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,

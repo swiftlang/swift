@@ -538,4 +538,12 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
   fileprivate(set) </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>String</SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></StructDecl><StructDecl><Attribute>
 
-@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl>
+@_alignment(16) </Attribute><DeclModifier>public </DeclModifier>struct float3 <MemberDeclBlock>{ <MemberDeclListItem><VariableDecl><DeclModifier>public </DeclModifier>var <PatternBinding><IdentifierPattern>x</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>y</IdentifierPattern>, </PatternBinding><PatternBinding><IdentifierPattern>z</IdentifierPattern><TypeAnnotation>: <SimpleTypeIdentifier>Float </SimpleTypeIdentifier></TypeAnnotation></PatternBinding></VariableDecl></MemberDeclListItem>}</MemberDeclBlock></StructDecl><PoundSourceLocation>
+
+#sourceLocation(<PoundSourceLocationArgs>file: "otherFile.swift", line: 5</PoundSourceLocationArgs>)</PoundSourceLocation><FunctionDecl>
+
+func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><PoundSourceLocation>
+
+#sourceLocation()</PoundSourceLocation>
+
+"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"

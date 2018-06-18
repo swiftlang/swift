@@ -429,7 +429,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -447,7 +447,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +456,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -596,9 +594,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
     unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, dataLength };
+    return { sizeof(uint32_t), dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -1140,12 +1137,10 @@ ModuleFile::ModuleFile(
         unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
         switch (kind) {
         case input_block::IMPORTED_MODULE: {
-          bool exported, usableFromInline, scoped;
+          bool exported, scoped;
           input_block::ImportedModuleLayout::readRecord(scratch,
-                                                        exported,
-                                                        usableFromInline,
-                                                        scoped);
-          Dependencies.push_back({blobData, exported, usableFromInline, scoped});
+                                                        exported, scoped);
+          Dependencies.push_back({blobData, exported, scoped});
           break;
         }
         case input_block::LINK_LIBRARY: {
@@ -1461,6 +1456,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
+std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
+  assert(getStatus() != Status::Valid);
+
+  // Today, the only buffer that might have diagnostics in them is the input
+  // buffer, and even then only if it has imported module contents.
+  if (!importedHeaderInfo.contents.empty())
+    return std::move(ModuleInputBuffer);
+
+  return nullptr;
+}
+
 ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
@@ -1518,7 +1524,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -1607,13 +1613,6 @@ void ModuleFile::getImportedModules(
         continue;
 
       break;
-
-    case ModuleDecl::ImportFilter::ForLinking:
-      // Only include @_exported and @usableFromInline imports.
-      if (!dep.isExported() && !dep.isUsableFromInline())
-        continue;
-
-      break;
     }
 
     assert(dep.isLoaded());
@@ -1682,9 +1681,6 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
       if (Dep.isExported())
         ID->getAttrs().add(
             new (Ctx) ExportedAttr(/*IsImplicit=*/false));
-      if (Dep.isUsableFromInline())
-        ID->getAttrs().add(
-            new (Ctx) UsableFromInlineImportAttr(/*IsImplicit=*/true));
       ImportDecls.push_back(ID);
     }
     Bits.ComputedImportDecls = true;
@@ -2033,10 +2029,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }

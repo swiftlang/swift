@@ -2,51 +2,51 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-names -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_NAMES
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-reflection-metadata -emit-ir %s | %FileCheck %s --check-prefix=STRIP_REFLECTION_METADATA
 
-// STRIP_REFLECTION_NAMES_DAG: {{.*}}swift4_reflect
-// STRIP_REFLECTION_NAMES_DAG: {{.*}}swift4_fieldmd
-// STRIP_REFLECTION_NAMES_DAG: {{.*}}swift4_assocty
-// STRIP_REFLECTION_NAMES-DAG: {{.*}}swift4_capture
-// STRIP_REFLECTION_NAMES-DAG: {{.*}}swift4_typeref
-// STRIP_REFLECTION_NAMES-NOT: {{.*}}swift4_reflstr
-// STRIP_REFLECTION_NAMES-NOT: {{.*}}swift4_builtin
+// STRIP_REFLECTION_NAMES_DAG: section "{{[^"]*swift5_reflect|.sw5rfst\$B}}
+// STRIP_REFLECTION_NAMES_DAG: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// STRIP_REFLECTION_NAMES_DAG: section "{{[^"]*swift5_assocty|.sw5asty\$B}}
+// STRIP_REFLECTION_NAMES-DAG: section "{{[^"]*swift5_capture|.sw5cptr\$B}}
+// STRIP_REFLECTION_NAMES-DAG: section "{{[^"]*swift5_typeref|.sw5tyrf\$B}}
+// STRIP_REFLECTION_NAMES-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// STRIP_REFLECTION_NAMES-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
-// STRIP_REFLECTION_NAMES-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift4_fieldmd
+// STRIP_REFLECTION_NAMES-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift5_fieldmd
 
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_reflect
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_fieldmd
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_assocty
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_capture
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_typeref
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_reflstr
-// STRIP_REFLECTION_METADATA-NOT: {{.*}}swift4_builtin
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflect|.sw5rfst\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_assocty|.sw5asty\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_capture|.sw5cptr\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_typeref|.sw5tyrf\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// STRIP_REFLECTION_METADATA-NOT: section "{{[^"]*swift5_builtin|.sw5bltn\$B}}
 
 // CHECK-DAG: @__swift_reflection_version = linkonce_odr hidden constant i16 {{[0-9]+}}
-// CHECK-DAG: private constant [2 x i8] c"i\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"ms\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"me\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"mc\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [2 x i8] c"C\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [2 x i8] c"S\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [2 x i8] c"E\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [2 x i8] c"I\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [2 x i8] c"t\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [4 x i8] c"mgs\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [4 x i8] c"mge\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [4 x i8] c"mgc\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"GC\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
-// CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*}}swift4_reflstr{{[^"]*}}"
+// CHECK-DAG: private constant [2 x i8] c"i\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"ms\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"me\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"mc\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [2 x i8] c"C\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [2 x i8] c"S\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [2 x i8] c"E\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [2 x i8] c"I\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [2 x i8] c"t\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [4 x i8] c"mgs\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [4 x i8] c"mge\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [4 x i8] c"mgc\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"GC\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"GS\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
+// CHECK-DAG: private constant [3 x i8] c"GE\00", section "{{[^"]*swift5_reflstr|.sw5rfst\$B}}
 
-// CHECK-DAG: @"\01l__swift4_reflection_descriptor" = private constant { {{.*}} } { i32 1, i32 1, i32 2, {{.*}} }
+// CHECK-DAG: @"\01l__swift5_reflection_descriptor" = private constant { {{.*}} } { i32 1, i32 1, i32 2, {{.*}} }
 
-// CHECK-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata7MyClassCMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}}swift4_assocty
-// CHECK-DAG: @"$S19reflection_metadata8MyStructVMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata6MyEnumOMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata15MyGenericStructVMF" = internal constant {{.*}}swift4_fieldmd
-// CHECK-DAG: @"$S19reflection_metadata13MyGenericEnumOMF" = internal constant {{.*}}swift4_fieldmd
+// CHECK-DAG: @"$S19reflection_metadata10MyProtocol_pMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata7MyClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata11ConformanceVAA10MyProtocolAAMA" = internal constant {{.*}} section "{{[^"]*swift5_assocty|.sw5asty\$B}}
+// CHECK-DAG: @"$S19reflection_metadata8MyStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata6MyEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata14MyGenericClassCMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata15MyGenericStructVMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
+// CHECK-DAG: @"$S19reflection_metadata13MyGenericEnumOMF" = internal constant {{.*}} section "{{[^"]*swift5_fieldmd|.sw5flmd\$B}}
 
 public protocol MyProtocol {
   associatedtype Inner

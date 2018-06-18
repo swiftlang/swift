@@ -12,4 +12,8 @@ func foo() {
   _ = FooComparisonResult.orderedSame
   let _ : FooComparisonResult = .orderedSame
   _ = Cities.CityKind.Town
+  _ = ToplevelType()
+  _ = ToplevelType(recordName: "")
 }
+
+func foo(_: ToplevelType) {}

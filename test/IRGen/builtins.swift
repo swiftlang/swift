@@ -225,12 +225,12 @@ func sizeof_alignof_test() {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 8
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[SIZE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[SIZE]], i64* [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 65535
@@ -241,7 +241,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$S8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 11
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[STRIDE:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: store i64 [[STRIDE]], i64* [[S:%.*]]
@@ -410,20 +410,24 @@ func testOnceWithContext(_ p: Builtin.RawPointer, f: @escaping @convention(c) (B
 
 class C {}
 struct S {}
+#if _runtime(_ObjC)
 @objc class O {}
 @objc protocol OP1 {}
 @objc protocol OP2 {}
+#endif
 protocol P {}
 
 // CHECK-LABEL: define hidden {{.*}}void @"$S8builtins10canBeClass{{[_0-9a-zA-Z]*}}F"
 func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+#if _runtime(_ObjC)
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(O.self))
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(OP1.self))
   typealias ObjCCompo = OP1 & OP2
-  // CHECK: call {{.*}}void {{%.*}}(i8 1
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 1
   f(Builtin.canBeClass(ObjCCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(S.self))
@@ -431,9 +435,11 @@ func canBeClass<T>(_ f: @escaping (Builtin.Int8) -> (), _: T) {
   f(Builtin.canBeClass(C.self))
   // CHECK: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(P.self))
+#if _runtime(_ObjC)
   typealias MixedCompo = OP1 & P
-  // CHECK: call {{.*}}void {{%.*}}(i8 0
+  // CHECK-objc: call {{.*}}void {{%.*}}(i8 0
   f(Builtin.canBeClass(MixedCompo.self))
+#endif
 
   // CHECK: call {{.*}}void {{%.*}}(i8 2
   f(Builtin.canBeClass(T.self))
@@ -765,7 +771,7 @@ func isUniqueIUO(_ ref: inout Builtin.NativeObject?) -> Bool {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 9
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
   // CHECK-NEXT: [[FLAGS:%.*]] = ptrtoint i8* [[T1]] to i64
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i64 [[FLAGS]], 65536
@@ -813,6 +819,8 @@ func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
 // CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: alloca
+// CHECK-NEXT: store
 // CHECK-NEXT: ret void
 func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(x)
@@ -843,9 +851,8 @@ func atomicload(_ p: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
-// CHECK-NEXT: {{.*}}:
-// CHECK-NEXT: %2 = or i64 %0, %1
-// CHECK-NEXT: ret i64 %2
+// CHECK:      %4 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %4
 func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
   return UInt(Builtin.stringObjectOr_Int64(
   x._value, y._value))

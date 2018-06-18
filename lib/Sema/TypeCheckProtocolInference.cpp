@@ -877,7 +877,7 @@ Type AssociatedTypeInference::computeDerivedTypeWitness(
 
   // Can we derive conformances for this protocol and adoptee?
   NominalTypeDecl *derivingTypeDecl = adoptee->getAnyNominal();
-  if (!DerivedConformance::derivesProtocolConformance(tc, derivingTypeDecl,
+  if (!DerivedConformance::derivesProtocolConformance(tc, dc, derivingTypeDecl,
                                                       proto))
     return Type();
 
@@ -1106,10 +1106,9 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
                              sanitizedRequirements,
                              QuerySubstitutionMap{substitutions},
                              TypeChecker::LookUpConformance(tc, dc),
-                             nullptr, None, nullptr, options);
+                             None, nullptr, options);
   switch (result) {
   case RequirementCheckResult::Failure:
-  case RequirementCheckResult::UnsatisfiedDependency:
     ++NumSolutionStatesFailedCheck;
     return true;
 
@@ -1155,15 +1154,13 @@ bool AssociatedTypeInference::checkConstrainedExtension(ExtensionDecl *ext) {
                        ext->getGenericSignature()->getRequirements(),
                        QueryTypeSubstitutionMap{subs},
                        LookUpConformanceInModule(ext->getModuleContext()),
-                                   nullptr, ConformanceCheckFlags::InExpression,
-                                   nullptr,
-                                   options)) {
+                       ConformanceCheckFlags::InExpression,
+                       nullptr, options)) {
   case RequirementCheckResult::Success:
   case RequirementCheckResult::SubstitutionFailure:
     return false;
 
   case RequirementCheckResult::Failure:
-  case RequirementCheckResult::UnsatisfiedDependency:
     return true;
   }
 }

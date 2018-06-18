@@ -11,6 +11,7 @@ import gizmo
 // CHECK: @"$SSo16NSRuncingOptionsVWV" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVMn" = linkonce_odr hidden constant
 // CHECK: @"$SSo16NSRuncingOptionsVN" = linkonce_odr hidden global
+// CHECK: @"$SSo16NSRuncingOptionsVs9EquatableSCMc" = linkonce_odr hidden constant %swift.protocol_conformance_descriptor { {{.*}}@"$SSo16NSRuncingOptionsVs9EquatableSCWa
 // CHECK: @"$SSo28NeverActuallyMentionedByNameVs9EquatableSCWp" = linkonce_odr hidden constant
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
@@ -82,11 +83,16 @@ func test_enum_without_name_Equatable(_ obj: TestThatEnumType) -> Bool {
   return obj.getValue() != .ValueOfThatEnumType
 }
 
-func use_metadata<T>(_ t:T){}
+func use_metadata<T: Equatable>(_ t:T){}
 use_metadata(NSRuncingOptions.mince)
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$SSo16NSRuncingOptionsVMa"(i64)
 // CHECK:         call %swift.type* @swift_getForeignTypeMetadata({{.*}} @"$SSo16NSRuncingOptionsVN" {{.*}}) [[NOUNWIND_READNONE:#[0-9]+]]
+
+// CHECK-LABEL: define linkonce_odr hidden i8** @"$SSo16NSRuncingOptionsVs9EquatableSCWa"()
+// CHECK:  [[NONUNIQUE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$SSo16NSRuncingOptionsVs9EquatableSCWG", %swift.type* null, i8*** null)
+// CHECK:  [[UNIQUE:%.*]] = call i8** @swift_getForeignWitnessTable(i8** [[NONUNIQUE]], %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32 }>* @"$SSo16NSRuncingOptionsVMn" to %swift.type_descriptor*), %swift.protocol* @"$Ss9EquatableMp")
+// CHECK:  ret i8** [[UNIQUE]]
 
 @objc enum ExportedToObjC: Int {
   case Foo = -1, Bar, Bas

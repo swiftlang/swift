@@ -18,8 +18,8 @@ public struct StructWithBaseStruct<T: BaseProt> {
     var elem2: BaseStruct<Element>
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$S11outcopyaddr010StructWithbc4BaseB0V4elemAA0bcdB0VyxGvg"(%T11outcopyaddr014StructWithBaseB0V.4* noalias nocapture sret, %swift.type* %"StructWithStructWithBaseStruct<T>", %T11outcopyaddr010StructWithbc4BaseB0V* noalias nocapture swiftself)
-// CHECK: call %T11outcopyaddr014StructWithBaseB0V.4* @"$S11outcopyaddr014StructWithBaseB0VyxGAA9ChildProtRzlWOc"
+// CHECK-LABEL: define hidden swiftcc void @"$S11outcopyaddr010StructWithbc4BaseB0V4elemAA0bcdB0VyxGvg"(%T11outcopyaddr014StructWithBaseB0V.5* noalias nocapture sret, %swift.type* %"StructWithStructWithBaseStruct<T>", %T11outcopyaddr010StructWithbc4BaseB0V* noalias nocapture swiftself)
+// CHECK: call %T11outcopyaddr014StructWithBaseB0V.5* @"$S11outcopyaddr014StructWithBaseB0VyxGAA9ChildProtRzlWOc"
 public struct StructWithStructWithBaseStruct<T: ChildProt> {
     public typealias Element = T
     let elem: StructWithBaseStruct<Element>
@@ -48,3 +48,30 @@ extension P {
   }
 }
 
+enum GenericError<T: BaseProt> {
+  case payload(T)
+}
+
+func testIt<P: BaseProt>(_ f: GenericError<P>?) {
+}
+
+func dontCrash<P: BaseProt>(_ f: GenericError<P>) {
+  testIt(f)
+}
+
+protocol Baz : class {
+}
+extension Baz {
+  static func crash(setup: ((Self) -> ())?){
+  }
+}
+class Foobar {
+  public static func dontCrash() -> Baz? {
+     let cls : Baz.Type = Foobar1.self
+     // This used to crash because we tried to outline the optional consume with
+     // an opened payload existential type.
+     cls.crash(setup: { (arg:  Baz) -> () in  })
+     return nil
+  }
+}
+class Foobar1 : Foobar, Baz { }

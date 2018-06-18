@@ -803,6 +803,15 @@ FUNCTION(GetForeignTypeMetadata, swift_getForeignTypeMetadata, C_CC,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind, ReadNone)) // only writes to runtime-private fields
 
+// WitnessTable *swift_getForeignWitnessTable(const WitnessTable *candidate,
+//                                            const TypeContextDescriptor
+//                                            *forType);
+FUNCTION(GetForeignWitnessTable, swift_getForeignWitnessTable, C_CC,
+         RETURNS(WitnessTablePtrTy),
+         ARGS(WitnessTablePtrTy, TypeContextDescriptorPtrTy,
+              ProtocolDescriptorPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // MetadataResponse swift_getGenericMetadata(MetadataRequest request,
 //                                           const void * const *arguments,
 //                                           TypeContextDescriptor *type);

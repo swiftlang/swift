@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -98,12 +98,13 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error  {{circular protocol inheritance CircleMiddle}}
 // expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
-// expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
+protocol CircleStart : CircleEnd { func circle_start() }
 // expected-note@-1{{protocol 'CircleStart' declared here}}
+// expected-error@-2{{circular protocol inheritance CircleStart}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+// expected-error@-1{{circular protocol inheritance CircleEnd}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
@@ -266,7 +267,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence' requires the types 'Sequence' and 'Sequence.Iterator' be equivalent to use 'makeIterator'}}
+  var x = e.makeIterator() // expected-error{{value of type 'Sequence' has no member 'makeIterator'}}
   x.next()
   x.nonexistent()
 }

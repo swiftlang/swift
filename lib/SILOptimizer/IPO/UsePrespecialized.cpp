@@ -77,15 +77,15 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     // If this is the case, check if there is a specialization
     // available for it already and use this specialization
     // instead of the generic version.
-
-    SubstitutionList Subs = AI.getSubstitutions();
-    if (Subs.empty())
+    if (!AI.hasSubstitutions())
       continue;
+
+    SubstitutionMap Subs = AI.getSubstitutionMap();
 
     // Bail if any generic type parameters are unbound.
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (hasArchetypes(Subs))
+    if (Subs.hasArchetypes())
       continue;
 
     ReabstractionInfo ReInfo(AI, ReferencedF, Subs);

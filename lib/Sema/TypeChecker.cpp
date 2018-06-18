@@ -590,7 +590,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned StartElem,
                                 unsigned WarnLongFunctionBodies,
                                 unsigned WarnLongExpressionTypeChecking,
-                                unsigned ExpressionTimeoutThreshold) {
+                                unsigned ExpressionTimeoutThreshold,
+                                unsigned SwitchCheckingInvocationThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
@@ -598,7 +599,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure we have a type checker.
   //
-  // FIXME: We should never have a type checker here, but currently do when
+  // FIXME: We should never have a type checker here, but currently we do when
   // we're using immediate together with -enable-source-import.
   //
   // This possibility should be eliminated, since it results in duplicated
@@ -609,7 +610,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-    performNameBinding(SF, StartElem);
+  performNameBinding(SF, StartElem);
 
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -621,6 +622,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       MyTC->setWarnLongExpressionTypeChecking(WarnLongExpressionTypeChecking);
       if (ExpressionTimeoutThreshold != 0)
         MyTC->setExpressionTimeoutThreshold(ExpressionTimeoutThreshold);
+
+      if (SwitchCheckingInvocationThreshold != 0)
+        MyTC->setSwitchCheckingInvocationThreshold(
+            SwitchCheckingInvocationThreshold);
 
       if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
         MyTC->enableDebugTimeFunctionBodies();
@@ -664,8 +669,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
             bindExtensionDecl(ED, TC);
         }
       }
-
-      return true;
     });
 
     // Type check the top-level elements of the source file.
@@ -953,8 +956,7 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
       .highlight(baseRange);
   }
   for (const auto &member : lookup) {
-    diagnose(member.first, diag::found_candidate_type,
-             member.second);
+    diagnose(member.Member, diag::found_candidate_type, member.MemberType);
   }
 }
 

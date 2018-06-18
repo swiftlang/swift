@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-verify-without-invalidation -enable-sil-verify-all -simplify-cfg -closure-specialize %s
+
+// Test if the ClosureSpecializer correctly invalidates the dominator tree
+// even if there are no functions specialized.
+// The test just checks if the compiler does not crash.
+// First running SimplifyCFG creates the dominator tree, which should then be
+// invalidated by the ClosureSpecializer.
+// If this is not done correctly the verification will complain that the
+// dominator tree is not up to date.
+
+import Builtin
+import Swift
+
+sil @closure : $@convention(thin) () -> ()
+
+sil @use_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+
+sil hidden [noinline] @use_closure2 : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> (), %1 : $@callee_owned () -> ()):
+  %2 = apply %0() : $@callee_owned () -> ()
+  %3 = apply %1() : $@callee_owned () -> ()
+  %4 = tuple ()
+  return %3 : $()
+}
+
+sil @insert_release_in_liferange_exit_block : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @closure : $@convention(thin) () -> ()
+  %3 = partial_apply %2() : $@convention(thin) () -> ()
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+  %5 = partial_apply %8(%3) : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
+
+  // There is a critical edge from bb0 to bb2 which is broken by ValueLifetimeAnalysis.
+  cond_br undef, bb2, bb1
+
+bb1:
+  strong_retain %3 : $@callee_owned () -> ()
+  strong_retain %3 : $@callee_owned () -> ()
+  %10 = function_ref @use_closure2 : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> ()
+
+  // Passing two closures actually prevents closure specialization.
+  %17 = apply %10(%3, %3) : $@convention(thin) (@owned @callee_owned () -> (), @owned @callee_owned () -> ()) -> ()
+  br bb2
+
+bb2:
+  strong_release %5 : $@callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}

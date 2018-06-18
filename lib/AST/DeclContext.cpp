@@ -296,23 +296,6 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
-DeclContext *DeclContext::getCommonParentContext(DeclContext *A,
-                                                 DeclContext *B) {
-  if (A == B)
-    return A;
-
-  if (A->isChildContextOf(B))
-    return B;
-
-  // Peel away layers of A until we reach a common parent
-  for (DeclContext *CurDC = A; CurDC; CurDC = CurDC->getParent()) {
-    if (B->isChildContextOf(CurDC))
-      return CurDC;
-  }
-
-  return nullptr;
-}
-
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
@@ -821,6 +804,9 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
 getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  if (DC->getASTContext().isSwiftVersion3())
+    return DC;
+
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;

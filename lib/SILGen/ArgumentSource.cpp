@@ -356,7 +356,7 @@ void ArgumentSource::forwardInto(SILGenFunction &SGF,
   // RValue about the formal type (by using the lowered type) because
   // we're emitting into an abstracted value, which RValue doesn't
   // really handle.
-  auto substLoweredType = destTL.getLoweredType().getSwiftRValueType();
+  auto substLoweredType = destTL.getLoweredType().getASTType();
   RValue(SGF, loc, substLoweredType, outputValue).forwardInto(SGF, loc, dest);
 }
 

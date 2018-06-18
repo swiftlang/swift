@@ -539,8 +539,8 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
 
       // Get our list of substitutions.
       auto Subs = (PAI
-                   ? PAI->getSubstitutions()
-                   : InnerAI.getSubstitutions());
+                   ? PAI->getSubstitutionMap()
+                   : InnerAI.getSubstitutionMap());
 
       SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(

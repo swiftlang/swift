@@ -24,7 +24,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/StringExtras.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/Attr.h"
@@ -431,7 +430,7 @@ public:
       }
     }
 
-    SILResultInfo result(substResultTL.getLoweredType().getSwiftRValueType(),
+    SILResultInfo result(substResultTL.getLoweredType().getASTType(),
                          convention);
     Results.push_back(result);
   }
@@ -759,10 +758,16 @@ private:
 
     unsigned origParamIndex = NextOrigParamIndex++;
 
+    bool isInout = false;
+    if (auto inoutType = dyn_cast<InOutType>(substType)) {
+      isInout = true;
+      substType = inoutType.getObjectType();
+      origType = origType.getWithoutSpecifierType();
+    }
+
     auto &substTL = M.Types.getTypeLowering(origType, substType);
     ParameterConvention convention;
-    if (isa<InOutType>(substType)) {
-      assert(origType.isTypeParameter() || origType.getAs<InOutType>());
+    if (isInout) {
       convention = ParameterConvention::Indirect_Inout;
     } else if (isFormallyPassedIndirectly(origType, substType, substTL)) {
       if (forSelf && rep == SILFunctionTypeRepresentation::WitnessMethod)
@@ -778,7 +783,7 @@ private:
                                    substTL);
       assert(!isIndirectFormalParameter(convention));
     }
-    auto loweredType = substTL.getLoweredType().getSwiftRValueType();
+    auto loweredType = substTL.getLoweredType().getASTType();
 
     Inputs.push_back(SILParameterInfo(loweredType, convention));
 
@@ -803,7 +808,7 @@ private:
       M.Types.getLoweredType(Foreign.Error->getErrorParameterType());
 
     // Assume the error parameter doesn't have interesting lowering.
-    Inputs.push_back(SILParameterInfo(foreignErrorTy.getSwiftRValueType(),
+    Inputs.push_back(SILParameterInfo(foreignErrorTy.getASTType(),
                                       ParameterConvention::Direct_Unowned));
     NextOrigParamIndex++;
     return true;
@@ -936,14 +941,14 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       } else {
         convention = ParameterConvention::Direct_Guaranteed;
       }
-      SILParameterInfo param(loweredTy.getSwiftRValueType(), convention);
+      SILParameterInfo param(loweredTy.getASTType(), convention);
       inputs.push_back(param);
       break;
     }
     case CaptureKind::Box: {
       // Lvalues are captured as a box that owns the captured value.
       auto boxTy = Types.getInterfaceBoxTypeForCapture(
-          VD, loweredTy.getSwiftRValueType(),
+          VD, loweredTy.getASTType(),
           /*mutable*/ true);
       auto convention = ParameterConvention::Direct_Guaranteed;
       auto param = SILParameterInfo(boxTy, convention);
@@ -954,7 +959,7 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
       // Non-escaping lvalues are captured as the address of the value.
       SILType ty = loweredTy.getAddressType();
       auto param =
-          SILParameterInfo(ty.getSwiftRValueType(),
+          SILParameterInfo(ty.getASTType(),
                            ParameterConvention::Indirect_InoutAliasable);
       inputs.push_back(param);
       break;
@@ -1032,7 +1037,7 @@ static CanSILFunctionType getSILFunctionType(
            "using native Swift error convention for foreign type!");
     SILType exnType = SILType::getExceptionType(M.getASTContext());
     assert(exnType.isObject());
-    errorResult = SILResultInfo(exnType.getSwiftRValueType(),
+    errorResult = SILResultInfo(exnType.getASTType(),
                                 ResultConvention::Owned);
   }
 
@@ -1530,6 +1535,11 @@ public:
     if (tl.isTrivial()) {
       if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
         return ResultConvention::UnownedInnerPointer;
+
+      auto type = tl.getLoweredType();
+      if (type.unwrapOptionalType().getStructOrBoundGenericStruct()
+          == type.getASTContext().getUnmanagedDecl())
+        return ResultConvention::UnownedInnerPointer;
       return ResultConvention::Unowned;
     }
 
@@ -1811,12 +1821,23 @@ static SelectorFamily getSelectorFamily(Identifier name) {
   StringRef text = name.get();
   while (!text.empty() && text[0] == '_') text = text.substr(1);
 
-  StringRef firstWord = camel_case::getFirstWord(text);
+  // Does the given selector start with the given string as a prefix, in the
+  // sense of the selector naming conventions?
+  // This implementation matches the one used by
+  // clang::Selector::getMethodFamily, to make sure we behave the same as Clang
+  // ARC. We're not just calling that method here because it means allocating a
+  // clang::IdentifierInfo, which requires a Clang ASTContext.
+  auto hasPrefix = [](StringRef text, StringRef prefix) {
+    if (!text.startswith(prefix)) return false;
+    if (text.size() == prefix.size()) return true;
+    assert(text.size() > prefix.size());
+    return !clang::isLowercase(text[prefix.size()]);
+  };
 
   auto result = SelectorFamily::None;
   if (false) /*for #define purposes*/;
 #define CHECK_PREFIX(LABEL, PREFIX) \
-  else if (firstWord == PREFIX) result = SelectorFamily::LABEL;
+  else if (hasPrefix(text, PREFIX)) result = SelectorFamily::LABEL;
   FOREACH_FAMILY(CHECK_PREFIX)
 #undef CHECK_PREFIX
 
@@ -1836,14 +1857,14 @@ static SelectorFamily getSelectorFamily(SILDeclRef c) {
     auto *FD = cast<FuncDecl>(c.getDecl());
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
         break;
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
+      case AccessorKind::MaterializeForSet:
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");
       }
     }
@@ -1913,7 +1934,7 @@ public:
       break;
     }
 
-    auto type = tl.getLoweredType().getSwiftRValueType();
+    auto type = tl.getLoweredType().getASTType();
     if (type->hasRetainablePointerRepresentation()
         || (type->getSwiftNewtypeUnderlyingType() && !tl.isTrivial()))
       return ResultConvention::Autoreleased;
@@ -2434,7 +2455,7 @@ public:
   }
 
   SILType subst(SILType type) {
-    return SILType::getPrimitiveType(visit(type.getSwiftRValueType()),
+    return SILType::getPrimitiveType(visit(type.getASTType()),
                                      type.getCategory());
   }
 
@@ -2499,7 +2520,7 @@ public:
 
     AbstractionPattern abstraction(Sig, origType);
     return TheSILModule.Types.getLoweredType(abstraction, substType)
-             .getSwiftRValueType();
+             .getASTType();
   }
 };
 
@@ -2519,7 +2540,7 @@ SILType SILType::subst(SILModule &silModule,
   return STST.subst(*this);
 }
 
-SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
+SILType SILType::subst(SILModule &silModule, SubstitutionMap subs) const{
   return subst(silModule,
                QuerySubstitutionMap{subs},
                LookUpConformanceInSubstitutionMap(subs));
@@ -2530,24 +2551,7 @@ SILType SILType::subst(SILModule &silModule, const SubstitutionMap &subs) const{
 /// type, except using the original conventions.
 CanSILFunctionType
 SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  SubstitutionList subs) {
-  if (subs.empty()) {
-    assert(
-        (!isPolymorphic() || getGenericSignature()->areAllParamsConcrete()) &&
-        "no args for non-concrete polymorphic substitution");
-    return CanSILFunctionType(this);
-  }
-
-  auto subMap = GenericSig->getSubstitutionMap(subs);
-  return substGenericArgs(silModule, subMap);
-}
-
-/// Apply a substitution to this polymorphic SILFunctionType so that
-/// it has the form of the normal SILFunctionType for the substituted
-/// type, except using the original conventions.
-CanSILFunctionType
-SILFunctionType::substGenericArgs(SILModule &silModule,
-                                  const SubstitutionMap &subs) {
+                                  SubstitutionMap subs) {
   if (!isPolymorphic()) {
     return CanSILFunctionType(this);
   }
@@ -2822,13 +2826,13 @@ static bool areABICompatibleParamsOrReturns(SILType a, SILType b) {
     auto types = tup.getElementTypes();
     aElements.append(types.begin(), types.end());
   } else {
-    aElements.push_back(a.getSwiftRValueType());
+    aElements.push_back(a.getASTType());
   }
   if (auto tup = b.getAs<TupleType>()) {
     auto types = tup.getElementTypes();
     bElements.append(types.begin(), types.end());
   } else {
-    bElements.push_back(b.getSwiftRValueType());
+    bElements.push_back(b.getASTType());
   }
 
   if (aElements.size() != bElements.size())

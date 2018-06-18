@@ -23,6 +23,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SubstitutionMap.h"
+#include "SubstitutionMapStorage.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -48,17 +49,62 @@ SubstitutionMap::Storage::Storage(
             getReplacementTypes().data());
   std::copy(conformances.begin(), conformances.end(),
             getConformances().data());
+  populatedAllReplacements = false;
+}
+
+SubstitutionMap::SubstitutionMap(
+                                GenericSignature *genericSig,
+                                ArrayRef<Type> replacementTypes,
+                                ArrayRef<ProtocolConformanceRef> conformances)
+  : storage(Storage::get(genericSig, replacementTypes, conformances)) { }
+
+ArrayRef<Type> SubstitutionMap::getReplacementTypesBuffer() const {
+  return storage ? storage->getReplacementTypes() : ArrayRef<Type>();
+}
+
+MutableArrayRef<Type> SubstitutionMap::getReplacementTypesBuffer() {
+  return storage ? storage->getReplacementTypes() : MutableArrayRef<Type>();
+}
+
+MutableArrayRef<ProtocolConformanceRef>
+SubstitutionMap::getConformancesBuffer() {
+  return storage ? storage->getConformances()
+                 : MutableArrayRef<ProtocolConformanceRef>();
+}
+
+ArrayRef<ProtocolConformanceRef> SubstitutionMap::getConformances() const {
+  return storage ? storage->getConformances()
+                 : ArrayRef<ProtocolConformanceRef>();
 }
 
 ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   if (empty()) return { };
 
   // Make sure we've filled in all of the replacement types.
-  for (auto gp : getGenericSignature()->getGenericParams()) {
-    (void)Type(gp).subst(*this);
+  if (!storage->populatedAllReplacements) {
+    for (auto gp : getGenericSignature()->getGenericParams()) {
+      (void)lookupSubstitution(cast<SubstitutableType>(gp->getCanonicalType()));
+    }
+
+    storage->populatedAllReplacements = true;
   }
 
   return getReplacementTypesBuffer();
+}
+
+GenericSignature *SubstitutionMap::getGenericSignature() const {
+  return storage ? storage->getGenericSignature() : nullptr;
+}
+
+bool SubstitutionMap::empty() const {
+  return getGenericSignature() == nullptr;
+}
+
+bool SubstitutionMap::hasAnySubstitutableParams() const {
+  auto genericSig = getGenericSignature();
+  if (!genericSig) return false;
+
+  return !genericSig->areAllParamsConcrete();
 }
 
 bool SubstitutionMap::hasArchetypes() const {
@@ -127,41 +173,19 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 
 
 SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
-                                     SubstitutionList substitutions) {
+                                     SubstitutionMap substitutions) {
   if (!genericSig) {
-    assert(substitutions.empty() && "Shouldn't have substitutions here");
+    assert(!substitutions.hasAnySubstitutableParams() &&
+           "Shouldn't have substitutions here");
     return SubstitutionMap();
   }
 
-  SmallVector<Type, 4> replacementTypes(genericSig->getGenericParams().size(),
-                                        Type());
-  SmallVector<ProtocolConformanceRef, 4> storedConformances;
-
-  genericSig->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
-      auto sub = substitutions.front();
-      substitutions = substitutions.slice(1);
-
-      auto canTy = depTy->getCanonicalType();
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy)) {
-        replacementTypes[genericSig->getGenericParamOrdinal(paramTy)] =
-          sub.getReplacement();
-      }
-
-      auto conformances = sub.getConformances();
-      assert(reqts.size() == conformances.size());
-
-      for (auto i : indices(conformances)) {
-        assert(reqts[i].getSecondType()->getAnyNominal() ==
-               conformances[i].getRequirement());
-        storedConformances.push_back(conformances[i]);
-      }
-
-      return false;
-    });
-
-  assert(substitutions.empty() && "did not use all substitutions?!");
-  return SubstitutionMap(genericSig, replacementTypes, storedConformances);
+  return SubstitutionMap::get(genericSig,
+           [&](SubstitutableType *type) -> Type {
+             return substitutions.lookupSubstitution(
+                      CanSubstitutableType(type));
+           },
+           LookUpConformanceInSubstitutionMap(substitutions));
 }
 
 /// Build an interface type substitution map for the given generic signature
@@ -173,37 +197,38 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     return SubstitutionMap();
   }
 
-  SmallVector<Type, 4> replacementTypes(genericSig->getGenericParams().size(),
-                                        Type());
-  SmallVector<ProtocolConformanceRef, 4> storedConformances;
+  // Form the replacement types.
+  SmallVector<Type, 4> replacementTypes;
+  replacementTypes.reserve(genericSig->getGenericParams().size());
+  for (auto gp : genericSig->getGenericParams()) {
+    // Don't eagerly form replacements for non-canonical generic parameters.
+    if (!genericSig->isCanonicalTypeInContext(gp->getCanonicalType())) {
+      replacementTypes.push_back(Type());
+      continue;
+    }
 
-  // Enumerate all of the requirements that require substitution.
-  genericSig->enumeratePairedRequirements(
-    [&](Type depTy, ArrayRef<Requirement> reqs) {
-      auto canTy = depTy->getCanonicalType();
+    // Record the replacement.
+    Type replacement = Type(gp).subst(subs, lookupConformance,
+                                      SubstFlags::UseErrorType);
+    replacementTypes.push_back(replacement);
+  }
 
-      // Compute the replacement type.
-      Type currentReplacement = depTy.subst(subs, lookupConformance,
-                                            SubstFlags::UseErrorType);
-      if (auto paramTy = dyn_cast<GenericTypeParamType>(canTy)) {
-        replacementTypes[genericSig->getGenericParamOrdinal(paramTy)] =
-          currentReplacement;
-      }
+  // Form the stored conformances.
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (const auto &req : genericSig->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance) continue;
 
-      // Collect the conformances.
-      for (auto req: reqs) {
-        assert(req.getKind() == RequirementKind::Conformance);
-        auto protoType = req.getSecondType()->castTo<ProtocolType>();
-        auto conformance =
-          lookupConformance(canTy, currentReplacement, protoType)
-            .getValueOr(ProtocolConformanceRef(protoType->getDecl()));
-        storedConformances.push_back(conformance);
-      }
+    CanType depTy = req.getFirstType()->getCanonicalType();
+    auto replacement = depTy.subst(subs, lookupConformance,
+                                   SubstFlags::UseErrorType);
+    auto protoType = req.getSecondType()->castTo<ProtocolType>();
+    auto proto = protoType->getDecl();
+    auto conformance = lookupConformance(depTy, replacement, proto)
+                         .getValueOr(ProtocolConformanceRef(proto));
+    conformances.push_back(conformance);
+  }
 
-      return false;
-    });
-
-  return SubstitutionMap(genericSig, replacementTypes, storedConformances);
+  return SubstitutionMap(genericSig, replacementTypes, conformances);
 }
 
 Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
@@ -250,11 +275,32 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
     // Substitute into the replacement type.
     replacementType = concreteType.subst(*this);
+
+    // If the generic signature is canonical, canonicalize the replacement type.
+    if (getGenericSignature()->isCanonical())
+      replacementType = replacementType->getCanonicalType();
+
     return replacementType;
   }
 
-  // Not known.
-  return Type();
+  // The generic parameter may not be canonical. Retrieve the canonical
+  // type, which will be dependent.
+  CanType canonicalType = genericSig->getCanonicalTypeInContext(genericParam);
+
+  // If nothing changed, we don't have a replacement.
+  if (canonicalType == type) return Type();
+
+  // If we're left with a substitutable type, substitute into that.
+  // First, set the replacement type to an error, to block infinite recursion.
+  replacementType = ErrorType::get(type);
+
+  replacementType = lookupSubstitution(cast<SubstitutableType>(canonicalType));
+
+  // If the generic signature is canonical, canonicalize the replacement type.
+  if (getGenericSignature()->isCanonical())
+    replacementType = replacementType->getCanonicalType();
+
+  return replacementType;
 }
 
 Optional<ProtocolConformanceRef>
@@ -302,7 +348,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       return LookUpConformanceInSignature(*getGenericSignature())(
                                                  type->getCanonicalType(),
                                                  superclass,
-                                                 proto->getDeclaredType());
+                                                 proto);
     }
 
     return None;
@@ -379,7 +425,7 @@ SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
 }
 
-SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
+SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap) const {
   return subst(QuerySubstitutionMap{subMap},
                LookUpConformanceInSubstitutionMap(subMap));
 }
@@ -388,14 +434,14 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
                                        LookupConformanceFn conformances) const {
   if (empty()) return SubstitutionMap();
 
-  return getGenericSignature()->getSubstitutionMap(
+  return get(
+    getGenericSignature(),
     [&](SubstitutableType *type) {
       return Type(type).subst(*this, SubstFlags::UseErrorType)
                .subst(subs, conformances, SubstFlags::UseErrorType);
     },
     [&](CanType dependentType, Type replacementType,
-        ProtocolType *conformedProtocol) ->Optional<ProtocolConformanceRef> {
-      auto proto = conformedProtocol->getDecl();
+        ProtocolDecl *proto) ->Optional<ProtocolConformanceRef> {
       auto conformance =
         lookupConformance(dependentType, proto)
           .getValueOr(ProtocolConformanceRef(proto));
@@ -410,7 +456,8 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           ProtocolConformanceRef conformance) {
   auto protocolSelfType = protocol->getSelfInterfaceType();
 
-  return protocol->getGenericSignature()->getSubstitutionMap(
+  return get(
+    protocol->getGenericSignature(),
     [&](SubstitutableType *type) -> Type {
       if (type->isEqual(protocolSelfType))
         return selfType;
@@ -419,10 +466,9 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
       // inside generic types.
       return Type();
     },
-    [&](CanType origType, Type replacementType, ProtocolType *protoType)
+    [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
       -> Optional<ProtocolConformanceRef> {
-      if (origType->isEqual(protocolSelfType) &&
-          protoType->getDecl() == protocol)
+      if (origType->isEqual(protocolSelfType) && protoType == protocol)
         return conformance;
 
       // This will need to change if we ever support protocols
@@ -482,7 +528,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   if (derivedSubs)
     origSubMap = *derivedSubs;
   else if (derivedSig) {
-    origSubMap = derivedSig->getSubstitutionMap(
+    origSubMap = get(
+        derivedSig,
         [](SubstitutableType *type) -> Type { return type; },
         MakeAbstractConformanceForGenericType());
   }
@@ -494,8 +541,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
 }
 
 SubstitutionMap
-SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
-                                         const SubstitutionMap &secondSubMap,
+SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
+                                         SubstitutionMap secondSubMap,
                                          CombineSubstitutionMaps how,
                                          unsigned firstDepthOrIndex,
                                          unsigned secondDepthOrIndex,
@@ -525,111 +572,78 @@ SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
     return type;
   };
 
-  return genericSig->getSubstitutionMap(
+  return get(
+    genericSig,
     [&](SubstitutableType *type) {
       auto replacement = replaceGenericParameter(type);
       if (replacement)
         return Type(replacement).subst(secondSubMap);
       return Type(type).subst(firstSubMap);
     },
-    [&](CanType type, Type substType, ProtocolType *conformedProtocol) {
+    [&](CanType type, Type substType, ProtocolDecl *conformedProtocol) {
       auto replacement = type.transform(replaceGenericParameter);
       if (replacement)
         return secondSubMap.lookupConformance(replacement->getCanonicalType(),
-                                              conformedProtocol->getDecl());
-      return firstSubMap.lookupConformance(type,
-                                           conformedProtocol->getDecl());
+                                              conformedProtocol);
+      return firstSubMap.lookupConformance(type, conformedProtocol);
     });
 }
 
 void SubstitutionMap::verify() const {
-  // FIXME: Remove the conditional compilation once the substitutions
-  // machinery and GenericSignatureBuilder always generate correct
-  // SubstitutionMaps.
-#if 0 && !defined(NDEBUG)
-  for (auto iter = conformanceMap.begin(), end = conformanceMap.end();
-       iter != end; ++iter) {
-    auto replacement = Type(iter->first).subst(*this, SubstFlags::UseErrorType);
-    if (replacement->isTypeParameter() || replacement->is<ArchetypeType>() ||
-        replacement->isTypeVariableOrMember() ||
-        replacement->is<UnresolvedType>() || replacement->hasError())
+#ifndef NDEBUG
+  if (empty())
+    return;
+
+  unsigned conformanceIndex = 0;
+
+  for (const auto &req : getGenericSignature()->getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
       continue;
-    // Check conformances of a concrete replacement type.
-    for (auto citer = iter->second.begin(), cend = iter->second.end();
-         citer != cend; ++citer) {
-      // An existential type can have an abstract conformance to
-      // AnyObject or an @objc protocol.
-      if (citer->isAbstract() && replacement->isExistentialType()) {
-        auto *proto = citer->getRequirement();
-        assert(proto->isObjC() &&
-               "an existential type can conform only to an "
-               "@objc-protocol");
-        continue;
-      }
-      // All of the conformances should be concrete.
-      if (!citer->isConcrete()) {
-        llvm::dbgs() << "Concrete replacement type:\n";
-        replacement->dump(llvm::dbgs());
+
+    auto substType = req.getFirstType().subst(*this, SubstFlags::UseErrorType);
+    if (substType->isTypeParameter() ||
+        substType->is<ArchetypeType>() ||
+        substType->isTypeVariableOrMember() ||
+        substType->is<UnresolvedType>() ||
+        substType->hasError())
+      continue;
+
+    auto conformance = getConformances()[conformanceIndex];
+
+    // An existential type can have an abstract conformance to
+    // AnyObject or an @objc protocol.
+    if (conformance.isAbstract() &&
+        substType->isExistentialType()) {
+      auto *proto = conformance.getRequirement();
+      if (!proto->isObjC()) {
+        llvm::dbgs() << "Existential type conforms to something:\n";
+        substType->dump();
         llvm::dbgs() << "SubstitutionMap:\n";
         dump(llvm::dbgs());
+        llvm::dbgs() << "\n";
       }
-      assert(citer->isConcrete() && "Conformance should be concrete");
+
+      assert(proto->isObjC() &&
+             "an existential type can conform only to an "
+             "@objc-protocol");
+      continue;
     }
+    // All of the conformances should be concrete.
+    if (!conformance.isConcrete()) {
+      llvm::dbgs() << "Concrete substType type:\n";
+      substType->dump(llvm::dbgs());
+      llvm::dbgs() << "SubstitutionMap:\n";
+      dump(llvm::dbgs());
+      llvm::dbgs() << "\n";
+    }
+    assert(conformance.isConcrete() && "Conformance should be concrete");
+
+    ++conformanceIndex;
   }
 #endif
 }
 
-void SubstitutionMap::dump(llvm::raw_ostream &out) const {
-  auto *genericSig = getGenericSignature();
-  if (genericSig == nullptr) {
-    out << "Empty substitution map\n";
-    return;
-  }
-  out << "Generic signature: ";
-  genericSig->print(out);
-  out << "\n";
-  out << "Substitutions:\n";
-  auto genericParams = genericSig->getGenericParams();
-  auto replacementTypes = getReplacementTypesBuffer();
-  for (unsigned i : indices(genericParams)) {
-    out.indent(2);
-    genericParams[i]->print(out);
-    out << " -> ";
-    if (replacementTypes[i])
-      replacementTypes[i]->print(out);
-    else
-      out << "<<unresolved concrete type>>";
-    out << "\n";
-  }
-
-  out << "\nConformance map:\n";
-  auto conformances = getConformances();
-  for (const auto &req : genericSig->getRequirements()) {
-    if (req.getKind() != RequirementKind::Conformance) continue;
-
-    out.indent(2);
-    req.getFirstType()->print(out);
-    out << " -> ";
-    conformances.front().dump(out);
-    out << "\n";
-
-    conformances = conformances.slice(1);
-  }
-}
-
-void SubstitutionMap::dump() const {
-  return dump(llvm::errs());
-}
-
 void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
   id.AddPointer(storage);
-}
-
-SmallVector<Substitution, 4> SubstitutionMap::toList() const {
-  SmallVector<Substitution, 4> subs;
-  if (empty()) return subs;
-
-  getGenericSignature()->getSubstitutions(*this, subs);
-  return subs;
 }
 

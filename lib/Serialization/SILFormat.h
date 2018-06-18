@@ -142,8 +142,7 @@ namespace sil_block {
   // These IDs must \em not be renumbered or reordered without incrementing
   // VERSION_MAJOR.
   enum RecordKind : uint8_t {
-    // To avoid overlapping with BOUND_GENERIC_SUBSTITUTION, we start from +1.
-    SIL_FUNCTION = decls_block::BOUND_GENERIC_SUBSTITUTION + 1,
+    SIL_FUNCTION = 1,
     SIL_BASIC_BLOCK,
     SIL_ONE_VALUE_ONE_OPERAND,
     SIL_ONE_TYPE,
@@ -176,7 +175,6 @@ namespace sil_block {
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
-    BOUND_GENERIC_SUBSTITUTION = decls_block::BOUND_GENERIC_SUBSTITUTION,
     ABSTRACT_PROTOCOL_CONFORMANCE = decls_block::ABSTRACT_PROTOCOL_CONFORMANCE,
     NORMAL_PROTOCOL_CONFORMANCE = decls_block::NORMAL_PROTOCOL_CONFORMANCE,
     SPECIALIZED_PROTOCOL_CONFORMANCE
@@ -389,7 +387,7 @@ namespace sil_block {
   using SILInstApplyLayout = BCRecordLayout<
     SIL_INST_APPLY,
     BCFixed<3>,           // ApplyKind
-    BCFixed<32>,          // num substitutions
+    SubstitutionMapIDField,  // substitution map
     TypeIDField,          // callee unsubstituted type
     TypeIDField,          // callee substituted type
     ValueIDField,         // callee value
@@ -417,7 +415,7 @@ namespace sil_block {
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<5>, // Optional attributes
+    BCFixed<6>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 
@@ -437,7 +435,7 @@ namespace sil_block {
   using SILTwoOperandsExtraAttributeLayout = BCRecordLayout<
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<5>,          // Optional attributes
+    BCFixed<6>,          // Optional attributes
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

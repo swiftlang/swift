@@ -65,3 +65,38 @@ public protocol DangerousEscaper {
 public func couldActuallyEscape(_ closure: @escaping () -> (), _ villian: DangerousEscaper) {
   villian.malicious(closure)
 }
+
+// We need to store nil on the back-edge.
+// CHECK  sil {{.*}}dontCrash
+// CHECK:  is_escaping_closure [objc]
+// CHECK:  cond_fail
+// CHECK:  destroy_addr %0
+// CHECK:  [[NONE:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK:  store [[NONE]] to %0 : $*Optional<@callee_guaranteed () -> ()>
+public func dontCrash() {
+  for i in 0 ..< 2 {
+    let queue = DispatchQueue(label: "Foo")
+    queue.sync { }
+  }
+}
+
+@_silgen_name("getDispatchQueue")
+func getDispatchQueue() -> DispatchQueue
+
+// We must not release the closure after calling super.deinit.
+// CHECK: sil hidden @$S27closure_lifetime_fixup_objc1CCfD : $@convention(method) (@owned C) -> () {
+// CHECK: bb0([[SELF:%.*]] : $C):
+// CHECK:   [[F:%.*]] = function_ref @$S27closure_lifetime_fixup_objc1CCfdyyXEfU_
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[F]](%0)
+// CHECK:   [[OPT:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt.1, [[PA]]
+// CHECK:   [[DEINIT:%.*]] = objc_super_method [[SELF]] : $C, #NSObject.deinit!deallocator.foreign
+// CHECK:   release_value [[OPT]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK:   [[SUPER:%.*]] = upcast [[SELF]] : $C to $NSObject               // user: %34
+// CHECK-NEXT:   apply [[DEINIT]]([[SUPER]]) : $@convention(objc_method) (NSObject) -> ()
+// CHECK-NEXT:   [[T:%.*]] = tuple ()
+// CHECK-NEXT:   return [[T]] : $()
+class C: NSObject {
+  deinit {
+    getDispatchQueue().sync(execute: { _ = self })
+  }
+}
