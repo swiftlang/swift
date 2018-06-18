@@ -109,7 +109,7 @@ public:
   
   std::string mangleBareProtocol(const ProtocolDecl *Decl) {
     beginMangling();
-    appendProtocolName(Decl);
+    appendProtocolName(Decl, /*allowStandardSubstitution=*/false);
     appendOperator("P");
     return finalize();
   }
@@ -344,7 +344,7 @@ public:
   
   std::string mangleForProtocolDescriptor(ProtocolType *Proto) {
     beginMangling();
-    appendProtocolName(Proto->getDecl());
+    appendProtocolName(Proto->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");
     return finalize();
   }

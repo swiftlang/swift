@@ -696,6 +696,6 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
-// CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
-// CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP4hash4intoys6HasherVz_tFTW
+// CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionaSkSCsACP9hashValueSivgTW
+// CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionaSkSCsACP4hash4intoys6HasherVz_tFTW
 // CHECK-NEXT: }

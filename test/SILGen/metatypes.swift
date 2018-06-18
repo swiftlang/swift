@@ -102,7 +102,7 @@ func existential_metatype_from_thin_value() -> Any.Type {
   return type(of: s)
 }
 
-// CHECK-LABEL: sil hidden @$S9metatypes20specialized_metatypes10DictionaryVySSSiGyF
+// CHECK-LABEL: sil hidden @$S9metatypes20specialized_metatypeSDySSSiGyF
 // CHECK:         metatype $@thin Dictionary<String, Int>.Type
 func specialized_metatype() -> Dictionary<String, Int> {
   let dict = Swift.Dictionary<Swift.String, Int>()
