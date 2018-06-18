@@ -407,18 +407,11 @@ static SILFunction *getCalleeFunction(
     return nullptr;
   }
 
+  // TODO(SR-8015): `shouldInlinePredicate` does too much. Fix this.
   // If the CalleeFunction is a not-transparent definition, we can not process
   // it.
   // SWIFT_ENABLE_TENSORFLOW
   if (!shouldInlinePredicate(AI, *CalleeFunction))
-    return nullptr;
-
-  // If CalleeFunction is a declaration, see if we can load it.
-  if (CalleeFunction->empty())
-    AI.getModule().loadFunction(CalleeFunction);
-
-  // If we fail to load it, bail.
-  if (CalleeFunction->empty())
     return nullptr;
 
   if (F->isSerialized() &&
@@ -679,8 +672,16 @@ class MandatoryInlining : public SILModuleTransform {
                                SetFactory, SetFactory.getEmptySet(), CHA,
                                // SWIFT_ENABLE_TENSORFLOW
                                SILInliner::InlineKind::MandatoryInline,
-         [&](FullApplySite site, const SILFunction &callee) -> bool {
-           return callee.isTransparent() == IsTransparent;
+         [&](FullApplySite site, SILFunction &callee) -> bool {
+           if (callee.isTransparent() != IsTransparent)
+             return false;
+
+           // If CalleeFunction is a declaration, see if we can load it.
+           if (callee.empty())
+             site.getModule().loadFunction(&callee);
+
+           // If we failed to load it, bail.
+           return !callee.empty();
          }
        );
     }
