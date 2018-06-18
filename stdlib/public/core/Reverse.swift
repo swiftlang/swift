@@ -299,6 +299,16 @@ extension LazyCollectionProtocol
   Self: BidirectionalCollection,
   Elements: BidirectionalCollection {
 
+  /// Reversing a lazy reversed array returns a lazy representation of the original array.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  @available(swift, introduced: 4.2)
+  public func reversed<T>() -> LazyCollection<T>
+    where Elements == ReversedCollection<T> {
+      return elements._base.lazy
+  }
+
   /// Returns the elements of the collection in reverse order.
   ///
   /// - Complexity: O(1)
