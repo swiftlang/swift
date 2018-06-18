@@ -44,10 +44,61 @@ protocol ByteTreeObjectDecodable {
 
 // MARK: - Reader objects
 
+// Implicitly create reference semantics for a stack allocated and
+// non-reference counted object by creating a ByteTreeObjectReaderImpl on the
+// stack and passing a pointer to it around, wrapped in another struct to
+// increase ease of use.
+
+// FIXME: We should be able to remove this workaround once we can specify memory
+// ownership
+struct ByteTreeObjectReader {
+  private let impl: UnsafeMutablePointer<ByteTreeObjectReaderImpl>
+
+  init(impl: UnsafeMutablePointer<ByteTreeObjectReaderImpl>) {
+    self.impl = impl
+  }
+
+  /// Read the field at the given index as the specified type. All indicies must
+  /// be read in order starting with 0. Skipping an index will result in a
+  /// runtime assertion error. To discard a field use `discardField(:)`.
+  ///
+  /// - Parameters:
+  ///   - objectType: The type as which this field should be read
+  ///   - index: The index of this field
+  /// - Returns: The decoded field
+  func readField<FieldType: ByteTreeScalarDecodable>(
+    _ objectType: FieldType.Type, index: Int
+  ) -> FieldType {
+    return impl.pointee.readField(objectType, index: index)
+  }
+
+  /// Read the field at the given index as the specified type. All indicies must
+  /// be read in order starting with 0. Skipping an index will result in a
+  /// runtime assertion error. To discard a field use `discardField(:)`.
+  ///
+  /// - Parameters:
+  ///   - objectType: The type as which this field should be read
+  ///   - index: The index of this field
+  /// - Returns: The decoded field
+  func readField<FieldType: ByteTreeObjectDecodable>(
+    _ objectType: FieldType.Type, index: Int
+  ) -> FieldType {
+    return impl.pointee.readField(objectType, index: index)
+  }
+
+  /// Read and immediately discard the field at the specified index. This
+  /// advances the reader by one field so that the next field can be read.
+  ///
+  /// - Parameter index: The index of the field that shall be discarded
+  func discardField(index: Int) {
+    impl.pointee.discardField(index: index)
+  }
+}
+
 /// Helper object for reading objects out a ByteTree. Keeps track that fields
 /// are not read out of order and discards all trailing fields that were present
 /// in the binary format but were not handled when reading the object.
-class ByteTreeObjectReader {
+struct ByteTreeObjectReaderImpl {
   /// The reader that holds a reference to the data from which the object is
   /// read
   private let reader: ByteTreeReader
@@ -63,53 +114,38 @@ class ByteTreeObjectReader {
     self.numFields = numFields
   }
 
-  private func advanceAndValidateIndex(_ index: Int) {
+  private mutating func advanceAndValidateIndex(_ index: Int) {
     assert(index == nextIndex, "Reading fields out of order")
     assert(index < numFields)
     nextIndex += 1
   }
 
-
-  /// Read the field at the given index as the specified type. All indicies must
-  /// be read in order starting with 0. Skipping an index will result in a
-  /// runtime assertion error. To discard a field use `discardField(:)`.
-  ///
-  /// - Parameters:
-  ///   - objectType: The type as which this field should be read
-  ///   - index: The index of this field
-  /// - Returns: The decoded field
-  func readField<FieldType: ByteTreeScalarDecodable>(
+  // Implementation of `ByteTreeObjectReader.readField`
+  mutating func readField<FieldType: ByteTreeScalarDecodable>(
     _ objectType: FieldType.Type, index: Int
   ) -> FieldType {
     advanceAndValidateIndex(index)
     return reader.read(objectType)
   }
 
-  /// Read the field at the given index as the specified type. All indicies must
-  /// be read in order starting with 0. Skipping an index will result in a
-  /// runtime assertion error. To discard a field use `discardField(:)`.
-  ///
-  /// - Parameters:
-  ///   - objectType: The type as which this field should be read
-  ///   - index: The index of this field
-  /// - Returns: The decoded field
-  func readField<FieldType: ByteTreeObjectDecodable>(
+  // Implementation of `ByteTreeObjectReader.readField`
+  mutating func readField<FieldType: ByteTreeObjectDecodable>(
     _ objectType: FieldType.Type, index: Int
   ) -> FieldType {
     advanceAndValidateIndex(index)
     return reader.read(objectType)
   }
 
-  /// Read and immediately discard the field at the specified index. This
-  /// advances the reader by one field so that the next field can be read.
-  ///
-  /// - Parameter index: The index of the field that shall be discarded
-  func discardField(index: Int) {
+  // Implementation of `ByteTreeObjectReader.discardField`
+  mutating func discardField(index: Int) {
     advanceAndValidateIndex(index)
     reader.discardField()
   }
 
-  deinit {
+  // Since we do manual memory management for ByteTreeObjectReaderImpl we need
+  // to call its destructor manually.
+  // FIXME: Change this to deinit when ByteTreeObjectReader becomes a class
+  mutating func finalize() {
     // Discard all fields that have not been read
     while nextIndex < numFields {
       discardField(index: nextIndex)
@@ -117,16 +153,21 @@ class ByteTreeObjectReader {
   }
 }
 
-/// Reader for reading the ByteTree format into Swift objects
-class ByteTreeReader {
+// Implicitly create reference semantics for a stack allocated and
+// non-reference counted object by creating a ByteTreeObjectReaderImpl on the
+// stack and passing a pointer to it around, wrapped in another struct to
+// increase ease of use.
+
+// FIXME: We should be able to remove this workaround once we can specify memory
+// ownership
+struct ByteTreeReader {
   /// The type as which the protocol version is encoded in ByteTree
   typealias ProtocolVersion = UInt32
 
-  /// A pointer pointing to the next byte of serialized data to be read
-  private var pointer: UnsafeRawPointer
+  let impl: UnsafeMutablePointer<ByteTreeReaderImpl>
 
-  private init(pointer: UnsafeRawPointer) {
-    self.pointer = pointer
+  init(impl: UnsafeMutablePointer<ByteTreeReaderImpl>) {
+    self.impl = impl
   }
 
   // MARK: Public entrance function
@@ -144,10 +185,56 @@ class ByteTreeReader {
   ///            failed
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from pointer: UnsafeRawPointer,
-    protocolVerisonValidation: (ProtocolVersion) -> Bool
+    protocolVersionValidation versionValidate: (ProtocolVersion) -> Bool
   ) -> T? {
-    let reader = ByteTreeReader(pointer: pointer)
-    if !reader.readAndValidateProtocolVersion(protocolVerisonValidation) {
+    return ByteTreeReaderImpl.read(rootObjectType, from: pointer,
+                                   protocolVersionValidation: versionValidate)
+  }
+
+  /// Read the next field in the tree as an object of the specified type.
+  ///
+  /// - Parameter objectType: The type as which the next field shall be read
+  /// - Returns: The deserialized object
+  fileprivate func read<T: ByteTreeObjectDecodable>(
+    _ objectType: T.Type
+  ) -> T {
+    return impl.pointee.read(objectType)
+  }
+
+  /// Read the next field in the tree as a scalar of the specified type.
+  ///
+  /// - Parameter scalarType: The type as which the field shall be read
+  /// - Returns: The deserialized scalar
+  fileprivate func read<T: ByteTreeScalarDecodable>(
+    _ scalarType: T.Type
+  ) -> T {
+    return impl.pointee.read(scalarType)
+  }
+
+  /// Discard the next scalar field, advancing the pointer to the next field
+  fileprivate func discardField() {
+    impl.pointee.discardField()
+  }
+}
+
+/// Reader for reading the ByteTree format into Swift objects
+struct ByteTreeReaderImpl {
+  /// A pointer pointing to the next byte of serialized data to be read
+  private var pointer: UnsafeRawPointer
+
+  private init(pointer: UnsafeRawPointer) {
+    self.pointer = pointer
+  }
+
+  // MARK: Public entrance function
+
+  /// Implementation of `ByteTreeReader.read`
+  static func read<T: ByteTreeObjectDecodable>(
+    _ rootObjectType: T.Type, from pointer: UnsafeRawPointer,
+    protocolVersionValidation: (ByteTreeReader.ProtocolVersion) -> Bool
+  ) -> T? {
+    var reader = ByteTreeReaderImpl(pointer: pointer)
+    if !reader.readAndValidateProtocolVersion(protocolVersionValidation) {
       return nil
     }
     return reader.read(rootObjectType)
@@ -160,7 +247,7 @@ class ByteTreeReader {
   ///
   /// - Parameter type: The type as which the current data should be read
   /// - Returns: The read value
-  private func readRaw<T>(_ type: T.Type) -> T {
+  private mutating func readRaw<T>(_ type: T.Type) -> T {
     let result = pointer.bindMemory(to: T.self, capacity: 1).pointee
     pointer = pointer.advanced(by: MemoryLayout<T>.size)
     return result
@@ -170,7 +257,7 @@ class ByteTreeReader {
   /// field.
   ///
   /// - Returns: The read value
-  private func readFieldLength() -> Int {
+  private mutating func readFieldLength() -> Int {
     return Int(UInt32(littleEndian: readRaw(UInt32.self)))
   }
 
@@ -179,34 +266,36 @@ class ByteTreeReader {
   ///
   /// - Parameter validationCallback: A callback that determines if the given
   ///             protocol version can be read
-  private func readAndValidateProtocolVersion(
-    _ validationCallback: (ProtocolVersion) -> Bool
+  private mutating func readAndValidateProtocolVersion(
+    _ validationCallback: (ByteTreeReader.ProtocolVersion) -> Bool
   ) -> Bool {
-    let protocolVersion = ProtocolVersion(littleEndian: 
-      readRaw(ProtocolVersion.self))
+    let protocolVersion = ByteTreeReader.ProtocolVersion(littleEndian:
+      readRaw(ByteTreeReader.ProtocolVersion.self))
     let result = validationCallback(protocolVersion)
-    pointer = pointer.advanced(by: MemoryLayout<ProtocolVersion>.size)
     return result
   }
 
-  /// Read the next field in the tree as an object of the specified type.
-  ///
-  /// - Parameter objectType: The type as which the next field shall be read
-  /// - Returns: The deserialized object
-  fileprivate func read<T: ByteTreeObjectDecodable>(
+  /// Implementation of `ByteTreeReader.read`
+  fileprivate mutating func read<T: ByteTreeObjectDecodable>(
     _ objectType: T.Type
   ) -> T {
     let numFields = readFieldLength()
-    let objectReader = ByteTreeObjectReader(reader: self,
-                                            numFields: numFields)
-    return T.read(from: objectReader, numFields: numFields)
+    return withUnsafeMutablePointer(to: &self) { (selfPointer) in
+      let reader = ByteTreeReader(impl: selfPointer)
+      var objectReaderImpl = ByteTreeObjectReaderImpl(reader: reader,
+                                                      numFields: numFields)
+      defer {
+        objectReaderImpl.finalize()
+      }
+      return withUnsafeMutablePointer(to: &objectReaderImpl) { (impl) in
+        let objectReader = ByteTreeObjectReader(impl: impl)
+        return T.read(from: objectReader, numFields: numFields)
+      }
+    }
   }
 
-  /// Read the next field in the tree as a scalar of the specified type.
-  ///
-  /// - Parameter scalarType: The type as which the field shall be read
-  /// - Returns: The deserialized scalar
-  fileprivate func read<T: ByteTreeScalarDecodable>(
+  /// Implementation of `ByteTreeReader.read`
+  fileprivate mutating func read<T: ByteTreeScalarDecodable>(
     _ scalarType: T.Type
   ) -> T {
     let fieldSize = readFieldLength()
@@ -216,8 +305,8 @@ class ByteTreeReader {
     return T.read(from: pointer, size: fieldSize)
   }
 
-  /// Discard the next scalar field, advancing the pointer to the next field
-  fileprivate func discardField() {
+  /// Implementation of `ByteTreeReader.discardField`
+  fileprivate mutating func discardField() {
     // FIXME: This can currently only discard scalar fields. Object fields
     // should also be discardable
     let fieldSize = readFieldLength()
