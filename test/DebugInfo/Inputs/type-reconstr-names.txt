@@ -4,4 +4,6 @@ $Ss5Int32VD ---> Int32
 $S4blah4mainyyF8PatatinoL_VMa ---> Can't resolve type of $S4blah4mainyyF8PatatinoL_VMa
 $Ss10CollectionP7Element ---> Can't resolve type of $Ss10CollectionP7Element
 $Ss15ContiguousArrayV9formIndex5afterySiz_tFSS_Tg5 ---> (inout Int) -> ()
+<<<<<<< HEAD
 $S13EyeCandySwift21_previousUniqueNumber33_ADC08935D64EA4F796440E7335798735LLs6UInt64Vvp -> UInt64
+$SSayypXpG ---> Array<Any.Type>
