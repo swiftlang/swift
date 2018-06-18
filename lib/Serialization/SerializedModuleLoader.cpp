@@ -223,7 +223,14 @@ FileUnit *SerializedModuleLoader::loadAST(
     M.removeFile(*fileUnit);
   }
 
-  // This is the failure path. If we have a location, diagnose the issue.
+  // From here on is the failure path.
+
+  // Even though the module failed to load, it's possible its contents include
+  // a source buffer that need to survive because it's already been used for
+  // diagnostics.
+  if (auto orphanedBuffer = loadedModuleFile->takeBufferForDiagnostics())
+    OrphanedMemoryBuffers.push_back(std::move(orphanedBuffer));
+
   if (!diagLoc)
     return nullptr;
 
