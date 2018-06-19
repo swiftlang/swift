@@ -369,7 +369,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   // parameter.
   auto canSimplifyOperand = [&](SILType type) -> bool {
     return isLoadableAddressType(type) ||
-           getPrimitiveStructField(type.getSwiftRValueType()) != nullptr;
+           getPrimitiveStructField(type.getASTType()) != nullptr;
   };
 
   // If we don't have to change any operands, don't rewrite the builtin.
@@ -408,7 +408,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
 
     // If this is a struct value, emit struct extraction instruction(s).
     while (auto fieldDecl = getPrimitiveStructField(
-                                     operand->getType().getSwiftRValueType())) {
+                                     operand->getType().getASTType())) {
       auto extract = B.createStructExtract(inst->getLoc(), operand, fieldDecl);
       extract->setDebugLocation(inst->getDebugLocation());
       operand = extract;
@@ -421,7 +421,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   // the old one.
   auto *newInst =
     B.createBuiltin(inst->getLoc(), inst->getName(),
-                    inst->getType(), /*no substitions*/{}, operands);
+                    inst->getType(), SubstitutionMap(), operands);
   newInst->setDebugLocation(inst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
@@ -1544,7 +1544,7 @@ static void expandArrayConstant(ArrayRef<SymbolicValue> arrayElements,
   name += SILTensorOpInfo::getOperandClassSuffix(attrKind);
 
   auto metatypeType =
-    MetatypeType::get(arrayEltType.getSwiftRValueType(),
+    MetatypeType::get(arrayEltType.getASTType(),
                       MetatypeRepresentation::Thin)
       ->getCanonicalType();
   operands.push_back(B.createMetatype(forInst->getLoc(),
@@ -1644,7 +1644,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
 
   if (!errorInfo.empty()) {
     auto loc = getUserSourceLocation(inst);
-    diagnose(inst->getType().getSwiftRValueType()->getASTContext(),
+    diagnose(inst->getType().getASTType()->getASTContext(),
              loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
       .highlight(loc.getSourceRange());
     return nullptr;
@@ -1664,7 +1664,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   auto newInst =
     B.createBuiltin(inst->getLoc(),
                     B.getASTContext().getIdentifier(name),
-                    inst->getType(), /*no substitions*/{},
+                    inst->getType(), SubstitutionMap(),
                     operands);
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
@@ -1751,7 +1751,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   auto newInst =
     B.createBuiltin(inst->getLoc(),
                     B.getASTContext().getIdentifier(name),
-                    inst->getType(), /*no substitions*/{},
+                    inst->getType(), SubstitutionMap(),
                     operands);
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);

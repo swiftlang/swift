@@ -1585,7 +1585,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   /// SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
-    ParserResult<DifferentiableAttr> Attr = parseDifferentiableAttribute(AtLoc, Loc);
+    auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull()) {
       Attributes.add(Attr.get());
     }

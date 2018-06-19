@@ -1004,7 +1004,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
   // OpaqueValue *swift_autoDiffCreateTape(Metadata *type);
   if (Builtin.ID == BuiltinValueKind::AutoDiffCreateTape) {
     auto valueTy =
-      getLoweredTypeAndTypeInfo(IGF.IGM, substitutions[0].getReplacement());
+      getLoweredTypeAndTypeInfo(
+        IGF.IGM, substitutions.getReplacementTypes().front());
     auto *metadata =
       IGF.emitTypeMetadataRef(valueTy.first.getSwiftRValueType());
     out.add(IGF.Builder.CreateCall(IGF.IGM.getAutoDiffCreateTapeFn(),
@@ -1044,8 +1045,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // `id` argument may be discarded. It is used as a marker in SIL.
     (void)args.claimAll();
 
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions[0].getReplacement());
+    auto valueTy = getLoweredTypeAndTypeInfo(
+      IGF.IGM, substitutions.getReplacementTypes().front());
     auto pointerTy = valueTy.second.getStorageType()->getPointerTo();
 
     // Pop alloca from tape and cast to pointer type.

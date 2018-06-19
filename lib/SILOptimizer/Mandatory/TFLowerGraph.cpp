@@ -629,7 +629,7 @@ TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
   // Handle things like TensorHandle<Float>.
   switch (classifyTensorFlowValue(type)) {
   case TFValueKind::TensorHandle: {
-    auto elt = getTensorHandleElementType(type.getSwiftRValueType());
+    auto elt = getTensorHandleElementType(type.getASTType());
     assert(elt && "We know this is TensorHandle!");
     if (auto ty = (TF_DataType)convertSwiftTypeToTF(elt))
       return ty;
@@ -641,7 +641,7 @@ TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
     return TF_VARIANT;
   case TFValueKind::Nope:
     // Otherwise this must be a scalar type we're promoting to a tensor.
-    if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getSwiftRValueType()))
+    if (auto ty = (TF_DataType)convertSwiftTypeToTF(type.getASTType()))
       return ty;
     break;
   }
@@ -1128,7 +1128,7 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   assert(inst->getNumResults() == 1);
 
   std::vector<TF_DataType> outputTypes;
-  auto outputType = inst->getType().getSwiftRValueType();
+  auto outputType = inst->getType().getASTType();
   if (auto tfType = getTFDataTypeFromTensorGenericType(outputType)) {
     outputTypes.push_back(static_cast<TF_DataType>(tfType));
   } else {
