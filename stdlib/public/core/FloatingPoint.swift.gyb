@@ -2501,13 +2501,6 @@ where Self.RawSignificand : FixedWidthInteger,
 
 % end
 
-/// Returns the absolute value of `x`.
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
-public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
-  return x.magnitude
-}
-
 extension FloatingPoint {
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, obsoleted: 4, message: "Please use operators instead.")
