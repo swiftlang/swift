@@ -3488,9 +3488,9 @@ public:
 };
 
 
-/// \brief Matching an array of input to an array of parameter.
+/// \brief Matches array of function parameters to candidate inputs,
+/// which can be anything suitable (e.g., parameters, arguments).
 ///
-/// Input can be anything suitable (e.g., parameter, argument).
 /// It claims inputs sequentially and tries to pair between an input
 /// and the next appropriate parameter. The detailed matching behavior
 /// of each pair is specified by a custom function (i.e., pairMatcher).
@@ -3500,8 +3500,8 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  llvm::SmallBitVector DefaultValueMap;
-  ArrayRef<AnyFunctionType::Param> Params;
+  const llvm::SmallBitVector DefaultValueMap;
+  const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
   enum Result {
@@ -3515,17 +3515,15 @@ public:
     IM_CustomPairMatcherFailed,
   };
 
-  InputMatcher(const ValueDecl *funcDecl,
-      const ArrayRef<AnyFunctionType::Param> params);
+  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+      const llvm::SmallBitVector &defaultValueMap);
 
   /// Matching a given array of inputs.
   ///
   /// \param numInputs The number of inputs.
-  /// \param ignoreLastPair Skip the last parameter and input. This may happen,
-  ///        for example, when we want to match trailing closures separately.
   /// \param pairMatcher Custom matching behavior of an input-parameter pair.
   /// \return the matching result.
-  Result solve(int numInputs, bool ignoreLastPair,
+  Result match(int numInputs,
       std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
 
   size_t getNumSkippedParameters() const {

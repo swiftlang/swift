@@ -660,10 +660,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        InputMatcher IM(decl2, params2);
-        if (IM.solve(numParams1,
-                compareTrailingClosureParamsSeparately,
-                pairMatcher) != InputMatcher::IM_Succeeded)
+        auto defaultMap = computeDefaultMap(params2, decl2,
+            decl2->getDeclContext()->isTypeContext());
+        auto params2ForMatching = params2;
+        if (compareTrailingClosureParamsSeparately) {
+          --numParams1;
+          params2ForMatching = params2.drop_back();
+        }
+
+        InputMatcher IM(params2ForMatching, defaultMap);
+        if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
           return false;
 
         fewerEffectiveParameters |= (IM.getNumSkippedParameters() != 0);
@@ -1358,27 +1364,18 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
   }
 }
 
-InputMatcher::InputMatcher(const ValueDecl *funcDecl,
-    const ArrayRef<AnyFunctionType::Param> params) :
-    NumSkippedParameters(0), Params(params) {
-  DefaultValueMap = computeDefaultMap(params, funcDecl,
-      funcDecl->getDeclContext()->isTypeContext());
+InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+    const llvm::SmallBitVector &defaultValueMap) :
+    NumSkippedParameters(0), DefaultValueMap(defaultValueMap), Params(params) {
 }
 
-InputMatcher::Result InputMatcher::solve(int numInputs,
-    bool ignoreLastPair,
+InputMatcher::Result InputMatcher::match(int numInputs,
     std::function<bool(unsigned, unsigned)> pairMatcher) {
 
   int inputIdx = 0;
   int numParams = Params.size();
-
-  if (ignoreLastPair) {
-    --numInputs;
-    --numParams;
-  }
-
   for (int i = 0; i < numParams; ++i) {
-    // If we've claimed all of the inputs, he rest of the parameters should
+    // If we've claimed all of the inputs, the rest of the parameters should
     // be either default or variadic.
     if (inputIdx == numInputs) {
       if (!DefaultValueMap[i] && !Params[i].isVariadic())
@@ -1398,13 +1395,13 @@ InputMatcher::Result InputMatcher::solve(int numInputs,
     // inputs: (a: Int, c: Int)
     // params: (a: Int, b: Int = 0, c: Int)
     //
-    // and we shouldn't claim parameter from the inputs.
+    // and we shouldn't claim any input and just skip such parameter.
     if ((numInputs - inputIdx) < (numParams - i) && DefaultValueMap[i]) {
       ++NumSkippedParameters;
       continue;
     }
 
-    // Call customized function to match the input-parameter pair.
+    // Call custom function to match the input-parameter pair.
     if (!pairMatcher(inputIdx, i)) return IM_CustomPairMatcherFailed;
 
     // claim the input as used.

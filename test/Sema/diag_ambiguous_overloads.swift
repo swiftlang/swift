@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift
 
 enum E : String {
   case foo = "foo"
@@ -93,17 +93,6 @@ class sr7440_Genre {
   static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
     return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
 // expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
-  }
-}
-
-
-//=-------------- SR-7295 --------------=/
-class sr7295 {
-  func doSomething(a: (() -> Void)? = nil, completion: @escaping ((String, Error?) -> Void)) {}
-  func doSomething(b: @escaping ((String, Error?, Bool) -> Void)) {}
-  func a() {
-    doSomething(a: nil, completion: { _ in })
-// expected-error@-1 {{contextual closure type '(String, Error?) -> Void' expects 2 arguments, but 1 was used in closure body}}
   }
 }
 

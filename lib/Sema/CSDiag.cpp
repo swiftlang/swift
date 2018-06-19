@@ -5665,9 +5665,10 @@ static bool shouldTypeCheckFunctionExpr(TypeChecker &TC, DeclContext *DC,
   return true;
 }
 
-// Check if any of the candidates can accept a specified number of arguments,
-// regardless of parameter type or label information.
-static bool acceptNumArgs(const CalleeCandidateInfo &CCI, size_t numArgs) {
+// Check if any candidate of the overload set can accept a specified
+// number of arguments, regardless of parameter type or label information.
+static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
+                                size_t numArgs) {
   for (unsigned i = 0; i < CCI.size(); ++i) {
     auto &&cand = CCI[i];
     auto funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
@@ -5680,8 +5681,9 @@ static bool acceptNumArgs(const CalleeCandidateInfo &CCI, size_t numArgs) {
       return true;
     };
 
-    InputMatcher IM(funcDecl, params);
-    auto result = IM.solve(numArgs, false, pairMatcher);
+    auto defaultMap = computeDefaultMap(params, funcDecl, cand.level);
+    InputMatcher IM(params, defaultMap);
+    auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded) return true;
     if (result == InputMatcher::IM_HasUnclaimedInput && hasVariadicParameter)
       return true;
@@ -5873,10 +5875,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         numArgs = tuple->getNumElements();
       }
 
-      if (!acceptNumArgs(calleeInfo, numArgs)) {
+      if (!isViableOverloadSet(calleeInfo, numArgs)) {
         CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
                                            hasTrailingClosure, CS);
-        if (acceptNumArgs(calleeInfoOrig, numArgs)) {
+        if (isViableOverloadSet(calleeInfoOrig, numArgs)) {
           fnExpr = callExpr->getFn();
           fnType = getFuncType(CS.getType(fnExpr));
           calleeInfo = calleeInfoOrig;
