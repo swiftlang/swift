@@ -29,6 +29,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DepthFirstIterator.h"
@@ -90,14 +91,10 @@ static SubstitutionMap getSingleSubstitutionMap(SILFunction *f, Type ty) {
 /// substitution map suitable for calling this builtin.
 static SubstitutionMap getSingleSubstitutionMapForBuiltin(
   Identifier builtinName, Type ty, ASTContext &ctx) {
-  SmallVector<ValueDecl *, 1> builtinDecls;
-  DeclName declName(builtinName);
-  ctx.TheBuiltinModule->lookupMember(builtinDecls, ctx.TheBuiltinModule,
-                                     declName, Identifier());
-  assert(builtinDecls.size() == 1 && "No such builtin!");
-  auto *builtinDecl = cast<FuncDecl>(builtinDecls.front());
-  return SubstitutionMap::get(builtinDecl->getGenericSignature(),
-                              [&](SubstitutableType *t) { return ty; },
+  auto builder = GenericSignatureBuilder(ctx);
+  builder.addGenericParameter(GenericTypeParamType::get(0, 0, ctx));
+  auto *genSig = std::move(builder).computeGenericSignature(SourceLoc());
+  return SubstitutionMap::get(genSig, [&](SubstitutableType *t) { return ty; },
                               MakeAbstractConformanceForGenericType());
 }
 
