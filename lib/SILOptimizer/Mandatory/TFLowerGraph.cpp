@@ -586,7 +586,6 @@ static std::string escapeDeclName(DeclName name) {
 std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
                                            const char *baseName) {
   std::string name = baseName;
-  auto *outerScope = loc.getScope();
 
   // Skip over internal implementation details of the Tensor library.
   loc = skipInternalLocations(loc);
