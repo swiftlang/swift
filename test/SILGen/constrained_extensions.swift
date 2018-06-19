@@ -65,7 +65,7 @@ extension Array where Element == Int {
 }
 
 extension Dictionary where Key == Int {
-  // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE1xABySiq_Gyt_tcfC : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> @owned Dictionary<Int, Value> {
+  // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE1xSDySiq_Gyt_tcfC : $@convention(method) <Key, Value where Key == Int> (@thin Dictionary<Int, Value>.Type) -> @owned Dictionary<Int, Value> {
   public init(x: ()) {
     self.init()
   }
