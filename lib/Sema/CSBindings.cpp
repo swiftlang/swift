@@ -70,8 +70,8 @@ ConstraintSystem::determineBestBindings() {
         // either be Exact or Supertypes in order for it to make sense
         // to add Supertype bindings based on the relationship between
         // our type variables.
-        if (binding.Kind != AllowedBindingKind::Exact
-            && binding.Kind != AllowedBindingKind::Supertypes)
+        if (binding.Kind != AllowedBindingKind::Exact &&
+            binding.Kind != AllowedBindingKind::Supertypes)
           continue;
 
         auto type = binding.BindingType;
