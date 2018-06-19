@@ -3760,7 +3760,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
 /// parseFunctionIdentifier
 ///
 ///   function-identifier:
-///     type-identifier unqualified-decl-name
+///     type-identifier? unqualified-decl-name
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
