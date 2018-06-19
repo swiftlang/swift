@@ -595,6 +595,9 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
   // Form a name for this op based on the user's source location and "stack
   // trace" of where it got inlined in user code.  We use the form
   // "file:line:col".
+  //
+  // FIXME: InlinedCallSite is always nullptr even if we use the performance
+  // inliner, so it currently does not track the inlined call site.
   for (auto ds = loc.getScope(); ds; ds = ds->InlinedCallSite) {
     // If the call site location is invalid, stop scanning.
     if (!ds->Loc.getSourceLoc().isValid())
