@@ -626,10 +626,11 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       // Otherwise, use the SIL name.
       std::string funcName;
       auto *dc = SILFn.getDeclContext();
-      if (AbstractFunctionDecl *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc)) {
+      if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc)) {
         funcName = escapeDeclName(afd->getEffectiveFullName());
         // Make sure the name is unique.
-        if (auto declCountLookup = uniqueNames.find(afd))
+        auto declCountLookup = uniqueNames.find(afd);
+        if (declCountLookup != uniqueNames.end())
           funcName += "_" + llvm::itostr(declCountLookup->getSecond()++);
         else
           uniqueNames.insert({afd, 1});
