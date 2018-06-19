@@ -263,7 +263,14 @@ class ASTProducer : public ThreadSafeRefCountedBase<ASTProducer> {
   SmallVector<BufferStamp, 8> Stamps;
   ThreadSafeRefCntPtr<ASTUnit> AST;
   SmallVector<std::pair<std::string, BufferStamp>, 8> DependencyStamps;
-  std::vector<std::pair<SwiftASTConsumerRef, const void*>> QueuedConsumers;
+
+  struct QueuedConsumer {
+    SwiftASTConsumerRef consumer;
+    std::vector<ImmutableTextSnapshotRef> snapshots;
+    const void *oncePerASTToken;
+  };
+
+  std::vector<QueuedConsumer> QueuedConsumers;
   llvm::sys::Mutex Mtx;
 
 public:
@@ -282,8 +289,13 @@ public:
   bool shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
                      ArrayRef<ImmutableTextSnapshotRef> Snapshots);
 
-  void enqueueConsumer(SwiftASTConsumerRef Consumer, const void *OncePerASTToken);
-  std::vector<SwiftASTConsumerRef> popQueuedConsumers();
+  void enqueueConsumer(SwiftASTConsumerRef Consumer,
+                       ArrayRef<ImmutableTextSnapshotRef> Snapshots,
+                       const void *OncePerASTToken);
+
+  using ConsumerPredicate = llvm::function_ref<bool(
+      SwiftASTConsumer *, ArrayRef<ImmutableTextSnapshotRef>)>;
+  std::vector<SwiftASTConsumerRef> takeConsumers(ConsumerPredicate predicate);
 
   size_t getMemoryCost() const {
     // FIXME: Report the memory cost of the overall CompilerInstance.
@@ -557,19 +569,27 @@ void SwiftASTManager::processASTAsync(SwiftInvocationRef InvokRef,
     }
   }
 
-  Producer->enqueueConsumer(std::move(ASTConsumer), OncePerASTToken);
+  Producer->enqueueConsumer(ASTConsumer, Snapshots, OncePerASTToken);
 
-  Producer->getASTUnitAsync(Impl, Snapshots,
-    [Producer](ASTUnitRef Unit, StringRef Error) {
-      auto Consumers = Producer->popQueuedConsumers();
+  auto handleAST = [this, Producer, ASTConsumer](ASTUnitRef unit,
+                                                 StringRef error) {
+    auto consumers = Producer->takeConsumers(
+        [&](SwiftASTConsumer *consumer,
+            ArrayRef<ImmutableTextSnapshotRef> snapshots) {
+          return consumer == ASTConsumer.get() ||
+                 !Producer->shouldRebuild(Impl, snapshots) ||
+                 (unit && consumer->canUseASTWithSnapshots(snapshots));
+        });
 
-      for (auto &Consumer : Consumers) {
-        if (Unit)
-          Unit->Impl.consumeAsync(std::move(Consumer), Unit);
-        else
-          Consumer->failed(Error);
-      }
-    });
+    for (auto &consumer : consumers) {
+      if (unit)
+        unit->Impl.consumeAsync(std::move(consumer), unit);
+      else
+        consumer->failed(error);
+    }
+  };
+
+  Producer->getASTUnitAsync(Impl, Snapshots, std::move(handleAST));
 }
 
 void SwiftASTManager::removeCachedAST(SwiftInvocationRef Invok) {
@@ -689,30 +709,37 @@ ASTUnitRef ASTProducer::getASTUnitImpl(SwiftASTManager::Implementation &MgrImpl,
   return AST;
 }
 
-void ASTProducer::enqueueConsumer(SwiftASTConsumerRef Consumer,
-                                  const void *OncePerASTToken) {
+void ASTProducer::enqueueConsumer(SwiftASTConsumerRef consumer,
+                                  ArrayRef<ImmutableTextSnapshotRef> snapshots,
+                                  const void *oncePerASTToken) {
   llvm::sys::ScopedLock L(Mtx);
-  if (OncePerASTToken) {
+  if (oncePerASTToken) {
     for (auto I = QueuedConsumers.begin(),
               E = QueuedConsumers.end(); I != E; ++I) {
-      if (I->second == OncePerASTToken) {
-        I->first->cancelled();
+      if (I->oncePerASTToken == oncePerASTToken) {
+        I->consumer->cancelled();
         QueuedConsumers.erase(I);
         break;
       }
     }
   }
-  QueuedConsumers.push_back({ std::move(Consumer), OncePerASTToken });
+  QueuedConsumers.push_back({std::move(consumer), snapshots, oncePerASTToken});
 }
 
-std::vector<SwiftASTConsumerRef> ASTProducer::popQueuedConsumers() {
+std::vector<SwiftASTConsumerRef>
+ASTProducer::takeConsumers(ConsumerPredicate predicate) {
   llvm::sys::ScopedLock L(Mtx);
-  std::vector<SwiftASTConsumerRef> Consumers;
-  Consumers.reserve(QueuedConsumers.size());
-  for (auto &C : QueuedConsumers)
-    Consumers.push_back(std::move(C.first));
-  QueuedConsumers.clear();
-  return Consumers;
+  std::vector<SwiftASTConsumerRef> consumers;
+
+  QueuedConsumers.erase(std::remove_if(QueuedConsumers.begin(),
+      QueuedConsumers.end(), [&](QueuedConsumer &qc) {
+    if (predicate(qc.consumer.get(), qc.snapshots)) {
+      consumers.push_back(std::move(qc.consumer));
+      return true;
+    }
+    return false;
+  }), QueuedConsumers.end());
+  return consumers;
 }
 
 bool ASTProducer::shouldRebuild(SwiftASTManager::Implementation &MgrImpl,
