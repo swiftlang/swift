@@ -289,9 +289,12 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("Conv2DBackpropInput", shape, filter, backpropOutput,
-                 strides: [strides.0, strides.1, strides.2, strides.3],
-                 padding: padding.cName)
+    return Raw.conv2DBackpropInput(
+      inputSizes: shape,
+      filter: filter,
+      outBackprop: backpropOutput,
+      strides: [strides.0, strides.1, strides.2, strides.3],
+      padding: padding.raw)
   }
 
   /// TensorFlow builtin conv2d gradient helper for the filter.
@@ -307,9 +310,12 @@ extension Tensor where Scalar : BinaryFloatingPoint {
     strides: (Int32, Int32, Int32, Int32),
     padding: Padding
   ) -> Tensor {
-    return #tfop("Conv2DBackpropFilter", input, filterSizes, backpropOutput,
-                 strides: [strides.0, strides.1, strides.2, strides.3],
-                 padding: padding.cName)
+    return Raw.conv2DBackpropFilter(
+      input,
+      filterSizes: filterSizes,
+      outBackprop: backpropOutput,
+      strides: [strides.0, strides.1, strides.2, strides.3],
+      padding: padding.raw)
   }
 
   @_inlineable @_versioned
@@ -378,9 +384,13 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
     // closed form.
-    return #tfop(
-      "MaxPoolGradV2", shapeTensor, originalValue, seed, Tensor<Int32>(kernelSize),
-      Tensor<Int32>(strides), padding: padding.cName
+    return Raw.maxPoolGradV2(
+      origInput: self,
+      origOutput: originalValue,
+      grad: seed,
+      ksize: Tensor<Int32>(kernelSize),
+      strides: Tensor<Int32>(strides),
+      padding: padding.raw
     )
   }
 
@@ -394,11 +404,12 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   ) -> Tensor {
     // TODO: Currently this is not higher order differentiable. Redefine in
     // closed form.
-    return #tfop(
-      "AvgPoolGrad", shapeTensor, seed,
+    return Raw.avgPoolGrad(
+      origInputShape: shapeTensor,
+      grad: seed,
       ksize: [kernelSize.0, kernelSize.1, kernelSize.2, kernelSize.3],
       strides: [strides.0, strides.1, strides.2, strides.3],
-      padding: padding.cName
+      padding: padding.raw
     )
   }
 }
