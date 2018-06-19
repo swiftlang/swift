@@ -217,6 +217,10 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   llvm::SmallSet<int, 4> processedTensorIdsForSend;
   llvm::SmallSet<int, 4> processedTensorIdsForReceive;
 
+  /// Mapping from declarations to the number to times a TF_Function took the
+  /// name from.
+  llvm::SmallDenseMap<ValueDecl *, unsigned> uniqueNames;
+
   /// This flag gets set if lowering code to the graph produces a TensorFlow
   /// error and emits a diagnostic.  This tells us to stop lowering and give up
   /// gracefully.
@@ -622,10 +626,16 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       // Otherwise, use the SIL name.
       std::string funcName;
       auto *dc = SILFn.getDeclContext();
-      if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc))
+      if (AbstractFunctionDecl *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc)) {
         funcName = escapeDeclName(afd->getEffectiveFullName());
-      else
+        // Make sure the name is unique.
+        if (auto declCountLookup = uniqueNames.find(afd))
+          funcName += "_" + llvm::itostr(declCountLookup->getSecond()++);
+        else
+          uniqueNames.insert({afd, 1});
+      } else {
         funcName = fnName.str();
+      }
 
       name += funcName + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
@@ -639,7 +649,7 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
     if (sourceLoc.isValid()) {
       auto lineCol = SM.getLineAndColumn(sourceLoc);
       auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
-      name += "." + bufferID.str() + "." + llvm::utostr(lineCol.first);
+      name += "/" + bufferID.str() + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
