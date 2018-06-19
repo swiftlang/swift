@@ -14,6 +14,10 @@ func testTrailingClosure() -> String {
     .map({ $0 + 1 })
 }
 
+func foobar(first: String? = nil, closure: () -> Void) { fatalError() }
+func blah() {
+  _ = foobar(closure: { print("foo") })
+}
 
 
 
