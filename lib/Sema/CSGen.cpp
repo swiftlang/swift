@@ -1482,78 +1482,51 @@ namespace {
       auto diffAttr = originalAttrs.getAttribute<DifferentiableAttr>();
 
       // Set the adjoint function in the adjoint expression.
-      auto adjointFunc = diffAttr->getAdjointFunction();
-      assert(adjointFunc &&
+      auto adjointDecl = diffAttr->getAdjointFunction();
+      assert(adjointDecl &&
              "adjoint for valid @differentiable attribute should be defined");
-
-      // This is an inline version of `addMemberRefConstraints` that tries to
-      // serve the same purpose, but ignores access control when performing
-      // lookup. This is important for finding normally inaccessible adjoint
-      // functions.
-      // This version omits code for handling member expressions that
-      // aren't methods (e.g. stored variables).
-      auto addMemberRefConstraints =
-          [&](Expr *expr, DeclName name, FunctionRefKind funcRefKind) -> Type {
-        assert(baseType && "Base type must be set");
-
-        auto memberLocator =
-          CS.getConstraintLocator(expr, ConstraintLocator::Member);
-        auto tv = CS.createTypeVariable(
-          memberLocator, TVO_CanBindToLValue | TVO_CanBindToInOut);
-
-        // Code copied from CS.performMemberLookup, with simplifications.
-        Type baseObjTy = baseType->getRValueType();
-        Type instanceTy = baseObjTy;
-        if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>())
-          instanceTy = baseObjMeta->getInstanceType();
-
-        MemberLookupResult result;
-        if (auto *selfTy = instanceTy->getAs<DynamicSelfType>())
-          instanceTy = selfTy->getSelfType();
-        assert(instanceTy->mayHaveMembers() &&
-               "Instance type should be able to have members");
-
-        // Ignore access control when doing adjoint lookup.
-        auto options = defaultMemberLookupOptions
-          | NameLookupFlags::IgnoreAccessControl;
-        auto lookupResult = TC.lookupMember(CurDC, instanceTy, name, options);
-        for (auto entry : lookupResult) {
-          OverloadChoice choice(baseType, entry.getValueDecl(), funcRefKind);
-          result.addViable(choice);
-        }
-        CS.addOverloadSet(tv, result.ViableCandidates, CurDC, memberLocator,
-                          result.getFavoredChoice());
-        return tv;
-      };
 
       // The adjoint decl ref is set here, without substitutions.
       // The correct substitutions for the adjoint decl ref are set in CSApply.
-      AE->setAdjointFunction(adjointFunc);
+      AE->setAdjointFunction(adjointDecl);
+
+      // This is an inline version of `addMemberRefConstraints` that uses
+      // base type directly instead of taking a base expression.
+      auto addMemberRefConstraints =
+          [&](Expr *expr, FunctionRefKind funcRefKind) -> Type {
+        assert(baseType && "Base type must be set");
+        auto memberLocator =
+          CS.getConstraintLocator(expr, ConstraintLocator::Member);
+        auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
+        OverloadChoice choice =
+          OverloadChoice(baseType, adjointDecl, funcRefKind);
+        CS.addBindOverloadConstraint(tv, choice, memberLocator, CurDC);
+        return tv;
+      };
 
       // Add constraints on the type of the #adjoint expression.
       // - If adjoint is within a type context (it is an instance/static
       //   method), add member reference constraints.
       // Code copied from `visitUnresolvedDotExpr`.
-      if (adjointFunc->getInnermostTypeContext()) {
+      if (adjointDecl->getInnermostTypeContext()) {
         if (!baseType) {
-          assert(adjointFunc->isInstanceMember() || adjointFunc->isStatic() &&
+          assert(adjointDecl->isInstanceMember() || adjointDecl->isStatic() &&
                  "Expected adjoint to be an instance/static method");
           auto methodContext = CurDC->getInnermostMethodContext();
           baseType = methodContext->getParameterList(0)->get(0)->getType();
         }
-        if (adjointFunc->isInstanceMember())
+        if (adjointDecl->isInstanceMember())
           baseType = MetatypeType::get(baseType, ctx);
         if (baseType->hasUnboundGenericType())
           baseType = CS.openUnboundGenericType(baseType, locator);
-        return addMemberRefConstraints(AE, adjointFunc->getFullName(),
-                                       AE->getFunctionRefKind());
+        return addMemberRefConstraints(AE, AE->getFunctionRefKind());
       }
 
       // - Otherwise, if adjoint is a top-level function, create overload choice
       //   and immediately resolve it.
       // Code copied from `visitDeclRefExpr`.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
-      OverloadChoice choice(Type(), adjointFunc, AE->getFunctionRefKind());
+      OverloadChoice choice(Type(), adjointDecl, AE->getFunctionRefKind());
       CS.resolveOverload(locator, tv, choice, CurDC);
       return tv;
     }
