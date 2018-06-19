@@ -217,11 +217,10 @@ void DevicePartitionCloner::addD2DSend(BuiltinInst *inst, int transferId,
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto valueToSend = remapValue(inst->getOperand(0));
   auto destDeviceStr = getDeviceString(destDevice);
-  auto valueTy = inst->getResults()[0]->getType();
   auto destDeviceAttr = B.createStringLiteral(
       loc, StringRef(destDeviceStr), StringLiteralInst::Encoding::UTF8);
   B.createBuiltin(loc, ctx.getIdentifier(newInstName), voidTy,
-                  /*MERGE*/ inst->getSubstitutions(),
+                  inst->getSubstitutions(),
                   {valueToSend, transferIdAttr, destDeviceAttr, deviceAttr});
   // Do not update ValueMap since Send does not produce a value.
 }
