@@ -35,6 +35,7 @@ func testLabels<T : BinaryFloatingPoint>(_ t: Tensor<T>) {
   // If the #adjoint expression is applied directly, argument labels are
   // necessary.
   // This matches the behavior for normal function application.
+  _ = #adjoint(matmul)(t, t, originalValue: t, seed: t)
   _ = #adjoint(Tensor.+)(t, t, originalValue: t, seed: t)
   _ = #adjoint(Tensor.batchNormalized)(t)(
     alongAxis: 0, offset: 0, scale: 0, epsilon: 0, originalValue: t, seed: t
@@ -42,6 +43,9 @@ func testLabels<T : BinaryFloatingPoint>(_ t: Tensor<T>) {
 
   // If the #adjoint expression is unapplied and bound to a variable, argument
   // labels are not necessary.
+  let dMatmul: (Tensor<T>, Tensor<T>, Tensor<T>, Tensor<T>) -> (Tensor<T>, Tensor<T>)
+    = #adjoint(matmul)
+  _ = dMatmul(t, t, t, t)
   let dAdd = #adjoint(Tensor<T>.+)
   _ = dAdd(t, t, t, t)
   let dBatchNorm = #adjoint(Tensor<T>.batchNormalized)
