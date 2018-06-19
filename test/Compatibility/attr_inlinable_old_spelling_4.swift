@@ -5,3 +5,6 @@
 
 @_inlineable public func oldInlinableFunction() {}
 @_versioned func oldVersionedFunction() {}
+
+// No warning here
+@_inlineable @_versioned func redundantAttribute() {}
