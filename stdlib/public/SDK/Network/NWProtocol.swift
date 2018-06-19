@@ -32,7 +32,7 @@ public class NWProtocolDefinition : Equatable, CustomDebugStringConvertible {
 	}
 }
 
-/// NWProtocolOptions is an abtract superclass that represents a configuration options
+/// NWProtocolOptions is an abstract superclass that represents a configuration options
 /// that can be used to add a protocol into an NWParameters.ProtocolStack. These options
 /// configure the behavior of a protocol and cannot be changed after starting a connection.
 @available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
@@ -45,7 +45,7 @@ public class NWProtocolOptions {
 	}
 }
 
-/// NWProtocolMetadata is an abtract superclass. An instance of metadata holds a set of
+/// NWProtocolMetadata is an abstract superclass. An instance of metadata holds a set of
 /// protocol-specific metadata. This metadata allows clients to pass down protocol requirements
 /// specific to some content being sent; as well as to retrieve metadata specific to some
 /// content that was received. Each protocol is responsible for defining its own accessor
