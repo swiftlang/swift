@@ -20,18 +20,17 @@ ClassAddVirtualMethodSubclassTest.test("AddVirtualMethod") {
   expectEqual(2, t.f3())
 }
 
-class AddVirtualMethodGenericSubclass<T : Strideable> : AddVirtualMethod
-    where T.Stride == Int {
-  func f3(_ t: T) -> T {
-    return t + f1()
+class AddVirtualMethodGenericSubclass<T> : AddVirtualMethod {
+  func f3(_ t: T) -> [Int : T] {
+     return [f1() : t]
   }
 }
 
 ClassAddVirtualMethodSubclassTest.test("AddVirtualMethodGeneric") {
-  let t = AddVirtualMethodGenericSubclass<Int32>()
+  let t = AddVirtualMethodGenericSubclass<String>()
 
   expectEqual(1, t.f1())
-  expectEqual(2, t.f3(1))
+  expectEqual([1 : "hi"], t.f3("hi"))
 }
 
 runAllTests()
