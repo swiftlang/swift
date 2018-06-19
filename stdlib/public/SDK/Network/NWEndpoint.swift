@@ -459,7 +459,7 @@ public enum NWEndpoint: Hashable, CustomDebugStringConvertible {
 	/// A service endpoint represents a Bonjour service
 	case service(name: String, type: String, domain: String, interface: NWInterface?)
 
-	/// A unix endpoint represnts a path that supports connections using AF_UNIX domain sockets.
+	/// A unix endpoint represents a path that supports connections using AF_UNIX domain sockets.
 	case unix(path: String)
 
 	/// A Host is a name or address
