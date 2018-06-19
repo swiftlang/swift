@@ -59,14 +59,16 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// CHECK-NEXT:  %2 = metatype $@thin Int32.Type
-// CHECK-NEXT:  %3 = integer_literal $Builtin.Int32, 1
-// CHECK-NEXT:  %4 = integer_literal $Builtin.Int32, 2
-// CHECK-NEXT:  %5 = integer_literal $Builtin.Int32, 3
-// CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 4
-// CHECK-NEXT:  %7 = string_literal utf8 "SAME"
-// CHECK:       %9 = builtin "__tfop_Conv2D,$in,$in,strides$array,$elt,$elt,$elt,$elt,padding,device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thin Int32.Type, %3 : $Builtin.Int32, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.RawPointer
-// CHECK-NEXT:  return %9 : $TensorHandle<Float>
+// CHECK-NEXT:  %2 = metatype $@thick Float.Type
+// CHECK-NEXT:  %3 = metatype $@thin Int32.Type
+// CHECK-NEXT:  %4 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %5 = integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:  %7 = integer_literal $Builtin.Int32, 4
+// CHECK-NEXT:  %8 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  %9 = string_literal utf8 "SAME"
+// CHECK:       builtin "__tfop_Conv2D,$in,$in,T,strides$array,$elt,$elt,$elt,$elt,use_cudnn_on_gpu,padding,data_format,dilations$array,$elt,$elt,$elt,$elt,device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1, %9 : $Builtin.RawPointer, %10 : $Builtin.RawPointer, %11 : $@thin Int32.Type, %12 : $Builtin.Int32, %13 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK-NEXT:  return %17 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
 
