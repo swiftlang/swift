@@ -6865,10 +6865,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       isInDefaultArgumentContext = (initalizerCtx->getInitializerKind() ==
                                     InitializerKind::DefaultArgument);
     auto toEI = toFunc->getExtInfo();
+
+    auto fromFunc = fromType->getAs<FunctionType>();
+
     // Coercion to an autoclosure type produces an implicit closure.
+    // The constraint solver only performs this conversion when the source
+    // type is not an autoclosure function type.  That's a weird rule in
+    // some rules, but it's easy to follow here.  Really we just shouldn't
+    // represent autoclosures as a bit on function types.
     // FIXME: The type checker is more lenient, and allows @autoclosures to
     // be subtypes of non-@autoclosures, which is bogus.
-    if (toFunc->isAutoClosure()) {
+    if (toFunc->isAutoClosure() &&
+        (!fromFunc || !fromFunc->isAutoClosure())) {
       // The function type without @noescape if we are in the default argument
       // context.
       auto newToFuncType = toFunc;
@@ -6909,7 +6917,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     // Coercion from one function type to another, this produces a
     // FunctionConversionExpr in its full generality.
-    if (auto fromFunc = fromType->getAs<FunctionType>()) {
+    if (fromFunc) {
       // If we have a ClosureExpr, then we can safely propagate the 'no escape'
       // bit to the closure without invalidating prior analysis.
       auto fromEI = fromFunc->getExtInfo();

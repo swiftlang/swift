@@ -146,6 +146,7 @@ func migrateAC(@autoclosure _: () -> ()) { }
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
+func takesThrowingAutoclosure(_: @autoclosure () throws -> Int) {}
 
 func callAutoclosureWithNoEscape(_ fn: () -> Int) {
   takesAutoclosure(1+1) // ok
@@ -160,4 +161,17 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
 // expected-error @+1 {{'@autoclosure' must not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
+}
+
+// rdar://41219750
+// These are all arguably invalid; the autoclosure should have to be called.
+// But as long as we allow them, we shouldn't crash.
+func passNonThrowingToNonThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesAutoclosure(fn)
+}
+func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesThrowingAutoclosure(fn)
+}
+func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
+  takesThrowingAutoclosure(fn)
 }
