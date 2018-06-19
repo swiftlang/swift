@@ -2269,7 +2269,9 @@ static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
 static void VisitNode(
     ASTContext *ast,
     Demangle::NodePointer node, VisitNodeResult &result) {
-  assert(result._error.empty());
+  // If we have an error, no point in going forward.
+  if (!result._error.empty())
+    return;
 
   const Demangle::Node::Kind nodeKind = node->getKind();
 
