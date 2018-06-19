@@ -562,6 +562,9 @@ ERROR(cannot_return_value_from_void_func,none,
 
 ERROR(sema_no_import,Fatal,
       "no such module '%0'", (StringRef))
+ERROR(sema_no_import_arch,Fatal,
+      "could not find module '%0' for architecture '%1'; "
+      "found: %2", (StringRef, StringRef, StringRef))
 ERROR(sema_no_import_repl,none,
       "no such module '%0'", (StringRef))
 NOTE(sema_no_import_no_sdk,none,
