@@ -167,12 +167,8 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 ///     print("Average: \(average)°F in \(validTemps.count) " +
 ///           "out of \(tempsFahrenheit.count) observations.")
 ///     // Prints "Average: 74.84°F in 5 out of 7 observations."
-public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
-
-  // For the minimumMagnitude and maximumMagnitude methods
-  /// A type that can represent the absolute value of any possible value of the
-  /// conforming type.
-  associatedtype Magnitude = Self
+public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
+                                where Magnitude == Self {
 
   /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
