@@ -19,7 +19,7 @@ public class NWProtocolTLS : NWProtocol {
 	public class Options : NWProtocolOptions {
 		/// Access the sec_protocol_options_t for a given network protocol
 		/// options instance. See <Security/SecProtocolOptions.h> for functions
-		/// to futher configure security options.
+		/// to further configure security options.
 		public var securityProtocolOptions: sec_protocol_options_t {
 			return nw_tls_copy_sec_protocol_options(self.nw)
 		}
@@ -39,7 +39,7 @@ public class NWProtocolTLS : NWProtocol {
 	public class Metadata: NWProtocolMetadata {
 		/// Access the sec_protocol_metadata_t for a given network protocol
 		/// metadata instance. See <Security/SecProtocolMetadata.h> for functions
-		/// to futher access security metadata.
+		/// to further access security metadata.
 		public var securityProtocolMetadata: sec_protocol_metadata_t {
 			return nw_tls_copy_sec_protocol_metadata(self.nw)
 		}
