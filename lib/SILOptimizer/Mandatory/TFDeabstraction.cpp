@@ -421,7 +421,7 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
   // the old one.
   auto *newInst =
     B.createBuiltin(inst->getLoc(), inst->getName(),
-                    inst->getType(), /*no substitions*/{}, operands);
+                    inst->getType(), SubstitutionMap(), operands);
   newInst->setDebugLocation(inst->getDebugLocation());
 
   // Replace the old with the new and delete the old instruction.
@@ -1664,7 +1664,7 @@ tryToPromoteTensorFromScalars(ApplyInst *inst,
   auto newInst =
     B.createBuiltin(inst->getLoc(),
                     B.getASTContext().getIdentifier(name),
-                    inst->getType(), /*no substitions*/{},
+                    inst->getType(), SubstitutionMap(),
                     operands);
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);
@@ -1751,7 +1751,7 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
   auto newInst =
     B.createBuiltin(inst->getLoc(),
                     B.getASTContext().getIdentifier(name),
-                    inst->getType(), /*no substitions*/{},
+                    inst->getType(), SubstitutionMap(),
                     operands);
   newInst->setDebugLocation(inst->getDebugLocation());
   inst->replaceAllUsesPairwiseWith(newInst);

@@ -27,6 +27,8 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DepthFirstIterator.h"
@@ -72,6 +74,31 @@ static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
   assert(fieldIt == decl->getStoredProperties().end() &&
          "Struct should have one member");
   return fieldType;
+}
+
+/// Given a generic function with a single generic parameter `<T>(...) -> ...`
+/// an a type for substitution, return a substitution map that's suitable for
+/// calling this func.
+static SubstitutionMap getSingleSubstitutionMap(SILFunction *f, Type ty) {
+  return SubstitutionMap::get(
+    f->getGenericEnvironment()->getGenericSignature(),
+    [&](SubstitutableType *t) { return ty; },
+    MakeAbstractConformanceForGenericType());
+}
+
+/// Given a known builtin name and a type for substitution, returns a
+/// substitution map suitable for calling this builtin.
+static SubstitutionMap getSingleSubstitutionMapForBuiltin(
+  Identifier builtinName, Type ty, ASTContext &ctx) {
+  SmallVector<ValueDecl *, 1> builtinDecls;
+  DeclName declName(builtinName);
+  ctx.TheBuiltinModule->lookupMember(builtinDecls, ctx.TheBuiltinModule,
+                                     declName, Identifier());
+  assert(builtinDecls.size() == 1 && "No such builtin!");
+  auto *builtinDecl = cast<FuncDecl>(builtinDecls.front());
+  return SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                              [&](SubstitutableType *t) { return ty; },
+                              MakeAbstractConformanceForGenericType());
 }
 
 /// Classification of instructions that are interesting to the partitioning
@@ -188,7 +215,7 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   // compatible.
   if (isa<IntegerLiteralInst>(inst) || isa<FloatLiteralInst>(inst)) {
     auto resultTy = inst->getResults()[0]->getType();
-    if (isValidTensorFlowElementType(resultTy.getSwiftRValueType()))
+    if (isValidTensorFlowElementType(resultTy.getASTType()))
       return { "Const", PromotedScalarKind::Literal };
   }
 
@@ -208,13 +235,13 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   // types.
   if (builtin->getNumOperands() != 0) {
     auto opTy = builtin->getOperand(0)->getType();
-    if (!isValidTensorFlowElementType(opTy.getSwiftRValueType()))
+    if (!isValidTensorFlowElementType(opTy.getASTType()))
       return { nullptr, PromotedScalarKind::Invalid };
   }
   // Verify the result is a valid tensorflow type, or a 2-element tuple that
   // starts with one (used by the overflowing ops).
-  if (!isValidTensorFlowElementType(builtin->getType().getSwiftRValueType())) {
-    auto *tt = builtin->getType().getSwiftRValueType()->getAs<TupleType>();
+  if (!isValidTensorFlowElementType(builtin->getType().getASTType())) {
+    auto *tt = builtin->getType().getASTType()->getAs<TupleType>();
     if (!tt || tt->getNumElements() != 2 ||
         !isValidTensorFlowElementType(tt->getElementType(0)))
       return { nullptr, PromotedScalarKind::Invalid };
@@ -286,7 +313,7 @@ static SILType convertToTensorValueType(SILType ty) {
   if (isTensorFlowValue(ty))
     return ty;
 
-  return convertToTensorValueType(ty.getSwiftRValueType(), ty.getASTContext());
+  return convertToTensorValueType(ty.getASTType(), ty.getASTContext());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2207,7 +2234,7 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   B.setCurrentDebugScope(getOpScope(inst->getDebugScope()));
 
   auto cond = getOpValue(inst->getCondition());
-  auto condTy = cond->getType().getSwiftRValueType();
+  auto condTy = cond->getType().getASTType();
 
   if (auto eltTy = getTensorHandleElementType(condTy)) {
     assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
@@ -2244,8 +2271,8 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
     // UncheckedRefCast to get it to the right type.  These are treated as noops
     // by GraphGen.
     auto result = remapValue(inst->getOperand(0));
-    if (!inst->getType().getSwiftRValueType()
-          ->isEqual(result->getType().getSwiftRValueType())) {
+    if (!inst->getType().getASTType()
+          ->isEqual(result->getType().getASTType())) {
       result = B.createUncheckedRefCast(loc, result, inst->getType());
     }
 
@@ -2338,7 +2365,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     // Literals take attributes specifying the dtype and value.
     opName += ",dtype$dtype,value$tensor";
 
-    auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
+    auto dtype = convertSwiftTypeToTF(inst->getType().getASTType());
     auto dtypeCst =
       B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
                              dtype);
@@ -2353,7 +2380,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
     opName += ",$in,DstT$dtype";
-    auto dtype = convertSwiftTypeToTF(inst->getType().getSwiftRValueType());
+    auto dtype = convertSwiftTypeToTF(inst->getType().getASTType());
     auto dtypeCst =
       B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
                              dtype);
@@ -2450,26 +2477,9 @@ static SILValue createDeviceReceive(SILBuilder &B, SILLocation loc,
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
                                       instName);
   auto name = ctx.getIdentifier(instName);
-  return B.createBuiltin(loc, name, valueTy,
-                         Substitution(valueTy.getSwiftRValueType(), {}),
-                         operands);
-}
-
-// Returns a Substitution based on the conformance spec of `fn`, which must have
-// a single entry, where the conformance is substantiated with type `ty`.
-//
-// FIXME: Make this function more general. Consider using
-// getMemberSubstitutionMap() and
-// ProtocolConformance::getGenericSignature()->getSubstitutions() to create
-// substitutions.
-static Substitution getSingletonSubstitutionFromFunction(
-    SILFunction *fn, Type ty, const ASTContext &ctx) {
-  assert(fn->getForwardingSubstitutions().size() == 1);
-  assert(fn->getForwardingSubstitutions()[0].getConformances().size() == 1);
-  auto conformance =
-      fn->getForwardingSubstitutions()[0].getConformances()[0];
-  SmallVector<ProtocolConformanceRef, 1> conformanceRefs{conformance};
-  return Substitution(ty, ctx.AllocateCopy(conformanceRefs));
+  auto subMap =
+    getSingleSubstitutionMapForBuiltin(name, valueTy.getASTType(), ctx);
+  return B.createBuiltin(loc, name, valueTy, subMap, operands);
 }
 
 // Create a runtime call for the host program to receive a tensor from device
@@ -2498,15 +2508,14 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // %4 = apply %2<Float>(..., %1, %3)
   auto tensorId = createIntValue(idNumber, B, loc);
 
-  auto scalarType = getTensorHandleElementType(valueTy.getSwiftRValueType());
+  auto scalarType = getTensorHandleElementType(valueTy.getASTType());
   assert(scalarType && "valueTy is not TensorHandle<T>");
-  Substitution sub = getSingletonSubstitutionFromFunction(receiveFn, scalarType,
-                                                          B.getASTContext());
+  auto subMap = getSingleSubstitutionMap(receiveFn, scalarType);
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
   auto tensorHandleType =
-      convertToTensorValueType(valueTy).getSwiftRValueType();
+      convertToTensorValueType(valueTy).getASTType();
   auto metatypeType =
       MetatypeType::get(tensorHandleType, MetatypeRepresentation::Thick)
           ->getCanonicalType();
@@ -2517,7 +2526,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // strong retain here to balance it.
   B.createStrongRetain(loc, tensorComputation, Atomicity::Atomic);
   auto receiveFnRef = B.createFunctionRef(loc, receiveFn);
-  return B.createApply(loc, receiveFnRef, sub,
+  return B.createApply(loc, receiveFnRef, subMap,
                        /*args*/ {tensorComputation, tensorId, metaTypeInst},
                        /*isNonThrowing*/ false);
 }
@@ -2543,9 +2552,9 @@ void createDeviceSend(SILBuilder &B, SILLocation loc, SILValue value,
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
                                       instName);
   auto name = ctx.getIdentifier(instName);
-  B.createBuiltin(loc, name, voidTy,
-                  Substitution(value->getType().getSwiftRValueType(), {}),
-                  operands);
+  auto subMap = getSingleSubstitutionMapForBuiltin(
+      name, value->getType().getASTType(), ctx);
+  B.createBuiltin(loc, name, voidTy, subMap, operands);
 }
 
 // Create a call to runtime API @_swift_tfc_SendTensorHandle() for the host
@@ -2575,12 +2584,12 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
   auto &ctx = B.getASTContext();
   Type scalarValueTy, tensorValueTy;
-  if (!isTensorHandle(value->getType().getSwiftRValueType())) {
+  if (!isTensorHandle(value->getType().getASTType())) {
     assert(createScalarTensorFn);
     // Here scalar type is something like $Builtin.FPIEEE32 -- convert it to an
     // AccelerableByTensorFlow conforming type like Float first, and then create
     // a scalar tensor to send that value.
-    scalarValueTy = value->getType().getSwiftRValueType();
+    scalarValueTy = value->getType().getASTType();
     if (!scalarValueTy->getAs<StructType>()) {
       // The value must be defined by a struct_extract like:
       //   %34 = struct_extract %33 : $Float, #Float._value
@@ -2591,10 +2600,10 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       auto *structValue = cast<SILInstruction>((SILNode *)SEI->getOperand());
       assert(structValue->getNumResults() == 1);
       value = structValue->getResults()[0];
-      scalarValueTy = value->getType().getSwiftRValueType();
+      scalarValueTy = value->getType().getASTType();
     }
     tensorValueTy =
-        convertToTensorValueType(scalarValueTy, ctx).getSwiftRValueType();
+        convertToTensorValueType(scalarValueTy, ctx).getASTType();
 
     // Convert the scalar to a tensor value.
     auto metatypeType =
@@ -2621,9 +2630,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    Substitution sub = getSingletonSubstitutionFromFunction(
-        createScalarTensorFn, scalarValueTy, ctx);
-    value = B.createApply(loc, createScalarTensorFnRef, sub,
+    SubstitutionMap subMap =
+      getSingleSubstitutionMap(createScalarTensorFn, scalarValueTy);
+    value = B.createApply(loc, createScalarTensorFnRef, subMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
 
@@ -2631,7 +2640,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
     B.createEndAccess(loc, access, /*aborted*/ false);
     B.createDeallocStack(loc, stackAlloc);
   } else {
-    tensorValueTy = value->getType().getSwiftRValueType();
+    tensorValueTy = value->getType().getASTType();
     scalarValueTy = getTensorHandleElementType(tensorValueTy);
   }
 
@@ -2639,14 +2648,12 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   // strong retain here to balance it.
   B.createStrongRetain(loc, tensorComputation, Atomicity::Atomic);
   auto sendFnRef = B.createFunctionRef(loc, sendFn);
-  Substitution sub =
-      getSingletonSubstitutionFromFunction(sendFn, scalarValueTy, ctx);
+  SubstitutionMap subMap = getSingleSubstitutionMap(sendFn, scalarValueTy);
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
-  return B.createApply(
-      loc, sendFnRef, sub,
-      /*args*/ {tensorComputation, tensorId, value},
-      /*isNonThrowing*/ false);
+  return B.createApply(loc, sendFnRef, subMap,
+                       /*args*/ {tensorComputation, tensorId, value},
+                       /*isNonThrowing*/ false);
 }
 
 SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
@@ -2657,7 +2664,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
   SmallVector<ProtocolConformance *, 1> conformances;
   auto tensorValueTy = convertToTensorValueType(value->getType());
-  auto nominal = tensorValueTy.getSwiftRValueType()->getAnyNominal();
+  auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
   if (!lookup) {
@@ -2693,7 +2700,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // sending that value to device. We pass such a function reference to
     // createHostSend() below for this scalar->tensor conversion.
     SILFunction *createScalarTensorFn = nullptr;
-    if (!isTensorHandle(result->getType().getSwiftRValueType())) {
+    if (!isTensorHandle(result->getType().getASTType())) {
       createScalarTensorFn = lookupSendReceiveFunction("scalar", result, loc);
       // If `result` were not a send'able data type like String, compiler would
       // not rejected the program before reaching here.
@@ -3076,7 +3083,7 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
                                                 SILLocation loc) {
   // We need to create a dtype value.  It is an imported C enum value, so it is
   // modeled as a struct that wraps an integer value (itself a struct).
-  auto dtypeVal = convertSwiftTypeToTF(value->getType().getSwiftRValueType());
+  auto dtypeVal = convertSwiftTypeToTF(value->getType().getASTType());
   assert(dtypeVal && "Can only convert TF compatible types to Tensors");
 
   // Get a reference to the CreateCTensorHandle function, which is defined like
@@ -3111,10 +3118,9 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
                                     SILAccessEnforcement::Static,
                                     /*noNestedConflict=*/false,
                                     /*fromBuiltin=*/false);
-
-  Substitution sub(value->getType().getSwiftRValueType(), {});
-  auto result = B.createApply(loc, fnRef, {sub}, { access, dtype },
-                              /* isNonThrowing */false);
+  auto result = B.createApply(loc, fnRef,
+    getSingleSubstitutionMap(createFn, value->getType().getASTType()),
+    { access, dtype }, /*isNonThrowing*/false);
   // Finish our read access and free the stack memory.
   B.createEndAccess(loc, access, /*aborted*/false);
   B.createDeallocStack(loc, stackAlloc);
@@ -3382,7 +3388,7 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
     // closed over.  If it is a TensorHandle<T>, load the CTensorHandle out of
     // it.  If it is a scalar, then we need to box the scalar in a
     // CTensorHandle.
-    if (isTensorHandle(tensorValue->getType().getSwiftRValueType())) {
+    if (isTensorHandle(tensorValue->getType().getASTType())) {
       auto fieldAddress = B.createRefElementAddr(loc, tensorValue,
                                                  tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
@@ -3697,13 +3703,13 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   SmallVector<SILParameterInfo, 4> params;
   for (auto v : tensorFnArguments) {
     auto argTy = convertToTensorValueType(v->getType());
-    params.push_back(SILParameterInfo(argTy.getSwiftRValueType(),
+    params.push_back(SILParameterInfo(argTy.getASTType(),
                                       ParameterConvention::Direct_Unowned));
   }
 
   SmallVector<SILResultInfo, 4> results;
   for (auto r : resultValues)
-    results.push_back(SILResultInfo(r->getType().getSwiftRValueType(),
+    results.push_back(SILResultInfo(r->getType().getASTType(),
                                     ResultConvention::Unowned));
 
 
