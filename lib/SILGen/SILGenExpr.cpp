@@ -3037,15 +3037,14 @@ visitAdjointExpr(AdjointExpr *E, SGFContext C) {
                            adjointFunc.getSubstitutions().toList());
     return RValue(SGF, loc, resultTy, result);
   }
-  // Otherwise, partially apply metatype to static adjoint method.
+  // Otherwise, apply metatype to static adjoint method.
   SILValue ref = SGF.emitGlobalFunctionRef(loc, adjointDeclRef, adjointInfo);
   auto subs = adjointFunc.getSubstitutions();
   auto baseMeta = adjointInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs)
     ->getSelfParameter().getType();
   auto metatype = SGF.B.createMetatype(loc, SGF.getLoweredType(baseMeta));
-  auto partialApply =
-    SGF.B.createApply(loc, ref, subs.toList(), { metatype }, false);
-  ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(partialApply);
+  auto apply = SGF.B.createApply(loc, ref, subs.toList(), { metatype }, false);
+  ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(apply);
   return RValue(SGF, E, adjointValue);
 }
 
