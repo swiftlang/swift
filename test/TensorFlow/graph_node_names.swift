@@ -21,6 +21,12 @@ func main() {
 
 main()
 
+/// CHECK-LABEL: node_def {
+/// CHECK:         op: "Identity"
+
+/// CHECK-LABEL: node_def {
+/// CHECK:         op: "Sin"
+
 /// FIXME: Currently the performance inliner is not capturing inlining trace for
 /// some reason. When that's fixed, add checks in this file.
 ///
