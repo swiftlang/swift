@@ -1455,10 +1455,10 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         // members of the parent type.
         IdentifierID IID;
         IdentifierID privateDiscriminator;
-        bool onlyInNominal = false;
         bool importedFromClang = false;
         XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                            onlyInNominal, importedFromClang);
+                                            /*inProtocolExt*/None,
+                                            importedFromClang);
         if (privateDiscriminator)
           goto giveUpFastPath;
 
@@ -1470,29 +1470,23 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
             "-Xfrontend -disable-serialization-nested-type-lookup-table"};
 
         auto *baseType = cast<NominalTypeDecl>(values.front());
-        TypeDecl *nestedType = nullptr;
-        if (onlyInNominal) {
-          // Only look in the file containing the type itself.
-          const DeclContext *dc = values.front()->getDeclContext();
-          auto *containingFile =
-            dyn_cast<FileUnit>(dc->getModuleScopeContext());
-          if (containingFile) {
-            nestedType = containingFile->lookupNestedType(memberName, baseType);
-          }
-        } else {
-          // Fault in extensions, then ask every file in the module.
-          ModuleDecl *extensionModule = M;
-          if (!extensionModule)
-            extensionModule = baseType->getModuleContext();
+        ModuleDecl *extensionModule = M;
+        if (!extensionModule)
+          extensionModule = baseType->getModuleContext();
 
-          (void)baseType->getExtensions();
-          for (FileUnit *file : extensionModule->getFiles()) {
-            if (file == getFile())
-              continue;
-            nestedType = file->lookupNestedType(memberName, baseType);
-            if (nestedType)
-              break;
-          }
+        // FIXME: If 'importedFromClang' is true but 'extensionModule' is an
+        // overlay module, the search below will fail and we'll fall back to
+        // the slow path.
+
+        // Fault in extensions, then ask every file in the module.
+        (void)baseType->getExtensions();
+        TypeDecl *nestedType = nullptr;
+        for (FileUnit *file : extensionModule->getFiles()) {
+          if (file == getFile())
+            continue;
+          nestedType = file->lookupNestedType(memberName, baseType);
+          if (nestedType)
+            break;
         }
 
         if (nestedType) {
