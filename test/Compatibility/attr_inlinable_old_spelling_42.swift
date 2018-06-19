@@ -7,3 +7,6 @@
 
 @_versioned func oldVersionedFunction() {}
 // expected-warning@-1 {{'@_versioned' has been renamed to '@usableFromInline'}}{{2-12=usableFromInline}}
+
+@inlinable @usableFromInline func redundantAttribute() {}
+// expected-warning@-1 {{'@inlinable' declaration is already '@usableFromInline'}}
