@@ -2775,7 +2775,7 @@ bool RefactoringActionTrailingClosure::performChange() {
     return true;
   Expr *Args = CE->getArg();
   if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE;
+    Args = TSE->getSubExpr();
 
   Expr *ClosureArg = nullptr;
   Expr *PrevArg = nullptr;

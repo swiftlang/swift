@@ -11,12 +11,12 @@ func testTrailingClosure() -> String {
 
   [1,2,3]
     .filter({ $0 % 2 == 0 })
-    .map { $0 + 1 }
+    .map({ $0 + 1 })
 }
 
 func foobar(first: String? = nil, closure: () -> Void) { fatalError() }
 func blah() {
-  _ = foobar(closure: { print("foo") })
+  _ = foobar { print("foo") }
 }
 
 
