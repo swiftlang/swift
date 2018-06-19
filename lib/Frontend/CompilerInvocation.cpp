@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -278,6 +278,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;

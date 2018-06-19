@@ -981,6 +981,9 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
+  if (TC.getLangOpts().SolverDisableShrink)
+    return;
+
   using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
 
   // A collection of original domains of all of the expressions,

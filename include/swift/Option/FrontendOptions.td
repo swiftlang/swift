@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -344,6 +344,10 @@ def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-
   Alias<warn_long_expression_type_checking>;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
 
 def switch_checking_invocation_threshold_EQ : Joined<["-"],
     "switch-checking-invocation-threshold=">;
