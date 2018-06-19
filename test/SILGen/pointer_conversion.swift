@@ -243,7 +243,7 @@ func classInoutToPointer() {
   // CHECK: [[POINTER:%.*]] = address_to_pointer [[WRITEBACK]]
   // CHECK: [[CONVERT:%.*]] = function_ref @$Ss30_convertInOutToPointerArgument{{[_0-9a-zA-Z]*}}F
   // CHECK: apply [[CONVERT]]<AutoreleasingUnsafeMutablePointer<C>>({{%.*}}, [[POINTER]])
-  // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @$S18pointer_conversion20takesPlusZeroPointeryys026AutoreleasingUnsafeMutableF0VyAA1CCGF
+  // CHECK: [[TAKES_PLUS_ZERO:%.*]] = function_ref @$S18pointer_conversion20takesPlusZeroPointeryySAyAA1CCGF
   // CHECK: apply [[TAKES_PLUS_ZERO]]
   // CHECK: [[UNOWNED_OUT:%.*]] = load [trivial] [[WRITEBACK]]
   // CHECK: [[OWNED_OUT:%.*]] = unmanaged_to_ref [[UNOWNED_OUT]]
