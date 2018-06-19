@@ -337,6 +337,11 @@ WARNING(warning_float_overflows_maxbuiltin, none,
   "'%0' overflows to %select{|-}1inf because its magnitude exceeds "
   "the limits of a float literal", (StringRef, bool))
 
+// Integer to floating-point conversions
+WARNING(warning_int_to_fp_inexact, none,
+  "'%1' is not exactly representable as %0; it becomes '%2'",
+  (Type, StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
