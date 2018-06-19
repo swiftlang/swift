@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,6 +66,14 @@ ConstraintSystem::determineBestBindings() {
         continue;
 
       for (auto &binding : relatedBindings->getSecond().Bindings) {
+        // We need the binding kind for the potential binding to
+        // either be Exact or Supertypes in order for it to make sense
+        // to add Supertype bindings based on the relationship between
+        // our type variables.
+        if (binding.Kind != AllowedBindingKind::Exact &&
+            binding.Kind != AllowedBindingKind::Supertypes)
+          continue;
+
         auto type = binding.BindingType;
 
         if (ConstraintSystem::typeVarOccursInType(typeVar, type))
