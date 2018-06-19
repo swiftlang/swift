@@ -12,15 +12,16 @@
 
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 
-#include "swift/AST/Expr.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/ADT/APFloat.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/ADT/APSInt.h"
 
 #define DEBUG_TYPE "constant-folding"
 
@@ -970,6 +971,205 @@ static SILValue foldFPToIntConversion(BuiltinInst *BI,
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), resInt);
 }
 
+/// Captures the layout of IEEE754 floating point values.
+struct IEEESemantics {
+  uint8_t bitWidth;
+  uint8_t exponentBitWidth;
+  uint8_t significandBitWidth; // Ignores the integer part.
+  bool explicitIntegerPart;
+  int minExponent;
+
+public:
+  IEEESemantics(uint8_t bits, uint8_t expBits, uint8_t sigBits,
+                bool explicitIntPart) {
+    bitWidth = bits;
+    exponentBitWidth = expBits;
+    significandBitWidth = sigBits;
+    explicitIntegerPart = explicitIntPart;
+    minExponent = -(1 << (exponentBitWidth - 1)) + 2;
+  }
+};
+
+IEEESemantics getFPSemantics(BuiltinFloatType *fpType) {
+  switch (fpType->getFPKind()) {
+  case BuiltinFloatType::IEEE32:
+    return IEEESemantics(32, 8, 23, false);
+  case BuiltinFloatType::IEEE64:
+    return IEEESemantics(64, 11, 52, false);
+  case BuiltinFloatType::IEEE80:
+    return IEEESemantics(80, 15, 63, true);
+  default:
+    llvm_unreachable("Unexpected semantics");
+  }
+}
+
+/// This function, given the exponent and significand of a binary fraction
+/// equalling 1.srcSignificand x 2^srcExponent,
+/// determines whether converting the value to a given destination semantics
+/// results in an underflow and whether the significand precision is reduced
+/// because of the underflow.
+bool isLossyUnderflow(int srcExponent, uint64_t srcSignificand,
+                      IEEESemantics srcSem, IEEESemantics destSem) {
+  if (srcExponent >= destSem.minExponent)
+    return false;
+
+  // Is the value smaller than the smallest non-zero value of destSem?
+  if (srcExponent < destSem.minExponent - destSem.significandBitWidth)
+    return true;
+
+  // Truncate the significand to the significand width of destSem.
+  uint8_t bitWidthDecrease =
+      srcSem.significandBitWidth - destSem.significandBitWidth;
+  uint64_t truncSignificand = bitWidthDecrease > 0
+                                  ? (srcSignificand >> bitWidthDecrease)
+                                  : srcSignificand;
+
+  // Compute the significand bits lost due to subnormal form. Note that the
+  // integer part: 1 will use up a significand bit in denormal form.
+  unsigned additionalLoss = destSem.minExponent - srcExponent + 1;
+
+  // Check whether a set LSB is lost due to subnormal representation.
+  unsigned lostLSBBitMask = (1 << additionalLoss) - 1;
+  return (truncSignificand & lostLSBBitMask);
+}
+
+/// This function, given an IEEE floating-point value (srcVal), determines
+/// whether the conversion to a given destination semantics results
+/// in an underflow and whether the significand precision is reduced
+/// because of the underflow.
+bool isLossyUnderflow(APFloat srcVal, BuiltinFloatType *srcType,
+                      BuiltinFloatType *destType) {
+  if (srcVal.isNaN() || srcVal.isZero() || srcVal.isInfinity())
+    return false;
+
+  IEEESemantics srcSem = getFPSemantics(srcType);
+  IEEESemantics destSem = getFPSemantics(destType);
+
+  if (srcSem.bitWidth <= destSem.bitWidth)
+    return false;
+
+  if (srcVal.isDenormal()) {
+    // A denormal value of a larger IEEE FP type will definitely
+    // reduce to zero when truncated to smaller IEEE FP type.
+    return true;
+  }
+
+  APInt bitPattern = srcVal.bitcastToAPInt();
+  uint64_t significand =
+      bitPattern.getLoBits(srcSem.significandBitWidth).getZExtValue();
+  return isLossyUnderflow(ilogb(srcVal), significand, srcSem, destSem);
+}
+
+/// This function determines whether the float literal in the given
+/// SIL instruction is specified using hex-float notation in the Swift source.
+bool isHexLiteralInSource(FloatLiteralInst *flitInst) {
+  Expr *expr = flitInst->getLoc().getAsASTNode<Expr>();
+  if (!expr)
+    return false;
+
+  // Iterate through a sequence of folded implicit constructors if any, and
+  // try to extract the FloatLiteralExpr.
+  while (auto *callExpr = dyn_cast<CallExpr>(expr)) {
+    if (!callExpr->isImplicit() || callExpr->getNumArguments() != 1 ||
+        !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
+      break;
+
+    auto *tupleExpr = dyn_cast<TupleExpr>(callExpr->getArg());
+    if (!tupleExpr)
+      break;
+
+    expr = tupleExpr->getElement(0);
+  }
+  auto *flitExpr = dyn_cast<FloatLiteralExpr>(expr);
+  if (!flitExpr)
+    return false;
+  return flitExpr->getDigitsText().startswith("0x");
+}
+
+bool maybeExplicitFPCons(BuiltinInst *BI, const BuiltinInfo &Builtin) {
+  assert(Builtin.ID == BuiltinValueKind::FPTrunc);
+
+  auto *callExpr = BI->getLoc().getAsASTNode<CallExpr>();
+  if (!callExpr || !dyn_cast<ConstructorRefCallExpr>(callExpr->getFn()))
+    return true; // not enough information here, so err on the safer side.
+
+  if (!callExpr->isImplicit())
+    return true;
+
+  // Here, the 'callExpr' is an implicit FP construction. However, if it is
+  // constructing a Double it could be a part of an explicit construction of
+  // another FP type, which uses an implicit conversion to Double as an
+  // intermediate step. So we conservatively assume that an implicit
+  // construction of Double could be a part of an explicit conversion
+  // and suppress the warning.
+  auto &astCtx = BI->getModule().getASTContext();
+  auto *typeDecl = callExpr->getType()->getCanonicalType().getAnyNominal();
+  return (typeDecl && typeDecl == astCtx.getDoubleDecl());
+}
+
+static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
+                            Optional<bool> &ResultsInError) {
+
+  assert(Builtin.ID == BuiltinValueKind::FPTrunc);
+
+  auto *flitInst = dyn_cast<FloatLiteralInst>(BI->getArguments()[0]);
+  if (!flitInst)
+    return nullptr; // We can fold only compile-time constant arguments.
+
+  SILLocation Loc = BI->getLoc();
+  auto *srcType = Builtin.Types[0]->castTo<BuiltinFloatType>();
+  auto *destType = Builtin.Types[1]->castTo<BuiltinFloatType>();
+  bool losesInfo;
+  APFloat truncVal = flitInst->getValue();
+  APFloat::opStatus opStatus =
+      truncVal.convert(destType->getAPFloatSemantics(),
+                       APFloat::rmNearestTiesToEven, &losesInfo);
+
+  // Emit a warning if one of the following conditions hold: (a) the source
+  // value overflows the destination type, or (b) the source value is tiny and
+  // the tininess results in additional loss of precision when converted to the
+  // destination type beyond what would result in the normal scenario, or
+  // (c) the source value is a hex-float literal that cannot be precisely
+  // represented in the destination type.
+  // Suppress all warnings if the conversion is made through an explicit
+  // constructor invocation.
+  if (ResultsInError.hasValue() && !maybeExplicitFPCons(BI, Builtin)) {
+    bool overflow = opStatus & APFloat::opStatus::opOverflow;
+    bool tinynInexact =
+        isLossyUnderflow(flitInst->getValue(), srcType, destType);
+    bool hexnInexact =
+        (opStatus != APFloat::opStatus::opOK) && isHexLiteralInSource(flitInst);
+
+    if (overflow || tinynInexact || hexnInexact) {
+      SILModule &M = BI->getModule();
+      const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
+
+      SmallString<10> fplitStr;
+      tryExtractLiteralText(flitInst, fplitStr);
+
+      auto userType = CE ? CE->getType() : destType;
+      auto diagId = overflow
+                        ? diag::warning_float_trunc_overflow
+                        : (hexnInexact ? diag::warning_float_trunc_hex_inexact
+                                       : diag::warning_float_trunc_underflow);
+      diagnose(M.getASTContext(), Loc.getSourceLoc(), diagId, fplitStr,
+               userType, truncVal.isNegative());
+
+      ResultsInError = Optional<bool>(true);
+    }
+  }
+  // Abort folding if we have subnormality, NaN or opInvalid status.
+  if ((opStatus & APFloat::opStatus::opInvalidOp) ||
+      (opStatus & APFloat::opStatus::opDivByZero) ||
+      (opStatus & APFloat::opStatus::opUnderflow) || truncVal.isDenormal()) {
+    return nullptr;
+  }
+  // Allow folding if there is no loss, overflow or normal imprecision
+  // (i.e., opOverflow, opOk, or opInexact).
+  SILBuilderWithScope B(BI);
+  return B.createFloatLiteral(Loc, BI->getType(), truncVal);
+}
+
 static SILValue constantFoldBuiltin(BuiltinInst *BI,
                                     Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
@@ -1044,10 +1244,9 @@ case BuiltinValueKind::id:
     if (!V)
       return nullptr;
     APInt SrcVal = V->getValue();
-    Type DestTy = Builtin.Types[1];
+    auto *DestTy = Builtin.Types[1]->castTo<BuiltinFloatType>();
 
-    APFloat TruncVal(
-        DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics());
+    APFloat TruncVal(DestTy->getAPFloatSemantics());
     APFloat::opStatus ConversionStatus = TruncVal.convertFromAPInt(
         SrcVal, /*IsSigned=*/true, APFloat::rmNearestTiesToEven);
 
@@ -1077,27 +1276,7 @@ case BuiltinValueKind::id:
   }
 
   case BuiltinValueKind::FPTrunc: {
-    // Get the value. It should be a constant in most cases.
-    auto *V = dyn_cast<FloatLiteralInst>(Args[0]);
-    if (!V)
-      return nullptr;
-    APFloat TruncVal = V->getValue();
-    Type DestTy = Builtin.Types[1];
-    bool losesInfo;
-    APFloat::opStatus ConversionStatus = TruncVal.convert(
-        DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics(),
-        APFloat::rmNearestTiesToEven, &losesInfo);
-    SILLocation Loc = BI->getLoc();
-
-    // Check if conversion was successful.
-    if (ConversionStatus != APFloat::opStatus::opOK &&
-        ConversionStatus != APFloat::opStatus::opInexact) {
-      return nullptr;
-    }
-
-    // The call to the builtin should be replaced with the constant value.
-    SILBuilderWithScope B(BI);
-    return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
+    return foldFPTrunc(BI, Builtin, ResultsInError);
   }
 
   // Conversions from floating point to integer,
@@ -1216,6 +1395,21 @@ bool ConstantFolder::constantFoldStringConcatenation(ApplyInst *AI) {
 void ConstantFolder::initializeWorklist(SILFunction &F) {
   for (auto &BB : F) {
     for (auto &I : BB) {
+      // If `I` is a floating-point literal instruction where the literal is
+      // inf, it means the input has a literal that overflows even
+      // MaxBuiltinFloatType. Diagnose this error, but allow this instruction
+      // to be folded, if needed.
+      if (auto floatLit = dyn_cast<FloatLiteralInst>(&I)) {
+        APFloat fpVal = floatLit->getValue();
+        if (EnableDiagnostics && fpVal.isInfinity()) {
+          SmallString<10> litStr;
+          tryExtractLiteralText(floatLit, litStr);
+          diagnose(I.getModule().getASTContext(), I.getLoc().getSourceLoc(),
+                   diag::warning_float_overflows_maxbuiltin, litStr,
+                   fpVal.isNegative());
+        }
+      }
+
       if (isFoldable(&I) && I.hasUsesOfAnyResult()) {
         WorkList.insert(&I);
         continue;
