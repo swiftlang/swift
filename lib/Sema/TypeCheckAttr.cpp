@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "CompilerRepresentable.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
@@ -2574,65 +2575,111 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   attr->setAdjointFunction(adjoint);
 }
 
-static bool
-compilerEvaluableAllowedInExtensionDecl(ExtensionDecl *extensionDecl) {
-  auto extendedTypeKind = extensionDecl->getExtendedType()->getKind();
-  return extendedTypeKind == TypeKind::Enum ||
-         extendedTypeKind == TypeKind::Protocol ||
-         extendedTypeKind == TypeKind::Struct ||
-         extendedTypeKind == TypeKind::BoundGenericEnum ||
-         extendedTypeKind == TypeKind::BoundGenericStruct;
-}
-
 void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // Check that the function is defined in an allowed context.
-  // TODO(marcrasi): In many cases, we can probably generate a more informative
-  // error message than just saying that it's "not allowed here". (Like "not
-  // allowed in a class [point at the class decl], put it at the top level or in
-  // a struct instead").
-  auto declContext = D->getDeclContext();
-  switch (declContext->getContextKind()) {
+  switch (D->getDeclContext()->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
     // Nested functions are okay.
     break;
   case DeclContextKind::ExtensionDecl:
-    // Enum, Protocol, and Struct extensions are okay. For Enums and Structs
-    // extensions, the extended type must be compiler-representable.
-    // TODO(marcrasi): Check that the extended type is compiler-representable.
-    if (!compilerEvaluableAllowedInExtensionDecl(
-            cast<ExtensionDecl>(declContext))) {
-      TC.diagnose(D, diag::compiler_evaluable_bad_context);
-      attr->setInvalid();
-      return;
-    }
+    // Extension methods are okay, as long as the extended type is
+    // compiler-representable. The signature check below ensures that it is.
     break;
   case DeclContextKind::FileUnit:
     // Top level functions are okay.
     break;
   case DeclContextKind::GenericTypeDecl:
-    switch (cast<GenericTypeDecl>(declContext)->getKind()) {
+    switch (cast<GenericTypeDecl>(D->getDeclContext())->getKind()) {
     case DeclKind::Enum:
-      // Enums are okay, if they are compiler-representable.
-      // TODO(marcrasi): Check that it's compiler-representable.
-      break;
     case DeclKind::Struct:
-      // Structs are okay, if they are compiler-representable.
-      // TODO(marcrasi): Check that it's compiler-representable.
+      // Enum and struct methods are okay, as long as the enum/struct is
+      // compiler-representable. The signature check below ensures that it is.
       break;
+    case DeclKind::Class:
+      // Class methods are not okat, but the singuature check below chatches
+      // them.
+      break;
+    case DeclKind::Protocol:
+      TC.diagnose(D, diag::compiler_evaluable_protocol_requirement);
+      attr->setInvalid();
+      return;
     default:
+      // We don't expect to catch anything here, but handle it with a generic
+      // error message just in case.
       TC.diagnose(D, diag::compiler_evaluable_bad_context);
       attr->setInvalid();
       return;
     }
     break;
   default:
+    // We don't expect to catch anything here, but handle it with a generic
+    // error message just in case.
     TC.diagnose(D, diag::compiler_evaluable_bad_context);
     attr->setInvalid();
     return;
   }
 
   // Check that the signature only has allowed types.
-  // TODO(marcrasi): Do this.
+  CompilerRepresentableChecker checker;
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+    for (auto *parameterList : afd->getParameterLists()) {
+      for (auto *paramDecl : *parameterList) {
+        auto unrepresentable = checker.check(paramDecl->getType());
+        if (!unrepresentable)
+          continue;
+
+        if (parameterList->size() == 1 &&
+            paramDecl->getName() == TC.Context.Id_self &&
+            paramDecl->isImplicit()) {
+          TC.diagnose(paramDecl, diag::compiler_evaluable_bad_self_parameter,
+                      paramDecl->getType());
+          unrepresentable->emitDiagnosticNotes(TC, paramDecl);
+          attr->setInvalid();
+          return;
+        } else {
+          TC.diagnose(paramDecl, diag::compiler_evaluable_bad_parameter,
+                      paramDecl->getType());
+          unrepresentable->emitDiagnosticNotes(TC, paramDecl);
+          attr->setInvalid();
+          return;
+        }
+      }
+    }
+
+    auto resultType =
+        cast<AnyFunctionType>(afd->getInterfaceType()->getCanonicalType())
+            ->getResult();
+    if (auto unrepresentable = checker.check(resultType)) {
+      TC.diagnose(afd, diag::compiler_evaluable_bad_result, resultType);
+      unrepresentable->emitDiagnosticNotes(TC, afd);
+      attr->setInvalid();
+      return;
+    }
+  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(D)) {
+    for (auto *paramDecl : *subscriptDecl->getIndices()) {
+      if (auto unrepresentable = checker.check(paramDecl->getType())) {
+        TC.diagnose(paramDecl, diag::compiler_evaluable_bad_parameter,
+                    paramDecl->getType());
+        unrepresentable->emitDiagnosticNotes(TC, paramDecl);
+        attr->setInvalid();
+        return;
+      }
+    }
+    if (auto unrepresentable =
+            checker.check(subscriptDecl->getElementInterfaceType())) {
+      TC.diagnose(subscriptDecl, diag::compiler_evaluable_bad_result,
+                  subscriptDecl->getElementInterfaceType());
+      unrepresentable->emitDiagnosticNotes(TC, subscriptDecl);
+      attr->setInvalid();
+      return;
+    }
+  } else {
+    // We don't expect to catch anything here, but handle it with a generic
+    // error message just in case.
+    TC.diagnose(D, diag::compiler_evaluable_bad_context);
+    attr->setInvalid();
+    return;
+  }
 
   // For @compilerEvaluable to be truly valid, the function body must also
   // follow certain rules. We can only check these rules after the body is type

@@ -16,24 +16,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "CompilerRepresentable.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
 
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
 
 namespace {
-
-/// Checks that a type is compiler representable.
-/// Currently a skeleton implementation that only rejects types named Float,
-/// Double and String.
-/// TODO(marcrasi): Fill in a real implementation.
-static bool checkCompilerRepresentable(const Type &type) {
-  return type.getString() != "Double" && type.getString() != "Float" &&
-         type.getString() != "String";
-}
 
 /// Checks that the body of a function is compiler evaluable.
 class CheckCompilerEvaluableBody : public ASTWalker {
@@ -58,10 +51,12 @@ public:
       if (parentDotSyntaxBaseIgnored->getLHS() == E)
         return {false, E};
 
-    if (!checkCompilerRepresentable(E->getType())) {
+    CompilerRepresentableChecker checker;
+    if (auto unrepresentableReason = checker.check(E->getType())) {
       TC.diagnose(E->getLoc(), diag::compiler_evaluable_forbidden_type,
                   E->getType())
           .highlight(E->getSourceRange());
+      unrepresentableReason->emitDiagnosticNotes(TC, E->getLoc());
       CompilerEvaluable = false;
       return {false, E};
     }
