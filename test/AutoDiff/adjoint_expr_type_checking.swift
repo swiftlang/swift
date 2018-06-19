@@ -7,13 +7,14 @@
 //===----------------------------------------------------------------------===//
 
 @differentiable(reverse, adjoint: dSquare(_:primal:seed:))
-func square<T : FloatingPoint>(_ x: T) -> T {
-  return x * x
-}
+func square<T : FloatingPoint>(_ x: T) -> T { return x * x }
 // expected-note @+1 {{in call to function 'dSquare(_:primal:seed:)'}}
 private func dSquare<T : FloatingPoint>(_ x: T, primal: T, seed: T) -> T {
   return 2 * x
 }
+// Overload `square` with non-differentiable cases.
+func square(_ x: Float) -> Float { return x * x }
+func square(_ x: Double) -> Double { return x * x }
 
 let _: (Float, Float, Float) -> Float = #adjoint(square)
 func testTopLevel() -> Float {
@@ -226,7 +227,7 @@ let _ = #adjoint(square) // expected-error {{generic parameter 'T' could not be 
 let _ = dSquare // expected-error {{generic parameter 'T' could not be inferred}}
 
 // Note: I think the case below is theoretically resolvable by the type checker.
-// The failing behavior is consistent for both #adjoint and direct function
+// The failing behavior is consistent for both #adjoint and direct adjoint
 // reference, so things are good.
 
 // expected-error @+2 {{cannot convert value of type '(Vector<_>, Vector<_>, Vector<_>, Vector<_>) -> (Vector<_>, Vector<_>)' to specified type '(Vector<Float>, Vector<Float>, Vector<Float>, Vector<Float>) -> (Vector<Float>, Vector<Float>)'}}
