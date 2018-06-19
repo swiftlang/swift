@@ -1606,7 +1606,8 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            inferImportAsMember);
+                            inferImportAsMember,
+                            version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
