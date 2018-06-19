@@ -1212,6 +1212,12 @@ public:
       *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
       return;
     }
+    case SymbolicValue::Function: {
+      auto function = v.getFunctionValue();
+      *this << "@" << function->getName();
+      *this << " : $" << function->getLoweredFunctionType();
+      return;
+    }
     case SymbolicValue::Aggregate:
       *this << "[";
       interleave(v.getAggregateValue(), [&](SymbolicValue element) {
@@ -1221,7 +1227,6 @@ public:
       });
       *this << "]";
       return;
-    case SymbolicValue::Function:
     case SymbolicValue::Address:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
