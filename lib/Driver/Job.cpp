@@ -341,9 +341,9 @@ void Job::dump() const {
 ArrayRef<const char *> Job::getArgumentsForTaskExecution() const {
   if (hasResponseFile()) {
     writeArgsToResponseFile();
-    return ArrayRef<const char *>(ResponseFileArg);
+    return getResponseFileArg();
   } else {
-    return Arguments;
+    return getArguments();
   }
 }
 
