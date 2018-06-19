@@ -3768,25 +3768,21 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
 /// be kept in sync.
 /// The code is duplicated because custom backtracking logic is needed to parse
 /// the final unqualified decl name.
-static std::tuple<TypeRepr *, DeclName, DeclNameLoc>
-parseFunctionIdentifier(Parser &P) {
-  DeclName funcName;
-  DeclNameLoc funcNameLoc;
-
-  auto makeResult = [&](TypeRepr *repr) {
-    return std::make_tuple(repr, funcName, funcNameLoc);
-  };
-
+/// Returns true on error (if function decl name could not be parsed).
+static bool parseFunctionIdentifier(Parser &P, TypeRepr *&baseType,
+                                    DeclName &funcName,
+                                    DeclNameLoc &funcNameLoc) {
   if (P.Tok.isNot(tok::identifier) && P.Tok.isNot(tok::kw_Self)
       && !P.Tok.isAnyOperator()) {
     if (P.Tok.is(tok::kw_Any)) {
-      return makeResult(P.parseAnyType().get());
+      baseType = P.parseAnyType().get();
+      return true;
     } else if (P.Tok.is(tok::code_complete)) {
       if (P.CodeCompletion)
         P.CodeCompletion->completeTypeSimpleBeginning();
       // Eat the code completion token because we handled it.
       P.consumeToken(tok::code_complete);
-      return makeResult(nullptr);
+      return true;
     }
     P.diagnose(P.Tok, diag::expected_identifier_for_type);
 
@@ -3795,7 +3791,7 @@ parseFunctionIdentifier(Parser &P) {
     if (P.Tok.isKeyword() && !P.Tok.isAtStartOfLine())
       P.consumeToken();
 
-    return makeResult(nullptr);
+    return true;
   }
   SyntaxParsingContext IdentTypeCtxt(P.SyntaxContext, SyntaxContextKind::Type);
   // Store the position for backtracking.
@@ -3834,7 +3830,7 @@ parseFunctionIdentifier(Parser &P) {
       SmallVector<TypeRepr*, 8> GenericArgs;
       if (P.startsWithLess(P.Tok)) {
         if (P.parseGenericArguments(GenericArgs, LAngle, RAngle))
-          return makeResult(nullptr);
+          return true;
       }
       EndLoc = Loc;
 
@@ -3896,7 +3892,6 @@ parseFunctionIdentifier(Parser &P) {
     if (auto Entry = P.lookupInScope(ComponentsR[0]->getIdentifier()))
       if (auto *TD = dyn_cast<TypeDecl>(Entry))
         ComponentsR[0]->setValue(TD, nullptr);
-
     ITR = IdentTypeRepr::create(P.Context, ComponentsR);
   }
 
@@ -3912,7 +3907,9 @@ parseFunctionIdentifier(Parser &P) {
     P.consumeToken(tok::code_complete);
   }
 
-  return makeResult(ITR);
+  assert(funcName && "Function name should have been parsed");
+  baseType = ITR;
+  return false;
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
@@ -3936,9 +3933,7 @@ ParserResult<Expr> Parser::parseExprAdjoint() {
   TypeRepr *baseType;
   DeclName originalName;
   DeclNameLoc originalNameLoc;
-  std::tie(baseType, originalName, originalNameLoc) =
-    parseFunctionIdentifier(*this);
-  if (!originalName)
+  if (parseFunctionIdentifier(*this, baseType, originalName, originalNameLoc))
     return errorAndSkipToEnd();
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen,
                  "#adjoint"))
