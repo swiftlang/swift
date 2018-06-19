@@ -91,19 +91,19 @@ llvm::raw_ostream *tf::getTFDumpIntermediateStream() {
 }
 
 bool tf::isTensorHandle(SILType ty) {
-  return (bool)isTensorHandle(ty.getSwiftRValueType());
+  return (bool)isTensorHandle(ty.getASTType());
 }
 
 /// Determine whether the specified type is one of our well-known types, and
 /// if so, which one it is.
 TFValueKind tf::classifyTensorFlowValue(SILType ty) {
-  return classifyTensorFlowValue(ty.getSwiftRValueType());
+  return classifyTensorFlowValue(ty.getASTType());
 }
 
 /// Return true if the specified type is TensorHandle<T>, ResourceHandle, or
 /// VariantHandle.
 bool tf::isTensorFlowValue(SILType ty) {
-  return (bool)isTensorFlowValue(ty.getSwiftRValueType());
+  return (bool)isTensorFlowValue(ty.getASTType());
 }
 
 /// If the specified type conforms to the TensorProtocol protocol, return the
@@ -263,7 +263,7 @@ static SILValue getValueInsideStructInst(SILValue value) {
   // Dig through one-argument struct insts.
   while (auto structVal = dyn_cast<StructInst>(value)) {
     // If this is an ArrayType, don't dig in.
-    if (getArrayElementType(structVal->getType().getSwiftRValueType()))
+    if (getArrayElementType(structVal->getType().getASTType()))
       break;
 
     if (structVal->getNumOperands() != 1)
@@ -285,7 +285,7 @@ static bool decodeArrayElements(SILValue value,
                                 SmallVectorImpl<SILValue> &elements,
                                 Type &elementType,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
-  elementType = getArrayElementType(value->getType().getSwiftRValueType());
+  elementType = getArrayElementType(value->getType().getASTType());
   if (!elementType) return false;
 
   // Handle the standard patterns for array initialization.  'Value' is an
@@ -564,8 +564,8 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
   // If the value is a string value, then we need to peel off all the SIL
   // instructions between the String struct value and the underlying
   // string_literal instruction.
-  auto &ctx = v->getType().getSwiftRValueType()->getASTContext();
-  if (v->getType().getSwiftRValueType()->isEqual(
+  auto &ctx = v->getType().getASTType()->getASTContext();
+  if (v->getType().getASTType()->isEqual(
                                      ctx.getStringDecl()->getDeclaredType())) {
     auto str = v;
     // Strip off the specific set of instructions we expect to form the string
@@ -924,7 +924,7 @@ SILInstruction *SILTensorOpInfo::decodeTensorFromScalars(ApplyInst *inst) {
 
   if (!errorInfo.empty()) {
     auto loc = getUserSourceLocation(inst);
-    diagnose(inst->getType().getSwiftRValueType()->getASTContext(),
+    diagnose(inst->getType().getASTType()->getASTContext(),
              loc.getSourceLoc(), diag::tf_op_misuse, errorInfo)
       .highlight(loc.getSourceRange());
     return inst;
@@ -1125,7 +1125,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
 
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
       if (opName == "tfc.scalarToTensor") {
-        auto scalarType = opTy.getSwiftRValueType();
+        auto scalarType = opTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0)
           return "scalarToTensor requires scalar value; unrecognized type '"
              + scalarType->getString() + "' is not allowed";
@@ -1137,7 +1137,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         break;
 
       // If this is an Array of TensorHandle or TensorProtocol we're good.
-      if (auto elt = getArrayElementType(opTy.getSwiftRValueType())) {
+      if (auto elt = getArrayElementType(opTy.getASTType())) {
         if (!isTensorHandle(elt) &&
             !conformsToTensorProtocol(elt, inst->getModule().getSwiftModule()))
           return "array element has unrecognized type '" + elt->getString() +
@@ -1153,7 +1153,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
 
       // Otherwise, this is an error.
       return "operand has unrecognized type '" +
-             opTy.getSwiftRValueType()->getString() + "'";
+             opTy.getASTType()->getString() + "'";
     }
     case OperandClass::InputElt: // InputList elements must be TensorHandle's.
       if (!isTensorHandle(operand->getType()))
@@ -1280,7 +1280,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   if (isTensorHandle(v->getType()))
     return v;
 
-  assert(v->getType().getSwiftRValueType()->getStructOrBoundGenericStruct() &&
+  assert(v->getType().getASTType()->getStructOrBoundGenericStruct() &&
          "Support more general conformances to TensorProtocol");
 
   auto module = B.getFunction().getModule().getSwiftModule();
@@ -1301,7 +1301,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
       return operand;
 
     // If we found a wrapper around another TensorProtocol, dig deeper.
-    if (!conformsToTensorProtocol(operand->getType().getSwiftRValueType(),
+    if (!conformsToTensorProtocol(operand->getType().getASTType(),
                                   module))
       break;
 
@@ -1314,7 +1314,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
   // approach.  This handles structs of TensorHandle (like Tensor) and structs
   // of structs of TensorHandle (like Tensor2D).
   while (!isTensorHandle(v->getType())) {
-    auto vTy = v->getType().getSwiftRValueType();
+    auto vTy = v->getType().getASTType();
     auto decl = vTy.getNominalOrBoundGenericNominal();
     assert(decl && "Type must be nominal to conform to TensorProtocol");
 
@@ -1368,7 +1368,7 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
       }
 
       // Non-array values are scalars.
-      auto elt = getArrayElementType(opTy.getSwiftRValueType());
+      auto elt = getArrayElementType(opTy.getASTType());
       if (!elt) {
         operands.push_back(operand);
         name += opName;
@@ -1546,7 +1546,7 @@ SILLocation tf::getUserSourceLocation(SILInstruction *inst) {
   // The struct-extract came from the implementation of some operator in the
   // standard library like "+", and we want the source of the parameter.
   if (auto *sei = dyn_cast<StructExtractInst>(inst)) {
-    auto outerType = sei->getType().getSwiftRValueType();
+    auto outerType = sei->getType().getASTType();
     if (outerType->is<BuiltinType>() || isTensorHandle(outerType)) {
       if (sei->getOperand())  // Could be called after dropAllReferences().
         return getUserSourceLocation(sei->getOperand());

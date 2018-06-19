@@ -1845,7 +1845,7 @@ extension FloatingPoint {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, withRespectTo: (self), adjoint: _adjointSquareRoot)
+  // @differentiable(reverse, withRespectTo: (self), adjoint: _adjointSquareRoot)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
@@ -1855,7 +1855,7 @@ extension FloatingPoint {
   /// SWIFT_ENABLE_TENSORFLOW
   /// The adjoint of `squareRoot`. Returns the gradient of `squareRoot` with
   /// respect to `self`.
-  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   func _adjointSquareRoot(originalValue: Self, adjoint: Self) -> Self {
     return 2 * self * adjoint
   }
@@ -1876,9 +1876,9 @@ extension FloatingPoint {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(
-    reverse, withRespectTo: (self, .0, .1), adjoint: _adjointAddingProduct
-  )
+  // @differentiable(
+  //   reverse, withRespectTo: (self, .0, .1), adjoint: _adjointAddingProduct
+  // )
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)
@@ -1888,7 +1888,7 @@ extension FloatingPoint {
   /// SWIFT_ENABLE_TENSORFLOW
   /// The adjoint of `addingProduct`. Returns the gradient of `addingProduct`
   /// with respect to `self`, `lhs` and `rhs`.
-  @_versioned @_inlineable
+  @inlinable
   func _adjointAddingProduct(
     _ lhs: Self, _ rhs: Self,
     originalValue: Self, adjoint: Self
