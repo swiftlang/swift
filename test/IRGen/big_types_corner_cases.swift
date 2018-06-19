@@ -185,8 +185,8 @@ public struct MUseStruct {
 
 // CHECK-LABEL-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, %Ts9SubstringV }>* noalias nocapture sret) #0 {
 // CHECK-LABEL-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S22big_types_corner_cases18stringAndSubstringSS_s0G0VtyF"(<{ %TSS, [4 x i8], %Ts9SubstringV }>* noalias nocapture sret) #0 {
-// CHECK: alloca %Ts9SubstringV
-// CHECK: alloca %Ts9SubstringV
+// CHECK: alloca %TSs
+// CHECK: alloca %TSs
 // CHECK: ret void
 public func stringAndSubstring() -> (String, Substring) {
   let s = "Hello, World"
@@ -207,15 +207,15 @@ public func testGetFunc() {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC4testyyF"(%T22big_types_corner_cases7TestBigC* swiftself)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSayy22big_types_corner_cases9BigStructVcSgGMa"
 // CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK: [[CALL2:%.*]] = call i8** @"$SSayy22big_types_corner_cases9BigStructVcSgGSayxGs10CollectionsWl
-// CHECK: call swiftcc void @"$Ss10CollectionPsE10firstIndex5where0C0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_ACytIegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
+// CHECK: [[CALL2:%.*]] = call i8** @"$SSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
+// CHECK: call swiftcc void @"$SSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(%TSq.{{.*}}* noalias nocapture sret {{.*}}, i8* bitcast (i1 (%T22big_types_corner_cases9BigStructVytIegnr_Sg*, %swift.refcounted*, %swift.error**)* @"$S22big_types_corner_cases9BigStructVIegy_SgSbs5Error_pIggdzo_ACytIegnr_SgSbsAE_pIegndzo_TRTA" to i8*), %swift.opaque* {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself
 // CHECK: ret void
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$S22big_types_corner_cases7TestBigC5test2yyF"(%T22big_types_corner_cases7TestBigC* swiftself)
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGMa"
 // CHECK: [[CALL1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK: [[CALL2:%.*]] = call i8** @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGs10CollectionsWl"
-// CHECK: call swiftcc void @"$Ss10CollectionPss16IndexingIteratorVyxG0C0RtzrlE04makeC0AEyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
+// CHECK: [[CALL2:%.*]] = call i8** @"$SSaySS2ID_y22big_types_corner_cases9BigStructVcSg7handlertGSayxGSlsWl"
+// CHECK: call swiftcc void @"$SSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF"(%Ts16IndexingIteratorV* noalias nocapture sret {{.*}}, %swift.type* [[CALL1]], i8** [[CALL2]], %swift.opaque* noalias nocapture swiftself {{.*}})
 // CHECK: ret void
 class TestBig {
     typealias Handler = (BigStruct) -> Void

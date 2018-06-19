@@ -33,7 +33,7 @@ func ==(lhs: S, rhs: S) -> Bool {
 // CHECK: debug_value [[ARG]]
 // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK: // function_ref
-// CHECK: [[FN:%.*]] = function_ref @$Ss30_dictionaryDownCastConditionalySDyq0_q1_GSgSDyxq_GSkRzSkR0_r2_lF
+// CHECK: [[FN:%.*]] = function_ref @$Ss30_dictionaryDownCastConditionalySDyq0_q1_GSgSDyxq_GSHRzSHR0_r2_lF
 // CHECK: [[BORROWED_ARG_COPY:%.*]] = begin_borrow [[ARG_COPY]]
 // CHECK: [[RESULT:%.*]] = apply [[FN]]<S, Any, S, Int>([[BORROWED_ARG_COPY]]) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2, τ_0_3 where τ_0_0 : Hashable, τ_0_2 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned Optional<Dictionary<τ_0_2, τ_0_3>>
 // CHECK: end_borrow [[BORROWED_ARG_COPY]] from [[ARG_COPY]]
