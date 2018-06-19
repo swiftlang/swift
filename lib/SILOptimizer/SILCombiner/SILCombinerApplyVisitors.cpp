@@ -14,6 +14,7 @@
 #include "SILCombiner.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -835,6 +836,129 @@ public:
   }
 };
 
+/// Helper routine for propagating concrete type from
+/// class hierarchy analysis.
+bool SILCombiner::propagateConcreteTypeFromCTAInternal(
+    FullApplySite Apply, ProtocolDecl *Protocol, SILValue &Arg,
+    SILValue &NewArg, Optional<ProtocolConformanceRef> &ConformanceRef,
+    ArchetypeType *OpenedArchetype, CanType &ConcreteType) {
+
+  if (VisitedAIForCTA.find(Apply) != VisitedAIForCTA.end())
+    return false;
+  auto &M = Builder.getModule();
+  if (!Protocol)
+    return false;
+  auto *NTD = CTA->getSoleTypeImplementingProtocol(Protocol);
+  if (!NTD)
+    return false;
+
+  ClassDecl *CD = nullptr;
+  /// Check if the class has no subclasses: direct or indirect.
+  if ((CD = dyn_cast<ClassDecl>(NTD)) &&
+          ((CHA->hasKnownDirectSubclasses(CD)) ||
+          (CHA->hasKnownIndirectSubclasses(CD)))) {
+    return false;
+  }
+
+  auto ElementType = NTD->getDeclaredType()->getCanonicalType();
+  if ((isa<ClassDecl>(NTD)) && (!(ElementType->getClassOrBoundGenericClass()))) {
+    return false;
+  }
+
+  bool isCopied = false;
+  if (auto *Instance = dyn_cast<AllocStackInst>(Arg)) {
+    if (SILValue Src =
+            getAddressOfStackInit(Instance, Apply.getInstruction(), isCopied)) {
+      Arg = Src;
+    }
+  }
+  if (auto *OER = dyn_cast<OpenExistentialRefInst>(Arg)) {
+    ConcreteType = ElementType;
+    SILType ConcreteSILType = M.Types.getLoweredType(ConcreteType);
+    auto *URCI =
+        Builder.createUncheckedRefCast(OER->getLoc(), OER, ConcreteSILType);
+    ConformanceRef = M.getSwiftModule()->lookupConformance(
+        ConcreteType, Protocol);
+    OpenedArchetype =
+        OER->getType().getASTType()->castTo<ArchetypeType>();
+    NewArg = URCI;
+  } else if (auto *OEA = dyn_cast<OpenExistentialAddrInst>(Arg)) {
+    ConcreteType = ElementType;
+    SILType ConcreteSILType = SILType::getPrimitiveAddressType(ConcreteType);
+    auto *UACI =
+        Builder.createUncheckedAddrCast(OEA->getLoc(), OEA, ConcreteSILType);
+    ConformanceRef = M.getSwiftModule()->lookupConformance(
+        ConcreteType, Protocol);
+    OpenedArchetype =
+        OEA->getType().getASTType()->castTo<ArchetypeType>();
+    NewArg = UACI;
+  } else {
+    return false;
+  }
+  VisitedAIForCTA.insert(Apply);
+  if (!(ConformanceRef.hasValue()))
+    return false;
+  return true;
+}
+
+//  If class C is the only class conforming to a protocol P, then
+//  Transfrom from
+//  %4 = open_existential_ref %3 : $P to $@opened P 
+//  %5 = witness_method $@opened P, #P.foo!1 : <Self
+//     where Self : P> (Self) -> () -> Int, %4 :  $@opened P :
+//     $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed
+//     τ_0_0) -> Int 
+//  %6 = apply %5<@opened P>(%4) : $@convention(witness_method: 
+//     P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+
+// To
+//  %4 = open_existential_ref %3 : $P to $@opened P 
+//  %7 = unchecked_ref_cast %4 : $@opened P to $C 
+//  %8 = class_method %7 : $C, #C.foo!1 : (C) -> () -> Int,
+//     $@convention(method) (@guaranteed C) -> Int 
+//  %9 = apply %8(%7) : $@convention(method) 
+//     (@guaranteed C) -> Int return %6 : $Int
+SILInstruction *SILCombiner::propagateConcreteTypeFromCTA(FullApplySite Apply) {
+
+  if (!(Apply.getModule().isWholeModule())) {
+    return nullptr;
+  }
+
+  SILValue Self = Apply.getSelfArgument();
+  auto *WMI = dyn_cast<WitnessMethodInst>(Apply.getCallee());
+  if (!WMI) {
+    return nullptr;
+  }
+  auto *PD = WMI->getLookupProtocol();
+  if (!PD)
+    return nullptr;
+
+  Optional<ProtocolConformanceRef> ConformanceRef;
+  ArchetypeType *OpenedArchetype = nullptr;
+  CanType ConcreteType;
+  SILValue NewSelf = Self;
+  if (!propagateConcreteTypeFromCTAInternal(Apply, PD, Self, NewSelf,
+                                            ConformanceRef, OpenedArchetype,
+                                            ConcreteType))
+    return nullptr;
+  auto Conformance = ConformanceRef.getValue().getConcrete();
+  auto *NewWMI = Builder.createWitnessMethod(
+      WMI->getLoc(), ConcreteType, ProtocolConformanceRef(Conformance),
+      WMI->getMember(), WMI->getType());
+  MutableArrayRef<Operand> Operands = Apply.getInstruction()->getAllOperands();
+  for (auto &Op : Operands) {
+    if (Op.get() == WMI)
+      Op.set(NewWMI);
+  }
+  if (WMI->use_empty())
+    eraseInstFromFunction(*WMI);
+
+  auto *NewAI = createApplyWithConcreteType(
+      Apply, NewSelf, Self, ConcreteType, SILValue(),
+      ProtocolConformanceRef(Conformance), OpenedArchetype);
+  return NewAI;
+}
+
 /// Propagate information about a concrete type from init_existential_addr
 /// or init_existential_ref into witness_method conformances and into
 /// apply instructions.
@@ -858,7 +982,7 @@ SILInstruction *SILCombiner::propagateConcreteTypeOfInitExistential(
   SILInstruction *InitExistential = findInitExistential(
       Apply, Self, OpenedArchetype, OpenedArchetypeDef, isCopied);
   if (!InitExistential)
-    return nullptr;
+    return propagateConcreteTypeFromCTA(Apply);
 
   // Try to derive the concrete type of self and a related conformance from
   // the found init_existential.

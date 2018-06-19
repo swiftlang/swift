@@ -26,6 +26,8 @@
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ConcreteTypeAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -117,6 +119,10 @@ class SILCombiner :
 
   DominanceAnalysis *DA;
 
+  ConcreteTypeAnalysis *CTA;
+
+  ClassHierarchyAnalysis *CHA;
+
   /// Worklist containing all of the instructions primed for simplification.
   SILCombineWorklist Worklist;
 
@@ -135,10 +141,14 @@ class SILCombiner :
   /// Cast optimizer
   CastOptimizer CastOpt;
 
+  /// Set of ApplySites instrumented by concrete type analysis.
+  llvm::DenseSet<FullApplySite> VisitedAIForCTA;
+
 public:
   SILCombiner(SILBuilder &B, AliasAnalysis *AA, DominanceAnalysis *DA,
+              ConcreteTypeAnalysis *CTA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), Worklist(), MadeChange(false),
+      : AA(AA), DA(DA), CTA(CTA), CHA(CHA), Worklist(), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SingleValueInstruction *I, ValueBase *V) {
@@ -297,6 +307,13 @@ private:
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI,
                                                          WitnessMethodInst *WMI);
   SILInstruction *propagateConcreteTypeOfInitExistential(FullApplySite AI);
+
+  /// Propagate concrete types from concrete type analysis.
+  SILInstruction *propagateConcreteTypeFromCTA(FullApplySite AI);
+  bool propagateConcreteTypeFromCTAInternal(
+      FullApplySite Apply, ProtocolDecl *Protocol, SILValue &Arg,
+      SILValue &NewArg, Optional<ProtocolConformanceRef> &ConformanceRef,
+      ArchetypeType *OpenedArchetype, CanType &ConcreteType);
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
