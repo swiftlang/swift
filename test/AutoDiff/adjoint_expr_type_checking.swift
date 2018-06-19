@@ -49,13 +49,16 @@ struct A {
         return (seed, seed)
       }
 
-      @differentiable(reverse, adjoint: dSubtract(a:b:primal:seed:))
-      func subtract(a: C, b: C) -> C {
+      @differentiable(
+        reverse, withRespectTo: (self, .0),
+        adjoint: dSubtract(a:primal:seed:)
+      )
+      func subtract(a: C) -> C {
         return a
       }
 
       private func dSubtract(
-        a: C, b: C, primal: C, seed: C
+        a: C, primal: C, seed: C
       ) -> (C, C) {
         return (seed, seed)
       }
