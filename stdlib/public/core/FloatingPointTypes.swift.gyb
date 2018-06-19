@@ -1732,7 +1732,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, adjoint: _adjointAdd)
+  // @differentiable(reverse, adjoint: _adjointAdd)
   public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs += rhs
@@ -1742,7 +1742,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, adjoint: _adjointSubtract)
+  // @differentiable(reverse, adjoint: _adjointSubtract)
   public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs -= rhs
@@ -1752,7 +1752,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, adjoint: _adjointMultiply)
+  // @differentiable(reverse, adjoint: _adjointMultiply)
   public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs *= rhs
@@ -1762,7 +1762,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(reverse, adjoint: _adjointDivide)
+  // @differentiable(reverse, adjoint: _adjointDivide)
   public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
     var lhs = lhs
     lhs /= rhs
@@ -1773,7 +1773,7 @@ extension ${Self} {
 /// SWIFT_ENABLE_TENSORFLOW
 /// Adjoints of standard binary operators.
 extension ${Self} {
-  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointAdd(
     _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
@@ -1781,7 +1781,7 @@ extension ${Self} {
     return (adjoint, adjoint)
   }
 
-  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointSubtract(
     _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
@@ -1789,7 +1789,7 @@ extension ${Self} {
     return (adjoint, -adjoint)
   }
 
-  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointMultiply(
     _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}
@@ -1797,7 +1797,7 @@ extension ${Self} {
     return (rhs * adjoint, lhs * adjoint)
   }
 
-  @_versioned @_inlineable // FIXME(sil-serialize-all)
+  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   static func _adjointDivide(
     _ lhs: ${Self}, _ rhs: ${Self}, originalValue: ${Self}, adjoint: ${Self}

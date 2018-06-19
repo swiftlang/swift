@@ -31,7 +31,7 @@ ConstExprLimit("constexpr-limit", llvm::cl::init(256),
                               " constexpr function"));
 
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
@@ -58,9 +58,6 @@ namespace {
 
     /// If we have a function being analyzed, this is the substitution list for
     /// the call to it.
-    SubstitutionList substitutions;
-
-    /// This is a mapping of substitutions.
     SubstitutionMap substitutionMap;
 
     /// This keeps track of the number of instructions we've evaluated.  If this
@@ -73,17 +70,10 @@ namespace {
 
   public:
     ConstExprFunctionCache(ConstExprEvaluator &evaluator, SILFunction *fn,
-                           SubstitutionList substitutions,
+                           SubstitutionMap substitutionMap,
                            unsigned &numInstEvaluated)
-      : evaluator(evaluator), fn(fn), substitutions(substitutions),
-        numInstEvaluated(numInstEvaluated) {
-
-      if (fn && !substitutions.empty()) {
-        auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-        if (signature)
-          substitutionMap = signature->getSubstitutionMap(substitutions);
-      }
-    }
+      : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
+        numInstEvaluated(numInstEvaluated) {}
 
     void setValue(SILValue value, SymbolicValue symVal) {
       calculatedValues.insert({ value, symVal });
@@ -617,7 +607,7 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
   // the call.
   SmallVector<SymbolicValue, 4> results;
   auto callResult =
-    evaluateAndCacheCall(*callee, apply->getSubstitutions(),
+    evaluateAndCacheCall(*callee, apply->getSubstitutionMap(),
                          paramConstants, results, numInstEvaluated, evaluator);
   if (callResult.hasValue())
     return callResult.getValue();
@@ -869,13 +859,13 @@ ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
 /// expression, returning None and filling in `results` on success, or
 /// returning an 'Unknown' SymbolicValue on failure carrying the error.
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
                      ConstExprEvaluator &evaluator) {
   assert(!fn.isExternalDeclaration() && "Can't analyze bodyless function");
-  ConstExprFunctionCache cache(evaluator, &fn, substitutions,
+  ConstExprFunctionCache cache(evaluator, &fn, substitutionMap,
                                numInstEvaluated);
 
   // TODO: implement caching.

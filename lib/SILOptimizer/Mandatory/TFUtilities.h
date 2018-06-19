@@ -427,7 +427,7 @@ struct GraphGlobalConfiguration {
     /// Return true if the specified type contains a TensorFlow value type that
     /// will be exposed after deabstraction.
     bool containsTensorFlowValue(SILType ty) {
-      return containsTensorFlowValue(ty.getSwiftRValueType());
+      return containsTensorFlowValue(ty.getASTType());
     }
 
   };

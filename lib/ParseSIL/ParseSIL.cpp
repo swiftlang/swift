@@ -1006,7 +1006,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     SILType temp;
     if (SP.parseSILType(temp))
       return true;
-    auto metatype = CanMetatypeType::get(temp.getSwiftRValueType());
+    auto metatype = CanMetatypeType::get(temp.getASTType());
     value = SymbolicValue::getMetatype(metatype);
     return false;
   }
@@ -2873,7 +2873,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     P.Context.TheBuiltinModule->lookupMember(foundBuiltins,
                                              P.Context.TheBuiltinModule, Id,
                                              Identifier());
-
+    // SWIFT_ENABLE_TENSORFLOW
+    SubstitutionMap subMap;
     if (!foundBuiltins.empty()) {
       assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
 
@@ -2881,7 +2882,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
 
       SmallVector<ParsedSubstitution, 4> parsedSubs;
-      SubstitutionMap subMap;
       if (parseSubstitutions(parsedSubs))
         return true;
 

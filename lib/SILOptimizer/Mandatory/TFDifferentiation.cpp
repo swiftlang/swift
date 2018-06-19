@@ -653,8 +653,8 @@ private:
 void AdjointGen::accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
                                    SILValue resultBuffer, SILBuilder &builder,
                                    SILLocation loc) const {
-  auto adjointTy = oldAdjoint->getType().getSwiftRValueType();
-  assert(adjointTy->isEqual(oldAdjoint->getType().getSwiftRValueType()) &&
+  auto adjointTy = oldAdjoint->getType().getASTType();
+  assert(adjointTy->isEqual(oldAdjoint->getType().getASTType()) &&
          "Adjoints must have equal types!");
   auto adjointTyDecl = adjointTy->getAnyNominal();
   // If the type conforms to `VectorNumeric`, then combine them using
@@ -684,19 +684,15 @@ void AdjointGen::accumulateAdjoint(SILValue oldAdjoint, SILValue newAdjoint,
   // %0 = witness_method @+
   auto witnessMethod = builder.createWitnessMethod(loc, adjointTy, confRef,
                                                    declRef, silFnTy);
-  auto subMap =
-    adjointTy->getMemberSubstitutionMap(context.getModule().getSwiftModule(),
-                                        combinerFuncDecl);
-  SmallVector<Substitution, 1> subs;
-  confRef.getConcrete()->getGenericSignature()->getSubstitutions(subMap, subs);
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(proto, adjointTy, confRef);
   // %1 = metatype $T.Type
   auto metatypeType = MetatypeType::get(adjointTy)->getCanonicalType();
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = builder.createMetatype(loc, metatypeSILType);
   // %2 = apply $0(%result, %new, %old, %1)
-  builder.createApply(loc, witnessMethod, subs,
+  builder.createApply(loc, witnessMethod, subMap,
                       { resultBuffer, newAdjoint, oldAdjoint, metatype },
-                      /*isNonThrowing*/false);
+                      /*isNonThrowing*/ false);
 }
 
 SILFunction *
@@ -996,11 +992,9 @@ static void convertFromIntegerLiteral(intmax_t value,
   // %3 = witness_method ...
   auto initBILFn = builder.createWitnessMethod(loc, intLitTy, ebilConfRef,
                                                initBILDeclRef, initBILType);
-  // Get substitutions.
-  auto intLitSubMap =
-    intLitTy->getMemberSubstitutionMap(astCtx.getStdlibModule(), initBILDecl);
-  SmallVector<Substitution, 1> initBILSubs;
-  ebilProto->getGenericSignature()->getSubstitutions(intLitSubMap, initBILSubs);
+  // Get substitution map.
+  auto initBILSubMap =
+    SubstitutionMap::getProtocolSubstitutions(ebilProto, intLitTy, ebilConfRef);
   // Allocate result buffer.
   // %intLitBuf = alloc_stack $IntegerLiteralType
   auto *intLitBuf =
@@ -1010,7 +1004,7 @@ static void convertFromIntegerLiteral(intmax_t value,
     builder.createDeallocStack(loc, intLitBuf);
   };
   // %4 = apply %3 <...>(%intLitBuf, %1, %2)
-  builder.createApply(loc, initBILFn, astCtx.AllocateCopy(initBILSubs),
+  builder.createApply(loc, initBILFn, initBILSubMap,
                       { intLitBuf, builtinInt, intLitMetatype },
                       /*isNonThrowing*/ false);
   
@@ -1037,14 +1031,11 @@ static void convertFromIntegerLiteral(intmax_t value,
   // %6 = witness_method ...
   auto initILFn = builder.createWitnessMethod(loc, targetTy, eilConfRef,
                                               initILDeclRef, initILType);
-  // Get substitutions.
-  auto targetSubMap =
-    targetTy->getMemberSubstitutionMap(targetTypeDecl->getModuleContext(),
-                                       initILDecl);
-  SmallVector<Substitution, 1> initILSubs;
-  eilProto->getGenericSignature()->getSubstitutions(targetSubMap, initILSubs);
+  // Get substitution map.
+  auto initILSubMap =
+    SubstitutionMap::getProtocolSubstitutions(eilProto, targetTy, eilConf);
   // %7 = apply %6 <...>(%resultBuf, %intLitBuf, %5)
-  builder.createApply(loc, initILFn, initILSubs,
+  builder.createApply(loc, initILFn, initILSubMap,
                       { resultBuf, intLitBuf, targetMetatype },
                       /*isNonThrowing*/ false);
 }
@@ -1117,13 +1108,10 @@ static void convertToIndirectSeed(intmax_t value, CanType type,
     // $4 = witness_method ...
     auto initFnRef =
       builder.createWitnessMethod(loc, type, confRef, reqrRef, silInitTy);
-    auto initSubMap =
-      type->getMemberSubstitutionMap(module.getSwiftModule(), reqr,
-                                     vecNumProto->getGenericEnvironment());
-    SmallVector<Substitution, 1> subs;
-    vecNumProto->getGenericSignature()->getSubstitutions(initSubMap, subs);
+    auto subMap =
+      SubstitutionMap::getProtocolSubstitutions(vecNumProto, type, confRef);
     // %5 = apply %4(%3, %2, %1)
-    builder.createApply(loc, initFnRef, astCtx.AllocateCopy(subs),
+    builder.createApply(loc, initFnRef, subMap,
                       { seedBuf, scalarValBuf, metatype },
                       /*isNonThrowing*/ false);
   }
@@ -1255,11 +1243,11 @@ static SILFunction *getOrCreateGradient(
     // Call the canonical gradient function.
     // %0 = function_ref ...
     auto *canGradFnRef = builder.createFunctionRef(loc, canonicalGrad);
-    SubstitutionList substList;
+    SubstitutionMap subMap;
     if (auto *genEnv = gradFn->getGenericEnvironment())
-      substList = genEnv->getForwardingSubstitutions();
+      subMap = genEnv->getForwardingSubstitutionMap();
     // %1 = apply %0(...)
-    auto *resultAndGrad = builder.createApply(loc, canGradFnRef, substList,
+    auto *resultAndGrad = builder.createApply(loc, canGradFnRef, subMap,
                                               args, /*isNonThrowing*/ false);
     // Clean up stack allocations made by seed passing when seed is addr-only.
     for (auto alloc : stackAllocsToCleanUp)
@@ -1343,9 +1331,9 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   // %0 = function_ref @primal
   auto *primalRef = builder.createFunctionRef(loc, primal);
   // %1 = apply %0(...)
-  auto *primalApply = builder.createApply(loc, primalRef,
-                                          canGrad.getForwardingSubstitutions(),
-                                          primalArgs, /*isNonThrowing*/ false);
+  auto *primalApply = builder.createApply(
+    loc, primalRef, canGrad.getForwardingSubstitutionMap(),
+    primalArgs, /*isNonThrowing*/ false);
   // Collect the primal's direct results.
   SmallVector<SILValue, 8> primalResults;
   if (primalConv.getNumDirectSILResults() == 1)
@@ -1380,7 +1368,7 @@ static void fillCanonicalGradient(SILFunction &canGrad,
   auto *adjRef = builder.createFunctionRef(loc, adjoint);
   // %3 = apply %2(...)
   auto *adjApply = builder.createApply(loc, adjRef,
-                                       canGrad.getForwardingSubstitutions(),
+                                       canGrad.getForwardingSubstitutionMap(),
                                        adjointArgs, /*isNonThrowing*/ false);
   // Clean up stack allocations.
   for (auto val : reversed(stackAllocsToCleanUp))

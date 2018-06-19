@@ -191,7 +191,7 @@ void DevicePartitionCloner::visitTFOpInst(BuiltinInst *inst,
 
   auto newName = B.getASTContext().getIdentifier(tfopInfo.builtinName);
   auto result = B.createBuiltin(loc, newName, inst->getType(),
-                                /*substitutionlist*/ {}, args);
+                                /*no substitutions*/ {}, args);
   ValueMap[inst] = result;
 }
 
@@ -217,11 +217,10 @@ void DevicePartitionCloner::addD2DSend(BuiltinInst *inst, int transferId,
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto valueToSend = remapValue(inst->getOperand(0));
   auto destDeviceStr = getDeviceString(destDevice);
-  auto valueTy = inst->getResults()[0]->getType();
   auto destDeviceAttr = B.createStringLiteral(
       loc, StringRef(destDeviceStr), StringLiteralInst::Encoding::UTF8);
   B.createBuiltin(loc, ctx.getIdentifier(newInstName), voidTy,
-                  Substitution(valueTy.getSwiftRValueType(), {}),
+                  inst->getSubstitutions(),
                   {valueToSend, transferIdAttr, destDeviceAttr, deviceAttr});
   // Do not update ValueMap since Send does not produce a value.
 }
@@ -250,7 +249,7 @@ void DevicePartitionCloner::addD2DRecv(BuiltinInst *inst, int transferId,
   auto valueTy = inst->getResults()[0]->getType();
   auto newValue =
       B.createBuiltin(inst->getLoc(), ctx.getIdentifier(newInstName), valueTy,
-                      Substitution(valueTy.getSwiftRValueType(), {}),
+                      inst->getSubstitutions(),
                       {transferIdAttr, srcDeviceAttr, deviceAttr});
   auto valueToRecv = inst->getResults()[0];
   ValueMap[valueToRecv] = newValue;
@@ -660,9 +659,11 @@ class DevicePartitionerImpl
                                 StringLiteralInst::Encoding::UTF8);
       markInstForAllDevices(destDeviceAttr);
 
+      // At this point, the operand must have been produced by a `builtin` inst.
+      auto builtinInst = cast<BuiltinInst>(operandInst);
       auto transferInst = B.createBuiltin(
           loc, ctx.getIdentifier(newInstName), opValue->getType(),
-          Substitution(opValue->getType().getSwiftRValueType(), {}),
+          builtinInst->getSubstitutions(),
           {opValue, transferIdAttr, srcDeviceAttr, destDeviceAttr});
       transferInstsByDestDevice[lookupKey] = transferInst;
       markInstForDevice(operandDeviceType, transferInst);

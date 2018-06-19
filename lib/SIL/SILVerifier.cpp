@@ -1469,14 +1469,14 @@ public:
   void checkAutoDiffBuiltinInst(BuiltinInst *BI) {
     auto &ctx = M->getASTContext();
     auto id = BI->getBuiltinInfo().ID;
-    require(BI->getSubstitutions().size() == 1,
+    require(BI->getSubstitutions().getReplacementTypes().size() == 1,
             "autodiff builtin should have a single type parameter");
 
     auto name = getBuiltinName(id);
     auto resultErrorMsg = "unexpected result type for '" + name + "'";
     auto operandErrorMsg = "unexpected operand type for '" + name + "'";
 
-    auto canGenericParam = BI->getSubstitutions()[0].getReplacement()
+    auto canGenericParam = BI->getSubstitutions().getReplacementTypes()[0]
       ->getCanonicalType();
     auto tapeType = SILType::getPrimitiveObjectType(
       BoundGenericType::get(ctx.get_AutoDiffTapeDecl(), Type(), canGenericParam)
