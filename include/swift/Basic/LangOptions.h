@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -182,6 +182,9 @@ namespace swift {
     /// \brief The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
