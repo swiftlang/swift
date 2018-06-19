@@ -588,7 +588,8 @@ ERROR(serialization_module_too_new,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
 ERROR(serialization_module_language_version_mismatch,Fatal,
-      "module compiled with Swift %0 cannot be imported in Swift %1: %2",
+      "module compiled with Swift %0 cannot be imported by the Swift %1 "
+      "compiler: %2",
       (StringRef, StringRef, StringRef))
 ERROR(serialization_module_too_old,Fatal,
       "module file was created by an older version of the compiler; "
