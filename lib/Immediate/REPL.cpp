@@ -1005,7 +1005,8 @@ public:
     IRGenOpts.OutputKind = IRGenOutputKind::Module;
     IRGenOpts.UseJIT = true;
     IRGenOpts.IntegratedREPL = true;
-    IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::None;
+    IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::None;
+    IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::None;
 
     if (!ParseStdlib) {
       // Force standard library to be loaded immediately.  This forces any

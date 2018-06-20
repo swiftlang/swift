@@ -1070,14 +1070,14 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
 /// the compile unit's flags.
 static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
                                             ModuleOrSourceFile MSF) {
-  if (IRGenOpts.DebugInfoKind == IRGenDebugInfoKind::None ||
+  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::None ||
       !MSF.is<SourceFile *>())
     return;
   Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
   if (!PD.empty()) {
-    if (!IRGenOpts.DWARFDebugFlags.empty())
-      IRGenOpts.DWARFDebugFlags += " ";
-    IRGenOpts.DWARFDebugFlags += ("-private-discriminator " + PD.str()).str();
+    if (!IRGenOpts.DebugFlags.empty())
+      IRGenOpts.DebugFlags += " ";
+    IRGenOpts.DebugFlags += ("-private-discriminator " + PD.str()).str();
   }
 }
 
@@ -1125,7 +1125,8 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   IRGenOpts.UseJIT = true;
-  IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
+  IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));

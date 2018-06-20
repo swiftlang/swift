@@ -121,11 +121,11 @@ public:
   serialization::Status loadFromSerializedAST(StringRef data);
 
   /// Serialize the command line arguments for emitting them
-  /// to DWARF and inject SDKPath if necessary.
-  static void buildDWARFDebugFlags(std::string &Output,
-                                   const ArrayRef<const char*> &Args,
-                                   StringRef SDKPath,
-                                   StringRef ResourceDir);
+  /// to DWARF or CodeView and inject SDKPath if necessary.
+  static void buildDebugFlags(std::string &Output,
+                              const ArrayRef<const char*> &Args,
+                              StringRef SDKPath,
+                              StringRef ResourceDir);
 
   void setTargetTriple(StringRef Triple);
 

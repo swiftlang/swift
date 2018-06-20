@@ -47,12 +47,18 @@ enum class IRGenOutputKind : unsigned {
   ObjectFile
 };
 
-enum class IRGenDebugInfoKind : unsigned {
-  None,       /// No debug info.
-  LineTables, /// Line tables only.
-  ASTTypes,   /// Line tables + AST type references.
-  DwarfTypes, /// Line tables + AST type references + DWARF types.
-  Normal = ASTTypes /// The setting LLDB prefers.
+enum class IRGenDebugInfoLevel : unsigned {
+  None,       ///< No debug info.
+  LineTables, ///< Line tables only.
+  ASTTypes,   ///< Line tables + AST type references.
+  DwarfTypes, ///< Line tables + AST type references + DWARF types.
+  Normal = ASTTypes ///< The setting LLDB prefers.
+};
+
+enum class IRGenDebugInfoFormat : unsigned {
+  None,
+  DWARF,
+  CodeView
 };
 
 enum class IRGenEmbedMode : unsigned {
@@ -72,8 +78,8 @@ public:
   /// The DWARF version of debug info.
   unsigned DWARFVersion;
 
-  /// The command line string that is to be stored in the DWARF debug info.
-  std::string DWARFDebugFlags;
+  /// The command line string that is to be stored in the debug info.
+  std::string DebugFlags;
 
   /// List of -Xcc -D macro definitions.
   std::vector<std::string> ClangDefines;
@@ -97,8 +103,11 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
-  /// Whether we should emit debug info.
-  IRGenDebugInfoKind DebugInfoKind : 2;
+  /// What level of debug info to generate.
+  IRGenDebugInfoLevel DebugInfoLevel : 2;
+
+  /// What type of debug info to generate.
+  IRGenDebugInfoFormat DebugInfoFormat : 2;
 
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
@@ -184,8 +193,9 @@ public:
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
-        DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
-        IntegratedREPL(false),
+        DebugInfoLevel(IRGenDebugInfoLevel::None),
+        DebugInfoFormat(IRGenDebugInfoFormat::None),
+        UseJIT(false), IntegratedREPL(false),
         DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
         EmitStackPromotionChecks(false), PrintInlineTree(false),
