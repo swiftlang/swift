@@ -1222,7 +1222,6 @@ public:
       *this << "]";
       return;
     case SymbolicValue::Function:
-    case SymbolicValue::Address:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
       llvm_unreachable("Unimplemented SymbolicValue case");
