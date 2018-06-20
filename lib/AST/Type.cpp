@@ -1061,9 +1061,8 @@ getCanonicalInputType(AnyFunctionType *funcType,
 
   auto flags = ParameterTypeFlags().withInOut(inputType->is<InOutType>());
   if (auto *parenTy = dyn_cast<ParenType>(origInputType.getPointer())) {
-    auto parenFlags = parenTy->getParameterFlags();
-    flags =
-        flags.withShared(parenFlags.isShared()).withOwned(parenFlags.isOwned());
+    flags = parenTy->getParameterFlags().withInOut(flags.isInOut());
+    assert(!flags.isVariadic() && "variadic ParenType");
   }
 
   inputType = ParenType::get(inputType->getASTContext(),
