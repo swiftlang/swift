@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift-swift3
 // REQUIRES: executable_test
 
 // NSButtonType (from AppKit) and UIViewAnimationCurve (from UIKit) both have

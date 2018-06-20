@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 // Ensure that the identifiers in compilation conditions don't reference
 // any decls in the scope.

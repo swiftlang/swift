@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -module-name Swift -parse-stdlib %s -swift-version 3 | %FileCheck %s
 
 enum Optional<Wrapped> {
   case none

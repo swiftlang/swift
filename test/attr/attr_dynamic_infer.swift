@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
 
 @objc class Super {
   func baseFoo() {}

@@ -5,7 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -typecheck -verify
+// RUN: %target-swift-frontend %s -typecheck -verify -swift-version 3
 
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 // rdar://18175202
