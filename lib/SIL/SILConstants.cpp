@@ -54,6 +54,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << Demangle::demangleSymbolAsString(fn->getName());
     os << "\n";
     return;
+  }
   case RK_Inst:
     os << "inst: ";
     value.inst->dump();
