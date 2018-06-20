@@ -29,7 +29,6 @@ class SerializedSILLoader;
 struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
 struct StringSymbolicValue;
-struct AddressSymbolicValue;
 struct AggregateSymbolicValue;
 
 /// When we fail to constant fold a value, this captures a reason why,
@@ -97,12 +96,6 @@ class SymbolicValue {
     /// representing a UTF-8 encoded string.
     RK_String,
 
-    /// This value is a pointer to a tracked memory location, along with zero
-    /// or more indices (tuple indices, struct field indices, etc) into the
-    /// value if it is an aggregate.
-    ///
-    RK_Address,
-
     /// This value is an array, struct, or tuple of constants.  This is
     /// tracked by the "aggregate" member of the value union.  Note that we
     /// cheat and represent single-element structs as the value of their
@@ -142,10 +135,6 @@ class SymbolicValue {
     /// When this SymbolicValue is of "String" kind, this pointer stores
     /// information about the StringRef value it holds.
     StringSymbolicValue *string;
-
-    /// When this SymbolicValue is of "Address" kind, this pointer stores
-    /// info about the base and the indices for the address.
-    AddressSymbolicValue *address;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements, count, and element type.
@@ -196,7 +185,6 @@ public:
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
-    Address,
     UninitMemory
   };
 
@@ -216,6 +204,10 @@ public:
     result.value.unknown = node;
     result.aux.unknown_reason = reason;
     return result;
+  }
+
+  bool isUnknown() const {
+    return getKind() == Unknown;
   }
 
   /// Return information about an unknown result, including the SIL node that
@@ -302,22 +294,6 @@ public:
 
   /// Returns the UTF-8 encoded string underlying a SymbolicValue.
   StringRef getStringValue() const;
-
-  /// Get a SymbolicValue corresponding to a memory object with an optional
-  /// list of indices into it.  This is used by (e.g.) a struct_element_addr
-  /// of a stack_alloc.
-  static SymbolicValue getAddress(SILValue base,
-                                  ArrayRef<unsigned> indices,
-                                  llvm::BumpPtrAllocator &allocator);
-
-  /// Accessors for Address SymbolicValue's.
-  bool isAddress() const {
-    return getKind() == Address;
-  }
-
-  SILValue getAddressBase() const;
-  ArrayRef<unsigned> getAddressIndices() const;
-
 
   /// This returns an aggregate value with the specified elements in it.  This
   /// copies the elements into the specified allocator.

@@ -1499,7 +1499,6 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   switch (symVal.getKind()) {
   case SymbolicValue::Unknown:
   case SymbolicValue::UninitMemory:
-  case SymbolicValue::Address:
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
   case SymbolicValue::Function:
