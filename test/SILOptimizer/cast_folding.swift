@@ -1032,6 +1032,39 @@ public func testCastProtocolTypeProtocolToProtocolTypeType() -> P.Type.Type? {
   return P.Type.self as? P.Type.Type
 }
 
+protocol PForOptional {
+}
+
+extension Optional: PForOptional {
+}
+
+func testCastToPForOptional<T>(_ t: T) -> Bool {
+  if let _ = t as? PForOptional {
+    return true
+  }
+  return false
+}
+
+// CHECK-LABEL: // testCastToPForOptionalSuccess()
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[RET:%.*]] = struct $Bool ([[RES]] : $Builtin.Int1)
+// CHECK: return [[RET]] : $Bool
+@inline(never)
+public func testCastToPForOptionalSuccess() -> Bool {
+  let t: Int? = 42
+  return testCastToPForOptional(t)
+}
+
+// CHECK-LABEL: // testCastToPForOptionalFailure()
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK: [[RET:%.*]] = struct $Bool ([[RES]] : $Builtin.Int1)
+// CHECK: return [[RET]] : $Bool
+@inline(never)
+public func testCastToPForOptionalFailure() -> Bool {
+  let t: Int = 42
+  return testCastToPForOptional(t)
+}
+
 print("test0=\(test0())")
 
 print("test1=\(test1())")

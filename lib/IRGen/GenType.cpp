@@ -1243,12 +1243,15 @@ const LoadableTypeInfo &TypeConverter::getEmptyTypeInfo() {
   return *EmptyTI;
 }
 
-const TypeInfo &TypeConverter::getResilientStructTypeInfo() {
-  if (ResilientStructTI) return *ResilientStructTI;
-  ResilientStructTI = convertResilientStruct();
-  ResilientStructTI->NextConverted = FirstType;
-  FirstType = ResilientStructTI;
-  return *ResilientStructTI;
+const TypeInfo &
+TypeConverter::getResilientStructTypeInfo(IsABIAccessible_t isAccessible) {
+  auto &cache = isAccessible ? AccessibleResilientStructTI
+                             : InaccessibleResilientStructTI;
+  if (cache) return *cache;
+  cache = convertResilientStruct(isAccessible);
+  cache->NextConverted = FirstType;
+  FirstType = cache;
+  return *cache;
 }
 
 /// Get the fragile type information for the given type, which may not
@@ -1365,17 +1368,7 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 const TypeInfo &TypeConverter::getCompleteTypeInfo(CanType T) {
   auto entry = getTypeEntry(T);
   assert(entry.is<const TypeInfo*>() && "getting TypeInfo recursively!");
-  auto &ti = *entry.get<const TypeInfo*>();
-  assert(ti.isComplete());
-  return ti;
-}
-
-const TypeInfo *TypeConverter::tryGetCompleteTypeInfo(CanType T) {
-  auto entry = getTypeEntry(T);
-  if (!entry.is<const TypeInfo*>()) return nullptr;
-  auto &ti = *entry.get<const TypeInfo*>();
-  if (!ti.isComplete()) return nullptr;
-  return &ti;
+  return *entry.get<const TypeInfo*>();
 }
 
 ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {

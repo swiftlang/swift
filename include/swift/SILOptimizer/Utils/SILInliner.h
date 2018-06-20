@@ -61,7 +61,7 @@ private:
 
 public:
   SILInliner(SILFunction &To, SILFunction &From, InlineKind IKind,
-             SubstitutionList ApplySubs,
+             SubstitutionMap ApplySubs,
              SILOpenedArchetypesTracker &OpenedArchetypesTracker,
              CloneCollector::CallbackType Callback = nullptr)
       : TypeSubstCloner<SILInliner>(To, From, ApplySubs,

@@ -992,7 +992,7 @@ function cmake_needs_to_specify_standard_computed_defaults() {
 function make_relative_symlink() {
     local SOURCE=$1
     local TARGET=$2
-    local TARGET_DIR=$(dirname $2)
+    local TARGET_DIR=$(dirname "$2")
     local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\"${SOURCE}\", \"${TARGET_DIR}\"))")
     call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
@@ -1389,7 +1389,7 @@ function calculate_targets_for_host() {
         fi
         if [[ "${build_benchmark_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
             SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
+            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
               SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
             fi
         fi
@@ -1398,7 +1398,7 @@ function calculate_targets_for_host() {
            [[ "${build_external_benchmark_this_target}" ]] &&
            [[ "${is_in_build_list}" ]] ; then
             SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}-external")
-            if [[ $(not ${SKIP_TEST_BENCHMARK}) ]] ; then
+            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
                 SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}-external")
             fi
         fi
@@ -1751,6 +1751,7 @@ function set_lldb_xcodebuild_options() {
         LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
         SYMROOT="${lldb_build_dir}"
         OBJROOT="${lldb_build_dir}"
+        -UseNewBuildSystem=NO
         ${LLDB_EXTRA_XCODEBUILD_ARGS}
     )
     if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
@@ -1811,8 +1812,7 @@ for host in "${ALL_HOSTS[@]}"; do
             echo "Running Swift tests for: ${SWIFT_TEST_TARGETS[@]}"
         fi
         if ! [[ "${SKIP_TEST_BENCHMARKS}" ]] &&
-                [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]] &&
-                ! [[ "${SKIP_TEST_BENCHMARK}" ]]; then
+             [[ "${SWIFT_RUN_BENCHMARK_TARGETS[@]}" ]]; then
             echo "Running Swift benchmarks for: ${SWIFT_RUN_BENCHMARK_TARGETS[@]}"
         fi
     fi
@@ -2654,7 +2654,7 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[ "${product}" == "llvm" ]]; then
             # Find the location of the c++ header dir.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname ${HOST_CXX})
+              HOST_CXX_DIR=$(dirname "${HOST_CXX}")
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"

@@ -1043,7 +1043,8 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
          "Invalid number of arguments");
 
   // Don't handle any apply instructions that involve substitutions.
-  if (ToAI->getSubstitutions().size() != 1) return false;
+  if (ToAI->getSubstitutionMap().getReplacementTypes().size() != 1)
+    return false;
 
   // Prepare the Apply args.
   SmallVector<SILValue, 8> Args;
@@ -1052,7 +1053,7 @@ static bool tryToCSEOpenExtCall(OpenExistentialAddrInst *From,
   }
 
   ApplyInst *NAI = Builder.createApply(ToAI->getLoc(), ToWMI,
-                                       ToAI->getSubstitutions(), Args,
+                                       ToAI->getSubstitutionMap(), Args,
                                        ToAI->isNonThrowing());
   FromAI->replaceAllUsesWith(NAI);
   FromAI->eraseFromParent();

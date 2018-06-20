@@ -1,0 +1,196 @@
+//===--- AccessorKinds.def - Swift accessor metaprogramming -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with accessor kinds.
+//
+//===----------------------------------------------------------------------===//
+
+#if defined(ACCESSOR) && defined(ACCESSOR_KEYWORD)
+#error do not define both ACCESSOR and ACCESSOR_KEYWORD
+#elif !defined(ACCESSOR) && !defined(ACCESSOR_KEYWORD)
+#error must define either ACCESSOR or ACCESSOR_KEYWORD
+#endif
+
+/// ACCESSOR(ID)
+///   There is an accessor with the enumerator value AccessorKind::ID.
+#if !defined(ACCESSOR) && defined(ACCESSOR_KEYWORD)
+#define ACCESSOR(ID)
+#endif
+
+/// SINGLETON_ACCESSOR(ID, KEYWORD)
+///   The given accessor has only one matching accessor keyword.
+///
+/// Defaults to ACCESSOR(ID) or ACCESSOR_KEYWORD(KEYWORD), depending on which
+/// is defined.
+#ifndef SINGLETON_ACCESSOR
+#if defined(ACCESSOR_KEYWORD)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) ACCESSOR_KEYWORD(KEYWORD)
+#else
+#define SINGLETON_ACCESSOR(ID, KEYWORD) ACCESSOR(ID)
+#endif
+#endif
+
+/// OBSERVING_ACCESSOR(ID, KEYWORD)
+///   The given accessor is an observing accessor.
+///
+///   Defaults to SINGLETON_ACCESSOR(ID, KEYWORD).
+#ifndef OBSERVING_ACCESSOR
+#define OBSERVING_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
+#endif
+
+/// OPAQUE_ACCESSOR(ID, KEYWORD)
+///   The given accessor is used in the opaque access pattern and is created
+///   for (mutable) storage whenever its implementation is unknown, such as
+///   when it is resilient, overridable, or accessed through a protocol.
+///
+///   Defaults to SINGLETON_ACCESSOR(ID, KEYWORD).
+#ifndef OPAQUE_ACCESSOR
+#define OPAQUE_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
+#endif
+
+/// OBJC_ACCESSOR(ID, KEYWORD)
+///   The given accessor is used in Objective-C, i.e. it is a getter or setter.
+///
+///   Defaults to OPAQUE_ACCESSOR(ID, KEYWORD).
+#ifndef OBJC_ACCESSOR
+#define OBJC_ACCESSOR(ID, KEYWORD) OPAQUE_ACCESSOR(ID, KEYWORD)
+#endif
+
+/// ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD)
+///   The given keyword corresponds to an addressor of the given kind.
+///
+///   Defaults to ACCESSOR_KEYWORD(KEYWORD) if that is defined; otherwise
+///   defaults to nothing.
+#ifndef ANY_ADDRESSOR
+#if defined(ACCESSOR_KEYWORD)
+#define ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD) \
+  ACCESSOR_KEYWORD(KEYWORD)
+#else
+#define ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD)
+#endif
+#endif
+
+/// IMMUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD)
+///   The given keyword corresponds to an immutable addressor of the given kind.
+///
+///   DEfaults to ANY_ADDRESSOR(Address, ADDRESSOR_ID, KEYWORD).
+#ifndef IMMUTABLE_ADDRESSOR
+#define IMMUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD) \
+  ANY_ADDRESSOR(Address, ADDRESSOR_ID, KEYWORD)
+#endif
+
+/// MUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD)
+///   The given keyword corresponds to a mutable addressor of the given kind.
+///
+///   DEfaults to ANY_ADDRESSOR(MutableAddress, ADDRESSOR_ID, KEYWORD).
+#ifndef MUTABLE_ADDRESSOR
+#define MUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD) \
+  ANY_ADDRESSOR(MutableAddress, ADDRESSOR_ID, KEYWORD)
+#endif
+
+// Suppress entries for accessors which can't be written in source code.
+#ifndef SUPPRESS_ARTIFICIAL_ACCESSORS
+#define SUPPRESS_ARTIFICIAL_ACCESSORS 0
+#endif
+
+/// This is a getter: a function that is called when a value is loaded
+/// from the storage.  It returns an owned value of the storage type.
+///
+/// If the storage is not implemented with a getter, a getter can
+/// always be synthesized.  However, this will not be true when
+/// move-only types are introduced.
+OBJC_ACCESSOR(Get, get)
+
+/// This is a setter: a function that is called when a value is assigned
+/// to the storage.  It takes a value of the storage type as its
+/// primary parameter, in addition to any index values that may be
+/// required for a subscript.
+///
+/// If the storage is not implemented with a setter, a setter can
+/// always be synthesized if the storage is mutable at all.
+OBJC_ACCESSOR(Set, set)
+
+/// This is a materializeForSet accessor: a function which is called
+/// when a combined read-modify operation is performed on the storage,
+/// such as passing it as an inout argument (which includes calling
+/// a mutating function on it).  It is essentially a SILGen-lowered
+/// coroutine that yields a pointer to a mutable value of the storage
+/// type.
+///
+/// We do not allow users to provide materializeForSet.  It can always
+/// be synthesized if the storage is mutable at all.
+#if !(SUPPRESS_ARTIFICIAL_ACCESSORS)
+OPAQUE_ACCESSOR(MaterializeForSet, materializeForSet)
+#endif
+
+/// This is a willSet observer: a function which "decorates" an
+/// underlying assignment operation by being called prior to the
+/// operation when a value is assigned to the storage.
+///
+/// willSet is essentially sugar for implementing a certain common
+/// setter idiom.
+OBSERVING_ACCESSOR(WillSet, willSet)
+
+/// This is a didSet observer: a function which "decorates" an
+/// underlying assignment operation by being called after the
+/// operation when a value is assigned to the storage.
+///
+/// didSet is essentially sugar for implementing a certain common
+/// setter idiom.
+OBSERVING_ACCESSOR(DidSet, didSet)
+
+/// This is an address-family accessor: a function that is called when
+/// a value is loaded from the storage, like a getter, but which works
+/// by returning a pointer to an immutable value of the storage type.
+/// This kind of accessor also has an addressor kind.
+///
+/// Addressors are a way of proving more efficient access to storage
+/// when it is already stored in memory (but not as a stored member
+/// of the type).
+ACCESSOR(Address)
+
+IMMUTABLE_ADDRESSOR(Unsafe, unsafeAddress)
+IMMUTABLE_ADDRESSOR(Owning, addressWithOwner)
+IMMUTABLE_ADDRESSOR(NativeOwning, addressWithNativeOwner)
+IMMUTABLE_ADDRESSOR(NativePinning, addressWithPinnedNativeOwner)
+
+/// This is a mutableAddress-family accessor: a function that is
+/// called when the storage is assigned to (like a setter) or
+/// read-modified (like materializeForSet), but which works by
+/// returning a pointer to a mutable value of the storage type.
+/// This kind of accessor also has an addressor kind.
+///
+/// Addressors are a way of proving more efficient access to storage
+/// when it is already stored in memory (but not as a stored member
+/// of the type).
+ACCESSOR(MutableAddress)
+
+MUTABLE_ADDRESSOR(Unsafe, unsafeMutableAddress)
+MUTABLE_ADDRESSOR(Owning, mutableAddressWithOwner)
+MUTABLE_ADDRESSOR(NativeOwning, mutableAddressWithNativeOwner)
+MUTABLE_ADDRESSOR(NativePinning, mutableAddressWithPinnedNativeOwner)
+
+#ifdef LAST_ACCESSOR
+LAST_ACCESSOR(MutableAddress)
+#undef LAST_ACCESSOR
+#endif
+
+#undef IMMUTABLE_ADDRESSOR
+#undef MUTABLE_ADDRESSOR
+#undef ANY_ADDRESSOR
+#undef OBJC_ACCESSOR
+#undef OPAQUE_ACCESSOR
+#undef OBSERVING_ACCESSOR
+#undef SINGLETON_ACCESSOR
+#undef ACCESSOR
+#undef ACCESSOR_KEYWORD
+#undef SUPPRESS_ARTIFICIAL_ACCESSORS

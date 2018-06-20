@@ -533,7 +533,7 @@ func r21684487() {
   var closures = Array<MyClosure>()
   let testClosure = {(list: [Int]) -> Bool in return true}
   
-  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions; operands here have types '_' and '([Int]) -> Bool'}}
+  let closureIndex = closures.index{$0 === testClosure} // expected-error {{cannot check reference equality of functions;}}
 }
 
 // <rdar://problem/18397777> QoI: special case comparisons with nil
@@ -651,7 +651,7 @@ _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an op
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(_ x : UnsafePointer<Int>) {}
 func segfault23433271(_ a : UnsafeMutableRawPointer) {
-  f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
+  f23433271(a[0])  // expected-error {{value of type 'UnsafeMutableRawPointer' has no subscripts}}
 }
 
 

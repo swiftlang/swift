@@ -73,19 +73,19 @@ import Builtin
 // --       field offset vector offset
 // CHECK-SAME: i32 6,
 // --       generic params, requirements, key args, extra args
-// CHECK-SAME: i16 2, i16 2, i16 2, i16 2,
+// CHECK-SAME: i16 2, i16 2, i16 4, i16 0,
 // --       generic parameters
 // CHECK-SAME: <i8 0x80>, <i8 0x80>,
 // --       generic requirement
-//   --       protocol requirement with extra arg
-// CHECK-SAME: i32 64
+//   --       protocol requirement with key arg
+// CHECK-SAME: i32 128
 //   --       param 0
 // CHECK-SAME: i32 0
 //   --       protocol Req1
 // CHECK-SAME: %swift.protocol* @"$S15generic_structs4Req1Mp"
 
-//   --       protocol requirement with extra arg
-// CHECK-SAME: i32 64
+//   --       protocol requirement with key arg
+// CHECK-SAME: i32 128
 //   --       param 1
 // CHECK-SAME: i32 2
 //   --       protocol Req2
@@ -217,7 +217,7 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 //   initializeBufferWithCopyOfBuffer
 // CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S15generic_structs13SingleDynamicVwCP"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
 // CHECK:      %T = load %swift.type*,
-// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
+// CHECK:      [[T0:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: %T.valueWitnesses = load i8**, i8*** [[T1]]
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** %T.valueWitnesses,
@@ -227,20 +227,6 @@ entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Ch
 // CHECK-NEXT: [[T2:%.*]] = bitcast {{.*}} [[T1]] to %swift.opaque*
 // CHECK-NEXT: ret %swift.opaque* [[T2]]
 
-
-//   initializeBufferWithTakeOfBuffer
-// CHECK-LABEL: define linkonce_odr hidden %swift.opaque* @"$S15generic_structs13SingleDynamicVwTK"([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %"SingleDynamic<T>") {{.*}} {
-// CHECK:      %T = load %swift.type*,
-// CHECK-NEXT: [[T0:%.*]] = bitcast %swift.type* %T to i8***
-// CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
-// CHECK-NEXT: %T.valueWitnesses = load i8**, i8*** [[T1]]
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** %T.valueWitnesses, i32 6
-// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]],
-// CHECK-NEXT: [[FN:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
-// CHECK-NEXT: [[T0:%.*]] = call %swift.opaque* [[FN]]([24 x i8]* noalias %dest, [24 x i8]* noalias %src, %swift.type* %T)
-// CHECK-NEXT: [[T1:%.*]] = bitcast %swift.opaque* [[T0]] to {{.*}}
-// CHECK-NEXT: [[T2:%.*]] = bitcast {{.*}} [[T1]] to %swift.opaque*
-// CHECK-NEXT: ret %swift.opaque* [[T2]]
 
 protocol HasAssociatedType {
   associatedtype Assoc

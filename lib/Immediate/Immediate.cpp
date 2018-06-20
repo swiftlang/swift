@@ -205,11 +205,9 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::IRGenImportedModules(
-    CompilerInstance &CI,
-    llvm::Module &Module,
-    llvm::SmallPtrSet<swift::ModuleDecl *, 8> &ImportedModules,
-    SmallVectorImpl<llvm::Function*> &InitFns,
-    IRGenOptions &IRGenOpts,
+    CompilerInstance &CI, llvm::Module &Module,
+    llvm::SmallPtrSetImpl<swift::ModuleDecl *> &ImportedModules,
+    SmallVectorImpl<llvm::Function *> &InitFns, IRGenOptions &IRGenOpts,
     const SILOptions &SILOpts) {
   swift::ModuleDecl *M = CI.getMainModule();
 

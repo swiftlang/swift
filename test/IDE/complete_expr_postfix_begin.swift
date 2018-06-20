@@ -123,8 +123,7 @@ typealias FooTypealias = Int
 // COMMON-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
-// NO_SELF-NOT: Self
-// NO_SELF-NOT: self
+// NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}
 
 //===--- Test that we can code complete at the beginning of expr-postfix.
 

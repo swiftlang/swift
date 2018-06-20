@@ -411,8 +411,10 @@ internal class _AnyRandomAccessCollectionBox<Element>
 @usableFromInline
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
 {
+  @usableFromInline
   internal typealias Element = S.Element
 
+  @inline(__always)
   @inlinable
   internal override func _makeIterator() -> AnyIterator<Element> {
     return AnyIterator(_base.makeIterator())
@@ -710,6 +712,7 @@ extension Any${Kind} {
 %   else:
   /// Returns an iterator over the elements of this collection.
 %   end
+  @inline(__always)
   @inlinable
   public func makeIterator() -> Iterator {
     return _box._makeIterator()

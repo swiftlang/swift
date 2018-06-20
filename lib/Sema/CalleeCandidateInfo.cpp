@@ -65,7 +65,7 @@ UncurriedCandidate::UncurriedCandidate(ValueDecl *decl, unsigned level)
     auto *DC = decl->getInnermostDeclContext();
     if (auto *GFT = entityType->getAs<GenericFunctionType>()) {
       auto subs = DC->getGenericEnvironmentOfContext()
-      ->getForwardingSubstitutions();
+      ->getForwardingSubstitutionMap();
       entityType = GFT->substGenericArgs(subs);
     } else {
       // FIXME: look through unforced IUOs here?
@@ -308,9 +308,8 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
-                    candDefaultMap);
+  llvm::SmallBitVector candDefaultMap =
+    computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -835,7 +834,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     // the uncurry level is 1 if self has already been applied.
     unsigned uncurryLevel = 0;
     if (decl->getDeclContext()->isTypeContext() &&
-        selfAlreadyApplied)
+        selfAlreadyApplied && !isa<SubscriptDecl>(decl))
       uncurryLevel = 1;
     
     candidates.push_back({ decl, uncurryLevel });

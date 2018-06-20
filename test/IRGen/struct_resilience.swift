@@ -19,13 +19,13 @@ import resilient_enum
 
 public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) -> Size) -> Size {
 // CHECK: entry:
-// CHECK-NEXT: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
+// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct4SizeVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
 // CHECK: [[WITNESS_FOR_SIZE:%.*]] = ptrtoint i8* [[WITNESS]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
@@ -92,10 +92,11 @@ public struct MySize {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(%T17struct_resilience6MySizeV* noalias nocapture sret, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|(16)}}), i8*, %swift.opaque*)
 public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned MySize) -> MySize) -> MySize {
-
+// CHECK: alloca
 // CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
 // CHECK: bitcast
 // CHECK: llvm.lifetime.start
+// CHECK: bitcast
 // CHECK: [[COPY:%.*]] = bitcast %T17struct_resilience6MySizeV* %4 to i8*
 // CHECK: [[ARG:%.*]] = bitcast %T17struct_resilience6MySizeV* %1 to i8*
 // CHECK: call void @llvm.memcpy{{.*}}(i8* [[COPY]], i8* [[ARG]], {{i32 8|i64 16}}, i32 {{.*}}, i1 false)
@@ -169,6 +170,24 @@ public func partialApplyOfResilientMethod(r: ResilientStructWithMethod) {
 public func partialApplyOfResilientMethod(s: Size) {
   _ = s.method
 }
+
+public func wantsAny(_ any: Any) {}
+
+public func resilientAny(s : ResilientWeakRef) {
+  wantsAny(s)
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$S17struct_resilience12resilientAny1sy0c1_A016ResilientWeakRefV_tF"(%swift.opaque* noalias nocapture)
+// CHECK: entry:
+// CHECK: [[ANY:%.*]] = alloca %Any
+// CHECK: [[META:%.*]] = call swiftcc %swift.metadata_response @"$S16resilient_struct16ResilientWeakRefVMa"([[INT]] 0)
+// CHECK: [[META2:%.*]] = extractvalue %swift.metadata_response %3, 0
+// CHECK: [[TYADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 1
+// CHECK:  store %swift.type* [[META2]], %swift.type** [[TYADDR]]
+// CHECK:  call %swift.opaque* @__swift_allocate_boxed_opaque_existential_0(%Any* [[ANY]])
+// CHECK:  call swiftcc void @"$S17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
+// CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
+// CHECK:  ret void
 
 // Public metadata accessor for our resilient struct
 

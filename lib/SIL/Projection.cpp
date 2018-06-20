@@ -898,7 +898,7 @@ processUsersOfValue(ProjectionTree &Tree,
       Worklist.push_back({V, ChildNode});
     } else {
       DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
-            "Adding to non projection user!\b");
+            "Adding to non projection user!\n");
 
       // The only projection which we do not currently handle are enums since we
       // may not know the correct case. This can be extended in the future.
@@ -1103,9 +1103,12 @@ public:
 //                               ProjectionTree
 //===----------------------------------------------------------------------===//
 
-ProjectionTree::
-ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+ProjectionTree::ProjectionTree(
+    SILModule &Mod, SILType BaseTy,
+    llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
+    : Mod(Mod), Allocator(Allocator) {
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
+                     << "\n");
 
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);
@@ -1243,7 +1246,7 @@ computeUsesAndLiveness(SILValue Base) {
 #ifndef NDEBUG
   DEBUG(llvm::dbgs() << "Final Leafs: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
-  getLeafTypes(LeafTypes);
+  getLiveLeafTypes(LeafTypes);
   for (SILType Leafs : LeafTypes) {
     DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
   }

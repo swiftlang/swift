@@ -121,9 +121,6 @@ private:
   /// Only set if this function is a specialization of another function.
   const GenericSpecializationInformation *SpecializationInfo;
 
-  /// The forwarding substitutions, lazily computed.
-  Optional<SubstitutionList> ForwardingSubs;
-
   /// The forwarding substitution map, lazily computed.
   SubstitutionMap ForwardingSubMap;
 
@@ -590,7 +587,7 @@ public:
   /// \return the function side effects information.
   EffectsKind getEffectsKind() const { return EffectsKindAttr; }
 
-  /// \return True if the function is annotated with the @effects attribute.
+  /// \return True if the function is annotated with the @_effects attribute.
   bool hasEffectsKind() const {
     return EffectsKindAttr != EffectsKind::Unspecified;
   }
@@ -683,10 +680,6 @@ public:
 
   /// Converts the given function definition to a declaration.
   void convertToDeclaration();
-
-  /// Return the identity substitutions necessary to forward this call if it is
-  /// generic.
-  SubstitutionList getForwardingSubstitutions();
 
   /// Return the identity substitutions necessary to forward this call if it is
   /// generic.

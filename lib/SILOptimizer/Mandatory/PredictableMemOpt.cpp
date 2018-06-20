@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "predictable-memopt"
 
-#include "DIMemoryUseCollector.h"
+#include "PMOMemoryUseCollector.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -163,7 +163,7 @@ struct AvailableValue {
   SetVector InsertionPoints;
 
   /// Just for updating.
-  SmallVectorImpl<DIMemoryUse> *Uses;
+  SmallVectorImpl<PMOMemoryUse> *Uses;
 
 public:
   AvailableValue() = default;
@@ -352,12 +352,12 @@ class AvailableValueAggregator {
   SILBuilderWithScope B;
   SILLocation Loc;
   MutableArrayRef<AvailableValue> AvailableValueList;
-  SmallVectorImpl<DIMemoryUse> &Uses;
+  SmallVectorImpl<PMOMemoryUse> &Uses;
 
 public:
   AvailableValueAggregator(SILInstruction *Inst,
                            MutableArrayRef<AvailableValue> AvailableValueList,
-                           SmallVectorImpl<DIMemoryUse> &Uses)
+                           SmallVectorImpl<PMOMemoryUse> &Uses)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
         AvailableValueList(AvailableValueList), Uses(Uses) {}
 
@@ -508,8 +508,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType LoadTy,
   if (!Val) {
     auto *Load =
         B.createLoad(Loc, Address, LoadOwnershipQualifier::Unqualified);
-    Uses.push_back(DIMemoryUse(Load, DIUseKind::Load, FirstElt,
-                               getNumSubElements(Load->getType(), M)));
+    Uses.push_back(PMOMemoryUse(Load, PMOUseKind::Load, FirstElt,
+                                getNumSubElements(Load->getType(), M)));
     return Load;
   }
 
@@ -564,7 +564,7 @@ class AvailableValueDataflowContext {
   /// The set of uses that we are tracking. This is only here so we can update
   /// when exploding copy_addr. It would be great if we did not have to store
   /// this.
-  llvm::SmallVectorImpl<DIMemoryUse> &Uses;
+  llvm::SmallVectorImpl<PMOMemoryUse> &Uses;
 
   /// The set of blocks with local definitions.
   ///
@@ -583,7 +583,7 @@ class AvailableValueDataflowContext {
 public:
   AvailableValueDataflowContext(AllocationInst *TheMemory,
                                 unsigned NumMemorySubElements,
-                                llvm::SmallVectorImpl<DIMemoryUse> &Uses);
+                                llvm::SmallVectorImpl<PMOMemoryUse> &Uses);
 
   /// Try to compute available values for "TheMemory" at the instruction \p
   /// StartingFrom. We only compute the values for set bits in \p
@@ -623,7 +623,7 @@ private:
 
 AvailableValueDataflowContext::AvailableValueDataflowContext(
     AllocationInst *InputTheMemory, unsigned NumMemorySubElements,
-    SmallVectorImpl<DIMemoryUse> &InputUses)
+    SmallVectorImpl<PMOMemoryUse> &InputUses)
     : TheMemory(InputTheMemory), NumMemorySubElements(NumMemorySubElements),
       Uses(InputUses) {
   // The first step of processing an element is to collect information about the
@@ -633,13 +633,13 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
     assert(Use.Inst && "No instruction identified?");
 
     // Keep track of all the uses that aren't loads.
-    if (Use.Kind == DIUseKind::Load)
+    if (Use.Kind == PMOUseKind::Load)
       continue;
 
     NonLoadUses[Use.Inst] = ui;
     HasLocalDefinition.insert(Use.Inst->getParent());
-    
-    if (Use.Kind == DIUseKind::Escape) {
+
+    if (Use.Kind == PMOUseKind::Escape) {
       // Determine which blocks the value can escape from.  We aren't allowed to
       // promote loads in blocks reachable from an escape point.
       HasAnyEscape = true;
@@ -883,12 +883,12 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
   // Remove the copy_addr from Uses.  A single copy_addr can appear multiple
   // times if the source and dest are to elements within a single aggregate, but
   // we only want to pick up the CopyAddrKind from the store.
-  DIMemoryUse LoadUse, StoreUse;
+  PMOMemoryUse LoadUse, StoreUse;
   for (auto &Use : Uses) {
     if (Use.Inst != CAI)
       continue;
 
-    if (Use.Kind == DIUseKind::Load) {
+    if (Use.Kind == PMOUseKind::Load) {
       assert(LoadUse.isInvalid());
       LoadUse = Use;
     } else {
@@ -991,14 +991,14 @@ class AllocOptimize {
   /// value.
   unsigned NumMemorySubElements;
 
-  SmallVectorImpl<DIMemoryUse> &Uses;
+  SmallVectorImpl<PMOMemoryUse> &Uses;
   SmallVectorImpl<SILInstruction *> &Releases;
 
   /// A structure that we use to compute our available values.
   AvailableValueDataflowContext DataflowContext;
 
 public:
-  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<DIMemoryUse> &Uses,
+  AllocOptimize(AllocationInst *TheMemory, SmallVectorImpl<PMOMemoryUse> &Uses,
                 SmallVectorImpl<SILInstruction *> &Releases);
 
   bool doIt();
@@ -1029,7 +1029,7 @@ static SILType getMemoryType(AllocationInst *TheMemory) {
 }
 
 AllocOptimize::AllocOptimize(AllocationInst *InputMemory,
-                             SmallVectorImpl<DIMemoryUse> &InputUses,
+                             SmallVectorImpl<PMOMemoryUse> &InputUses,
                              SmallVectorImpl<SILInstruction *> &InputReleases)
     : Module(InputMemory->getModule()), TheMemory(InputMemory),
       MemoryType(getMemoryType(TheMemory)),
@@ -1233,20 +1233,20 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
     return false;
 
   // Check the uses list to see if there are any non-store uses left over after
-  // load promotion and other things DI does.
+  // load promotion and other things PMO does.
   for (auto &U : Uses) {
     // Ignore removed instructions.
     if (U.Inst == nullptr) continue;
 
     switch (U.Kind) {
-    case DIUseKind::SelfInit:
-    case DIUseKind::SuperInit:
+    case PMOUseKind::SelfInit:
+    case PMOUseKind::SuperInit:
       llvm_unreachable("Can't happen on allocations");
-    case DIUseKind::Assign:
-    case DIUseKind::PartialStore:
-    case DIUseKind::InitOrAssign:
+    case PMOUseKind::Assign:
+    case PMOUseKind::PartialStore:
+    case PMOUseKind::InitOrAssign:
       break;    // These don't prevent removal.
-    case DIUseKind::Initialization:
+    case PMOUseKind::Initialization:
       if (!isa<ApplyInst>(U.Inst) &&
           // A copy_addr that is not a take affects the retain count
           // of the source.
@@ -1255,10 +1255,10 @@ bool AllocOptimize::tryToRemoveDeadAllocation() {
         break;
       // FALL THROUGH.
      LLVM_FALLTHROUGH;
-    case DIUseKind::Load:
-    case DIUseKind::IndirectIn:
-    case DIUseKind::InOutUse:
-    case DIUseKind::Escape:
+    case PMOUseKind::Load:
+    case PMOUseKind::IndirectIn:
+    case PMOUseKind::InOutUse:
+    case PMOUseKind::Escape:
       DEBUG(llvm::dbgs() << "*** Failed to remove autogenerated alloc: "
             "kept alive by: " << *U.Inst);
       return false;   // These do prevent removal.
@@ -1340,7 +1340,7 @@ bool AllocOptimize::doIt() {
   for (unsigned i = 0; i != Uses.size(); ++i) {
     auto &Use = Uses[i];
     // Ignore entries for instructions that got expanded along the way.
-    if (Use.Inst && Use.Kind == DIUseKind::Load) {
+    if (Use.Inst && Use.Kind == PMOUseKind::Load) {
       if (promoteLoad(Use.Inst)) {
         Uses[i].Inst = nullptr;  // remove entry if load got deleted.
         Changed = true;
@@ -1366,15 +1366,20 @@ static bool optimizeMemoryAllocations(SILFunction &Fn) {
       }
       auto Alloc = cast<AllocationInst>(Inst);
 
-      DEBUG(llvm::dbgs() << "*** DI Optimize looking at: " << *Alloc << "\n");
-      DIMemoryObjectInfo MemInfo(Alloc);
+      DEBUG(llvm::dbgs() << "*** PMO Optimize looking at: " << *Alloc << "\n");
+      PMOMemoryObjectInfo MemInfo(Alloc);
 
       // Set up the datastructure used to collect the uses of the allocation.
-      SmallVector<DIMemoryUse, 16> Uses;
+      SmallVector<PMOMemoryUse, 16> Uses;
       SmallVector<SILInstruction*, 4> Releases;
-      
-      // Walk the use list of the pointer, collecting them.
-      collectDIElementUsesFrom(MemInfo, Uses, Releases);
+
+      // Walk the use list of the pointer, collecting them. If we are not able
+      // to optimize, skip this value. *NOTE* We may still scalarize values
+      // inside the value.
+      if (!collectPMOElementUsesFrom(MemInfo, Uses, Releases)) {
+        ++I;
+        continue;
+      }
 
       Changed |= AllocOptimize(Alloc, Uses, Releases).doIt();
       

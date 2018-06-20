@@ -43,7 +43,6 @@ extension String {
   ///     // Prints "Caf�"
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  @inlinable // FIXME(sil-serialize-all)
   public init(cString: UnsafePointer<CChar>) {
     self = _decodeValidCString(cString, repair: true)
   }
@@ -53,7 +52,6 @@ extension String {
   ///
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
-  @inlinable // FIXME(sil-serialize-all)
   public init(cString: UnsafePointer<UInt8>) {
     self = _decodeValidCString(cString, repair: true)
   }
@@ -84,7 +82,6 @@ extension String {
   ///     // Prints "nil"
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  @inlinable // FIXME(sil-serialize-all)
   public init?(validatingUTF8 cString: UnsafePointer<CChar>) {
     guard let str = _decodeCString(cString, repair: false) else {
       return nil
@@ -134,7 +131,8 @@ extension String {
   /// - Returns: A tuple with the new string and a Boolean value that indicates
   ///   whether any repairs were made. If `isRepairing` is `false` and an
   ///   ill-formed sequence is detected, this method returns `nil`.
-  @inlinable // FIXME(sil-serialize-all)
+  @_specialize(where Encoding == Unicode.UTF8)
+  @_specialize(where Encoding == Unicode.UTF16)
   public static func decodeCString<Encoding : _UnicodeEncoding>(
     _ cString: UnsafePointer<Encoding.CodeUnit>?,
     as encoding: Encoding.Type,
@@ -157,7 +155,6 @@ extension String {
 /// From a non-`nil` `UnsafePointer` to a null-terminated string
 /// with possibly-transient lifetime, create a null-terminated array of 'C' char.
 /// Returns `nil` if passed a null pointer.
-@inlinable // FIXME(sil-serialize-all)
 public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else {
     return nil
@@ -170,7 +167,6 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   return result
 }
 
-@inlinable
 internal func _decodeValidCString(
   _ cString: UnsafePointer<Int8>, repair: Bool
 ) -> String {
@@ -178,20 +174,18 @@ internal func _decodeValidCString(
   return cString.withMemoryRebound(to: UInt8.self, capacity: len) {
     (ptr: UnsafePointer<UInt8>) -> String in
     let bufPtr = UnsafeBufferPointer(start: ptr, count: len)
-    return String._fromWellFormedUTF8CodeUnitSequence(bufPtr, repair: repair)
+    return String._fromWellFormedUTF8(bufPtr, repair: repair)
   }
 }
 
-@inlinable
 internal func _decodeValidCString(
   _ cString: UnsafePointer<UInt8>, repair: Bool
 ) -> String {
   let len = UTF8._nullCodeUnitOffset(in: cString)
   let bufPtr = UnsafeBufferPointer(start: cString, count: len)
-  return String._fromWellFormedUTF8CodeUnitSequence(bufPtr, repair: repair)
+  return String._fromWellFormedUTF8(bufPtr, repair: repair)
 }
 
-@inlinable
 internal func _decodeCString(
   _ cString: UnsafePointer<Int8>, repair: Bool
 ) -> String? {
@@ -199,24 +193,22 @@ internal func _decodeCString(
   return cString.withMemoryRebound(to: UInt8.self, capacity: len) {
     (ptr: UnsafePointer<UInt8>) -> String? in
     let bufPtr = UnsafeBufferPointer(start: ptr, count: len)
-    return String._fromUTF8CodeUnitSequence(bufPtr, repair: repair)
+    return String._fromUTF8(bufPtr, repair: repair)
   }
 }
 
-@inlinable
 internal func _decodeCString(
   _ cString: UnsafePointer<UInt8>, repair: Bool
 ) -> String? {
   let len = UTF8._nullCodeUnitOffset(in: cString)
   let bufPtr = UnsafeBufferPointer(start: cString, count: len)
-  return String._fromUTF8CodeUnitSequence(bufPtr, repair: repair)
+  return String._fromUTF8(bufPtr, repair: repair)
 }
 
 /// Creates a new string by copying the null-terminated data referenced by
 /// the given pointer using the specified encoding.
 ///
 /// This internal helper takes the string length as an argument.
-@inlinable // FIXME(sil-serialize-all)
 internal func _decodeCString<Encoding : _UnicodeEncoding>(
   _ cString: UnsafePointer<Encoding.CodeUnit>,
   as encoding: Encoding.Type, length: Int,

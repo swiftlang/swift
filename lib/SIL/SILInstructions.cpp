@@ -98,13 +98,13 @@ static void collectTypeDependentOperands(
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
                       CanType Ty,
-                      SubstitutionList subs = SubstitutionList()) {
+                      SubstitutionMap subs = { }) {
   SmallVector<CanArchetypeType, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
-  for (auto sub : subs) {
+  for (Type replacement : subs.getReplacementTypes()) {
     // Substitutions in SIL should really be canonical.
-    auto ReplTy = sub.getReplacement()->getCanonicalType();
+    auto ReplTy = replacement->getCanonicalType();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
@@ -399,8 +399,9 @@ InitBlockStorageHeaderInst::create(SILFunction &F,
 
 ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
                      SILType SubstCalleeTy, SILType Result,
-                     SubstitutionList Subs,
-                     ArrayRef<SILValue> Args, ArrayRef<SILValue> TypeDependentOperands,
+                     SubstitutionMap Subs,
+                     ArrayRef<SILValue> Args,
+                     ArrayRef<SILValue> TypeDependentOperands,
                      bool isNonThrowing,
                      const GenericSpecializationInformation *SpecializationInfo)
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
@@ -410,7 +411,7 @@ ApplyInst::ApplyInst(SILDebugLocation Loc, SILValue Callee,
 }
 
 ApplyInst *
-ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionList Subs,
+ApplyInst::create(SILDebugLocation Loc, SILValue Callee, SubstitutionMap Subs,
                   ArrayRef<SILValue> Args, bool isNonThrowing,
                   Optional<SILModuleConventions> ModuleConventions,
                   SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
@@ -440,7 +441,7 @@ BeginApplyInst::BeginApplyInst(SILDebugLocation loc, SILValue callee,
                                SILType substCalleeTy,
                                ArrayRef<SILType> allResultTypes,
                                ArrayRef<ValueOwnershipKind> allResultOwnerships,
-                               SubstitutionList subs,
+                               SubstitutionMap subs,
                                ArrayRef<SILValue> args,
                                ArrayRef<SILValue> typeDependentOperands,
                                bool isNonThrowing,
@@ -455,7 +456,7 @@ BeginApplyInst::BeginApplyInst(SILDebugLocation loc, SILValue callee,
 
 BeginApplyInst *
 BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
-                       SubstitutionList subs, ArrayRef<SILValue> args,
+                       SubstitutionMap subs, ArrayRef<SILValue> args,
                        bool isNonThrowing,
                        Optional<SILModuleConventions> moduleConventions,
                        SILFunction &F,
@@ -507,7 +508,7 @@ bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
 
 PartialApplyInst::PartialApplyInst(
     SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
-    SubstitutionList Subs, ArrayRef<SILValue> Args,
+    SubstitutionMap Subs, ArrayRef<SILValue> Args,
     ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
     const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
@@ -520,7 +521,7 @@ PartialApplyInst::PartialApplyInst(
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
-    SubstitutionList Subs, ParameterConvention CalleeConvention, SILFunction &F,
+    SubstitutionMap Subs, ParameterConvention CalleeConvention, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes,
     const GenericSpecializationInformation *SpecializationInfo) {
   SILType SubstCalleeTy =
@@ -548,7 +549,7 @@ TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
 
 TryApplyInst::TryApplyInst(
     SILDebugLocation Loc, SILValue callee, SILType substCalleeTy,
-    SubstitutionList subs, ArrayRef<SILValue> args,
+    SubstitutionMap subs, ArrayRef<SILValue> args,
     ArrayRef<SILValue> TypeDependentOperands, SILBasicBlock *normalBB,
     SILBasicBlock *errorBB,
     const GenericSpecializationInformation *SpecializationInfo)
@@ -557,7 +558,7 @@ TryApplyInst::TryApplyInst(
                       errorBB) {}
 
 TryApplyInst *TryApplyInst::create(
-    SILDebugLocation loc, SILValue callee, SubstitutionList subs,
+    SILDebugLocation loc, SILValue callee, SubstitutionMap subs,
     ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
     SILFunction &F, SILOpenedArchetypesState &openedArchetypes,
     const GenericSpecializationInformation *specializationInfo) {
@@ -566,7 +567,8 @@ TryApplyInst *TryApplyInst::create(
 
   SmallVector<SILValue, 32> typeDependentOperands;
   collectTypeDependentOperands(typeDependentOperands, openedArchetypes, F,
-                               substCalleeTy.getASTType(), subs);
+                               substCalleeTy.getASTType(),
+                               subs);
   void *buffer =
     allocateTrailingInst<TryApplyInst, Operand>(
       F, getNumAllOperands(args, typeDependentOperands));

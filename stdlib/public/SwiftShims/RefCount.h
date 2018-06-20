@@ -35,19 +35,10 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 
 #include "llvm/Support/Compiler.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 
-// FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
-// a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
-// is formally UB by C++11 language rules, we should be OK because neither
-// the processor model nor the optimizer can realistically reorder our uses
-// of 'consume'.
-#if __arm64__ || __arm__
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_relaxed)
-#else
-#  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
-#endif
 
 /*
   An object conceptually has three refcounts. These refcounts 

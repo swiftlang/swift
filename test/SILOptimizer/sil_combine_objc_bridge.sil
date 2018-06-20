@@ -197,3 +197,30 @@ bb0(%0 : $*NSObject, %1 : $*Array<String>):
   return %7 : $()
 }
 
+enum AddressOnlyError : Error {
+  case data(Data)
+  case none
+}
+
+// Test that we emit a copy_addr for the address-only value initialization.
+
+// CHECK-LABEL: sil @unconditional_checked_cast_addr_address_only_type
+// CHECK: alloc_stack $Error
+// CHECK: alloc_stack $AddressOnlyError
+// CHECK  copy_addr
+// CHECK: alloc_existential_box
+// CHECK: project_existential_box
+// CHECK: copy_addr
+// CHECK: store
+sil @unconditional_checked_cast_addr_address_only_type: $@convention(thin) (@in_guaranteed AddressOnlyError) -> @owned Error {
+bb0(%0 : $*AddressOnlyError):
+  %1 = alloc_stack $Error
+  %2 = alloc_stack $AddressOnlyError
+  copy_addr %0 to [initialization] %2 : $*AddressOnlyError
+  unconditional_checked_cast_addr AddressOnlyError in %2 : $*AddressOnlyError to Error in %1 : $*Error
+  dealloc_stack %2 : $*AddressOnlyError
+  %8 = tuple ()
+  %9 = load %1 : $*Error
+  dealloc_stack %1 : $*Error
+  return %9 : $Error
+}

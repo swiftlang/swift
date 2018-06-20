@@ -97,6 +97,13 @@ bool FrontendInputsAndOutputs::forEachPrimaryInput(
   return false;
 }
 
+bool FrontendInputsAndOutputs::forEachNonPrimaryInput(
+    llvm::function_ref<bool(const InputFile &)> fn) const {
+  return forEachInput([&](const InputFile &f) -> bool {
+    return f.isPrimary() ? false : fn(f);
+  });
+}
+
 void FrontendInputsAndOutputs::assertMustNotBeMoreThanOnePrimaryInput() const {
   assert(!hasMultiplePrimaryInputs() &&
          "have not implemented >1 primary input yet");

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
 
 // Non-final classes where Codable conformance is added in extensions should
 // only be able to derive conformance for Encodable.

@@ -25,6 +25,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CFG.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -308,7 +309,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite AI) {
   }
 
   auto Callee = PAI->getCallee();
-  SubstitutionList Subs = PAI->getSubstitutions();
+  SubstitutionMap Subs = PAI->getSubstitutionMap();
 
   // The partial_apply might be substituting in an open existential type.
   Builder.addOpenedArchetypeOperands(PAI);
@@ -501,10 +502,10 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   SILInstruction *NAI;
   if (auto *TAI = dyn_cast<TryApplyInst>(AI))
     NAI = Builder.createTryApply(AI.getLoc(), FRI, 
-                                 SubstitutionList(), Args,
+                                 SubstitutionMap(), Args,
                                  TAI->getNormalBB(), TAI->getErrorBB());
   else {
-    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionList(), Args,
+    NAI = Builder.createApply(AI.getLoc(), FRI, SubstitutionMap(), Args,
                               cast<ApplyInst>(AI)->isNonThrowing());
     assert(FullApplySite::isa(NAI).getSubstCalleeType()->getAllResultsType() ==
            AI.getSubstCalleeType()->getAllResultsType() &&
@@ -600,186 +601,6 @@ SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   return tryToConcatenateStrings(AI, Builder);
 }
 
-/// Determine the pattern for global_addr.
-/// %3 = global_addr @$P : $*SomeP
-/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
-/// %5 = alloc_ref $SomeC
-/// store %5 to %4 : $*SomeC
-/// %8 = alloc_stack $SomeP
-/// copy_addr %3 to [initialization] %8 : $*SomeP
-/// %9 = open_existential_addr immutable_access %8 : $*SomeP to $*@opened SomeP
-static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
-                                                  CopyAddrInst *CAI) {
-  assert(CAI->getSrc() == SILValue(GAI) &&
-         "Broken Assumption! Global Addr is not the source of the passed in "
-         "copy_addr?!");
-
-  /// Check for a single InitExistential usage for GAI and
-  /// a simple dominance check: both InitExistential and CAI are in
-  /// the same basic block and only one InitExistential
-  /// occurs between GAI and CAI.
-  llvm::SmallPtrSet<SILInstruction *, 8> IEUses;
-  for (auto *Use : GAI->getUses()) {
-    if (auto *InitExistential =
-            dyn_cast<InitExistentialAddrInst>(Use->getUser())) {
-      IEUses.insert(InitExistential);
-    }
-  }
-
-  /// No InitExistential found in the basic block.
-  if (IEUses.empty())
-    return SILValue();
-
-  /// Walk backwards from CAI instruction till the begining of the basic block
-  /// looking for InitExistential.
-  SILValue SingleIE;
-  for (auto II = CAI->getIterator().getReverse(), IE = CAI->getParent()->rend();
-       II != IE; ++II) {
-    if (!IEUses.count(&*II))
-      continue;
-    if (SingleIE)
-      return SILValue();
-
-    SingleIE = cast<InitExistentialAddrInst>(&*II);
-  }
-  return SingleIE;
-}
-
-/// Returns the address of an object with which the stack location \p ASI is
-/// initialized. This is either a init_existential_addr or the destination of a
-/// copy_addr. Returns a null value if the address does not dominate the
-/// alloc_stack user \p ASIUser.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
-static SILValue getAddressOfStackInit(AllocStackInst *ASI,
-                                      SILInstruction *ASIUser,
-                                      bool &isCopied) {
-  SILInstruction *SingleWrite = nullptr;
-  // Check that this alloc_stack is initialized only once.
-  for (auto Use : ASI->getUses()) {
-    auto *User = Use->getUser();
-
-    // Ignore instructions which don't write to the stack location.
-    // Also ignore ASIUser (only kicks in if ASIUser is the original apply).
-    if (isa<DeallocStackInst>(User) || isa<DebugValueAddrInst>(User) ||
-        isa<DestroyAddrInst>(User) || isa<WitnessMethodInst>(User) ||
-        isa<DeinitExistentialAddrInst>(User) ||
-        isa<OpenExistentialAddrInst>(User) ||
-        User == ASIUser) {
-      continue;
-    }
-    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == ASI) {
-        if (SingleWrite)
-          return SILValue();
-        SingleWrite = CAI;
-        isCopied = true;
-      }
-      continue;
-    }
-    if (isa<InitExistentialAddrInst>(User)) {
-      if (SingleWrite)
-        return SILValue();
-      SingleWrite = User;
-      continue;
-    }
-    if (isa<ApplyInst>(User) || isa<TryApplyInst>(User)) {
-      // Ignore function calls which do not write to the stack location.
-      auto Idx = Use->getOperandNumber() - ApplyInst::getArgumentOperandNumber();
-      auto Conv = FullApplySite(User).getArgumentConvention(Idx);
-      if (Conv != SILArgumentConvention::Indirect_In &&
-          Conv != SILArgumentConvention::Indirect_In_Guaranteed)
-        return SILValue();
-      continue;
-    }
-    // Bail if there is any unknown (and potentially writing) instruction.
-    return SILValue();
-  }
-  if (!SingleWrite)
-    return SILValue();
-
-  // A very simple dominance check. As ASI is an operand of ASIUser,
-  // SingleWrite dominates ASIUser if it is in the same block as ASI or ASIUser.
-  SILBasicBlock *BB = SingleWrite->getParent();
-  if (BB != ASI->getParent() && BB != ASIUser->getParent())
-    return SILValue();
-
-  if (auto *CAI = dyn_cast<CopyAddrInst>(SingleWrite)) {
-    // Try to derive the type from the copy_addr that was used to
-    // initialize the alloc_stack.
-    assert(isCopied && "isCopied not set for a copy_addr");
-    SILValue CAISrc = CAI->getSrc();
-    if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied);
-    // Check if the CAISrc is a global_addr.
-    if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
-      return findInitExistentialFromGlobalAddr(GAI, CAI);
-    }
-    return CAISrc;
-  }
-  return cast<InitExistentialAddrInst>(SingleWrite);
-}
-
-/// Find the init_existential, which could be used to determine a concrete
-/// type of the \p Self.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
-static SILInstruction *findInitExistential(FullApplySite AI, SILValue Self,
-                                           ArchetypeType *&OpenedArchetype,
-                                           SILValue &OpenedArchetypeDef,
-                                           bool &isCopied) {
-  isCopied = false;
-  if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
-    // In case the Self operand is an alloc_stack where a copy_addr copies the
-    // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(Instance, AI.getInstruction(),
-                                             isCopied))
-      Self = Src;
-  }
-
-  if (auto *Open = dyn_cast<OpenExistentialAddrInst>(Self)) {
-    auto Op = Open->getOperand();
-    auto *ASI = dyn_cast<AllocStackInst>(Op);
-    if (!ASI)
-      return nullptr;
-
-    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied);
-    if (!StackWrite)
-      return nullptr;
-
-    auto *IE = dyn_cast<InitExistentialAddrInst>(StackWrite);
-    if (!IE)
-      return nullptr;
-
-    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
-    OpenedArchetypeDef = Open;
-    return IE;
-  }
-
-  if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
-    if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
-      OpenedArchetype = Open->getType().castTo<ArchetypeType>();
-      OpenedArchetypeDef = Open;
-      return IE;
-    }
-    return nullptr;
-  }
-
-  if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
-    if (auto *IE =
-          dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      auto Ty = Open->getType().getASTType();
-      while (auto Metatype = dyn_cast<MetatypeType>(Ty))
-        Ty = Metatype.getInstanceType();
-      OpenedArchetype = cast<ArchetypeType>(Ty);
-      OpenedArchetypeDef = Open;
-      return IE;
-    }
-    return nullptr;
-  }
-  return nullptr;
-}
-
 /// Create a new apply instructions that uses the concrete type instead
 /// of the existential type.
 SILInstruction *
@@ -803,25 +624,24 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
 
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
-  SmallVector<Substitution, 8> Substitutions;
+  SubstitutionMap Substitutions;
   if (FnTy->isPolymorphic()) {
-    auto FnSubsMap =
-        FnTy->getGenericSignature()->getSubstitutionMap(AI.getSubstitutions());
-    auto FinalSubsMap = FnSubsMap.subst(
+    auto FnSubsMap = AI.getSubstitutionMap();
+    Substitutions = FnSubsMap.subst(
         [&](SubstitutableType *type) -> Type {
           if (type == OpenedArchetype)
             return ConcreteType;
           return type;
         },
         [&](CanType origTy, Type substTy,
-            ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
+            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
           if (substTy->isEqual(ConcreteType)) {
-            assert(proto->getDecl() == Conformance.getRequirement());
+            assert(proto == Conformance.getRequirement());
             return Conformance;
           }
-          return ProtocolConformanceRef(proto->getDecl());
+          return ProtocolConformanceRef(proto);
         });
-    FnTy->getGenericSignature()->getSubstitutions(FinalSubsMap, Substitutions);
+    
     // Handle polymorphic functions by properly substituting
     // their parameter types.
     CanSILFunctionType SFT = FnTy->substGenericArgs(
@@ -928,8 +748,8 @@ ConformanceAndConcreteType::ConformanceAndConcreteType(
   auto ExistentialSig = Ctx.getExistentialSignature(ExistentialType,
                                                     AI.getModule().getSwiftModule());
 
-  Substitution ConcreteSub(ConcreteType, Conformances);
-  auto SubMap = ExistentialSig->getSubstitutionMap({&ConcreteSub, 1});
+  auto SubMap = SubstitutionMap::get(ExistentialSig, { ConcreteType },
+                                     Conformances);
 
   // If the requirement is in a base protocol that is refined by the
   // conforming protocol, fish out the exact conformance for the base
@@ -1366,11 +1186,11 @@ FullApplySite SILCombiner::rewriteApplyCallee(FullApplySite apply,
   Builder.addOpenedArchetypeOperands(apply.getInstruction());
   if (auto *TAI = dyn_cast<TryApplyInst>(apply)) {
     return Builder.createTryApply(TAI->getLoc(), callee,
-                                  TAI->getSubstitutions(), arguments,
+                                  TAI->getSubstitutionMap(), arguments,
                                   TAI->getNormalBB(), TAI->getErrorBB());
   } else {
-    return Builder.createApply(apply.getLoc(), callee, apply.getSubstitutions(),
-                               arguments,
+    return Builder.createApply(apply.getLoc(), callee,
+                               apply.getSubstitutionMap(), arguments,
                                cast<ApplyInst>(apply)->isNonThrowing());
   }
 }

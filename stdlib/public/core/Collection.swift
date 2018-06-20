@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -522,7 +522,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(upTo end: Index) -> SubSequence
+  __consuming func prefix(upTo end: Index) -> SubSequence
 
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
@@ -557,7 +557,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
-  func suffix(from start: Index) -> SubSequence
+  __consuming func suffix(from start: Index) -> SubSequence
 
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
@@ -588,7 +588,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, and including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(through position: Index) -> SubSequence
+  __consuming func prefix(through position: Index) -> SubSequence
 
   /// A Boolean value indicating whether the collection is empty.
   ///
@@ -642,6 +642,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
+
+  // FIXME(move-only types): `first` might not be implementable by collections
+  // with move-only elements, since they would need to be able to somehow form
+  // a temporary `Optional<Element>` value from a non-optional Element without
+  // modifying the collection.
 
   /// The first element of the collection.
   ///
@@ -802,6 +807,25 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   func formIndex(after i: inout Index)
+
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
+  ///
+  /// You use this method to select a random element from a collection when you
+  /// are using a custom random number generator. For example, call
+  /// `randomElement(using:)` to select a random element from an array of names.
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani"
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  __consuming func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element?
 
   @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
@@ -1014,6 +1038,54 @@ extension Collection {
       formIndex(after: &start)
     }
     return count
+  }
+
+  /// Returns a random element of the collection, using the given generator as
+  /// a source for randomness.
+  ///
+  /// Call `randomElement(using:)` to select a random element from an array or
+  /// another collection when you are using a custom random number generator.
+  /// This example picks a name at random from an array:
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement(using: &myGenerator)!
+  ///     // randomName == "Amani"
+  ///
+  /// - Parameter generator: The random number generator to use when choosing
+  ///   a random element.
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Element? {
+    guard !isEmpty else { return nil }
+    let random = generator.next(upperBound: UInt(count))
+    let index = self.index(
+      startIndex,
+      offsetBy: numericCast(random)
+    )
+    return self[index]
+  }
+
+  /// Returns a random element of the collection.
+  ///
+  /// Call `randomElement()` to select a random element from an array or
+  /// another collection. This example picks a name at random from an array:
+  ///
+  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
+  ///     let randomName = names.randomElement()!
+  ///     // randomName == "Amani"
+  ///
+  /// This method uses the default random generator, `Random.default`. The call
+  /// to `names.randomElement()` above is equivalent to calling
+  /// `names.randomElement(using: &Random.default)`.
+  ///
+  /// - Returns: A random element from the collection. If the collection is
+  ///   empty, the method returns `nil`.
+  @inlinable
+  public func randomElement() -> Element? {
+    return randomElement(using: &Random.default)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

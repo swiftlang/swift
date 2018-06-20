@@ -16,7 +16,7 @@ open class Cities {
 
 public protocol ExtraCities {
   func coolum(x: [String : [Int : [(((String))?)]]])
-  func blibli(x: (String?, String) -> String!)
+  func blibli(x: (String?, String) -> String?)
   func currimundi(x: (Int, (Int, Int))!)
 }
 
@@ -53,4 +53,38 @@ public class Container {
   public func getOptionalAttrDictionary() -> [String: Any]? { return nil }
   public func getSingleAttr() -> String { return "" }
   public func getOptionalSingleAttr() -> String? { return nil }
+}
+
+open class ToplevelType {
+  public init() {}
+  public init(recordName: String) {}
+  open func member(_ x: @escaping ([Any]?) -> Void) {}
+}
+
+public var GlobalAttribute: String = ""
+
+public enum FontWeighting: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public enum FontWeight: Int {
+  case Light = 0
+  case Regular
+  case Bold
+}
+
+public struct AwesomeCityAttribute: RawRepresentable {
+  public init?(rawValue: String) { self.rawValue = rawValue }
+  public var rawValue: String
+  public typealias RawValue = String
+}
+
+public class Wrapper {
+  public struct Attribute: RawRepresentable {
+    public init?(rawValue: String) { self.rawValue = rawValue }
+    public var rawValue: String
+    public typealias RawValue = String
+  }
 }

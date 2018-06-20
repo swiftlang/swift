@@ -163,11 +163,7 @@ bool ReleaseDevirtualizer::createDeallocCall(SILType AllocType,
   // argument.
   auto *MI = B.createFunctionRef(ReleaseInst->getLoc(), Dealloc);
 
-  SmallVector<Substitution, 4> AllocSubsts;
-  if (auto *Sig = NTD->getGenericSignature())
-    Sig->getSubstitutions(AllocSubMap, AllocSubsts);
-
-  B.createApply(ReleaseInst->getLoc(), MI, AllocSubsts, {object}, false);
+  B.createApply(ReleaseInst->getLoc(), MI, AllocSubMap, {object}, false);
 
   NumReleasesDevirtualized++;
   ReleaseInst->eraseFromParent();

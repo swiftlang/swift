@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -639,15 +639,24 @@ bool Expr::isTypeReference(
 
 bool Expr::isStaticallyDerivedMetatype(
     llvm::function_ref<Type(const Expr *)> getType) const {
-  // The type must first be a type reference.
+  // The expression must first be a type reference.
   if (!isTypeReference(getType))
     return false;
 
+  auto type = getType(this)
+    ->castTo<AnyMetatypeType>()
+    ->getInstanceType();
+
   // Archetypes are never statically derived.
-  return !getType(this)
-              ->getAs<AnyMetatypeType>()
-              ->getInstanceType()
-              ->is<ArchetypeType>();
+  if (type->is<ArchetypeType>())
+    return false;
+
+  // Dynamic Self is never statically derived.
+  if (type->is<DynamicSelfType>())
+    return false;
+
+  // Everything else is statically derived.
+  return true;
 }
 
 bool Expr::isSuperExpr() const {
@@ -996,15 +1005,19 @@ LiteralExpr *LiteralExpr::shallowClone(
   return Result;
 }
 
-
-
+/// A wrapper around LLVM::getAsInteger that can be used on Swift interger
+/// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
+/// octal numbers.
+static bool getAsInteger(StringRef Text, llvm::APInt &Value) {
+  // swift encodes octal differently from C
+  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
+  return Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+}
 
 static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
                                     unsigned BitWidth) {
   llvm::APInt Value(BitWidth, 0);
-  // swift encodes octal differently from C
-  bool IsCOctal = Text.size() > 1 && Text[0] == '0' && isdigit(Text[1]);
-  bool Error = Text.getAsInteger(IsCOctal ? 10 : 0, Value);
+  bool Error = getAsInteger(Text, Value);
   assert(!Error && "Invalid IntegerLiteral formed"); (void)Error;
   if (IsNegative)
     Value = -Value;
@@ -1015,6 +1028,15 @@ static APInt getIntegerLiteralValue(bool IsNegative, StringRef Text,
 
 APInt IntegerLiteralExpr::getValue(StringRef Text, unsigned BitWidth, bool Negative) {
   return getIntegerLiteralValue(Negative, Text, BitWidth);
+}
+
+/// Returns the raw magnitude of the literal text without any truncation.
+APInt IntegerLiteralExpr::getRawMagnitude() const {
+  llvm::APInt Value(64, 0);
+  bool Error = getAsInteger(getDigitsText(), Value);
+  assert(!Error && "Invalid IntegerLiteral formed");
+  (void)Error;
+  return Value;
 }
 
 APInt IntegerLiteralExpr::getValue() const {
@@ -1342,12 +1364,10 @@ ConstructorDecl *OtherConstructorDeclRefExpr::getDecl() const {
 MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
                              ConcreteDeclRef member, DeclNameLoc nameLoc,
                              bool Implicit, AccessSemantics semantics)
-  : Expr(ExprKind::MemberRef, Implicit), Base(base),
-    Member(member), DotLoc(dotLoc), NameLoc(nameLoc) {
+  : LookupExpr(ExprKind::MemberRef, base, member, Implicit),
+    DotLoc(dotLoc), NameLoc(nameLoc) {
    
   Bits.MemberRefExpr.Semantics = (unsigned) semantics;
-  Bits.MemberRefExpr.IsSuper = false;
-  assert(Member);
 }
 
 Type OverloadSetRefExpr::getBaseType() const {
@@ -1564,8 +1584,17 @@ static ValueDecl *getCalledValue(Expr *E) {
   if (auto *DRE = dyn_cast<DeclRefExpr>(E))
     return DRE->getDecl();
 
+  if (auto *OCRE = dyn_cast<OtherConstructorDeclRefExpr>(E))
+    return OCRE->getDecl();
+
+  // Look through SelfApplyExpr.
+  if (auto *SAE = dyn_cast<SelfApplyExpr>(E))
+    return SAE->getCalledValue();
+
   Expr *E2 = E->getValueProvidingExpr();
-  if (E != E2) return getCalledValue(E2);
+  if (E != E2)
+    return getCalledValue(E2);
+
   return nullptr;
 }
 
@@ -1579,10 +1608,9 @@ SubscriptExpr::SubscriptExpr(Expr *base, Expr *index,
                              bool hasTrailingClosure,
                              ConcreteDeclRef decl,
                              bool implicit, AccessSemantics semantics)
-    : Expr(ExprKind::Subscript, implicit, Type()),
-      TheDecl(decl), Base(base), Index(index) {
+    : LookupExpr(ExprKind::Subscript, base, decl, implicit),
+      Index(index) {
   Bits.SubscriptExpr.Semantics = (unsigned) semantics;
-  Bits.SubscriptExpr.IsSuper = false;
   Bits.SubscriptExpr.NumArgLabels = argLabels.size();
   Bits.SubscriptExpr.HasArgLabelLocs = !argLabelLocs.empty();
   Bits.SubscriptExpr.HasTrailingClosure = hasTrailingClosure;
@@ -2155,6 +2183,23 @@ TypeExpr *TypeExpr::createImplicitHack(SourceLoc Loc, Type Ty, ASTContext &C) {
   return Res;
 }
 
+bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
+  auto *E = getSemanticsProvidingExpr();
+
+  if (auto IOE = dyn_cast<InOutExpr>(E))
+    E = IOE->getSubExpr();
+
+  while (auto ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+    if (sameBase && isa<DerivedToBaseExpr>(ICE))
+      return false;
+    E = ICE->getSubExpr();
+  }
+
+  if (auto DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl() == AFD->getImplicitSelfDecl();
+
+  return false;
+}
 
 ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   auto type = getOpaqueValue()->getType()->getRValueType();

@@ -103,11 +103,14 @@ public:
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
+  /// \brief Whether we're generating code for the integrated REPL.
+  unsigned IntegratedREPL : 1;
+  
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
-  /// \brief Whether we should run LLVM ARC optimizations after IRGen.
-  unsigned DisableLLVMARCOpts : 1;
+  /// Whether we should run swift specific LLVM optimizations after IRGen.
+  unsigned DisableSwiftSpecificLLVMOptzns : 1;
 
   /// \brief Whether we should run LLVM SLP vectorizer.
   unsigned DisableLLVMSLPVectorizer : 1;
@@ -182,7 +185,8 @@ public:
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
         DebugInfoKind(IRGenDebugInfoKind::None), UseJIT(false),
-        DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
+        IntegratedREPL(false),
+        DisableLLVMOptzns(false), DisableSwiftSpecificLLVMOptzns(false),
         DisableLLVMSLPVectorizer(false), DisableFPElim(true), Playground(false),
         EmitStackPromotionChecks(false), PrintInlineTree(false),
         EmbedMode(IRGenEmbedMode::None), HasValueNamesSetting(false),
@@ -197,7 +201,7 @@ public:
   unsigned getLLVMCodeGenOptionsHash() {
     unsigned Hash = (unsigned)OptMode;
     Hash = (Hash << 1) | DisableLLVMOptzns;
-    Hash = (Hash << 1) | DisableLLVMARCOpts;
+    Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
     return Hash;
   }
 

@@ -134,16 +134,16 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
     auto accessor = dyn_cast<AccessorDecl>(fn);
     if (!accessor) return Flags::Kind::Method;
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsGetter:
+    case AccessorKind::Get:
       return Flags::Kind::Getter;
-    case AccessorKind::IsSetter:
+    case AccessorKind::Set:
       return Flags::Kind::Setter;
-    case AccessorKind::IsMaterializeForSet:
+    case AccessorKind::MaterializeForSet:
       return Flags::Kind::MaterializeForSet;
-    case AccessorKind::IsWillSet:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsMutableAddressor:
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
     llvm_unreachable("bad kind");
@@ -3833,15 +3833,13 @@ GenericRequirementsMetadata irgen::addGenericRequirements(
       break;
 
     case RequirementKind::Conformance: {
-      // ABI TODO: We also need a *key* argument that uniquely identifies
-      // the conformance for conformance requirements as well.
       auto protocol = requirement.getSecondType()->castTo<ProtocolType>()
         ->getDecl();
       bool needsWitnessTable =
         Lowering::TypeConverter::protocolRequiresWitnessTable(protocol);
       auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
-                                           /*TODO key argument*/ false,
-                                           needsWitnessTable);
+                                           /*key argument*/needsWitnessTable,
+                                           /*extra argument*/false);
       auto descriptorRef =
         IGM.getConstantReferenceForProtocolDescriptor(protocol);
       addGenericRequirement(IGM, B, metadata, sig, flags,

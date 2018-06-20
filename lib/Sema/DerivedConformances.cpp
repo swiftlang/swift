@@ -272,7 +272,8 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
   auto getter =
     declareDerivedPropertyGetter(tc, property, propertyContextType);
 
-  property->makeComputed(SourceLoc(), getter, nullptr, nullptr, SourceLoc());
+  property->setAccessors(VarDecl::Computed,
+                         SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
@@ -296,7 +297,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::IsGetter, AddressorKind::NotAddressor, property,
+    AccessorKind::Get, AddressorKind::NotAddressor, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
@@ -383,13 +384,27 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
     allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
   }
 
+  if (TC.Context.isSwiftVersion3()) {
+    // In Swift 3, a 'private' property can't be accessed in any extensions, so
+    // we can't synthesize anything that uses them. Thus, we stick to the old
+    // rule for synthesis, which is never in an extension except for the
+    // Equatable/Hashable cases mentioned above.
+    if (!allowCrossfileExtensions && Nominal != ConformanceDecl) {
+      TC.diagnose(ConformanceDecl->getLoc(),
+                  diag::swift3_cannot_synthesize_in_extension,
+                  getProtocolType());
+      return true;
+    }
+  }
+
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
     TC.diagnose(ConformanceDecl->getLoc(),
                 diag::cannot_synthesize_in_crossfile_extension,
                 getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::type_declared_here);
+    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
+                DescriptiveDeclKind::Type);
     return true;
   }
 

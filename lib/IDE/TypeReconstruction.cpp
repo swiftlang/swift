@@ -668,9 +668,10 @@ static DeclKind GetKindAsDeclKind(Demangle::Node::Kind node_kind) {
     return DeclKind::Enum;
   case Demangle::Node::Kind::Protocol:
     return DeclKind::Protocol;
+  case Demangle::Node::Kind::Variable:
+    return DeclKind::Var;
   default:
     llvm_unreachable("Missing alias");
-    // FIXME: can we 'log' getNodeKindString(node_kind))
   }
 }
 
@@ -747,12 +748,78 @@ static void VisitNodeAssociatedTypeRef(
           return;
         }
       }
+      ProtocolType *protocol_type = type->getAs<ProtocolType>();
+      if (protocol_type) {
+        Identifier assoc_id = ast->getIdentifier(ident->getText());
+        ProtocolDecl *protocol_decl = protocol_type->getDecl();
+        AssociatedTypeDecl *associated = nullptr;
+        for (auto member : protocol_decl->getMembers()) {
+          auto *atd = dyn_cast<AssociatedTypeDecl>(member);
+          if (!atd)
+            continue;
+          if (assoc_id == atd->getName()) {
+            associated = atd;
+            break;
+          }
+        }
+        if (associated) {
+          result._types.push_back(
+          DependentMemberType::get(protocol_type, assoc_id));
+          result._module = type_result._module;
+          return;
+        }
+      }
     }
   }
   result._types.clear();
   result._error = stringWithFormat(
       "unable to find associated type %s in context",
       ident->getText().str().c_str());
+}
+
+static void VisitNodeGenericTypealias(ASTContext *ast,
+                                      Demangle::NodePointer cur_node,
+                                      VisitNodeResult &result) {
+  VisitNodeResult generic_type_result;
+  VisitNodeResult template_types_result;
+
+  Demangle::Node::iterator end = cur_node->end();
+  for (Demangle::Node::iterator pos = cur_node->begin(); pos != end; ++pos) {
+    const Demangle::Node::Kind child_node_kind = (*pos)->getKind();
+    switch (child_node_kind) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, *pos, generic_type_result);
+      break;
+    case Demangle::Node::Kind::TypeList:
+      VisitNode(ast, *pos, template_types_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (generic_type_result._decls.size() != 1 ||
+      generic_type_result._types.size() != 1 ||
+      template_types_result._types.empty())
+    return;
+
+  auto *genericTypeAlias =
+      cast<TypeAliasDecl>(generic_type_result._decls.front());
+  GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  // FIXME: handle conformances.
+  SubstitutionMap subMap =
+      SubstitutionMap::get(signature, template_types_result._types,
+                           ArrayRef<ProtocolConformanceRef>({}));
+  Type parentType;
+  if (auto nominal = genericTypeAlias->getDeclContext()
+                         ->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    parentType = nominal->getDeclaredInterfaceType().subst(subMap);
+  }
+  NameAliasType *NAT = NameAliasType::get(
+      genericTypeAlias, parentType, subMap,
+      genericTypeAlias->getDeclaredInterfaceType().subst(subMap));
+  result._types.push_back(NAT);
+  result._decls.push_back(genericTypeAlias);
 }
 
 static void VisitNodeBoundGeneric(
@@ -878,7 +945,8 @@ static void VisitNodeConstructor(
 
             // inits are typed as (Foo.Type) -> (args...) -> Foo, but don't
             // assert that in case we're dealing with broken code.
-            if (identifier_func->getInput()->is<AnyMetatypeType>() &&
+            if (identifier_func->getParams().size() == 1 &&
+                identifier_func->getParams()[0].getType()->is<AnyMetatypeType>() &&
                 identifier_func->getResult()->is<AnyFunctionType>()) {
               identifier_func =
                   identifier_func->getResult()->getAs<AnyFunctionType>();
@@ -958,6 +1026,28 @@ static void VisitNodeDestructor(
     }
   }
 }
+
+static void VisitNodeDependentMember(ASTContext *ast,
+                                     Demangle::NodePointer cur_node,
+                                     VisitNodeResult &result) {
+  if (cur_node->getNumChildren() == 2) {
+    auto dep = cur_node->getChild(0);
+    auto assoc = cur_node->getChild(1);
+    VisitNodeResult dependency;
+    if (dep->getKind() == Demangle::Node::Kind::Type &&
+        assoc->getKind() == Demangle::Node::Kind::DependentAssociatedTypeRef) {
+      VisitNode(ast, dep, dependency);
+      if (dependency._types.size() == 1 && assoc->hasText()) {
+        Identifier name = ast->getIdentifier(assoc->getText());
+        result._types.push_back(
+            DependentMemberType::get(dependency._types[0], name));
+        return;
+      }
+    }
+  }
+  result._error = "bad dependent member type";
+}
+
 
 static Demangle::NodePointer DropGenericSignature(
     Demangle::NodePointer cur_node) {
@@ -1832,10 +1922,34 @@ static void VisitNodeInOut(
   VisitNodeResult type_result;
   VisitNode(ast, cur_node->getFirstChild(), type_result);
   if (type_result._types.size() == 1 && type_result._types[0]) {
-    result._types.push_back(Type(InOutType::get(type_result._types[0])));
+    result._types.push_back(InOutType::get(type_result._types[0]));
   } else {
     result._error = "couldn't resolve referent type";
   }
+}
+
+static void VisitNodeExistentialMetatype(ASTContext *ast,
+                                         Demangle::NodePointer cur_node,
+                                         VisitNodeResult &result) {
+  VisitNodeResult type_result;
+  Optional<MetatypeRepresentation> metatype_repr;
+
+  for (auto &child : *cur_node) {
+    switch (child->getKind()) {
+    case Demangle::Node::Kind::Type:
+      VisitNode(ast, child, type_result);
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (type_result.HasSingleType())
+    result._types.push_back(
+        ExistentialMetatypeType::get(type_result._types[0], metatype_repr));
+  else
+    result._error = stringWithFormat(
+        "instance type for existential metatype cannot be uniquely resolved");
 }
 
 static void VisitNodeMetatype(
@@ -2049,16 +2163,17 @@ static void VisitNodeTupleElement(
     }
   }
 
-  if (tuple_type_result._error.empty() &&
-      tuple_type_result._types.size() == 1) {
-    if (!tuple_name.empty())
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer(),
-                       ast->getIdentifier(tuple_name));
-    else
-      result._tuple_type_element =
-          TupleTypeElt(tuple_type_result._types.front().getPointer());
-  }
+  if (!tuple_type_result._error.empty() || tuple_type_result._types.size() != 1)
+    return;
+
+  auto tupleType = tuple_type_result._types.front();
+  auto typeFlags = ParameterTypeFlags();
+  typeFlags = typeFlags.withInOut(tupleType->is<InOutType>());
+  if (auto *inOutTy = tupleType->getAs<InOutType>())
+    tupleType = inOutTy->getObjectType();
+  Identifier idName =
+      tuple_name.empty() ? Identifier() : ast->getIdentifier(tuple_name);
+  result._tuple_type_element = TupleTypeElt(tupleType, idName, typeFlags);
 }
 
 static void VisitNodeTypeList(
@@ -2175,7 +2290,9 @@ static void VisitNodeGlobal(ASTContext *ast, Demangle::NodePointer cur_node,
 static void VisitNode(
     ASTContext *ast,
     Demangle::NodePointer node, VisitNodeResult &result) {
-  assert(result._error.empty());
+  // If we have an error, no point in going forward.
+  if (!result._error.empty())
+    return;
 
   const Demangle::Node::Kind nodeKind = node->getKind();
 
@@ -2200,6 +2317,10 @@ static void VisitNode(
   case Demangle::Node::Kind::BoundGenericEnum:
   case Demangle::Node::Kind::BoundGenericOtherNominalType:
     VisitNodeBoundGeneric(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::BoundGenericTypeAlias:
+    VisitNodeGenericTypealias(ast, node, result);
     break;
 
   case Demangle::Node::Kind::BuiltinTypeName:
@@ -2232,6 +2353,10 @@ static void VisitNode(
   case Demangle::Node::Kind::Allocator:
   case Demangle::Node::Kind::Constructor:
     VisitNodeConstructor(ast, node, result);
+    break;
+
+ case Demangle::Node::Kind::DependentMemberType:
+    VisitNodeDependentMember(ast, node, result);
     break;
 
   case Demangle::Node::Kind::Destructor:
@@ -2280,6 +2405,10 @@ static void VisitNode(
 
   case Demangle::Node::Kind::InOut:
     VisitNodeInOut(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::ExistentialMetatype:
+    VisitNodeExistentialMetatype(ast, node, result);
     break;
 
   case Demangle::Node::Kind::Metatype:

@@ -2455,6 +2455,15 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
         results.push_back(extension);
     }
 
+    auto findEnclosingExtension = [](Decl *importedDecl) -> ExtensionDecl * {
+      for (auto importedDC = importedDecl->getDeclContext();
+           !importedDC->isModuleContext();
+           importedDC = importedDC->getParent()) {
+        if (auto ext = dyn_cast<ExtensionDecl>(importedDC))
+          return ext;
+      }
+      return nullptr;
+    };
     // Retrieve all of the globals that will be mapped to members.
 
     // FIXME: Since we don't represent Clang submodules as Swift
@@ -2462,21 +2471,33 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
     for (auto entry : lookupTable->allGlobalsAsMembers()) {
       auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl =
-          owner.importDecl(decl, owner.CurrentVersion);
+      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
       if (!importedDecl) continue;
 
       // Find the enclosing extension, if there is one.
-      ExtensionDecl *ext = nullptr;
-      for (auto importedDC = importedDecl->getDeclContext();
-           !importedDC->isModuleContext();
-           importedDC = importedDC->getParent()) {
-        ext = dyn_cast<ExtensionDecl>(importedDC);
-        if (ext) break;
-      }
-      if (!ext) continue;
+      ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
+        results.push_back(ext);
 
-      if (knownExtensions.insert(ext).second)
+      // If this is a compatibility typealias, the canonical type declaration
+      // may exist in another extension.
+      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+      if (!alias || !alias->isCompatibilityAlias()) continue;
+
+      auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
+      ext = nullptr;
+      importedDecl = nullptr;
+
+      // Note: We can't use getAnyGeneric() here because `aliasedTy`
+      // might be typealias.
+      if (auto Ty = dyn_cast<NameAliasType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
+        importedDecl = Ty->getDecl();
+      if (!importedDecl) continue;
+
+      ext = findEnclosingExtension(importedDecl);
+      if (ext && knownExtensions.insert(ext).second)
         results.push_back(ext);
     }
   }
@@ -2747,6 +2768,11 @@ void ClangImporter::loadObjCMethods(
     // we're looking for.
     if (objcMethod->getClassInterface() != objcClass)
       continue;
+
+    // If we found a property accessor, import the property.
+    if (objcMethod->isPropertyAccessor())
+      (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
+                            Impl.CurrentVersion);
 
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
                         Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
@@ -3518,7 +3544,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 
   // Resolve the type.
   if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));
+    typeResolver->resolveIsObjC(const_cast<NominalTypeDecl *>(nominal));
 
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
@@ -3577,7 +3603,8 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+bool ClangImporter::isInOverlayModuleForImportedModule(
+                                               const DeclContext *overlayDC,
                                                const DeclContext *importedDC) {
   overlayDC = overlayDC->getModuleScopeContext();
   importedDC = importedDC->getModuleScopeContext();
@@ -3592,7 +3619,7 @@ bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
 
   // Is this a private module that's re-exported to the public (overlay) name?
   auto clangModule =
-    importedClangModuleUnit->getClangModule()->getTopLevelModule();
+  importedClangModuleUnit->getClangModule()->getTopLevelModule();
   return !clangModule->ExportAsModule.empty() &&
     clangModule->ExportAsModule == overlayModule->getName().str();
 }

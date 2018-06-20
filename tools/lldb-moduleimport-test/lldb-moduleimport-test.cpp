@@ -116,7 +116,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
   for (auto &name : InputNames) {
     auto OF = llvm::object::ObjectFile::createObjectFile(name);
     if (!OF) {
-      llvm::outs() << name << " is not an object file.\n";
+      llvm::outs() << "error: " << name << " "
+                   << errorToErrorCode(OF.takeError()).message() << "\n";
       return false;
     }
     auto *Obj = OF->getBinary();
@@ -213,9 +214,6 @@ int main(int argc, char **argv) {
     return true;
   };
 
-  for (auto &InputFilename : InputNames)
-    if (!validateInputFile(InputFilename))
-      return 1;
   if (!validateInputFile(DumpTypeFromMangled))
     return 1;
   if (!validateInputFile(DumpDeclFromMangled))

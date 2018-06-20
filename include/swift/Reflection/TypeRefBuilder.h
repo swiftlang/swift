@@ -178,6 +178,11 @@ private:
   std::unordered_map<TypeRefID, const TypeRef *,
                      TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
 
+  /// Cache for field info lookups.
+  std::unordered_map<std::string,
+                     std::pair<const FieldDescriptor *, const ReflectionInfo *>>
+                     FieldTypeInfoCache;
+
   TypeConverter TC;
   MetadataSourceBuilder MSB;
 

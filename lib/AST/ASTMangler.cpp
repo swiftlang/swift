@@ -46,15 +46,15 @@ using namespace swift::Mangle;
 static StringRef getCodeForAccessorKind(AccessorKind kind,
                                         AddressorKind addressorKind) {
   switch (kind) {
-  case AccessorKind::IsGetter:
+  case AccessorKind::Get:
     return "g";
-  case AccessorKind::IsSetter:
+  case AccessorKind::Set:
     return "s";
-  case AccessorKind::IsWillSet:
+  case AccessorKind::WillSet:
     return "w";
-  case AccessorKind::IsDidSet:
+  case AccessorKind::DidSet:
     return "W";
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Address:
     // 'l' is for location. 'A' was taken.
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
@@ -69,7 +69,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "lp";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     switch (addressorKind) {
     case AddressorKind::NotAddressor:
       llvm_unreachable("bad combo");
@@ -83,7 +83,7 @@ static StringRef getCodeForAccessorKind(AccessorKind kind,
       return "aP";
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     return "m";
   }
   llvm_unreachable("bad accessor kind");
@@ -739,15 +739,31 @@ void ASTMangler::appendType(Type type) {
       auto aliasTy = cast<NameAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
-      // FIXME: We also cannot yet mangle references to typealiases that
-      // involve generics.
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      // For the DWARF output we want to mangle the type alias + context,
-      // unless the type alias references a builtin type.
+      if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(tybase))
+          return;
+
+        appendAnyGenericType(decl);
+        bool isFirstArgList = true;
+        if (auto *nominalType = type->getAs<NominalType>()) {
+          if (nominalType->getParent())
+            type = nominalType->getParent();
+        }
+        appendBoundGenericArgs(type, isFirstArgList);
+        appendRetroactiveConformances(type);
+        appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
+      }
+
       return appendAnyGenericType(decl);
     }
 
@@ -873,7 +889,7 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::Archetype: {
       auto *archetype = cast<ArchetypeType>(tybase);
 
-      assert(DWARFMangling && "Cannot mangle free-standing archetypes");
+      assert(false && DWARFMangling && "Cannot mangle free-standing archetypes");
 
       // Mangle the associated type of a parent archetype.
       if (auto parent = archetype->getParent()) {

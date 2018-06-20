@@ -142,7 +142,8 @@ static llvm::Constant *emitEnumLayoutFlags(IRGenModule &IGM, bool isVWTMutable){
   return IGM.getSize(Size(uintptr_t(flags)));
 }
 
-SpareBitVector getBitVectorFromAPInt(const APInt &bits, unsigned startBit = 0) {
+static SpareBitVector
+getBitVectorFromAPInt(const APInt &bits, unsigned startBit = 0) {
   if (startBit == 0) {
     return SpareBitVector::fromAPInt(bits);
   }
@@ -150,6 +151,28 @@ SpareBitVector getBitVectorFromAPInt(const APInt &bits, unsigned startBit = 0) {
   result.appendClearBits(startBit);
   result.append(SpareBitVector::fromAPInt(bits));
   return result;
+}
+
+static IsABIAccessible_t
+areElementsABIAccessible(ArrayRef<EnumImplStrategy::Element> elts) {
+  for (auto &elt : elts) {
+    if (!elt.ti->isABIAccessible())
+      return IsNotABIAccessible;
+  }
+  return IsABIAccessible;
+}
+
+EnumImplStrategy::EnumImplStrategy(IRGenModule &IGM,
+                                   TypeInfoKind tik,
+                                   IsFixedSize_t alwaysFixedSize,
+                                   unsigned NumElements,
+                                   std::vector<Element> &&eltsWithPayload,
+                                   std::vector<Element> &&eltsWithNoPayload)
+  : ElementsWithPayload(std::move(eltsWithPayload)),
+    ElementsWithNoPayload(std::move(eltsWithNoPayload)),
+    IGM(IGM), TIK(tik), AlwaysFixedSize(alwaysFixedSize),
+    ElementsAreABIAccessible(areElementsABIAccessible(ElementsWithPayload)),
+    NumElements(NumElements) {
 }
 
 void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
@@ -465,7 +488,9 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->assignWithCopy(
@@ -478,7 +503,9 @@ namespace {
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->assignWithTake(
@@ -498,7 +525,9 @@ namespace {
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithCopy(
@@ -511,7 +540,9 @@ namespace {
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
       if (!getSingleton()) return;
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         dest = getSingletonAddress(IGF, dest);
         src = getSingletonAddress(IGF, src);
         getSingleton()->initializeWithTake(
@@ -555,7 +586,9 @@ namespace {
                  bool isOutlined) const override {
       if (getSingleton() &&
           !getSingleton()->isPOD(ResilienceExpansion::Maximal)) {
-        if (isOutlined || T.hasOpenedExistential()) {
+        if (!ElementsAreABIAccessible) {
+          emitDestroyCall(IGF, T, addr);
+        } else if (isOutlined || T.hasOpenedExistential()) {
           getSingleton()->destroy(IGF, getSingletonAddress(IGF, addr),
                                   getSingletonType(IGF.IGM, T), isOutlined);
         } else {
@@ -1478,6 +1511,8 @@ namespace {
       Normal,
       /// The payload is POD, so copying is bitwise, and destruction is a noop.
       POD,
+      /// The payload type is ABI-inaccessible, so we can't recurse.
+      ABIInaccessible,
       /// The payload is a single reference-counted value, and we have
       /// a single no-payload case which uses the null extra inhabitant, so
       /// copy and destroy can pass through to retain and release entry
@@ -1595,7 +1630,9 @@ namespace {
 
       // If the payload is POD, then we can use POD value semantics.
       auto &payloadTI = *ElementsWithPayload[0].ti;
-      if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
+      if (!payloadTI.isABIAccessible()) {
+        CopyDestroyKind = ABIInaccessible;
+      } else if (payloadTI.isPOD(ResilienceExpansion::Maximal)) {
         CopyDestroyKind = POD;
       // If the payload is a single refcounted pointer and we have a single
       // empty case, then the layout will be a nullable pointer, and we can
@@ -2217,6 +2254,7 @@ namespace {
         return IGM.getReferenceType(Refcounting);
       case POD:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
 
@@ -2231,6 +2269,7 @@ namespace {
         return;
       case POD:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -2243,6 +2282,7 @@ namespace {
         return;
       case POD:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -2255,6 +2295,7 @@ namespace {
         return;
       case POD:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -2281,7 +2322,33 @@ namespace {
         reexplode(IGF, src, dest);
         return;
 
+      case ABIInaccessible:
+        llvm_unreachable("ABI-inaccessible type cannot be loadable");
+
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            Explosion payloadCopy;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.copy(IGF, payloadValue, payloadCopy,
+                            IGF.getDefaultAtomicity());
+            (void)payloadCopy.claimAll();
+          }
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
+
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -2315,7 +2382,31 @@ namespace {
         (void)src.claim(getExplosionSize());
         return;
 
+      case ABIInaccessible:
+        llvm_unreachable("ABI-inaccessible type cannot be loadable");
+
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          EnumPayload payload;
+          llvm::Value *extraTag;
+          std::tie(payload, extraTag) =
+              getPayloadAndExtraTagFromExplosion(IGF, src);
+          llvm::BasicBlock *endBB =
+              testFixedEnumContainsPayload(IGF, payload, extraTag);
+
+          // If we did, consume it.
+          if (PayloadBitCount > 0) {
+            ConditionalDominanceScope condition(IGF);
+            Explosion payloadValue;
+            auto &loadableTI = getLoadablePayloadTypeInfo();
+            loadableTI.unpackFromEnumPayload(IGF, payload, payloadValue, 0);
+            loadableTI.consume(IGF, payloadValue, IGF.getDefaultAtomicity());
+          }
+
+          IGF.Builder.CreateBr(endBB);
+          IGF.Builder.emitBlock(endBB);
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -2344,6 +2435,9 @@ namespace {
       case POD:
         (void)src.claim(getExplosionSize());
         return;
+
+      case ABIInaccessible:
+        llvm_unreachable("ABI-inaccessible type cannot be loadable");
 
       case Normal: {
         // Check that we have a payload.
@@ -2385,10 +2479,15 @@ namespace {
       if (CopyDestroyKind == POD) {
         return;
       }
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        return emitDestroyCall(IGF, T, addr);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         switch (CopyDestroyKind) {
         case POD:
           return;
+
+        case ABIInaccessible:
+          llvm_unreachable("should already have been handled");
 
         case Normal: {
           // Check that there is a payload at the address.
@@ -2474,6 +2573,9 @@ namespace {
       switch (CopyDestroyKind) {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
+
+      case ABIInaccessible:
+        llvm_unreachable("shouldn't get here");
 
       case Normal: {
         llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
@@ -2582,6 +2684,9 @@ namespace {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
 
+      case ABIInaccessible:
+        llvm_unreachable("shouldn't get here");
+
       case Normal: {
         llvm::BasicBlock *endBB = llvm::BasicBlock::Create(C);
 
@@ -2638,7 +2743,9 @@ namespace {
   public:
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
@@ -2647,7 +2754,9 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
@@ -2656,7 +2765,9 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
@@ -2665,7 +2776,9 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
@@ -2932,6 +3045,8 @@ namespace {
       /// The payloads are all POD, so copying is bitwise, and destruction is a
       /// noop.
       POD,
+      /// One or more of the payloads is ABI-inaccessible, so we cannot recurse.
+      ABIInaccessible,
       /// The payloads are all bitwise-takable, but have no other special
       /// shared layout.
       BitwiseTakable,
@@ -3058,22 +3173,21 @@ namespace {
                                                &refcounting)) {
           allSingleRefcount = false;
         } else if (haveRefcounting) {
-          // Different payloads have different reference counting styles.
-          if (refcounting != Refcounting) {
-            // Fall back to unknown entry points if the Objective-C runtime is
-            // available.
-            Refcounting = ReferenceCounting::Unknown;
-            // Otherwise, use value witnesses.
-            if (!IGM.ObjCInterop)
-              allSingleRefcount = false;
-          }
+          // Only support a single style of reference counting for now.
+          // swift_unknowRetain does not support the heap buffer of indirect
+          // enums. And I am not convinced that unknowRetain supports
+          // bridgedObjectRetain.
+          if (refcounting != Refcounting)
+            allSingleRefcount = false;
         } else {
           Refcounting = refcounting;
           haveRefcounting = true;
         }
       }
 
-      if (allPOD) {
+      if (!ElementsAreABIAccessible) {
+        CopyDestroyKind = ABIInaccessible;
+      } else if (allPOD) {
         assert(!allSingleRefcount && "pod *and* refcounted?!");
         CopyDestroyKind = POD;
       // FIXME: Memory corruption issues arise when enabling this for mixed
@@ -3168,6 +3282,7 @@ namespace {
       case POD:
       case BitwiseTakable:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
 
@@ -3183,6 +3298,7 @@ namespace {
       case POD:
       case BitwiseTakable:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -3196,6 +3312,7 @@ namespace {
       case POD:
       case BitwiseTakable:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -3209,6 +3326,7 @@ namespace {
       case POD:
       case BitwiseTakable:
       case Normal:
+      case ABIInaccessible:
         llvm_unreachable("not a refcounted payload");
       }
     }
@@ -3989,8 +4107,27 @@ namespace {
         reexplode(IGF, src, dest);
         return;
 
+      case ABIInaccessible:
+        llvm_unreachable("ABI-accessible type cannot be loadable");
+
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                Explosion tmp;
+                lti.copy(IGF, value, tmp, IGF.getDefaultAtomicity());
+                (void)tmp.claimAll(); // FIXME: repack if not bit-identical
+              });
+          return;
+        }
         if (!copyEnumFunction)
           copyEnumFunction = emitCopyEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4031,8 +4168,25 @@ namespace {
         (void)src.claim(getExplosionSize());
         return;
 
+      case ABIInaccessible:
+        llvm_unreachable("ABI-accessible type cannot be loadable");
+
       case BitwiseTakable:
       case Normal: {
+        if (loweredType.hasOpenedExistential()) {
+          auto parts = destructureAndTagLoadableEnum(IGF, src);
+
+          forNontrivialPayloads(
+              IGF, parts.tag,
+              [&](unsigned tagIndex, EnumImplStrategy::Element elt) {
+                auto &lti = cast<LoadableTypeInfo>(*elt.ti);
+                Explosion value;
+                projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
+
+                lti.consume(IGF, value, IGF.getDefaultAtomicity());
+              });
+          return;
+        }
         if (!consumeEnumFunction)
           consumeEnumFunction = emitConsumeEnumFunction(IGF.IGM, loweredType);
         Explosion tmp;
@@ -4063,6 +4217,9 @@ namespace {
       case POD:
         (void)src.claim(getExplosionSize());
         return;
+
+      case ABIInaccessible:
+        llvm_unreachable("ABI-accessible type cannot be loadable");
 
       case BitwiseTakable:
       case Normal: {
@@ -4102,6 +4259,9 @@ namespace {
       switch (CopyDestroyKind) {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
+
+      case ABIInaccessible:
+        llvm_unreachable("shouldn't get here");
 
       case BitwiseTakable:
       case TaggedRefcounted:
@@ -4152,6 +4312,9 @@ namespace {
       switch (CopyDestroyKind) {
       case POD:
         return emitPrimitiveCopy(IGF, dest, src, T);
+
+      case ABIInaccessible:
+        llvm_unreachable("shouldn't get here");
 
       case BitwiseTakable:
       case TaggedRefcounted:
@@ -4277,7 +4440,9 @@ namespace {
   public:
     void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsNotTake);
@@ -4286,7 +4451,9 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src,
                         SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitAssignWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectAssign(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
@@ -4295,7 +4462,9 @@ namespace {
 
     void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithCopyCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsNotTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsNotTake);
@@ -4304,7 +4473,9 @@ namespace {
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                             SILType T, bool isOutlined) const override {
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitInitializeWithTakeCall(IGF, T, dest, src);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         emitIndirectInitialize(IGF, dest, src, T, IsTake, isOutlined);
       } else {
         callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
@@ -4332,10 +4503,15 @@ namespace {
       if (CopyDestroyKind == POD) {
         return;
       }
-      if (isOutlined || T.hasOpenedExistential()) {
+      if (!ElementsAreABIAccessible) {
+        emitDestroyCall(IGF, T, addr);
+      } else if (isOutlined || T.hasOpenedExistential()) {
         switch (CopyDestroyKind) {
         case POD:
           return;
+
+        case ABIInaccessible:
+          llvm_unreachable("shouldn't get here");
 
         case BitwiseTakable:
         case Normal:
@@ -5109,8 +5285,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     origArgType = theEnum->mapTypeIntoContext(origArgType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origArgType);
-    auto origArgTI = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getASTType());
-    assert(origArgTI && "didn't complete type info?!");
+    auto *origArgTI = &TC.getCompleteTypeInfo(origArgLoweredTy.getASTType());
 
     // If the unsubstituted argument contains a generic parameter type, or
     // is not fixed-size in all resilience domains that have knowledge of
@@ -5146,7 +5321,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
         // can reproduce.
         if (!substArgTI->isFixedSize(layoutScope)) {
           alwaysFixedSize = IsNotFixedSize;
-          allowFixedLayoutOptimizations = false;
+          assert(!allowFixedLayoutOptimizations);
         }
       }
     }
@@ -5394,8 +5569,9 @@ namespace {
                          llvm::Type *irTy,
                          Alignment align,
                          IsPOD_t pod,
-                         IsBitwiseTakable_t bt)
-      : EnumTypeInfoBase(strategy, irTy, align, pod, bt) {}
+                         IsBitwiseTakable_t bt,
+                         IsABIAccessible_t abiAccessible)
+      : EnumTypeInfoBase(strategy, irTy, align, pod, bt, abiAccessible) {}
   };
 
   /// TypeInfo for dynamically-sized enum types.
@@ -5404,8 +5580,8 @@ namespace {
   {
   public:
     ResilientEnumTypeInfo(EnumImplStrategy &strategy,
-                          llvm::Type *irTy)
-      : EnumTypeInfoBase(strategy, irTy) {}
+                          llvm::Type *irTy, IsABIAccessible_t abiAccessible)
+      : EnumTypeInfoBase(strategy, irTy, abiAccessible) {}
   };
 } // end anonymous namespace
 
@@ -5477,10 +5653,13 @@ SingletonEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
       auto alignment = eltTI.getBestKnownAlignment();
       applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                             alignment);
+      auto enumAccessible =
+        IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
       return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
                              alignment,
                              eltTI.isPOD(ResilienceExpansion::Maximal),
-                             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
+                             eltTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+                             enumAccessible));
     } else {
       auto &fixedEltTI = cast<FixedTypeInfo>(eltTI);
       auto alignment = fixedEltTI.getFixedAlignment();
@@ -5663,10 +5842,14 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
   applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                         alignment);
   
+  auto enumAccessible =
+    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
          payloadTI.isPOD(ResilienceExpansion::Maximal),
-         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal)));
+         payloadTI.isBitwiseTakable(ResilienceExpansion::Maximal),
+         enumAccessible));
 }
 
 TypeInfo *
@@ -5861,9 +6044,13 @@ TypeInfo *MultiPayloadEnumImplStrategy::completeDynamicLayout(
   
   applyLayoutAttributes(TC.IGM, Type.getASTType(), /*fixed*/false,
                         alignment);
+
+  auto enumAccessible =
+    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
   
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
-                                                       alignment, pod, bt));
+                                                       alignment, pod, bt,
+                                                       enumAccessible));
 }
 
 TypeInfo *
@@ -5882,7 +6069,10 @@ ResilientEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
                                                   SILType Type,
                                                   EnumDecl *theEnum,
                                                   llvm::StructType *enumTy) {
-  return registerEnumTypeInfo(new ResilientEnumTypeInfo(*this, enumTy));
+  auto abiAccessible =
+    IsABIAccessible_t(TC.IGM.getSILModule().isTypeABIAccessible(Type));
+  return registerEnumTypeInfo(
+                       new ResilientEnumTypeInfo(*this, enumTy, abiAccessible));
 }
 
 const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,

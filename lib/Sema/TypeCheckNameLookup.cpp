@@ -75,19 +75,37 @@ namespace {
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
+    /// Determine whether we should filter out the results by removing
+    /// overridden and shadowed declarations.
+    /// FIXME: We should *always* do this, but there are weird assumptions
+    /// about the results of unqualified name lookup, e.g., that a local
+    /// variable not having a type indicates that it hasn't been seen yet.
+    bool shouldFilterResults() const {
+      // Member lookups always filter results.
+      if (IsMemberLookup) return true;
+
+      bool allAreInOtherModules = true;
+      auto currentModule = DC->getParentModule();
+      for (const auto &found : Result) {
+        // We found a member, so we need to filter.
+        if (found.getBaseDecl() != nullptr)
+          return true;
+
+        // We found something in our own module.
+        if (found.getValueDecl()->getDeclContext()->getParentModule() ==
+              currentModule)
+          allAreInOtherModules = false;
+      }
+
+      // FIXME: Only perform shadowing if we found things from other modules.
+      // This prevents us from introducing additional type-checking work
+      // during name lookup.
+      return allAreInOtherModules;
+    }
+
     ~LookupResultBuilder() {
-      // If any of the results have a base, we need to remove
-      // overridden and shadowed declarations.
-      // FIXME: We should *always* remove overridden and shadowed declarations,
-      // but there are weird assumptions about the results of unqualified
-      // name lookup, e.g., that a local variable not having a type indicates
-      // that it hasn't been seen yet.
-      if (!IsMemberLookup &&
-          std::find_if(Result.begin(), Result.end(),
-                       [](const LookupResultEntry &found) {
-                         return found.getBaseDecl() != nullptr;
-                       }) == Result.end())
-        return;
+      // Check whether we should do this filtering aat all.
+      if (!shouldFilterResults()) return;
 
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
@@ -429,7 +447,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({typeDecl, memberType});
+        result.Results.push_back({typeDecl, memberType, nullptr});
 
       continue;
     }
@@ -474,7 +492,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
-      result.Results.push_back({typeDecl, memberType});
+      result.Results.push_back({typeDecl, memberType, nullptr});
   }
 
   if (result.Results.empty()) {
@@ -503,7 +521,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // Use the type witness.
       auto concrete = conformance->getConcrete();
-      Type memberType = concrete->getTypeWitness(assocType, this);
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
@@ -511,11 +528,14 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      assert(memberType && "Missing type witness?");
+      auto typeDecl = concrete->getTypeWitnessAndDecl(assocType, this).second;
 
-      // If we haven't seen this type result yet, add it to the result set.
+      assert(typeDecl && "Missing type witness?");
+
+      auto memberType =
+          substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
       if (types.insert(memberType->getCanonicalType()).second)
-        result.Results.push_back({assocType, memberType});
+        result.Results.push_back({typeDecl, memberType, assocType});
     }
   }
 

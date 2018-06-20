@@ -61,6 +61,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Syntax/Serialization/SyntaxSerialization.h"
 #include "swift/Syntax/SyntaxNodes.h"
+#include "swift/TBDGen/TBDGen.h"
 
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
@@ -764,20 +765,24 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath())
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  if (!frontendOpts.InputsAndOutputs.hasTBDPath())
     return false;
 
   const std::string &TBDPath = Invocation.getTBDPathForWholeModule();
   assert(!TBDPath.empty() &&
          "If not WMO, getTBDPathForWholeModule should have failed");
 
-  auto installName = Invocation.getFrontendOptions().TBDInstallName.empty()
+  auto installName = frontendOpts.TBDInstallName.empty()
                          ? "lib" + Invocation.getModuleName().str() + ".dylib"
-                         : Invocation.getFrontendOptions().TBDInstallName;
+                         : frontendOpts.TBDInstallName;
 
-  return writeTBD(Instance.getMainModule(),
-                  Invocation.getSILOptions().hasMultipleIGMs(), TBDPath,
-                  installName);
+  TBDGenOptions opts;
+  opts.InstallName = installName;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
+  return writeTBD(Instance.getMainModule(), TBDPath, opts);
 }
 
 static std::deque<PostSILGenInputs>
@@ -948,9 +953,13 @@ static bool performCompile(CompilerInstance &Instance,
 
   // We've just been told to perform a typecheck, so we can return now.
   if (Action == FrontendOptions::ActionType::Typecheck) {
-    const bool hadPrintAsObjCError = printAsObjCIfNeeded(
-        Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
-        Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
+    const bool hadPrintAsObjCError =
+        Invocation.getFrontendOptions()
+            .InputsAndOutputs.hasObjCHeaderOutputPath() &&
+        printAsObjCIfNeeded(
+            Invocation.getObjCHeaderOutputPathForAtMostOnePrimary(),
+            Instance.getMainModule(), opts.ImplicitObjCHeaderPath,
+            moduleIsPublic);
 
     const bool hadEmitIndexDataError = emitIndexData(Invocation, Instance);
 
@@ -1065,8 +1074,11 @@ static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
       !MSF.is<SourceFile *>())
     return;
   Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
-  if (!PD.empty())
-    IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
+  if (!PD.empty()) {
+    if (!IRGenOpts.DWARFDebugFlags.empty())
+      IRGenOpts.DWARFDebugFlags += " ";
+    IRGenOpts.DWARFDebugFlags += ("-private-discriminator " + PD.str()).str();
+  }
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1134,7 +1146,8 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
 
-  const auto mode = Invocation.getFrontendOptions().ValidateTBDAgainstIR;
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+  const auto mode = frontendOpts.ValidateTBDAgainstIR;
   // Ensure all cases are covered by using a switch here.
   switch (mode) {
   case FrontendOptions::TBDValidationMode::None:
@@ -1143,12 +1156,14 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   case FrontendOptions::TBDValidationMode::MissingFromTBD:
     break;
   }
-  const auto hasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  TBDGenOptions opts;
+  opts.HasMultipleIGMs = Invocation.getSILOptions().hasMultipleIGMs();
+  opts.ModuleLinkName = frontendOpts.ModuleLinkName;
+
   const bool allSymbols = mode == FrontendOptions::TBDValidationMode::All;
-  return MSF.is<SourceFile *>() ? validateTBD(MSF.get<SourceFile *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols)
-                                : validateTBD(MSF.get<ModuleDecl *>(), IRModule,
-                                              hasMultipleIGMs, allSymbols);
+  return MSF.is<SourceFile *>()
+             ? validateTBD(MSF.get<SourceFile *>(), IRModule, opts, allSymbols)
+             : validateTBD(MSF.get<ModuleDecl *>(), IRModule, opts, allSymbols);
 }
 
 static bool generateCode(CompilerInvocation &Invocation,
@@ -1527,6 +1542,19 @@ createDispatchingDiagnosticConsumerIfNeeded(
       subConsumers.emplace_back(input.file(), std::move(subConsumer));
     return false;
   });
+  // For batch mode, the compiler must swallow diagnostics pertaining to
+  // non-primary files in order to avoid Xcode showing the same diagnostic
+  // multiple times. So, create a diagnostic "eater" for those non-primary
+  // files.
+  // To avoid introducing bugs into WMO or single-file modes, test for multiple
+  // primaries.
+  if (inputsAndOutputs.hasMultiplePrimaryInputs()) {
+    inputsAndOutputs.forEachNonPrimaryInput(
+        [&](const InputFile &input) -> bool {
+          subConsumers.emplace_back(input.file(), nullptr);
+          return false;
+        });
+  }
 
   if (subConsumers.empty())
     return nullptr;
@@ -1739,15 +1767,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
-  {
-    const FrontendInputsAndOutputs &io =
-        Invocation.getFrontendOptions().InputsAndOutputs;
-    if (io.hasDependencyTrackerPath() ||
-        !Invocation.getFrontendOptions().IndexStorePath.empty()) {
-      Instance->setDependencyTracker(&depTracker);
-    }
-  }
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasDependencyTrackerPath() ||
+      !Invocation.getFrontendOptions().IndexStorePath.empty())
+    Instance->createDependencyTracker();
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1);

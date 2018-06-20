@@ -66,6 +66,27 @@ static SILBasicBlock *getOptionalDiamondSuccessor(SwitchEnumInst *SEI) {
    return nullptr;
 }
 
+/// Find a safe insertion point for closure destruction. We might create a
+/// closure that captures self in deinit of self. In this situation it is not
+/// safe to destroy the closure after we called super deinit. We have to place
+/// the closure destruction before that call.
+///
+///  %deinit = objc_super_method %0 : $C, #A.deinit!deallocator.foreign
+///  %super = upcast %0 : $C to $A
+///  apply %deinit(%super) : $@convention(objc_method) (A) -> ()
+///  end_lifetime %super : $A
+static SILInstruction *getDeinitSafeClosureDestructionPoint(TermInst *Term) {
+  for (auto It = Term->getParent()->rbegin(), E = Term->getParent()->rend();
+       It != E; ++It) {
+    if (auto *EndLifetime = dyn_cast<EndLifetimeInst>(&*It)) {
+      auto *SuperInstance = EndLifetime->getOperand()->getDefiningInstruction();
+      assert(SuperInstance && "Expected an instruction");
+      return SuperInstance;
+    }
+  }
+  return Term;
+}
+
 /// Extend the lifetime of the convert_escape_to_noescape's operand to the end
 /// of the function.
 static void extendLifetimeToEndOfFunction(SILFunction &Fn,
@@ -111,10 +132,11 @@ static void extendLifetimeToEndOfFunction(SILFunction &Fn,
   Fn.findExitingBlocks(ExitingBlocks);
   for (auto *Exit : ExitingBlocks) {
     auto *Term = Exit->getTerminator();
-    SILBuilderWithScope B(Term);
-    B.setInsertionPoint(Term);
+    auto *SafeClosureDestructionPt = getDeinitSafeClosureDestructionPoint(Term);
+    SILBuilderWithScope B(SafeClosureDestructionPt);
     B.createDestroyAddr(loc, Slot);
-    B.createDeallocStack(loc, Slot);
+    SILBuilderWithScope B2(Term);
+    B2.createDeallocStack(loc, Slot);
   }
 }
 
@@ -296,7 +318,6 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
         Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
-    Cvt = NewCvt;
   }
 
   // Extend the lifetime.
@@ -416,10 +437,10 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
   auto &Context = NewCB->getModule().getASTContext();
   auto OptionalEscapingClosureTy =
       SILType::getOptionalType(SentinelClosure->getType());
+  auto *NoneDecl = Context.getOptionalNoneDecl();
   {
     SILBuilderWithScope B(Fn.getEntryBlock()->begin());
     Slot = B.createAllocStack(generatedLoc, OptionalEscapingClosureTy);
-    auto *NoneDecl = Context.getOptionalNoneDecl();
     // Store None to it.
     B.createStore(generatedLoc,
                   B.createEnum(generatedLoc, SILValue(), NoneDecl,
@@ -445,6 +466,11 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB) {
                                   IsEscapingClosureInst::ObjCEscaping);
     B.createCondFail(Loc, IsEscaping);
     B.createDestroyAddr(generatedLoc, Slot);
+    // Store None to it.
+    B.createStore(generatedLoc,
+                  B.createEnum(generatedLoc, SILValue(), NoneDecl,
+                               OptionalEscapingClosureTy),
+                  Slot, StoreOwnershipQualifier::Init);
   }
 
   // Insert the dealloc_stack in all exiting blocks.

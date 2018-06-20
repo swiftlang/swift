@@ -173,6 +173,7 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
     queue.execute(nullptr,
                   [&path](sys::ProcessId PID, int returnCode, StringRef output,
                           StringRef errors,
+                          sys::TaskProcessInformation ProcInfo,
                           void *unused) -> sys::TaskFinishedResponse {
                     if (returnCode == 0) {
                       output = output.rtrim();
@@ -449,4 +450,12 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return II;
+}
+
+bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
+  // This matches the behavior in Clang (see
+  // clang/lib/driver/ToolChains/Darwin.cpp).
+  if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
+    return S[0] != '\0';
+  return false;
 }

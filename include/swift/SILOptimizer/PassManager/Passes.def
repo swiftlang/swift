@@ -54,6 +54,8 @@ PASS(AADumper, "aa-dump",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
+PASS(AccessEnforcementOpts, "access-enforcement-opts",
+     "Access Enforcement Optimization")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessSummaryDumper, "access-summary-dump",
@@ -234,6 +236,8 @@ PASS(MandatorySILLinker, "mandatory-linker",
      "Deserialize all referenced SIL functions that are shared or transparent")
 PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
+PASS(RawSILInstLowering, "raw-sil-inst-lowering",
+     "Lower all raw SIL instructions to canonical equivalents.")
 PASS(RemovePins, "remove-pins",
      "Remove SIL pin/unpin pairs")
 PASS(TempRValueOpt, "temp-rvalue-opt",
@@ -252,7 +256,7 @@ PASS(SROABBArgs, "sroa-bb-args",
      "Scalar Replacement of Aggregate SIL Block Arguments")
 PASS(SimplifyBBArgs, "simplify-bb-args",
      "SIL Block Argument Simplification")
-PASS(SimplifyCFG, "-simplify-cfg",
+PASS(SimplifyCFG, "simplify-cfg",
      "SIL CFG Simplification")
 PASS(SpeculativeDevirtualization, "specdevirt",
      "Speculative Devirtualization via Guarded Calls")

@@ -149,9 +149,9 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(new ASTContext(Invocation.getLangOptions(),
-                               Invocation.getSearchPathOptions(), SourceMgr,
-                               Diagnostics));
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
 
   if (setUpModuleLoaders())
     return true;
@@ -197,10 +197,10 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(SourceLoader::create(*Context,
                                                   !immediate,
                                                   enableResilience,
-                                                  DepTracker));
+                                                  getDependencyTracker()));
   }
   {
-    auto SML = SerializedModuleLoader::create(*Context, DepTracker);
+    auto SML = SerializedModuleLoader::create(*Context, getDependencyTracker());
     this->SML = SML.get();
     Context->addModuleLoader(std::move(SML));
   }
@@ -210,7 +210,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     // knowledge.
     auto clangImporter =
         ClangImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              Invocation.getPCHHash(), DepTracker);
+                              Invocation.getPCHHash(), getDependencyTracker());
     if (!clangImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;
@@ -871,6 +871,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals) {
   if (MainBufferID != NO_SUCH_BUFFER) {
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
+    MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
 
     bool Done;
     do {

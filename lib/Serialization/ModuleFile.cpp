@@ -429,7 +429,7 @@ class ModuleFile::LocalDeclTableInfo {
 public:
   using internal_key_type = StringRef;
   using external_key_type = internal_key_type;
-  using data_type = std::pair<DeclID, unsigned>; // ID, local discriminator
+  using data_type = DeclID;
   using hash_value_type = uint32_t;
   using offset_type = unsigned;
 
@@ -447,7 +447,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, sizeof(uint32_t) + sizeof(unsigned) };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -456,9 +456,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    auto declID = endian::readNext<uint32_t, little, unaligned>(data);
-    auto discriminator = endian::readNext<unsigned, little, unaligned>(data);
-    return { declID, discriminator };
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -596,9 +594,8 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
     unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, dataLength };
+    return { sizeof(uint32_t), dataLength };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -1459,6 +1456,17 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
+std::unique_ptr<llvm::MemoryBuffer> ModuleFile::takeBufferForDiagnostics() {
+  assert(getStatus() != Status::Valid);
+
+  // Today, the only buffer that might have diagnostics in them is the input
+  // buffer, and even then only if it has imported module contents.
+  if (!importedHeaderInfo.contents.empty())
+    return std::move(ModuleInputBuffer);
+
+  return nullptr;
+}
+
 ModuleFile::~ModuleFile() { }
 
 void ModuleFile::lookupValue(DeclName name,
@@ -1516,7 +1524,7 @@ TypeDecl *ModuleFile::lookupLocalType(StringRef MangledName) {
   if (iter == LocalTypeDecls->end())
     return nullptr;
 
-  return cast<TypeDecl>(getDecl((*iter).first));
+  return cast<TypeDecl>(getDecl(*iter));
 }
 
 TypeDecl *ModuleFile::lookupNestedType(Identifier name,
@@ -1852,6 +1860,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
+        llvm::consumeError(mem.takeError());
+
         // Treat this as a cache-miss to the caller and let them attempt
         // to refill through the normal loadAllMembers() path.
         return None;
@@ -2021,10 +2031,8 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!LocalTypeDecls)
     return;
 
-  for (auto entry : LocalTypeDecls->data()) {
-    auto DeclID = entry.first;
+  for (auto DeclID : LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
-    TD->setLocalDiscriminator(entry.second);
     results.push_back(TD);
   }
 }

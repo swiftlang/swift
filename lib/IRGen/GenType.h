@@ -82,7 +82,8 @@ private:
   const LoadableTypeInfo *ObjCClassPtrTI = nullptr;
   const LoadableTypeInfo *EmptyTI = nullptr;
 
-  const TypeInfo *ResilientStructTI = nullptr;
+  const TypeInfo *AccessibleResilientStructTI = nullptr;
+  const TypeInfo *InaccessibleResilientStructTI = nullptr;
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -123,7 +124,7 @@ private:
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
-  const TypeInfo *convertResilientStruct();
+  const TypeInfo *convertResilientStruct(IsABIAccessible_t abiAccessible);
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
   const TypeInfo *convertUnownedStorageType(UnownedStorageType *T);
   const TypeInfo *convertWeakStorageType(WeakStorageType *T);
@@ -138,7 +139,6 @@ public:
 
   TypeCacheEntry getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
-  const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
@@ -147,7 +147,7 @@ public:
   const LoadableTypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
-  const TypeInfo &getResilientStructTypeInfo();
+  const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);

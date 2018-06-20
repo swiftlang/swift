@@ -789,6 +789,7 @@ Some kinds need arguments, which precede ``Tf``.
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
                                              // and one 'identifier' argument which is the closure symbol name
   ARG-SPEC-KIND ::= 'p' CONST-PROP           // Constant propagated argument
+  ARG-SPEC-KIND ::= 'e' 'D'? 'G'? 'X'?       // Generic argument, with optional dead, owned=>guaranteed or exploded-specifier
   ARG-SPEC-KIND ::= 'd' 'G'? 'X'?            // Dead argument, with optional owned=>guaranteed or exploded-specifier
   ARG-SPEC-KIND ::= 'g' 'X'?                 // Owned => Guaranteed,, with optional exploded-specifier
   ARG-SPEC-KIND ::= 'x'                      // Exploded

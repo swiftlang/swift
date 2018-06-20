@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -enable-objc-interop
 
 class A {
   func ret_sametype() -> Int { return 0 }

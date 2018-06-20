@@ -2588,10 +2588,25 @@ static void emitDiagnoseOfUnexpectedEnumCaseValue(SILGenFunction &SGF,
                                                       loweredRawType);
   auto materializedRawValue = rawValue.materialize(SGF, loc);
 
-  Substitution subs[] = {
-    {switchedValueSwiftType, /*Conformances*/None},
-    {enumDecl->getRawType(), /*Conformances*/None},
-  };
+  auto genericSig = diagnoseFailure->getGenericSignature();
+  auto subs = SubstitutionMap::get(
+      genericSig,
+      [&](SubstitutableType *type) -> Type {
+        auto genericParam = cast<GenericTypeParamType>(type);
+        assert(genericParam->getDepth() == 0);
+        assert(genericParam->getIndex() < 2);
+        switch (genericParam->getIndex()) {
+        case 0:
+          return switchedValueSwiftType;
+
+        case 1:
+          return enumDecl->getRawType();
+
+        default:
+          llvm_unreachable("wrong generic signature for expected case value");
+        }
+      },
+      LookUpConformanceInSignature(*genericSig));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, subs,
                                   {ManagedValue::forUnmanaged(metatype),
@@ -2616,9 +2631,11 @@ static void emitDiagnoseOfUnexpectedEnumCase(SILGenFunction &SGF,
                            MetatypeRepresentation::Thick));
   ManagedValue metatype = SGF.B.createValueMetatype(loc, metatypeType, value);
 
-  Substitution sub{switchedValueSwiftType, /*Conformances*/None};
-  auto genericArgsMap =
-      diagnoseFailure->getGenericSignature()->getSubstitutionMap(sub);
+  auto diagnoseSignature = diagnoseFailure->getGenericSignature();
+  auto genericArgsMap = SubstitutionMap::get(
+      diagnoseSignature,
+      [&](SubstitutableType *type) -> Type { return switchedValueSwiftType; },
+      LookUpConformanceInSignature(*diagnoseSignature));
 
   SGF.emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, genericArgsMap,
                                   metatype,

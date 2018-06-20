@@ -1536,35 +1536,39 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
-
-  auto checkRenamedAttr = [&](StringRef oldName, StringRef newName,
-                              DeclAttrKind kind, bool warning) {
-    if (DK == DAK_Count && Tok.getText() == oldName) {
-      // We renamed @availability to @available, so if we see the former,
-      // treat it as the latter and emit a Fix-It.
+  
+  auto checkInvalidAttrName = [&](StringRef invalidName,
+                                  StringRef correctName,
+                                  DeclAttrKind kind,
+                                  Optional<Diag<StringRef, StringRef>> diag = None) {
+    if (DK == DAK_Count && Tok.getText() == invalidName) {
       DK = kind;
-      if (warning) {
-        diagnose(Tok, diag::attr_renamed_warning, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
-      } else {
-        diagnose(Tok, diag::attr_renamed, oldName, newName)
-            .fixItReplace(Tok.getLoc(), newName);
+
+      if (diag) {
+        diagnose(Tok, *diag, invalidName, correctName)
+            .fixItReplace(Tok.getLoc(), correctName);
       }
     }
   };
 
   // FIXME: This renaming happened before Swift 3, we can probably remove
   // the specific fallback path at some point.
-  checkRenamedAttr("availability", "available", DAK_Available, false);
+  checkInvalidAttrName("availability", "available", DAK_Available, diag::attr_renamed);
 
-  // In Swift 5 and above, these become hard errors. Otherwise, emit a
-  // warning for compatibility.
-  if (!Context.isSwiftVersionAtLeast(5)) {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, true);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, true);
+  // Check if attr is inlineable, and suggest inlinable instead
+  checkInvalidAttrName("inlineable", "inlinable", DAK_Inlinable, diag::attr_name_close_match);
+
+  // In Swift 5 and above, these become hard errors. In Swift 4.2, emit a
+  // warning for compatibility. Otherwise, don't diagnose at all.
+  if (Context.isSwiftVersionAtLeast(5)) {
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed);
+  } else if (Context.isSwiftVersionAtLeast(4, 2)) {
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline, diag::attr_renamed_warning);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable, diag::attr_renamed_warning);
   } else {
-    checkRenamedAttr("_versioned", "usableFromInline", DAK_UsableFromInline, false);
-    checkRenamedAttr("_inlineable", "inlinable", DAK_Inlinable, false);
+    checkInvalidAttrName("_versioned", "usableFromInline", DAK_UsableFromInline);
+    checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable);
   }
 
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
@@ -2409,6 +2413,14 @@ void Parser::setLocalDiscriminator(ValueDecl *D) {
   D->setLocalDiscriminator(discriminator);
 }
 
+void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
+  for (auto P : *PL) {
+    if (!P->hasName() || P->isImplicit())
+      continue;
+    setLocalDiscriminator(P);
+  }
+}
+
 void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                            ParseDeclOptions Flags) {
   auto CurLoc = Tok.getLoc();
@@ -2666,10 +2678,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
     return makeParserErrorResult<Decl>();
   }
 
-  if (DeclResult.isParseError() && MayNeedOverrideCompletion &&
-      Tok.is(tok::code_complete)) {
-    DeclResult = makeParserCodeCompletionStatus();
-    if (CodeCompletion) {
+  if (DeclResult.isParseError() && Tok.is(tok::code_complete)) {
+    if (MayNeedOverrideCompletion && CodeCompletion) {
       // If we need to complete an override, collect the keywords already
       // specified so that we do not duplicate them in code completion
       // strings.
@@ -2691,6 +2701,9 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       CodeCompletion->completeNominalMemberBeginning(Keywords);
     }
+
+    DeclResult = makeParserCodeCompletionStatus();
+    consumeToken(tok::code_complete);
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
@@ -3131,6 +3144,9 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   ParserResult<Decl> Result;
   SyntaxParsingContext DeclContext(SyntaxContext,
                                    SyntaxKind::MemberDeclListItem);
+  if (loadCurrentSyntaxNodeFromCache()) {
+    return ParserStatus();
+  }
   Result = parseDecl(Options, handler);
   if (Result.isParseError())
     skipUntilDeclRBrace(tok::semi, tok::pound_endif);
@@ -3342,6 +3358,8 @@ ParserResult<PoundDiagnosticDecl> Parser::parseDeclPoundDiagnostic() {
 }
 
 ParserStatus Parser::parseLineDirective(bool isLine) {
+  SyntaxParsingContext PoundSourceLocation(SyntaxContext,
+                                           SyntaxKind::PoundSourceLocation);
   SourceLoc Loc = consumeToken();
   if (isLine) {
     diagnose(Loc, diag::line_directive_style_deprecated)
@@ -3371,40 +3389,47 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
       }
       return makeParserSuccess();
     }
-    
-    if (parseSpecificIdentifier("file", diag::sourceLocation_expected,"file:")||
-        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
-      return makeParserError();
 
-    if (Tok.isNot(tok::string_literal)) {
-      diagnose(Tok, diag::expected_line_directive_name);
-      return makeParserError();
+    {
+      SyntaxParsingContext Args(SyntaxContext,
+                                SyntaxKind::PoundSourceLocationArgs);
+
+      if (parseSpecificIdentifier("file", diag::sourceLocation_expected,
+                                  "file:") ||
+          parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+        return makeParserError();
+
+      if (Tok.isNot(tok::string_literal)) {
+        diagnose(Tok, diag::expected_line_directive_name);
+        return makeParserError();
+      }
+
+      Filename =
+          getStringLiteralIfNotInterpolated(*this, Loc, Tok, "#sourceLocation");
+      if (!Filename.hasValue())
+        return makeParserError();
+      consumeToken(tok::string_literal);
+
+      if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
+          parseSpecificIdentifier("line", diag::sourceLocation_expected,
+                                  "line:") ||
+          parseToken(tok::colon, diag::sourceLocation_expected, ":"))
+        return makeParserError();
+
+      if (Tok.isNot(tok::integer_literal)) {
+        diagnose(Tok, diag::expected_line_directive_number);
+        return makeParserError();
+      }
+      if (Tok.getText().getAsInteger(0, StartLine)) {
+        diagnose(Tok, diag::expected_line_directive_number);
+        return makeParserError();
+      }
+      if (StartLine == 0) {
+        diagnose(Tok, diag::line_directive_line_zero);
+        return makeParserError();
+      }
+      consumeToken(tok::integer_literal);
     }
-    
-    Filename = getStringLiteralIfNotInterpolated(*this, Loc, Tok,
-                                                 "#sourceLocation");
-    if (!Filename.hasValue())
-      return makeParserError();
-    consumeToken(tok::string_literal);
-    
-    if (parseToken(tok::comma, diag::sourceLocation_expected, ",") ||
-        parseSpecificIdentifier("line", diag::sourceLocation_expected,"line:")||
-        parseToken(tok::colon, diag::sourceLocation_expected, ":"))
-      return makeParserError();
-  
-    if (Tok.isNot(tok::integer_literal)) {
-      diagnose(Tok, diag::expected_line_directive_number);
-      return makeParserError();
-    }
-    if (Tok.getText().getAsInteger(0, StartLine)) {
-      diagnose(Tok, diag::expected_line_directive_number);
-      return makeParserError();
-    }
-    if (StartLine == 0) {
-      diagnose(Tok, diag::line_directive_line_zero);
-      return makeParserError();
-    }
-    consumeToken(tok::integer_literal);
 
     LastTokTextEnd = Tok.getText().end();
     if (parseToken(tok::r_paren, diag::sourceLocation_expected, ")"))
@@ -3529,10 +3554,16 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     return parseDeclAssociatedType(Flags, Attributes);
   }
   TmpCtxt.reset();
-  
+
+  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
+                                          /*genericParams*/nullptr,
+                                          CurDeclContext);
+
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    ContextChange CC(*this, TAD);
+
     SyntaxParsingContext InitCtx(SyntaxContext,
                                  SyntaxKind::TypeInitializerClause);
     if (Tok.is(tok::colon)) {
@@ -3540,20 +3571,15 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
       // Recognize this and produce a fixit.
       diagnose(Tok, diag::expected_equal_in_typealias)
           .fixItReplace(Tok.getLoc(), " = ");
-      consumeToken(tok::colon);
+      EqualLoc = consumeToken(tok::colon);
     } else {
       EqualLoc = consumeToken(tok::equal);
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
     Status |= UnderlyingTy;
-    if (UnderlyingTy.isNull())
-      return Status;
   }
 
-  auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
   TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
   TAD->getAttrs() = Attributes;
 
@@ -3567,8 +3593,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
-    diagnose(Tok, diag::expected_equal_in_typealias);
-    Status.setIsParseError();
+    // If there is an attempt to do code completion
+    // inside of typealias type, let's just return
+    // because we've seen required '=' token.
+    if (EqualLoc.isInvalid()) {
+      diagnose(Tok, diag::expected_equal_in_typealias);
+      Status.setIsParseError();
+    }
     return Status;
   }
 
@@ -3770,19 +3801,19 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   // default to mutating.  get/address default to
   // non-mutating.
   switch (Kind) {
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsGetter:
+  case AccessorKind::Address:
+  case AccessorKind::Get:
     break;
 
-  case AccessorKind::IsMutableAddressor:
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     if (D->isInstanceMember())
       D->setSelfAccessKind(SelfAccessKind::Mutating);
     break;
 
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("not parseable accessors");
   }
 
@@ -3798,7 +3829,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   bool isNameImplicit = name.empty();
   if (isNameImplicit) {
     const char *implName =
-      accessorKind == AccessorKind::IsDidSet ? "oldValue" : "newValue";
+      accessorKind == AccessorKind::DidSet ? "oldValue" : "newValue";
     name = P.Context.getIdentifier(implName);
   }
 
@@ -3831,8 +3862,8 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                                                     TypeLoc ElementTy) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
-  if (Kind != AccessorKind::IsSetter && Kind != AccessorKind::IsWillSet &&
-      Kind != AccessorKind::IsDidSet)
+  if (Kind != AccessorKind::Set && Kind != AccessorKind::WillSet &&
+      Kind != AccessorKind::DidSet)
     return nullptr;
 
   SourceLoc StartLoc, NameLoc, EndLoc;
@@ -3856,8 +3887,8 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
       NameLoc = P.consumeToken();
 
       auto DiagID =
-         Kind == AccessorKind::IsSetter ? diag::expected_rparen_set_name :
-         Kind == AccessorKind::IsWillSet ? diag::expected_rparen_willSet_name :
+         Kind == AccessorKind::Set ? diag::expected_rparen_set_name :
+         Kind == AccessorKind::WillSet ? diag::expected_rparen_willSet_name :
           diag::expected_rparen_didSet_name;
       
       // Look for the closing ')'.
@@ -3929,58 +3960,33 @@ void Parser::consumeGetSetBody(AbstractFunctionDecl *AFD,
   }
 }
 
-static AddressorKind getImmutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeAddress")) {
-    return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("addressWithOwner")) {
-    return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("addressWithNativeOwner")) {
-    return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("addressWithPinnedNativeOwner")) {
-    return AddressorKind::NativePinning;
-  } else {
-    return AddressorKind::NotAddressor;
-  }
-}
-static AddressorKind getMutableAddressorKind(Token &tok) {
-  if (tok.isContextualKeyword("unsafeMutableAddress")) {
-    return AddressorKind::Unsafe;
-  } else if (tok.isContextualKeyword("mutableAddressWithOwner")) {
-    return AddressorKind::Owning;
-  } else if (tok.isContextualKeyword("mutableAddressWithNativeOwner")) {
-    return AddressorKind::NativeOwning;
-  } else if (tok.isContextualKeyword("mutableAddressWithPinnedNativeOwner")) {
-    return AddressorKind::NativePinning;
-  } else {
-    return AddressorKind::NotAddressor;
-  }
-}
-
-/// Returns an accessor kind that 
+/// Returns a descriptive name for the given accessor/addressor kind.
 static StringRef getAccessorNameForDiagnostic(AccessorKind accessorKind,
                                               AddressorKind addressorKind) {
   switch (accessorKind) {
-  case AccessorKind::IsGetter: return "getter";
-  case AccessorKind::IsSetter: return "setter";
-  case AccessorKind::IsDidSet: return "didSet";
-  case AccessorKind::IsWillSet: return "willSet";
-  case AccessorKind::IsMaterializeForSet: return "materializeForSet";
-  case AccessorKind::IsAddressor:
+  case AccessorKind::Get: return "getter";
+  case AccessorKind::Set: return "setter";
+#define ACCESSOR(ID)
+#define OBJC_ACCESSOR(ID, KEYWORD) // treated specially above
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  case AccessorKind::Address:
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-    case AddressorKind::Unsafe: return "unsafeAddress";
-    case AddressorKind::Owning: return "addressWithOwner";
-    case AddressorKind::NativeOwning: return "addressWithNativeOwner";
-    case AddressorKind::NativePinning: return "addressWithPinnedNativeOwner";
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad addressor kind");
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::MutableAddress:
     switch (addressorKind) {
     case AddressorKind::NotAddressor: llvm_unreachable("invalid");
-    case AddressorKind::Unsafe: return "unsafeMutableAddress";
-    case AddressorKind::Owning: return "mutableAddressWithOwner";
-    case AddressorKind::NativeOwning: return "mutableAddressWithNativeOwner";
-    case AddressorKind::NativePinning: return "mutableAddressWithPinnedNativeOwner";
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
+    case AddressorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
     }
     llvm_unreachable("bad addressor kind");
   }
@@ -3994,15 +4000,15 @@ static void diagnoseRedundantAccessors(Parser &P, SourceLoc loc,
                                        AccessorDecl *previousDecl) {
   // Different addressor safety kinds still count as the same addressor.
   if (previousDecl->getAddressorKind() != addressorKind) {
-    assert(accessorKind == AccessorKind::IsAddressor ||
-           accessorKind == AccessorKind::IsMutableAddressor);
+    assert(accessorKind == AccessorKind::Address ||
+           accessorKind == AccessorKind::MutableAddress);
     P.diagnose(loc, diag::conflicting_property_addressor,
                unsigned(isSubscript),
-               unsigned(accessorKind == AccessorKind::IsMutableAddressor));
+               unsigned(accessorKind == AccessorKind::MutableAddress));
 
     // Be less specific about the previous definition.
     P.diagnose(previousDecl->getLoc(), diag::previous_accessor,
-               accessorKind == AccessorKind::IsMutableAddressor
+               accessorKind == AccessorKind::MutableAddress
                  ? "mutable addressor" : "addressor");
     return;
   }
@@ -4030,6 +4036,22 @@ void Parser::parseAccessorAttributes(DeclAttributes &Attributes) {
   }
 }
 
+static bool isAllowedInLimitedSyntax(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::Get:
+  case AccessorKind::Set:
+    return true;
+
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+  case AccessorKind::MaterializeForSet:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
+    return false;
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
 /// \brief Parse a get-set clause, optionally containing a getter, setter,
 /// willSet, and/or didSet clauses.  'Indices' is a paren or tuple pattern,
 /// specifying the index list for a subscript.
@@ -4039,92 +4061,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                              TypeLoc ElementTy, ParsedAccessors &accessors,
                              AbstractStorageDecl *storage,
                              SourceLoc &LastValidLoc, SourceLoc StaticLoc,
-                             SourceLoc VarLBLoc,
-                             SmallVectorImpl<Decl *> &Decls) {
-  // Properties in protocols use sufficiently limited syntax that we have a
-  // special parsing loop for them.  SIL mode uses the same syntax.
-  if (Flags.contains(PD_InProtocol) || isInSILMode()) {
-    if (Tok.is(tok::r_brace)) {
-      // Give syntax node an empty statement list.
-      SyntaxParsingContext StmtListContext(SyntaxContext,
-                                           SyntaxKind::CodeBlockItemList);
-    }
-    while (Tok.isNot(tok::r_brace)) {
-      if (Tok.is(tok::eof))
-        return true;
-
-      SyntaxParsingContext AccessorCtx(SyntaxContext, SyntaxKind::AccessorDecl);
-      // Parse any leading attributes.
-      DeclAttributes Attributes;
-      parseAccessorAttributes(Attributes);
-      AccessorKind Kind;
-      AddressorKind addressorKind = AddressorKind::NotAddressor;
-      AccessorDecl **TheDeclPtr;
-      SourceLoc AccessorKeywordLoc = Tok.getLoc();
-      if (Tok.isContextualKeyword("get")) {
-        Kind = AccessorKind::IsGetter;
-        TheDeclPtr = &accessors.Get;
-      } else if (Tok.isContextualKeyword("set")) {
-        Kind = AccessorKind::IsSetter;
-        TheDeclPtr = &accessors.Set;
-      } else if (!Flags.contains(PD_InProtocol) &&
-                 (addressorKind = getImmutableAddressorKind(Tok))
-                   != AddressorKind::NotAddressor) {
-        Kind = AccessorKind::IsAddressor;
-        TheDeclPtr = &accessors.Addressor;
-      } else if (!Flags.contains(PD_InProtocol) &&
-                 (addressorKind = getMutableAddressorKind(Tok))
-                   != AddressorKind::NotAddressor) {
-        Kind = AccessorKind::IsMutableAddressor;
-        TheDeclPtr = &accessors.MutableAddressor;
-      } else {
-        AccessorCtx.setTransparent();
-        AccessorKeywordLoc = SourceLoc();
-        diagnose(Tok, diag::expected_getset_in_protocol);
-        return true;
-      }
-
-      // Correct the token kind to be contextual keyword.
-      if (AccessorKeywordLoc.isValid()) {
-        Tok.setKind(tok::contextual_keyword);
-      }
-
-      AccessorDecl *&TheDecl = *TheDeclPtr;
-      SourceLoc Loc = consumeToken();
-
-      // Have we already parsed this kind of clause?
-      if (TheDecl) {
-        diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
-                                   /*subscript*/Indices != nullptr, TheDecl);
-
-        // Forget the previous decl.
-        Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
-        TheDecl = nullptr;  // Forget the previous decl.
-      }
-
-      // "set" could have a name associated with it.  This isn't valid in a
-      // protocol, but we parse and then reject it, for better QoI.
-      if (Tok.is(tok::l_paren))
-        diagnose(Loc, diag::protocol_setter_name);
-
-      auto *ValueNameParams =
-          parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
-
-      // Set up a function declaration.
-      TheDecl = createAccessorFunc(Loc, ValueNameParams,
-                                   GenericParams, Indices, ElementTy,
-                                   StaticLoc, Flags, Kind, addressorKind,
-                                   storage, this, AccessorKeywordLoc);
-      TheDecl->getAttrs() = Attributes;
-      
-      Decls.push_back(TheDecl);
-    }
-
-    return false;
-  }
-
-  // Otherwise, we have a normal var or subscript declaration, parse the full
-  // complement of specifiers, along with their bodies.
+                             SourceLoc VarLBLoc) {
+  // Properties in protocols use a very limited syntax.
+  // SIL mode uses the same syntax.
+  // Otherwise, we have a normal var or subscript declaration and we need
+  // parse the full complement of specifiers, along with their bodies.
+  bool parsingLimitedSyntax =
+    Flags.contains(PD_InProtocol) || isInSILMode();
 
   // If the body is completely empty, preserve it.  This is at best a getter with
   // an implicit fallthrough off the end.
@@ -4132,7 +4075,12 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Give syntax node an empty statement list.
     SyntaxParsingContext StmtListContext(SyntaxContext,
                                          SyntaxKind::CodeBlockItemList);
-    diagnose(Tok, diag::computed_property_no_accessors);
+
+    // In the limited syntax, fall out and let the caller handle it.
+    if (parsingLimitedSyntax)
+      return false;
+
+    diagnose(Tok, diag::computed_property_no_accessors, /*subscript*/Indices != nullptr);
     return true;
   }
 
@@ -4147,7 +4095,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // position and restore it later.
     llvm::Optional<SyntaxParsingContext> BacktrackCtxt;
     ParserPosition BeginParserPosition;
-    if (Tok.is(tok::at_sign)) {
+    if (!parsingLimitedSyntax && Tok.is(tok::at_sign)) {
       BeginParserPosition = getParserPosition();
       BacktrackCtxt.emplace(SyntaxContext);
       BacktrackCtxt->setTransparent();
@@ -4156,31 +4104,29 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Parse any leading attributes.
     DeclAttributes Attributes;
     parseAccessorAttributes(Attributes);
+
     bool isImplicitGet = false;
     AccessorKind Kind;
     AddressorKind addressorKind = AddressorKind::NotAddressor;
-    AccessorDecl **TheDeclPtr;
-    SourceLoc AccessorKeywordLoc =  Tok.getLoc();
-    if (Tok.isContextualKeyword("get")) {
-      Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &accessors.Get;
-    } else if (Tok.isContextualKeyword("set")) {
-      Kind = AccessorKind::IsSetter;
-      TheDeclPtr = &accessors.Set;
-    } else if (Tok.isContextualKeyword("willSet")) {
-      Kind = AccessorKind::IsWillSet;
-      TheDeclPtr = &accessors.WillSet;
-    } else if (Tok.isContextualKeyword("didSet")) {
-      Kind = AccessorKind::IsDidSet;
-      TheDeclPtr = &accessors.DidSet;
-    } else if ((addressorKind = getImmutableAddressorKind(Tok))
-                 != AddressorKind::NotAddressor) {
-      Kind = AccessorKind::IsAddressor;
-      TheDeclPtr = &accessors.Addressor;
-    } else if ((addressorKind = getMutableAddressorKind(Tok))
-                 != AddressorKind::NotAddressor) {
-      Kind = AccessorKind::IsMutableAddressor;
-      TheDeclPtr = &accessors.MutableAddressor;
+    SourceLoc AccessorKeywordLoc = Tok.getLoc();
+    if (false) {}
+#define SUPPRESS_ARTIFICIAL_ACCESSORS 1
+#define ACCESSOR_KEYWORD(KEYWORD)
+#define SINGLETON_ACCESSOR(ID, KEYWORD)               \
+    else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+      Kind = AccessorKind::ID;                        \
+    }
+#define ANY_ADDRESSOR(ID, ADDRESSOR_ID, KEYWORD)      \
+    else if (Tok.isContextualKeyword(#KEYWORD)) {     \
+      Kind = AccessorKind::ID;                        \
+      addressorKind = AddressorKind::ADDRESSOR_ID;    \
+    }
+#include "swift/AST/AccessorKinds.def"
+    else if (parsingLimitedSyntax) {
+      AccessorCtx.setTransparent();
+      AccessorKeywordLoc = SourceLoc();
+      diagnose(Tok, diag::expected_getset_in_protocol);
+      return true;
     } else {
       AccessorKeywordLoc = SourceLoc();
       // This is an implicit getter.  Might be not valid in this position,
@@ -4199,8 +4145,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
         // Don't signal an error since we recovered.
         return false;
       }
-      Kind = AccessorKind::IsGetter;
-      TheDeclPtr = &accessors.Get;
+      Kind = AccessorKind::Get;
       isImplicitGet = true;
     }
     if (BacktrackCtxt)
@@ -4216,24 +4161,44 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     // Consume the contextual keyword, if present.
     SourceLoc Loc = isImplicitGet ? VarLBLoc : consumeToken();
 
-    AccessorDecl *&TheDecl = *TheDeclPtr;
-
-    // Have we already parsed this kind of clause?
-    if (TheDecl) {
-      diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
-                                 /*subscript*/Indices != nullptr, TheDecl);
-
-      // Forget the previous decl.
-      Decls.erase(std::find(Decls.begin(), Decls.end(), TheDecl));
-      TheDecl = nullptr;
+    // For now, immediately reject illegal accessors in protocols just to
+    // avoid having to deal with them everywhere.
+    if (parsingLimitedSyntax && !isAllowedInLimitedSyntax(Kind)) {
+      diagnose(Loc, diag::expected_getset_in_protocol);
+      continue;
     }
 
-    // 'set' and 'willSet' can have an optional name.
+    // 'set' and 'willSet' can have an optional name.  This isn't valid in a
+    // protocol, but we parse and then reject it for better QoI.
     //
     //     set-name    ::= '(' identifier ')'
+    if (parsingLimitedSyntax && Tok.is(tok::l_paren)) {
+      diagnose(Loc, diag::protocol_setter_name);
+    }
     auto *ValueNamePattern =
         parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
 
+    // Set up a function declaration.
+    auto accessor = createAccessorFunc(Loc, ValueNamePattern,
+                                       GenericParams, Indices, ElementTy,
+                                       StaticLoc, Flags, Kind, addressorKind,
+                                       storage, this, AccessorKeywordLoc);
+    accessor->getAttrs() = Attributes;
+
+    // Collect this accessor and detect conflicts.
+    if (auto existingAccessor = accessors.add(accessor)) {
+      diagnoseRedundantAccessors(*this, Loc, Kind, addressorKind,
+                                 /*subscript*/Indices != nullptr,
+                                 existingAccessor);
+    }
+
+    // There's no body in the limited syntax.
+    if (parsingLimitedSyntax) {
+      LastValidLoc = Loc;
+      continue;
+    }
+
+    // Set up the syntax nodes for parsing the accessor body.
     SyntaxParsingContext BlockCtx(SyntaxContext, SyntaxKind::CodeBlock);
     if (AccessorKeywordLoc.isInvalid()) {
       // If the keyword is absent, we shouldn't make these sub-nodes.
@@ -4242,8 +4207,8 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
     }
 
     SourceLoc LBLoc = isImplicitGet ? VarLBLoc : Tok.getLoc();
-    // FIXME: Use outer '{' loc if isImplicitGet.
-    bool ExternalAsmName = false;
+
+    // It's okay not to have a body if there's an external asm name.
     if (!isImplicitGet && !consumeIf(tok::l_brace)) {
       // _silgen_name'd accessors don't need bodies.
       if (!Attributes.hasAttribute<SILGenNameAttr>()) {
@@ -4251,62 +4216,52 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
                  getAccessorNameForDiagnostic(Kind, addressorKind));
         return true;
       }
-      ExternalAsmName = true;
       BlockCtx.setTransparent();
-    }
-
-    // Set up a function declaration.
-    TheDecl = createAccessorFunc(Loc, ValueNamePattern,
-                                 GenericParams, Indices, ElementTy,
-                                 StaticLoc, Flags, Kind, addressorKind,
-                                 storage, this, AccessorKeywordLoc);
-    TheDecl->getAttrs() = Attributes;
-
-    // Parse the body, if any.
-    if (ExternalAsmName) {
       LastValidLoc = Loc;
-    } else {
-      Scope S(this, ScopeKind::FunctionBody);
-      for (auto PL : TheDecl->getParameterLists())
-        addParametersToScope(PL);
-
-      if (TheDecl->isGeneric())
-        for (auto *GP : TheDecl->getGenericParams()->getParams())
-          addToScope(GP);
-
-      // Establish the new context.
-      ParseFunctionBody CC(*this, TheDecl);
-
-      // Parse the body.
-      SmallVector<ASTNode, 16> Entries;
-      {
-        llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
-        if (!isDelayedParsingEnabled()) {
-          if (Context.Stats)
-            Context.Stats->getFrontendCounters().NumFunctionsParsed++;
-
-          parseBraceItems(Entries);
-        } else {
-          consumeGetSetBody(TheDecl, LBLoc);
-        }
-      }
-
-      SourceLoc RBLoc;
-      if (!isImplicitGet) {
-        parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
-                           LBLoc);
-      } else {
-        RBLoc = Tok.is(tok::r_brace) ? Tok.getLoc() : PreviousLoc;
-      }
-
-      if (!isDelayedParsingEnabled()) {
-        BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
-        TheDecl->setBody(Body);
-      }
-      LastValidLoc = RBLoc;
+      continue;
     }
 
-    Decls.push_back(TheDecl);
+    // Parse the body.
+    Scope S(this, ScopeKind::FunctionBody);
+    for (auto PL : accessor->getParameterLists())
+      addParametersToScope(PL);
+
+    if (accessor->isGeneric())
+      for (auto *GP : accessor->getGenericParams()->getParams())
+        addToScope(GP);
+
+    // Establish the new context.
+    ParseFunctionBody CC(*this, accessor);
+    for (auto PL : accessor->getParameterLists())
+      setLocalDiscriminatorToParamList(PL);
+
+    // Parse the body.
+    SmallVector<ASTNode, 16> Entries;
+    {
+      llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+      if (!isDelayedParsingEnabled()) {
+        if (Context.Stats)
+          Context.Stats->getFrontendCounters().NumFunctionsParsed++;
+
+        parseBraceItems(Entries);
+      } else {
+        consumeGetSetBody(accessor, LBLoc);
+      }
+    }
+
+    SourceLoc RBLoc;
+    if (!isImplicitGet) {
+      parseMatchingToken(tok::r_brace, RBLoc, diag::expected_rbrace_in_getset,
+                         LBLoc);
+    } else {
+      RBLoc = Tok.is(tok::r_brace) ? Tok.getLoc() : PreviousLoc;
+    }
+
+    if (!isDelayedParsingEnabled()) {
+      BraceStmt *Body = BraceStmt::create(Context, LBLoc, Entries, RBLoc);
+      accessor->setBody(Body);
+    }
+    LastValidLoc = RBLoc;
   }
 
   return false;
@@ -4317,14 +4272,13 @@ bool Parser::parseGetSet(ParseDeclOptions Flags,
                          ParameterList *Indices,
                          TypeLoc ElementTy, ParsedAccessors &accessors,
                          AbstractStorageDecl *storage,
-                         SourceLoc StaticLoc,
-                         SmallVectorImpl<Decl *> &Decls) {
+                         SourceLoc StaticLoc) {
   SyntaxParsingContext AccessorsCtx(SyntaxContext, SyntaxKind::AccessorBlock);
   accessors.LBLoc = consumeToken(tok::l_brace);
   SourceLoc LastValidLoc = accessors.LBLoc;
   bool Invalid = parseGetSetImpl(Flags, GenericParams, Indices, ElementTy,
                                  accessors, storage, LastValidLoc, StaticLoc,
-                                 accessors.LBLoc, Decls);
+                                 accessors.LBLoc);
 
   // Collect all explicit accessors to a list.
   AccessorsCtx.collectNodesInPlace(SyntaxKind::AccessorList);
@@ -4367,6 +4321,8 @@ void Parser::parseAccessorBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, AccessorParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   SmallVector<ASTNode, 16> Entries;
   parseBraceItems(Entries);
@@ -4384,27 +4340,27 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
   for (auto paramList : accessor->getParameterLists()) {
     for (auto param : *paramList) {
       if (param->getTypeLoc().isNull()) {
-        param->getTypeLoc().setType(P.Context.TheErrorType, true);
+        param->getTypeLoc().setInvalidType(P.Context);
       }
     }
   }
 
   // Fill in the result type.
   switch (kind) {
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("should never be seen here");
 
   // These have non-trivial returns, so fill in error.
-  case AccessorKind::IsGetter:
-  case AccessorKind::IsAddressor:
-  case AccessorKind::IsMutableAddressor:
-    accessor->getBodyResultTypeLoc().setType(P.Context.TheErrorType, true);
+  case AccessorKind::Get:
+  case AccessorKind::Address:
+  case AccessorKind::MutableAddress:
+    accessor->getBodyResultTypeLoc().setInvalidType(P.Context);
     return;
 
   // These return void.
-  case AccessorKind::IsSetter:
-  case AccessorKind::IsWillSet:
-  case AccessorKind::IsDidSet:
+  case AccessorKind::Set:
+  case AccessorKind::WillSet:
+  case AccessorKind::DidSet:
     return;
   }
   llvm_unreachable("bad kind");
@@ -4414,13 +4370,9 @@ static void fillInAccessorTypeErrors(Parser &P, FuncDecl *accessor,
 /// Fill in various slots with type errors.
 static void fillInAccessorTypeErrors(Parser &P,
                                      Parser::ParsedAccessors &accessors) {
-  fillInAccessorTypeErrors(P, accessors.Get, AccessorKind::IsGetter);
-  fillInAccessorTypeErrors(P, accessors.Set, AccessorKind::IsSetter);
-  fillInAccessorTypeErrors(P, accessors.Addressor, AccessorKind::IsAddressor);
-  fillInAccessorTypeErrors(P, accessors.MutableAddressor,
-                           AccessorKind::IsMutableAddressor);
-  fillInAccessorTypeErrors(P, accessors.WillSet, AccessorKind::IsWillSet);
-  fillInAccessorTypeErrors(P, accessors.DidSet, AccessorKind::IsDidSet);
+#define ACCESSOR(ID) \
+  fillInAccessorTypeErrors(P, accessors.ID, AccessorKind::ID);
+#include "swift/AST/AccessorKinds.def"
 }
 
 /// \brief Parse the brace-enclosed getter and setter for a variable.
@@ -4464,8 +4416,6 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   if (!PrimaryVar || !primaryVarIsWellFormed) {
     diagnose(pattern->getLoc(), diag::getset_nontrivial_pattern);
     Invalid = true;
-  } else {
-    setLocalDiscriminator(PrimaryVar);
   }
 
   TypeLoc TyLoc;
@@ -4504,19 +4454,19 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   // Parse getter and setter.
   ParsedAccessors accessors;
   if (parseGetSet(Flags, /*GenericParams=*/nullptr,
-                  /*Indices=*/nullptr, TyLoc, accessors, storage, StaticLoc,
-                  Decls))
+                  /*Indices=*/nullptr, TyLoc, accessors, storage, StaticLoc))
     Invalid = true;
 
   // If we have an invalid case, bail out now.
   if (!PrimaryVar) {
     fillInAccessorTypeErrors(*this, accessors);
+    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
     return nullptr;
   }
 
   if (!TyLoc.hasLocation()) {
-    if (accessors.Get || accessors.Set || accessors.Addressor ||
-        accessors.MutableAddressor) {
+    if (accessors.Get || accessors.Set || accessors.Address ||
+        accessors.MutableAddress) {
       SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
         pattern->getBoundName().getLength());
       diagnose(pattern->getLoc(), diag::computed_property_missing_type)
@@ -4530,7 +4480,7 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     Diag<> DiagID;
     if (accessors.WillSet || accessors.DidSet)
       DiagID = diag::let_cannot_be_observing_property;
-    else if (accessors.Addressor || accessors.MutableAddressor)
+    else if (accessors.Address || accessors.MutableAddress)
       DiagID = diag::let_cannot_be_addressed_property;
     else
       DiagID = diag::let_cannot_be_computed_property;
@@ -4555,6 +4505,26 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   return PrimaryVar;
 }
 
+/// Add the given accessor to the collection of parsed accessors.  If
+/// it's the first accessor of its kind, remember it for that purpose
+/// and return null; otherwise, return the existing accessor.
+AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
+  Accessors.push_back(accessor);
+
+  switch (accessor->getAccessorKind()) {
+#define ACCESSOR(ID)                      \
+  case AccessorKind::ID:                  \
+    if (ID) {                             \
+      return ID;                          \
+    } else {                              \
+      ID = accessor;                      \
+      return nullptr;                     \
+    }
+#include "swift/AST/AccessorKinds.def"
+  }
+  llvm_unreachable("bad accessor kind");
+}
+
 /// Record a bunch of parsed accessors into the given abstract storage decl.
 void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      bool invalid, ParseDeclOptions flags,
@@ -4562,6 +4532,20 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      const DeclAttributes &attrs,
                                      TypeLoc elementTy, ParameterList *indices,
                                      SmallVectorImpl<Decl *> &decls) {
+  auto storageKind = classify(P, storage, invalid, flags, staticLoc, attrs,
+                              elementTy, indices);
+
+  decls.append(Accessors.begin(), Accessors.end());
+
+  storage->setAccessors(storageKind, LBLoc, Accessors, RBLoc);
+}
+
+AbstractStorageDecl::StorageKindTy
+Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
+                                  bool invalid, ParseDeclOptions flags,
+                                  SourceLoc staticLoc,
+                                  const DeclAttributes &attrs,
+                                  TypeLoc elementTy, ParameterList *indices) {
   auto flagInvalidAccessor = [&](AccessorDecl *&func) {
     if (func) {
       func->setInvalid();
@@ -4570,12 +4554,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   auto ignoreInvalidAccessor = [&](AccessorDecl *&func) {
     if (func) {
       flagInvalidAccessor(func);
-
-      // Forget the decl being invalidated
-      auto PositionInDecls = std::find(decls.begin(), decls.end(), func);
-      assert(PositionInDecls != decls.end());
-      decls.erase(PositionInDecls);
-
       func = nullptr;
     }
   };
@@ -4586,40 +4564,38 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
 
   // Create an implicit accessor declaration.
   auto createImplicitAccessor =
-  [&](AccessorKind kind, AddressorKind addressorKind,
-      ParameterList *argList) -> AccessorDecl* {
+  [&](AccessorKind kind, AddressorKind addressorKind, ParameterList *argList) {
     auto accessor = createAccessorFunc(SourceLoc(), argList,
                                        genericParams, indices, elementTy,
                                        staticLoc, flags, kind, addressorKind,
                                        storage, &P, SourceLoc());
     accessor->setImplicit();
-    decls.push_back(accessor);
-    return accessor;
+    add(accessor);
   };
 
-  // 'address' is exclusive with 'get', and 'mutableAddress' is
-  // exclusive with 'set'.
-  if (Addressor || MutableAddressor) {
+  // 'address' is exclusive with 'get'/'read', and 'mutableAddress' is
+  // exclusive with 'set'/'modify'.
+  if (Address || MutableAddress) {
     // Require either a 'get' or an 'address' accessor if there's
     // a 'mutableAddress' accessor.  In principle, we could synthesize
     // 'address' from 'mutableAddress', but for now we'll enforce this.
-    if (!Addressor && !Get) {
-      P.diagnose(MutableAddressor->getLoc(),
+    if (!Address && !Get) {
+      P.diagnose(MutableAddress->getLoc(),
                  diag::mutableaddressor_without_address,
                  isa<SubscriptDecl>(storage));
 
-      Addressor = createImplicitAccessor(AccessorKind::IsAddressor,
-                                         AddressorKind::Unsafe,
-                                         nullptr);
+      createImplicitAccessor(AccessorKind::Address, AddressorKind::Unsafe,
+                             nullptr);
+    }
 
     // Don't allow both.
-    } else if (Addressor && Get) {
-      P.diagnose(Addressor->getLoc(), diag::addressor_with_getter,
-                 isa<SubscriptDecl>(storage));      
+    if (Address && Get) {
+      P.diagnose(Address->getLoc(), diag::addressor_with_getter,
+                 isa<SubscriptDecl>(storage));
       ignoreInvalidAccessor(Get);
     }
 
-    // Disallow mutableAddress+set.
+    // Disallow mutableAddress+{set,modify}.
     //
     // Currently we don't allow the address+set combination either.
     // In principle, this is an unnecessary restriction, and you can
@@ -4628,8 +4604,8 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     // important.  (For example, we don't make any effort to optimize
     // them for polymorphic accesses.)
     if (Set) {
-      if (MutableAddressor) {
-        P.diagnose(MutableAddressor->getLoc(), diag::mutableaddressor_with_setter,
+      if (MutableAddress) {
+        P.diagnose(MutableAddress->getLoc(), diag::mutableaddressor_with_setter,
                    isa<SubscriptDecl>(storage));
       } else {
         P.diagnose(Set->getLoc(), diag::addressor_with_setter,
@@ -4646,85 +4622,81 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
     ignoreInvalidAccessor(WillSet);
     ignoreInvalidAccessor(DidSet);
   }
-  
+
   // If this decl is invalid, mark any parsed accessors as invalid to avoid
   // tripping up later invariants.
   if (invalid) {
-    flagInvalidAccessor(Get);
-    flagInvalidAccessor(Set);
-    flagInvalidAccessor(Addressor);
-    flagInvalidAccessor(MutableAddressor);
-    flagInvalidAccessor(WillSet);
-    flagInvalidAccessor(DidSet);
+    for (auto accessor : Accessors) {
+      flagInvalidAccessor(accessor);
+    }
   }
 
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
-    if (Get || Set) {
-      P.diagnose(Get ? Get->getLoc() : Set->getLoc(),
-                 diag::observingproperty_with_getset, bool(DidSet), bool(Set));
+    if (Get) {
+      P.diagnose(Get->getLoc(), diag::observingproperty_with_getset,
+                 bool(DidSet), /*getter*/0);
       ignoreInvalidAccessor(Get);
+    }
+    if (Set) {
+      P.diagnose(Set->getLoc(), diag::observingproperty_with_getset,
+                 bool(DidSet), /*setter*/1);
       ignoreInvalidAccessor(Set);
     }
 
-    if (Addressor) {
-      if (!MutableAddressor) {
+    AbstractStorageDecl::StorageKindTy storageKind;
+    if (Address) {
+      if (!MutableAddress) {
         P.diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
                    diag::observingproperty_without_mutableaddress,
                    bool(DidSet));
-        MutableAddressor =
-          createImplicitAccessor(AccessorKind::IsMutableAddressor,
-                                 AddressorKind::Unsafe, nullptr);
+        createImplicitAccessor(AccessorKind::MutableAddress,
+                               AddressorKind::Unsafe, nullptr);
       }
 
-      storage->makeAddressedWithObservers(LBLoc, Addressor, MutableAddressor,
-                                          WillSet, DidSet, RBLoc);
+      storageKind = AbstractStorageDecl::AddressedWithObservers;
     } else if (attrs.hasAttribute<OverrideAttr>()) {
-      storage->makeInheritedWithObservers(LBLoc, WillSet, DidSet, RBLoc);
+      storageKind = AbstractStorageDecl::InheritedWithObservers;
     } else {
-      storage->makeStoredWithObservers(LBLoc, WillSet, DidSet, RBLoc);
+      storageKind = AbstractStorageDecl::StoredWithObservers;
     }
 
     // Observing properties will have getters and setters synthesized by sema.
     // Create their prototypes now.
-    Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                 AddressorKind::NotAddressor, nullptr);
+    createImplicitAccessor(AccessorKind::Get,
+                           AddressorKind::NotAddressor, nullptr);
 
     auto argFunc = (WillSet ? WillSet : DidSet);
     auto argLoc = argFunc->getParameterLists().back()->getStartLoc();
 
     auto argument = createSetterAccessorArgument(
-        argLoc, Identifier(), AccessorKind::IsSetter, P, elementTy);
+        argLoc, Identifier(), AccessorKind::Set, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
-    Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argList);
+    createImplicitAccessor(AccessorKind::Set,
+                           AddressorKind::NotAddressor, argList);
 
-    storage->setObservingAccessors(Get, Set, nullptr);
-    return;
+    return storageKind;
   }
 
   // If we have addressors, at this point mark it as addressed.
-  if (Addressor) {
+  if (Address) {
     assert(!Get && !Set);
-    storage->makeAddressed(LBLoc, Addressor, MutableAddressor, RBLoc);
-    return;
+    return AbstractStorageDecl::Addressed;
   }
 
   // If this is a get+mutableAddress property, synthesize an implicit
   // setter and record what we've got.
-  if (MutableAddressor) {
+  if (MutableAddress) {
     assert(Get && !Set);
     auto argument =
-        createSetterAccessorArgument(MutableAddressor->getLoc(), Identifier(),
-                                     AccessorKind::IsSetter, P, elementTy);
+        createSetterAccessorArgument(MutableAddress->getLoc(), Identifier(),
+                                     AccessorKind::Set, P, elementTy);
     auto argList = ParameterList::create(P.Context, argument);
-    Set = createImplicitAccessor(AccessorKind::IsSetter,
-                                 AddressorKind::NotAddressor, argList);
+    createImplicitAccessor(AccessorKind::Set,
+                           AddressorKind::NotAddressor, argList);
 
-    storage->makeComputedWithMutableAddress(LBLoc, Get, Set, nullptr,
-                                            MutableAddressor, RBLoc);
-    return;
-  } 
+    return AbstractStorageDecl::ComputedWithMutableAddress;
+  }
 
   // Otherwise, this must be a get/set property.  The set is optional,
   // but get is not.
@@ -4735,28 +4707,28 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
       if (!invalid) P.diagnose(LBLoc, diag::subscript_without_get);
       // Create a getter so we don't break downstream invariants by having a
       // setter without a getter.
-      Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                   AddressorKind::NotAddressor, nullptr);
+      createImplicitAccessor(AccessorKind::Get,
+                             AddressorKind::NotAddressor, nullptr);
     } else if (Set) {
       if (!invalid) P.diagnose(Set->getLoc(), diag::var_set_without_get);
       // Create a getter so we don't break downstream invariants by having a
       // setter without a getter.
-      Get = createImplicitAccessor(AccessorKind::IsGetter,
-                                   AddressorKind::NotAddressor, nullptr);
+      createImplicitAccessor(AccessorKind::Get,
+                             AddressorKind::NotAddressor, nullptr);
     }
   }
 
   if (Set || Get) {
     if (attrs.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
-      storage->addTrivialAccessors(Get, Set, nullptr);
+      return AbstractStorageDecl::StoredWithTrivialAccessors;
     else
       // Turn this into a computed variable.
-      storage->makeComputed(LBLoc, Get, Set, nullptr, RBLoc);
+      return AbstractStorageDecl::Computed;
   } else {
     // Otherwise this decl is invalid and the accessors have been rejected above.
     // Make sure to at least record the braces range in the AST.
-    storage->setInvalidBracesRange(SourceRange(LBLoc, RBLoc));
+    return AbstractStorageDecl::Stored;
   }
 }
 
@@ -4780,7 +4752,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass)
-        diagnose(Tok, diag::class_var_not_in_class)
+        diagnose(Tok, diag::class_var_not_in_class, 
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
     }
   }
@@ -4875,6 +4848,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+      setLocalDiscriminator(VD);
       Decls.push_back(VD);
     });
 
@@ -5165,7 +5139,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     } else if (Flags.contains(PD_InStruct) || Flags.contains(PD_InEnum) ||
                Flags.contains(PD_InProtocol)) {
       if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-        diagnose(Tok, diag::class_func_not_in_class)
+        diagnose(Tok, diag::class_func_not_in_class,
+                 Flags.contains(PD_InProtocol))
             .fixItReplace(StaticLoc, "static");
 
         StaticSpelling = StaticSpellingKind::KeywordStatic;
@@ -5320,6 +5295,8 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     
     // Establish the new context.
     ParseFunctionBody CC(*this, FD);
+    for (auto PL : FD->getParameterLists())
+      setLocalDiscriminatorToParamList(PL);
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
@@ -5390,6 +5367,8 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope S(this, FunctionParserState->takeScope());
   ParseFunctionBody CC(*this, AFD);
+  for (auto PL : AFD->getParameterLists())
+    setLocalDiscriminatorToParamList(PL);
 
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::func_decl_without_brace);
@@ -6105,7 +6084,7 @@ Parser::parseDeclSubscript(ParseDeclOptions Flags,
   } else {
     if (parseGetSet(Flags, GenericParams,
                     Indices.get(), ElementTy.get(),
-                    accessors, Subscript, /*StaticLoc=*/SourceLoc(), Decls))
+                    accessors, Subscript, /*StaticLoc=*/SourceLoc()))
       Status.setIsParseError();
   }
 
@@ -6252,6 +6231,8 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     } else {
       // Parse the body.
       ParseFunctionBody CC(*this, CD);
+      for (auto PL : CD->getParameterLists())
+        setLocalDiscriminatorToParamList(PL);
 
       if (!isDelayedParsingEnabled()) {
         if (Context.Stats)

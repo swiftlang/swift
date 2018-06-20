@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -210,7 +210,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
@@ -254,6 +253,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_debug_cycles)) {
+    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -275,6 +278,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -769,12 +775,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
              "unknown -g<kind> option");
 
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-      ArgStringList RenderedArgs;
-      for (auto A : Args)
-        A->render(Args, RenderedArgs);
-      CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                               RenderedArgs, SDKPath,
-                                               ResourceDir);
+      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+        ArgStringList RenderedArgs;
+        for (auto A : Args)
+          A->render(Args, RenderedArgs);
+        CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
+                                                 RenderedArgs, SDKPath,
+                                                 ResourceDir);
+      }
       // TODO: Should we support -fdebug-compilation-dir?
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);
@@ -809,7 +817,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
-  Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
+  Opts.DisableSwiftSpecificLLVMOptzns |=
+      Args.hasArg(OPT_disable_swift_specific_llvm_optzns);
   Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
@@ -955,9 +964,16 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     auto &Triple = LangOpts.Target;
     bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
 
+    llvm::SmallString<128> basePath;
+    if (auto DataDir = Args.getLastArg(OPT_api_diff_data_dir)) {
+      basePath = DataDir->getValue();
+    } else {
+      basePath = ResourcePath;
+      llvm::sys::path::append(basePath, "migrator");
+    }
+
     bool Supported = true;
-    llvm::SmallString<128> dataPath(ResourcePath);
-    llvm::sys::path::append(dataPath, "migrator");
+    llvm::SmallString<128> dataPath(basePath);
 
     if (Triple.isMacOSX())
       llvm::sys::path::append(dataPath,
@@ -974,8 +990,7 @@ static bool ParseMigratorArgs(MigratorOptions &Opts,
     else
       Supported = false;
     if (Supported) {
-      llvm::SmallString<128> authoredDataPath(ResourcePath);
-      llvm::sys::path::append(authoredDataPath, "migrator");
+      llvm::SmallString<128> authoredDataPath(basePath);
       llvm::sys::path::append(authoredDataPath,
                               getScriptFileName("overlay", isSwiftVersion3));
       // Add authored list first to take higher priority.

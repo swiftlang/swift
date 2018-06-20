@@ -414,3 +414,7 @@ func testHashableGenerics(
   let _: Int = insufficient.foo // expected-error{{cannot convert value of type 'Set<AnyHashable>' to specified type 'Int'}}
   let _: Int = extra.foo // expected-error{{cannot convert value of type 'Set<ElementConcrete>' to specified type 'Int'}}
 }
+
+func testGenericsWithTypedefBlocks(hba: HasBlockArray) {
+  let _: Int = hba.blockArray() // expected-error{{type '[@convention(block) () -> Void]'}}
+}

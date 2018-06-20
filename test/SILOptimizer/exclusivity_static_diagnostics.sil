@@ -554,29 +554,35 @@ bb0(%0 : $Storage, %1 : $Builtin.Word):
 
 // Conflicts involving noescape closures.
 
-sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
-bb0(%0 : $*Int):
-  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 3{{conflicting access is here}}
-  end_access %1 : $*Int
-  %2 = tuple ()
-  return %2 : $()
+sil hidden @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  end_access %2 : $*Int
+  %3 = tuple ()
+  return %3 : $()
 }
 
+// FIXME: We should prevent SILGen from emitting such a thing because the only
+// way to distinguish a capture from a regular @inout argument here is by the
+// @inout_aliasable convention. When we eliminate that convention we should make
+// sure that whenever we promote a closure from a @callee_guaranteed @noescape
+// function type to @conventio(thin), we insert access enforcement on the caller
+// side for captured variables.
+//
 // CHECK-LABEL: sil hidden @inProgressModifyModifyConflictWithCallToClosure
 sil hidden @inProgressModifyModifyConflictWithCallToClosure : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %2 = alloc_box ${ var Int }
   %3 = project_box %2 : ${ var Int }, 0
   store %0 to [trivial] %3 : $*Int
-  %4 = function_ref @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = function_ref @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
   %5 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
-  %8 = apply %4(%3) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %8 = apply %4(%5, %3) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
   end_access %5: $*Int
   destroy_value %2 : ${ var Int }
   %9 = tuple ()
   return %9 : $()
 }
-
 
 sil hidden @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
@@ -597,7 +603,7 @@ bb0(%0 : $Int):
   %6 = partial_apply %5(%3) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
   %conv = convert_escape_to_noescape %6 : $@callee_owned (Int) -> () to $@callee_owned @noescape (Int) -> ()
   %7 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
-  %8 = apply %4(%3, %conv) : $@convention(thin) (@inout Int, @noescape @owned @callee_owned (Int) -> ()) -> ()
+  %8 = apply %4(%7, %conv) : $@convention(thin) (@inout Int, @noescape @owned @callee_owned (Int) -> ()) -> ()
   end_access %7: $*Int
   destroy_value %2 : ${ var Int }
   %9 = tuple ()
@@ -616,7 +622,7 @@ bb0(%0 : $Int):
   %conv = convert_escape_to_noescape %6 : $@callee_guaranteed (Int) -> () to $@callee_guaranteed @noescape (Int) -> ()
   %bconv = begin_borrow %conv : $@callee_guaranteed @noescape (Int) -> ()
   %7 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
-  %8 = apply %4(%3, %bconv) : $@convention(thin) (@inout Int, @noescape @guaranteed @callee_guaranteed (Int) -> ()) -> ()
+  %8 = apply %4(%7, %bconv) : $@convention(thin) (@inout Int, @noescape @guaranteed @callee_guaranteed (Int) -> ()) -> ()
   end_access %7: $*Int
   end_borrow %bconv from %conv : $@callee_guaranteed @noescape (Int) -> (), $@callee_guaranteed @noescape (Int) -> ()
   destroy_value %2 : ${ var Int }
@@ -682,6 +688,14 @@ bb0(%0 : $Int):
 
 sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
 sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+sil hidden @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 2{{conflicting access is here}}
+  end_access %1 : $*Int
+  %2 = tuple ()
+  return %2 : $()
+}
 
 // CHECK-LABEL: sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage
 sil hidden @inProgressConflictWithNoEscapeClosureWithBlockStorage : $@convention(thin) (Int) -> () {
@@ -897,4 +911,82 @@ bb0( %0 : $Int):
   %6 = apply %5(%3, %4) : $@convention(thin) (@inout Int, @owned Optional<@convention(block) @noescape () -> ()>) -> ()
   %7 = tuple ()
   return %7 : $()
+}
+
+sil private @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil hidden @directPartialApplyTakingInout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %nepa = convert_escape_to_noescape %pa : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int  // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+sil private @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
+  %access = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil hidden @directPartialApplyChain : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %pa1(%0) : $@callee_guaranteed (@inout Int, Int) -> ()
+  %nepa = convert_escape_to_noescape %pa2 : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int   // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+sil private @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+bb0(%0 : $Int, %1 : $*Int):
+  %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil hidden @partialApplyArgChain : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesInoutAndNoEscapeClosure : $@convention(thin) (@inout Int, @noescape @owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %7 = partial_apply %6(%0) : $@callee_owned (Int) -> ()
+  %conv = convert_escape_to_noescape %7 : $@callee_owned () -> () to $@callee_owned @noescape () -> ()
+  %8 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %9 = apply %4(%8, %conv) : $@convention(thin) (@inout Int, @noescape @owned @callee_owned () -> ()) -> ()
+  end_access %8: $*Int
+  destroy_value %2 : ${ var Int }
+  %v = tuple ()
+  return %v : $()
 }

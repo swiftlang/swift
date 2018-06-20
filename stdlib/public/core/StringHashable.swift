@@ -107,7 +107,7 @@ extension _SmallUTF8String {
 }
 
 extension _StringGuts {
-  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
   internal func hash(into hasher: inout Hasher) {
     if _isSmall {
@@ -127,7 +127,7 @@ extension _StringGuts {
     _unmanagedUTF16View.hash(into: &hasher)
   }
 
-  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
   internal func hash(_ range: Range<Int>, into hasher: inout Hasher) {
     if _isSmall {
@@ -147,7 +147,7 @@ extension _StringGuts {
     _unmanagedUTF16View[range].hash(into: &hasher)
   }
 
-  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
   internal func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
     if _isSmall {
@@ -164,7 +164,7 @@ extension _StringGuts {
     return _unmanagedUTF16View._rawHashValue(seed: seed)
   }
 
-  @effects(releasenone) // FIXME: Is this valid in the opaque case?
+  @_effects(releasenone) // FIXME: Is this valid in the opaque case?
   @usableFromInline
   internal func _rawHashValue(
     _ range: Range<Int>,
@@ -186,6 +186,11 @@ extension _StringGuts {
 }
 
 extension String : Hashable {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _guts.hash(into: &hasher)
@@ -198,6 +203,11 @@ extension String : Hashable {
 }
 
 extension StringProtocol {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
     _wholeString._guts.hash(_encodedOffsetRange, into: &hasher)

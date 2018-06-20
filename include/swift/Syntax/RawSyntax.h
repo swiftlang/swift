@@ -232,18 +232,24 @@ class RawSyntax final
       /// memory.
       unsigned ManualMemory : 1;
     };
-    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
+    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 + 1 };
 
     // For "layout" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 32);
+      static_assert(NumRawSyntaxBits <= 32,
+                    "Only 32 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 32); // align to 32 bits
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
+      /// Number of bytes this node takes up spelled out in the source code
+      unsigned TextLength : 32;
     };
 
     // For "token" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 16);
+      static_assert(NumRawSyntaxBits <= 16,
+                    "Only 16 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 16); // align to 16 bits
       /// The kind of token this "token" node represents.
       unsigned TokenKind : 16;
       /// Number of leading  trivia pieces.
@@ -263,8 +269,10 @@ class RawSyntax final
     return isToken() ? Bits.NumLeadingTrivia + Bits.NumTrailingTrivia : 0;
   }
 
+  /// Constructor for creating layout nodes
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
             SourcePresence Presence, bool ManualMemory);
+  /// Constructor for creating token nodes
   RawSyntax(tok TokKind, OwnedString Text,
             ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia,
@@ -432,6 +440,22 @@ public:
   /// the position of the terms in the production of the Swift grammar.
   const RC<RawSyntax> &getChild(CursorIndex Index) const {
     return getLayout()[Index];
+  }
+
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() {
+    // For tokens the computation of the length is fast enough to justify the
+    // space for caching it. For layout nodes, we cache the length to avoid
+    // traversing the tree
+
+    // FIXME: Or would it be sensible to cache the size of token nodes as well?
+    if (isToken()) {
+      AbsolutePosition Pos;
+      accumulateAbsolutePosition(Pos);
+      return Pos.getOffset();
+    } else {
+      return Bits.TextLength;
+    }
   }
 
   /// @}

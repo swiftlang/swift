@@ -152,7 +152,9 @@ import SwiftShims
 /// share buffer.
 @_fixed_layout
 public struct Set<Element: Hashable> {
+  @usableFromInline
   internal typealias _VariantBuffer = _VariantSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeBuffer = _NativeSetBuffer<Element>
 
   @usableFromInline
@@ -484,7 +486,12 @@ extension Set: Equatable {
 }
 
 extension Set: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     // FIXME(ABI)#177: <rdar://problem/18915294> Cache Set<T> hashValue
     var hash = 0
@@ -1453,6 +1460,7 @@ extension Set {
 internal class _RawNativeSetStorage:
   _SwiftNativeNSSet, _NSSetCore
 {
+  @usableFromInline
   internal typealias RawStorage = _RawNativeSetStorage
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1564,7 +1572,9 @@ internal class _RawNativeSetStorage:
 @usableFromInline
 internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 
+  @usableFromInline
   internal typealias Key = Element
+  @usableFromInline
   internal typealias Value = Element
 
   deinit {
@@ -1604,7 +1614,9 @@ internal class _TypedNativeSetStorage<Element>: _RawNativeSetStorage {
 final internal class _HashableTypedNativeSetStorage<Element: Hashable>
   : _TypedNativeSetStorage<Element> {
 
+  @usableFromInline
   internal typealias FullContainer = Set<Element>
+  @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
 
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -1718,13 +1730,20 @@ final internal class _HashableTypedNativeSetStorage<Element: Hashable>
 @_fixed_layout
 internal struct _NativeSetBuffer<Element> {
 
+  @usableFromInline
   internal typealias RawStorage = _RawNativeSetStorage
+  @usableFromInline
   internal typealias TypedStorage = _TypedNativeSetStorage<Element>
+  @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias Index = _NativeSetIndex<Element>
 
+  @usableFromInline
   internal typealias Key = Element
+  @usableFromInline
   internal typealias Value = Element
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = Element
 
   /// See this comments on _RawNativeSetStorage and its subclasses to
@@ -1954,8 +1973,10 @@ internal struct _NativeSetBuffer<Element> {
 
 extension _NativeSetBuffer where Element: Hashable
 {
+  @usableFromInline
   internal typealias HashTypedStorage =
     _HashableTypedNativeSetStorage<Element>
+  @usableFromInline
   internal typealias SequenceElement = Element
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2209,7 +2230,9 @@ extension _NativeSetBuffer where Element: Hashable
 final internal class _NativeSetNSEnumerator<Element>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
+  @usableFromInline
   internal typealias Buffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias Index = _NativeSetIndex<Element>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2291,12 +2314,18 @@ final internal class _NativeSetNSEnumerator<Element>
 final internal class _SwiftDeferredNSSet<Element: Hashable>
   : _SwiftNativeNSSet, _NSSetCore {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias BridgedBuffer = _NativeSetBuffer<AnyObject>
+  @usableFromInline
   internal typealias NativeIndex = _NativeSetIndex<Element>
+  @usableFromInline
   internal typealias BridgedIndex = _NativeSetIndex<AnyObject>
 
+  @usableFromInline
   internal typealias Key = Element
+  @usableFromInline
   internal typealias Value = Element
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2517,11 +2546,16 @@ internal struct _CocoaSetBuffer: _HashBuffer {
     self.cocoaSet = cocoaSet
   }
 
+  @usableFromInline
   internal typealias Index = _CocoaSetIndex
+  @usableFromInline
   internal typealias SequenceElement = AnyObject
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = AnyObject
 
+  @usableFromInline
   internal typealias Key = AnyObject
+  @usableFromInline
   internal typealias Value = AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2640,16 +2674,24 @@ internal struct _CocoaSetBuffer: _HashBuffer {
 @_frozen
 internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias NativeIndex = _NativeSetIndex<Element>
 #if _runtime(_ObjC)
+  @usableFromInline
   internal typealias CocoaBuffer = _CocoaSetBuffer
 #endif
+  @usableFromInline
   internal typealias SequenceElement = Element
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = Element
+  @usableFromInline
   internal typealias SelfType = _VariantSetBuffer
 
+  @usableFromInline
   internal typealias Key = Element
+  @usableFromInline
   internal typealias Value = Element
 
   case native(NativeBuffer)
@@ -2866,6 +2908,7 @@ internal enum _VariantSetBuffer<Element: Hashable>: _HashBuffer {
   // _HashBuffer conformance
   //
 
+  @usableFromInline
   internal typealias Index = SetIndex<Element>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3519,9 +3562,12 @@ extension _CocoaSetIndex {
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum SetIndexRepresentation<Element: Hashable> {
+  @usableFromInline
   typealias _Index = SetIndex<Element>
+  @usableFromInline
   typealias _NativeIndex = _Index._NativeIndex
 #if _runtime(_ObjC)
+  @usableFromInline
   typealias _CocoaIndex = _Index._CocoaIndex
 #endif
 
@@ -3542,12 +3588,16 @@ extension Set {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSSet in terms of Cocoa enumeration facilities.
 
+    @usableFromInline
     internal typealias _NativeIndex = _NativeSetIndex<Element>
 #if _runtime(_ObjC)
+    @usableFromInline
     internal typealias _CocoaIndex = _CocoaSetIndex
 #endif
 
+    @usableFromInline
     internal typealias Key = Element
+    @usableFromInline
     internal typealias Value = Element
 
     @inlinable // FIXME(sil-serialize-all)
@@ -3648,7 +3698,12 @@ extension Set.Index {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
@@ -3674,6 +3729,7 @@ extension Set.Index {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaSetIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = AnyObject
 
   // Cocoa Set iterator has to be a class, otherwise we cannot
@@ -3759,9 +3815,11 @@ final internal class _CocoaSetIterator: IteratorProtocol {
 @usableFromInline
 @_frozen // FIXME(sil-serialize-all)
 internal enum SetIteratorRepresentation<Element: Hashable> {
+  @usableFromInline
   internal typealias _Iterator = SetIterator<Element>
-  internal typealias _NativeBuffer =
-    _NativeSetBuffer<Element>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native buffer, we keep two indices to keep track of the iteration
@@ -3790,8 +3848,9 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeBuffer =
-    _NativeSetBuffer<Element>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeSetBuffer<Element>
+  @usableFromInline
   internal typealias _NativeIndex = _NativeSetIndex<Element>
 
   @usableFromInline

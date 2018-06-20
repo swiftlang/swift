@@ -121,6 +121,22 @@ static void deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl) {
   toRawDecl->setBody(body);
 }
 
+static void maybeMarkAsInlinable(DerivedConformance &derived,
+                                 AbstractFunctionDecl *afd) {
+  ASTContext &C = derived.TC.Context;
+  auto parentDC = derived.getConformanceContext();
+  if (parentDC->getParentModule()->getResilienceStrategy() !=
+      ResilienceStrategy::Resilient) {
+    AccessScope access =
+        afd->getFormalAccessScope(nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+    if (auto *attr = afd->getAttrs().getAttribute<UsableFromInlineAttr>())
+      attr->setInvalid();
+    if (access.isPublic())
+      afd->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
+  }
+}
+
 static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
   ASTContext &C = derived.TC.Context;
 
@@ -143,14 +159,7 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
 
   // If the containing module is not resilient, make sure clients can get at
   // the raw value without function call overhead.
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
-    AccessScope access =
-        enumDecl->getFormalAccessScope(nullptr,
-                                       /*treatUsableFromInlineAsPublic*/true);
-    if (access.isPublic())
-      getterDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
-  }
+  maybeMarkAsInlinable(derived, getterDecl);
 
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
@@ -350,14 +359,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 
   // If the containing module is not resilient, make sure clients can construct
   // an instance without function call overhead.
-  if (parentDC->getParentModule()->getResilienceStrategy() !=
-      ResilienceStrategy::Resilient) {
-    AccessScope access =
-        enumDecl->getFormalAccessScope(nullptr,
-                                       /*treatUsableFromInlineAsPublic*/true);
-    if (access.isPublic())
-      initDecl->getAttrs().add(new (C) InlinableAttr(/*implicit*/false));
-  }
+  maybeMarkAsInlinable(derived, initDecl);
 
   C.addSynthesizedDecl(initDecl);
 

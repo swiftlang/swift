@@ -335,8 +335,9 @@ class ConformanceLookupTable {
                    ConformanceSource source);
 
   /// Add the protocols from the given list.
-  void addProtocols(ArrayRef<TypeLoc> inherited,
-                    ConformanceSource source, LazyResolver *resolver);
+  void addInheritedProtocols(
+                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                         ConformanceSource source);
 
   /// Expand the implied conformances for the given DeclContext.
   void expandImpliedConformances(NominalTypeDecl *nominal, DeclContext *dc,

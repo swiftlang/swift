@@ -83,10 +83,32 @@ static llvm::Constant *emitConstantValue(IRGenModule &IGM, SILValue operand) {
   } else if (auto *SLI = dyn_cast<StringLiteralInst>(operand)) {
     return emitAddrOfConstantString(IGM, SLI);
   } else if (auto *BI = dyn_cast<BuiltinInst>(operand)) {
-    assert(IGM.getSILModule().getBuiltinInfo(BI->getName()).ID ==
-           BuiltinValueKind::PtrToInt);
-    llvm::Constant *ptr = emitConstantValue(IGM, BI->getArguments()[0]);
-    return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
+    switch (IGM.getSILModule().getBuiltinInfo(BI->getName()).ID) {
+      case BuiltinValueKind::PtrToInt: {
+        llvm::Constant *ptr = emitConstantValue(IGM, BI->getArguments()[0]);
+        return llvm::ConstantExpr::getPtrToInt(ptr, IGM.IntPtrTy);
+      }
+      case BuiltinValueKind::ZExtOrBitCast: {
+        llvm::Constant *value = emitConstantValue(IGM, BI->getArguments()[0]);
+        return llvm::ConstantExpr::getZExtOrBitCast(value, IGM.getStorageType(BI->getType()));
+      }
+      case BuiltinValueKind::StringObjectOr: {
+        llvm::Constant *lhs = emitConstantValue(IGM, BI->getArguments()[0]);
+        llvm::Constant *rhs = emitConstantValue(IGM, BI->getArguments()[1]);
+        // It is a requirement that the or'd bits in the left argument are
+        // initialized with 0. Therefore the or-operation is equivalent to an
+        // addition. We need an addition to generate a valid relocation.
+        return llvm::ConstantExpr::getAdd(lhs, rhs);
+      }
+      default:
+        llvm_unreachable("unsupported builtin for constant expression");
+    }
+  } else if (auto *VTBI = dyn_cast<ValueToBridgeObjectInst>(operand)) {
+    auto *SI = cast<StructInst>(VTBI->getOperand());
+    assert(SI->getElements().size() == 1);
+    auto *val = emitConstantValue(IGM, SI->getElements()[0]);
+    auto *sTy = IGM.getTypeInfo(VTBI->getType()).getStorageType();
+    return llvm::ConstantExpr::getIntToPtr(val, sTy);
   } else {
     llvm_unreachable("Unsupported SILInstruction in static initializer!");
   }

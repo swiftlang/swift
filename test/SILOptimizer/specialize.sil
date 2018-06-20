@@ -630,9 +630,7 @@ bb0:
   %6 = function_ref @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
   %7 = partial_apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
   %8 = apply [nothrow] %1<Never>(%2, %7) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-  dealloc_stack %2 : $*Never
-  %12 = tuple ()
-  return %12 : $()
+  unreachable
 } // end sil function 'testGenericClosureSpecialization'
 
 // Test a specialization of a self-recursive generic closure.
@@ -644,7 +642,7 @@ bb0:
 // CHECK-LABEL: sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> ()
 // Refer to the specialized version of the function
 // CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$S27selfReferringGenericClosurexBi64_Bi64_Bi64_Rs_r0_lIetnyy_Tp5
-// CHECK: partial_apply [[SPECIALIZED_FN]]<R>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
+// CHECK: partial_apply [[SPECIALIZED_FN]]<R, Builtin.Int64>({{.*}}) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 == Builtin.Int64> (@in_guaranteed τ_0_0, Builtin.Int64, Builtin.Int64) -> ()
 sil @selfReferringGenericClosure : $@convention(thin) <R, S> (@in_guaranteed R, @in_guaranteed S, Builtin.Int64) -> () {
 bb0(%0 : $*R, %1 : $*S, %2 : $Builtin.Int64):
   %4 = integer_literal $Builtin.Int64, 100

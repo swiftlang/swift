@@ -1043,16 +1043,15 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // ExpressibleByIntegerLiteral.
   if (!tc.conformsToProtocol(intType,
                              C.getProtocol(KnownProtocolKind::Hashable),
-                             derived.Nominal, None)) {
-    tc.diagnose(derived.Nominal->getLoc(),
-                diag::broken_int_hashable_conformance);
+                             parentDC, None)) {
+    tc.diagnose(derived.ConformanceDecl, diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, derived.Nominal, None)) {
-    tc.diagnose(derived.Nominal->getLoc(),
+  if (!tc.conformsToProtocol(intType, intLiteralProto, parentDC, None)) {
+    tc.diagnose(derived.ConformanceDecl,
                 diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
@@ -1071,7 +1070,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   AccessorDecl *getterDecl = AccessorDecl::create(C,
       /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::IsGetter, AddressorKind::NotAddressor, hashValueDecl,
+      AccessorKind::Get, AddressorKind::NotAddressor, hashValueDecl,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params,
@@ -1102,8 +1101,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setValidationStarted();
-  hashValueDecl->makeComputed(SourceLoc(), getterDecl,
-                              nullptr, nullptr, SourceLoc());
+  hashValueDecl->setAccessors(VarDecl::Computed, SourceLoc(), {getterDecl},
+                              SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 

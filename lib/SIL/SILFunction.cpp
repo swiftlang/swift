@@ -482,18 +482,6 @@ void SILFunction::convertToDeclaration() {
   getBlocks().clear();
 }
 
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
-
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
-
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
-}
-
 SubstitutionMap SILFunction::getForwardingSubstitutionMap() {
   if (ForwardingSubMap)
     return ForwardingSubMap;

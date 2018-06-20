@@ -244,6 +244,10 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateAutolinkingArgs(diags, args);
+
+  if (args.hasArg(options::OPT_emit_public_type_metadata_accessors))
+    diags.diagnose(SourceLoc(),
+                   diag::warn_emit_public_type_metadata_accessors_deprecated);
 }
 
 std::unique_ptr<ToolChain>
@@ -279,6 +283,28 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     break;
   }
   return nullptr;
+}
+
+std::unique_ptr<sys::TaskQueue> Driver::buildTaskQueue(const Compilation &C) {
+  const auto &ArgList = C.getArgs();
+  unsigned NumberOfParallelCommands = 1;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_j)) {
+    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+      return nullptr;
+    }
+  }
+
+  const bool DriverSkipExecution =
+    ArgList.hasArg(options::OPT_driver_skip_execution,
+                   options::OPT_driver_print_jobs);
+  if (DriverSkipExecution) {
+    return llvm::make_unique<sys::DummyTaskQueue>(NumberOfParallelCommands);
+  } else {
+    return llvm::make_unique<sys::TaskQueue>(NumberOfParallelCommands,
+                                             C.getStatsReporter());
+  }
 }
 
 static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
@@ -617,6 +643,35 @@ static bool getFilelistThreshold(DerivedArgList &Args, size_t &FilelistThreshold
   return false;
 }
 
+static unsigned
+getDriverBatchSeed(llvm::opt::InputArgList &ArgList,
+                   DiagnosticEngine &Diags) {
+  unsigned DriverBatchSeed = 0;
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_seed)) {
+    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    }
+  }
+  return DriverBatchSeed;
+}
+
+static Optional<unsigned>
+getDriverBatchCount(llvm::opt::InputArgList &ArgList,
+                    DiagnosticEngine &Diags)
+{
+  if (const Arg *A = ArgList.getLastArg(options::OPT_driver_batch_count)) {
+    unsigned Count = 0;
+    if (StringRef(A->getValue()).getAsInteger(10, Count)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(ArgList), A->getValue());
+    } else {
+      return Count;
+    }
+  }
+  return None;
+}
+
 std::unique_ptr<Compilation>
 Driver::buildCompilation(const ToolChain &TC,
                          std::unique_ptr<llvm::opt::InputArgList> ArgList) {
@@ -633,20 +688,13 @@ Driver::buildCompilation(const ToolChain &TC,
   bool DriverPrintDerivedOutputFileMap =
     ArgList->hasArg(options::OPT_driver_print_derived_output_file_map);
   DriverPrintBindings = ArgList->hasArg(options::OPT_driver_print_bindings);
-  bool DriverSkipExecution =
-    ArgList->hasArg(options::OPT_driver_skip_execution,
-                    options::OPT_driver_print_jobs);
   bool ShowIncrementalBuildDecisions =
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
-  if (const Arg *A = ArgList->getLastArg(options::OPT_driver_batch_seed)) {
-    if (StringRef(A->getValue()).getAsInteger(10, DriverBatchSeed)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-    }
-  }
-  DriverForceOneBatchRepartition =
+  unsigned DriverBatchSeed = getDriverBatchSeed(*ArgList, Diags);
+  Optional<unsigned> DriverBatchCount = getDriverBatchCount(*ArgList, Diags);
+  bool DriverForceOneBatchRepartition =
       ArgList->hasArg(options::OPT_driver_force_one_batch_repartition);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
@@ -667,8 +715,6 @@ Driver::buildCompilation(const ToolChain &TC,
   }
 
   bool SaveTemps = ArgList->hasArg(options::OPT_save_temps);
-  bool ContinueBuildingAfterErrors =
-    ArgList->hasArg(options::OPT_continue_building_after_errors);
   bool ShowDriverTimeCompilation =
     ArgList->hasArg(options::OPT_driver_time_compilation);
 
@@ -702,6 +748,21 @@ Driver::buildCompilation(const ToolChain &TC,
   bool BatchMode = false;
   OI.CompilerMode = computeCompilerMode(*TranslatedArgList, Inputs, BatchMode);
   buildOutputInfo(TC, *TranslatedArgList, BatchMode, Inputs, OI);
+
+  // Note: Batch mode handling of serialized diagnostics requires that all
+  // batches get to run, in order to make sure that all diagnostics emitted
+  // during the compilation end up in at least one serialized diagnostic file.
+  // Therefore, treat batch mode as implying -continue-building-after-errors.
+  // (This behavior could be limited to only when serialized diagnostics are
+  // being emitted, but this seems more consistent and less surprising for
+  // users.)
+  // FIXME: We don't really need (or want) a full ContinueBuildingAfterErrors.
+  // If we fail to precompile a bridging header, for example, there's no need
+  // to go on to compilation of source files, and if compilation of source files
+  // fails, we shouldn't try to link. Instead, we'd want to let all jobs finish
+  // but not schedule any new ones.
+  const bool ContinueBuildingAfterErrors =
+      BatchMode || ArgList->hasArg(options::OPT_continue_building_after_errors);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -769,15 +830,6 @@ Driver::buildCompilation(const ToolChain &TC,
     }
   }
 
-  unsigned NumberOfParallelCommands = 1;
-  if (const Arg *A = ArgList->getLastArg(options::OPT_j)) {
-    if (StringRef(A->getValue()).getAsInteger(10, NumberOfParallelCommands)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(*ArgList), A->getValue());
-      return nullptr;
-    }
-  }
-
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
     return nullptr;
@@ -807,12 +859,11 @@ Driver::buildCompilation(const ToolChain &TC,
                       StartTime,
                       LastBuildTime,
                       DriverFilelistThreshold,
-                      NumberOfParallelCommands,
                       Incremental,
                       BatchMode,
                       DriverBatchSeed,
+                      DriverBatchCount,
                       DriverForceOneBatchRepartition,
-                      DriverSkipExecution,
                       SaveTemps,
                       ShowDriverTimeCompilation,
                       std::move(StatsReporter)));
@@ -1173,14 +1224,14 @@ static bool isSDKTooOld(StringRef sdkPath, clang::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 13), "OSX");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(10, 14), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, clang::VersionTuple(11, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(12, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, clang::VersionTuple(4, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, clang::VersionTuple(5, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1409,10 +1460,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
           sys::TaskQueue queue;
           queue.addTask(xcrunPath->c_str(), args);
           queue.execute(nullptr,
-                        [&OI](sys::ProcessId PID,
-                              int returnCode,
-                              StringRef output,
-                              StringRef errors,
+                        [&OI](sys::ProcessId PID, int returnCode,
+                              StringRef output, StringRef errors,
+                              sys::TaskProcessInformation ProcInfo,
                               void *unused) -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();

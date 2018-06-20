@@ -85,8 +85,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   // FIXME: Handle 'self' along with the other arguments.
   auto *paramList = ctor->getParameterList(1);
   auto *selfDecl = ctor->getImplicitSelfDecl();
-  auto selfTyCan = selfDecl->getType()->getInOutObjectType();
-  auto selfIfaceTyCan = selfDecl->getInterfaceType()->getInOutObjectType();
+  auto selfTyCan = selfDecl->getType();
+  auto selfIfaceTyCan = selfDecl->getInterfaceType();
   SILType selfTy = SGF.getLoweredType(selfTyCan);
 
   // Emit the indirect return argument, if any.
@@ -199,7 +199,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 
   // Get the 'self' decl and type.
   VarDecl *selfDecl = ctor->getImplicitSelfDecl();
-  auto &lowering = getTypeLowering(selfDecl->getType()->getInOutObjectType());
+  auto &lowering = getTypeLowering(selfDecl->getType());
   SILType selfTy = lowering.getLoweredType();
   (void)selfTy;
   assert(!selfTy.getClassOrBoundGenericClass()
@@ -516,23 +516,22 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
 
   // Call the initializer.
   SubstitutionMap subMap;
-  SmallVector<Substitution, 4> subs;
   if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
     auto *genericSig = genericEnv->getGenericSignature();
-    subMap = genericSig->getSubstitutionMap(
+    subMap = SubstitutionMap::get(
+      genericSig,
       [&](SubstitutableType *t) -> Type {
         return genericEnv->mapTypeIntoContext(
           t->castTo<GenericTypeParamType>());
       },
       MakeAbstractConformanceForGenericType());
-    genericSig->getSubstitutions(subMap, subs);
   }
 
   std::tie(initVal, initTy)
     = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
-                                                  initTy, subs, args);
+                                                  initTy, subMap, args);
 
   emitProfilerIncrement(ctor->getBody());
 
@@ -783,8 +782,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
 static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
-  CanType selfFormalType = selfDecl->getType()
-      ->getInOutObjectType()->getCanonicalType();
+  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   if (selfFormalType->hasReferenceSemantics())
     return SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
                                  AccessSemantics::DirectToStorage,
@@ -800,8 +798,7 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
 static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                       VarDecl *selfDecl,
                                       VarDecl *property) {
-  CanType selfFormalType = selfDecl->getType()
-    ->getInOutObjectType()->getCanonicalType();
+  CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   auto self = emitSelfForMemberInit(SGF, loc, selfDecl);
   return SGF.emitPropertyLValue(loc, self, selfFormalType, property,
                                 LValueOptions(), AccessKind::Write,
@@ -953,7 +950,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // signature of the type, with replacement archetypes from the
         // constructor's context (which might be in an extension of
         // the type, which adds additional generic requirements).
-        SubstitutionList subs;
+        SubstitutionMap subs;
         auto *genericEnv = dc->getGenericEnvironmentOfContext();
         auto typeGenericSig = nominal->getGenericSignatureOfContext();
 
@@ -961,23 +958,16 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           // Generate a set of substitutions for the initialization function,
           // whose generic signature is that of the type context, and whose
           // replacement types are the archetypes of the initializer itself.
-          auto subMap = typeGenericSig->getSubstitutionMap(
-                       [&](SubstitutableType *type) {
-                         if (auto gp = type->getAs<GenericTypeParamType>()) {
-                           return genericEnv->mapTypeIntoContext(gp);
-                         }
+          subs = SubstitutionMap::get(
+            typeGenericSig,
+            [&](SubstitutableType *type) {
+              if (auto gp = type->getAs<GenericTypeParamType>()) {
+                return genericEnv->mapTypeIntoContext(gp);
+              }
 
-                         return Type(type);
-                       },
-                       [](CanType dependentType,
-                           Type conformingReplacementType,
-                           ProtocolType *conformedProtocol) {
-                         return ProtocolConformanceRef(
-                                  conformedProtocol->getDecl());
-                       });
-          SmallVector<Substitution, 4> subsVec;
-          typeGenericSig->getSubstitutions(subMap, subsVec);
-          subs = SGM.getASTContext().AllocateCopy(subsVec);
+              return Type(type);
+            },
+            MakeAbstractConformanceForGenericType());
         }
 
         // Get the type of the initialization result, in terms

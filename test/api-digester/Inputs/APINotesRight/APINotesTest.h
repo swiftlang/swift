@@ -26,3 +26,7 @@ typedef NSString * AnimalAttributeName NS_STRING_ENUM;
 + (nonnull AnimalStatusDescriptor *)animalStatusSingleOptionalAttribute:(nullable AnimalAttributeName)attributes;
 + (nonnull AnimalStatusDescriptor *)animalStatusSingleAttribute:(nonnull AnimalAttributeName)attributes;
 @end
+
+extern AnimalAttributeName globalAttributeName;
+
+typedef NSString * CatAttributeName NS_STRING_ENUM;

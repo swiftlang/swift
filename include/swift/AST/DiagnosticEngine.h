@@ -760,7 +760,7 @@ namespace swift {
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
     bool finishProcessing();
-    
+
     /// \brief Format the given diagnostic text and place the result in the given
     /// buffer.
     static void formatDiagnosticText(
@@ -781,6 +781,9 @@ namespace swift {
     /// \brief Send all tentative diagnostics to all diagnostic consumers and
     /// delete them.
     void emitTentativeDiagnostics();
+
+  public:
+    static const char *diagnosticStringFor(const DiagID id);
   };
 
   /// \brief Represents a diagnostic transaction. While a transaction is

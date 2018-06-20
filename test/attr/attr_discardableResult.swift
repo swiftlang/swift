@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // ---------------------------------------------------------------------------
 // Mark function's return value as discardable and silence warning
@@ -185,3 +185,12 @@ func testOptionalChaining(c1: C1?, s1: S1?) {
   return closure
 }
 SR2948({}) // okay
+
+class SR7562_A {
+    @discardableResult required init(input: Int) { }
+}
+
+class SR7562_B : SR7562_A {}
+
+SR7562_A(input: 10) // okay
+SR7562_B(input: 10) // okay

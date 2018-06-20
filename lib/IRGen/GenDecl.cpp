@@ -79,6 +79,8 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
   // is not used by the program itself.
   if (!Opts.shouldOptimize())
     return false;
+  if (Opts.UseJIT)
+    return false;
 
   switch (Nominal->getKind()) {
     case DeclKind::Enum:
@@ -1065,7 +1067,6 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
     IGM->emitSILGlobalVariable(&v);
   }
-  PrimaryIGM->emitCoverageMapping();
   
   // Emit SIL functions.
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
@@ -1099,6 +1100,9 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
     IGM->emitSILProperty(&prop);
   }
   
+  // Emit code coverage mapping data.
+  PrimaryIGM->emitCoverageMapping();
+
   for (auto Iter : *this) {
     IRGenModule *IGM = Iter.second;
     IGM->finishEmitAfterTopLevel();
@@ -1107,17 +1111,25 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
 void IRGenModule::finishEmitAfterTopLevel() {
   // Emit the implicit import of the swift standard library.
+  // FIXME: We'd get the exact set of implicit imports if we went through the
+  // SourceFile's getImportedModules instead, but then we'd lose location info
+  // for the explicit imports.
   if (DebugInfo) {
-    std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
-      { Context.StdlibModuleName, swift::SourceLoc() }
-    };
+    if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
+      if (TheStdlib != getSwiftModule()) {
+        std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+          { Context.StdlibModuleName, swift::SourceLoc() }
+        };
 
-    auto Imp = ImportDecl::create(Context,
-                                  getSwiftModule(),
-                                  SourceLoc(),
-                                  ImportKind::Module, SourceLoc(),
-                                  AccessPath);
-    DebugInfo->emitImport(Imp);
+        auto Imp = ImportDecl::create(Context,
+                                      getSwiftModule(),
+                                      SourceLoc(),
+                                      ImportKind::Module, SourceLoc(),
+                                      AccessPath);
+        Imp->setModule(TheStdlib);
+        DebugInfo->emitImport(Imp);
+      }
+    }
   }
 }
 
@@ -1846,11 +1858,21 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        ModuleDecl *swiftModule, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
+  // FIXME: For anything in the standard library, we assume is locally defined.
+  // The only two ways imported interfaces are currently created is via a shims
+  // interface where the ClangImporter will correctly give us the proper DLL
+  // storage for the declaration.  Otherwise, it is from a `@_silgen_name`
+  // attributed declaration, which we explicitly handle elsewhere.  So, in the
+  // case of a standard library build, just assume everything is locally
+  // defined.  Ideally, we would integrate the linkage calculation properly to
+  // avoid this special casing.
+  ForDefinition_t isStdlibOrDefinition =
+      ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(linkInfo, entity.getLinkage(isDefinition), isDefinition,
-                   entity.isWeakImported(swiftModule));
+      getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
+                   isDefinition, entity.isWeakImported(swiftModule));
   result.ForDefinition = isDefinition;
   return result;
 }
@@ -2208,7 +2230,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 }
 
 /// Return True if the function \p f is a 'readonly' function. Checking
-/// for the SIL @effects(readonly) attribute is not enough because this
+/// for the SIL @_effects(readonly) attribute is not enough because this
 /// definition does not match the definition of the LLVM readonly function
 /// attribute. In this function we do the actual check.
 static bool isReadOnlyFunction(SILFunction *f) {
@@ -2221,11 +2243,11 @@ static bool isReadOnlyFunction(SILFunction *f) {
   auto Eff = f->getEffectsKind();
 
   // Swift's readonly does not automatically match LLVM's readonly.
-  // Swift SIL optimizer relies on @effects(readonly) to remove e.g.
+  // Swift SIL optimizer relies on @_effects(readonly) to remove e.g.
   // dead code remaining from initializers of strings or dictionaries
   // of variables that are not used. But those initializers are often
   // not really readonly in terms of LLVM IR. For example, the
-  // Dictionary.init() is marked as @effects(readonly) in Swift, but
+  // Dictionary.init() is marked as @_effects(readonly) in Swift, but
   // it does invoke reference-counting operations.
   if (Eff == EffectsKind::ReadOnly || Eff == EffectsKind::ReadNone) {
     // TODO: Analyze the body of function f and return true if it is
@@ -2328,6 +2350,14 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
   }
   fn = createFunction(*this, link, signature, insertBefore,
                       f->getOptimizationMode());
+
+  // If `hasCReferences` is true, then the function is either marked with
+  // @_silgen_name OR @_cdecl.  If it is the latter, it must have a definition
+  // associated with it.  The combination of the two allows us to identify the
+  // @_silgen_name functions.  These are locally defined function thunks used in
+  // the standard library.  Do not give them DLLImport DLL Storage.
+  if (useDllStorage() && f->hasCReferences() && !forDefinition)
+    fn->setDLLStorageClass(llvm::GlobalValue::DefaultStorageClass);
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
@@ -2571,12 +2601,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // binary, then we ought to be able to directly relative-reference the
   // symbol. However, some platforms don't have the necessary relocations to
   // represent a relative reference to an undefined symbol, so conservatively
-  // produce an indirect reference in this case. Also, some JIT modes
-  // incrementally add new definitions that refer back to existing ones
+  // produce an indirect reference in this case. Also, the integrated REPL
+  // incrementally adds new definitions that refer back to existing ones
   // relatively, so always use indirect references in this situation.
   auto entry = GlobalVars[entity];
   if (forceIndirectness == ConstantReference::Direct &&
-      !IRGen.Opts.UseJIT &&
+      !IRGen.Opts.IntegratedREPL &&
       (!entity.isAvailableExternally(*this) || isDefinition(entry))) {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its
@@ -2747,10 +2777,10 @@ llvm::Constant *IRGenModule::emitSwiftProtocols() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_protos, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_protos, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_protocols";
+    sectionName = "swift5_protocols";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prt$B";
@@ -2819,7 +2849,8 @@ namespace {
       llvm::Constant *witnessTableVar;
 
       if (Conformance->getConditionalRequirements().empty()) {
-        if (!isDependentConformance(Conformance)) {
+        if (!isDependentConformance(Conformance) &&
+            !Conformance->isSynthesizedNonUnique()) {
           Flags = Flags.withConformanceKind(ConformanceKind::WitnessTable);
           witnessTableVar = IGM.getAddrOfWitnessTable(Conformance);
         } else {
@@ -2936,10 +2967,10 @@ llvm::Constant *IRGenModule::emitProtocolConformances() {
   StringRef sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_proto, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_proto, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_protocol_conformances";
+    sectionName = "swift5_protocol_conformances";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5prtc$B";
@@ -2963,10 +2994,10 @@ llvm::Constant *IRGenModule::emitTypeMetadataRecords() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_types, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_types, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_type_metadata";
+    sectionName = "swift5_type_metadata";
     break;
   case llvm::Triple::COFF:
     sectionName = ".sw5tymd$B";
@@ -3030,13 +3061,13 @@ llvm::Constant *IRGenModule::emitFieldDescriptors() {
   std::string sectionName;
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO:
-    sectionName = "__TEXT, __swift4_fieldmd, regular, no_dead_strip";
+    sectionName = "__TEXT, __swift5_fieldmd, regular, no_dead_strip";
     break;
   case llvm::Triple::ELF:
-    sectionName = "swift4_fieldmd";
+    sectionName = "swift5_fieldmd";
     break;
   case llvm::Triple::COFF:
-    sectionName = ".swift4_fieldmd";
+    sectionName = ".swift5_fieldmd";
     break;
   default:
     llvm_unreachable("Don't know how to emit field records table for "
@@ -4062,8 +4093,10 @@ IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
 /// - For classes, the superclass might change the size or number
 ///   of stored properties
 bool IRGenModule::isResilient(NominalTypeDecl *D, ResilienceExpansion expansion) {
-  if (Types.isCompletelyFragile())
+  if (expansion == ResilienceExpansion::Maximal &&
+      Types.isCompletelyFragile()) {
     return false;
+  }
   return D->isResilient(getSwiftModule(), expansion);
 }
 

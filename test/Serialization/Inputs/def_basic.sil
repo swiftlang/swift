@@ -344,7 +344,7 @@ bb0:
 }
 
 // CHECK-LABEL: @test_union_data_case : $@convention(thin) (Int) -> Beth {
-sil [transparent] [serialized] @test_union_data_case : $@convention(thin) Int -> Beth {
+sil [transparent] [serialized] @test_union_data_case : $@convention(thin) (Int) -> Beth {
 bb0(%0 : $Int):
   // CHECK: %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
   %1 = enum $Beth, #Beth.DataCase!enumelt.1, %0 : $Int
@@ -935,12 +935,12 @@ sil [transparent] [serialized] @takes_unnamed_closure : $@convention(thin) (@cal
 sil [transparent] [serialized] @takes_int64_float32 : $@convention(thin) (Int, Float32) -> ()
 
 // CHECK-LABEL: sil public_external [transparent] [serialized] @test_partial_apply : $@convention(thin) (Float) -> @callee_owned (Int) -> () {
-sil [transparent] [serialized] @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> () {
+sil [transparent] [serialized] @test_partial_apply : $@convention(thin) (Float32) -> @callee_owned (Int) -> () {
 bb0(%0 : $Float32):
   %1 = function_ref @takes_int64_float32 : $@convention(thin) (Int, Float) -> ()
   // CHECK: partial_apply %{{.*}}(%{{.*}}) : $@convention(thin) (Int, Float) -> ()
   %2 = partial_apply %1(%0) : $@convention(thin) (Int, Float) -> ()
-  return %2 : $@callee_owned Int -> ()
+  return %2 : $@callee_owned (Int) -> ()
 }
 
 class X {
@@ -1034,7 +1034,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 }
 
 // CHECK: sil public_external [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
-sil [transparent] [serialized] @cond_fail_test : $@convention(thin) Builtin.Int1 -> () {
+sil [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int1):
   // CHECK: cond_fail %0 : $Builtin.Int1
   cond_fail %0 : $Builtin.Int1
@@ -1043,7 +1043,7 @@ entry(%0 : $Builtin.Int1):
 }
 
 // CHECK-LABEL: sil public_external [transparent] [serialized] @block_storage_type
-sil [transparent] [serialized] @block_storage_type : $@convention(thin) Int -> @convention(block) () -> () {
+sil [transparent] [serialized] @block_storage_type : $@convention(thin) (Int) -> @convention(block) () -> () {
 entry(%0 : $Int):
   // CHECK: [[STORAGE:%.*]] = alloc_stack $@block_storage Int
   %s = alloc_stack $@block_storage Int
@@ -1149,7 +1149,7 @@ struct GenericStruct<T> {
 }
 
 // CHECK-LABEL: sil public_external [transparent] [serialized] @extract_generic_struct
-sil [transparent] [serialized] @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64 {
+sil [transparent] [serialized] @extract_generic_struct : $@convention(thin) (GenericStruct<Int64>) -> Int64 {
 entry(%0 : $GenericStruct<Int64>):
   // CHECK: %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
   %1 = struct_extract %0 : $GenericStruct<Int64>, #GenericStruct.x
@@ -1280,6 +1280,31 @@ bb0(%0 : $A):
   end_unpaired_access [dynamic] %9 : $*Builtin.UnsafeValueBuffer
   begin_unpaired_access [read] [dynamic] [no_nested_conflict] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
   copy_addr %2 to %1 : $*Any
+  destroy_addr %1 : $*Any
+  dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
+  dealloc_stack %1 : $*Any
+  %20 = tuple ()
+  return %20 : $()
+}
+
+// CHECK-LABEL: sil public_external [transparent] [serialized] @test_builtin_access : $@convention(thin) (@guaranteed A) -> () {
+// CHECK: begin_access [read] [dynamic] [builtin]
+// CHECK: end_access
+// CHECK: begin_unpaired_access [read] [dynamic] [builtin]
+// CHECK: end_unpaired_access [dynamic] [builtin]
+// CHECK-LABEL: } // end sil function 'test_builtin_access'
+sil [transparent] [serialized] @test_builtin_access : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  %1 = alloc_stack $Any
+  %2 = ref_element_addr %0 : $A, #A.property
+  %6 = begin_access [dynamic] [read] [builtin] %2 : $*Any
+  copy_addr %6 to %1 : $*Any
+  end_access %6 : $*Any
+  destroy_addr %1 : $*Any
+  %9 = alloc_stack $Builtin.UnsafeValueBuffer
+  begin_unpaired_access [read] [dynamic] [builtin] %2 : $*Any, %9 : $*Builtin.UnsafeValueBuffer
+  copy_addr %2 to %1 : $*Any
+  end_unpaired_access [dynamic] [builtin] %9 : $*Builtin.UnsafeValueBuffer
   destroy_addr %1 : $*Any
   dealloc_stack %9 : $*Builtin.UnsafeValueBuffer
   dealloc_stack %1 : $*Any
@@ -1424,7 +1449,7 @@ bb0:
   %31 = function_ref @$S6struct5AlephVyAcA3RefC1a_AA3ValV1btcACmcfC : $@convention(thin) (Ref, Val, @thin Aleph.Type) -> Aleph
   %33 = function_ref @$S6struct5AlephVyACycACmcfC : $@convention(thin) (@thin Aleph.Type) -> Aleph
   %35 = function_ref @test_union_empty_case : $@convention(thin) () -> Beth
-  %37 = function_ref @test_union_data_case : $@convention(thin) Int -> Beth
+  %37 = function_ref @test_union_data_case : $@convention(thin) (Int) -> Beth
   %39 = function_ref @test_union_addr_empty_case : $@convention(thin) () -> @out Gimel
   %41 = function_ref @test_union_addr_data_case : $@convention(thin) (@in Q) -> @out Gimel
   %43 = function_ref @$S5tuple5float1xySf_tF : $@convention(thin) (Float32) -> ()
@@ -1469,16 +1494,16 @@ bb0:
   %136 = function_ref @test_onone : $@convention(thin) () -> ()
   %137 = function_ref @test_ospeed : $@convention(thin) () -> ()
   %138 = function_ref @test_osize : $@convention(thin) () -> ()
-  %111 = function_ref @test_partial_apply : $@convention(thin) Float32 -> @callee_owned Int -> ()
+  %111 = function_ref @test_partial_apply : $@convention(thin) (Float32) -> @callee_owned (Int) -> ()
   %113 = function_ref @test_dynamic_lookup_br : $@convention(thin) (AnyObject) -> ()
   %115 = function_ref @test_mark_fn_escape : $@convention(thin) () -> ()
   %117 = function_ref @test_copy_release_value : $@convention(thin) (X) -> (X)
   %118 = function_ref @test_set_deallocating : $@convention(thin) (X) -> (X)
   %119 = function_ref @test_pointer_to_address : $@convention(thin) (Builtin.RawPointer, X) -> ()
   %120 = function_ref @test_bind_memory : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> ()
-  %121 = function_ref @cond_fail_test : $@convention(thin) Builtin.Int1 -> ()
+  %121 = function_ref @cond_fail_test : $@convention(thin) (Builtin.Int1) -> ()
 
-  %124 = function_ref @block_storage_type : $@convention(thin) Int -> @convention(block) () -> ()
+  %124 = function_ref @block_storage_type : $@convention(thin) (Int) -> @convention(block) () -> ()
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error Error) -> @error Error
   %135 = function_ref @test_try_nothrow : $@convention(thin) (@convention(thin) () -> @error Error) -> ()
@@ -1486,7 +1511,7 @@ bb0:
   %140 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %141 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (Int) -> @out Int, Int) -> Int
   %142 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()
-  %143 = function_ref @extract_generic_struct : $@convention(thin) GenericStruct<Int64> -> Int64
+  %143 = function_ref @extract_generic_struct : $@convention(thin) (GenericStruct<Int64>) -> Int64
   %148 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
   %149 = function_ref @existential_box : $@convention(thin) (SomeError) -> ()
   %150 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()
@@ -1494,6 +1519,7 @@ bb0:
   %152 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
   %153 = function_ref @weak_unowned: $@convention(thin) (@owned WeakUnownedTest, @owned AnyObject) -> ()
   %154 = function_ref @test_access : $@convention(thin) (@guaranteed A) -> ()
+  %155 = function_ref @test_builtin_access : $@convention(thin) (@guaranteed A) -> ()
 
   %r = tuple ()
   return %r : $()

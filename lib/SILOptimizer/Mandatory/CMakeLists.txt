@@ -4,7 +4,6 @@ set(MANDATORY_SOURCES
   Mandatory/AddressLowering.cpp
   Mandatory/ConstantPropagation.cpp
   Mandatory/DefiniteInitialization.cpp
-  Mandatory/DIMemoryUseCollector.cpp
   Mandatory/DIMemoryUseCollectorOwnership.cpp
   Mandatory/DataflowDiagnostics.cpp
   Mandatory/DiagnoseInfiniteRecursion.cpp
@@ -14,6 +13,9 @@ set(MANDATORY_SOURCES
   Mandatory/IRGenPrepare.cpp
   Mandatory/MandatoryInlining.cpp
   Mandatory/PredictableMemOpt.cpp
+  Mandatory/PMOMemoryUseCollector.cpp
   Mandatory/SemanticARCOpts.cpp
   Mandatory/ClosureLifetimeFixup.cpp
+  Mandatory/RawSILInstLowering.cpp
+  Mandatory/MandatoryOptUtils.cpp
   PARENT_SCOPE)

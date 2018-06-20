@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime-%target-ptrsize
+// #if directives don't work with SIL keywords, therefore please put ObjC tests
+// in `enum_objc.sil`.
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -enable-objc-interop  | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-objc --check-prefix=CHECK-objc-%target-ptrsize
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -gnone -emit-ir -disable-objc-interop | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-native --check-prefix=CHECK-native-%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
@@ -126,11 +129,11 @@ import Swift
 
 // CHECK: @"$S4enum16DynamicSingletonOMP" = internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   @"$S4enum16DynamicSingletonOMi"
-// CHECK-SAME:   [18 x i8*]* @"$S4enum16DynamicSingletonOWV"
+// CHECK-SAME:   [17 x i8*]* @"$S4enum16DynamicSingletonOWV"
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
-// CHECK: @"$S4enum10NoPayloadsOWV" = internal constant [18 x i8*] [
+// CHECK: @"$S4enum10NoPayloadsOWV" = internal constant [17 x i8*] [
 // -- ...
 // -- size
 // CHECK-SAME:   i8* inttoptr ([[WORD:i32|i64]] 1 to i8*),
@@ -148,7 +151,7 @@ import Swift
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
-// CHECK: @"$S4enum19SinglePayloadNestedOWV" = internal constant [18 x i8*] [
+// CHECK: @"$S4enum19SinglePayloadNestedOWV" = internal constant [17 x i8*] [
 // -- ...
 // -- size
 // CHECK-SAME:   i8* inttoptr ([[WORD]] 1 to i8*),
@@ -164,16 +167,16 @@ import Swift
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum19SinglePayloadNestedOwxg" to i8*)
 // CHECK-SAME: ]
 
-// CHECK: @"$S4enum20DynamicSinglePayloadOWV" = internal constant [18 x i8*] [
+// CHECK: @"$S4enum20DynamicSinglePayloadOWV" = internal constant [17 x i8*] [
 // CHECK-SAME:   i8* null
 // CHECK-SAME:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxs" to i8*)
 // CHECK-SAME:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @"$S4enum20DynamicSinglePayloadOwxg" to i8*)
 
 // CHECK: @"$S4enum20DynamicSinglePayloadOMP" = internal constant <{ {{.*}} }> <{
 // CHECK-SAME:   @"$S4enum20DynamicSinglePayloadOMi"
-// CHECK-SAME:   [18 x i8*]* @"$S4enum20DynamicSinglePayloadOWV"
+// CHECK-SAME:   [17 x i8*]* @"$S4enum20DynamicSinglePayloadOWV"
 
-// CHECK: @"$S4enum18MultiPayloadNestedOWV" = internal constant [18 x i8*] [
+// CHECK: @"$S4enum18MultiPayloadNestedOWV" = internal constant [17 x i8*] [
 // -- size
 // CHECK-32-SAME:   i8* inttoptr ([[WORD]] 5 to i8*),
 // CHECK-64-SAME:   i8* inttoptr ([[WORD]] 9 to i8*),
@@ -1108,13 +1111,6 @@ sil_vtable C {}
 
 sil @$S4enum1CCfD : $@convention(method) (C) -> ()
 
-@objc class OC {}
-sil_vtable OC {}
-sil hidden @$S4enum2OCCACycfcTo : $@convention(thin) (OC) -> OC {
-entry(%x : $OC):
-  return %x : $OC
-}
-
 enum SinglePayloadClass {
   case x(C)
   case y
@@ -1126,8 +1122,10 @@ enum SinglePayloadClass {
 // CHECK-64: entry:
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-objc-64:   i64 2, label {{%.*}}
+// CHECK-objc-64:   i64 4, label {{%.*}}
+// CHECK-native-64: i64 1, label {{%.*}}
+// CHECK-native-64: i64 2, label {{%.*}}
 // CHECK-64:   ]
 // CHECK-64: ; <label>
 // CHECK-64:   inttoptr [[WORD]] %0 to %T4enum1CC*
@@ -1160,23 +1158,19 @@ end:
 }
 
 protocol PC : class {}
-@objc protocol PO {}
 
 enum SinglePayloadClassProtocol {
   case x(PC)
   case y, z, w
 }
 
-enum SinglePayloadObjCProtocol {
-  case x(PO)
-  case y, z, w
-}
-
 // CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
 // CHECK-64:   switch i64 %0, label {{%.*}} [
 // CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-objc-64:     i64 2, label {{%.*}}
+// CHECK-objc-64:     i64 4, label {{%.*}}
+// CHECK-native-64:   i64 1, label {{%.*}}
+// CHECK-native-64:   i64 2, label {{%.*}}
 // CHECK-64:   ]
 
 // CHECK-objc-64:     inttoptr i64 %0 to %objc_object*
@@ -1211,42 +1205,6 @@ end:
   return undef : $()
 }
 
-// CHECK-64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i64) {{.*}} {
-// CHECK-64:   switch i64 %0, label {{%.*}}
-// CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
-// CHECK-64:   ]
-// CHECK-objc-64:     inttoptr i64 %0 to %objc_object*
-// CHECK-native-64:   inttoptr i64 %0 to %swift.refcounted*
-
-// CHECK-32: define{{( dllexport)?}}{{( protected)?}} swiftcc void @single_payload_objc_protocol_switch(i32) {{.*}} {
-// CHECK-32:   switch i32 %0, label {{%.*}}
-// CHECK-32:     i32 0, label {{%.*}}
-// CHECK-32:     i32 1, label {{%.*}}
-// CHECK-32:     i32 2, label {{%.*}}
-// CHECK-32:   ]
-// CHECK-objc-32:     inttoptr i32 %0 to %objc_object*
-// CHECK-native-32:   inttoptr i32 %0 to %swift.refcounted*
-
-sil @single_payload_objc_protocol_switch : $(SinglePayloadObjCProtocol) -> () {
-entry(%c : $SinglePayloadObjCProtocol):
-  switch_enum %c : $SinglePayloadObjCProtocol, case #SinglePayloadObjCProtocol.x!enumelt.1: x_dest, case #SinglePayloadObjCProtocol.y!enumelt: y_dest, case #SinglePayloadObjCProtocol.z!enumelt: z_dest, case #SinglePayloadObjCProtocol.w!enumelt: w_dest
-
-x_dest(%d : $PO):
-  br end
-y_dest:
-  br end
-z_dest:
-  br end
-w_dest:
-  br end
-
-end:
-  return undef : $()
-}
-
-
 enum DynamicSinglePayload<T> {
   case x(T)
   case y
@@ -1259,7 +1217,7 @@ enum DynamicSinglePayload<T> {
 // CHECK:   [[TMP:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds i8**, i8*** [[TMP]], i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[TMP2]]
-// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 7
+// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
 // CHECK:   [[WITNESS:%.*]] = load i8*, i8** [[ENUMADDR]]
 // CHECK:   %getEnumTagSinglePayload = bitcast i8* [[WITNESS]] to i32 (%swift.opaque*, i32, %swift.type*)*
 // CHECK:   [[CASE_INDEX:%.*]] = call i32 %getEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE_ENUM]], i32 3, %swift.type* %T)
@@ -1290,7 +1248,7 @@ end:
 // CHECK:   [[TMP:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds i8**, i8*** [[TMP]], i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[TMP2]]
-// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
+// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 7
 // CHECK:   [[WITNESS:%.*]] = load i8*, i8** [[ENUMADDR]]
 // CHECK:   %storeEnumTagSinglePayload = bitcast i8* [[WITNESS]] to void (%swift.opaque*, i32, i32, %swift.type*)*
 // CHECK:   call void %storeEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE_ENUM]], i32 0, i32 3, %swift.type* %T)
@@ -1306,7 +1264,7 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
 // CHECK:   [[TMP:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:   [[TMP2:%.*]] = getelementptr inbounds i8**, i8*** [[TMP]], i{{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[TMP2]]
-// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
+// CHECK:   [[ENUMADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 7
 // CHECK:   [[WITNESS:%.*]] = load i8*, i8** [[ENUMADDR]]
 // CHECK:   %storeEnumTagSinglePayload = bitcast i8* [[WITNESS]] to void (%swift.opaque*, i32, i32, %swift.type*)*
 // CHECK:   call void %storeEnumTagSinglePayload(%swift.opaque* noalias [[OPAQUE_ENUM]], i32 1, i32 3, %swift.type* %T)
@@ -1327,7 +1285,7 @@ entry(%r : $*DynamicSinglePayload<T>):
 // CHECK:     i8 2, label {{.*}}
 // CHECK:     i8 3, label {{.*}}
 // CHECK:   ]
-sil @dynamic_single_payload_empty_payload_switch : $DynamicSinglePayload<()> -> () {
+sil @dynamic_single_payload_empty_payload_switch : $(DynamicSinglePayload<()>) -> () {
 entry(%x : $DynamicSinglePayload<()>):
   switch_enum %x : $DynamicSinglePayload<()>, case #DynamicSinglePayload.x!enumelt.1: x_case, case #DynamicSinglePayload.y!enumelt: y_case, case #DynamicSinglePayload.z!enumelt: z_case, default default_case
 
@@ -2487,13 +2445,14 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 // Check that payloads get properly masked in nested single-payload enums.
 // rdar://problem/18841262
 // CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i64, i64)
-// CHECK-64:         icmp eq i64 %0, 2
+// CHECK-objc-64:       icmp eq i64 %0, 2
+// CHECK-native-64:     icmp eq i64 %0, 1
 // CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @optional_optional_class_protocol(i32, i32)
 // CHECK-32:         icmp eq i32 %0, 1
 enum Optionable<T> {
   case some(T), none
 }
-sil @optional_optional_class_protocol : $@convention(thin) Optionable<Optionable<PC>> -> Builtin.Int1 {
+sil @optional_optional_class_protocol : $@convention(thin) (Optionable<Optionable<PC>>) -> Builtin.Int1 {
 entry(%o : $Optionable<Optionable<PC>>):
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
@@ -2508,10 +2467,8 @@ struct ContainsUnownedObjC {
   unowned let x: C
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned() {{.*}} {
-// CHECK-objc-64:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native-64:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-objc-32:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native-32:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned : $@convention(thin) () -> (Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>) {
 entry:
   %a = enum $Optionable<ContainsUnowned>, #Optionable.none!enumelt
@@ -2520,10 +2477,8 @@ entry:
   return %t : $(Optionable<ContainsUnowned>, Optionable<Optionable<ContainsUnowned>>)
 }
 // CHECK-LABEL: define {{.*}} @optional_unowned_objc() {{.*}} {
-// CHECK-objc-64:      ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native-64:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 2 }
-// CHECK-objc-32:      ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
-// CHECK-native-32:    ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
+// CHECK-objc:     ret { [[WORD]], [[WORD]], i8 } { [[WORD]] 0, [[WORD]] 0, i8 1 }
+// CHECK-native:   ret { [[WORD]], [[WORD]] } { [[WORD]] 0, [[WORD]] 1 }
 sil @optional_unowned_objc : $@convention(thin) () -> (Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>) {
 entry:
   %a = enum $Optionable<ContainsUnownedObjC>, #Optionable.none!enumelt
@@ -2549,7 +2504,7 @@ entry(%x : $Int32):
   return %d : $Optional<(Optional<()>, Int32)>
 }
 
-sil @optional_float80 : $@convention(thin) Float80 -> () {
+sil @optional_float80 : $@convention(thin) (Float80) -> () {
 entry(%x : $Float80):
   %y = enum $Optional<Float80>, #Optional.some!enumelt.1, %x : $Float80
   return undef : $()
@@ -2694,7 +2649,7 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
-// CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
+// CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 8
 // CHECK:   call void @swift_initEnumMetadataSingleCase(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]])
 // CHECK:   ret %swift.metadata_response
 
@@ -2713,7 +2668,7 @@ entry(%x : $*MyOptional):
 // CHECK:   [[T_VWTS:%.*]] = bitcast %swift.type* [[T_CHECKED]] to i8***
 // CHECK:   [[T_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[T_VWTS]], [[WORD]] -1
 // CHECK:   [[T_VWT:%.*]] = load i8**, i8*** [[T_VWT_ADDR]]
-// CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 9
+// CHECK:   [[T_LAYOUT:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 8
 // CHECK:   call void @swift_initEnumMetadataSinglePayload(%swift.type* [[METADATA]], [[WORD]] 0, i8** [[T_LAYOUT]], i32 3)
 
 // CHECK-64-LABEL: define linkonce_odr hidden void @"$S4enum17StructWithWeakVarVwxs"(%swift.opaque* noalias %dest, i32 %index, %swift.type* %StructWithWeakVar)
