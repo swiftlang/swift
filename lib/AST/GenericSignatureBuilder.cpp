@@ -166,7 +166,7 @@ public:
   ///
   /// \returns the path, or None if it contained unresolved dependent member
   /// types.
-  RewritePath static createPath(Type type);
+  static RewritePath createPath(Type type);
 
   /// Decompose a type into a path.
   ///

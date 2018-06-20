@@ -515,11 +515,11 @@ bool swift::canDevirtualizeClassMethod(FullApplySite AI,
   }
 
   // We need to disable the  “effectively final” opt if a function is inlinable
-  if (isEffectivelyFinalMethod &&
-      F->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+  if (isEffectivelyFinalMethod && AI.getFunction()->getResilienceExpansion() ==
+                                      ResilienceExpansion::Minimal) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL: Could not optimize function because "
                           "it is an effectively-final inlinable: "
-                       << F->getName() << "\n");
+                       << AI.getFunction()->getName() << "\n");
     return false;
   }
 

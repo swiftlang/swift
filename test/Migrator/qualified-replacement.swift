@@ -14,6 +14,11 @@ func foo() {
   _ = Cities.CityKind.Town
   _ = ToplevelType()
   _ = ToplevelType(recordName: "")
+  bar(.orderedSame)
+  bar(.orderedMemberSame)
+  bar(FooComparisonResult.orderedSame)
+  bar(FooComparisonResult.orderedMemberSame)
 }
 
 func foo(_: ToplevelType) {}
+func bar(_ : FooComparisonResult) {}
