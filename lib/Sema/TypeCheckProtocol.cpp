@@ -3829,11 +3829,18 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     markConformanceUsed(*lookupResult, DC);
   }
 
-  // If we have a concrete conformance with conditional requirements that
+  auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
+  // If we have a conditional requirements that
   // we need to check, do so now.
-  if (lookupResult->isConcrete() &&
-      !lookupResult->getConditionalRequirements().empty() &&
-      !options.contains(ConformanceCheckFlags::SkipConditionalRequirements)) {
+  if (!condReqs) {
+    assert(
+        options.contains(
+            ConformanceCheckFlags::AllowUnavailableConditionalRequirements) &&
+        "unhandled recursion: missing conditional requirements when they're "
+        "required");
+  } else if (!condReqs->empty() &&
+             !options.contains(
+                 ConformanceCheckFlags::SkipConditionalRequirements)) {
     // Figure out the location of the conditional conformance.
     auto conformanceDC = lookupResult->getConcrete()->getDeclContext();
     SourceLoc noteLoc;
@@ -3846,7 +3853,7 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
       checkGenericArguments(DC, ComplainLoc, noteLoc, T,
                             { Type(lookupResult->getRequirement()
                                 ->getProtocolSelfType()) },
-                            lookupResult->getConditionalRequirements(),
+                            *condReqs,
                             [](SubstitutableType *dependentType) {
                               return Type(dependentType);
                             },

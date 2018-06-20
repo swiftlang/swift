@@ -665,11 +665,11 @@ static void maybeDiagnoseBadConformanceRef(TypeChecker &tc,
                                            AssociatedTypeDecl *assocType) {
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (auto conformanceRef =
-        tc.conformsToProtocol(
+  if (auto conformanceRef = tc.conformsToProtocol(
           parentTy, assocType->getProtocol(), dc,
-          (ConformanceCheckFlags::InExpression|
-           ConformanceCheckFlags::SuppressDependencyTracking))) {
+          (ConformanceCheckFlags::InExpression |
+           ConformanceCheckFlags::SuppressDependencyTracking |
+           ConformanceCheckFlags::AllowUnavailableConditionalRequirements))) {
     if (conformanceRef->isConcrete())
       conformance = conformanceRef->getConcrete();
   }
@@ -679,9 +679,14 @@ static void maybeDiagnoseBadConformanceRef(TypeChecker &tc,
   if (tc.Context.Diags.hadAnyError())
     return;
 
-  tc.diagnose(loc, diag::broken_associated_type_witness,
-              assocType->getFullName(), parentTy);
-};
+  auto diagCode =
+      (conformance && !conformance->getConditionalRequirementsIfAvailable())
+          ? diag::unsupported_recursion_in_associated_type_reference
+          : diag::broken_associated_type_witness;
+
+  tc.diagnose(loc, diagCode, assocType->getFullName(), parentTy);
+}
+
 /// \brief Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC,
