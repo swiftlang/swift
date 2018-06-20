@@ -1800,6 +1800,9 @@ NOTE(redundant_conformance_here,none,
      "inferred from type here}0",
      (unsigned, Type, ProtocolDecl *))
 
+ERROR(unsupported_recursive_requirements, none,
+      "requirement involves recursion that is not currently supported", ())
+
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "
       "%2 and %3", (unsigned, Type, Type, Type))
