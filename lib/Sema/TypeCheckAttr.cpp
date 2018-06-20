@@ -2306,6 +2306,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return true;
   };
 
+  auto originalTypeCtx = original->getInnermostTypeContext();
+  if (!originalTypeCtx) originalTypeCtx = original->getParent();
+
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
     | NameLookupFlags::IgnoreAccessControl;
@@ -2315,9 +2318,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (attr->getPrimal()) {
     auto primalSpecifier = attr->getPrimal().getValue();
     auto primalNameLoc = primalSpecifier.Loc.getBaseNameLoc();
-
-    auto primalTypeCtx = original->getInnermostTypeContext();
-    if (!primalTypeCtx) primalTypeCtx = original->getParent();
 
     auto primalOverloadDiagnostic = [&]() {
       TC.diagnose(primalNameLoc,
@@ -2371,10 +2371,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     primal = TC.lookupFuncDecl(
-      primalSpecifier.Name, primalNameLoc, primalTypeCtx, isValidPrimal,
-      primalOverloadDiagnostic, primalAmbiguousDiagnostic,
-      primalNotFunctionDiagnostic, lookupOptions, hasValidTypeContext,
-      primalInvalidTypeContextDiagnostic);
+      primalSpecifier.Name, primalNameLoc, /*baseType*/ Type(),
+      originalTypeCtx, isValidPrimal, primalOverloadDiagnostic,
+      primalAmbiguousDiagnostic, primalNotFunctionDiagnostic, lookupOptions,
+      hasValidTypeContext, primalInvalidTypeContextDiagnostic);
 
     if (!primal) {
       attr->setInvalid();
@@ -2524,9 +2524,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto adjointSpecifier = attr->getAdjoint();
   auto adjointNameLoc = adjointSpecifier.Loc.getBaseNameLoc();
 
-  auto adjointTypeCtx = original->getInnermostTypeContext();
-  if (!adjointTypeCtx) adjointTypeCtx = original->getParent();
-
   auto adjointOverloadDiagnostic = [&]() {
     TC.diagnose(adjointNameLoc,
                 diag::differentiable_attr_adjoint_overload_not_found,
@@ -2560,11 +2557,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   adjoint =
-    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc, adjointTypeCtx,
-                      isValidAdjoint, adjointOverloadDiagnostic,
-                      adjointAmbiguousDiagnostic, adjointNotFunctionDiagnostic,
-                      lookupOptions, hasValidTypeContext,
-                      adjointInvalidTypeContextDiagnostic);
+    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc,
+                      /*baseType*/ Type(), originalTypeCtx, isValidAdjoint,
+                      adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
+                      adjointNotFunctionDiagnostic, lookupOptions,
+                      hasValidTypeContext, adjointInvalidTypeContextDiagnostic);
 
   if (!adjoint) {
     attr->setInvalid();
