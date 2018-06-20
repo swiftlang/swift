@@ -3757,158 +3757,44 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// parseFunctionIdentifier
+/// parseQualifiedDeclName
 ///
-///   function-identifier:
+///   qualified-decl-name:
 ///     type-identifier? unqualified-decl-name
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-/// Note: this function is largely copied from `parseTypeIdentifier` and should
-/// be kept in sync.
-/// The code is duplicated because custom backtracking logic is needed to parse
-/// the final unqualified decl name.
+/// Parses an optional base type, followed by a declaration name.
 /// Returns true on error (if function decl name could not be parsed).
-static bool parseFunctionIdentifier(Parser &P, TypeRepr *&baseType,
-                                    DeclName &funcName,
-                                    DeclNameLoc &funcNameLoc) {
-  if (P.Tok.isNot(tok::identifier) && P.Tok.isNot(tok::kw_Self)
-      && !P.Tok.isAnyOperator()) {
-    if (P.Tok.is(tok::kw_Any)) {
-      baseType = P.parseAnyType().get();
-      return true;
-    } else if (P.Tok.is(tok::code_complete)) {
-      if (P.CodeCompletion)
-        P.CodeCompletion->completeTypeSimpleBeginning();
-      // Eat the code completion token because we handled it.
-      P.consumeToken(tok::code_complete);
-      return true;
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType, DeclName &name,
+                                   DeclNameLoc &nameLoc) {
+  // If the current token is an identifier or `Self` or `Any`, then attempt to
+  // parse the base type. Otherwise, base type is null.
+  auto currentPosition = P.getParserPosition();
+  bool canParseBaseType = P.canParseTypeIdentifier();
+  P.backtrackToPosition(currentPosition);
+  if (canParseBaseType)
+    baseType =
+      P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true).getPtrOrNull();
+  else
+    baseType = nullptr;
+
+  // If base type was parsed and has at least one component, then there was a
+  // dot before the current token.
+  bool afterDot = false;
+  if (baseType) {
+    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
+      auto components = ident->getComponentRange();
+      afterDot = std::distance(components.begin(), components.end()) > 0;
     }
-    P.diagnose(P.Tok, diag::expected_identifier_for_type);
-
-    // If there is a keyword at the start of a new line, we won't want to
-    // skip it as a recovery but rather keep it.
-    if (P.Tok.isKeyword() && !P.Tok.isAtStartOfLine())
-      P.consumeToken();
-
-    return true;
   }
-  SyntaxParsingContext IdentTypeCtxt(P.SyntaxContext, SyntaxContextKind::Type);
-  // Store the position for backtracking.
-  ParserPosition backtrackingPosition;
-  // True if an operator token is encountered.
-  // If true, backtracking is not necessary.
-  bool foundOperator = false;
-
-  ParserStatus Status;
-  SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
-  SourceLoc EndLoc;
-  while (true) {
-    backtrackingPosition = P.getParserPosition();
-    SourceLoc Loc;
-    Identifier Name;
-    if (P.Tok.is(tok::kw_Self)) {
-      Loc = P.consumeIdentifier(&Name);
-    } else if (P.Tok.isAnyOperator()) {
-      // If an operator is encountered, break early and don't backtrack.
-      // The operator will be parsed as the final unqualified decl name.
-      foundOperator = true;
-      break;
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      if (P.parseIdentifier(Name, Loc,
-                            diag::expected_identifier_in_dotted_type)) {
-        Status.setIsParseError();
-        break;
-      }
-    }
-
-    if (Loc.isValid()) {
-      SourceLoc LAngle, RAngle;
-      SmallVector<TypeRepr*, 8> GenericArgs;
-      if (P.startsWithLess(P.Tok)) {
-        if (P.parseGenericArguments(GenericArgs, LAngle, RAngle))
-          return true;
-      }
-      EndLoc = Loc;
-
-      ComponentIdentTypeRepr *CompT;
-      if (!GenericArgs.empty())
-        CompT = GenericIdentTypeRepr::create(P.Context, Loc, Name, GenericArgs,
-                                             SourceRange(LAngle, RAngle));
-      else
-        CompT = new (P.Context) SimpleIdentTypeRepr(Loc, Name);
-      ComponentsR.push_back(CompT);
-    }
-    P.SyntaxContext->createNodeInPlace(ComponentsR.size() == 1
-                                       ? SyntaxKind::SimpleTypeIdentifier
-                                       : SyntaxKind::MemberTypeIdentifier);
-
-    // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
-    if ((P.Tok.is(tok::period) || P.Tok.is(tok::period_prefix))) {
-      if (P.peekToken().is(tok::code_complete)) {
-        Status.setHasCodeCompletion();
-        break;
-      }
-      if (!P.peekToken().isContextualKeyword("Type")
-          && !P.peekToken().isContextualKeyword("Protocol")) {
-        P.consumeToken();
-        continue;
-      }
-    } else if (P.Tok.is(tok::code_complete)) {
-      if (!P.Tok.isAtStartOfLine())
-        Status.setHasCodeCompletion();
-      break;
-    } else if (P.startsWithSymbol(P.Tok, '.')) {
-      if (P.Tok.getLength() != 1 || !P.peekToken().is(tok::identifier)) {
-        P.consumeStartingCharacterOfCurrentToken(tok::period);
-        continue;
-      }
-    }
-    break;
-  }
-
-  // If an operator was not encountered, backtrack before parsing the last
-  // identifier.
-  if (!foundOperator) {
-    P.restoreParserPosition(backtrackingPosition);
-    if (!ComponentsR.empty())
-      ComponentsR.pop_back();
-  }
-  bool afterDot = ComponentsR.size() > 0;
-  funcName =
-    P.parseUnqualifiedDeclName(afterDot, funcNameLoc,
-                               diag::attr_implements_expected_member_name,
-                               /*allowOperators*/ true,
-                               /*allowZeroArgCompoundNames*/ true);
-
-  IdentTypeRepr *ITR = nullptr;
-  if (!ComponentsR.empty()) {
-    // Lookup element #0 through our current scope chains in case it is some
-    // thing local (this returns null if nothing is found).
-    if (auto Entry = P.lookupInScope(ComponentsR[0]->getIdentifier()))
-      if (auto *TD = dyn_cast<TypeDecl>(Entry))
-        ComponentsR[0]->setValue(TD, nullptr);
-    ITR = IdentTypeRepr::create(P.Context, ComponentsR);
-  }
-
-  if (Status.hasCodeCompletion() && P.CodeCompletion) {
-    if (P.Tok.isNot(tok::code_complete)) {
-      // We have a dot.
-      P.consumeToken();
-      P.CodeCompletion->completeTypeIdentifierWithDot(ITR);
-    } else {
-      P.CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
-    }
-    // Eat the code completion token because we handled it.
-    P.consumeToken(tok::code_complete);
-  }
-
-  assert(funcName && "Function name should have been parsed");
-  baseType = ITR;
+  name = P.parseUnqualifiedDeclName(afterDot, nameLoc, nameParseError,
+                                    /*allowOperators*/ true,
+                                    /*allowZeroArgCompoundNames*/ true);
+  // The base type is optional, but the final unqualified decl name is not.
+  // If name could not be parsed, return true for error.
+  if (!name) return true;
   return false;
 }
 
@@ -3933,7 +3819,8 @@ ParserResult<Expr> Parser::parseExprAdjoint() {
   TypeRepr *baseType;
   DeclName originalName;
   DeclNameLoc originalNameLoc;
-  if (parseFunctionIdentifier(*this, baseType, originalName, originalNameLoc))
+  if (parseQualifiedDeclName(*this, diag::expr_adjoint_expected_function_name,
+                             baseType, originalName, originalNameLoc))
     return errorAndSkipToEnd();
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen,
                  "#adjoint"))

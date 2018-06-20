@@ -545,29 +545,40 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
-  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
-    // is this the 'Any' type
-    if (Tok.is(tok::kw_Any)) {
-      return parseAnyType();
-    } else if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
-      // Eat the code completion token because we handled it.
-      consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult<IdentTypeRepr>();
+/// SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
+/// The `isParsingQualifiedDeclName` flag controls whether parsing is done as if
+/// this type identifier is the prefix to a qualified declaration name. If true,
+/// backtrack parsing the last identifier.
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
+  if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
+    if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
+      // is this the 'Any' type
+      if (Tok.is(tok::kw_Any)) {
+        return parseAnyType();
+      } else if (Tok.is(tok::code_complete)) {
+        if (CodeCompletion)
+          CodeCompletion->completeTypeSimpleBeginning();
+        // Eat the code completion token because we handled it.
+        consumeToken(tok::code_complete);
+        return makeParserCodeCompletionResult<IdentTypeRepr>();
+      }
+
+      diagnose(Tok, diag::expected_identifier_for_type);
+
+      // If there is a keyword at the start of a new line, we won't want to
+      // skip it as a recovery but rather keep it.
+      if (Tok.isKeyword() && !Tok.isAtStartOfLine())
+        consumeToken();
+
+      return nullptr;
     }
-
-    diagnose(Tok, diag::expected_identifier_for_type);
-
-    // If there is a keyword at the start of a new line, we won't want to
-    // skip it as a recovery but rather keep it.
-    if (Tok.isKeyword() && !Tok.isAtStartOfLine())
-      consumeToken();
-
-    return nullptr;
   }
   SyntaxParsingContext IdentTypeCtxt(SyntaxContext, SyntaxContextKind::Type);
+
+  // Note: these variables are used only when parsing a qualified decl name.
+  // Store the position for backtracking.
+  ParserPosition backtrackingPosition;
 
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
@@ -575,8 +586,13 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   while (true) {
     SourceLoc Loc;
     Identifier Name;
+    // Update backtracking position.
+    backtrackingPosition = getParserPosition();
     if (Tok.is(tok::kw_Self)) {
       Loc = consumeIdentifier(&Name);
+    } else if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
+      // If an operator is encountered, break and do not backtrack later.
+      break;
     } else {
       // FIXME: specialize diagnostic for 'Type': type cannot start with
       // 'metatype'
@@ -622,8 +638,28 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       if (!Tok.isAtStartOfLine())
         Status.setHasCodeCompletion();
       break;
+    // If parsing qualified decl name and encountered a token like `.+` in
+    // `Float.+`, consume the period so that `+` is treated correctly as a
+    // standalone token.
+    } else if (isParsingQualifiedDeclName && startsWithSymbol(Tok, '.')) {
+      if (Tok.getLength() != 1 || !peekToken().is(tok::identifier)) {
+        consumeStartingCharacterOfCurrentToken(tok::period);
+        continue;
+      }
     }
     break;
+  }
+
+  if (isParsingQualifiedDeclName) {
+    // If parsing qualified decl name and the current token is not an operator,
+    // backtrack before parsing the last identifier.
+    if (Tok.isNotAnyOperator()) {
+      restoreParserPosition(backtrackingPosition);
+      if (!ComponentsR.empty())
+        ComponentsR.pop_back();
+    }
+    if (ComponentsR.empty())
+      Status.setIsParseError();
   }
 
   IdentTypeRepr *ITR = nullptr;

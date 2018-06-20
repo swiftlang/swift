@@ -2304,10 +2304,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto originalTypeCtx = original->getInnermostTypeContext();
   if (!originalTypeCtx) originalTypeCtx = original->getParent();
 
-  Type originalBaseType;
-  if (originalTypeCtx->isTypeContext())
-    originalBaseType = originalTypeCtx->getSelfTypeInContext();
-
   // Set lookup options.
   auto lookupOptions = defaultMemberLookupOptions
     | NameLookupFlags::IgnoreAccessControl;
@@ -2370,7 +2366,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     };
 
     primal = TC.lookupFuncDecl(
-      primalSpecifier.Name, primalNameLoc, originalBaseType,
+      primalSpecifier.Name, primalNameLoc, /*baseType*/ Type(),
       originalTypeCtx, isValidPrimal, primalOverloadDiagnostic,
       primalAmbiguousDiagnostic, primalNotFunctionDiagnostic, lookupOptions,
       hasValidTypeContext, primalInvalidTypeContextDiagnostic);
@@ -2556,8 +2552,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   };
 
   adjoint =
-    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc, originalBaseType,
-                      originalTypeCtx, isValidAdjoint,
+    TC.lookupFuncDecl(adjointSpecifier.Name, adjointNameLoc,
+                      /*baseType*/ Type(), originalTypeCtx, isValidAdjoint,
                       adjointOverloadDiagnostic, adjointAmbiguousDiagnostic,
                       adjointNotFunctionDiagnostic, lookupOptions,
                       hasValidTypeContext, adjointInvalidTypeContextDiagnostic);
