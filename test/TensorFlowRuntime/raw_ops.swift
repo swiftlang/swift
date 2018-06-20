@@ -86,8 +86,4 @@ RawOpsTests.testAllBackends("GreaterEqualOp") {
   testPointwiseBinaryOp(tfOp: Raw.greaterEqual, swiftOp: { $0 >= $1 })
 }
 
-#if CPU && !CUDA
-runAllTestsWithRemoteSession()
-#else
 runAllTests()
-#endif // CPU && !CUDA
