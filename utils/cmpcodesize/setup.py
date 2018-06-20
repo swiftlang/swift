@@ -50,5 +50,8 @@ setuptools.setup(
         'console_scripts': [
             'cmpcodesize = cmpcodesize:main',
         ],
-    }
+    },
+    install_requires=[
+        'pyyaml==3.12'
+    ],
 )
