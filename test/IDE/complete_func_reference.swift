@@ -1,24 +1,24 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_0 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_1 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_2 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_3 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_VOID_4 | %FileCheck %s -check-prefix=VOID_VOID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_0 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_1 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_2 > %t.results
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_0 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_1 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_2 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_3 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_VOID_4 | %FileCheck %s -check-prefix=VOID_VOID
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_0 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_1 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_2 > %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT < %t.results
 // RUN:%FileCheck %s -check-prefix=ANY_INT_STATIC_CURRY < %t.results
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_3 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ANY_INT_4 | %FileCheck %s -check-prefix=ANY_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_0 | %FileCheck %s -check-prefix=INT_ANY
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_1 | %FileCheck %s -check-prefix=INT_ANY
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_2 > %t.results
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_3 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=ANY_INT_4 | %FileCheck %s -check-prefix=ANY_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_0 | %FileCheck %s -check-prefix=INT_ANY
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_1 | %FileCheck %s -check-prefix=INT_ANY
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_2 > %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY < %t.results
 // RUN: %FileCheck %s -check-prefix=INT_ANY_STATIC_CURRY < %t.results
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INT_ANY_3 > %t.results
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=INT_ANY_3 > %t.results
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_0 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_1 | %FileCheck %s -check-prefix=VOID_INT_INT
+// RUN: %target-swift-ide-test -swift-version 3 -code-completion -source-filename %s -code-completion-token=VOID_INT_INT_2 | %FileCheck %s -check-prefix=VOID_INT_INT
 
 func voidToVoid() {}
 func voidToInt() -> Int {}

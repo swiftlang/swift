@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift -swift-version 3
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -emit-module -o %t %S/Inputs/ImplementProtoRenaming.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -emit-module -o %t %S/Inputs/ImplementProtoRenaming.swift -swift-version 3
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -typecheck %s -verify -swift-version 3
 
 // REQUIRES: objc_interop
 

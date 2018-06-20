@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 3
 
 // rdar://29605388 -- Swift 3 admitted opening an existential type with
 // associated types in one case.

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o %t
+// RUN: %target-swift-frontend %s -emit-ir -g -o %t -swift-version 3
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK1
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK2
 // RUN: cat %t | %FileCheck %s --check-prefix=CHECK3

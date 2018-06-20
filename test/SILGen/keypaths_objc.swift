@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s | %FileCheck %s
-// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/keypaths_objc.h %s -swift-version 3
 // REQUIRES: objc_interop
 
 import Foundation

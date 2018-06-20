@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-silgen %s -swift-version 3 | %FileCheck %s
 
 infix operator ~> { precedence 255 associativity left }
 

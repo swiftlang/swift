@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir -swift-version 3
 
 enum Value {
     case IntValue(Int)

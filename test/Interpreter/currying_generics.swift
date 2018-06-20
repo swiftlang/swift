@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
 // REQUIRES: executable_test
 
 func curry<T, U, V>(_ f: @escaping (T, U) -> V) -> (T) -> (U) -> V {

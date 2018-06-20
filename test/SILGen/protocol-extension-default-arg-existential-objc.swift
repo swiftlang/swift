@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify %s -swift-version 3
 // REQUIRES: objc_interop
 
 import Foundation

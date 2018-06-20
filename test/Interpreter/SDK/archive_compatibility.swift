@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -module-name=test -o %t/a.out
+// RUN: %target-build-swift %s -module-name=test -o %t/a.out -swift-version 3
 // RUN: %target-run %t/a.out %S/Inputs/test.arc | %FileCheck %s
 
 // REQUIRES: executable_test

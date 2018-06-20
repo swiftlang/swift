@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name objc_thunks -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -emit-verbose-sil -enable-sil-ownership -swift-version 3 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
