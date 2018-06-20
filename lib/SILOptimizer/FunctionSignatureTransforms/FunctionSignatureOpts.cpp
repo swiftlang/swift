@@ -64,10 +64,16 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
     FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
+
+static llvm::cl::opt<bool>
+    FSOOptimizeIfNotCalled("sil-fso-optimize-if-not-called",
+                           llvm::cl::init(false),
+                           llvm::cl::desc("Optimize even if a function isn't "
+                                          "called. For testing only!"));
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
@@ -613,8 +619,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
 // Run the optimization.
 bool FunctionSignatureTransform::run(bool hasCaller) {
-  bool Changed = false;
+  // We use a reference here on purpose so our transformations can know if we
+  // are going to make a thunk and thus should just optimize.
+  bool &Changed = TransformDescriptor.Changed;
   SILFunction *F = TransformDescriptor.OriginalFunction;
+
+  // If we are asked to assume a caller for testing purposes, set the flag.
+  hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
     DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");

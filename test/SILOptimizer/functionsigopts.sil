@@ -220,10 +220,12 @@ bb0(%0 : $LotsOfFields):
 }
 
 // Since this is a value that contains only a singular owned type, there is no
-// point from an ARC perspective in splitting it up. We still want to perform owned to guaranteed though.
+// point from an ARC perspective in splitting it up. We still want to perform
+// owned to guaranteed though so we know we are oging to already create a
+// thunk. Thus we are not creating code-size.
 //
 // CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @dead_argument_due_to_more_than_release_user
-// CHECK: [[FN1:%.*]] = function_ref @$S43dead_argument_due_to_more_than_release_userTf4g_n : $@convention(thin) (@guaranteed Boo) -> (Int, Int)
+// CHECK: [[FN1:%.*]] = function_ref @$S43dead_argument_due_to_more_than_release_userTf4gX_n : $@convention(thin) (@guaranteed Baz, Int) -> (Int, Int)
 sil @dead_argument_due_to_more_than_release_user : $@convention(thin) (@owned Boo) -> (Int, Int) {
 bb0(%0 : $Boo):
   // make it a non-trivial function

@@ -9,6 +9,15 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// \file
+///
+/// This file contains an implementation of the partial dead argument
+/// elimination optimization. We do this to attempt to remove non-trivial
+/// arguments of callees to eliminate lifetime constraints of a large argument
+/// on values in the caller.
+///
+//===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "fso-argument-explosion-transform"
 #include "FunctionSignatureOpts.h"
@@ -25,12 +34,68 @@ static llvm::cl::opt<bool> FSODisableArgExplosion(
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+static bool
+shouldExplodeTrivial(FunctionSignatureTransformDescriptor &transformDesc,
+                     ArgumentDescriptor &argDesc, SILType ty) {
+  // Just blow up parameters if we will reduce the size of arguments.
+  //
+  // FIXME: In the future we should attempt to only do this if we can generate a
+  // thunk. This was tried with the current heuristic and it resulted in a 1%
+  // increase in code-size in the standard library.
+  unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
+  return explosionSize <= 3;
+}
+
 /// Return true if it's both legal and a good idea to explode this argument.
-static bool shouldExplode(ArgumentDescriptor &argDesc,
-                          ConsumedArgToEpilogueReleaseMatcher &ERM) {
-  // We cannot optimize the argument.
-  if (!argDesc.canOptimizeLiveArg())
+///
+/// Our main interest here is to expose more opportunities for ARC. This means
+/// that we are not interested in exploding (and partially DCEing) structs in
+/// the following cases:
+///
+/// 1. Completely dead arguments. This is handled by dead argument elimination.
+///
+/// 2. Values that are completely trivial. By splitting these up we create
+///    more register pressure during argument marshalling and do not really add
+///    any advantage. We only eliminate them
+///
+/// 3. Structs with many live leaf nodes. Our heuristic is 1-3 live leaf
+///    nodes. Otherwise again we run into register pressure/spilling issues.
+///
+/// One important thing to note here is that the last two cases could be dealt
+/// with more effectively by having FSO consider the number of arguments
+/// created in total instead of not reasoning about this and hoping the
+/// heuristic works.
+///
+/// With that in mind, we want to perform argument exploding in the following
+/// cases (assuming our live leaf restriction):
+///
+/// 1. Non-trivial structs that only have live trivial parts. This at the SIL
+///    level eliminates ARC restrictions on the caller by the callee.
+///
+/// 2. Splitting non-trivial structs that have multiple non-trivial live leaf
+///    nodes. This is useful because it enables the low level ARC optimizer to
+///    consider the arguments as having different RC identities and thus pair
+///    retains/releases in an easier way.
+///
+/// What is important to notice here is that we do not want to explode
+/// arguments if.
+static bool
+shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
+              ArgumentDescriptor &argDesc,
+              ConsumedArgToEpilogueReleaseMatcher &epilogueReleaseMatcher) {
+  // No passes can optimize this argument, so just bail.
+  if (!argDesc.canOptimizeLiveArg()) {
     return false;
+  }
+
+  // We do not explode parameters that are completely dead. This is so we can
+  // rely on normal dead argument elimination to eliminate such parameters.
+  //
+  // We compute this early since it is already computed at this point.
+  unsigned naiveExplosionSize = argDesc.ProjTree.getLiveLeafCount();
+  if (naiveExplosionSize == 0) {
+    return false;
+  }
 
   // See if the projection tree consists of potentially multiple levels of
   // structs containing one field. In such a case, there is no point in
@@ -38,30 +103,95 @@ static bool shouldExplode(ArgumentDescriptor &argDesc,
   //
   // Also, in case of a type can not be exploded, e.g an enum, we treat it
   // as a singleton.
-  if (argDesc.ProjTree.isSingleton())
-    return false;
-
-  auto *arg = argDesc.Arg;
-  if (!shouldExpand(arg->getModule(), arg->getType().getObjectType())) {
+  if (argDesc.ProjTree.isSingleton()) {
     return false;
   }
 
-  // If this argument is @owned and we can not find all the releases for it
-  // try to explode it, maybe we can find some of the releases and O2G some
-  // of its components.
-  //
-  // This is a potentially a very profitable optimization. Ignore other
-  // heuristics.
-  if (arg->hasConvention(SILArgumentConvention::Direct_Owned) &&
-      ERM.hasSomeReleasesForArgument(arg))
-    return true;
+  // Ok, we have a case that we may be able to handle. First make sure that the
+  // current global size expansion heuristic does not ban us from expanding this
+  // type.
+  auto *arg = argDesc.Arg;
+  auto &module = arg->getModule();
+  auto ty = arg->getType().getObjectType();
+  if (!shouldExpand(module, ty)) {
+    return false;
+  }
 
-  unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
-  return explosionSize >= 1 && explosionSize <= 3;
+  // Ok, this is something that globally we are not forbidden from
+  // expanded. First check if our type is completely trivial. We never want to
+  // explode arguments that are trivial so return false. See comment above.
+  if (ty.isTrivial(module)) {
+    return shouldExplodeTrivial(transformDesc, argDesc, ty);
+  }
+
+  // Ok, we think that this /may/ be profitable to optimize. Grab our leaf node
+  // types. We already know that we have a strictily non-trivial type. If by
+  // performing partial DCE we will eliminate a non-trivial argument, we want to
+  // eliminate that argument to eliminate an ARC lifetime restriction in our
+  // caller scope.
+  llvm::SmallVector<SILType, 32> allTypes;
+  argDesc.ProjTree.getAllLeafTypes(allTypes);
+  llvm::SmallVector<const ProjectionTreeNode *, 32> liveNodes;
+  argDesc.ProjTree.getLiveLeafNodes(liveNodes);
+
+  unsigned numInputNonTrivialLeafNodes =
+      llvm::count_if(allTypes, [&](SILType t) { return !t.isTrivial(module); });
+  unsigned numNonTrivialLiveLeafNodes =
+      llvm::count_if(liveNodes, [&](const ProjectionTreeNode *n) {
+        return n->getType().isTrivial(module);
+      });
+
+  // TODO: Special case if we have one argument or if all other arguments are
+  // trivial.
+  unsigned maxExplosionSize = 3;
+
+  // If we reduced the number of non-trivial leaf types, we want to split this
+  // given that we already know that we are not going to drastically change the
+  // number of arguments.
+  if (naiveExplosionSize <= maxExplosionSize &&
+      numNonTrivialLiveLeafNodes < numInputNonTrivialLeafNodes) {
+    return true;
+  }
+
+  // Ok, this is an argument with more than 3 live leaf nodes. See if after
+  // performing o2g we will be able to reduce our number of non-trivial nodes.
+  //
+  // *NOTE* This does not create a phase ordering issue since we re-run the
+  // pipeline after we run FSO a first time.
+  if (numNonTrivialLiveLeafNodes > 1 &&
+      argDesc.hasConvention(SILArgumentConvention::Direct_Owned)) {
+    if (auto releases =
+            epilogueReleaseMatcher.getPartiallyPostDomReleaseSet(arg)) {
+      llvm::SmallPtrSet<SILInstruction *, 8> users;
+      for (auto *i : *releases)
+        users.insert(i);
+
+      // *NOTE* This will still include trivial parameters. We only
+      // will delete non-trivial parameters.
+      unsigned newExplosionSize = naiveExplosionSize;
+      for (auto *node : liveNodes) {
+        // If all of our users are epilogue releases, reduce the explosion size.
+        if (llvm::all_of(node->getNonProjUsers(), [&](Operand *op) {
+              return users.count(op->getUser());
+            })) {
+          --newExplosionSize;
+        }
+      }
+
+      // See if newExplosionSize is less than our max allowed explosion size. If
+      // we reduce this value then we know we will reduce the number of
+      // non-trivial nodes. We just don't want to expand the number of arguments
+      // too much.
+      return newExplosionSize <= maxExplosionSize;
+    }
+  }
+
+  // Otherwise, we are not reducing the number of live non-trivial values
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
-//                               Implementation
+//                          Top Level Implementation
 //===----------------------------------------------------------------------===//
 
 bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
@@ -95,7 +225,7 @@ bool FunctionSignatureTransform::ArgumentExplosionAnalyzeParameters() {
       continue;
 
     A.ProjTree.computeUsesAndLiveness(A.Arg);
-    A.Explode = shouldExplode(A, ArgToReturnReleaseMap);
+    A.Explode = shouldExplode(TransformDescriptor, A, ArgToReturnReleaseMap);
 
     // Modified self argument.
     if (A.Explode && Args[i]->isSelf()) {

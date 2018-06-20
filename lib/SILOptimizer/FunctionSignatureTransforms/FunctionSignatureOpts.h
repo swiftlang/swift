@@ -110,9 +110,13 @@ struct ArgumentDescriptor {
     return Arg->hasConvention(P);
   }
 
+  /// Returns true if all function signature opt passes are able to process
+  /// this.
   bool canOptimizeLiveArg() const {
-    if (Arg->getType().isObject())
+    if (Arg->getType().isObject()) {
       return true;
+    }
+
     // @in arguments of generic types can be processed.
     if (Arg->getType().hasArchetype() &&
         Arg->getType().isAddress() &&
@@ -192,6 +196,9 @@ struct FunctionSignatureTransformDescriptor {
   /// Keep a "view" of precompiled information on the direct results that we
   /// will use during our optimization.
   MutableArrayRef<ResultDescriptor> ResultDescList;
+
+  /// Are we going to make a change to this function?
+  bool Changed;
 
   /// Return a function name based on the current state of ArgumentDescList and
   /// ResultDescList.
@@ -289,8 +296,8 @@ public:
       llvm::SmallDenseMap<int, int> &AIM,
       llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
       llvm::SmallVector<ResultDescriptor, 4> &RDL)
-      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL}, RCIA(RCIA),
-        EA(EA) {}
+      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL, false},
+        RCIA(RCIA), EA(EA) {}
 
   /// Return the optimized function.
   SILFunction *getOptimizedFunction() {
