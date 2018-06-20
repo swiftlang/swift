@@ -54,7 +54,7 @@ public func test1SendWithParam(x: Float) {
 // CHECK:          node_def {
 // CHECK:            name: "RunControlDependency"
 // CHECK:            op: "Identity"
-// CHECK-NEXT:       input: "op.
+// CHECK-NEXT:       input: "op/test1SendWithParam.x_
 // CHECK-NEXT:       input: "^tf_send_0"
 
 public func test2Sends() {
