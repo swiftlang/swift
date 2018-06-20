@@ -108,7 +108,7 @@ print("\(repr(s))")
 
 // -- expect a reallocation here
 
-// CHECK-NEXT: String(Native(owner: @[[storage3:[x0-9a-f]+]], count: 49, capacity: 96))
+// CHECK-NEXT: String(Native(owner: @[[storage3:[x0-9a-f]+]], count: 49, capacity: 80))
 // CHECK-NOT: @[[storage2]],
 s += "C"
 print("\(repr(s))")
