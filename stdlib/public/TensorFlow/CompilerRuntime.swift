@@ -82,6 +82,10 @@ public enum _ExecutionMode : Equatable {
 // TODO(hongm): Revisit the longer-term design.
 @_frozen
 public enum _RuntimeConfig {
+  /// When false, tensorflow runtime will be initialized before running any
+  /// tensor program in this process.
+  static public var tensorFlowRuntimeInitialized = false
+
   /// When true, run the entire tensor computation in
   /// _TFCStartTensorComputation(), instead of running it on a separate thread.
   /// - Note: Set to true only for debugging purposes.
@@ -229,8 +233,11 @@ public final class _ExecutionContext {
 
     // Initialize the TF runtime exactly once. Only affects local execution
     // (when _RuntimeConfig.tensorFlowServer is set to "").
-    InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
-                          _RuntimeConfig.tensorflowVerboseLogLevel)
+    if !_RuntimeConfig.tensorFlowRuntimeInitialized {
+      InitTensorFlowRuntime(_RuntimeConfig.printsDebugLog ? 1 : 0,
+                            _RuntimeConfig.tensorflowVerboseLogLevel)
+      _RuntimeConfig.tensorFlowRuntimeInitialized = true
+    }
 
     guard let opts = TFE_NewContextOptions() else {
       fatalError("ContextOptions object can never be nil.")
