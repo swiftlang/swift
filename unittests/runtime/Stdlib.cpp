@@ -178,7 +178,7 @@ void *$Ss32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF(void *) {
 // Hashable
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-const long long $Ss8HashableMp[1] = {0};
+const long long $SkMp[1] = {0};
 
 // Array
 
@@ -188,12 +188,12 @@ const long long $SSaMn[1] = {0};
 // Dictionary
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-const long long $Ss10DictionaryVMn[1] = {0};
+const long long $SsSdVMn[1] = {0};
 
 // Set
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
-const long long $Ss3SetVMn[1] = {0};
+const long long $SsSeVMn[1] = {0};
 
 // Mirror
 
