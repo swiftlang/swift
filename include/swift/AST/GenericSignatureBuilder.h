@@ -337,6 +337,10 @@ private:
                                    EquivalenceClass *unresolvedEquivClass,
                                    UnresolvedHandlingKind unresolvedHandling);
 
+  /// Add any conditional requirements from the given conformance.
+  void addConditionalRequirements(ProtocolConformanceRef conformance,
+                                  ModuleDecl *inferForModule);
+
   /// Resolve the conformance of the given type to the given protocol when the
   /// potential archetype is known to be equivalent to a concrete type.
   ///

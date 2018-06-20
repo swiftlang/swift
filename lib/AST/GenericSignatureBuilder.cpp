@@ -2604,17 +2604,14 @@ ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
   }
 }
 
-// Function for feeding through any other requirements that the conformance
-// requires to be satisfied. These are things we're inferring.
-static void addConditionalRequirements(GenericSignatureBuilder &builder,
-                                       ProtocolConformanceRef conformance,
-                                       ModuleDecl *inferForModule) {
+void GenericSignatureBuilder::addConditionalRequirements(
+    ProtocolConformanceRef conformance, ModuleDecl *inferForModule) {
   // Abstract conformances don't have associated decl-contexts/modules, but also
   // don't have conditional requirements.
   if (conformance.isConcrete()) {
     auto source = FloatingRequirementSource::forInferred(nullptr);
     for (auto requirement : conformance.getConditionalRequirements()) {
-      builder.addRequirement(requirement, source, inferForModule);
+      addRequirement(requirement, source, inferForModule);
       ++NumConditionalRequirementsAdded;
     }
   }
@@ -2656,7 +2653,7 @@ GenericSignatureBuilder::resolveConcreteConformance(ResolvedType type,
 
   concreteSource = concreteSource->viaConcrete(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, concreteSource);
-  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
+  addConditionalRequirements(*conformance, /*inferForModule=*/nullptr);
   return concreteSource;
 }
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
@@ -2685,7 +2682,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
   superclassSource =
     superclassSource->viaSuperclass(*this, *conformance);
   equivClass->recordConformanceConstraint(*this, type, proto, superclassSource);
-  addConditionalRequirements(*this, *conformance, /*inferForModule=*/nullptr);
+  addConditionalRequirements(*conformance, /*inferForModule=*/nullptr);
   return superclassSource;
 }
 
@@ -4741,7 +4738,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
 
         // FIXME: diagnose if there's no conformance.
         if (conformance) {
-          addConditionalRequirements(*this, *conformance, inferForModule);
+          addConditionalRequirements(*conformance, inferForModule);
         }
       }
     }
