@@ -1213,7 +1213,7 @@ public:
       return;
     }
     case SymbolicValue::Function: {
-      auto function = v.getFunctionValue();
+      auto function = v.getFunctionValue().first;
       *this << "@" << function->getName();
       *this << " : $" << function->getLoweredFunctionType();
       return;
