@@ -748,27 +748,6 @@ static void VisitNodeAssociatedTypeRef(
           return;
         }
       }
-      ProtocolType *protocol_type = type->getAs<ProtocolType>();
-      if (protocol_type) {
-        Identifier assoc_id = ast->getIdentifier(ident->getText());
-        ProtocolDecl *protocol_decl = protocol_type->getDecl();
-        AssociatedTypeDecl *associated = nullptr;
-        for (auto member : protocol_decl->getMembers()) {
-          auto *atd = dyn_cast<AssociatedTypeDecl>(member);
-          if (!atd)
-            continue;
-          if (assoc_id == atd->getName()) {
-            associated = atd;
-            break;
-          }
-        }
-        if (associated) {
-          result._types.push_back(
-          DependentMemberType::get(protocol_type, assoc_id));
-          result._module = type_result._module;
-          return;
-        }
-      }
     }
   }
   result._types.clear();
