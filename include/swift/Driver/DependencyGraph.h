@@ -123,9 +123,17 @@ private:
   /// The set of marked nodes.
   llvm::SmallPtrSet<const void *, 16> Marked;
 
-  /// A list of all external dependencies that cannot be resolved
-  /// just from this dependency graph. They must be resolved from definitions
-  /// in files that do not belong to this module.
+  /// A list of all external dependencies that cannot be resolved from just this
+  /// dependency graph. Each member of the set is the name of a file which is
+  /// not in the module. These files' contents may (or may not) have affected
+  /// the module's compilation. This list may even include the paths of
+  /// non-existent files whose absence is significant in the same way as
+  /// Makefile .d dependencies.
+  ///
+  /// Furthermore, this set might not exhaustive. It only includes dependencies
+  /// that will be checked by the driver's incremental mode.
+  /// For example, it might excludes headers in the SDK if the cost
+  /// of `stat`ing them were to outweigh the likelihood that they would change.
   llvm::StringSet<> ExternalDependencies;
 
   /// The interface hash for each node. This determines if the interface of
