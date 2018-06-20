@@ -660,6 +660,9 @@ ERROR(ambiguous_module_type,none,
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
+ERROR(unsupported_recursion_in_associated_type_reference,none,
+      "unsupported recursion for reference to associated type %0 of type %1",
+      (DeclName, Type))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
