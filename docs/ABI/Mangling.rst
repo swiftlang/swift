@@ -339,7 +339,7 @@ Types
   KNOWN-TYPE-KIND ::= 'B'                    // Swift.BinaryFloatingPoint
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
   KNOWN-TYPE-KIND ::= 'c'                    // Swift.UnicodeScalar
-  KNOWN-TYPE-KIND ::= 'd'                    // Swift.Dictionary
+  KNOWN-TYPE-KIND ::= 'D'                    // Swift.Dictionary
   KNOWN-TYPE-KIND ::= 'd'                    // Swift.Float64
   KNOWN-TYPE-KIND ::= 'E'                    // Swift.Encodable
   KNOWN-TYPE-KIND ::= 'e'                    // Swift.Decodable
