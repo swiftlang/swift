@@ -29,7 +29,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   /// `TensorHandle` will require tweaking the compiler.
   public let cTensorHandle: CTensorHandle
 
-  @_versioned
+  @usableFromInline
   init(copyingFromCTensor cTensor: CTensor) {
     let status = TF_NewStatus()
     let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
@@ -39,7 +39,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
     TF_DeleteStatus(status)
   }
 
-  @_versioned
+  @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
     self.cTensorHandle = cTensorHandle
   }
@@ -49,7 +49,7 @@ public final class TensorHandle<Scalar : AccelerableByTensorFlow> {
   ///
   /// - Note: `scalarsInitializer` must initialize all scalars in the underlying
   /// buffer.
-  @_versioned
+  @usableFromInline
   convenience init(
     shape: [Int32],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
@@ -83,7 +83,7 @@ internal extension TensorHandle {
   /// Create a `ShapedArray` with contents of the underlying `TensorHandle`. If
   /// the `TensorHandle` is on the accelerator, it will be copied to the host.
   /// - Returns: A `ShapedArray`.
-  @_versioned
+  @usableFromInline
   @inline(never)
   func makeHostCopy() -> ShapedArray<Scalar> {
     return ShapedArray(cTensorHandle: cTensorHandle)
@@ -91,7 +91,7 @@ internal extension TensorHandle {
 }
 
 extension TensorHandle : TensorSendableReceivable {
-  @_inlineable @_versioned
+  @inlinable
   static func receiveFromDevice(_ computation: _TensorComputation,
                                 _ tensorId: Int
   ) -> TensorHandle<Scalar> {
@@ -110,7 +110,7 @@ extension TensorHandle : TensorSendableReceivable {
     return tensorHandle
   }
 
-  @_inlineable @_versioned
+  @inlinable
   func sendToDevice(_ computation: _TensorComputation,
                     _ tensorId: Int) {
     if _RuntimeConfig.printsDebugLog {
@@ -128,7 +128,7 @@ extension TensorHandle : TensorSendableReceivable {
     TF_DeleteTensor(cTensor)
   }
 
-  @_inlineable @_versioned
+  @inlinable
   static func scalar(_ scalar: Scalar) -> TensorHandle<Scalar> {
     debugLog("Creating a tensor from scalar \(scalar).")
     let cTensorHandle = _TFCCreateCTensorHandle(scalar, Scalar.cDataType)
@@ -137,7 +137,7 @@ extension TensorHandle : TensorSendableReceivable {
 }
 
 internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
-  @_versioned
+  @usableFromInline
   @inline(never)
   init(cTensorHandle: CTensorHandle) {
     let status = TF_NewStatus()
