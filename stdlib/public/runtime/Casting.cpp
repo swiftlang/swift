@@ -1974,10 +1974,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SD);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,
@@ -2091,7 +2091,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Dictionaries.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s10Dictionary)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(SD)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
@@ -2107,7 +2107,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Sets.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s3Set)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(Sh)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
                                  sourceArgs[0], targetArgs[0],
