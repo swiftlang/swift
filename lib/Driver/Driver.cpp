@@ -1369,14 +1369,43 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
   if (const Arg *A = Args.getLastArg(options::OPT_g_Group)) {
     if (A->getOption().matches(options::OPT_g))
-      OI.DebugInfoKind = IRGenDebugInfoKind::Normal;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
-      OI.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
     else if (A->getOption().matches(options::OPT_gdwarf_types))
-      OI.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
+      OI.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
+    if (strcmp(A->getValue(), "dwarf") == 0)
+      OI.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    else if (strcmp(A->getValue(), "codeview") == 0)
+      OI.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  } else if (OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+    // If -g was specified but not -debug-info-format, DWARF is assumed.
+    OI.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+  if (Args.hasArg(options::OPT_debug_info_format) &&
+      !Args.hasArg(options::OPT_g_Group)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   debugFormatArg->getAsString(Args), "-g");
+  }
+  if (OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+      (OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
+       OI.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   debugFormatArg->getAsString(Args),
+                   OI.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
+                     ? "-gline-tables-only"
+                     : "-gdwarf_types");
   }
 
   if (Args.hasArg(options::OPT_emit_module, options::OPT_emit_module_path)) {
@@ -1384,7 +1413,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     // top-level output.
     OI.ShouldGenerateModule = true;
     OI.ShouldTreatModuleAsTopLevelOutput = true;
-  } else if ((OI.DebugInfoKind > IRGenDebugInfoKind::LineTables &&
+  } else if ((OI.DebugInfoLevel > IRGenDebugInfoLevel::LineTables &&
               OI.shouldLink()) ||
              Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path)) {
@@ -1806,7 +1835,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     }
 
     if (MergeModuleAction) {
-      if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
+      if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
         if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
@@ -1823,7 +1852,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     TopLevelActions.push_back(LinkAction);
 
     if (TC.getTriple().isOSDarwin() &&
-        OI.DebugInfoKind > IRGenDebugInfoKind::None) {
+        OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
       auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
       TopLevelActions.push_back(dSYMAction);
       if (Args.hasArg(options::OPT_verify_debug_info)) {

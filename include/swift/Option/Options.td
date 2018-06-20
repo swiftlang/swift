@@ -471,6 +471,10 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,

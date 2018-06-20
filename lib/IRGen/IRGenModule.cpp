@@ -92,23 +92,33 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
   CGO.DisableFPElim = Opts.DisableFPElim;
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
-  switch (Opts.DebugInfoKind) {
-  case IRGenDebugInfoKind::None:
+  switch (Opts.DebugInfoLevel) {
+  case IRGenDebugInfoLevel::None:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
     break;
-  case IRGenDebugInfoKind::LineTables:
+  case IRGenDebugInfoLevel::LineTables:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
     break;
-  case IRGenDebugInfoKind::ASTTypes:
-  case IRGenDebugInfoKind::DwarfTypes:
+  case IRGenDebugInfoLevel::ASTTypes:
+  case IRGenDebugInfoLevel::DwarfTypes:
     CGO.DebugTypeExtRefs = true;
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::FullDebugInfo);
     break;
   }
-  if (Opts.DebugInfoKind > IRGenDebugInfoKind::None) {
+  switch (Opts.DebugInfoFormat) {
+  case IRGenDebugInfoFormat::None:
+    break;
+  case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.DWARFDebugFlags;
+    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    break;
+  case IRGenDebugInfoFormat::CodeView:
+    CGO.EmitCodeView = true;
+    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
+    // This actually contains the debug flags for codeview.
+    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    break;
   }
 
   auto &HSI = Importer->getClangPreprocessor()
@@ -413,7 +423,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
-  if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
+  if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
                                                  MainInputFilenameForDebugInfo);
