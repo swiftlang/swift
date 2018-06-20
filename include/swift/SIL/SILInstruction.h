@@ -8225,8 +8225,14 @@ public:
     return OperandValueArrayRef(getAllOperands());
   }
 
-  ArrayRef<GraphOperationAttribute> getAttributes() const;
-  MutableArrayRef<GraphOperationAttribute> getAttributes();
+  ArrayRef<GraphOperationAttribute> getAttributes() const {
+    return Attributes;
+  }
+
+  MutableArrayRef<GraphOperationAttribute> getAttributes() {
+    return Attributes;
+  }
+
   Optional<GraphOperationAttribute> getAttribute(StringRef name);
 
   static bool classof(const SILNode *N) {

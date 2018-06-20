@@ -2499,8 +2499,7 @@ GraphOperationInst::GraphOperationInst(
   auto allOperands = getAllOperands();
   for (unsigned i : indices(arguments))
     new (&allOperands[i]) Operand(this, arguments[i]);
-  auto attrBuf = AlignedAlloc(sizeof(GraphOperationAttribute) * attrs.size(),
-                              alignof(GraphOperationAttribute));
+  auto attrBuf = new GraphOperationAttribute[attrs.size()];
   Attributes = MutableArrayRef<GraphOperationAttribute>(
     static_cast<GraphOperationAttribute *>(attrBuf), attrs.size());
   std::uninitialized_copy(attrs.begin(), attrs.end(), Attributes.data());
@@ -2509,7 +2508,7 @@ GraphOperationInst::GraphOperationInst(
 GraphOperationInst::~GraphOperationInst() {
   for (auto &operand : getAllOperands())
     operand.~Operand();
-  delete getAttributes().data();
+  delete[] getAttributes().data();
 }
 
 GraphOperationInst *GraphOperationInst::create(
@@ -2529,16 +2528,6 @@ GraphOperationInst *GraphOperationInst::create(
   void *buffer = M.allocateInst(size, alignof(GraphOperationInst));
   return ::new (buffer) GraphOperationInst(M, loc, name, arguments, attributes,
                                            resultTypes, resultOwnerships);
-}
-
-ArrayRef<GraphOperationAttribute>
-GraphOperationInst::getAttributes() const {
-  return Attributes;
-}
-
-MutableArrayRef<GraphOperationAttribute>
-GraphOperationInst::getAttributes() {
-  return Attributes;
 }
 
 Optional<GraphOperationAttribute>
