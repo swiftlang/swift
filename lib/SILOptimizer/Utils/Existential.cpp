@@ -18,24 +18,24 @@
 
 using namespace swift;
 
-/// Determine the pattern for global_addr.
+/// Determine InitExistential from global_addr.
 /// %3 = global_addr @$P : $*SomeP
 /// %4 = init_existential_addr %3 : $*SomeP, $SomeC
 /// %5 = alloc_ref $SomeC
 /// store %5 to %4 : $*SomeC
 /// %8 = alloc_stack $SomeP
 /// copy_addr %3 to [initialization] %8 : $*SomeP
-/// %9 = open_existential_addr immutable_access %8 : $*SomeP to $*@opened SomeP
-SILValue swift::findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
-                                                  CopyAddrInst *CAI) {
-  assert(CAI->getSrc() == SILValue(GAI) &&
-         "Broken Assumption! Global Addr is not the source of the passed in "
-         "copy_addr?!");
-
+/// %10 = apply %9(%3) : $@convention(thin) (@in_guaranteed SomeP)
+/// Assumptions: Insn is a direct user of GAI (e.g., copy_addr or 
+/// apply pattern shown above) and that a valid init_existential_addr 
+/// value is returned only if it can prove that the value it 
+/// initializes is the same value at the use point.
+static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
+                                                  SILInstruction *Insn) {
   /// Check for a single InitExistential usage for GAI and
-  /// a simple dominance check: both InitExistential and CAI are in
+  /// a simple dominance check: both InitExistential and Insn are in
   /// the same basic block and only one InitExistential
-  /// occurs between GAI and CAI.
+  /// occurs between GAI and Insn.
   llvm::SmallPtrSet<SILInstruction *, 8> IEUses;
   for (auto *Use : GAI->getUses()) {
     if (auto *InitExistential =
@@ -48,10 +48,11 @@ SILValue swift::findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
   if (IEUses.empty())
     return SILValue();
 
-  /// Walk backwards from CAI instruction till the begining of the basic block
-  /// looking for InitExistential.
+  /// Walk backwards from Insn instruction till the begining of the basic block
+  /// looking for an InitExistential.
   SILValue SingleIE;
-  for (auto II = CAI->getIterator().getReverse(), IE = CAI->getParent()->rend();
+  for (auto II = Insn->getIterator().getReverse(),
+            IE = Insn->getParent()->rend();
        II != IE; ++II) {
     if (!IEUses.count(&*II))
       continue;
@@ -61,6 +62,56 @@ SILValue swift::findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
     SingleIE = cast<InitExistentialAddrInst>(&*II);
   }
   return SingleIE;
+}
+
+/// Determine InitExistential from global_addr and copy_addr.
+/// %3 = global_addr @$P : $*SomeP
+/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
+/// %5 = alloc_ref $SomeC
+/// store %5 to %4 : $*SomeC
+/// %8 = alloc_stack $SomeP
+/// copy_addr %3 to [initialization] %8 : $*SomeP
+SILValue
+swift::findInitExistentialFromGlobalAddrAndCopyAddr(GlobalAddrInst *GAI,
+                                                    CopyAddrInst *CAI) {
+  assert(CAI->getSrc() == SILValue(GAI) &&
+         "Broken Assumption! Global Addr is not the source of the passed in "
+         "copy_addr?!");
+  return findInitExistentialFromGlobalAddr(GAI, cast<SILInstruction>(CAI));
+}
+
+/// Determine InitExistential from global_addr and an apply argument.
+/// Pattern 1
+/// %3 = global_addr @$P : $*SomeP
+/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
+/// %5 = alloc_ref $SomeC
+/// store %5 to %4 : $*SomeC
+/// %10 = apply %9(%3) : $@convention(thin) (@in_guaranteed SomeP)
+/// Pattern 2
+/// %3 = global_addr @$P : $*SomeP
+/// %9 = open_existential_addr mutable_access %3 : $*SomeP to $*@opened SomeP
+/// %15 = apply %11(%9) : $@convention(thin) (@in_guaranteed SomeP)
+SILValue swift::findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
+                                                          ApplySite Apply,
+                                                          int ArgIdx) {
+  /// Code to ensure that we are calling only in two pattern matching scenarios.
+  bool isArg = false;
+  auto Arg = Apply.getArgument(ArgIdx);
+  if (auto *ApplyGAI = dyn_cast<GlobalAddrInst>(Arg)) {
+    if (ApplyGAI->isIdenticalTo(GAI)) {
+      isArg = true;
+    }
+  } else if (auto Open = dyn_cast<OpenExistentialAddrInst>(Arg)) {
+    auto Op = Open->getOperand();
+    if (auto *OpGAI = dyn_cast<GlobalAddrInst>(Op)) {
+      if (OpGAI->isIdenticalTo(GAI)) {
+        isArg = true;
+      }
+    }
+  }
+  assert(isArg && "Broken Assumption! Global Addr is not an argument to "
+                  "apply?!");
+  return findInitExistentialFromGlobalAddr(GAI, Apply.getInstruction());
 }
 
 /// Returns the address of an object with which the stack location \p ASI is
@@ -130,7 +181,7 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
       return getAddressOfStackInit(ASI, CAI, isCopied);
     // Check if the CAISrc is a global_addr.
     if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
-      return findInitExistentialFromGlobalAddr(GAI, CAI);
+      return findInitExistentialFromGlobalAddrAndCopyAddr(GAI, CAI);
     }
     return CAISrc;
   }

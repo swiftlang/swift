@@ -18,8 +18,12 @@
 namespace swift {
 
 /// Find InitExistential from global_addr and copy_addr.
-SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
-                                           CopyAddrInst *CAI);
+SILValue findInitExistentialFromGlobalAddrAndCopyAddr(GlobalAddrInst *GAI,
+                                                      CopyAddrInst *CAI);
+
+/// Find InitExistential from global_addr and an apply argument.
+SILValue findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
+                                                   ApplySite Apply, int ArgIdx);
 
 /// Returns the address of an object with which the stack location \p ASI is
 /// initialized. This is either a init_existential_addr or the destination of a
