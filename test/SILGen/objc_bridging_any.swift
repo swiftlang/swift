@@ -655,7 +655,7 @@ extension GenericClass {
 // Make sure AnyHashable erasure marks Hashable conformance as used
 class AnyHashableClass : NSObject {
   // CHECK-LABEL: sil hidden @$S17objc_bridging_any16AnyHashableClassC07returnsdE0s0dE0VyF
-  // CHECK: [[FN:%.*]] = function_ref @$Ss21_convertToAnyHashableys0cD0Vxs0D0RzlF
+  // CHECK: [[FN:%.*]] = function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF
   // CHECK: apply [[FN]]<GenericOption>({{.*}})
   func returnsAnyHashable() -> AnyHashable {
     return GenericOption.multithreaded
@@ -696,7 +696,7 @@ class SwiftAnyEnjoyer: NSIdLover, NSIdLoving {
 
 // CHECK-LABEL: sil_witness_table shared [serialized] GenericOption: Hashable module objc_generics {
 // CHECK-NEXT: base_protocol Equatable: GenericOption: Equatable module objc_generics
-// CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP9hashValueSivgTW
-// CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP4hash4intoys6HasherVz_tFTW
-// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$SSo13GenericOptionas8HashableSCsACP13_rawHashValue4seedSis6UInt64V_AHt_tFTW
+// CHECK-NEXT: method #Hashable.hashValue!getter.1: {{.*}} : @$SSo13GenericOptionaSHSCSH9hashValueSivgTW
+// CHECK-NEXT: method #Hashable.hash!1: {{.*}} : @$SSo13GenericOptionaSHSCSH4hash4intoys6HasherVz_tFTW
+// CHECK-NEXT: method #Hashable._rawHashValue!1: {{.*}} : @$SSo13GenericOptionaSHSCSH13_rawHashValue4seedSis6UInt64V_AFt_tFTW
 // CHECK-NEXT: }

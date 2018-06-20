@@ -1492,7 +1492,11 @@ void ASTMangler::appendModule(const ModuleDecl *module) {
 }
 
 /// Mangle the name of a protocol as a substitution candidate.
-void ASTMangler::appendProtocolName(const ProtocolDecl *protocol) {
+void ASTMangler::appendProtocolName(const ProtocolDecl *protocol,
+                                    bool allowStandardSubstitution) {
+  if (allowStandardSubstitution && tryAppendStandardSubstitution(protocol))
+    return;
+
   appendContextOf(protocol);
   auto *clangDecl = protocol->getClangDecl();
   if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))

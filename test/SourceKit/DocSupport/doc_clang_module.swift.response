@@ -393,14 +393,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:s9EquatableP",
+    key.usr: "s:SQ",
     key.offset: 54,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:s16RawRepresentableP",
+    key.usr: "s:SY",
     key.offset: 65,
     key.length: 16
   },
@@ -556,14 +556,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:s9EquatableP",
+    key.usr: "s:SQ",
     key.offset: 303,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:s16RawRepresentableP",
+    key.usr: "s:SY",
     key.offset: 314,
     key.length: 16
   },
@@ -741,14 +741,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:s9EquatableP",
+    key.usr: "s:SQ",
     key.offset: 584,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:s16RawRepresentableP",
+    key.usr: "s:SY",
     key.offset: 595,
     key.length: 16
   },
@@ -1257,7 +1257,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Sequence",
-    key.usr: "s:s8SequenceP",
+    key.usr: "s:ST",
     key.offset: 1507,
     key.length: 8
   },
@@ -4479,14 +4479,14 @@ var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "Equatable",
-    key.usr: "s:s9EquatableP",
+    key.usr: "s:SQ",
     key.offset: 7708,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "RawRepresentable",
-    key.usr: "s:s16RawRepresentableP",
+    key.usr: "s:SY",
     key.offset: 7719,
     key.length: 16
   },
@@ -4682,17 +4682,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.doc.full_as_xml: "<Enum file=Foo.h line=\"16\" column=\"6\"><Name>FooEnum1</Name><USR>c:@E@FooEnum1</USR><Declaration>struct FooEnum1 : Equatable, RawRepresentable</Declaration><Abstract><Para> Aaa.  FooEnum1.  Bbb.</Para></Abstract></Enum>",
     key.offset: 36,
     key.length: 216,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum1</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum1</decl.name> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:s9EquatableP"
+        key.usr: "s:SQ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:s16RawRepresentableP"
+        key.usr: "s:SY"
       }
     ],
     key.entities: [
@@ -4724,7 +4724,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:s16RawRepresentableP8rawValuexSg0aD0Qz_tcfc"
+            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
           }
         ],
         key.entities: [
@@ -4748,16 +4748,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
+            key.usr: "s:SY8rawValue03RawB0Qzvp"
           }
         ]
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum1",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum1",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 182,
         key.length: 68,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum1\">FooEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum1\">FooEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -4795,17 +4795,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum2",
     key.offset: 285,
     key.length: 216,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum2</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum2</decl.name> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:s9EquatableP"
+        key.usr: "s:SQ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:s16RawRepresentableP"
+        key.usr: "s:SY"
       }
     ],
     key.entities: [
@@ -4837,7 +4837,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:s16RawRepresentableP8rawValuexSg0aD0Qz_tcfc"
+            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
           }
         ],
         key.entities: [
@@ -4861,16 +4861,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
+            key.usr: "s:SY8rawValue03RawB0Qzvp"
           }
         ]
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum2",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum2",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 431,
         key.length: 68,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum2\">FooEnum2</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -4915,17 +4915,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooEnum3",
     key.offset: 566,
     key.length: 216,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum3</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooEnum3</decl.name> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:s9EquatableP"
+        key.usr: "s:SQ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:s16RawRepresentableP"
+        key.usr: "s:SY"
       }
     ],
     key.entities: [
@@ -4957,7 +4957,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:s16RawRepresentableP8rawValuexSg0aD0Qz_tcfc"
+            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
           }
         ],
         key.entities: [
@@ -4981,16 +4981,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
+            key.usr: "s:SY8rawValue03RawB0Qzvp"
           }
         ]
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum3",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooEnum3",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 712,
         key.length: 68,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooEnum3\">FooEnum3</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -5072,9 +5072,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooComparisonResult",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooComparisonResult",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 962,
         key.length: 90,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr=\"c:@E@FooComparisonResult\">FooComparisonResult</ref.enum></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr=\"c:@E@FooComparisonResult\">FooComparisonResult</ref.enum></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -5129,7 +5129,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:s16RawRepresentableP8rawValuexSg0aD0Qz_tcfc"
+            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
           }
         ],
         key.entities: [
@@ -5161,9 +5161,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 1244,
         key.length: 86,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooRuncingOptions\">FooRuncingOptions</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -5219,8 +5219,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.constructor,
         key.name: "init(_:)",
-        key.usr: "s:s10SetAlgebraPsEyxqd__cs8SequenceRd__7ElementQyd__ADRtzlufc::SYNTHESIZED::c:@E@FooRuncingOptions",
-        key.original_usr: "s:s10SetAlgebraPsEyxqd__cs8SequenceRd__7ElementQyd__ADRtzlufc",
+        key.usr: "s:s10SetAlgebraPsEyxqd__cSTRd__7ElementQyd__ACRtzlufc::SYNTHESIZED::c:@E@FooRuncingOptions",
+        key.original_usr: "s:s10SetAlgebraPsEyxqd__cSTRd__7ElementQyd__ACRtzlufc",
         key.generic_params: [
           {
             key.name: "S"
@@ -5234,10 +5234,10 @@ var FooSubUnnamedEnumeratorA1: Int { get }
             key.description: "Self.Element == S.Element"
           }
         ],
-        key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:s10SetAlgebraPsEyxqd__cs8SequenceRd__7ElementQyd__ADRtzlufc</USR><Declaration>@inlinable convenience init&lt;S&gt;(_ sequence: S) where S : Sequence, Self.Element == S.Element</Declaration><CommentParts><Abstract><Para>Creates a new set from a finite sequence of items.</Para></Abstract><Parameters><Parameter><Name>sequence</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The elements to use as members of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Use this initializer to create a new set from an existing sequence, like an array or a range:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let validIndices = Set(0..<7).subtracting([2, 4, 5])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(validIndices)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[6, 0, 1, 3]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
+        key.doc.full_as_xml: "<Function><Name>init(_:)</Name><USR>s:s10SetAlgebraPsEyxqd__cSTRd__7ElementQyd__ACRtzlufc</USR><Declaration>@inlinable convenience init&lt;S&gt;(_ sequence: S) where S : Sequence, Self.Element == S.Element</Declaration><CommentParts><Abstract><Para>Creates a new set from a finite sequence of items.</Para></Abstract><Parameters><Parameter><Name>sequence</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>The elements to use as members of the new set.</Para></Discussion></Parameter></Parameters><Discussion><Para>Use this initializer to create a new set from an existing sequence, like an array or a range:</Para><CodeListing language=\"swift\"><zCodeLineNumbered><![CDATA[let validIndices = Set(0..<7).subtracting([2, 4, 5])]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[print(validIndices)]]></zCodeLineNumbered><zCodeLineNumbered><![CDATA[// Prints \"[6, 0, 1, 3]\"]]></zCodeLineNumbered><zCodeLineNumbered></zCodeLineNumbered></CodeListing></Discussion></CommentParts></Function>",
         key.offset: 1451,
         key.length: 86,
-        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;S&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>S : <ref.protocol usr=\"s:s8SequenceP\">Sequence</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.typealias usr=\"s:So17FooRuncingOptionsV7Elementa\">Element</ref.typealias> == S.Element</decl.generic_type_requirement></decl.function.constructor>",
+        key.fully_annotated_decl: "<decl.function.constructor><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>&lt;S&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>sequence</decl.var.parameter.name>: <decl.var.parameter.type>S</decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>S : <ref.protocol usr=\"s:ST\">Sequence</ref.protocol></decl.generic_type_requirement>, <decl.generic_type_requirement><ref.typealias usr=\"s:So17FooRuncingOptionsV7Elementa\">Element</ref.typealias> == S.Element</decl.generic_type_requirement></decl.function.constructor>",
         key.entities: [
           {
             key.kind: source.lang.swift.decl.var.local,
@@ -5856,7 +5856,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "SignedInteger",
-        key.usr: "s:s13SignedIntegerP"
+        key.usr: "s:SZ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -6425,7 +6425,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "SignedInteger",
-        key.usr: "s:s13SignedIntegerP"
+        key.usr: "s:SZ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
@@ -7177,9 +7177,9 @@ var FooSubUnnamedEnumeratorA1: Int { get }
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@ABAuthorizationStatus",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@ABAuthorizationStatus",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 7552,
         key.length: 94,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr=\"c:@E@ABAuthorizationStatus\">ABAuthorizationStatus</ref.enum></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.enum usr=\"c:@E@ABAuthorizationStatus\">ABAuthorizationStatus</ref.enum></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",
@@ -7234,17 +7234,17 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1",
     key.offset: 7687,
     key.length: 225,
-    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:s9EquatableP\">Equatable</ref.protocol>, <ref.protocol usr=\"s:s16RawRepresentableP\">RawRepresentable</ref.protocol></decl.struct>",
+    key.fully_annotated_decl: "<decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>FooSubEnum1</decl.name> : <ref.protocol usr=\"s:SQ\">Equatable</ref.protocol>, <ref.protocol usr=\"s:SY\">RawRepresentable</ref.protocol></decl.struct>",
     key.conforms: [
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "Equatable",
-        key.usr: "s:s9EquatableP"
+        key.usr: "s:SQ"
       },
       {
         key.kind: source.lang.swift.ref.protocol,
         key.name: "RawRepresentable",
-        key.usr: "s:s16RawRepresentableP"
+        key.usr: "s:SY"
       }
     ],
     key.entities: [
@@ -7276,7 +7276,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.function.constructor,
             key.name: "init(rawValue:)",
-            key.usr: "s:s16RawRepresentableP8rawValuexSg0aD0Qz_tcfc"
+            key.usr: "s:SY8rawValuexSg03RawB0Qz_tcfc"
           }
         ],
         key.entities: [
@@ -7300,16 +7300,16 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           {
             key.kind: source.lang.swift.ref.var.instance,
             key.name: "rawValue",
-            key.usr: "s:s16RawRepresentableP8rawValue0aD0Qzvp"
+            key.usr: "s:SY8rawValue03RawB0Qzvp"
           }
         ]
       },
       {
         key.kind: source.lang.swift.decl.function.operator.infix,
         key.name: "!=(_:_:)",
-        key.usr: "s:s9EquatablePsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooSubEnum1",
-        key.original_usr: "s:s9EquatablePsE2neoiySbx_xtFZ",
-        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:s9EquatablePsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
+        key.usr: "s:SQsE2neoiySbx_xtFZ::SYNTHESIZED::c:@E@FooSubEnum1",
+        key.original_usr: "s:SQsE2neoiySbx_xtFZ",
+        key.doc.full_as_xml: "<Function><Name>!=(_:_:)</Name><USR>s:SQsE2neoiySbx_xtFZ</USR><Declaration>@inlinable static func != (lhs: Self, rhs: Self) -&gt; Bool</Declaration><CommentParts><Abstract><Para>Returns a Boolean value indicating whether two values are not equal.</Para></Abstract><Parameters><Parameter><Name>lhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>A value to compare.</Para></Discussion></Parameter><Parameter><Name>rhs</Name><Direction isExplicit=\"0\">in</Direction><Discussion><Para>Another value to compare.</Para></Discussion></Parameter></Parameters><Discussion><Para>Inequality is the inverse of equality. For any values <codeVoice>a</codeVoice> and <codeVoice>b</codeVoice>, <codeVoice>a != b</codeVoice> implies that <codeVoice>a == b</codeVoice> is <codeVoice>false</codeVoice>.</Para><Para>This is the default implementation of the not-equal-to operator (<codeVoice>!=</codeVoice>) for any type that conforms to <codeVoice>Equatable</codeVoice>.</Para></Discussion></CommentParts></Function>",
         key.offset: 7836,
         key.length: 74,
         key.fully_annotated_decl: "<decl.function.operator.infix><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@inlinable</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>static</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>!= </decl.name>(<decl.var.parameter><decl.var.parameter.name>lhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>rhs</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Sb\">Bool</ref.struct></decl.function.returntype></decl.function.operator.infix>",

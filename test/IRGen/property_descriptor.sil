@@ -77,7 +77,7 @@ sil_property #ExternalGeneric.computedRW <T: Comparable> (
     getter @get_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed ExternalGeneric<T>) -> @out T,
     setter @set_computed_generic : $@convention(thin) <T: Comparable> (@in_guaranteed T, @inout ExternalGeneric<T>) -> ())
 
-// CHECK: @"$S19property_descriptor15ExternalGenericVyxqd__cs8HashableRd__luipMV" ={{( dllexport)?}}{{( protected)?}} constant
+// CHECK: @"$S19property_descriptor15ExternalGenericVyxqd__cSHRd__luipMV" ={{( dllexport)?}}{{( protected)?}} constant
 // -- 0x01c8_0000 - computed, settable, mutating, has arguments
 // CHECK-SAME:  <{ <i32 0x01c8_0000>, 
 // CHECK-SAME:     @id_computed,
