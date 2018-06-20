@@ -38,6 +38,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     switch (unknown.second) {
     case UnknownReason::Default: os << "unknown: "; break;
     case UnknownReason::TooManyInstructions: os << "unknown(toobig): "; break;
+    case UnknownReason::Loop: os << "unknown(loop): "; break;
     }
     unknown.first->dump();
     return;
@@ -47,9 +48,10 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     getMetatypeValue()->print(os);
     os << "\n";
     return;
-  case RK_Function:
-    os << "fn: " << getFunctionValue()->getName() << ": ";
-    os << Demangle::demangleSymbolAsString(getFunctionValue()->getName());
+  case RK_Function: {
+    auto fn = getFunctionValue().first;
+    os << "fn: " << fn->getName() << ": ";
+    os << Demangle::demangleSymbolAsString(fn->getName());
     os << "\n";
     return;
   case RK_Inst:
@@ -76,6 +78,14 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   }
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
+    if (elements.empty()) {
+      os << "agg: 0 elements []\n";
+      return;
+    } else if (elements.size() == 1) {
+      os << "agg: 1 elt: ";
+      elements[0].print(os, indent+2);
+      return;
+    }
     os << "agg: " << elements.size() << " element" << "s"[elements.size() == 1]
        << " [\n";
     for (auto elt : elements)
@@ -494,7 +504,7 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is.
-void SymbolicValue::emitUnknownDiagnosticNotes() {
+void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
   auto badInst = dyn_cast<SILInstruction>(unknown.first);
   if (!badInst) return;
@@ -508,12 +518,20 @@ void SymbolicValue::emitUnknownDiagnosticNotes() {
     // TODO: Should pop up a level of the stack trace.
     error = "expression is too large to evaluate at compile-time";
     break;
+  case UnknownReason::Loop:
+    error = "control flow loop found";
+    break;
   }
 
   auto &module = badInst->getModule();
 
   auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) return;
+  if (loc.isNull()) {
+    // If we have important clarifying information, make sure to emit it.
+    if (unknown.second != UnknownReason::Default)
+      return;
+    loc = fallbackLoc;
+  }
 
   diagnose(module.getASTContext(), loc.getSourceLoc(),
            diag::tf_op_misuse_note, error)

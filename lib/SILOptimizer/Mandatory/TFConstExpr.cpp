@@ -26,18 +26,21 @@ using namespace swift;
 using namespace tf;
 
 static llvm::cl::opt<unsigned>
-ConstExprLimit("constexpr-limit", llvm::cl::init(256),
+ConstExprLimit("constexpr-limit", llvm::cl::init(512),
                llvm::cl::desc("Number of instructions interpreted in a"
                               " constexpr function"));
 
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
                      ConstExprEvaluator &evaluator);
 
 
+// TODO: ConstantTracker in the performance inliner and the
+// ConstantFolding.h/cpp files should be subsumed by this, as this is a more
+// general framework.
 
 //===----------------------------------------------------------------------===//
 // ConstExprFunctionCache implementation.
@@ -56,11 +59,9 @@ namespace {
     /// function.  This is null for the top-level expression.
     SILFunction *fn;
 
-    /// If we have a function being analyzed, this is the substitution list for
-    /// the call to it.
-    SubstitutionList substitutions;
-
-    /// This is a mapping of substitutions.
+    /// substitutionMap specifies a mapping from all of the protocol and type
+    /// requirements in the generic signature down to concrete conformances and
+    /// concrete types.
     SubstitutionMap substitutionMap;
 
     /// This keeps track of the number of instructions we've evaluated.  If this
@@ -73,16 +74,10 @@ namespace {
 
   public:
     ConstExprFunctionCache(ConstExprEvaluator &evaluator, SILFunction *fn,
-                           SubstitutionList substitutions,
+                           SubstitutionMap substitutionMap,
                            unsigned &numInstEvaluated)
-      : evaluator(evaluator), fn(fn), substitutions(substitutions),
+      : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
         numInstEvaluated(numInstEvaluated) {
-
-      if (fn && !substitutions.empty()) {
-        auto signature = fn->getLoweredFunctionType()->getGenericSignature();
-        if (signature)
-          substitutionMap = signature->getSubstitutionMap(substitutions);
-      }
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
@@ -99,11 +94,15 @@ namespace {
     llvm::Optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
   private:
     Type simplifyType(Type ty);
+    CanType simplifyType(CanType ty) {
+      return simplifyType(Type(ty))->getCanonicalType();
+    }
     SymbolicValue computeConstantValue(SILValue value);
     SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
 
     SymbolicValue computeSingleStoreAddressValue(SILValue addr);
     llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
+    SymbolicValue computeLoadResult(SILValue addr);
   };
 } // end anonymous namespace
 
@@ -125,12 +124,17 @@ initLoader(std::unique_ptr<SerializedSILLoader> &silLoader, SILModule &module) {
 
 
 // TODO: refactor this out somewhere sharable between autodiff and this code.
-static SILWitnessTable *
-lookupOrLinkWitnessTable(ProtocolConformanceRef confRef, SILModule &module,
+static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
+                                     SILModule &module,
                          std::unique_ptr<SerializedSILLoader> &silLoader) {
+  // Cannot resolve abstract conformances.
+  if (!confRef.isConcrete())
+    return;
+
   auto *conf = confRef.getConcrete();
   auto wtable = module.lookUpWitnessTable(conf);
-  if (wtable) return wtable;
+  if (wtable)
+    return;
 
   auto *decl =
     conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -142,7 +146,37 @@ lookupOrLinkWitnessTable(ProtocolConformanceRef confRef, SILModule &module,
   for (auto &entry : newTable->getEntries())
     if (entry.getKind() == SILWitnessTable::WitnessKind::Method)
       entry.getMethodWitness().Witness->setLinkage(linkage);
-  return newTable;
+}
+
+/// Given the operand to a load, resolve it to a constant if possible.
+SymbolicValue ConstExprFunctionCache::computeLoadResult(SILValue addr) {
+  auto pointer = getConstantValue(addr);
+
+  // If this is a non-constant value, then we fail.
+  if (!pointer.isConstant())
+    return pointer;
+
+  // If it is some non-address value, then this is a direct reference to
+  // memory.
+  if (!pointer.isAddress())
+    return pointer;
+
+  // If this is a derived address, then we are digging into an aggregate
+  // value.
+  auto baseVal = getConstantValue(pointer.getAddressBase());
+  auto indices = pointer.getAddressIndices();
+  // Try digging through the aggregate to get to our value.
+  while (!indices.empty() &&
+         baseVal.getKind() == SymbolicValue::Aggregate) {
+    baseVal = baseVal.getAggregateValue()[indices.front()];
+    indices = indices.drop_front();
+  }
+
+  // If we successfully indexed down to our value, then we're done.
+  if (indices.empty())
+    return baseVal;
+
+  return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 }
 
 SymbolicValue ConstExprFunctionCache::computeConstantValue(SILValue value) {
@@ -222,35 +256,8 @@ SymbolicValue ConstExprFunctionCache::computeConstantValue(SILValue value) {
   // result of a call.  Either way, we ask for the value of the pointer: in the
   // former case this will be the latest value for this, in the later case, this
   // must be a single-def value for us to analyze it.
-  if (auto li = dyn_cast<LoadInst>(value)) {
-    auto result = getConstantValue(li->getOperand());
-    // If it is some non-address value, then this is a direct reference to
-    // memory.
-    if (result.isConstant() && !result.isAddress())
-      return result;
-
-    // If this is a derived address, then we are digging into an aggregate
-    // value.
-    if (result.isAddress()) {
-      auto baseVal = getConstantValue(result.getAddressBase());
-      auto indices = result.getAddressIndices();
-      // Try digging through the aggregate to get to our value.
-      while (!indices.empty() &&
-             baseVal.getKind() == SymbolicValue::Aggregate) {
-        baseVal = baseVal.getAggregateValue()[indices.front()];
-        indices = indices.drop_front();
-      }
-
-      // If we successfully indexed down to our value, then we're done.
-      if (indices.empty())
-        return baseVal;
-    }
-
-    // When accessing a var in top level code, we want to report the error at
-    // the site of the load, not the site of the memory definition.  Remap an
-    // unknown result to be the load if present.
-    return SymbolicValue::getUnknown(value, UnknownReason::Default);
-  }
+  if (auto li = dyn_cast<LoadInst>(value))
+    return computeLoadResult(li->getOperand());
 
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
@@ -266,14 +273,17 @@ SymbolicValue ConstExprFunctionCache::computeConstantValue(SILValue value) {
       module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     if (!fn) {
       // If that failed, try force loading it, and try again.
-      (void)lookupOrLinkWitnessTable(conf, wmi->getModule(),
-                                     evaluator.getSILLoader());
+      lookupOrLinkWitnessTable(conf, wmi->getModule(),
+                               evaluator.getSILLoader());
       fn = module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     }
 
     // If we were able to resolve it, then we can proceed.
     if (fn)
-      return SymbolicValue::getFunction(fn);
+      return SymbolicValue::getFunction(fn, conf);
+
+    DEBUG(llvm::errs() << "ConstExpr Unresolved witness: " << *value << "\n");
+    return SymbolicValue::getUnknown(value, UnknownReason::Default);
   }
 
   if (auto *builtin = dyn_cast<BuiltinInst>(value))
@@ -290,6 +300,9 @@ SymbolicValue ConstExprFunctionCache::computeConstantValue(SILValue value) {
     return calculatedValues[apply];
   }
 
+  // These instructions are markers that return their first operand.
+  if (auto *bai = dyn_cast<BeginAccessInst>(value))
+    return getConstantValue(bai->getOperand());
 
   DEBUG(llvm::errs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -302,6 +315,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
   const BuiltinInfo &builtin = inst->getBuiltinInfo();
 
   // Handle various cases in groups.
+  auto unknownResult = [&]() -> SymbolicValue {
+    return SymbolicValue::getUnknown(SILValue(inst), UnknownReason::Default);
+  };
 
   // Unary operations first.
   if (inst->getNumOperands() == 1) {
@@ -319,6 +335,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     // TODO: We can/should diagnose statically detectable integer overflow
     // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
     auto IntCheckedTruncFn = [&](bool srcSigned, bool dstSigned)->SymbolicValue{
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto operandVal = operand.getIntegerValue();
       uint32_t srcBitWidth = operandVal.getBitWidth();
       auto dstBitWidth =
@@ -355,6 +374,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
       return IntCheckedTruncFn(false, false);
     case BuiltinValueKind::SIToFP:
     case BuiltinValueKind::UIToFP: {
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto operandVal = operand.getIntegerValue();
       auto &semantics =
         inst->getType().castTo<BuiltinFloatType>()->getAPFloatSemantics();
@@ -371,6 +393,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     case BuiltinValueKind::ZExtOrBitCast:
     case BuiltinValueKind::SExt:
     case BuiltinValueKind::SExtOrBitCast: {
+      if (operand.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       unsigned destBitWidth =
         inst->getType().castTo<BuiltinIntegerType>()->getGreatestWidth();
 
@@ -394,6 +419,16 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
       }
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
     }
+
+    case BuiltinValueKind::PtrToInt: {
+      auto resultType = inst->getType().castTo<BuiltinIntegerType>();
+      // The only ptrtoint case we handle is from a string value to Word type,
+      // which happens in the wrapping up of strings.
+      if (operand.getKind() != SymbolicValue::String ||
+          !resultType->getWidth().isPointerWidth())
+        break;
+      return operand;
+    }
     }
   }
 
@@ -407,6 +442,10 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntCompare =
       [&](const std::function<bool(const APInt &, const APInt &)> &fn)
         -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Integer ||
+          operand1.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       auto result = fn(operand0.getIntegerValue(), operand1.getIntegerValue());
       return SymbolicValue::getInteger(APInt(1, result),
                                        evaluator.getAllocator());
@@ -414,16 +453,26 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldFPCompare =
       [&](const std::function<bool(APFloat::cmpResult result)> &fn)
         -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Float ||
+          operand1.getKind() != SymbolicValue::Float)
+        return unknownResult();
+
       auto comparison =
           operand0.getFloatValue().compare(operand1.getFloatValue());
       return SymbolicValue::getInteger(APInt(1, fn(comparison)),
                                        evaluator.getAllocator());
     };
 
+#define REQUIRE_KIND(KIND)                          \
+  if (operand0.getKind() != SymbolicValue::KIND ||  \
+      operand1.getKind() != SymbolicValue::KIND)    \
+      return unknownResult();
+
     switch (builtin.ID) {
     default: break;
 #define INT_BINOP(OPCODE, EXPR)                                            \
     case BuiltinValueKind::OPCODE: {                                       \
+      REQUIRE_KIND(Integer)                                                \
       auto l = operand0.getIntegerValue(), r = operand1.getIntegerValue(); \
       return SymbolicValue::getInteger((EXPR), evaluator.getAllocator());  \
     }
@@ -443,6 +492,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 #undef INT_BINOP
 #define FP_BINOP(OPCODE, EXPR)                                           \
     case BuiltinValueKind::OPCODE: {                                     \
+      REQUIRE_KIND(Float)                                                \
       auto l = operand0.getFloatValue(), r = operand1.getFloatValue();   \
       return SymbolicValue::getFloat((EXPR), evaluator.getAllocator());  \
     }
@@ -455,6 +505,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 
 #define INT_COMPARE(OPCODE, EXPR)                                              \
     case BuiltinValueKind::OPCODE:                                             \
+      REQUIRE_KIND(Integer)                                                    \
       return constFoldIntCompare([&](const APInt &l, const APInt &r) -> bool { \
         return (EXPR);                                                         \
       })
@@ -471,6 +522,7 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
 #undef INT_COMPARE
 #define FP_COMPARE(OPCODE, EXPR)                                         \
     case BuiltinValueKind::OPCODE:                                       \
+      REQUIRE_KIND(Float)                                                \
       return constFoldFPCompare([&](APFloat::cmpResult result) -> bool { \
         return (EXPR);                                                   \
       })
@@ -495,9 +547,9 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     FP_COMPARE(FCMP_UNE, result != APFloat::cmpEqual);
     FP_COMPARE(FCMP_UNO, result == APFloat::cmpUnordered);
 #undef FP_COMPARE
+#undef REQUIRE_KIND
     }
   }
-
 
   // Three operand builtins.
   if (inst->getNumOperands() == 3) {
@@ -513,13 +565,17 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntOverflow =
       [&](const std::function<APInt(const APInt &, const APInt &, bool &)> &fn)
             -> SymbolicValue {
+      if (operand0.getKind() != SymbolicValue::Integer ||
+          operand1.getKind() != SymbolicValue::Integer)
+        return unknownResult();
+
       // TODO: We can/should diagnose statically detectable integer overflow
       // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
       auto l = operand0.getIntegerValue(), r = operand1.getIntegerValue();
       bool overflowed = false;
       auto result = fn(l, r, overflowed);
       auto &allocator = evaluator.getAllocator();
-      // Build the Symbolic value result for our truncated value.
+      // Build the Symbolic value result for our normal and overflow bit.
       return SymbolicValue::getAggregate({
         SymbolicValue::getInteger(result, allocator),
         SymbolicValue::getInteger(APInt(1, overflowed), allocator)
@@ -545,12 +601,25 @@ ConstExprFunctionCache::computeConstantValueBuiltin(BuiltinInst *inst) {
     }
   }
 
+  // Handle LLVM intrinsics.
+  auto &intrinsic = inst->getIntrinsicInfo();
+  switch (intrinsic.ID) {
+  default: break;
+  case llvm::Intrinsic::expect:
+    // llvm.expect(x, y) always lowers to x.
+    return getConstantValue(inst->getOperand(0));
+  }
+
+
   DEBUG(llvm::errs() << "ConstExpr Unknown Builtin: " << *inst << "\n");
 
   // Otherwise, we don't know how to handle this builtin.
-  return SymbolicValue::getUnknown(SILValue(inst), UnknownReason::Default);
+  return unknownResult();
 }
 
+SubstitutionMap
+getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
+                              ProtocolConformanceRef CRef);
 
 /// Given a call to a function, determine whether it is a call to a constexpr
 /// function.  If so, collect its arguments as constants, fold it and return
@@ -582,19 +651,22 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
   if (!calleeLV.isConstant())
     return failure(UnknownReason::Default);
 
-  SILFunction *callee = calleeLV.getFunctionValue();
+  SILFunction *callee;
+  Optional<ProtocolConformanceRef> conformance;
+  std::tie(callee, conformance) = calleeLV.getFunctionValue();
+
 
   // If we reached an external function that hasn't been deserialized yet, make
   // sure to pull it in so we can see its body.  If that fails, then we can't
   // analyze the function.
   if (callee->isExternalDeclaration()) {
-    callee = initLoader(evaluator.getSILLoader(),
-                        callee->getModule()).lookupSILFunction(callee);
-    if (!callee || callee->isExternalDeclaration()) {
-      DEBUG(llvm::errs() << "ConstExpr Opaque Callee: "
-                         << *calleeLV.getFunctionValue() << "\n");
+    auto newCallee = initLoader(evaluator.getSILLoader(),
+                                callee->getModule()).lookupSILFunction(callee);
+    if (!newCallee || newCallee->isExternalDeclaration()) {
+      DEBUG(llvm::errs() << "ConstExpr Opaque Callee: " << *callee << "\n");
       return failure(UnknownReason::Default);
     }
+    callee = newCallee;
   }
 
   // TODO: Verify that the callee was defined as a @constexpr function.
@@ -613,12 +685,42 @@ ConstExprFunctionCache::computeCallResult(ApplyInst *apply) {
     paramConstants.push_back(cst);
   }
 
+  // Compute the substitution map for the callee, which maps from all of its
+  // generic requirements to concrete conformances and concrete types.
+  SubstitutionMap calleeSubMap;
+
+  auto calleeFnType = callee->getLoweredFunctionType();
+  if (auto signature = calleeFnType->getGenericSignature()) {
+    ApplySite AI(apply);
+
+    // Get the substitution map of the call.  This maps from the callee's space
+    // into the caller's world.
+    SubstitutionMap callSubMap;
+    if (conformance.hasValue()) {
+      // Witness methods have special magic that is required to resolve them.
+      callSubMap = getWitnessMethodSubstitutions(apply->getModule(), AI, callee,
+                                                 conformance.getValue());
+    } else {
+      auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
+      callSubMap =
+        requirementSig->getSubstitutionMap(apply->getSubstitutions());
+    }
+
+
+    // The substitution map for the callee is the composition of the callers
+    // substitution map (which is always type/conformance to a concrete type
+    // or conformance, with the mapping introduced by the call itself.  This
+    // ensures that the callee's substitution map can map from its type
+    // namespace back to concrete types and conformances.
+    calleeSubMap = callSubMap.subst(substitutionMap);
+  }
+
   // Now that have successfully folded all of the parameters, we can evaluate
   // the call.
   SmallVector<SymbolicValue, 4> results;
   auto callResult =
-    evaluateAndCacheCall(*callee, apply->getSubstitutions(),
-                         paramConstants, results, numInstEvaluated, evaluator);
+    evaluateAndCacheCall(*callee, calleeSubMap, paramConstants, results,
+                         numInstEvaluated, evaluator);
   if (callResult.hasValue())
     return callResult.getValue();
 
@@ -673,16 +775,23 @@ ConstExprFunctionCache::computeSingleStoreAddressValue(SILValue addr) {
 
     // TODO: BeginAccess/EndAccess.
 
-#if 0
+    // TODO: CopyAddr.
+
     // If this is a store *to* the memory, analyze the input value.
     if (auto *si = dyn_cast<StoreInst>(user)) {
       if (use->getOperandNumber() == 1) {
-      TODO: implement;
+
+        // If we have already found a value for this stack slot then we're done
+        // - we don't support multiple assignment.
+        if (result.getKind() != SymbolicValue::UninitMemory)
+          return SymbolicValue::getUnknown(addr, UnknownReason::Default);
+
+        result = getConstantValue(si->getOperand(0));
+        if (!result.isConstant())
+          return result;
         continue;
       }
     }
-#endif
-    // TODO: CopyAddr.
 
     // If this is an apply_inst passing the memory address as an indirect
     // result operand, then we have a call that fills in this result.
@@ -766,24 +875,57 @@ SymbolicValue ConstExprFunctionCache::getConstantValue(SILValue value) {
 ///
 static bool updateIndexedElement(SymbolicValue &aggregate,
                                  ArrayRef<unsigned> indices,
-                                 SymbolicValue scalar,
+                                 SymbolicValue scalar, Type type,
                                  llvm::BumpPtrAllocator &allocator) {
   // We're done if we've run out of indices.
-  if (indices.empty())
+  if (indices.empty()) {
+    aggregate = scalar;
     return false;
+  }
 
-  // TODO: We should handle updates into uninit memory as well.  TODO: we need
-  // to know something about its shape/type to do that because we need to turn
-  // it into an aggregate.  Maybe uninit should only be for scalar values?
+  // If we have a non-aggregate then fail.  If we have an uninit memory, then
+  // scalarize it into an aggregate to continue.  This happens when memory
+  // objects are initialized piecewise.
+  if (aggregate.getKind() != SymbolicValue::Aggregate) {
+    if (aggregate.getKind() != SymbolicValue::UninitMemory)
+      return true;
 
-  if (aggregate.getKind() != SymbolicValue::Aggregate)
+    unsigned numMembers;
+    // We need to have either a struct or a tuple type.
+    if (auto *decl = type->getStructOrBoundGenericStruct()) {
+      numMembers = std::distance(decl->getStoredProperties().begin(),
+                                 decl->getStoredProperties().end());
+    } else if (auto tuple = type->getAs<TupleType>()) {
+      numMembers = tuple->getNumElements();
+    } else {
+      return true;
+    }
+
+    SmallVector<SymbolicValue, 4> newElts(numMembers,
+                                          SymbolicValue::getUninitMemory());
+    aggregate = SymbolicValue::getAggregate(newElts, allocator);
+  }
+
+  unsigned elementNo = indices.front();
+  Type eltType;
+
+  // We need to have either a struct or a tuple type.
+  if (auto *decl = type->getStructOrBoundGenericStruct()) {
+    auto it = decl->getStoredProperties().begin();
+    std::advance(it, elementNo);
+    eltType = (*it)->getType();
+  } else if (auto tuple = type->getAs<TupleType>()) {
+    assert(elementNo < tuple->getNumElements() && "invalid index");
+    eltType = tuple->getElement(elementNo).getType();
+  } else {
     return true;
+  }
 
   // Update the indexed element of the aggregate.
   auto oldElts = aggregate.getAggregateValue();
   SmallVector<SymbolicValue, 4> newElts(oldElts.begin(), oldElts.end());
-  if (updateIndexedElement(newElts[indices.front()], indices.drop_front(),
-                           scalar, allocator))
+  if (updateIndexedElement(newElts[elementNo], indices.drop_front(),
+                           scalar, eltType, allocator))
     return true;
 
   aggregate = SymbolicValue::getAggregate(newElts, allocator);
@@ -796,7 +938,11 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// information about an error on failure.
 llvm::Optional<SymbolicValue>
 ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
-  if (isa<DebugValueInst>(inst))
+  // These are just markers.
+  if (isa<DebugValueInst>(inst) || isa<DebugValueAddrInst>(inst) ||
+      isa<EndAccessInst>(inst) ||
+      // Constant have no important state.
+      isa<DestroyAddrInst>(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,
@@ -826,37 +972,67 @@ ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
   if (auto apply = dyn_cast<ApplyInst>(inst))
     return computeCallResult(apply);
 
+
+  // We have a couple forms of store instruction, this is the logic for handling
+  // storing of a constant to memory.
+  auto evaluateFSStore = [&](SymbolicValue storedCst, SILValue dest) ->
+                               llvm::Optional<SymbolicValue> {
+    // Only update existing memory locations that we're tracking.
+    auto it = calculatedValues.find(dest);
+    if (it == calculatedValues.end())
+      return SymbolicValue::getUnknown(inst, UnknownReason::Default);
+
+    // If this is a direct store to tracked memory object, just update it.
+    if (!it->second.isAddress()) {
+      it = calculatedValues.find(dest);
+      assert(it != calculatedValues.end());
+      it->second = storedCst;
+      return None;
+    }
+
+    // Otherwise, this is a store to a derived address, update the element of
+    // the base value.
+    auto base = it->second.getAddressBase();
+    auto baseVal = getConstantValue(base);
+    auto baseType = simplifyType(base->getType().getSwiftRValueType());
+    auto indices = it->second.getAddressIndices();
+
+    if (updateIndexedElement(baseVal, indices, storedCst, baseType,
+                             evaluator.getAllocator()))
+      return SymbolicValue::getUnknown(inst, UnknownReason::Default);
+
+    it = calculatedValues.find(base);
+    assert(it != calculatedValues.end());
+    it->second = baseVal;
+    return None;
+  };
+
   if (auto *store = dyn_cast<StoreInst>(inst)) {
     auto stored = getConstantValue(inst->getOperand(0));
     if (!stored.isConstant())
       return stored;
 
-    // Only update existing memory locations that we're tracking.
-    auto it = calculatedValues.find(inst->getOperand(1));
-    if (it == calculatedValues.end())
-      return SymbolicValue::getUnknown(inst, UnknownReason::Default);
+    return evaluateFSStore(stored, inst->getOperand(1));
+  }
 
-    // If this is a store to an address, update the element of the base value.
-    if (it->second.isAddress()) {
-      auto baseVal = getConstantValue(it->second.getAddressBase());
-      auto indices = it->second.getAddressIndices();
+  // Copy addr is a load + store combination.
+  if (auto *copy = dyn_cast<CopyAddrInst>(inst)) {
+    auto value = computeLoadResult(copy->getOperand(0));
+    if (!value.isConstant())
+      return value;
 
-      if (updateIndexedElement(baseVal, indices, stored,
-                               evaluator.getAllocator()))
-        return SymbolicValue::getUnknown(inst, UnknownReason::Default);
-      stored = baseVal;
-    }
-
-    it->second = stored;
-    return None;
+    return evaluateFSStore(value, copy->getOperand(1));
   }
 
   // If the instruction produces normal results, try constant folding it.
   // If this fails, then we fail.
   if (inst->getNumResults() != 0) {
     auto result = getConstantValue(inst->getResults()[0]);
-    if (result.isConstant()) return None;
-    return result;
+    if (!result.isConstant())
+      return result;
+
+    DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+    return None;
   }
 
   DEBUG(llvm::errs() << "ConstExpr Unknown FS: " << *inst << "\n");
@@ -868,14 +1044,15 @@ ConstExprFunctionCache::evaluateFlowSensitive(SILInstruction *inst) {
 /// Evaluate a call to the specified function as if it were a constant
 /// expression, returning None and filling in `results` on success, or
 /// returning an 'Unknown' SymbolicValue on failure carrying the error.
+///
 static llvm::Optional<SymbolicValue>
-evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
+evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
                      ConstExprEvaluator &evaluator) {
   assert(!fn.isExternalDeclaration() && "Can't analyze bodyless function");
-  ConstExprFunctionCache cache(evaluator, &fn, substitutions,
+  ConstExprFunctionCache cache(evaluator, &fn, substitutionMap,
                                numInstEvaluated);
 
   // TODO: implement caching.
@@ -885,6 +1062,12 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
   auto conventions = fn.getConventions();
   unsigned nextBBArg = 0;
   const auto &argList = fn.front().getArguments();
+
+  DEBUG(llvm::errs().changeColor(raw_ostream::SAVEDCOLOR, /*bold*/true)
+        << "\nConstExpr call fn: "
+        << Demangle::demangleSymbolAsString(fn.getName());
+        llvm::errs().resetColor()
+        << "\n");
 
   for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i)
     cache.setValue(argList[nextBBArg++], SymbolicValue::getUninitMemory());
@@ -905,6 +1088,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
 
   while (1) {
     SILInstruction *inst = &*nextInst++;
+    DEBUG(llvm::errs() << "ConstExpr interpret: "; inst->dump());
 
     // Make sure we haven't exceeded our interpreter iteration cap.
     if (++numInstEvaluated > ConstExprLimit)
@@ -945,6 +1129,8 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
       }
 
       // TODO: Handle caching of results.
+
+      DEBUG(llvm::errs() << "\n");
       return None;
     }
 
@@ -953,13 +1139,13 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
 
       // If we've already visited this block then fail - we have a loop.
       if (!visitedBlocks.insert(destBB).second)
-        return SymbolicValue::getUnknown(br, UnknownReason::Default);
+        return SymbolicValue::getUnknown(br, UnknownReason::Loop);
 
       // Set up basic block arguments.
       for (unsigned i = 0, e = br->getNumArgs(); i != e; ++i) {
-        auto argument = cache.getConstantValue(destBB->getArgument(i));
+        auto argument = cache.getConstantValue(br->getArg(i));
         if (!argument.isConstant()) return argument;
-        cache.setValue(br->getArg(i), argument);
+        cache.setValue(destBB->getArgument(i), argument);
       }
       // Set the instruction pointer to the first instruction of the block.
       nextInst = destBB->begin();
@@ -968,7 +1154,8 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
 
     if (auto *cbr = dyn_cast<CondBranchInst>(inst)) {
       auto val = cache.getConstantValue(inst->getOperand(0));
-      if (!val.isConstant()) return val;
+      if (!val.isConstant())
+        return val;
 
       SILBasicBlock *destBB;
       if (!val.getIntegerValue())
@@ -978,7 +1165,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionList substitutions,
 
       // If we've already visited this block then fail - we have a loop.
       if (!visitedBlocks.insert(destBB).second)
-        return SymbolicValue::getUnknown(cbr, UnknownReason::Default);
+        return SymbolicValue::getUnknown(cbr, UnknownReason::Loop);
 
       nextInst = destBB->begin();
       continue;
