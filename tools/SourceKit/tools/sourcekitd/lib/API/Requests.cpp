@@ -415,6 +415,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     Optional<StringRef> Name = Req.getString(KeyName);
     if (!Name.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
+    if (Name->empty())
+      return Rec(createErrorRequestInvalid("empty 'key.name'"));
     std::unique_ptr<llvm::MemoryBuffer>
     InputBuf = getInputBufForRequest(SourceFile, SourceText, ErrBuf);
     if (!InputBuf)
