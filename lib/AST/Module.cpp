@@ -1362,7 +1362,8 @@ std::vector<Token> &SourceFile::getTokenVector() {
 }
 
 ArrayRef<Token> SourceFile::getAllTokens() const {
-  assert(shouldCollectToken() && "Disabled");
+  if (!shouldCollectToken())
+    return {};
   return *AllCorrectedTokens;
 }
 
