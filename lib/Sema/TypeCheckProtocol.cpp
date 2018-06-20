@@ -2774,7 +2774,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
         if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
-          auto isMemberwiseInitializer = decl->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+          auto isMemberwiseInitializer =
+              decl->getBodyKind() ==
+              AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
           if (isMemberwiseInitializer) {
             return;
           }
