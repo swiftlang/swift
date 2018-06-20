@@ -1210,6 +1210,16 @@ extension NSURL : _HasCustomAnyHashableRepresentation {
     }
 }
 
+extension URL {
+    //Simple Fetching value in Query String URL 
+    func fetch(key:String) -> String? {
+        if let uri = URLComponents(string: self.absoluteString){
+            return uri.queryItems?.first(where: {$0.name == key})?.value;
+        }
+        return nil;
+    }
+}
+
 extension URL : CustomPlaygroundQuickLookable {
     @available(*, deprecated, message: "URL.customPlaygroundQuickLook will be removed in a future Swift version")
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
