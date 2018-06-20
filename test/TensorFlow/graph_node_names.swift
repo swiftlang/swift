@@ -21,9 +21,9 @@ func main() {
 
 main()
 
-/// CHECK-LABEL:         op: "Sin"
-
-/// CHECK-LABEL:         op: "Const"
+/// CHECK: op: "Const"
+/// CHECK: op: "Sin"
+/// CHECK: op: "Add"
 
 /// FIXME: Currently the performance inliner is not capturing inlining trace for
 /// some reason. When that's fixed, add checks in this file.

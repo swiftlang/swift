@@ -580,7 +580,7 @@ static std::string escapeDeclName(DeclName name) {
   for (char &c : buffer) {
     if (c == '(' || c == ')')
       c = '.';
-    if (c == ':')
+    else if (!llvm::isAlnum(c))
       c = '_';
   }
   return newName.str();
