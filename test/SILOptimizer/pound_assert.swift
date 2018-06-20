@@ -112,8 +112,6 @@ func substitutionsF<T: SubstitutionsP>(_: T.Type) -> T {
 }
 
 func testProto() {
-  // This is because our memory representation is not correct.
-  // BUG: expected-error @+1 {{#assert condition not constant}}
   #assert(substitutionsF(SubstitutionsX.self).getState() == 123)
 }
 
