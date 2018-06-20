@@ -715,11 +715,14 @@ bool TypeChecker::isCompatibleWithVectorAutoDiff(Type type, DeclContext *DC) {
 
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the function declaration corresponding to the given function name and
-// lookup context. If the function declaration cannot be resolved, emits a
-// diagnostic and returns nullptr.
+// lookup context. If the base type of the function is specified, member lookup
+// is performed. Otherwise, unqualified lookup is performed.
+// If the function declaration cannot be resolved, emits a diagnostic and
+// returns nullptr.
 FuncDecl *
 TypeChecker::lookupFuncDecl(
-    DeclName funcName, SourceLoc funcNameLoc, DeclContext *lookupContext,
+    DeclName funcName, SourceLoc funcNameLoc, Type baseType,
+    DeclContext *lookupContext,
     const std::function<bool(FuncDecl *)> &isValidFuncDecl,
     const std::function<void()> &overloadDiagnostic,
     const std::function<void()> &ambiguousDiagnostic,
@@ -731,30 +734,35 @@ TypeChecker::lookupFuncDecl(
   FuncDecl *resolvedFuncDecl = nullptr;
 
   // Perform lookup.
-  auto results =
-    lookupUnqualified(lookupContext, funcName, funcNameLoc, lookupOptions);
+  LookupResult results;
+  if (baseType) {
+    results = lookupMember(lookupContext, baseType, funcName);
+  } else {
+    results =
+      lookupUnqualified(lookupContext, funcName, funcNameLoc, lookupOptions);
 
-  // If looking up an operator within a type context, look specifically within
-  // the type context.
-  // This works around the fact that operators cannot be specified with a
-  // qualified name (i.e. only `(+)` works, `Float.(+)` doesn't).
-  if (funcName.isOperator() && lookupContext->isTypeContext()) {
-    if (auto tmp = lookupMember(lookupContext,
-                                lookupContext->getSelfTypeInContext(),
-                                funcName))
-      results = tmp;
-  }
-  // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
-  // Swift 3. The code below is a workaround for resolving them.
-  //
-  // This is necessary because the stdlib is compiled with `-swift-version 3`
-  // for Swift 3 compatibility, and floating point types use the
-  // `@differentiable` attribute with static adjoint methods (such as
-  // `_adjointAdd`).
-  else if (lookupContext->getASTContext().isSwiftVersion3() &&
-           results.empty() && lookupContext->isTypeContext()) {
-    results = lookupMember(lookupContext, lookupContext->getSelfTypeInContext(),
-                           funcName);
+    // If looking up an operator within a type context, look specifically within
+    // the type context.
+    // This tries to resolve unqualified operators, like `+`.
+    if (funcName.isOperator() && lookupContext->isTypeContext()) {
+      if (auto tmp = lookupMember(lookupContext,
+                                  lookupContext->getSelfTypeInContext(),
+                                  funcName))
+        results = tmp;
+    }
+    // Note: static methods are omitted from `TypeChecker.lookupUnqualified` in
+    // Swift 3. The code below is a workaround for resolving them.
+    //
+    // This is necessary because the stdlib is compiled with `-swift-version 3`
+    // for Swift 3 compatibility, and floating point types use the
+    // `@differentiable` attribute with static adjoint methods (such as
+    // `_adjointAdd`).
+    else if (lookupContext->getASTContext().isSwiftVersion3() &&
+             results.empty() && lookupContext->isTypeContext()) {
+      results = lookupMember(lookupContext,
+                             lookupContext->getSelfTypeInContext(),
+                             funcName);
+    }
   }
 
   // Initialize error flags.
@@ -773,11 +781,9 @@ TypeChecker::lookupFuncDecl(
       notAFuncDecl = true;
       continue;
     }
-    if (hasValidTypeCtx.hasValue()) {
-      if (hasValidTypeCtx && !(*hasValidTypeCtx)(funcDecl)) {
-        wrongTypeContext = true;
-        continue;
-      }
+    if (hasValidTypeCtx && !(*hasValidTypeCtx)(funcDecl)) {
+      wrongTypeContext = true;
+      continue;
     }
     if (!isValidFuncDecl(funcDecl)) {
       overloadNotFound = true;

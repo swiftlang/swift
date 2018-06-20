@@ -3015,9 +3015,37 @@ visitValueAndGradientExpr(ValueAndGradientExpr *E, SGFContext C) {
   return emitGradientInst(*this, C, E, /*isValueAndGrad*/ true);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 RValue RValueEmitter::
 visitAdjointExpr(AdjointExpr *E, SGFContext C) {
-  llvm_unreachable("handle #adjoint");
+  ConcreteDeclRef adjointFunc = E->getAdjointFunction();
+  FuncDecl *adjointDecl = cast<FuncDecl>(adjointFunc.getDecl());
+  SILLocation loc(adjointDecl);
+  SILDeclRef adjointDeclRef(adjointDecl);
+
+  // If adjoint has multiple parameter lists, mark as curried.
+  if (adjointDecl->getNumParameterLists() >= 2) {
+    adjointDeclRef = adjointDeclRef.asCurried();
+  }
+  auto adjointInfo = SGF.getConstantInfo(adjointDeclRef);
+
+  // Convert function ref to thick function type.
+  if (!adjointDecl->isStatic()) {
+    auto resultTy = E->getType()->getCanonicalType();
+    ManagedValue result =
+      SGF.emitClosureValue(loc, adjointDeclRef, resultTy,
+                           adjointFunc.getSubstitutions().toList());
+    return RValue(SGF, loc, resultTy, result);
+  }
+  // Otherwise, apply metatype to static adjoint method.
+  SILValue ref = SGF.emitGlobalFunctionRef(loc, adjointDeclRef, adjointInfo);
+  auto subs = adjointFunc.getSubstitutions();
+  auto baseMeta = adjointInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs)
+    ->getSelfParameter().getType();
+  auto metatype = SGF.B.createMetatype(loc, SGF.getLoweredType(baseMeta));
+  auto apply = SGF.B.createApply(loc, ref, subs.toList(), { metatype }, false);
+  ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(apply);
+  return RValue(SGF, E, adjointValue);
 }
 
 RValue RValueEmitter::

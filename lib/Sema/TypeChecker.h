@@ -2547,7 +2547,8 @@ public:
   // lookup context. If the function declaration cannot be resolved, emits a
   // diagnostic and returns nullptr.
   FuncDecl *lookupFuncDecl(
-      DeclName funcName, SourceLoc funcNameLoc, DeclContext *lookupContext,
+      DeclName funcName, SourceLoc funcNameLoc, Type baseType,
+      DeclContext *lookupContext,
       const std::function<bool(FuncDecl *)> &isValidFuncDecl,
       const std::function<void()> &overloadDiagnostic,
       const std::function<void()> &ambiguousDiagnostic,
