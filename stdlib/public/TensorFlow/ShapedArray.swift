@@ -23,7 +23,7 @@ import CTensorFlow
 /// mode, the buffer object stores a `TF_Tensor*` and bridges to TensorFlow.
 /// In either mode, the buffer object owns the memory and will deallocate it
 /// on `deinit`.
-@_fixed_layout @_versioned
+@_fixed_layout @usableFromInline
 internal final class TensorBuffer<Scalar> {
   typealias Shape = [Int]
 
@@ -31,7 +31,7 @@ internal final class TensorBuffer<Scalar> {
   /// - Note: an Array is used as the native storage for `TensorBuffer`. To make
   /// in-place mutation possible when the array is stored in an enum value, the
   /// array must be wrapped in a reference type.
-  @_fixed_layout @_versioned
+  @_fixed_layout @usableFromInline
   final class BoxedArray {
     var array: [Scalar]
 
@@ -318,7 +318,7 @@ fileprivate extension ShapedArray {
 }
 
 internal extension ShapedArray where Scalar : AccelerableByTensorFlow {
-  @_versioned
+  @usableFromInline
   init(owning cTensor: CTensor) {
     // Including \(Scalar.self) into the message would cause non-deterministic
     // crashes.
@@ -507,7 +507,7 @@ extension ShapedArray where Scalar : AccelerableByTensorFlow {
     return MemoryLayout<Scalar>.stride * scalarCount
   }
 
-  @_versioned
+  @usableFromInline
   func makeTensorHandle() -> TensorHandle<Scalar> {
     // This initializer is designed to optimize conversion from TF-allocated
     // `ShapedArray` instances.
@@ -543,7 +543,7 @@ public extension Tensor where Scalar : AccelerableByTensorFlow {
 extension ShapedArray : ExpressibleByArrayLiteral
   where Scalar : AccelerableByTensorFlow {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
     self = Tensor<Scalar>(tensorElementLiterals: elements).array
   }
@@ -632,15 +632,15 @@ extension ShapedArray : CustomReflectable {
 @_fixed_layout
 public struct ShapedArraySlice<Scalar> : _ShapedArrayProtocol {
   /// The underlying `ShapedArray` of the slice.
-  @_versioned internal var base: ShapedArray<Scalar>
+  @usableFromInline internal var base: ShapedArray<Scalar>
   /// The subdimensional indices of a slice.
-  @_versioned internal var baseIndices: [Int]
+  @usableFromInline internal var baseIndices: [Int]
   /// The subarray bounds of a slice.
-  @_versioned internal var bounds: Range<Int>?
+  @usableFromInline internal var bounds: Range<Int>?
 
   /// Creates a `ShapedArraySlice` from a base `ShapedArray`, with the specified
   /// subdimensional indices and subarray bounds.
-  @_versioned @_inlineable
+  @inlinable
   internal init(
     base: ShapedArray<Scalar>,
     baseIndices indices: [Int] = [],
@@ -855,7 +855,7 @@ public extension ShapedArraySlice where Scalar : AccelerableByTensorFlow {
 extension ShapedArraySlice : ExpressibleByArrayLiteral
   where Scalar : AccelerableByTensorFlow {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
     self.init(base: Tensor(tensorElementLiterals: elements).array)
   }

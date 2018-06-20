@@ -36,7 +36,7 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
   /// normally be used otherwise.
   public let handle: TensorHandle<Scalar>
 
-  @_inlineable
+  @inlinable
   public init(handle: TensorHandle<Scalar>) {
     self.handle = handle
   }
@@ -54,14 +54,14 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
 // TODO: These would be nicer defined as builtins rather than "well known
 // functions".
 
-@_versioned @inline(never)
+@usableFromInline @inline(never)
 @_silgen_name("__tf_send")
 @effects(readnone)
 func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
 
-@_versioned @inline(never)
+@usableFromInline @inline(never)
 @_silgen_name("__tf_receive")
 func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
   -> TensorHandle<Scalar> {
@@ -72,14 +72,14 @@ func _TFReceive<Scalar>(_ handle: TensorHandle<Scalar>)
 /// into the scalar that it produces. This is intended for use in op definitions
 /// where it is known that the op always returns a 0-d tensor. It is not for use
 /// in general code.
-@_versioned @_inlineable @inline(__always)
+@inlinable @inline(__always)
 func _TFGetScalarOrDie<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar {
   return Scalar._getScalarOrDie(handle)
 }
 
 /// This function converts a `TensorHandle` into a scalar if it is 0-d, or
 /// returns nil otherwise.
-@_versioned @_inlineable @inline(__always)
+@inlinable @inline(__always)
 func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
   return Scalar._getScalar(handle)
 }
@@ -87,7 +87,7 @@ func _TFGetScalar<Scalar>(_ handle: TensorHandle<Scalar>) -> Scalar? {
 /// This compiler builtin is known by the partitioning pass, which recognizes it
 /// and promotes calls to it to being in graph when it can. This signature was
 /// designed to align with the requirements of the `Const` TensorFlow operation.
-@_versioned @inline(never)
+@usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars")
 func _TFTensorFromScalars<Scalar>(
   _ scalars: [Scalar], shape: [Int32]
@@ -105,19 +105,19 @@ func _TFTensorFromScalars<Scalar>(
   )
 }
 
-@_versioned @_inlineable @inline(__always)
+@inlinable @inline(__always)
 func _TFMakeScalarTensor<Scalar>(_ scalar: Scalar) -> TensorHandle<Scalar> {
   return Scalar._makeScalarTensor(scalar)
 }
 
-@_versioned @inline(never)
+@usableFromInline @inline(never)
 @_silgen_name("__tf_tensor_from_scalars_1d")
 func _TFTensorFromScalars1D<Scalar>(_ scalars: [Scalar])
   -> TensorHandle<Scalar> {
   return _TFTensorFromScalars(scalars, shape: [Int32(scalars.count)])
 }
 
-@_versioned @_inlineable @inline(__always)
+@inlinable @inline(__always)
 func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
   -> TensorHandle<Scalar> {
   return Scalar._hoistableClosure(fn)
@@ -130,13 +130,13 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 /// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
   /// Mark memory transfer to device.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func toDevice() -> Tensor {
     return Tensor(handle: _TFSend(handle))
   }
 
   /// Mark memory transfer to host.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func toHost() -> Tensor {
     return Tensor(handle: _TFReceive(handle))
   }
@@ -148,7 +148,7 @@ public extension Tensor {
 
 public extension Tensor where Scalar : Numeric {
   /// Perform an element-wise conversion from another `Tensor`.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init<OtherScalar : Numeric>(_ other: Tensor<OtherScalar>) {
     self = Raw.cast(other)
   }
@@ -156,14 +156,14 @@ public extension Tensor where Scalar : Numeric {
 
 public extension Tensor {
   /// Creates a tensor from a scalar value.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(_ value: Scalar) {
     self.init(handle: _TFMakeScalarTensor(value))
   }
 
   /// Creates a tensor from an array of tensors (which may themselves be
   /// scalars).
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(_ elements: [Tensor]) {
     self = Raw.pack(values: elements)
   }
@@ -175,7 +175,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(_ vector: [Scalar]) {
     self.init(handle: _TFTensorFromScalars1D(vector))
   }
@@ -187,7 +187,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init<C : RandomAccessCollection>(_ vector: C) where C.Element == Scalar {
     let handle = _TFHoistable {
       TensorHandle<Scalar>(
@@ -213,7 +213,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(shape: TensorShape, scalars: [Scalar]) {
     // NOTE: We use `_TFTensorFromScalars` here so the compiler can try to
     // promote constants and avoid copies.
@@ -229,7 +229,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(shape: TensorShape, scalars: UnsafeBufferPointer<Scalar>) {
     let handle: TensorHandle<Scalar> = _TFHoistable {
       precondition(scalars.count == shape.contiguousSize)
@@ -253,7 +253,7 @@ public extension Tensor {
   /// - Precondition: The number of scalars must equal the product of the
   ///   dimensions of the shape.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init<C : RandomAccessCollection>(shape: TensorShape, scalars: C)
     where C.Element == Scalar {
     let handle: TensorHandle<Scalar> = _TFHoistable {
@@ -278,7 +278,7 @@ public extension Tensor {
   ///   - shape: The dimensions of the tensor.
   ///   - repeatedValue: The scalar value to repeat.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(shape: TensorShape, repeating repeatedValue: Scalar) {
     self = Raw.fill(
       dims: Tensor<Int32>(shape.dimensions), value: Tensor(repeatedValue))
@@ -286,7 +286,7 @@ public extension Tensor {
 
   /// Creates a tensor by broadcasting the given scalar to a given rank with
   /// all dimensions being 1.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(broadcasting scalar: Scalar, rank: Int32) {
     let shapeTensor = Tensor<Int32>(shape: [rank], repeating: 1)
     self = Raw.fill(dims: shapeTensor, value: Tensor(scalar))
@@ -295,7 +295,7 @@ public extension Tensor {
   /// Creates a tensor of shape `[4]` from a 4-tuple.
   /// - Note: This is intended for internal use, for example, to initialize a
   ///   tensor attribute from `convolved2D`'s `strides` argument.
-  @_versioned @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   internal init(_ scalars: (Scalar, Scalar, Scalar, Scalar)) {
     self.init([scalars.0, scalars.1, scalars.2, scalars.3])
   }
@@ -354,14 +354,14 @@ public extension Tensor {
 public struct TensorElementLiteral<Scalar> : TensorProtocol
   where Scalar : AccelerableByTensorFlow {
 
-  @_versioned let tensor: Tensor<Scalar>
+  @usableFromInline let tensor: Tensor<Scalar>
 
-  @_inlineable
+  @inlinable
   public var handle: TensorHandle<Scalar> {
     return tensor.handle
   }
 
-  @_inlineable
+  @inlinable
   public init(handle: TensorHandle<Scalar>) {
     tensor = Tensor(handle: handle)
   }
@@ -370,7 +370,7 @@ public struct TensorElementLiteral<Scalar> : TensorProtocol
 extension TensorElementLiteral : ExpressibleByBooleanLiteral
   where Scalar : ExpressibleByBooleanLiteral {
   public typealias BooleanLiteralType = Scalar.BooleanLiteralType
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(booleanLiteral: BooleanLiteralType) {
     tensor = Tensor(Scalar(booleanLiteral: booleanLiteral))
   }
@@ -379,7 +379,7 @@ extension TensorElementLiteral : ExpressibleByBooleanLiteral
 extension TensorElementLiteral : ExpressibleByIntegerLiteral
   where Scalar : ExpressibleByIntegerLiteral {
   public typealias IntegerLiteralType = Scalar.IntegerLiteralType
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(integerLiteral: IntegerLiteralType) {
     tensor = Tensor(Scalar(integerLiteral: integerLiteral))
   }
@@ -388,7 +388,7 @@ extension TensorElementLiteral : ExpressibleByIntegerLiteral
 extension TensorElementLiteral : ExpressibleByFloatLiteral
   where Scalar : ExpressibleByFloatLiteral {
   public typealias FloatLiteralType = Scalar.FloatLiteralType
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(floatLiteral: FloatLiteralType) {
     tensor = Tensor(Scalar(floatLiteral: floatLiteral))
   }
@@ -396,7 +396,7 @@ extension TensorElementLiteral : ExpressibleByFloatLiteral
 
 extension TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
     tensor = #tfop("Pack", elements)
   }
@@ -409,7 +409,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   /// Creates a tensor initialized with the given elements.
   /// - Note: This is for conversion from tensor element literals. This is a
   /// separate method because `ShapedArray` initializers need to call it.
-  @_versioned @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   internal init(
     tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
   ) {
@@ -417,7 +417,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   }
 
   /// Creates a tensor initialized with the given elements.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
     self.init(tensorElementLiterals: elements)
   }
@@ -429,7 +429,7 @@ extension Tensor : ExpressibleByArrayLiteral {
 
 public extension Tensor {
   /// The number of dimensions of the `Tensor`.
-  @_inlineable
+  @inlinable
   var rank: Int32 {
     @inline(__always)
     get {
@@ -438,7 +438,7 @@ public extension Tensor {
   }
 
   /// The dimensions of the `Tensor`.
-  @_inlineable
+  @inlinable
   var shape: TensorShape {
     @inline(__always)
     get {
@@ -447,7 +447,7 @@ public extension Tensor {
   }
 
   /// The number of scalars in the `Tensor`.
-  @_inlineable
+  @inlinable
   var scalarCount: Int32 {
     @inline(__always)
     get {
@@ -464,7 +464,7 @@ public extension Tensor where Scalar : Numeric {
   /// Creates a tensor with all scalars set to zero.
   ///
   /// - Parameter shape: The dimensions of the tensor.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(zeros shape: TensorShape) {
     self.init(shape: shape, repeating: 0)
   }
@@ -472,12 +472,12 @@ public extension Tensor where Scalar : Numeric {
   /// Creates a tensor with all scalars set to one.
   ///
   /// - Parameter shape: The dimensions of the tensor.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(ones shape: TensorShape) {
     self.init(shape: shape, repeating: 1)
   }
 
-  @inline(never) // make @_inlineable when implemented.
+  @inline(never) // make @inlinable when implemented.
   static func eye(
     rowCount: Int, columnCount: Int? = nil, batchShape: [Int]? = nil
   ) -> Tensor {
@@ -497,7 +497,7 @@ public extension Tensor where Scalar : Numeric {
   ///   - stride: The amount to step by with each iteration. `stride` must be
   ///     positive.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(rangeFrom start: Scalar, to end: Scalar, stride: Scalar) {
     self = Raw.range(
       start: Tensor(start),
@@ -533,7 +533,7 @@ public extension Tensor where Scalar : Numeric {
   ///     referred to by any index in `indices`.
   ///   - axis: The axis to fill. The default is `-1`, a new inner-most axis.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(oneHotAtIndices indices: Tensor<Int32>, depth: Int32,
        onValue: Scalar = 1, offValue: Scalar = 0, axis: Int = -1) {
     self = Raw.oneHot(
@@ -615,7 +615,7 @@ public extension Tensor where Scalar == Int32 {
   ///   - state: The pseudorandom state in which the random numbers are being
   ///     generated.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(randomStandardUniform shape: TensorShape, state: RandomState? = nil) {
     self = Tensor(
       handle: _TFHoistable {
@@ -636,7 +636,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - state: The pseudorandom state in which the random numbers are being
   ///     generated.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(randomUniform shape: TensorShape, state: RandomState? = nil) {
     self = Tensor(
       Tensor<Int32>(randomStandardUniform: shape, state: state)
@@ -653,7 +653,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - state: The pseudorandom state in which the random numbers are being
   ///     generated.
   ///
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init(randomNormal shape: TensorShape, mean: Scalar = 0, stddev: Scalar = 1,
        state: RandomState? = nil) {
     let uniform = Tensor(randomUniform: shape, state: state)
@@ -670,7 +670,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
 public extension AccelerableByTensorFlow {
   /// Convert to a tensor with the specified rank, with all dimensions equal to
   /// 1.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func makeTensor(withRank rank: Int32) -> Tensor<Self> {
     return Raw.fill(
       dims: Tensor<Int32>(ones: TensorShape(rank)),
@@ -681,21 +681,21 @@ public extension AccelerableByTensorFlow {
 public extension Tensor {
   /// Reshape to the shape of the specified `Tensor`.
   /// - Precondition: The number of scalars matches the new shape.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func reshaped<T>(like other: Tensor<T>) -> Tensor {
     return reshaped(toShape: other.shapeTensor)
   }
 
   /// Reshape to the specified shape.
   /// - Precondition: The number of scalars matches the new shape.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func reshaped(to newShape: TensorShape) -> Tensor {
     return reshaped(toShape: Tensor<Int32>(newShape.dimensions))
   }
 
   /// Reshape to the specified `Tensor` representing a shape.
   /// - Precondition: The number of scalars matches the new shape.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   @differentiable(
     reverse, withRespectTo: (self),
     adjoint: _adjointReshaped(toShape:originalValue:seed:)
@@ -706,20 +706,20 @@ public extension Tensor {
 
   /// Return a copy of the tensor collapsed into a 1-D `Tensor`, in row-major
   /// order.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func flattened() -> Tensor {
     return reshaped(to: [-1])
   }
 
   /// Returns a rank-lifted `Tensor` with a leading dimension of 1.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func rankLifted() -> Tensor {
     return expandingShape(at: 0)
   }
 
   /// Returns a shape-expanded `Tensor`, with a dimension of 1 inserted at the
   /// specified shape index.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   @differentiable(
     reverse, withRespectTo: (self),
     adjoint: _adjointExpandingShape(at:originalValue:seed:)
@@ -733,14 +733,14 @@ public extension Tensor {
   /// removed.
   // FIXME: The gradient for variadic `squeezed` is difficult to express because
   // ExpandDims only expands one axis at a time.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   func squeezingShape(at axes: Int32...) -> Tensor {
     return Raw.squeeze(self, squeezeDims: axes)
   }
 
   /// Reshape to scalar.
   /// - Precondition: The tensor has exactly one scalar.
-  @_inlineable
+  @inlinable
   func scalarized() -> Scalar {
     return _TFGetScalarOrDie(reshaped(to: []).handle)
   }
@@ -752,7 +752,7 @@ public extension Tensor {
 
 public extension Tensor {
   /// Returns `true` if `rank` is equal to 0 and `false` otherwise.
-  @_inlineable
+  @inlinable
   var isScalar: Bool {
     @inline(__always)
     get {
@@ -762,7 +762,7 @@ public extension Tensor {
 
   /// Returns the single scalar element if `rank` is equal to 0 and `nil`
   /// otherwise.
-  @_inlineable
+  @inlinable
   var scalar: Scalar? {
     @inline(__always)
     get {
@@ -772,7 +772,7 @@ public extension Tensor {
 }
 
 public extension AccelerableByTensorFlow {
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   init?(_ tensor: Tensor<Self>) {
     guard let scalar = _TFGetScalar(tensor.handle) else {
       return nil
@@ -786,12 +786,12 @@ public extension AccelerableByTensorFlow {
 //===----------------------------------------------------------------------===//
 
 extension Tensor : Equatable where Scalar : Equatable {
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public static func == (lhs: Tensor, rhs: Tensor) -> Bool {
     return lhs.elementsEqual(rhs).all()
   }
 
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public static func != (lhs: Tensor, rhs: Tensor) -> Bool {
     return lhs.elementsNotEqual(rhs).any()
   }
@@ -827,7 +827,7 @@ extension Tensor : CustomReflectable {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  @_inlineable
+  @inlinable
   var array: ShapedArray<Scalar> {
     @inline(__always)
     get {
@@ -838,7 +838,7 @@ public extension Tensor {
     }
   }
 
-  @_inlineable
+  @inlinable
   var scalars: [Scalar] {
     return array.scalars
   }

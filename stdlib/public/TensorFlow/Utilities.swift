@@ -79,7 +79,7 @@ typealias CTFGraph = OpaquePointer
 typealias CTFFunction = OpaquePointer
 
 /// The `TF_Tensor *` type.
-typealias CTensor = OpaquePointer
+@usableFromInline typealias CTensor = OpaquePointer
 
 /// The `TF_TensorHandle *` type.
 ///
