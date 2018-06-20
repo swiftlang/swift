@@ -226,15 +226,15 @@ int main(int argc_, const char **argv_) {
     }
 
     // Rewrite the program argument.
-    argv[0] = SubcommandPath.c_str();
+    subCommandArgs[0] = SubcommandPath.c_str();
 
     // Execute the subcommand.
-    argv.push_back(nullptr);
-    ExecuteInPlace(SubcommandPath.c_str(), argv.data());
+    subCommandArgs.push_back(nullptr);
+    ExecuteInPlace(SubcommandPath.c_str(), subCommandArgs.data());
 
     // If we reach here then an error occurred (typically a missing path).
     std::string ErrorString = llvm::sys::StrError();
-    llvm::errs() << "error: unable to invoke subcommand: " << argv[0]
+    llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
                  << " (" << ErrorString << ")\n";
     return 2;
   }
