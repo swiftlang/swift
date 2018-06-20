@@ -4,7 +4,16 @@
 // RUN: %empty-directory(%t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule)
 // RUN: %target-swift-frontend -emit-module -o %t/Frameworks/has_alias.framework/Modules/has_alias.swiftmodule/%target-swiftmodule-name %S/Inputs/alias.swift -module-name has_alias
 
-// RUN: cd %t/secret && %target-swiftc_driver -emit-module -o %t/has_xref.swiftmodule -I . -F ../Frameworks -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift -Xfrontend -serialize-debugging-options -Xcc -ivfsoverlay -Xcc %S/../Inputs/unextended-module-overlay.yaml -Xcc -DDUMMY
+// RUN: cd %t/secret && %target-swiftc_driver -emit-module \
+// RUN:   -o %t/has_xref.swiftmodule -I . -F ../Frameworks \
+// RUN:   -parse-as-library %S/Inputs/has_xref.swift %S/../Inputs/empty.swift \
+// RUN:   -Xfrontend -serialize-debugging-options \
+// RUN:   -Xcc -ivfsoverlay \
+// RUN:   -Xcc %S/../Inputs/unextended-module-overlay.yaml \
+// RUN:   -Xcc -DDUMMY \
+// RUN:   -Xcc -I%S/Inputs/test.hmap \
+// RUN:   -Xcc -I -Xcc %S/Inputs/test.hmap \
+// RUN:   -Xcc -iquote -Xcc %S/Inputs/test.hmap
 // RUN: %target-swift-frontend %s -typecheck -I %t
 
 // Check the actual serialized search paths.
@@ -31,3 +40,4 @@ numeric(42)
 // NEGATIVE-NOT: '../Frameworks'
 // This should be filtered out.
 // NEGATIVE-NOT: -ivfsoverlay{{.*}}unextended-module-overlay.yaml
+// NEGATIVE-NOT: .hmap

@@ -65,6 +65,11 @@ using namespace llvm::support;
 using swift::version::Version;
 using llvm::BCBlockRAII;
 
+/// This is an escape hatch that will be removed in the future.
+llvm::cl::opt<bool> SerializeXCCHeadermaps(
+    "serialize-xcc-headermaps", llvm::cl::init(false),
+    llvm::cl::desc("Serialize XCC options that refer to header maps"));
+
 /// Used for static_assert.
 static constexpr bool declIDFitsIn32Bits() {
   using Int32Info = std::numeric_limits<uint32_t>;
@@ -938,20 +943,38 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         auto &Opts = options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) { 
           // FIXME: This is a hack and calls for a better design.
-          //
+          StringRef Arg0 = *Arg;
+          StringRef Arg1;
+          auto Next = std::next(Arg);
+          if (Next != E)
+            Arg1 = *Next;
+
           // Filter out any -ivfsoverlay options that include an
           // unextended-module-overlay.yaml overlay. By convention the Xcode
           // buildsystem uses these while *building* mixed Objective-C and Swift
           // frameworks; but they should never be used to *import* the module
           // defined in the framework.
-          if (StringRef(*Arg).startswith("-ivfsoverlay")) {
-            auto Next = std::next(Arg);
-            if (Next != E &&
-                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+          if (Arg0.startswith("-ivfsoverlay"))
+            if (Arg1.endswith("unextended-module-overlay.yaml")) {
               ++Arg;
               continue;
             }
+
+          // Filter out any headermap options. The Xcode build system introduces
+          // these to implement the unextended module overlay at *framework
+          // build time* but they are not relevent at all for importing the
+          // module from the install or build directory from within the
+          // debugger.
+          if (!SerializeXCCHeadermaps) {
+            if ((Arg0 == "-I" || Arg0.startswith("-i")) &&
+                Arg1.endswith(".hmap")) {
+              ++Arg;
+              continue;
+            }
+            if (Arg0.startswith("-I") && Arg0.endswith(".hmap"))
+              continue;
           }
+
           XCC.emit(ScratchRecord, *Arg);
         }
       }
