@@ -14,9 +14,6 @@ func one() -> Int {
 }
 
 public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
-  // FIXME: ConstExpr folding can't deal with the non-optimized initializer.
-  // expected-error @+2 {{attribute 'axis' requires a constant argument}}
-  // expected-note @+1 {{could not fold operation}}
   return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: one())
 }
 
@@ -28,9 +25,6 @@ struct Wrapper {
 
 public func f(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
   let w = Wrapper(v: 1)
-  // FIXME: ConstExpr folding can't deal with the non-optimized initializer.
-  // expected-error @+2 {{attribute 'axis' requires a constant argument}}
-  // expected-note @+1 {{could not fold operation}}
   return Tensor<Float>(oneHotAtIndices: idx.toDevice(), depth: 0, axis: w.v)
 }
 
@@ -42,6 +36,7 @@ public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [2]
   // expected-error @+1 {{attribute 'value' requires a constant argument}}
   return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
+  // expected-note @-1 {{could not fold operation}}
 }
 
 // b/75407624

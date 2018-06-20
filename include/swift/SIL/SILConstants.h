@@ -44,6 +44,9 @@ enum class UnknownReason {
   /// The constant expression was too big.  This is reported on a random
   /// instruction within the constexpr that triggered the issue.
   TooManyInstructions,
+
+  /// A control flow loop was found.
+  Loop
 };
 
 
@@ -110,12 +113,6 @@ class SymbolicValue {
   RepresentationKind representationKind : 8;
 
   union {
-    UnknownReason unknown_reason;
-    //unsigned integer_bitwidth;
-    // ...
-  } aux;
-
-  union {
     /// When the value is Unknown, this contains the value that was the
     /// unfoldable part of the computation.
     ///
@@ -155,17 +152,52 @@ class SymbolicValue {
     AggregateSymbolicValue *aggregate;
   } value;
 
+  union {
+    UnknownReason unknown_reason;
+
+    // FIXME: Move function_conformance out of this union.  I want to make sure
+    // that SymbolicValue stays exactly equal to two words.  The witness method
+    // conformance case should be handled as a separate representation and be
+    // bump pointer allocated.
+    // TODO: Add a static_assert about the size of SymbolicValue.
+    void *function_conformance;
+    //unsigned integer_bitwidth;
+    // ...
+  } aux;
+
 public:
 
   /// This enum is used to indicate the sort of value held by a SymbolicValue
   /// independent of its concrete representation.  This is the public
   /// interface to SymbolicValue.
   enum Kind {
-    Unknown, Metatype, Function, Integer, Float, String, Aggregate,
+    /// This is a value that isn't a constant.
+    Unknown,
 
-    // These values are generally only seen internally to the system, external
-    // clients shouldn't have to deal with them.
-    Address, UninitMemory
+    /// This is a known metatype value.
+    Metatype,
+
+    /// This is a function, potentially containing a conformance if the function
+    /// was resolved from a witness_method lookup.
+    Function,
+
+    /// This is an integer constant.
+    Integer,
+
+    /// This is a floating point constant.
+    Float,
+
+    /// String values may have SIL type of Builtin.RawPointer or Builtin.Word
+    /// type.
+    String,
+
+    /// This can be an array, struct, tuple, etc.
+    Aggregate,
+
+    /// These values are generally only seen internally to the system, external
+    /// clients shouldn't have to deal with them.
+    Address,
+    UninitMemory
   };
 
   /// For constant values, return the type classification of this value.
@@ -216,12 +248,28 @@ public:
     SymbolicValue result;
     result.representationKind = RK_Function;
     result.value.function = fn;
+    result.aux.function_conformance = nullptr;
     return result;
   }
 
-  SILFunction *getFunctionValue() const {
+  static SymbolicValue getFunction(SILFunction *fn,
+                                   ProtocolConformanceRef conformance) {
+    assert(fn && "Function cannot be null");
+    SymbolicValue result;
+    result.representationKind = RK_Function;
+    result.value.function = fn;
+    result.aux.function_conformance = conformance.getOpaqueValue();
+    return result;
+  }
+
+  std::pair<SILFunction *, Optional<ProtocolConformanceRef>>
+  getFunctionValue() const {
     assert(getKind() == Function);
-    return value.function;
+    Optional<ProtocolConformanceRef> conf;
+    if (auto opaqueConf = aux.function_conformance)
+      conf = ProtocolConformanceRef::getFromOpaqueValue(opaqueConf);
+
+    return std::make_pair(value.function, conf);
   }
 
   static SymbolicValue getConstantInst(SingleValueInstruction *inst) {
@@ -248,11 +296,11 @@ public:
 
   APFloat getFloatValue() const;
 
-  // Returns a SymbolicValue representing a UTF-8 encoded string.
+  /// Returns a SymbolicValue representing a UTF-8 encoded string.
   static SymbolicValue getString(const StringRef string,
                                  llvm::BumpPtrAllocator &allocator);
 
-  // Returns the UTF-8 encoded string underlying a SymbolicValue.
+  /// Returns the UTF-8 encoded string underlying a SymbolicValue.
   StringRef getStringValue() const;
 
   /// Get a SymbolicValue corresponding to a memory object with an optional
@@ -279,8 +327,9 @@ public:
   ArrayRef<SymbolicValue> getAggregateValue() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
-  /// context about what the problem is.
-  void emitUnknownDiagnosticNotes();
+  /// context about what the problem is.  If there is no location for some
+  /// reason, we fall back to using the specified location.
+  void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
 
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
