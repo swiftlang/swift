@@ -61,7 +61,7 @@ extension Sequence {
   ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
-  @inlinable
+  @inlinable // protocol-only
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -102,7 +102,7 @@ extension Sequence {
   /// - Returns: The sequence's minimum element, according to
   ///   `areInIncreasingOrder`. If the sequence has no elements, returns
   ///   `nil`.
-  @inlinable
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func min(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -144,7 +144,7 @@ extension Sequence {
   ///   otherwise, `false`.
   /// - Returns: The sequence's maximum element if the sequence is not empty;
   ///   otherwise, `nil`.
-  @inlinable
+  @inlinable // protocol-only
   @warn_unqualified_access
   public func max(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
@@ -742,7 +742,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
-  @inlinable
+  @inlinable // protocol-only
   public func compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
@@ -752,7 +752,7 @@ extension Sequence {
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func _compactMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?

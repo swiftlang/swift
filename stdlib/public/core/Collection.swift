@@ -804,7 +804,7 @@ extension Collection {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)

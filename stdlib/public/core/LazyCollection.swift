@@ -29,7 +29,7 @@ public protocol LazyCollectionProtocol: Collection, LazySequenceProtocol {
 
 extension LazyCollectionProtocol {
   // Lazy things are already lazy
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: LazyCollection<Elements> {
     return elements.lazy
   }
@@ -37,7 +37,7 @@ extension LazyCollectionProtocol {
 
 extension LazyCollectionProtocol where Elements: LazyCollectionProtocol {
   // Lazy things are already lazy
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public var lazy: Elements {
     return elements
   }

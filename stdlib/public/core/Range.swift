@@ -644,7 +644,7 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
@@ -674,7 +674,7 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
     return PartialRangeUpTo(maximum)
@@ -702,7 +702,7 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
     return PartialRangeThrough(maximum)
@@ -730,7 +730,7 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
     return PartialRangeFrom(minimum)
