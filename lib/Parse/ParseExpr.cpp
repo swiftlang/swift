@@ -3752,6 +3752,48 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+/// parseQualifiedDeclName
+///
+///   qualified-decl-name:
+///     type-identifier? unqualified-decl-name
+///   type-identifier:
+///     identifier generic-args? ('.' identifier generic-args?)*
+///
+/// Parses an optional base type, followed by a declaration name.
+/// Returns true on error (if function decl name could not be parsed).
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType, DeclName &name,
+                                   DeclNameLoc &nameLoc) {
+  // If the current token is an identifier or `Self` or `Any`, then attempt to
+  // parse the base type. Otherwise, base type is null.
+  auto currentPosition = P.getParserPosition();
+  bool canParseBaseType = P.canParseTypeIdentifier();
+  P.backtrackToPosition(currentPosition);
+  if (canParseBaseType)
+    baseType =
+      P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true).getPtrOrNull();
+  else
+    baseType = nullptr;
+
+  // If base type was parsed and has at least one component, then there was a
+  // dot before the current token.
+  bool afterDot = false;
+  if (baseType) {
+    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
+      auto components = ident->getComponentRange();
+      afterDot = std::distance(components.begin(), components.end()) > 0;
+    }
+  }
+  name = P.parseUnqualifiedDeclName(afterDot, nameLoc, nameParseError,
+                                    /*allowOperators*/ true,
+                                    /*allowZeroArgCompoundNames*/ true);
+  // The base type is optional, but the final unqualified decl name is not.
+  // If name could not be parsed, return true for error.
+  if (!name) return true;
+  return false;
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
 /// parseExprAdjoint
 ///   expr-adjoint: '#adjoint' '(' expr ')'
 ParserResult<Expr> Parser::parseExprAdjoint() {
@@ -3768,16 +3810,19 @@ ParserResult<Expr> Parser::parseExprAdjoint() {
   if (parseToken(tok::l_paren, lParenLoc, diag::expr_expected_lparen,
                  "#adjoint"))
     return errorAndSkipToEnd();
-  auto exprResult = parseExpr(diag::expr_expected_function_to_differentiate);
-  if (exprResult.isParseError())
+  // Parse original function.
+  TypeRepr *baseType;
+  DeclName originalName;
+  DeclNameLoc originalNameLoc;
+  if (parseQualifiedDeclName(*this, diag::expr_adjoint_expected_function_name,
+                             baseType, originalName, originalNameLoc))
     return errorAndSkipToEnd();
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen,
                  "#adjoint"))
     return errorAndSkipToEnd();
-
   return makeParserResult<Expr>(
-    AdjointExpr::create(Context, poundLoc, lParenLoc, exprResult.get(),
-                        rParenLoc));
+    AdjointExpr::create(Context, poundLoc, lParenLoc, originalName,
+                        originalNameLoc, baseType, rParenLoc));
 }
 
 /// SWIFT_ENABLE_TENSORFLOW

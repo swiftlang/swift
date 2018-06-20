@@ -994,7 +994,12 @@ public:
                              SourceLoc &LAngleLoc,
                              SourceLoc &RAngleLoc);
 
-  ParserResult<TypeRepr> parseTypeIdentifier();
+  // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
+  /// The `isParsingQualifiedDeclName` flag controls whether parsing is done as
+  /// if this type identifier is the prefix to a qualified declaration name. If
+  /// true, backtrack parsing the last identifier.
+  ParserResult<TypeRepr>
+    parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<CompositionTypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,

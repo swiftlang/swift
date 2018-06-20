@@ -1254,6 +1254,10 @@ ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
+// Adjoint expressions.
+ERROR(expr_adjoint_expected_function_name,PointsToFirstBadToken,
+      "expected function name within '#adjoint` expression", ())
+
 //------------------------------------------------------------------------------
 // MARK: Attribute-parsing diagnostics
 //------------------------------------------------------------------------------
