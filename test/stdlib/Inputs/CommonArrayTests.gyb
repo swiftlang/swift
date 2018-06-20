@@ -357,14 +357,14 @@ ${Suite}.test("${ArrayType}/reserveCapacity") {
 }
 
 //===----------------------------------------------------------------------===//
-// init(_unsafeUninitializedCapacity:initializingWith:)
+// init(unsafeUninitializedCapacity:initializingWith:)
 //===----------------------------------------------------------------------===//
 
 extension Collection {
   func stablyPartitioned(
     by belongsInFirstPartition: (Element) -> Bool
   ) -> ${ArrayType}<Element> {
-    let result = ${ArrayType}<Element>(_unsafeUninitializedCapacity: self.count) {
+    let result = ${ArrayType}<Element>(unsafeUninitializedCapacity: self.count) {
       buffer, initializedCount in
       var lowIndex = 0
       var highIndex = buffer.count
@@ -385,7 +385,15 @@ extension Collection {
   }
 }
 
-${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)") {
+final class InstanceCountedClass {
+  static var instanceCounter = 0
+
+  init() { InstanceCountedClass.instanceCounter += 1 }
+  deinit { InstanceCountedClass.instanceCounter -= 1 }
+}
+enum E: Error { case error }
+
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)") {
   var a = ${ArrayType}(0..<300)
   let p = a.stablyPartitioned(by: { $0 % 2 == 0 })
   expectEqualSequence(
@@ -394,17 +402,9 @@ ${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)") {
   )
 }
 
-${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)/throwing") {
-  final class InstanceCountedClass {
-    static var instanceCounter = 0
-
-    init() { InstanceCountedClass.instanceCounter += 1 }
-    deinit { InstanceCountedClass.instanceCounter -= 1 }
-  }
-  enum E: Error { case error }
-
+${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/throwing") {
   do {
-    var a = Array<InstanceCountedClass>(_unsafeUninitializedCapacity: 10) { buffer, c in
+    var a = Array<InstanceCountedClass>(unsafeUninitializedCapacity: 10) { buffer, c in
       let p = buffer.baseAddress!
       for i in 0..<5 {
         (p + i).initialize(to: InstanceCountedClass())
@@ -417,7 +417,7 @@ ${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)/throwing") {
     a = []
     expectEqual(0, InstanceCountedClass.instanceCounter)
 
-    a = try Array(_unsafeUninitializedCapacity: 10) { buffer, c in
+    a = try Array(unsafeUninitializedCapacity: 10) { buffer, c in
       let p = buffer.baseAddress!
       for i in 0..<5 {
         (p + i).initialize(to: InstanceCountedClass())
@@ -429,7 +429,56 @@ ${Suite}.test("${ArrayType}/init(_unsafeUninitializedCapacity:...:)/throwing") {
     // The throw above should prevent reaching here, which should mean the
     // instances created in the closure should get deallocated before the final
     // expectation outside the do/catch block.
-    expectTrue(false)
+    expectUnreachable()
+  } catch {}
+  expectEqual(0, InstanceCountedClass.instanceCounter)
+}
+
+${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity") {
+  var a = Array<Int>()
+  let result: Int = a.withUnsafeMutableBufferPointerToFullCapacity(reservingCapacity: 10) {
+    buffer, initializedCount in
+    expectEqual(10, buffer.count)
+    expectEqual(0, initializedCount)
+
+    for i in 0..<5 {
+      buffer[i] = i
+    }
+    initializedCount = 5
+    return buffer[0..<5].reduce(0, +)
+  }
+  expectEqual(10, a.reduce(0, +))
+  expectEqual(5, a.count)
+}
+
+${Suite}.test("${ArrayType}/withUnsafeMutableBufferPointerToFullCapacity/throwing") {
+  do {
+    var a = Array<InstanceCountedClass>()
+    a.withUnsafeMutableBufferPointerToFullCapacity(capacity: 10) { buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+    }
+    expectEqual(5, a.count)
+    expectEqual(5, InstanceCountedClass.instanceCounter)
+
+    a = []
+    expectEqual(0, InstanceCountedClass.instanceCounter)
+    try a.withUnsafeMutableBufferPointerToFullCapacity(capacity: 10) { buffer, c in
+      let p = buffer.baseAddress!
+      for i in 0..<5 {
+        (p + i).initialize(to: InstanceCountedClass())
+      }
+      c = 5
+      throw E.error
+    }
+
+    // The throw above should prevent reaching here, which means that the
+    // instances created in the closure should get deallocated before the final
+    // expectation outside the do/catch block.
+    expectUnreachable()
   } catch {}
   expectEqual(0, InstanceCountedClass.instanceCounter)
 }

@@ -1373,8 +1373,8 @@ extension Array {
   ///   the requested number of elements.
   ///
   /// - Parameters:
-  ///   - _unsafeUninitializedCapacity: The number of elements to allocate
-  ///     space for in the new array.
+  ///   - unsafeUninitializedCapacity: The number of elements to allocate space
+  ///     for in the new array.
   ///   - initializer: A closure that initializes elements and sets the count
   ///     of the new array.
   ///     - Parameters:
@@ -1385,26 +1385,26 @@ extension Array {
   ///         elements you initialize.
   @inlinable
   public init(
-    _unsafeUninitializedCapacity: Int,
+    unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
     var firstElementAddress: UnsafeMutablePointer<Element>
     (self, firstElementAddress) =
-      Array._allocateUninitialized(_unsafeUninitializedCapacity)
+      Array._allocateUninitialized(unsafeUninitializedCapacity)
     
     var initializedCount = 0
     defer {
       // Update self.count even if initializer throws an error.
       _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
+        initializedCount <= unsafeUninitializedCapacity,
         "Initialized count set to greater than specified capacity."
       )
       self._buffer.count = initializedCount
     }
     var buffer = UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
+      start: firstElementAddress, count: unsafeUninitializedCapacity)
     try initializer(&buffer, &initializedCount)
   }
   
@@ -1552,6 +1552,59 @@ extension Array {
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
     return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
+  }
+
+  /// Calls the given closure with a pointer to the full capacity of the
+  /// array's mutable contiguous storage.
+  ///
+  /// - Parameters:
+  ///   - capacity: The minimum capacity to reserve for the array. `capacity`
+  ///     must be greater than or equal to the array's current `count`.
+  ///   - body: A closure that can modify or deinitialize existing elements or
+  ///     initialize new elements.
+  ///   - Parameters:
+  ///     - buffer: An unsafe mutable buffer of the array's full storage,
+  ///       including any uninitialized capacity after the initialized
+  ///       elements. Only the elements in `buffer[0..<initializedCount]` are
+  ///       initialized. `buffer` covers the memory for exactly the number of
+  ///       elements specified in the `capacity` parameter.
+  ///     - initializedCount: The count of the array's initialized elements. If
+  ///       you initialize or deinitialize any elements inside `body`, update
+  ///       `initializedCount` with the new count for the array.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  public mutating func withUnsafeMutableBufferPointerToFullCapacity<R>(
+    capacity: Int,
+    _ body: (
+      _ buffer: UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int
+    ) throws -> R
+  ) rethrows -> R {
+    // Ensure unique storage and requested capacity
+    reserveCapacity(capacity)
+    _precondition(capacity >= self.count)
+
+    var initializedCount = self.count
+
+    // Ensure that body can't invalidate the storage or its bounds by
+    // moving self into a temporary working array.
+    // See further notes above in withUnsafeMutableBuffer
+    var work = Array()
+    (work, self) = (self, work)
+
+    // Create an UnsafeBufferPointer over the full capacity of `work`
+    // that we can pass to `body`.
+    let pointer = work._buffer.firstElementAddress
+    let bufferPointer = UnsafeMutableBufferPointer(
+      start: pointer, count: capacity)
+
+    // Put the working array back before returning and update the count.
+    defer {
+      (work, self) = (self, work)
+      _buffer.count = initializedCount
+    }
+
+    // Invoke the body.
+    return try body(bufferPointer, &initializedCount)
   }
 }
 
