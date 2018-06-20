@@ -96,8 +96,6 @@ struct ConcreteExistentialInfo {
   ConcreteExistentialInfo(Operand &ArgOperand, CanType ConcreteType,
                           ProtocolDecl *Protocol);
 
-  ConcreteExistentialInfo(ConcreteExistentialInfo &) = delete;
-
   /// For scenerios where ConcreteExistentialInfo is created using a known
   /// ConcreteType and ProtocolDecl, both of InitExistential
   /// and ConcreteValue can be null. So there is no need for explicit check for
