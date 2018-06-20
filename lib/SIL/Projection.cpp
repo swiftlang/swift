@@ -843,6 +843,24 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
+// Projection tree only supports structs and tuples today.
+static bool isSupportedProjection(const Projection &p) {
+  switch (p.getKind()) {
+  case ProjectionKind::Struct:
+  case ProjectionKind::Tuple:
+    return true;
+  case ProjectionKind::Class:
+  case ProjectionKind::Enum:
+  case ProjectionKind::Box:
+  case ProjectionKind::Upcast:
+  case ProjectionKind::RefCast:
+  case ProjectionKind::BitwiseCast:
+  case ProjectionKind::TailElems:
+  case ProjectionKind::Index:
+    return false;
+  }
+}
+
 void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
@@ -866,12 +884,11 @@ processUsersOfValue(ProjectionTree &Tree,
       continue;
     }
 
-    // Check whether the user is such a projection.
     auto P = Projection(projectionInst);
 
-    // If we fail to create a projection, add User as a user to this node and
-    // continue.
-    if (!P.isValid()) {
+    // If we fail to create a projection or this is a type of projection that we
+    // do not support, add User as a user to this node and continue.
+    if (!P.isValid() || !isSupportedProjection(P)) {
       DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
       addNonProjectionUser(Op);
