@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 420; // Last change: accessor refactor
+const uint16_t VERSION_MINOR = 421; // Last change: track whether xrefs come from Clang
 
 using DeclIDField = BCFixed<31>;
 
@@ -1308,7 +1308,8 @@ namespace decls_block {
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
     IdentifierIDField, // private discriminator
-    BCFixed<1>         // restrict to protocol extension
+    BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>         // imported from Clang?
   >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
@@ -1316,6 +1317,7 @@ namespace decls_block {
     TypeIDField,       // type
     IdentifierIDField, // name
     BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>,        // imported from Clang?
     BCFixed<1>         // static?
   >;
 
@@ -1323,6 +1325,7 @@ namespace decls_block {
     XREF_INITIALIZER_PATH_PIECE,
     TypeIDField,             // type
     BCFixed<1>,              // restrict to protocol extension
+    BCFixed<1>,              // imported from Clang?
     CtorInitializerKindField // initializer kind
   >;
 
