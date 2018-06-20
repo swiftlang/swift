@@ -570,7 +570,13 @@ RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
 ModuleDecl *RemoteASTTypeBuilder::findModule(const Demangle::NodePointer &node){
   assert(node->getKind() == Demangle::Node::Kind::Module);
   const auto &moduleName = node->getText();
-  return Ctx.getModuleByName(moduleName);
+  // Intentionally using getLoadedModule() instead of getModuleByName() here.
+  // LLDB uses RemoteAST for its per-module SwiftASTContext. Importing external
+  // modules here could permanently damage this context, for example when a
+  // Clang import fails because of missing header search options. To avoid this
+  // situation, restrict RemoteAST's access to only the module's transitive
+  // closure of imports.
+  return Ctx.getLoadedModule(Ctx.getIdentifier(moduleName));
 }
 
 Demangle::NodePointer
