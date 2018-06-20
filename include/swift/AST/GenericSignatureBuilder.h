@@ -338,8 +338,10 @@ private:
                                    UnresolvedHandlingKind unresolvedHandling);
 
   /// Add any conditional requirements from the given conformance.
-  void addConditionalRequirements(ProtocolConformanceRef conformance,
-                                  ModuleDecl *inferForModule);
+  ///
+  /// \returns \c true if an error occurred, \c false if not.
+  bool addConditionalRequirements(ProtocolConformanceRef conformance,
+                                  ModuleDecl *inferForModule, SourceLoc loc);
 
   /// Resolve the conformance of the given type to the given protocol when the
   /// potential archetype is known to be equivalent to a concrete type.
