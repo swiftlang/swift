@@ -70,13 +70,6 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_String:
     os << "string: \"" << getStringValue() << "\"\n";
     return;
-  case RK_Address: {
-    os << "address indices = [";
-    interleave(getAddressIndices(), [&](unsigned idx) { os << idx; },
-               [&]() { os << ", "; });
-    os << "]:  " << getAddressBase();
-    return;
-  }
   case RK_Aggregate: {
     ArrayRef<SymbolicValue> elements = getAggregateValue();
     if (elements.empty()) {
@@ -109,7 +102,6 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Unknown:      return Unknown;
   case RK_Metatype:     return Metatype;
   case RK_Function:     return Function;
-  case RK_Address:      return Address;
   case RK_Aggregate:    return Aggregate;
   case RK_Integer:      return Integer;
   case RK_Float:        return Float;
@@ -335,74 +327,6 @@ StringRef SymbolicValue::getStringValue() const {
   assert(representationKind == RK_Inst);
   return cast<StringLiteralInst>(value.inst)->getValue();
 }
-
-//===----------------------------------------------------------------------===//
-// Addresses
-//===----------------------------------------------------------------------===//
-
-namespace swift {
-/// This is a representation of an address value, stored as a base pointer plus
-/// trailing array of indices.  Elements of this value are bump-pointer
-/// allocated.
-struct alignas(SILValue) AddressSymbolicValue final
-  : private llvm::TrailingObjects<AddressSymbolicValue, unsigned> {
-    friend class llvm::TrailingObjects<AddressSymbolicValue, unsigned>;
-
-  /// The number of words in the trailing array and # bits of the value.
-  const SILValue base;
-  const unsigned numIndices;
-
-  static AddressSymbolicValue *create(SILValue base, ArrayRef<unsigned> indices,
-                                      llvm::BumpPtrAllocator &allocator) {
-    auto byteSize =
-      AddressSymbolicValue::totalSizeToAlloc<unsigned>(indices.size());
-    auto rawMem = allocator.Allocate(byteSize, alignof(AddressSymbolicValue));
-
-    //  Placement initialize the AddressSymbolicValue.
-    auto alv = ::new (rawMem) AddressSymbolicValue(base, indices.size());
-    std::uninitialized_copy(indices.begin(), indices.end(),
-                            alv->getTrailingObjects<unsigned>());
-    return alv;
-  }
-
-  ArrayRef<unsigned> getIndices() const {
-    return { getTrailingObjects<unsigned>(), numIndices };
-  }
-
-  // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<unsigned>) const {
-    return numIndices;
-  }
-private:
-  AddressSymbolicValue() = delete;
-  AddressSymbolicValue(const AddressSymbolicValue &) = delete;
-  AddressSymbolicValue(SILValue base, unsigned numIndices)
-    : base(base), numIndices(numIndices) {}
-};
-} // end namespace swift
-
-
-SymbolicValue
-SymbolicValue::getAddress(SILValue base, ArrayRef<unsigned> indices,
-                          llvm::BumpPtrAllocator &allocator) {
-  auto alv = AddressSymbolicValue::create(base, indices, allocator);
-  assert(alv && "aggregate value must be present");
-  SymbolicValue result;
-  result.representationKind = RK_Address;
-  result.value.address = alv;
-  return result;
-}
-
-SILValue SymbolicValue::getAddressBase() const {
-  assert(representationKind == RK_Address);
-  return value.address->base;
-}
-
-ArrayRef<unsigned> SymbolicValue::getAddressIndices() const {
-  assert(representationKind == RK_Address);
-  return value.address->getIndices();
-}
-
 
 //===----------------------------------------------------------------------===//
 // Aggregates
