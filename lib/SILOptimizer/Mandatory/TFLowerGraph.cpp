@@ -218,7 +218,8 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   llvm::SmallSet<int, 4> processedTensorIdsForReceive;
 
   /// Mapping from declarations to the number to times a TF_Function took the
-  /// name from.
+  /// name from the declaration. This will be used in `getUniqueName` to produce
+  /// uniqued graph node names.
   llvm::SmallDenseMap<ValueDecl *, unsigned> uniqueNames;
 
   /// This flag gets set if lowering code to the graph produces a TensorFlow
