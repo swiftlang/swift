@@ -217,6 +217,11 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   llvm::SmallSet<int, 4> processedTensorIdsForSend;
   llvm::SmallSet<int, 4> processedTensorIdsForReceive;
 
+  /// Mapping from declarations to the number to times a TF_Function took the
+  /// name from the declaration. This will be used in `getUniqueName` to produce
+  /// uniqued graph node names.
+  llvm::SmallDenseMap<ValueDecl *, unsigned> uniqueNames;
+
   /// This flag gets set if lowering code to the graph produces a TensorFlow
   /// error and emits a diagnostic.  This tells us to stop lowering and give up
   /// gracefully.
@@ -558,12 +563,27 @@ static void escapeOpName(std::string &name) {
   // Currently, invalid characters are simply replaced with underscores.
   // TODO: Use a more robust escaping transformation. It should handle unicode
   // characters (using llvm::UTF8 or some other means) and be reversible.
-  for (unsigned i = 0, n = name.size(); i < n; i++) {
-    char c = name[i];
-    if (!std::isalnum(c) && c != '.')
-      if (i == 0 || (i != '_' && i != '/'))
-        name[i] = '_';
+  for (auto i : indices(name)) {
+    char &c = name[i];
+    if (!llvm::isAlnum(c) && c != '.')
+      if (i == 0 || (c != '_' && c != '/'))
+        c = '_';
   }
+}
+
+/// Given a DeclName, returns an escaped (TF-compatible)
+/// name that replaces parentheses with '.' and colons with '_', for example:
+/// `foo(x:y:z:)` -> `foo.x_y_z_.`.
+static std::string escapeDeclName(DeclName name) {
+  SmallVector<char, 8> buffer;
+  auto newName = name.getString(buffer, /*skipEmptyArgumentNames*/ true);
+  for (char &c : buffer) {
+    if (c == '(' || c == ')')
+      c = '.';
+    else if (!llvm::isAlnum(c))
+      c = '_';
+  }
+  return newName.str();
 }
 
 /// Produce a "stack trace" for the specified location, producing it in a form
@@ -580,6 +600,9 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
   // Form a name for this op based on the user's source location and "stack
   // trace" of where it got inlined in user code.  We use the form
   // "file:line:col".
+  //
+  // FIXME: InlinedCallSite is always nullptr even if we use the performance
+  // inliner, so it currently does not track the inlined call site.
   for (auto ds = loc.getScope(); ds; ds = ds->InlinedCallSite) {
     // If the call site location is invalid, stop scanning.
     if (!ds->Loc.getSourceLoc().isValid())
@@ -596,7 +619,27 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
       if (fnName.endswith(".device_partition"))
         fnName = fnName.drop_back(strlen(".device_partition"));
 
-      name += "." + fnName.str() + "." + llvm::utostr(lineCol.first);
+      // Separate functions using '/' so that TensorBoard can treat it as a
+      // hierarchical separator.
+      name += '/';
+
+      // If the SIL function is backed by a Swift decl, use the decl name.
+      // Otherwise, use the SIL name.
+      std::string funcName;
+      auto *dc = SILFn.getDeclContext();
+      if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc)) {
+        funcName = escapeDeclName(afd->getEffectiveFullName());
+        // Make sure the name is unique.
+        auto declCountLookup = uniqueNames.find(afd);
+        if (declCountLookup != uniqueNames.end())
+          funcName += "_" + llvm::itostr(declCountLookup->getSecond()++);
+        else
+          uniqueNames.insert({afd, 1});
+      } else {
+        funcName = fnName.str();
+      }
+
+      name += funcName + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
@@ -608,7 +651,7 @@ std::string TFGraphLowering::getUniqueName(SILDebugLocation loc,
     if (sourceLoc.isValid()) {
       auto lineCol = SM.getLineAndColumn(sourceLoc);
       auto bufferID = SM.getBufferIdentifierForLoc(sourceLoc);
-      name += "." + bufferID.str() + "." + llvm::utostr(lineCol.first);
+      name += "/" + bufferID.str() + "." + llvm::utostr(lineCol.first);
       name += "." + llvm::utostr(lineCol.second);
     }
   }
@@ -1099,7 +1142,6 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   StringRef filePath;
   if (dataSource != DatasetCreationContext::FAKE) {
     auto operand = inst->getOperand(1);
-    auto opInfo = tfopInfo.operandClasses[1];
     auto *sli = cast<StringLiteralInst>(operand);
     assert(sli->getEncoding() == StringLiteralInst::Encoding::UTF8);
     filePath = sli->getValue();
