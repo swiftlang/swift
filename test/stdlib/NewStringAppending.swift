@@ -115,20 +115,20 @@ print("\(repr(s))")
 
 var s1 = s
 
-// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 49, capacity: 96))
+// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 49, capacity: 80))
 print("\(repr(s1))")
 
 /// The use of later buffer capacity by another string forces
 /// reallocation; however, the original capacity is kept by intact
 
-// CHECK-NEXT: String(Native(owner: @[[storage4:[x0-9a-f]+]], count: 50, capacity: 96)) = "{{.*}}X"
+// CHECK-NEXT: String(Native(owner: @[[storage4:[x0-9a-f]+]], count: 50, capacity: 80)) = "{{.*}}X"
 // CHECK-NOT: @[[storage3]],
 s1 += "X"
 print("\(repr(s1))")
 
 /// The original copy is left unchanged
 
-// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 49, capacity: 96))
+// CHECK-NEXT: String(Native(owner: @[[storage3]], count: 49, capacity: 80))
 print("\(repr(s))")
 
 /// Appending to an empty string re-uses the RHS

@@ -26,7 +26,6 @@ Algorithm.test("min,max") {
   let a3 = MinimalComparableValue(0, identity: 3)
   let b1 = MinimalComparableValue(1, identity: 4)
   let b2 = MinimalComparableValue(1, identity: 5)
-  let b3 = MinimalComparableValue(1, identity: 6)
   let c1 = MinimalComparableValue(2, identity: 7)
   let c2 = MinimalComparableValue(2, identity: 8)
   let c3 = MinimalComparableValue(2, identity: 9)
@@ -80,7 +79,7 @@ Algorithm.test("sorted/strings") {
     ["apple", "Banana", "cherry"].sorted())
 
   let s = ["apple", "Banana", "cherry"].sorted() {
-    $0.characters.count > $1.characters.count
+    $0.count > $1.count
   }
   expectEqual(["Banana", "cherry", "apple"], s)
 }
@@ -140,7 +139,7 @@ func randomArray() -> A<Int> {
 
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
-    var a = randomArray()
+    let a = randomArray()
     _blackHole(a.sorted(by: $0))
   }
   withInvalidOrderings {
@@ -218,7 +217,7 @@ Algorithm.test("sorted/complexity") {
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
+  let _: Array = ([5, 4, 3, 2, 1] as ArraySlice).sorted()
 }
 
 Algorithm.test("sort3/simple")
