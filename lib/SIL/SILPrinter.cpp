@@ -1217,6 +1217,15 @@ public:
       *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
       return;
     }
+    case SymbolicValue::Function: {
+      assert(!v.getFunctionValue().second &&
+             "SILFunction SymbolicValues with protocol conformances cannot be "
+             "printed");
+      auto function = v.getFunctionValue().first;
+      *this << "@" << function->getName();
+      *this << " : $" << function->getLoweredFunctionType();
+      return;
+    }
     case SymbolicValue::Aggregate:
       *this << "[";
       interleave(v.getAggregateValue(), [&](SymbolicValue element) {
@@ -1226,7 +1235,6 @@ public:
       });
       *this << "]";
       return;
-    case SymbolicValue::Function:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
       llvm_unreachable("Unimplemented SymbolicValue case");
