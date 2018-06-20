@@ -546,9 +546,6 @@ bool Parser::parseGenericArguments(SmallVectorImpl<TypeRepr*> &Args,
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
 /// SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
-/// The `isParsingQualifiedDeclName` flag controls whether parsing is done as if
-/// this type identifier is the prefix to a qualified declaration name. If true,
-/// backtrack parsing the last identifier.
 ParserResult<TypeRepr>
 Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {

@@ -1835,7 +1835,7 @@ public:
   void visitAdjointExpr(AdjointExpr *E) {
     printCommon(E, "adjoint_expr");
     PrintWithColorRAII(OS, TypeReprColor) << " base_type='";
-    if (auto baseRepr = E->getBaseType().getTypeRepr())
+    if (auto *baseRepr = E->getBaseType().getTypeRepr())
       baseRepr->print(PrintWithColorRAII(OS, TypeReprColor).getOS());
     else
       PrintWithColorRAII(OS, TypeReprColor) << "<<NULL>>";

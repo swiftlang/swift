@@ -3024,7 +3024,7 @@ visitAdjointExpr(AdjointExpr *E, SGFContext C) {
   SILDeclRef adjointDeclRef(adjointDecl);
 
   // If adjoint has multiple parameter lists, mark as curried.
-  if (adjointDecl->getNumParameterLists() == 2) {
+  if (adjointDecl->getNumParameterLists() >= 2) {
     adjointDeclRef = adjointDeclRef.asCurried();
   }
   auto adjointInfo = SGF.getConstantInfo(adjointDeclRef);
