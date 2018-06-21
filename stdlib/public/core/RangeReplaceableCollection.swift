@@ -1113,7 +1113,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
 
 
 extension RangeReplaceableCollection 
-  where Self: BidirectionalCollection, Element: Equatable 
+  where Self: BidirectionalCollection, Element: Hashable 
 {
   public mutating func removeLast<C: BidirectionalCollection>(
     occurrenceOf pattern: C) where C.Element == Element 
@@ -1131,7 +1131,7 @@ extension RangeReplaceableCollection
   }
 }
 
-extension RangeReplaceableCollection where Element: Equatable {
+extension RangeReplaceableCollection where Element: Hashable {
   public mutating func removeFirst<C: BidirectionalCollection>(
     occurrenceOf pattern: C) where C.Element == Element 
   {

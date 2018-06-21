@@ -87,6 +87,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "Split.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "SequenceWrapper.swift",

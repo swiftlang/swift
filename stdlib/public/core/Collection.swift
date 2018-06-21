@@ -1820,87 +1820,36 @@ extension Collection where SubSequence == Self {
   }
 }
 
-internal
-struct _RangeIterator
-    <Base: Collection, Other: BidirectionalCollection>: IteratorProtocol 
-    where Base.Element == Other.Element, Base.Element: Equatable 
-{
-  typealias Element = Range<Base.Index>
-  let base: Base
-  let pattern: Other
-  let overlapping: Bool
-  var offset: Base.Index
-  internal
-  init(_ base: Base, _ pattern: Other, overlapping: Bool) {
-    self.base = base
-    self.pattern = pattern
-    self.overlapping = overlapping
-    self.offset = base.startIndex
+extension Collection where Element: Hashable {
+  public func count<C: BidirectionalCollection>(of pattern: C, overlapping: Bool = false) -> Int where C.Element == Element {
+    let lazyCollection = LazyRangeCollection(self, pattern, overlapping: overlapping)
+    return lazyCollection.count
   }
-  internal
-  mutating func next() -> Element? {
-    guard let range = base._firstRange(of: pattern, startingAt: offset) else { 
-      return nil 
-    }
-    if overlapping {
-      var index = range.lowerBound
-      base.formIndex(after: &index)
-      offset = index
-    } else {
-      offset = range.upperBound
-    }
-    return range
+  
+  public func contains<C: BidirectionalCollection>(occurrenceOf: C) -> Bool where C.Element == Element {
+    return firstRange(of: occurrenceOf) != nil
   }
-}
-
-extension Collection where Element: Equatable {
-  public func countOccurrences<C: BidirectionalCollection>(
-      of pattern: C, allowingOverlaps: Bool = false
-    ) -> Int where C.Element == Element 
-  {
-    var result = 0
-    let iterator = _RangeIterator(self, pattern, overlapping: allowingOverlaps)
-    for _ in IteratorSequence(iterator) {
-      result += 1
-    }
-    return result
-  }
-
-  public func contains<C: BidirectionalCollection>(
-      occurrenceOf pattern: C
-    ) -> Bool where C.Element == Element 
-  {
-    return firstRange(of: pattern) != nil
-  }
-
-  internal func _firstRange<C: BidirectionalCollection>(
-      of pattern: C, startingAt index: Index
-    ) -> Range<Index>? where C.Element == Element 
-  {
-    if let result = _customFirstRangeOfEquatableElements(pattern, index) {
-      return result
-    } 
-    
+  
+  internal func _firstRange<C: BidirectionalCollection>(of pattern: C, startingAt: Index) -> Range<Index>? where C.Element == Element {
     if pattern.isEmpty || isEmpty {
       return nil
     }
-
-    var start = index
+    
+    var start = startingAt
     var cachedEndIndex = endIndex
-
+    
     func endOfMatchIfAny(_ subsequence: SubSequence) -> Index? {
       let subIndices = subsequence.indices
       let separatorIndices = pattern.indices
-
+      
       if subIndices.count < separatorIndices.count {
         return nil
       }
-
+      
       guard var lastIndex = subIndices.first else {
         return nil
       }
-      let zipped = zip(subIndices, separatorIndices)
-      for (subsequenceIndex, separatorIndex) in zipped {
+      for (subsequenceIndex, separatorIndex) in zip(subIndices, separatorIndices) {
         if subsequence[subsequenceIndex] != pattern[separatorIndex] {
           return nil
         }
@@ -1909,23 +1858,39 @@ extension Collection where Element: Equatable {
       formIndex(after: &lastIndex)
       return lastIndex
     }
-
+    
     while start != cachedEndIndex {
       if let end = endOfMatchIfAny(self[start..<cachedEndIndex]) {
         return start..<end
       }
       formIndex(after: &start)
     }
-
+    
     return nil
   }
-
-  public func firstRange<C: BidirectionalCollection>(of pattern: C) 
-    -> Range<Index>? where C.Element == Element 
-  {
+  
+  public func firstRange<C: BidirectionalCollection>(of pattern: C) -> Range<Index>? where C.Element == Element {
     return _firstRange(of: pattern, startingAt: startIndex)
   }
-
+  
+  public func allRanges<C: BidirectionalCollection>(of pattern: C, overlapping: Bool = false) -> [Range<Index>] where C.Element == Element {
+    let lazyCollection = LazyRangeCollection(self, pattern, overlapping: overlapping)
+    let result = [Range<Index>](lazyCollection)
+    return result
+  }
+  
+  public func split<C: BidirectionalCollection>(separatedBy separator: C, separatorBehavior: SeparatorBehavior = .excluded, maxSplits: Int = Int.max, omittingEmptySubsequences: Bool = true) -> [SubSequence] where C.Element == Element {
+    _precondition(maxSplits >= 0, "Must take zero or more splits")
+    
+    if maxSplits == 0 || isEmpty || separator.isEmpty {
+      return [self[...]]
+    }
+    
+    let seq = LazySplitCollection(self, separator: separator, omittingEmptySubsequences: omittingEmptySubsequences, behavior: separatorBehavior)
+    let result = [SubSequence](seq)
+    
+    return result
+  }
 }
 
 extension Collection {

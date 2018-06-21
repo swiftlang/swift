@@ -121,6 +121,7 @@ set(SWIFTLIB_ESSENTIAL
   Slice.swift
   SmallString.swift
   Sort.swift.gyb
+  Split.swift
   StaticString.swift
   Stride.swift.gyb
   StringCharacterView.swift # ORDER DEPENDENCY: Must precede String.swift

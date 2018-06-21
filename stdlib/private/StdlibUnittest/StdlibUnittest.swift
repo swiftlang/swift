@@ -260,8 +260,9 @@ public func expectationFailure(
   print(message, terminator: message == "" ? "" : "\n")
 }
 
-public func failTest(_ reason: String, ${TRACE}) {
-  expectationFailure(reason, trace: ${trace})
+public func failTest(_ message: @autoclosure () -> String = "", 
+  stackTrace: SourceLocStack = SourceLocStack()) {
+  expectationFailure("Test failed", trace: message(), stackTrace: stackTrace)
 }
 
 // Renamed to avoid collision with expectEqual(_, _, TRACE).

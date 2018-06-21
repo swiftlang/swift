@@ -311,16 +311,16 @@ extension BidirectionalCollection {
   }
 }
 
-extension BidirectionalCollection where Element: Equatable {
+extension BidirectionalCollection where Element: Hashable {
   public func lastRange<C: BidirectionalCollection>(of pattern: C) -> Range<Index>? where C.Element == Element {
     if pattern.isEmpty || isEmpty {
       return nil
     }
-
+    
     guard let range = self.reversed().firstRange(of: pattern.reversed()) else {
       return nil
     }
-
+    
     return range.upperBound.base..<range.lowerBound.base
   }
 }
