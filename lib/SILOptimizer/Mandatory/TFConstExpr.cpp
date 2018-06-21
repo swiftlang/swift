@@ -769,13 +769,14 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
     return SymbolicValue::getUnknown((SILInstruction*)apply,
                                      UnknownReason::Trap);
   }
-
+  
   if (classifyFunction(callee->getName()) ==
-                      WellKnownFunction::AssertionFailure)
+      WellKnownFunction::AssertionFailure) {
     // TODO: Actually get the message out of fatalError.  We can literally get
     // its string and file/line/col info and propagate it up!
     return SymbolicValue::getUnknown((SILInstruction*)apply,
                                      UnknownReason::Trap);
+  }
 
   DEBUG(llvm::errs() << "ConstExpr Opaque Callee: " << *callee << "\n");
   return SymbolicValue::getUnknown((SILInstruction*)apply,
