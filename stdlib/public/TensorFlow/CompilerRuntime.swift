@@ -221,7 +221,7 @@ public final class _ExecutionContext {
   private var mutex: pthread_mutex_t = pthread_mutex_t()
 
   /// Initializes a new execution context by initializing available devices.
-  @_versioned
+  @usableFromInline
   init() {
     configureRuntimeFromEnvironment()
 
@@ -377,7 +377,7 @@ fileprivate extension _ExecutionContext {
   }
 }
 
-@_versioned
+@usableFromInline
 internal func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
   _ inputTensor: CTensorHandle, _: Scalar.Type
 ) {
@@ -389,7 +389,7 @@ internal func dumpTensorContent<Scalar : AccelerableByTensorFlow>(
     """)
 }
 
-@_versioned
+@usableFromInline
 internal func dumpCTensorHandleContent(
   _ idx: Int,
   _ inputTensorHandle: CTensorHandle) {
@@ -604,7 +604,7 @@ public final class _TensorComputation {
   ///
   /// - TODO(clattner): `resultCount` should go away when the runtime is
   ///   implemented with an async design.
-  @_versioned
+  @usableFromInline
   init(programByteAddress: UnsafeRawPointer,
        programByteCount: Int,
        entryFunctionBaseNameAddress: UnsafePointer<Int8>,
@@ -761,7 +761,7 @@ public extension _TensorComputation {
 }
 
 extension _TensorComputation {
-  @_versioned
+  @usableFromInline
   var cSession: CTFSession {
     if let stateTF = stateTF {
       return stateTF.cSession
@@ -792,7 +792,7 @@ extension _TensorComputation {
 ///   - tensorArgumentCount: The number of tensor arguments to pass in.
 ///   - helperFunctionCount: The number of helper functions to run.
 ///   - resultCount: The number of output tensors.
-@_inlineable
+@inlinable
 @_silgen_name("_swift_tfc_StartTensorComputation")
 public func _TFCStartTensorComputation(
   _ programByteAddress: UnsafeRawPointer,
@@ -832,7 +832,7 @@ public func _TFCStartTensorComputation(
 /// - Note: The result address as passed in is pointing to uninitialized memory,
 ///   this must initialize the memory, transfering ownership of the tensor
 ///   handles to the caller.
-@_inlineable
+@inlinable
 @_silgen_name("_swift_tfc_FinishTensorComputation")
 public func _TFCFinishTensorComputation(
   _ computation: _TensorComputation,
@@ -851,7 +851,7 @@ public func _TFCFinishTensorComputation(
 /// - Parameters:
 ///   - program: The tensor program to terminate.
 /// - Note: If the execution was synchronous, then this function does nothing.
-@_inlineable
+@inlinable
 @_silgen_name("_swift_tfc_TerminateTensorComputation")
 public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
   computation.terminate()
@@ -868,7 +868,7 @@ public func _TFCTerminateTensorComputation(_ computation: _TensorComputation) {
 /// - TODO(rxwei): Constrain T to AccelerableByTensorFlow and remove the
 ///   precondition. This requires the compiler to emit a call to the generic
 ///   function.
-@_inlineable
+@inlinable
 @_silgen_name("_swift_tfc_CreateCTensorHandle")
 public func _TFCCreateCTensorHandle<T>(_ value : T,
                                        _ dtype: TF_DataType) -> CTensorHandle {

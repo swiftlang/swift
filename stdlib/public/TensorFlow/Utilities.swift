@@ -40,7 +40,7 @@ public extension Sequence {
 /// in debug mode), to help shake out more bugs and facilitate debugging in the
 /// early project phases. It can be replaced with plain assert() later, when we
 /// have a more mature code base.
-@_versioned
+@usableFromInline
 func internalConsistencyCheck(
   _ predicate: Bool,
   _ errMessage: String = "TF runtime assertion failure",
@@ -52,7 +52,7 @@ func internalConsistencyCheck(
   }
 }
 
-@_versioned
+@usableFromInline
 func checkOk(_ s: CTFStatus?, file: StaticString = #file, line: UInt = #line) {
   internalConsistencyCheck(TF_GetCode(s) == TF_OK,
                            String(cString: TF_Message(s)),
@@ -115,7 +115,7 @@ func logToStderr(_ message: String) {
   _ = fputs(message, stderr)
 }
 
-@_versioned
+@usableFromInline
 func debugLog(_ message: @autoclosure () -> String,
               file: StaticString = #file,
               line: UInt = #line) {
@@ -173,7 +173,7 @@ open class RandomState {
   ///     information. It is initialized based on `seed`. `size` must be
   ///     between 8 and 256, and should be a power of two.
   ///
-  @_versioned
+  @usableFromInline
   init(seed: UInt32, bufferSize: Int = 64) {
     self.bufferAddress = .allocate(capacity: bufferSize)
     self.bufferSize = bufferSize

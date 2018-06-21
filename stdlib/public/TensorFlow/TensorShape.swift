@@ -20,13 +20,13 @@
 @_fixed_layout
 public struct TensorShape : ExpressibleByArrayLiteral {
   /// The dimensions of the shape.
-  @_versioned
+  @usableFromInline
   internal var dimensions: [Int32]
 
   /// Initialize with an array of dimensions. The rank of the tensor is the
   /// length of the array.
   /// - Parameter dimensions: The shape dimensions.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(_ dimensions: [Int32]) {
     self.dimensions = dimensions
   }
@@ -34,7 +34,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
   /// Initialize with an array literal representing the shape dimensions. The rank
   /// of the tensor is the number of dimensions.
   /// - Parameter dimensions: The shape dimensions.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(arrayLiteral elements: Int32...) {
     self.init(elements)
   }
@@ -42,13 +42,13 @@ public struct TensorShape : ExpressibleByArrayLiteral {
   /// Initialize with variadic elements representing the shape dimensions. The rank
   /// of the tensor is the number of elements.
   /// - Parameter dimensions: The shape dimensions.
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(_ elements: Int32...) {
     self.init(elements)
   }
 
   /// The rank of the shape.
-  @_inlineable
+  @inlinable
   public var rank: Int32 {
     @inline(__always)
     get {
@@ -57,7 +57,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
   }
 
   /// The size of the shape as a contiguously stored array.
-  @_inlineable
+  @inlinable
   public var contiguousSize: Int32 {
     @inline(__always)
     get {
@@ -67,7 +67,7 @@ public struct TensorShape : ExpressibleByArrayLiteral {
 }
 
 public extension TensorShape {
-  @_inlineable
+  @inlinable
   var count: Int32 {
     @inline(__always)
     get {
@@ -75,7 +75,7 @@ public extension TensorShape {
     }
   }
 
-  @_inlineable
+  @inlinable
   var indices: Range<Int32> {
     @inline(__always)
     get {
@@ -84,7 +84,7 @@ public extension TensorShape {
     }
   }
 
-  @_inlineable
+  @inlinable
   var startIndex: Int32 {
     @inline(__always)
     get {
@@ -92,7 +92,7 @@ public extension TensorShape {
     }
   }
 
-  @_inlineable
+  @inlinable
   var endIndex: Int32 {
     @inline(__always)
     get {
@@ -102,7 +102,7 @@ public extension TensorShape {
 
   /// Access the size of the i-th dimension.
   /// - Parameter index: The index of a dimension.
-  @_inlineable
+  @inlinable
   subscript(index: Int32) -> Int32 {
     @inline(__always)
     get {
@@ -116,7 +116,7 @@ public extension TensorShape {
 
   /// Access the size of the i-th dimension.
   /// - Parameter index: The index of a dimension.
-  @_inlineable
+  @inlinable
   subscript(bounds: Range<Int32>) -> TensorShape {
     @inline(__always)
     get {
@@ -133,7 +133,7 @@ public extension TensorShape {
 }
 
 extension TensorShape : Equatable {
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public static func ==(lhs: TensorShape, rhs: TensorShape) -> Bool {
     return lhs.dimensions == rhs.dimensions
   }
