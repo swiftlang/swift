@@ -217,10 +217,7 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl) {
       // In case of a string enum we are calling the _findStringSwitchCase
       // function from the library and switching on the returned Int value.
       stringExprs.push_back(litExpr);
-      llvm::SmallString<16> IdxAsStringBuffer;
-      APInt(64, Idx).toStringUnsigned(IdxAsStringBuffer);
-      StringRef IndexAsString(C.AllocateCopy(IdxAsStringBuffer.str()));
-      litExpr = new (C) IntegerLiteralExpr(IndexAsString, SourceLoc());
+      litExpr = IntegerLiteralExpr::createFromUnsigned(C, Idx); 
     }
     auto litPat = new (C) ExprPattern(litExpr, /*isResolved*/ true,
                                       nullptr, nullptr);
