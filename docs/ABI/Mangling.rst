@@ -467,7 +467,6 @@ Types
 
   assoc-type-list ::= assoc-type-name '_' assoc-type-name*
 
-  archetype ::= context 'Qq' INDEX           // archetype+context (DWARF only)
   archetype ::= associated-type
 
   associated-type ::= substitution
