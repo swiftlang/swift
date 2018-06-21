@@ -19,13 +19,13 @@
 // the compiler supports infeed in a more generic way, we will redesign this.
 // This API should not be used for anything other than the Swift for TensorFlow
 // demo.
-@_versioned
+@usableFromInline
 @_fixed_layout
 struct Dataset<InputScalar : AccelerableByTensorFlow,
                OutputScalar : AccelerableByTensorFlow> {
   public typealias Element = (Tensor<InputScalar>, Tensor<OutputScalar>)
 
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public init(filePath: String, batchSize: Int32,
               inputShape: TensorShape, outputShape: TensorShape) {
     fatalError("Unimplemented")

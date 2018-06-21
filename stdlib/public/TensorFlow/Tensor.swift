@@ -56,7 +56,7 @@ public struct Tensor<Scalar : AccelerableByTensorFlow> : TensorProtocol {
 
 @usableFromInline @inline(never)
 @_silgen_name("__tf_send")
-@effects(readnone)
+@_effects(readnone)
 func _TFSend<Scalar>(_ handle: TensorHandle<Scalar>) -> TensorHandle<Scalar> {
   return handle
 }
