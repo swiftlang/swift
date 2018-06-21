@@ -1492,7 +1492,7 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   }
 
   if (!hasDevice) {
-    inst->print(llvm::errs());
+    inst->dump();
     llvm_unreachable("The above tensor op has no device set");
   }
 
