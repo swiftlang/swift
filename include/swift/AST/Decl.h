@@ -37,6 +37,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <type_traits>
 
 namespace swift {
   enum class AccessSemantics : unsigned char;
@@ -6764,6 +6765,9 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 /// the type of the corresponding parameter.
 std::pair<DefaultArgumentKind, Type>
 getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
+
+/// Display ValueDecl subclasses.
+void simple_display(llvm::raw_ostream &out, const ValueDecl *&decl);
 
 } // end namespace swift
 

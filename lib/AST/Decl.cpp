@@ -5731,3 +5731,8 @@ NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
   return getAsDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
 }
 bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }
+
+void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *&decl) {
+  if (decl) decl->dumpRef(out);
+  else out << "(null)";
+}
