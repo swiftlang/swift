@@ -43,8 +43,30 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
 // general framework.
 
+
+// We have a list of functions that we hackily special case.  In order to keep
+// this localized, we use this classifier function.  This should be replaced
+// with an attribute put on the standard library that captures this info.
+enum class WellKnownFunction {
+  Unknown,
+  StringInitEmpty,  // String.init()
+  AssertionFailure, // _assertionFailure(_:_:file:line:flags:)
+};
+
+
+static WellKnownFunction classifyFunction(StringRef mangledName) {
+  if (mangledName == "$SS2SycfC")
+    return WellKnownFunction::StringInitEmpty;
+
+  if (mangledName.contains("_assertionFailure"))
+    return WellKnownFunction::AssertionFailure;
+  return WellKnownFunction::Unknown;
+}
+
+
+
 //===----------------------------------------------------------------------===//
-// MemoryValue implementation.
+// AddressValue implementation.
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -251,6 +273,10 @@ namespace {
 
     AddressValue computeSingleStoreAddressValue(SILValue addr);
     llvm::Optional<SymbolicValue> computeCallResult(ApplyInst *apply);
+
+    llvm::Optional<SymbolicValue>
+    computeOpaqueCallResult(ApplyInst *apply, SILFunction *callee);
+
     SymbolicValue computeLoadResult(SILValue addr);
     llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                  SILValue dest);
@@ -266,20 +292,9 @@ Type ConstExprFunctionState::simplifyType(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
-/// Lazily initialize the specified SIL Loader.
-static SerializedSILLoader &
-initLoader(std::unique_ptr<SerializedSILLoader> &silLoader, SILModule &module) {
-  if (!silLoader)
-    silLoader = SerializedSILLoader::create(module.getASTContext(),
-                                            &module, nullptr);
-  return *silLoader;
-}
-
-
 // TODO: refactor this out somewhere sharable between autodiff and this code.
 static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
-                                     SILModule &module,
-                         std::unique_ptr<SerializedSILLoader> &silLoader) {
+                                     SILModule &module) {
   // Cannot resolve abstract conformances.
   if (!confRef.isConcrete())
     return;
@@ -293,7 +308,8 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
     conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
   auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-  newTable = initLoader(silLoader, module).lookupWitnessTable(newTable);
+  newTable = module.getSILLoader()->lookupWitnessTable(newTable);
+
   // Update linkage for witness methods.
   // FIXME: Figure out why witnesses have shared linkage by default.
   for (auto &entry : newTable->getEntries())
@@ -372,8 +388,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     if (!fn) {
       // If that failed, try force loading it, and try again.
-      lookupOrLinkWitnessTable(conf, wmi->getModule(),
-                               evaluator.getSILLoader());
+      lookupOrLinkWitnessTable(conf, wmi->getModule());
       fn = module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     }
 
@@ -414,7 +429,27 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     return SymbolicValue::getUnknown(SILValue(inst), UnknownReason::Default);
   };
 
-  // Unary operations first.
+  // Nullary operations.
+  if (inst->getNumOperands() == 0) {
+    switch (builtin.ID) {
+    default: break;
+    case BuiltinValueKind::AssertConf: {
+      // assert_configuration builtin gets replaces with debug/release/etc
+      // constants.
+      auto config = inst->getModule().getOptions().AssertConfig;
+      // Don't replace assert_configuration if we're not supposed to.
+      if (config == SILOptions::DisableReplacement)
+        break;
+      auto resultBitWidth =
+        inst->getType().castTo<BuiltinIntegerType>()->getGreatestWidth();
+      auto result = APInt(resultBitWidth, config);
+      return SymbolicValue::getInteger(result, evaluator.getAllocator());
+    }
+    }
+  }
+
+
+  // Unary operations.
   if (inst->getNumOperands() == 1) {
     auto operand = getConstantValue(inst->getOperand(0));
     // TODO: Could add a "value used here" sort of diagnostic.
@@ -448,6 +483,10 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
       if (builtin.ID == BuiltinValueKind::UToSCheckedTrunc)
         overflowed |= result.isSignBitSet();
+
+      if (overflowed)
+        return SymbolicValue::getUnknown(SILValue(inst),
+                                         UnknownReason::Overflow);
 
       auto &allocator = evaluator.getAllocator();
       // Build the Symbolic value result for our truncated value.
@@ -661,14 +700,20 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       [&](const std::function<APInt(const APInt &, const APInt &, bool &)> &fn)
             -> SymbolicValue {
       if (operand0.getKind() != SymbolicValue::Integer ||
-          operand1.getKind() != SymbolicValue::Integer)
+          operand1.getKind() != SymbolicValue::Integer ||
+          operand2.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
-      // TODO: We can/should diagnose statically detectable integer overflow
-      // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
       auto l = operand0.getIntegerValue(), r = operand1.getIntegerValue();
       bool overflowed = false;
       auto result = fn(l, r, overflowed);
+
+      // Return a statically diagnosed overflow if the operation is supposed to
+      // trap on overflow.
+      if (overflowed && !operand2.getIntegerValue().isNullValue())
+        return SymbolicValue::getUnknown(SILValue(inst),
+                                         UnknownReason::Overflow);
+
       auto &allocator = evaluator.getAllocator();
       // Build the Symbolic value result for our normal and overflow bit.
       return SymbolicValue::getAggregate({
@@ -712,6 +757,34 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
   return unknownResult();
 }
 
+// Handle calls to opaque callees, either by handling them and returning None or
+// by returning with a Unknown indicating a failure.
+llvm::Optional<SymbolicValue>
+ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
+                                                SILFunction *callee) {
+  // This is a termination point like fatalError.
+  if (callee->hasSemanticsAttr("arc.programtermination_point")) {
+    // TODO: Actually get the message out of fatalError.  We can literally get
+    // its string and file/line/col info and propagate it up!
+    return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                     UnknownReason::Trap);
+  }
+  
+  if (classifyFunction(callee->getName()) ==
+      WellKnownFunction::AssertionFailure) {
+    // TODO: Actually get the message out of fatalError.  We can literally get
+    // its string and file/line/col info and propagate it up!
+    return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                     UnknownReason::Trap);
+  }
+
+  DEBUG(llvm::errs() << "ConstExpr Opaque Callee: " << *callee << "\n");
+  return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                   UnknownReason::Default);
+}
+
+
+// TODO: Refactor this to someplace common, this is defined in Devirtualize.cpp.
 SubstitutionMap
 getWitnessMethodSubstitutions(SILModule &Module, ApplySite AI, SILFunction *F,
                               ProtocolConformanceRef CRef);
@@ -724,47 +797,44 @@ llvm::Optional<SymbolicValue>
 ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   auto conventions = apply->getSubstCalleeConv();
 
-  // The many failure paths through this function invoke this to return their
-  // failure information.
-  auto failure = [&](UnknownReason reason) -> SymbolicValue {
-    auto unknown = SymbolicValue::getUnknown((SILInstruction*)apply, reason);
-    // Remember that this call produced unknown as well as any indirect results.
-    calculatedValues[apply] = unknown;
-
-    for (unsigned i = 0, e = conventions.getNumIndirectSILResults();
-         i != e; ++i) {
-      auto resultOperand = apply->getOperand(i+1);
-      assert(resultOperand->getType().isAddress() &&
-             "Indirect results should be by-address");
-      calculatedValues[resultOperand] = unknown;
-    }
-    return unknown;
-  };
-
   // Determine the callee.
-  auto calleeLV = getConstantValue(apply->getOperand(0));
-  if (!calleeLV.isConstant())
-    return failure(UnknownReason::Default);
+  auto calleeFn = getConstantValue(apply->getOperand(0));
+  if (!calleeFn.isConstant())
+    return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                     UnknownReason::Default);
 
   SILFunction *callee;
   Optional<ProtocolConformanceRef> conformance;
-  std::tie(callee, conformance) = calleeLV.getFunctionValue();
+  std::tie(callee, conformance) = calleeFn.getFunctionValue();
 
 
   // If we reached an external function that hasn't been deserialized yet, make
   // sure to pull it in so we can see its body.  If that fails, then we can't
   // analyze the function.
   if (callee->isExternalDeclaration()) {
-    auto newCallee = initLoader(evaluator.getSILLoader(),
-                                callee->getModule()).lookupSILFunction(callee);
-    if (!newCallee || newCallee->isExternalDeclaration()) {
-      DEBUG(llvm::errs() << "ConstExpr Opaque Callee: " << *callee << "\n");
-      return failure(UnknownReason::Default);
-    }
-    callee = newCallee;
+    callee->getModule().loadFunction(callee);
+    if (callee->isExternalDeclaration())
+      return computeOpaqueCallResult(apply, callee);
   }
 
   // TODO: Verify that the callee was defined as a @constexpr function.
+
+  // If this is a well-known function, do not step into it.
+  //
+  // FIXME: This should be based on the SILFunction carrying a
+  // @constexprSemantics sort of attribute that indicates it is well known,
+  // just like the existing SemanticsAttr thing.
+  switch (classifyFunction(callee->getName())) {
+  default: break;
+  case WellKnownFunction::StringInitEmpty: {  // String.init()
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           "unexpected String.init() signature");
+    auto result = SymbolicValue::getString("", evaluator.getAllocator());
+    setValue(apply->getResults()[0], result);
+    return None;
+  }
+  }
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;
@@ -832,7 +902,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   if (unsigned numNormalResults = conventions.getNumDirectSILResults()) {
     // TODO: unclear when this happens, is this for tuple result values?
     assert(numNormalResults == 1 && "Multiple results aren't supported?");
-    calculatedValues[apply->getResults()[0]] = results[nextResult];
+    setValue(apply->getResults()[0], results[nextResult]);
     ++nextResult;
   }
 
@@ -861,6 +931,13 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 
   // Compute the value of a normal instruction based on its operands.
   auto result = computeConstantValue(value);
+
+  // If this is the top-level lazy interpreter, output a debug trace.
+  if (!fn) {
+    DEBUG(llvm::errs() << "ConstExpr top level: "; value->dump());
+    DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+  }
+
   return calculatedValues[value] = result;
 }
 
@@ -1183,11 +1260,12 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
 
   if (isa<CondFailInst>(inst)) {
     auto failed = getConstantValue(inst->getOperand(0));
-    if (failed.isConstant() && failed.getIntegerValue() == 0)
-      return None;
-    // TODO: Emit a diagnostic if this cond_fail actually fails under constant
-    // folding.
-    DEBUG(llvm::errs() << "CONDFAIL FAILED!\n");
+    if (failed.getKind() == SymbolicValue::Integer) {
+      if (failed.getIntegerValue() == 0)
+        return None;
+      // Conditional fail actually failed.
+      return SymbolicValue::getUnknown(inst, UnknownReason::Trap);
+    }
   }
 
   // If this is a call, evaluate it.
