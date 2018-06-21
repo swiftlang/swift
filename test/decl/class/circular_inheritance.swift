@@ -42,7 +42,7 @@ class Outer3
 }
 
 // CHECK: ===CYCLE DETECTED===
-// CHECK-NEXT: `--{{.*}}SuperclassTypeRequest
+// CHECK-NEXT: `--{{.*}}SuperclassTypeRequest({{.*Left}}
 // CHECK-NEXT:      `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Left@
 // CHECK-NEXT:          `--{{.*}}SuperclassTypeRequest
 // CHECK-NEXT:              `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Right@

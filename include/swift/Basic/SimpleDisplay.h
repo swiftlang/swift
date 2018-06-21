@@ -25,7 +25,36 @@
 
 namespace swift {
   template<typename T>
-  void simple_display(llvm::raw_ostream &out, const T &value) {
+  struct HasTrivialDisplay {
+    static const bool value = false;
+  };
+
+#define HAS_TRIVIAL_DISPLAY(Type)     \
+  template<>                          \
+  struct HasTrivialDisplay<Type> {    \
+    static const bool value = true;   \
+  }
+
+  HAS_TRIVIAL_DISPLAY(unsigned char);
+  HAS_TRIVIAL_DISPLAY(signed char);
+  HAS_TRIVIAL_DISPLAY(char);
+  HAS_TRIVIAL_DISPLAY(short);
+  HAS_TRIVIAL_DISPLAY(unsigned short);
+  HAS_TRIVIAL_DISPLAY(int);
+  HAS_TRIVIAL_DISPLAY(unsigned int);
+  HAS_TRIVIAL_DISPLAY(long);
+  HAS_TRIVIAL_DISPLAY(unsigned long);
+  HAS_TRIVIAL_DISPLAY(long long);
+  HAS_TRIVIAL_DISPLAY(unsigned long long);
+  HAS_TRIVIAL_DISPLAY(float);
+  HAS_TRIVIAL_DISPLAY(double);
+  HAS_TRIVIAL_DISPLAY(bool);
+
+#undef HAS_TRIVIAL_DISPLAY
+
+  template<typename T>
+  typename std::enable_if<HasTrivialDisplay<T>::value>::type
+  simple_display(llvm::raw_ostream &out, const T &value) {
     out << value;
   }
 
