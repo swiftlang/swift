@@ -2885,10 +2885,17 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
       }
     }
 
-    for (auto requirement : normal->getConditionalRequirements()) {
+    if (auto condReqs = normal->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto requirement : *condReqs) {
+        out << '\n';
+        out.indent(indent + 2);
+        requirement.dump(out);
+      }
+    } else {
       out << '\n';
       out.indent(indent + 2);
-      requirement.dump(out);
+      out << "(conditional requirements unable to be computed)";
     }
     break;
   }
@@ -2909,10 +2916,16 @@ void ProtocolConformance::dump(llvm::raw_ostream &out, unsigned indent) const {
       sub.dump(out, indent + 2);
       out << '\n';
     }
-    for (auto subReq : conf->getConditionalRequirements()) {
+    if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto subReq : *condReqs) {
+        out.indent(indent + 2);
+        subReq.dump(out);
+        out << '\n';
+      }
+    } else {
       out.indent(indent + 2);
-      subReq.dump(out);
-      out << '\n';
+      out << "(conditional requirements unable to be computed)\n";
     }
     conf->getGenericConformance()->dump(out, indent + 2);
     break;

@@ -702,6 +702,13 @@ enum class ConformanceCheckFlags {
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
   SkipConditionalRequirements = 0x08,
+
+  /// Whether to require that the conditional requirements have been computed.
+  ///
+  /// When set, if the conditional requirements aren't available, they are just
+  /// skipped, and the caller is responsible for detecting and handling this
+  /// case (likely via another call to getConditionalRequirementsIfAvailable).
+  AllowUnavailableConditionalRequirements = 0x10,
 };
 
 /// Options that control protocol conformance checking.

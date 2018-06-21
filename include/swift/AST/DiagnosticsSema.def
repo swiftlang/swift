@@ -647,6 +647,9 @@ ERROR(ambiguous_module_type,none,
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
+ERROR(unsupported_recursion_in_associated_type_reference,none,
+      "unsupported recursion for reference to associated type %0 of type %1",
+      (DeclName, Type))
 ERROR(broken_associated_type_witness,none,
       "reference to invalid associated type %0 of type %1", (DeclName, Type))
 
@@ -1799,6 +1802,9 @@ NOTE(redundant_conformance_here,none,
      "conformance constraint %1: %2 %select{written here|implied here|"
      "inferred from type here}0",
      (unsigned, Type, ProtocolDecl *))
+
+ERROR(unsupported_recursive_requirements, none,
+      "requirement involves recursion that is not currently supported", ())
 
 ERROR(same_type_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be equal to both "

@@ -371,8 +371,24 @@ bool NormalProtocolConformance::isSynthesizedNonUnique() const {
   return isa<ClangModuleUnit>(getDeclContext()->getModuleScopeContext());
 }
 
+Optional<ArrayRef<Requirement>>
+ProtocolConformance::getConditionalRequirementsIfAvailable() const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirementsIfAvailable, ());
+}
+
 ArrayRef<Requirement> ProtocolConformance::getConditionalRequirements() const {
   CONFORMANCE_SUBCLASS_DISPATCH(getConditionalRequirements, ());
+}
+
+Optional<ArrayRef<Requirement>>
+ProtocolConformanceRef::getConditionalRequirementsIfAvailable() const {
+  if (isConcrete())
+    return getConcrete()->getConditionalRequirementsIfAvailable();
+  else
+    // An abstract conformance is never conditional: any conditionality in the
+    // concrete types that will eventually pass through this at runtime is
+    // completely pre-checked and packaged up.
+    return ArrayRef<Requirement>();
 }
 
 ArrayRef<Requirement>
@@ -380,35 +396,66 @@ ProtocolConformanceRef::getConditionalRequirements() const {
   if (isConcrete())
     return getConcrete()->getConditionalRequirements();
   else
-    // An abstract conformance is never conditional: any conditionality in the
-    // concrete types that will eventually pass through this at runtime is
-    // completely pre-checked and packaged up.
+    // An abstract conformance is never conditional, as above.
     return {};
 }
 
-void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
-  assert(ConditionalRequirements.empty() &&
-         "should not recompute conditional requirements");
+void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
+    const {
+  switch (CRState) {
+  case ConditionalRequirementsState::Complete:
+    // already done!
+    return;
+  case ConditionalRequirementsState::Computing:
+    // recursive
+    return;
+  case ConditionalRequirementsState::Uncomputed:
+    // try to compute it!
+    break;
+  };
+
+  CRState = ConditionalRequirementsState::Computing;
+  auto success = [this](ArrayRef<Requirement> reqs) {
+    ConditionalRequirements = reqs;
+    assert(CRState == ConditionalRequirementsState::Computing);
+    CRState = ConditionalRequirementsState::Complete;
+  };
+  auto failure = [this] {
+    assert(CRState == ConditionalRequirementsState::Computing);
+    CRState = ConditionalRequirementsState::Uncomputed;
+  };
+
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();
-  // Only conformances in extensions can be conditional
-  if (!isa<ExtensionDecl>(DC))
+  // A non-extension conformance won't have conditional requirements.
+  if (!isa<ExtensionDecl>(DC)) {
+    success({});
     return;
+  }
 
   auto typeSig = DC->getAsNominalTypeOrNominalTypeExtensionContext()
                      ->getGenericSignature();
-  auto extensionSig = DC->getGenericSignatureOfContext();
 
-  // If the type is generic, the extension should be too, and vice versa.
-  assert((bool)typeSig == (bool)extensionSig &&
-         "unexpected generic-ness mismatch on conformance");
-  if (!typeSig)
+  // A non-generic type won't have conditional requirements.
+  if (!typeSig) {
+    success({});
     return;
+  }
+
+  auto extensionSig = DC->getGenericSignatureOfContext();
+  // The type is generic, but the extension doesn't have a signature yet, so
+  // we can't do any differencing.
+  if (!extensionSig) {
+    failure();
+    return;
+  }
 
   auto canExtensionSig = extensionSig->getCanonicalSignature();
   auto canTypeSig = typeSig->getCanonicalSignature();
-  if (canTypeSig == canExtensionSig)
+  if (canTypeSig == canExtensionSig) {
+    success({});
     return;
+  }
 
   // The extension signature should be a superset of the type signature, meaning
   // every thing in the type signature either is included too or is implied by
@@ -419,8 +466,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements() {
 
   // Find the requirements in the extension that aren't proved by the original
   // type, these are the ones that make the conformance conditional.
-  ConditionalRequirements =
-      ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig));
+  success(ctxt.AllocateCopy(extensionSig->requirementsNotSatisfiedBy(typeSig)));
 }
 
 void NormalProtocolConformance::setSignatureConformances(
@@ -608,6 +654,12 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
     return { Type(), nullptr };
   }
 
+  // If the conditional requirements aren't known, we can't properly run
+  // inference.
+  if (!getConditionalRequirementsIfAvailable()) {
+    return {Type(), nullptr};
+  }
+
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
   assert(resolver && "Unable to resolve type witness");
@@ -783,8 +835,20 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     GenericSubstitutions(substitutions)
 {
   assert(genericConformance->getKind() != ProtocolConformanceKind::Specialized);
+  computeConditionalRequirements();
+}
 
-  if (!GenericConformance->getConditionalRequirements().empty()) {
+void SpecializedProtocolConformance::computeConditionalRequirements() const {
+  // already computed?
+  if (ConditionalRequirements)
+    return;
+
+  auto parentCondReqs =
+      GenericConformance->getConditionalRequirementsIfAvailable();
+  if (!parentCondReqs)
+    return;
+
+  if (!parentCondReqs->empty()) {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
@@ -793,13 +857,15 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     auto subMap = getType()->getContextSubstitutionMap(module, nominal);
 
     SmallVector<Requirement, 4> newReqs;
-    for (auto oldReq : GenericConformance->getConditionalRequirements()) {
+    for (auto oldReq : *parentCondReqs) {
       if (auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
                                      LookUpConformanceInModule(module)))
         newReqs.push_back(*newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
+  } else {
+    ConditionalRequirements = {};
   }
 }
 
