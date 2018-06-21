@@ -248,6 +248,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 
@@ -1670,7 +1671,10 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }
 
 ToolChain::InvocationInfo
@@ -1934,7 +1938,10 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(context.Args.MakeArgString(
       context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }
 
 std::string

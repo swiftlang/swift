@@ -16,6 +16,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
@@ -337,6 +338,15 @@ void Job::dump() const {
   printCommandLineAndEnvironment(llvm::errs());
 }
 
+ArrayRef<const char *> Job::getArgumentsForTaskExecution() const {
+  if (hasResponseFile()) {
+    writeArgsToResponseFile();
+    return getResponseFileArg();
+  } else {
+    return getArguments();
+  }
+}
+
 void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
                                          StringRef Terminator) const {
   printCommandLine(Stream, /*Terminator=*/"");
@@ -352,7 +362,12 @@ void Job::printCommandLineAndEnvironment(raw_ostream &Stream,
 void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
+  if (hasResponseFile()) {
+    printArguments(os, {ResponseFileArg});
+    os << " # ";
+  }
   printArguments(os, Arguments);
+
   os << Terminator;
 }
 
@@ -401,6 +416,21 @@ void Job::printSummary(raw_ostream &os) const {
     os << " ... " << (actual_in-limit) << " more";
   }
   os << "}";
+}
+
+bool Job::writeArgsToResponseFile() const {
+  std::error_code EC;
+  llvm::raw_fd_ostream OS(ResponseFilePath, EC, llvm::sys::fs::F_None);
+  if (EC) {
+    return true;
+  }
+  for (const char *arg : Arguments) {
+    OS << "\"";
+    escapeAndPrintString(OS, arg);
+    OS << "\" ";
+  }
+  OS.flush();
+  return false;
 }
 
 BatchJob::BatchJob(const JobAction &Source,
