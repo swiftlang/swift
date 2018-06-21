@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module-path %t/main4.swiftmodule -swift-version 4 %s
-// RUN: %target-build-swift -emit-module-path %t/main4_2.swiftmodule -swift-version 4.2 %s
+// RUN: %target-build-swift -emit-module-path %t/main4.swiftmodule -swift-version 4 -Fsystem %sdk/System/Library/PrivateFrameworks/ %s
+// RUN: %target-build-swift -emit-module-path %t/main4_2.swiftmodule -swift-version 4.2 -Fsystem %sdk/System/Library/PrivateFrameworks/ %s
 
 // REQUIRES: OS=macosx || OS=ios
 
