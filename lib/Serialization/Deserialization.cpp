@@ -1176,7 +1176,8 @@ static bool reExportedToSameModule(const ModuleDecl *fromModule,
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
-                         bool inProtocolExt, bool isStatic,
+                         bool inProtocolExt, bool importedFromClang,
+                         bool isStatic,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -1197,6 +1198,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
       return true;
     if (value->isStatic() != isStatic)
+      return true;
+    if (value->hasClangNode() != importedFromClang)
       return true;
 
     if (value->getAttrs().hasAttribute<ForbidSerializingReferenceAttr>())
@@ -1275,13 +1278,14 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool inProtocolExt = false;
+    bool importedFromClang = false;
     bool isStatic = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                          inProtocolExt);
+                                          inProtocolExt, importedFromClang);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                           isStatic);
+                                           importedFromClang, isStatic);
 
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
@@ -1309,8 +1313,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   /*typeResolver=*/nullptr, values);
     }
-    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
-                 None, values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
+                 importedFromClang, isStatic, None, values);
     break;
   }
 
@@ -1364,13 +1368,14 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None, None);
         result = getIdentifier(IID);
         break;
       }
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None);
+        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None,
+                                             None);
         result = getIdentifier(IID);
         break;
       }
@@ -1423,8 +1428,9 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         IdentifierID IID;
         IdentifierID privateDiscriminator;
         bool onlyInNominal = false;
+        bool importedFromClang = false;
         XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                            onlyInNominal);
+                                            onlyInNominal, importedFromClang);
         if (privateDiscriminator)
           goto giveUpFastPath;
 
@@ -1481,12 +1487,13 @@ giveUpFastPath:
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool inProtocolExt = false;
+      bool importedFromClang = false;
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID, discriminatorID;
         XRefTypePathPieceLayout::readRecord(scratch, IID, discriminatorID,
-                                            inProtocolExt);
+                                            inProtocolExt, importedFromClang);
         memberName = getDeclBaseName(IID);
         privateDiscriminator = getIdentifier(discriminatorID);
         isType = true;
@@ -1496,7 +1503,7 @@ giveUpFastPath:
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                             isStatic);
+                                             importedFromClang, isStatic);
         memberName = getDeclBaseName(IID);
         break;
       }
@@ -1504,7 +1511,7 @@ giveUpFastPath:
       case XREF_INITIALIZER_PATH_PIECE: {
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
-                                                   kind);
+                                                   importedFromClang, kind);
         memberName = DeclBaseName::createConstructor();
         ctorInit = getActualCtorInitializerKind(kind);
         break;
@@ -1557,8 +1564,8 @@ giveUpFastPath:
         auto members = nominal->lookupDirect(memberName);
         values.append(members.begin(), members.end());
       }
-      filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
-                   ctorInit, values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt,
+                   importedFromClang, isStatic, ctorInit, values);
       break;
     }
 
