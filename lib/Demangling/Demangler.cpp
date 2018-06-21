@@ -1560,13 +1560,6 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
-    case 'q': {
-      NodePointer Idx = demangleIndexAsNode();
-      NodePointer Ctx = popContext();
-      NodePointer DeclCtx = createWithChild(Node::Kind::DeclContext, Ctx);
-      return createType(createWithChildren(Node::Kind::QualifiedArchetype,
-                                           Idx, DeclCtx));
-    }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);

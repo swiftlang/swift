@@ -2079,49 +2079,6 @@ static void VisitNodeProtocolListWithAnyObject(
   }
 }
 
-static void VisitNodeQualifiedArchetype(
-    ASTContext *ast,
-    Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  if (cur_node->begin() != cur_node->end()) {
-    VisitNodeResult type_result;
-    uint64_t index = 0xFFFFFFFFFFFFFFFF;
-    for (Demangle::NodePointer ChildNd : *cur_node) {
-      switch (ChildNd->getKind()) {
-      case Demangle::Node::Kind::Number:
-        index = ChildNd->getIndex();
-        break;
-      case Demangle::Node::Kind::DeclContext:
-        VisitNode(ast, ChildNd, type_result);
-        break;
-      default:
-        break;
-      }
-    }
-    if (index != 0xFFFFFFFFFFFFFFFF) {
-      Decl *decl_ptr = nullptr;
-      if (type_result._decls.size() == 1) {
-        decl_ptr = type_result._decls[0];
-      } else if (type_result._module.IsExtension()) {
-        decl_ptr = type_result._module.GetExtendedDecl();
-      }
-
-      if (decl_ptr) {
-        auto *dc = decl_ptr->getInnermostDeclContext();
-        auto *sig = dc->getGenericSignatureOfContext();
-        if (sig) {
-          auto params = sig->getInnermostGenericParams();
-          if (index < params.size()) {
-            auto argTy = dc->mapTypeIntoContext(params[index])
-                ->getAs<ArchetypeType>();
-            if (argTy)
-              result._types.push_back(argTy);
-          }
-        }
-      }
-    }
-  }
-}
-
 static void VisitNodeTupleElement(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -2412,10 +2369,6 @@ static void VisitNode(
 
   case Demangle::Node::Kind::ProtocolListWithAnyObject:
     VisitNodeProtocolListWithAnyObject(ast, node, result);
-    break;
-
-  case Demangle::Node::Kind::QualifiedArchetype:
-    VisitNodeQualifiedArchetype(ast, node, result);
     break;
 
   case Demangle::Node::Kind::TupleElement:
