@@ -268,6 +268,8 @@ private:
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
 
+  // SWIFT_ENABLE_TENSORFLOW
+public:
   /// Method which returns the SerializedSILLoader, creating the loader if it
   /// has not been created yet.
   SerializedSILLoader *getSILLoader();

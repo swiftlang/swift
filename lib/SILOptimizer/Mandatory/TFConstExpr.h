@@ -32,7 +32,6 @@ namespace swift {
   class SILBuilder;
   class SILModule;
   class SILValue;
-  class SerializedSILLoader;
   class SymbolicValue;
 
 namespace tf {
@@ -44,9 +43,6 @@ class ConstExprEvaluator {
   /// result values for the cached constexpr calls we have already analyzed.
   llvm::BumpPtrAllocator allocator;
 
-  /// This is a handle to a loader for serialized code.
-  std::unique_ptr<SerializedSILLoader> silLoader;
-
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
 public:
@@ -54,7 +50,6 @@ public:
   ~ConstExprEvaluator();
 
   llvm::BumpPtrAllocator &getAllocator() { return allocator; }
-  std::unique_ptr<SerializedSILLoader> &getSILLoader() { return silLoader; }
 
   /// Analyze the specified values to determine if they are constant values.
   /// This is done in code that is not necessarily itself a constexpr

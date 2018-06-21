@@ -35,11 +35,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_UninitMemory: os << "uninit\n"; return;
   case RK_Unknown: {
     std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
-    switch (unknown.second) {
-    case UnknownReason::Default: os << "unknown: "; break;
-    case UnknownReason::TooManyInstructions: os << "unknown(toobig): "; break;
-    case UnknownReason::Loop: os << "unknown(loop): "; break;
-    }
+    os << "unknown(" << (int)unknown.second << "): ";
     unknown.first->dump();
     return;
   }
@@ -446,6 +442,12 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   case UnknownReason::Loop:
     error = "control flow loop found";
     break;
+  case UnknownReason::Overflow:
+    error = "integer overflow detected";
+    break;
+  case UnknownReason::Trap:
+    error = "trap detected";
+    break;
   }
 
   auto &module = badInst->getModule();
@@ -453,7 +455,8 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
   if (loc.isNull()) {
     // If we have important clarifying information, make sure to emit it.
-    if (unknown.second != UnknownReason::Default)
+    if (unknown.second == UnknownReason::Default ||
+        fallbackLoc.isNull())
       return;
     loc = fallbackLoc;
   }
