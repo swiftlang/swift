@@ -532,26 +532,10 @@ public:
     std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
         Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    const size_t buf_size = 8;
-
-    char *start_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
-
-    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
-
-    Expr *StartLine =
-        new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);
-    Expr *EndLine =
-        new (Context) IntegerLiteralExpr(end_line_buf, SR.End, true);
-    Expr *StartColumn =
-        new (Context) IntegerLiteralExpr(start_column_buf, SR.End, true);
-    Expr *EndColumn =
-        new (Context) IntegerLiteralExpr(end_column_buf, SR.End, true);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
     llvm::SmallVector<Expr *, 5> ArgsWithSourceRange{};
 
@@ -615,26 +599,10 @@ public:
     std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
         Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    const size_t buf_size = 8;
-
-    char *start_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_line_buf = (char *)Context.Allocate(buf_size, 1);
-    char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
-    char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
-
-    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
-
-    Expr *StartLine =
-        new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);
-    Expr *EndLine =
-        new (Context) IntegerLiteralExpr(end_line_buf, SR.End, true);
-    Expr *StartColumn =
-        new (Context) IntegerLiteralExpr(start_column_buf, SR.End, true);
-    Expr *EndColumn =
-        new (Context) IntegerLiteralExpr(end_column_buf, SR.End, true);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
     llvm::SmallVector<Expr *, 4> ArgsWithSourceRange{};
 

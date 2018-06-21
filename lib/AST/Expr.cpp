@@ -1005,6 +1005,13 @@ LiteralExpr *LiteralExpr::shallowClone(
   return Result;
 }
 
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value) {
+  llvm::SmallString<8> Scratch;
+  llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
+  auto Text = C.AllocateCopy(StringRef(Scratch));
+  return new (C) IntegerLiteralExpr(Text, SourceLoc(), /*implicit*/ true);
+}
+
 /// A wrapper around LLVM::getAsInteger that can be used on Swift interger
 /// literals. It avoids misinterpreting decimal numbers prefixed with 0 as
 /// octal numbers.
