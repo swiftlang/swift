@@ -123,6 +123,20 @@ public func testSendsInALoopGPU() {
   let _ = a.array
 }
 
+// CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}testSendsInALoopGPU{{.*}}
+
+// In the loop head (where cond and body are evaluated), send a to CPU, which
+// then sends it to host.
+// CHECK:      bb1
+// CHECK:      builtin "__tfop_tfc.TensorTransfer
+// CHECK:      builtin "__tfop_tfc.SendToHost
+
+// In the loop body (a trivial back-edge), we should not need to do transfer,
+// but since we are replicating BB args to BB1 to all devices, there is
+// currently another transfer, which we can optimize away in the future.
+// CHECK:      bb2
+// CHECK:      builtin "__tfop_tfc.TensorTransfer
+
 public func testSendsInALoopTPU() {
   TensorFlow.enableTPU()
   let maxCount = 10
@@ -140,19 +154,17 @@ public func testSendsInALoopTPU() {
   let _ = a.array
 }
 
-// CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}testSendsInALoopGPU{{.*}}
+// There are currently two tensor transfers, both involving TPU->CPU. The first
+// one is to provide input to _hostOp(). The second one is to send the TPU-based
+// tensor `a` to CPU at the end of each loop iteration, to maintain the current
+// invariant in device partitioning pass that BB args are always replicated
+// across all devices. That second transfer can be eliminated later.
 
-// In the loop head (where cond and body are evaluated), send a to CPU, which
-// then sends it to host.
-// CHECK:      bb1
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.SendToHost
-
-// In the loop body (a trivial back-edge), we should not need to do transfer,
-// but since we are replicating BB args to BB1 to all devices, there is
-// currently another transfer, which we can optimize away in the future.
-// CHECK:      bb2
-// CHECK:      builtin "__tfop_tfc.TensorTransfer
+// CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}testSendsInALoopTPU{{.*}}TPU{{.*}}
+// CHECK: bb1
+// CHECK:   builtin "__tfop_tfc.D2DTensorSend
+// CHECK: bb2
+// CHECK:   builtin "__tfop_tfc.D2DTensorSend
 
 public func testSendsInALoopWithNoResultTensor() {
   let maxCount = 10
@@ -248,6 +260,29 @@ public func test1RecvScalarGPU() {
 
 // CHECK-LABEL: --- TFDevicePartition Per-Device Function Extraction Result: {{.*}}test1RecvScalarGPU{{.*}}CPU{{.*}}
 // CHECK: builtin "__tfop_tfc.D2DTensorSend
+
+public func test1RecvScalarTPU() {
+  TensorFlow.enableTPU()
+  let x = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
+  let y = x.scalar! + 2 // expected-note {{value used here}}
+  // expected-warning @-1 {{value implicitly copied to the accelerator}}
+
+  let z = Tensor<Float>(y)
+  let result = z + z
+  _hostOp(result.toHost())
+}
+
+// On receiving x.scalar in CPU, add a __shapes pseudo attr for XLA
+// compilation. The shape array attr gets propagated to TensorTransfer.
+//
+// CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
+// CHECK:      [[X_SCALAR_CPU:%.*]] = builtin "__tfop_tfc.RecvFromHost,tensorId,device,__shapes$shapearray,$shape
+// CHECK:      [[X_SCALAR_TPU:%.*]] = builtin "__tfop_tfc.TensorTransfer,$in,transferId,srcDevice,destDevice,__shapes$shapearray,$shape"{{.*}}([[X_SCALAR_CPU]] : $TensorHandle
+// This is the promoted scalar add that computes x.scalar! + 2
+// CHECK-NEXT: builtin "__tfop_Add{{.*}}"([[X_SCALAR_TPU]] : $TensorHandle
+// This is z + z
+// CHECK:      [[RESULT:%.*]] = builtin "__tfop_Add
+// CHECK-NEXT: return [[RESULT]]
 
 @inline(never)
 public func atariSim(_ a: Tensor<Float>) -> Tensor<Float> {

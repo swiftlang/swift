@@ -959,9 +959,11 @@ void TFGraphLowering::visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo) {
 
   // Type check and process the parameters.
   // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
+  // Optionally it can carry a shape array attr, only used for shape propagation
+  // in XLA compilation.
   auto *inst = tfopInfo.inst;
   assert(inst->getNumResults() == 1);
-  assert(inst->getNumOperands() == 2);
+  assert(inst->getNumOperands() >= 2);
 
   int tensorId = tfopInfo.getIntAttrOperand(0, "tensorId");
   assert(tfopInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&

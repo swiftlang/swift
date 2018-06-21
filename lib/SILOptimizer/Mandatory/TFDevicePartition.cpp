@@ -65,15 +65,17 @@ static void createShapeAttr(
   }
 }
 
-/// Create a shape array attribute with input from `tfopInfo` starting at
-/// `operandIdx`, for a new instruction the caller is constructing, by extending
-/// `name` and `operands` to be used in the new inst.
+/// Create a shape array pseudo-attribute (with attr name "__shapes") with input
+/// from `tfopInfo` starting at `operandIdx`, for a new instruction the caller
+/// is constructing. The work is done by extending `name` and `operands` to be
+/// used in the new inst.
 /// For each operand of `operandRemapper` involved in the shape array attr, call
-/// `operandRemapper` to remap it to an operand for the new inst under construction.
+/// `operandRemapper` to remap it to an operand for the new inst under
+/// construction.
 ///
 /// An example input `tfopInfo` is:
 /// %6 = builtin
-///   "__tfop_Const,dtype,value$tensor,shapes$shapearray,$shape,$elt,device"(%0
+///   "__tfop_Const,dtype,value$tensor,__shapes$shapearray,$shape,$elt,device"(%0
 ///   : $@thin Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.Int64, %3 :
 ///   $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.RawPointer) :
 ///   $TensorHandle<Float>
@@ -81,10 +83,11 @@ static void createShapeArrayAttr(
     const SILTensorOpInfo &tfopInfo, unsigned operandIdx, std::string &name,
     SmallVectorImpl<SILValue> &operands,
     const std::function<SILValue(SILValue)>& operandRemapper) {
-  // First add the shapes$shapearray operand, with # shapes as the value.
+  // First add the __shapes$shapearray operand, with # shapes as the value.
   auto attrInfo = tfopInfo.operandClasses[operandIdx];
   assert(attrInfo.second == SILTensorOpInfo::OperandClass::ShapeArray);
   StringRef attrName = attrInfo.first;
+  assert(attrName == SHAPE_ARRAY_ATTR);
   name += "," + attrName.str();
   name += SILTensorOpInfo::getOperandClassSuffix(
       SILTensorOpInfo::OperandClass::ShapeArray);
@@ -521,7 +524,7 @@ class DevicePartitionerImpl
 
  public:
   /// Impl note: Although we can short-circuit
-  /// markFunctionAndInsertTensorTranfers() and extractFunctionForDevice() when
+  /// markFunctionAndInsertTensorTransfers() and extractFunctionForDevice() when
   /// there is a single device, we choose to exercise them for test
   /// coverage. This can be optimized for compiler performance later if it turns
   /// out to matter.
@@ -532,7 +535,7 @@ class DevicePartitionerImpl
         NUM_DEVICE_TYPES <= 8,
         "3 bits are allocated in KeyByInstDestDevice to encode device types");
     instByDevice.resize(NUM_DEVICE_TYPES);
-    markFunctionAndInsertTensorTranfers();
+    markFunctionAndInsertTensorTransfers();
   }
 
   /// Returns a function extracted from `srcFn`, specialized on `deviceType`.
@@ -680,7 +683,7 @@ class DevicePartitionerImpl
  private:
   /// Track the tensor ops on a per device basis, and insert "TensorTransfer"
   /// builtin's for cross-device TF tensor sends/recvs.
-  void markFunctionAndInsertTensorTranfers() {
+  void markFunctionAndInsertTensorTransfers() {
     for (auto *BB : llvm::depth_first(&srcFn)) {
       processBlock(BB);
     }
