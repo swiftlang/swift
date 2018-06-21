@@ -87,7 +87,7 @@ public extension VectorNumeric {
 // Differential Operators
 //===----------------------------------------------------------------------===//
 
-@_transparent @_versioned
+@_transparent @usableFromInline
 func _gradientBodyUnreachable() {
   // This implementation is never used, since calls to `Swift.gradient(of:)` are
   // resolved as a special case by the type checker.
@@ -97,7 +97,7 @@ func _gradientBodyUnreachable() {
   Builtin.unreachable()
 }
 
-@_transparent @_versioned
+@_transparent @usableFromInline
 func _valueAndGradientBodyUnreachable() {
   // This implementation is never used, since calls to
   // `Swift.valueAndGradient(of:)` are resolved as a special case by the type
@@ -108,7 +108,7 @@ func _valueAndGradientBodyUnreachable() {
   Builtin.unreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
@@ -116,7 +116,7 @@ public func gradient<T, Result>(of function: (T) -> Result) -> (T) -> T
   _gradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, Result>(
@@ -127,7 +127,7 @@ public func gradient<T, U, Result>(
   _gradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, V, Result>(
@@ -139,7 +139,7 @@ public func gradient<T, U, V, Result>(
   _gradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.gradient(of:)")
 public func gradient<T, U, V, W, Result>(
@@ -152,7 +152,7 @@ public func gradient<T, U, V, W, Result>(
   _gradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, Result>(
@@ -162,7 +162,7 @@ public func valueAndGradient<T, Result>(
   _valueAndGradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, U, Result>(
@@ -173,7 +173,7 @@ public func valueAndGradient<T, U, Result>(
   _valueAndGradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, U, V, Result>(
@@ -185,7 +185,7 @@ public func valueAndGradient<T, U, V, Result>(
   _valueAndGradientBodyUnreachable()
 }
 
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 @_transparent
 @_semantics("typechecker.valueAndGradient(of:)")
 public func valueAndGradient<T, U, V, W, Result>(
@@ -202,5 +202,5 @@ public func valueAndGradient<T, U, V, W, Result>(
 // Builtins
 //===----------------------------------------------------------------------===//
 
-@_versioned @_fixed_layout
+@usableFromInline @_fixed_layout
 class _AutoDiffTape<Element> {}
