@@ -36,14 +36,15 @@ static llvm::cl::opt<bool> FSODisableArgExplosion(
 
 static bool
 shouldExplodeTrivial(FunctionSignatureTransformDescriptor &transformDesc,
-                     ArgumentDescriptor &argDesc, SILType ty) {
+                     ArgumentDescriptor &argDesc, SILType ty,
+                     unsigned maxExplosionSize) {
   // Just blow up parameters if we will reduce the size of arguments.
   //
   // FIXME: In the future we should attempt to only do this if we can generate a
   // thunk. This was tried with the current heuristic and it resulted in a 1%
   // increase in code-size in the standard library.
   unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
-  return explosionSize <= 3;
+  return explosionSize <= maxExplosionSize;
 }
 
 /// Return true if it's both legal and a good idea to explode this argument.
@@ -113,15 +114,25 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
   auto *arg = argDesc.Arg;
   auto &module = arg->getModule();
   auto ty = arg->getType().getObjectType();
+#if false
   if (!shouldExpand(module, ty)) {
     return false;
+  }
+#endif
+
+  // If we have a singular argument, be more aggressive about our max explosion
+  // size. If we were unable to expand the value we know that it will be
+  // exploded so use UINT_MAX.
+  unsigned maxExplosionSize = 3;
+  if (transformDesc.ArgumentDescList.size() == 1) {
+    maxExplosionSize = UINT_MAX;
   }
 
   // Ok, this is something that globally we are not forbidden from
   // expanded. First check if our type is completely trivial. We never want to
   // explode arguments that are trivial so return false. See comment above.
   if (ty.isTrivial(module)) {
-    return shouldExplodeTrivial(transformDesc, argDesc, ty);
+    return shouldExplodeTrivial(transformDesc, argDesc, ty, maxExplosionSize);
   }
 
   // Ok, we think that this /may/ be profitable to optimize. Grab our leaf node
@@ -140,10 +151,6 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
       llvm::count_if(liveNodes, [&](const ProjectionTreeNode *n) {
         return n->getType().isTrivial(module);
       });
-
-  // TODO: Special case if we have one argument or if all other arguments are
-  // trivial.
-  unsigned maxExplosionSize = 3;
 
   // If we reduced the number of non-trivial leaf types, we want to split this
   // given that we already know that we are not going to drastically change the
