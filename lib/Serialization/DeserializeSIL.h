@@ -114,7 +114,7 @@ namespace swift {
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
 
-    KeyPathPatternComponent
+    Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
     
 public:

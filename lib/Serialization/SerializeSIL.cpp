@@ -2222,8 +2222,11 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
   SmallVector<ValueID, 4> componentValues;
   SmallVector<ProtocolConformanceRef, 4> serializeAfter;
   
-  writeKeyPathPatternComponent(prop.getComponent(),
-                               componentValues, serializeAfter);
+  if (auto component = prop.getComponent()) {
+    writeKeyPathPatternComponent(*component, componentValues, serializeAfter);
+  } else {
+    componentValues.push_back((unsigned)KeyPathComponentKindEncoding::Trivial);
+  }
   
   PropertyLayout::emitRecord(
     Out, ScratchRecord,

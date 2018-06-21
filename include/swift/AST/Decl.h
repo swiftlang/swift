@@ -4228,6 +4228,25 @@ public:
     llvm_unreachable("bad storage kind");
   }
 
+  /// \brief Return true if this is a VarDecl that has storage associated with
+  /// it which can be trivially accessed.
+  bool hasTrivialStorage() const {
+    switch (getStorageKind()) {
+    case Stored:
+    case StoredWithTrivialAccessors:
+      return true;
+    case StoredWithObservers:
+    case InheritedWithObservers:
+    case Computed:
+    case ComputedWithMutableAddress:
+    case Addressed:
+    case AddressedWithTrivialAccessors:
+    case AddressedWithObservers:
+      return false;
+    }
+    llvm_unreachable("bad storage kind");
+  }
+
   /// \brief Return true if this object has a getter (and, if mutable,
   /// a setter and a materializeForSet).
   bool hasAccessorFunctions() const {
@@ -4456,7 +4475,8 @@ public:
 
   /// Determine how this storage declaration should actually be accessed.
   AccessStrategy getAccessStrategy(AccessSemantics semantics,
-                                   AccessKind accessKind) const;
+                                   AccessKind accessKind,
+                                   DeclContext *accessFromDC = nullptr) const;
 
   /// \brief Should this declaration behave as if it must be accessed
   /// resiliently, even when we're building a non-resilient module?
