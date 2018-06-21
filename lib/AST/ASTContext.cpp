@@ -1891,6 +1891,12 @@ ASTContext::getSpecializedConformance(Type type,
   if (auto *genericSig = generic->getGenericSignature())
     genericSig->getSubstitutions(subMap, subs);
 
+  bool anyError = llvm::any_of(subs, [](const Substitution &sub) {
+    return sub.getReplacement()->hasError();
+  });
+  if (anyError)
+    return nullptr;
+
   return getSpecializedConformance(type, generic, subs,
                                    /*alreadyCheckedCollapsed=*/true);
 }
