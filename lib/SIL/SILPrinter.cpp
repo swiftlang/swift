@@ -21,6 +21,8 @@
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/CFG.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1210,6 +1212,15 @@ public:
       *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
       return;
     }
+    case SymbolicValue::Function: {
+      assert(!v.getFunctionValue().second &&
+             "SILFunction SymbolicValues with protocol conformances cannot be "
+             "printed");
+      auto function = v.getFunctionValue().first;
+      *this << "@" << function->getName();
+      *this << " : $" << function->getLoweredFunctionType();
+      return;
+    }
     case SymbolicValue::Aggregate:
       *this << "[";
       interleave(v.getAggregateValue(), [&](SymbolicValue element) {
@@ -1219,8 +1230,6 @@ public:
       });
       *this << "]";
       return;
-    case SymbolicValue::Function:
-    case SymbolicValue::Address:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
       llvm_unreachable("Unimplemented SymbolicValue case");

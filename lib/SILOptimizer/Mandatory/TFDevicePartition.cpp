@@ -464,7 +464,7 @@ class DevicePartitionerImpl
     if (inst->getName().str() == "tf_tensor_to_i1")
       return;
 
-    inst->print(llvm::errs());
+    inst->dump();
     llvm_unreachable(
         "DevicePartitionerImpl cannot mark this instruction yet\n");
   }

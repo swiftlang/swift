@@ -29,8 +29,6 @@
 #include "swift/Basic/Range.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunctionConventions.h"
 #include "swift/SIL/SILLocation.h"
@@ -54,6 +52,7 @@ class MultipleValueInstructionResult;
 class DestructureTupleInst;
 class DestructureStructInst;
 // SWIFT_ENABLE_TENSORFLOW
+struct GraphOperationAttribute;
 class GraphOperationInst;
 class NonValueInstruction;
 class SILBasicBlock;
@@ -8170,13 +8169,6 @@ public:
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
-/// A graph operation attribute. Attributes have a name and a constant value.
-struct GraphOperationAttribute {
-  Identifier name;
-  SymbolicValue value;
-};
-
-/// SWIFT_ENABLE_TENSORFLOW
 /// A graph operation. This instruction will be extracted to a graph program
 /// via graph program extraction passes.
 class GraphOperationInst final
@@ -8186,41 +8178,27 @@ class GraphOperationInst final
     public MultipleValueInstructionTrailingObjects<
                GraphOperationInst, GraphOperationResult,
                InitialTrailingObjects<>,
-               FinalTrailingObjects<Operand, GraphOperationAttribute>> {
+               FinalTrailingObjects<Operand>> {
   friend TrailingObjects;
 
   /// The name of the graph operation.
   Identifier Name;
   /// The number of operands.
   unsigned NumOperands;
-  /// The number of attributes.
-  unsigned NumAttributes;
+  /// The attributes of the graph operation.
+  MutableArrayRef<GraphOperationAttribute> Attributes;
 
   GraphOperationInst(SILModule &M, SILDebugLocation loc, Identifier name,
                      ArrayRef<SILValue> arguments,
                      ArrayRef<GraphOperationAttribute> attrs,
                      ArrayRef<SILType> resultTypes,
-                     ArrayRef<ValueOwnershipKind> resultOwnerships) :
-    InstructionBase(loc),
-    MultipleValueInstructionTrailingObjects(this, resultTypes,
-                                            resultOwnerships),
-    Name(name), NumOperands(arguments.size()), NumAttributes(attrs.size()) {
-      auto allOperands = getAllOperands();
-      for (unsigned i : indices(arguments))
-        new (&allOperands[i]) Operand(this, arguments[i]);
-      std::uninitialized_copy(attrs.begin(), attrs.end(),
-                              getAttributes().data());
-    }
+                     ArrayRef<ValueOwnershipKind> resultOwnerships);
 
 public:
   using MultipleValueInstructionTrailingObjects::numTrailingObjects;
   using MultipleValueInstructionTrailingObjects::totalSizeToAlloc;
 
-  ~GraphOperationInst() {
-    for (auto &operand : getAllOperands())
-      operand.~Operand();
-  }
-
+  ~GraphOperationInst();
   static GraphOperationInst *create(SILModule &M, SILDebugLocation loc,
                                     Identifier name,
                                     ArrayRef<SILValue> arguments,
@@ -8229,7 +8207,7 @@ public:
 
   Identifier getName() const { return Name; }
   unsigned getNumOperands() const { return NumOperands; }
-  unsigned getNumAttributes() const { return NumAttributes; }
+  unsigned getNumAttributes() const { return Attributes.size(); }
 
   unsigned numTrailingObjects(OverloadToken<Operand>) const {
     return NumOperands;
@@ -8248,19 +8226,14 @@ public:
   }
 
   ArrayRef<GraphOperationAttribute> getAttributes() const {
-    return { getTrailingObjects<GraphOperationAttribute>(), NumAttributes };
+    return Attributes;
   }
 
   MutableArrayRef<GraphOperationAttribute> getAttributes() {
-    return { getTrailingObjects<GraphOperationAttribute>(), NumAttributes };
+    return Attributes;
   }
 
-  Optional<GraphOperationAttribute> getAttribute(StringRef name) {
-    for (auto attr : getAttributes())
-      if (attr.name.is(name))
-        return attr;
-    return None;
-  };
+  Optional<GraphOperationAttribute> getAttribute(StringRef name);
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;

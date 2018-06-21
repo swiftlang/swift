@@ -895,6 +895,7 @@ void SILParser::convertRequirements(SILFunction *F,
 /// - A metatype (the instance type is parsed) ($Float).
 /// - An aggregate ([i32 1, i64 2, f32 3.0]).
 ///   - Aggregates values represent constant arrays/structs/tuples.
+/// - A SIL function reference (@foo : $(Int) -> Int).
 /// Returns true on error.
 static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
                                SILBuilder &B) {
@@ -1008,6 +1009,15 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
       return true;
     auto metatype = CanMetatypeType::get(temp.getSwiftRValueType());
     value = SymbolicValue::getMetatype(metatype);
+    return false;
+  }
+  // Handle SIL function references.
+  if (P.Tok.is(tok::at_sign)) {
+    SILFunction *func;
+    SILLocation funcLoc = RegularLocation(P.getEndOfPreviousLoc());
+    if (SP.parseSILFunctionRef(funcLoc, func))
+      return true;
+    value = SymbolicValue::getFunction(func);
     return false;
   }
   // Handle aggregate literals.

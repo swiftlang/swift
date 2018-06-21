@@ -3218,7 +3218,7 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
       continue;
     }
 
-    oldResult->print(llvm::errs());
+    oldResult->dump();
     llvm_unreachable("Unhandled instruction type");
   }
 
