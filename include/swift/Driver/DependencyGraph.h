@@ -127,8 +127,7 @@ private:
   /// dependency graph. Each member of the set is the name of a file which is
   /// not in the module. These files' contents may (or may not) have affected
   /// the module's compilation. This list may even include the paths of
-  /// non-existent files whose absence is significant in the same way as
-  /// Makefile .d dependencies.
+  /// non-existent files whose absence is significant.
   ///
   /// Furthermore, this set might not exhaustive. It only includes dependencies
   /// that will be checked by the driver's incremental mode.
