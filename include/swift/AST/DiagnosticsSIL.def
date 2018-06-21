@@ -238,11 +238,11 @@ ERROR(tf_lowering_unknown_op, none,
       "op named '%0' is not registered in TensorFlow", (StringRef))
 
 WARNING(tf_value_implicitly_copied_to_accel, none,
-        "%0 implicitly copied to the accelerator, use .toDevice() to make "
+        "%0 implicitly copied to the accelerator, use .toAccelerator() to make "
         "transfer explicit",
         (StringRef))
 WARNING(tf_value_implicitly_copied_to_accel_always, none,
-        "%0 always cause a copy to the accelerator, use .toDevice() to make "
+        "%0 always cause a copy to the accelerator, use .toAccelerator() to make "
         "transfer explicit",
         (StringRef))
 

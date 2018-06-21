@@ -13,9 +13,9 @@ import TensorFlow
 
 public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float>)
   -> Tensor<Float> {
-  let conds = conds1.toDevice()
-  let x = x1.toDevice()
-  let y = y1.toDevice()
+  let conds = conds1.toAccelerator()
+  let x = x1.toAccelerator()
+  let y = y1.toAccelerator()
 
   let result = conds.selecting(x+x, y)*y
 
@@ -52,7 +52,7 @@ public func testEmptyScalarsArray() {
 
 // This tests the attributes necessary to get arrays of integers and strings going.
 public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
-  return x.toDevice().convolved2D(withFilter: filter.toDevice(),
+  return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
                        strides: (1, 2, 3, 4), padding: .same)
 }
 
@@ -92,15 +92,15 @@ public func testConstantArray() -> TensorHandle<Float> {
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
-  let a = sigmoid(x.toDevice())
-  let b = sigmoid(y.toDevice()).toHost()
+  let a = sigmoid(x.toAccelerator())
+  let b = sigmoid(y.toAccelerator()).toHost()
   // FIXME: b/76177896 the toHost() call should be movable up.
   return (a.toHost(), b)
 }
 
 // Likewise, mean and max shouldn't cause send/receive errors.
 public func testMeanMax(x: Tensor<Float>) -> Float {
-  let y = x.toDevice()
+  let y = x.toAccelerator()
   let a = y.mean()
   let b = y.max()
   return a+b
@@ -112,7 +112,7 @@ public func testZeros() -> Tensor<Float> {
   return (b1+b2).toHost()
 }
 
-// Verify that we are able to run randomUniform on the device, or at least hoist
+// Verify that we are able to run randomUniform on the accelerator, or at least hoist
 // it to being an argument so we don't get copy-ins.
 public func randomUniformHoisting() -> Tensor<Float> {
   let x = Tensor<Float>(ones: [2, 2, 2])
@@ -127,7 +127,7 @@ public func randomUniformHoisting() -> Tensor<Float> {
 // this whole mess in graph without leaving anything on the host that will cause
 // a send/receive.
 public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
-  let scalar = a.toDevice().mean()
+  let scalar = a.toAccelerator().mean()
   let b = Tensor(scalar)
   return (b+b).toHost()
 }
@@ -147,7 +147,7 @@ public func test75494462() {
 
 public func paddingTuplesHoistable() {
   let matrix: Tensor<Float> = Tensor([[1, 2, 3], [4, 5, 6]]) + 1
-  let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toDevice()
+  let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toAccelerator()
   _ = padded.array
 }
 
@@ -209,7 +209,7 @@ struct Classifier {
 
 public func mnist() {
   // Training data
-  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator, use .toDevice}}
+  // expected-warning @+1 {{'Tensor<Float>' implicitly copied to the accelerator, use .toAccelerator}}
   let images = Tensor<Float>(randomNormal: [10, 784])
   let labels = Tensor<Float>(randomNormal: [10, 10])
   var classifier = Classifier()
