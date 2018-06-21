@@ -292,23 +292,9 @@ Type ConstExprFunctionState::simplifyType(Type ty) {
   return substitutionMap.empty() ? ty : ty.subst(substitutionMap);
 }
 
-/// Lazily initialize the specified SIL Loader.
-static SerializedSILLoader &
-initLoader(std::unique_ptr<SerializedSILLoader> &silLoader, SILModule &module) {
-//  return *module.getSILLoader();
-
-
-  if (!silLoader)
-    silLoader = SerializedSILLoader::create(module.getASTContext(),
-                                            &module, nullptr);
-  return *silLoader;
-}
-
-
 // TODO: refactor this out somewhere sharable between autodiff and this code.
 static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
-                                     SILModule &module,
-                         std::unique_ptr<SerializedSILLoader> &silLoader) {
+                                     SILModule &module) {
   // Cannot resolve abstract conformances.
   if (!confRef.isConcrete())
     return;
@@ -322,7 +308,7 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
     conf->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   auto linkage = getSILLinkage(getDeclLinkage(decl), NotForDefinition);
   auto *newTable = module.createWitnessTableDeclaration(conf, linkage);
-  newTable = initLoader(silLoader, module).lookupWitnessTable(newTable);
+  newTable = module.getSILLoader()->lookupWitnessTable(newTable);
 
   // Update linkage for witness methods.
   // FIXME: Figure out why witnesses have shared linkage by default.
@@ -402,8 +388,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     if (!fn) {
       // If that failed, try force loading it, and try again.
-      lookupOrLinkWitnessTable(conf, wmi->getModule(),
-                               evaluator.getSILLoader());
+      lookupOrLinkWitnessTable(conf, wmi->getModule());
       fn = module.lookUpFunctionInWitnessTable(conf, wmi->getMember()).first;
     }
 
