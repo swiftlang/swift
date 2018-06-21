@@ -16,7 +16,7 @@ func testGizmo(gizmo: Gizmo) {
 // CHECK-LABEL: sil hidden @$S26default_arguments_imported21testNonnullDictionary5gizmoySo5GizmoC_tF
 func testNonnullDictionary(gizmo: Gizmo) {
   // CHECK-NOT: nilLiteral
-  // CHECK: function_ref @$Ss10DictionaryV17dictionaryLiteralAByxq_Gx_q_td_tcfC
+  // CHECK: function_ref @$SSD17dictionaryLiteralSDyxq_Gx_q_td_tcfC
   // CHECK: objc_method [[SELF:%[0-9]+]] : $Gizmo, #Gizmo.doTheThing!1.foreign
   gizmo.doTheThing()
 } // CHECK: } // end sil function '$S26default_arguments_imported21testNonnullDictionary5gizmoySo5GizmoC_tF'
