@@ -36,7 +36,6 @@ public func tensorShape() -> Tensor<Float> {
   let shape : TensorShape = [2]
   // expected-error @+1 {{attribute 'value' requires a constant argument}}
   return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
-  // expected-note @-1 {{could not fold operation}}
 }
 
 // b/75407624

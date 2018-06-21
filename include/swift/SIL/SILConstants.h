@@ -45,7 +45,13 @@ enum class UnknownReason {
   TooManyInstructions,
 
   /// A control flow loop was found.
-  Loop
+  Loop,
+
+  /// Integer overflow detected.
+  Overflow,
+
+  /// Unspecified trap detected.
+  Trap,
 };
 
 
