@@ -226,7 +226,8 @@ namespace {
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
-      assert(!value->getType().isAddress() &&"addresses are tracked separately");
+      assert(!value->getType().isAddress() &&
+             "addresses are tracked separately");
       calculatedValues.insert({ value, symVal });
     }
 
@@ -396,7 +397,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     if (fn)
       return SymbolicValue::getFunction(fn, conf);
 
-    DEBUG(llvm::errs() << "ConstExpr Unresolved witness: " << *value << "\n");
+    DEBUG(llvm::dbgs() << "ConstExpr Unresolved witness: " << *value << "\n");
     return SymbolicValue::getUnknown(value, UnknownReason::Default);
   }
 
@@ -414,7 +415,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return calculatedValues[apply];
   }
 
-  DEBUG(llvm::errs() << "ConstExpr Unknown simple: " << *value << "\n");
+  DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
   return SymbolicValue::getUnknown(value, UnknownReason::Default);
@@ -751,7 +752,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
   }
 
 
-  DEBUG(llvm::errs() << "ConstExpr Unknown Builtin: " << *inst << "\n");
+  DEBUG(llvm::dbgs() << "ConstExpr Unknown Builtin: " << *inst << "\n");
 
   // Otherwise, we don't know how to handle this builtin.
   return unknownResult();
@@ -778,7 +779,7 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
                                      UnknownReason::Trap);
   }
 
-  DEBUG(llvm::errs() << "ConstExpr Opaque Callee: " << *callee << "\n");
+  DEBUG(llvm::dbgs() << "ConstExpr Opaque Callee: " << *callee << "\n");
   return SymbolicValue::getUnknown((SILInstruction*)apply,
                                    UnknownReason::Default);
 }
@@ -934,8 +935,8 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 
   // If this is the top-level lazy interpreter, output a debug trace.
   if (!fn) {
-    DEBUG(llvm::errs() << "ConstExpr top level: "; value->dump());
-    DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+    DEBUG(llvm::dbgs() << "ConstExpr top level: "; value->dump());
+    DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
   }
 
   return calculatedValues[value] = result;
@@ -1094,7 +1095,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
     }
 
 
-    DEBUG(llvm::errs() << "Unknown SingleStore ConstExpr user: "
+    DEBUG(llvm::dbgs() << "Unknown SingleStore ConstExpr user: "
                        << *user << "\n");
 
     // If this is some other user that we don't know about, then we should
@@ -1196,7 +1197,7 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
   if (auto *bai = dyn_cast<BeginAccessInst>(addr))
     return getAddressValue(bai->getOperand());
 
-  DEBUG(llvm::errs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
+  DEBUG(llvm::dbgs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
 
   // Otherwise, we don't know how to handle this.
   return getUnknownAddress(addr, UnknownReason::Default);
@@ -1297,7 +1298,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       auto result = getConstantValue(oneResultVal);
       if (!result.isConstant())
         return result;
-      DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+      DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
     } else {
       auto result = getAddressValue(oneResultVal);
       // If the address could not be resolved, puts the 'unknown' code into
@@ -1305,12 +1306,12 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       auto memVal = memoryObjects[result.getObjectID()].first;
       if (memVal.isUnknown())
         return memVal;
-      DEBUG(llvm::errs() << "  RESULT: ";  result.dump());
+      DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
     }
     return None;
   }
 
-  DEBUG(llvm::errs() << "ConstExpr Unknown FS: " << *inst << "\n");
+  DEBUG(llvm::dbgs() << "ConstExpr Unknown FS: " << *inst << "\n");
   // If this is an unknown instruction with no results then bail out.
   return SymbolicValue::getUnknown(inst, UnknownReason::Default);
 }
@@ -1338,10 +1339,10 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
   unsigned nextBBArg = 0;
   const auto &argList = fn.front().getArguments();
 
-  DEBUG(llvm::errs().changeColor(raw_ostream::SAVEDCOLOR, /*bold*/true)
+  DEBUG(llvm::dbgs().changeColor(raw_ostream::SAVEDCOLOR, /*bold*/true)
         << "\nConstExpr call fn: "
         << Demangle::demangleSymbolAsString(fn.getName());
-        llvm::errs().resetColor()
+        llvm::dbgs().resetColor()
         << "\n");
 
   for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i)
@@ -1369,7 +1370,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 
   while (1) {
     SILInstruction *inst = &*nextInst++;
-    DEBUG(llvm::errs() << "ConstExpr interpret: "; inst->dump());
+    DEBUG(llvm::dbgs() << "ConstExpr interpret: "; inst->dump());
 
     // Make sure we haven't exceeded our interpreter iteration cap.
     if (++numInstEvaluated > ConstExprLimit)
@@ -1411,7 +1412,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 
       // TODO: Handle caching of results.
 
-      DEBUG(llvm::errs() << "\n");
+      DEBUG(llvm::dbgs() << "\n");
       return None;
     }
 
@@ -1452,7 +1453,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       continue;
     }
 
-    DEBUG(llvm::errs() << "ConstExpr: Unknown Terminator: " << *inst << "\n");
+    DEBUG(llvm::dbgs() << "ConstExpr: Unknown Terminator: " << *inst << "\n");
 
     // TODO: Enum switches when we support enums?
     return SymbolicValue::getUnknown(inst, UnknownReason::Default);

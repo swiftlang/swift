@@ -384,8 +384,6 @@ public:
 ADContext::ADContext(SILModule &module, SILPassManager &passManager)
   : module(module), passManager(passManager), typeConverter(module)
 {
-  auto &ctx = getASTContext();
-      
   // Add local witness tables to the local map.
   for (auto &wt : module.getWitnessTables())
     witnessTables.insert({wt.getConformance(), &wt});
