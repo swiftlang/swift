@@ -1063,6 +1063,17 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
+      // If both are VarDecls, and both have exactly the same type, then
+      // matching the Swift 4 behaviour (i.e. just emitting the future-compat
+      // warning) will result in SILGen crashes due to both properties mangling
+      // the same, so it's better to just follow the Swift 5 behaviour and emit
+      // the actual error.
+      if (wouldBeSwift5Redeclaration && isa<VarDecl>(current) &&
+          isa<VarDecl>(other) &&
+          current->getInterfaceType()->isEqual(other->getInterfaceType())) {
+        wouldBeSwift5Redeclaration = false;
+      }
+
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
