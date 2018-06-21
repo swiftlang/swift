@@ -40,7 +40,6 @@ set(SOURCES
   CompilerRuntime.swift
   CompositeMath.swift
   DataTypes.swift
-  Dataset.swift
   Gradients.swift
   OpaqueHandles.swift
   Ops.swift
