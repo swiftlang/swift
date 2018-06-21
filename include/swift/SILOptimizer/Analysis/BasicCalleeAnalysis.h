@@ -25,6 +25,7 @@
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
+
 class ClassDecl;
 class SILFunction;
 class SILModule;
@@ -74,10 +75,9 @@ public:
 /// any function application site (including those that are simple
 /// function_ref, thin_to_thick, or partial_apply callees).
 class CalleeCache {
-  typedef llvm::SmallVector<SILFunction *, 16> Callees;
-  typedef llvm::PointerIntPair<Callees *, 1> CalleesAndCanCallUnknown;
-  typedef llvm::DenseMap<SILDeclRef, CalleesAndCanCallUnknown>
-      CacheType;
+  using Callees = llvm::SmallVector<SILFunction *, 16>;
+  using CalleesAndCanCallUnknown = llvm::PointerIntPair<Callees *, 1>;
+  using CacheType = llvm::DenseMap<SILDeclRef, CalleesAndCanCallUnknown>;
 
   SILModule &M;
 
