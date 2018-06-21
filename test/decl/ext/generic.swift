@@ -144,6 +144,23 @@ extension GenericClass where Self : P3 { }
 // expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}} {{30-34=GenericClass}}
 // expected-error@-2{{type 'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
 
+protocol Prot1 {}
+protocol Prot2 {}
+protocol Prot3 {}
+protocol Prot4 {}
+protocol Prot5 {}
+
+extension GenericClass: Prot1 where T: Prot1 {}
+extension GenericClass: Prot2 where Self: Prot1 {}
+// expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}}
+// expected-error@-2 {{type 'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
+extension GenericClass: Prot3 where GenericClass<T>: Prot1 {}
+// expected-error @-1 {{type 'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
+extension GenericClass: Prot4 where GenericClass<Int>: Prot1 {}
+// expected-error @-1 {{type 'GenericClass<Int>' in conformance requirement does not refer to a generic parameter or associated type}}
+extension GenericClass: Prot5 where GenericClass: Prot5 {}
+// expected-error @-1 {{type 'GenericClass<T>' in conformance requirement does not refer to a generic parameter or associated type}}
+
 protocol P4 {
   associatedtype T
   init(_: T)
