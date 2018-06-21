@@ -53,3 +53,5 @@ compile_commands.json
 SortedCFDatabase.def
 htmlcov
 .coverage
+/benchmark/utils/Version.swift
+/benchmark/.build

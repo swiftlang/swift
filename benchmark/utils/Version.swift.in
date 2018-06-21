@@ -1,0 +1,18 @@
+//===--- Version.swift ----------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// Swift Benchmark Suite version is composed of Swift version and the git branch
+// version as determined during CMake build and generated into this file.
+public let version = """
+Swift Benchmark Suite @BRANCH_VERSION@
+@SWIFT_VERSION@
+"""

@@ -1,0 +1,17 @@
+//===--- UnknownVersion.swift ---------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// SwiftPM doesn't support code generation and scripting, so we cannot determine
+// the versions of Swift compiler and the git branch during build.
+public let version = """
+Swift Benchmark Suite unknown (SwiftPM build)
+"""

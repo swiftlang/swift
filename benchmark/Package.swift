@@ -56,7 +56,7 @@ let p = Package(
     .target(name: "DriverUtils",
       dependencies: [.target(name: "TestsUtils")],
       path: "utils",
-      sources: ["DriverUtils.swift", "ArgParse.swift"]),
+      sources: ["DriverUtils.swift", "ArgParse.swift", "UnknownVersion.swift"]),
     .target(name: "SwiftBench",
             dependencies: [
               .target(name: "TestsUtils"),

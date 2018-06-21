@@ -267,6 +267,33 @@ function(add_swift_multisource_nonwmo_benchmark_library objfiles_out)
   set(${objfiles_out} ${objfiles} PARENT_SCOPE)
 endfunction()
 
+function(swift_benchmark_suite_version)
+    # Swift Benchmark Suite version is composed of Swift version and
+    # the git branch version.
+    message("Determining Swift Benchmark Suite version")
+    runcmd(COMMAND "${SWIFT_EXEC}" "--version"
+      VARIABLE SWIFT_VERSION
+      ERROR "Unable to determine Swift version")
+    message("Swift version: ${SWIFT_VERSION}")
+    message("CMake current source dir: ${CMAKE_CURRENT_SOURCE_DIR}")
+    runcmd(COMMAND "git" "-C" "${CMAKE_CURRENT_SOURCE_DIR}" "describe"
+      VARIABLE BRANCH_VERSION
+      ERROR "Unable to determine git tree version")
+    # get_current_git_branch
+    runcmd(COMMAND "git" "-C" "${CMAKE_CURRENT_SOURCE_DIR}" "rev-parse" "--abbrev-ref" "HEAD"
+      VARIABLE BRANCH_VERSION
+      ERROR "Unable to determine git tree version")
+    # get_git_head_ID
+    runcmd(COMMAND "git" "-C" "${CMAKE_CURRENT_SOURCE_DIR}" "rev-parse" "--short" "HEAD"
+      VARIABLE BRANCH_VERSION
+      ERROR "Unable to determine git tree version")
+    message("Git branch ${BRANCH_VERSION}")
+    configure_file(
+      ${CMAKE_CURRENT_SOURCE_DIR}/utils/Version.swift.in
+      ${CMAKE_CURRENT_SOURCE_DIR}/utils/Version.swift
+      @ONLY)
+endfunction()
+
 function (swift_benchmark_compile_archopts)
   cmake_parse_arguments(BENCH_COMPILE_ARCHOPTS "" "PLATFORM;ARCH;OPT" "" ${ARGN})
   set(is_darwin ${${BENCH_COMPILE_ARCHOPTS_PLATFORM}_is_darwin})
@@ -359,6 +386,7 @@ function (swift_benchmark_compile_archopts)
     get_filename_component(module_name "${module_name_path}" NAME)
     if("${module_name}" STREQUAL "DriverUtils")
       list(APPEND sources "${srcdir}/utils/ArgParse.swift")
+      list(APPEND sources "${srcdir}/utils/Version.swift")
     endif()
 
     set(objfile_out)
@@ -635,6 +663,8 @@ endfunction()
 
 function(swift_benchmark_compile)
   cmake_parse_arguments(SWIFT_BENCHMARK_COMPILE "" "PLATFORM" "" ${ARGN})
+
+  swift_benchmark_suite_version()
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
     set(stdlib_dependencies "swift")
