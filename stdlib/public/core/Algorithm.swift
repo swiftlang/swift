@@ -159,5 +159,5 @@ extension EnumeratedSequence: Sequence {
   }
 }
 
-@available(*, deprecated: 4.2, renamed: "EmptyCollection.Iterator")
+@available(*, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
 public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator
