@@ -798,8 +798,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
              /*DeclModifier=*/false);
-    Status.setIsParseError();
-    return Status;
+    return makeParserError();
   }
 
   return ParserResult<DifferentiableAttr>(

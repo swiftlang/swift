@@ -1456,9 +1456,6 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a qualified %0 function", (StringRef))
 
-ERROR(attr_differentiable_expected_rparen,PointsToFirstBadToken,
-      "expected ')' at end of parameter index list", ())
-
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to, e.g. (.0, w, b)", ())
 
