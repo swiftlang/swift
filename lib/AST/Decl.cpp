@@ -1017,6 +1017,15 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   return Result;
 }
 
+PatternBindingDecl *PatternBindingDecl::createImplicit(
+    ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
+    DeclContext *Parent, SourceLoc VarLoc) {
+  auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
+                        Pat, E, Parent);
+  Result->setImplicit();
+  return Result;
+}
+
 PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
                            StaticSpellingKind StaticSpelling,

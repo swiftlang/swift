@@ -146,9 +146,11 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
 
   // Create a pattern binding to describe the variable.
   Pattern *varPattern = createTypedNamedPattern(var);
-  auto patternBinding =
-      PatternBindingDecl::create(ctx, SourceLoc(), StaticSpellingKind::None,
-                                 SourceLoc(), varPattern, nullptr, dc);
+  auto *patternBinding = PatternBindingDecl::create(
+      ctx, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+      /*VarLoc*/ SourceLoc(), varPattern, /*InitExpr*/ nullptr, dc);
+  if (isImplicit)
+    patternBinding->setImplicit();
 
   return {var, patternBinding};
 }
@@ -1562,9 +1564,9 @@ static void makeStructRawValuedWithBridge(
 
   // Create a pattern binding to describe the variable.
   Pattern *computedVarPattern = createTypedNamedPattern(computedVar);
-  auto computedPatternBinding = PatternBindingDecl::create(
-      ctx, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-      computedVarPattern, nullptr, structDecl);
+  auto *computedPatternBinding = PatternBindingDecl::createImplicit(
+      ctx, StaticSpellingKind::None, computedVarPattern, /*InitExpr*/ nullptr,
+      structDecl);
 
   // Don't bother synthesizing the body if we've already finished
   // type-checking.
@@ -2728,9 +2730,9 @@ namespace {
           // Create a pattern binding to describe the variable.
           Pattern *nsErrorPattern = createTypedNamedPattern(nsErrorProp);
 
-          auto nsErrorBinding = PatternBindingDecl::create(
-                                  C, loc, StaticSpellingKind::None, loc,
-                                  nsErrorPattern, nullptr, errorWrapper);
+          auto *nsErrorBinding = PatternBindingDecl::createImplicit(
+              C, StaticSpellingKind::None, nsErrorPattern, /*InitExpr*/ nullptr,
+              /*ParentDC*/ errorWrapper, /*VarLoc*/ loc);
           errorWrapper->addMember(nsErrorProp);
           errorWrapper->addMember(nsErrorBinding);
 
@@ -2810,9 +2812,9 @@ namespace {
         // Create a pattern binding to describe the variable.
         Pattern *varPattern = createTypedNamedPattern(rawValue);
 
-        auto rawValueBinding = PatternBindingDecl::create(
-            C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
-            varPattern, nullptr, enumDecl);
+        auto *rawValueBinding = PatternBindingDecl::createImplicit(
+            C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
+            enumDecl);
 
         auto rawValueGetter = makeEnumRawValueGetter(Impl, enumDecl, rawValue);
 
