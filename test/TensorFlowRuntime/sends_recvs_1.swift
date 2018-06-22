@@ -72,6 +72,22 @@ func testSendsInALoop() {
 }
 SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
 
+
+@inline(never)
+func testSendsInALoopWithNoResultTensor() {
+  let maxCount = 10
+  var count = 1
+  var a = Tensor<Float>(1.0)
+  while count < maxCount {
+    a += a
+    // One send.
+    print(a.toHost())
+    count += 1
+  }
+}
+SendsRecvsTests.testCPU("testSendsInALoopWithNoResultTensor",
+                        testSendsInALoopWithNoResultTensor)
+
 func test1RecvFloatScalar() {
   let x = Tensor<Float>(1.0)
   let y = x.scalar! + 2.0

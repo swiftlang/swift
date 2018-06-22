@@ -497,44 +497,40 @@ extension TFState {
       targetNodeSpecs.append(helperFuncNode)
     }
 
-    if returnValues.count > 0 {
-      if _RuntimeConfig.executionMode.isTPU {
-        debugLog("Enable TPU execution.")
-        // When infeed is enabled, run it along with the output tensor nodes
-        // below.
-        let infeedEnqueueNode = TF_GraphOperationByName(graph,
-                                                        "InfeedEnqueueTuple")
-        if let infeedEnqueueNode = infeedEnqueueNode {
-          targetNodeSpecs.append(infeedEnqueueNode)
-          debugLog("Running enqueue with \(inputTensors.count) input tensors.")
-        }
-      }
-      debugLog("""
-        Calling TF_SessionRun on function \(entryFunctionBaseName), With \
-        \(targetNodeSpecs.count) target nodes.
-        """)
-      TF_SessionRun(
-        cSession, nil,
-        // input related parameters
-        inputNodeSpecs, inputTensors, Int32(inputTensors.count),
-        // output related parameters
-        outputNodeSpecs, &outputTensors, Int32(returnValues.count),
-        // target related parameters
-        targetNodeSpecs, Int32(targetNodeSpecs.count),
-        /*run_metadata*/nil, status
-      )
-      checkOk(status)
-      debugLog("Done running TF computation.")
-    } else {
-      // TF_SessionRun() does not support execution that involves no
-      // outputs. In this case we assume the TF execution is side-effect free,
-      // so skipping is a valid optimization without changing behavior.
-      //
-      // This case usually only occurs in compiler-only unit tests, where the
-      // generated TF program does not produce any outputs to be consumed by
-      // Swift host code.
-      debugLog("Skipping calling TF_SessionRun since there are no outputs.")
+    if returnValues.isEmpty {
+        debugLog("""
+                   Function \(entryFunctionBaseName) has no result tensors, so \
+                   adding it as a target node.
+                   """)
+      targetNodeSpecs.append(funcNode)
     }
+    if _RuntimeConfig.executionMode.isTPU {
+      debugLog("Enable TPU execution.")
+      // When infeed is enabled, run it along with the output tensor nodes
+      // below.
+      let infeedEnqueueNode = TF_GraphOperationByName(graph,
+                                                      "InfeedEnqueueTuple")
+      if let infeedEnqueueNode = infeedEnqueueNode {
+        targetNodeSpecs.append(infeedEnqueueNode)
+        debugLog("Running enqueue with \(inputTensors.count) input tensors.")
+      }
+    }
+    debugLog("""
+               Calling TF_SessionRun on function \(entryFunctionBaseName), With \
+               \(targetNodeSpecs.count) target nodes.
+               """)
+    TF_SessionRun(
+      cSession, nil,
+      // input related parameters
+      inputNodeSpecs, inputTensors, Int32(inputTensors.count),
+      // output related parameters
+      outputNodeSpecs, &outputTensors, Int32(returnValues.count),
+      // target related parameters
+      targetNodeSpecs, Int32(targetNodeSpecs.count),
+      /*run_metadata*/nil, status
+    )
+    checkOk(status)
+    debugLog("Done running TF computation.")
 
     // Delete input tensors.
     for inputTensor in inputTensors {
