@@ -17,7 +17,7 @@ struct NonInlineMethodExample {
   @inline(never)
   mutating func nonInlineMutatingMethod() {
     // Some random computation, doesn't matter for this example.
-    _ = a.toDevice() + b.toDevice()
+    _ = a.toAccelerator() + b.toAccelerator()
   }
 }
 
