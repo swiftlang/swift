@@ -14,10 +14,12 @@
 
 #include "ImageInspection.h"
 #include "ImageInspectionCOFF.h"
+#include "swift/Runtime/Metadata.h"
 
 #if defined(__CYGWIN__)
 #include <dlfcn.h>
 #endif
+#include <memory>
 
 using namespace swift;
 
@@ -35,16 +37,109 @@ void record(const swift::MetadataSections *sections) {
     registered->prev = sections;
   }
 }
+
+  // Returns true if all bytes in the given memory range are 0.
+  bool areAllBytesZero(const char *start, std::size_t length) {
+    for (auto p = start; p < start + length; p++) {
+      if (*p != 0) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // Checks whether the beginning and the end of the given section range is
+  // padding with 0 bytes and adjusts the section range such that the padding
+  // bytes are removed from the range. We do this because the MSVC linker adds 0
+  // padding bytes in incremental linking mode (which is on by default for debug
+  // builds).
+  swift::MetadataSections::Range adjustedRange(
+                                          swift::MetadataSections::Range range,
+                                          std::size_t recordStride,
+                                          std::size_t alignment) {
+    std::size_t space = range.length;
+    void *start = reinterpret_cast<void *>(range.start);
+    const char *alignedStart = reinterpret_cast<const char *>(std::align(
+                                          alignment, recordStride, start, space));
+    const char *end = reinterpret_cast<char *>(range.start + range.length);
+    const char *alignedEnd = alignedStart + (space / recordStride) * recordStride;
+    bool done = false;
+
+    if (space == 0) {
+      return range;
+    }
+
+    // Skip 0 padding at the beginning of the section
+    const char *adjStart = alignedStart;
+    while (adjStart < alignedEnd) {
+      if (!areAllBytesZero(adjStart, recordStride)) {
+        break;
+      }
+
+      adjStart += recordStride;
+    }
+
+    // Skip 0 padding at the end of the section
+    const char *adjEnd = alignedEnd;
+    while (adjEnd > adjStart) {
+      if (!areAllBytesZero(adjEnd - recordStride, recordStride)) {
+        break;
+      }
+
+      adjEnd -= recordStride;
+    }
+
+    return {reinterpret_cast<uintptr_t>(adjStart),
+        static_cast<std::size_t>(adjEnd - adjStart)};
+  }
+
+  void registerImageProtocolsSection(
+                                     swift::MetadataSections::Range section) {
+    auto adjSection = adjustedRange(section, sizeof(ProtocolRecord), 4);
+
+    if (adjSection.length) {
+      addImageProtocolsBlockCallback(
+          reinterpret_cast<void *>(adjSection.start), adjSection.length);
+    }
+  }
+
+  void registerImageProtocolConformanceSection(
+                                      swift::MetadataSections::Range section) {
+    auto adjSection = adjustedRange(section, sizeof(ProtocolConformanceRecord), 4);
+
+    if (adjSection.length) {
+      addImageProtocolConformanceBlockCallback(
+          reinterpret_cast<void *>(adjSection.start), adjSection.length);
+    }
+  }
+
+  void registerImageTypeMetadataRecordSection(
+                                      swift::MetadataSections::Range section) {
+    auto adjSection = adjustedRange(section, sizeof(TypeMetadataRecord), 4);
+
+    if (adjSection.length) {
+      addImageTypeMetadataRecordBlockCallback(
+          reinterpret_cast<void *>(adjSection.start), adjSection.length);
+    }
+  }
+
+  void registerImageTypeFieldDescriptorSection(
+                                      swift::MetadataSections::Range section) {
+    auto adjSection = adjustedRange(section,
+                                sizeof(swift::reflection::FieldDescriptor), 4);
+
+    if (adjSection.length) {
+      addImageTypeFieldDescriptorBlockCallback(
+          reinterpret_cast<void *>(adjSection.start), adjSection.length);
+    }
+  }
 }
 
 void swift::initializeProtocolLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &protocols =
-      sections->swift5_protocols;
-    if (protocols.length)
-      addImageProtocolsBlockCallback(reinterpret_cast<void *>(protocols.start),
-                                     protocols.length);
+    registerImageProtocolsSection(sections->swift5_protocols);
 
     if (sections->next == registered)
       break;
@@ -55,11 +150,8 @@ void swift::initializeProtocolLookup() {
 void swift::initializeProtocolConformanceLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &conformances =
-        sections->swift5_protocol_conformances;
-    if (conformances.length)
-      addImageProtocolConformanceBlockCallback(reinterpret_cast<void *>(conformances.start),
-                                               conformances.length);
+    registerImageProtocolConformanceSection(
+        sections->swift5_protocol_conformances);
 
     if (sections->next == registered)
       break;
@@ -70,11 +162,7 @@ void swift::initializeProtocolConformanceLookup() {
 void swift::initializeTypeMetadataRecordLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &type_metadata =
-        sections->swift5_type_metadata;
-    if (type_metadata.length)
-      addImageTypeMetadataRecordBlockCallback(reinterpret_cast<void *>(type_metadata.start),
-                                              type_metadata.length);
+    registerImageTypeMetadataRecordSection(sections->swift5_type_metadata);
 
     if (sections->next == registered)
       break;
@@ -85,10 +173,7 @@ void swift::initializeTypeMetadataRecordLookup() {
 void swift::initializeTypeFieldLookup() {
   const swift::MetadataSections *sections = registered;
   while (true) {
-    const swift::MetadataSections::Range &fields = sections->swift5_fieldmd;
-    if (fields.length)
-      addImageTypeFieldDescriptorBlockCallback(
-          reinterpret_cast<void *>(fields.start), fields.length);
+    registerImageTypeFieldDescriptorSection(sections->swift5_fieldmd);
 
     if (sections->next == registered)
       break;
@@ -103,23 +188,9 @@ void swift_addNewDSOImage(const void *addr) {
 
   record(sections);
 
-  const auto &protocols_section = sections->swift5_protocols;
-  const void *protocols =
-      reinterpret_cast<void *>(protocols_section.start);
-  if (protocols_section.length)
-    addImageProtocolsBlockCallback(protocols, protocols_section.length);
-
-  const auto &protocol_conformances = sections->swift5_protocol_conformances;
-  const void *conformances =
-      reinterpret_cast<void *>(protocol_conformances.start);
-  if (protocol_conformances.length)
-    addImageProtocolConformanceBlockCallback(conformances,
-                                             protocol_conformances.length);
-
-  const auto &type_metadata = sections->swift5_type_metadata;
-  const void *metadata = reinterpret_cast<void *>(type_metadata.start);
-  if (type_metadata.length)
-    addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+  registerImageProtocolsSection(sections->swift5_protocols);
+  registerImageProtocolConformanceSection(sections->swift5_protocol_conformances);
+  registerImageTypeMetadataRecordSection(sections->swift5_type_metadata);
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
