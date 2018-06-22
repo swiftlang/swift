@@ -18,4 +18,13 @@ set(MANDATORY_SOURCES
   Mandatory/ClosureLifetimeFixup.cpp
   Mandatory/RawSILInstLowering.cpp
   Mandatory/MandatoryOptUtils.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  Mandatory/TFDifferentiation.cpp
+  Mandatory/TFCanonicalizeCFG.cpp
+  Mandatory/TFConstExpr.cpp
+  Mandatory/TFDeabstraction.cpp
+  Mandatory/TFDevicePartition.cpp
+  Mandatory/TFLowerGraph.cpp
+  Mandatory/TFPartition.cpp
+  Mandatory/TFUtilities.cpp
   PARENT_SCOPE)
