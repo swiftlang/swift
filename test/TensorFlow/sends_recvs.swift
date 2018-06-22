@@ -5,10 +5,10 @@ import TensorFlow
 public func test1Send() {
   var a = Tensor<Float>(1.0)
   // One send.
-  print(a.toHost())
+  _hostOp(a.toHost())
   a += 1
   // This one should not be a send.
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1Send{{.*}}
@@ -29,10 +29,10 @@ public func test1SendWithParam(x: Float) {
   TensorFlow.enableGPU()
   var a = Tensor<Float>(x) // expected-note {{value used here}}
   // One send.
-  print(a.toHost())
+  _hostOp(a.toHost())
   a += 1
   // This one should not be a send.
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 // GPU function takes the input arg of x.
@@ -60,13 +60,13 @@ public func test1SendWithParam(x: Float) {
 public func test2Sends() {
   var a = Tensor<Float>(1.0)
   // One send.
-  print(a.toHost())
+  _hostOp(a.toHost())
   a += 2
   // Another send.
-  print(a.toHost())
+  _hostOp(a.toHost())
   a += 3
   // This one should not be a send.
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test2Send{{.*}}
@@ -81,7 +81,7 @@ public func test2Sends() {
 // CHECK-NEXT: apply [[RECEIVE_H0]]<Float>([[TC]], [[TENSOR_ID0]]
 
 // The second receive is over tensor id 1.
-// CHECK: function_ref print(_:separator:terminator:)
+// CHECK: function_ref _hostOp
 // CHECK: integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: [[TENSOR_ID1:%.*]] = struct $Int
 // CHECK:      // function_ref static TensorHandle.receiveFromAccelerator(_:_:)
@@ -97,12 +97,12 @@ public func testSendsInALoopCPU() {
   while count < maxCount {
     a += a
     // One send.
-    print(a.toHost())
+    _hostOp(a.toHost())
     count += 1
   }
   a += a
   // This one should not be a send.
-  print(a.toHost())
+  _hostOp(a.toHost())
 }
 
 
@@ -116,7 +116,24 @@ public func testSendsInALoopGPU() {
   while count < maxCount {
     a += a
     // One send.
-    print(a.toHost())
+    _hostOp(a.toHost())
+    count += 1
+  }
+  a += a
+  let _ = a.array
+}
+
+public func testSendsInALoopTPU() {
+  TensorFlow.enableTPU()
+  let maxCount = 10
+  // a cannot be an integer tensor due to a TensorFlow Eigen bug (b/77737504).
+  var a = Tensor<Float>(1)
+  var count = 1
+
+  while count < maxCount {
+    a = _addScalarTensorsWithShape(a, a)
+    // One send.
+    _hostOp(a.toHost())
     count += 1
   }
   a += a
@@ -240,7 +257,7 @@ public func atariSim(_ a: Tensor<Float>) -> Tensor<Float> {
 public func test1RecvTensor() {
   let a = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
   // One send.
-  print(a.toHost())
+  _hostOp(a.toHost())
   // One recv.
   var b = atariSim(a).toAccelerator()
   b += a

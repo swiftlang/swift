@@ -5,53 +5,63 @@
 // Swift <-> TF sends/recvs tests.
 
 import TensorFlow
+#if TPU
+import TensorFlowUnittestTPU
+#else
 import TensorFlowUnittest
+#endif
 import StdlibUnittest
 
 var SendsRecvsTests = TestSuite("SendsRecvs")
 
-// FIXME: Add TPU Support.
 @inline(never)
 func test1Send() {
   var a = Tensor<Float>(1.0)
   // One send.
-  print(a.toHost())
-  a += 1
+  printT(a.toHost())
+  a += 2
   // This one should not be a send.
-  print(a.toHost())
-  expectEqual(2, a.scalar)
+  printT(a.toHost())
+  expectNearlyEqualWithScalarTensor(3, a)
 }
-SendsRecvsTests.testCPU("test1Send", test1Send)
+SendsRecvsTests.testAllBackends("test1Send", test1Send)
 
 @inline(never)
 func test1SendWithParam() {
   func _test1SendWithParam(x: Float) {
     var a = Tensor<Float>(x)
+
+    // On a TPU graph, to print out tensor `a` on host, we need to send it to TF
+    // CPU via TPU outfeed. To supply outfeed with the tensor shape, we define
+    // the intermediate `aSend`.
+    let aSend = _scalarTensorWithShape(a)
     // One send.
-    print(a.toHost())
+    printT(aSend.toHost())
+
     a += 1
     // This one should not be a send.
-    print(a.toHost())
-    expectEqual(2, a.scalar)
+    printT(a.toHost())
+    expectNearlyEqualWithScalarTensor(2, a)
   }
   _test1SendWithParam(x: 1.0)
 }
-SendsRecvsTests.testCPU("test1SendWithParam", test1SendWithParam)
+SendsRecvsTests.testAllBackends("test1SendWithParam", test1SendWithParam)
 
 @inline(never)
 func test2Sends() {
   var a = Tensor<Float>(1.0)
   // One send.
-  print(a.toHost())
+  printT(a.toHost())
   a += 2
+  let aSend = _scalarTensorWithShape(a)
   // Another send.
-  print(a.toHost())
+  printT(aSend.toHost())
   a += 3
   // This one should not be a send.
-  print(a.toHost())
-  expectEqual(6, a.scalar)
+  printT(a.toHost())
+  expectNearlyEqualWithScalarTensor(6, a)
 }
-SendsRecvsTests.testCPU("test2Sends", test2Sends)
+SendsRecvsTests.testAllBackends("test2Sends", test2Sends)
 
 @inline(never)
 func testSendsInALoop() {
@@ -60,18 +70,18 @@ func testSendsInALoop() {
   var a = Tensor<Float>(0.0)
   let b = Tensor<Float>(1.0)
   while count < maxCount {
-    a += b
+    a = _addScalarTensorsWithShape(a, b)
+    let aSend = _scalarTensorWithShape(a)
     // One send.
-    print(a.toHost())
+    printT(aSend.toHost())
     count += 1
   }
   a += a
   // This is not a send.
-  print("final a = \(a.toHost())")
-  expectEqual(3 * 2, a.scalar)
+  printT("final a = \(a.toHost())")
+  expectNearlyEqualWithScalarTensor(3 * 2, a)
 }
-SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
-
+SendsRecvsTests.testAllBackends("testSendsInALoop", testSendsInALoop)
 
 @inline(never)
 func testSendsInALoopWithNoResultTensor() {
@@ -85,26 +95,31 @@ func testSendsInALoopWithNoResultTensor() {
     count += 1
   }
 }
-SendsRecvsTests.testCPU("testSendsInALoopWithNoResultTensor",
-                        testSendsInALoopWithNoResultTensor)
+SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
+                                testSendsInALoopWithNoResultTensor)
 
+// TODO: Add TPU Support for the tests below.
 func test1RecvFloatScalar() {
+#if !TPU
   let x = Tensor<Float>(1.0)
   let y = x.scalar! + 2.0
 
   let z = Tensor<Float>(y)
   let result = z + z
-  expectEqual(6, result.scalar)
+  expectNearlyEqualWithScalarTensor(6, result)
+#endif //!TPU  
 }
 SendsRecvsTests.testCPU("test1RecvFloatScalar", test1RecvFloatScalar)
 
 func test1RecvIntScalar() {
+#if !TPU
   let x = Tensor<Int32>(1)
   let y = x.scalar! + 2
 
   let z = Tensor<Int32>(y)
   let result = z + z
-  expectEqual(6, result.scalar)
+  expectEqualWithScalarTensor(6, result)
+#endif //!TPU
 }
 SendsRecvsTests.testCPU("test1RecvIntScalar", test1RecvIntScalar)
 
@@ -114,14 +129,16 @@ func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
 }
 
 func test1RecvFloatTensor() {
+#if !TPU
   let a = Tensor<Float>(1.0)
   // One send.
-  print(a.toHost())
+  printT(a.toHost())
   // One recv.
   var b = atariSimFloat(a).toAccelerator()
   b += a
-  print("final b = \(b.toHost())")
-  expectEqual(2, b.scalar)
+  printT("final b = \(b.toHost())")
+  expectEqualWithScalarTensor(2, b)
+#endif //!TPU
 }
 SendsRecvsTests.testCPU("test1RecvFloatTensor", test1RecvFloatTensor)
 
@@ -131,14 +148,16 @@ func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
 }
 
 func test1RecvIntTensor() {
+#if !TPU
   let a = Tensor<Int64>(1)
   // One send.
-  print(a.toHost())
+  printT(a.toHost())
   // One recv.
   var b = atariSimInt(a).toAccelerator()
   b += a
-  print("final b = \(b.toHost())")
-  expectEqual(2, b.scalar)
+  printT("final b = \(b.toHost())")
+  expectEqualWithScalarTensor(2, b)
+#endif //!TPU
 }
 SendsRecvsTests.testCPU("test1RecvIntTensor", test1RecvIntTensor)
 
