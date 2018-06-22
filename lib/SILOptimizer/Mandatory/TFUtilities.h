@@ -74,7 +74,15 @@ static const char DEFAULT_TPU_DEVICE[] = "TPU_SYSTEM";
 // TFPartition and GraphPartitioner, and will be replaced with real devices in
 // TFGraphLowering.
 static const char ALL_DEVICES[] = "ALL_DEVICES";
+
+// We assume the following special attr names do not occur in the regular
+// attributes of any TF ops.
 static const char DEVICE_ATTR[] = "device";
+// This pseudo-attribute is propagated from a tfop inst to TensorTransfer, and
+// then to D2D send/recv insts. When lowering to TF graph, the pseudo-attribute
+// is used when creating TPU infeed/outfeed ops, and is dropped when creating
+// other TF ops (e.g. a "Const" op).
+static const char SHAPE_ARRAY_ATTR[] = "__shapes";
 
 static DeviceType OpDeviceType(StringRef device) {
   if (device.str() == DEFAULT_CPU_DEVICE) return DeviceType::CPU;
@@ -123,20 +131,20 @@ static std::string getDeviceShortName(DeviceType deviceType) {
 /// we are generating.  This can be different between distinct graphs in the
 /// same program though.
 struct GraphGlobalConfiguration {
-  const DeviceType deviceType;
+  const DeviceType primaryDeviceType;
   const bool isTPUInfeedEnabled;
 
   // Actual TF devices involved in the tensor computation.
   // It cannot contain DeviceType::ALL.
   llvm::SetVector<DeviceType> usedDeviceTypes;
 
-  GraphGlobalConfiguration(DeviceType deviceType, bool isTPUInfeedEnabled)
-      : deviceType(deviceType), isTPUInfeedEnabled(isTPUInfeedEnabled) {
-    assert(deviceType != DeviceType::ALL);
-    usedDeviceTypes.insert(deviceType);
+  GraphGlobalConfiguration(DeviceType primaryDeviceType,
+                           bool isTPUInfeedEnabled)
+      : primaryDeviceType(primaryDeviceType),
+        isTPUInfeedEnabled(isTPUInfeedEnabled) {
+    assert(primaryDeviceType != DeviceType::ALL);
+    usedDeviceTypes.insert(primaryDeviceType);
   }
-
-  bool isTPUEnabled() const { return deviceType == DeviceType::TPU; }
 
   // Chooses a device for this tfop, extends `operands` and `newInstName`
   // accordingly with the device attribute, and tracks the chosen device in
@@ -193,9 +201,9 @@ struct GraphGlobalConfiguration {
 
     // Place this inst on the device given by this configuration.
     // FIXME: Use the op kernel device availability info to select a device for
-    // `opType` -- if that op has no available kernel on `deviceType`, a
+    // `opType` -- if that op has no available kernel on `primaryDeviceType`, a
     // different device should be returned.
-    return deviceType;
+    return primaryDeviceType;
   }
 };
 
@@ -329,7 +337,6 @@ struct GraphGlobalConfiguration {
       return getAttrOperand(inst->getOperand(operandNumber));
     }
     static SingleValueInstruction *getAttrOperand(SILValue v);
-
 
     /// Given an array value on which we recently dropped a consuming use, try
     /// to remove all the computation that produces the array if possible.  If
