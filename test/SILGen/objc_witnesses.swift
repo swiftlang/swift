@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -66,7 +66,7 @@ protocol Orbital {
 }
 
 class Electron : Orbital {
-  dynamic var quantumNumber: Int = 0
+  @objc dynamic var quantumNumber: Int = 0
 }
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S14objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSivgTW
@@ -82,7 +82,7 @@ public protocol Lepton {
 }
 
 public class Positron : Lepton {
-  public dynamic var spin: Float = 0.5
+  @objc public dynamic var spin: Float = 0.5
 }
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @$S14objc_witnesses8PositronCAA6LeptonA2aDP4spinSfvgTW
@@ -91,13 +91,13 @@ public class Positron : Lepton {
 // Override of property defined in @objc extension
 
 class Derived : NSObject {
-  override var valence: Int {
+  @objc override var valence: Int {
     get { return 2 } set { }
   }
 }
 
 extension NSObject : Atom {
-  var valence: Int { get { return 1 } set { } }
+  @objc var valence: Int { get { return 1 } set { } }
 }
 
 // CHECK-LABEL: sil private @$SSo8NSObjectC14objc_witnessesE7valenceSivmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @in_guaranteed NSObject, @thick NSObject.Type) -> () {

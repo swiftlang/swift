@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -enable-sil-ownership %s -emit-verbose-sil -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -enable-sil-ownership %s -emit-verbose-sil -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -10,7 +10,7 @@ import gizmo
 @objc class ObjCClass {}
 
 class A {
-  dynamic subscript (i: Int) -> ObjCClass {
+  @objc dynamic subscript (i: Int) -> ObjCClass {
     get {
       return ObjCClass()
     }

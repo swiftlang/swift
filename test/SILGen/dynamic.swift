@@ -2,8 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify -swift-version 3
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
 
 // REQUIRES: objc_interop
 
@@ -31,10 +31,10 @@ class Foo: Proto {
   }
 
   // dynamic, so it has only an ObjC entry point
-  dynamic init(dynamic: Int) {}
-  dynamic func dynamicMethod() {}
-  dynamic var dynamicProp: Int = 0
-  dynamic subscript(dynamic dynamic: Int) -> Int {
+  @objc dynamic init(dynamic: Int) {}
+  @objc dynamic func dynamicMethod() {}
+  @objc dynamic var dynamicProp: Int = 0
+  @objc dynamic subscript(dynamic dynamic: Int) -> Int {
     get { return dynamic }
     set {}
   }
@@ -233,7 +233,7 @@ class Subclass: Foo {
     // CHECK:         objc_super_method {{%.*}} : $Subclass, #Foo.subscript!setter.1.foreign :
   }
 
-  dynamic override func overriddenByDynamic() {}
+  @objc dynamic override func overriddenByDynamic() {}
 }
 
 class SubclassWithInheritedInits: Foo {
@@ -347,7 +347,7 @@ extension Gizmo {
   }
 
   @objc func foreignObjCExtension() { }
-  dynamic func foreignDynamicExtension() { }
+  @objc dynamic func foreignDynamicExtension() { }
 }
 
 // CHECK-LABEL: sil hidden @$S7dynamic24foreignExtensionDispatchyySo5GizmoCF
@@ -438,7 +438,7 @@ func dynamicExtensionMethods(_ obj: ObjCOtherFile) {
 }
 
 public class Base {
-  dynamic var x: Bool { return false }
+  @objc dynamic var x: Bool { return false }
 }
 
 public class Sub : Base {
@@ -483,7 +483,7 @@ public class GenericBase<T> {
 }
 
 public class ConcreteDerived : GenericBase<Int> {
-  public override dynamic func method(_: Int) {}
+  @objc public override dynamic func method(_: Int) {}
 }
 
 // The dynamic override has a different calling convention than the base,

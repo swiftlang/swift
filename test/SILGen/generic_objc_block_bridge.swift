@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
 
 import Foundation
 
 class Butt: NSObject {
-  dynamic func butt(_ b: (Int) -> Int) {}
+  @objc dynamic func butt(_ b: (Int) -> Int) {}
 }
 
 class Tubb<GenericParamName>: Butt {

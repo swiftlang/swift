@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_bridging_any -Xllvm -sil-print-debuginfo -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -413,7 +413,7 @@ protocol Anyable {
 // Make sure we generate correct bridging thunks
 class SwiftIdLover : NSObject, Anyable {
 
-  func methodReturningAny() -> Any { fatalError() }
+  @objc func methodReturningAny() -> Any { fatalError() }
   // SEMANTIC ARC TODO: This is another case of pattern matching the body of one
   // function in a different function... Just pattern match the unreachable case
   // to preserve behavior. We should check if it is correct.
@@ -439,7 +439,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:   return [[OBJC_RESULT]]
   // CHECK: } // end sil function '$S17objc_bridging_any12SwiftIdLoverC18methodReturningAnyypyFTo'
 
-  func methodReturningOptionalAny() -> Any? { fatalError() }
+  @objc func methodReturningOptionalAny() -> Any? { fatalError() }
   // CHECK-LABEL: sil hidden @$S17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyF
   // CHECK-LABEL: sil hidden [thunk] @$S17objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyFTo
   // CHECK:       function_ref @$Ss27_bridgeAnythingToObjectiveC{{.*}}F
@@ -451,7 +451,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK:  [[METHOD:%.*]] = function_ref @$S17objc_bridging_any12SwiftIdLoverC15methodTakingAny1ayyp_tF
   // CHECK-NEXT:  apply [[METHOD]]([[RESULT:%.*]], [[BORROWED_SELF_COPY:%.*]]) :
 
-  func methodTakingOptionalAny(a: Any?) { fatalError() }
+  @objc func methodTakingOptionalAny(a: Any?) { fatalError() }
   // CHECK-LABEL: sil hidden @$S17objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tF
 
   // CHECK-LABEL: sil hidden [thunk] @$S17objc_bridging_any12SwiftIdLoverC23methodTakingOptionalAny1ayypSg_tFTo
@@ -641,7 +641,7 @@ func dynamicLookup(x: AnyObject) {
 
 extension GenericClass {
   // CHECK-LABEL: sil hidden @$SSo12GenericClassC17objc_bridging_anyE23pseudogenericAnyErasure1xypx_tF :
-  func pseudogenericAnyErasure(x: T) -> Any {
+  @objc func pseudogenericAnyErasure(x: T) -> Any {
     // CHECK: bb0([[ANY_OUT:%.*]] : @trivial $*Any, [[ARG:%.*]] : @guaranteed $T, [[SELF:%.*]] : @guaranteed $GenericClass<T>
     // CHECK:   [[ANY_BUF:%.*]] = init_existential_addr [[ANY_OUT]] : $*Any, $AnyObject
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]

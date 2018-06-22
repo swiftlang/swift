@@ -1,8 +1,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s -swift-version 3 | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module -enable-sil-ownership  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -21,7 +21,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '$S20objc_blocks_bridging3FooC3foo_1xS3iXE_SitFTo'
-  dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
+  @objc dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
     return f(x)
   }
 
@@ -38,7 +38,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK: } // end sil function '$S20objc_blocks_bridging3FooC3bar_1xS3SXE_SStFTo'
-  dynamic func bar(_ f: (String) -> String, x: String) -> String {
+  @objc dynamic func bar(_ f: (String) -> String, x: String) -> String {
     return f(x)
   }
 
@@ -61,7 +61,7 @@ import Foundation
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>, @guaranteed Optional<String>, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
-  dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
+  @objc dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
     return f(x)
   }
 
@@ -73,7 +73,7 @@ import Foundation
   // CHECK:         apply [[NATIVE]]([[F]], [[X]], [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:         destroy_value [[SELF_COPY]]
-  dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
+  @objc dynamic func cFunctionPointer(_ fp: @convention(c) (Int) -> Int, x: Int) -> Int {
     _ = fp(x)
   }
 
@@ -89,7 +89,7 @@ import Foundation
   // CHECK:         enum $Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, #Optional.some!enumelt.1, [[BRIDGED]]
   // CHECK:         [[NATIVE:%.*]] = function_ref @$S20objc_blocks_bridging3FooC7optFunc{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed Optional<@callee_guaranteed (@guaranteed String) -> @owned String>, @guaranteed String, @guaranteed Foo) -> @owned Optional<String>
   // CHECK:         apply [[NATIVE]]
-  dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
+  @objc dynamic func optFunc(_ f: ((String) -> String)?, x: String) -> String? {
     return f?(x)
   }
 
@@ -97,7 +97,7 @@ import Foundation
   // CHECK:         switch_enum %0
   //
   // CHECK: bb2([[FP_BUF:%.*]] : @trivial $@convention(c) (NSString) -> @autoreleased NSString):
-  dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
+  @objc dynamic func optCFunctionPointer(_ fp: (@convention(c) (String) -> String)?, x: String) -> String? {
     return fp?(x)
   }
 }
@@ -143,7 +143,7 @@ func callBlocks(_ x: Foo,
 }
 
 class Test: NSObject {
-  func blockTakesBlock() -> ((Int) -> Int) -> Int {}
+  @objc func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
 // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$SS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
@@ -286,7 +286,7 @@ public func bridgeNoescapeBlock() {
 class ObjCClass : NSObject {}
 
 extension ObjCClass {
-  func someDynamicMethod(closure: (() -> ()) -> ()) {}
+  @objc func someDynamicMethod(closure: (() -> ()) -> ()) {}
 }
 
 struct GenericStruct<T> {
