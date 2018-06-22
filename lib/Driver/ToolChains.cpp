@@ -248,6 +248,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                const JobContext &context) const {
   InvocationInfo II{SWIFT_EXECUTABLE_NAME};
   ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
 
   Arguments.push_back("-frontend");
 

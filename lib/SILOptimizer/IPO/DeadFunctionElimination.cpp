@@ -599,7 +599,9 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     }
     // Check property descriptor implementations.
     for (SILProperty &P : Module->getPropertyList()) {
-      ensureKeyPathComponentIsAlive(P.getComponent());
+      if (auto component = P.getComponent()) {
+        ensureKeyPathComponentIsAlive(*component);
+      }
     }
 
   }

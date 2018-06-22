@@ -1414,7 +1414,8 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
 
 AccessStrategy
 AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
-                                       AccessKind accessKind) const {
+                                       AccessKind accessKind,
+                                       DeclContext *accessFromDC) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     switch (getStorageKind()) {
@@ -1481,7 +1482,14 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // This is done by using DirectToStorage semantics above, with the
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
-      if (isResilient())
+      bool resilient;
+      if (accessFromDC)
+        resilient = isResilient(accessFromDC->getParentModule(),
+                                ResilienceExpansion::Maximal);
+      else
+        resilient = isResilient();
+      
+      if (resilient)
         return AccessStrategy::DirectToAccessor;
 
       if (storageKind == StoredWithObservers ||
@@ -1747,7 +1755,30 @@ bool swift::conflicting(ASTContext &ctx,
   }
 
   // Otherwise, the declarations conflict if the overload types are the same.
-  return sig1Type == sig2Type;
+  if (sig1Type != sig2Type)
+    return false;
+
+  // The Swift 5 overload types are the same, but similar to the above, prior to
+  // Swift 5, a variable not in an extension of a generic type got a null
+  // overload type instead of a function type as it does now, so we really
+  // follow that behaviour and warn if there's going to be a conflict in future.
+  if (!ctx.isSwiftVersionAtLeast(5)) {
+    auto swift4Sig1Type = sig1.IsVariable && !sig1.InExtensionOfGenericType
+                              ? CanType()
+                              : sig1Type;
+    auto swift4Sig2Type = sig1.IsVariable && !sig2.InExtensionOfGenericType
+                              ? CanType()
+                              : sig1Type;
+    if (swift4Sig1Type != swift4Sig2Type) {
+      // Old was different to the new behaviour!
+      if (wouldConflictInSwift5)
+        *wouldConflictInSwift5 = true;
+
+      return false;
+    }
+  }
+
+  return true;
 }
 
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,

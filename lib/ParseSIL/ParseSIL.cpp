@@ -5464,18 +5464,25 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   }
 
   Identifier ComponentKind;
-  KeyPathPatternComponent Component;
+  Optional<KeyPathPatternComponent> Component;
   SourceLoc ComponentLoc;
   SmallVector<SILType, 4> OperandTypes;
 
-  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
-      || P.parseIdentifier(ComponentKind, ComponentLoc,
-                           diag::expected_tok_in_sil_instr, "component kind")
-      || SP.parseKeyPathPatternComponent(Component, OperandTypes,
-               ComponentLoc, ComponentKind, InstLoc,
-               patternEnv)
-      || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
+  
+  if (!P.consumeIf(tok::r_paren)) {
+    KeyPathPatternComponent parsedComponent;
+    if (P.parseIdentifier(ComponentKind, ComponentLoc,
+                          diag::expected_tok_in_sil_instr, "component kind")
+        || SP.parseKeyPathPatternComponent(parsedComponent, OperandTypes,
+                 ComponentLoc, ComponentKind, InstLoc,
+                 patternEnv)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+      return true;
+    
+    Component = std::move(parsedComponent);
+  }
   
   SILProperty::create(M, Serialized,
                       cast<AbstractStorageDecl>(VD), Component);

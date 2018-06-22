@@ -570,6 +570,8 @@ public:
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
 
+  llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
+
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
   unsigned TailElemTypeID = 0;

@@ -1631,11 +1631,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  Out << "Qq";
-  mangleChildNodes(node); // index, declcontext
-}
-
 void Remangler::mangleDeclContext(Node *node) {
   mangleSingleChildNode(node);
 }
