@@ -124,7 +124,7 @@ LazyTestSuite.test("CollectionOfOne/AssociatedTypes") {
   typealias Subject = CollectionOfOne<OpaqueValue<Int>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
-    iteratorType: IteratorOverOne<OpaqueValue<Int>>.self,
+    iteratorType: Subject.Iterator.self,
     subSequenceType: Slice<Subject>.self,
     indexType: Int.self,
     indicesType: Range<Int>.self)
