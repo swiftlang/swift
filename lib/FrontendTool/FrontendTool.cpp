@@ -1800,7 +1800,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     // Install stats-reporter somewhere visible for subsystems that
     // need to bump counters as they work, rather than measure
     // accumulated work on completion (mostly: TypeChecker).
-    Instance->getASTContext().Stats = StatsReporter.get();
+    Instance->getASTContext().setStatsReporter(StatsReporter.get());
   }
 
   // The compiler instance has been configured; notify our observer.
