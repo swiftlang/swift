@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -122,13 +122,13 @@ func objc_enum_switch(_ x: ExportedToObjC) -> Int {
 
 @objc class ObjCEnumMethods : NSObject {
   // CHECK: define internal void @"$S12objc_ns_enum15ObjCEnumMethodsC0C2InyyAA010ExportedToD1COFTo"([[OBJC_ENUM_METHODS:.*]]*, i8*, i64)
-  dynamic func enumIn(_ x: ExportedToObjC) {}
+  @objc dynamic func enumIn(_ x: ExportedToObjC) {}
   // CHECK: define internal i64 @"$S12objc_ns_enum15ObjCEnumMethodsC0C3OutAA010ExportedToD1COyFTo"([[OBJC_ENUM_METHODS]]*, i8*)
-  dynamic func enumOut() -> ExportedToObjC { return .Foo }
+  @objc dynamic func enumOut() -> ExportedToObjC { return .Foo }
 
   // CHECK: define internal i64 @"$S12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvgTo"([[OBJC_ENUM_METHODS]]*, i8*)
   // CHECK: define internal void @"$S12objc_ns_enum15ObjCEnumMethodsC4propAA010ExportedToD1COvsTo"([[OBJC_ENUM_METHODS]]*, i8*, i64)
-  dynamic var prop: ExportedToObjC = .Foo
+  @objc dynamic var prop: ExportedToObjC = .Foo
 }
 
 // CHECK-LABEL: define hidden swiftcc void @"$S12objc_ns_enum0a1_C13_method_callsyyAA15ObjCEnumMethodsCF"(%T12objc_ns_enum15ObjCEnumMethodsC*)

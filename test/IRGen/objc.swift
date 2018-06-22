@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -51,12 +51,12 @@ class Test2 : Gizmo {
 // CHECK:    call {{.*}} @objc_release
 // CHECK:    ret void
 
-  dynamic func bar() {}
+  @objc dynamic func bar() {}
 }
 
 // Test @nonobjc.
 class Contrarian : Blammo {
-  func acquiesce() {}
+  @objc func acquiesce() {}
   @nonobjc func disharmonize() {}
   @nonobjc func eviscerate() {}
 }

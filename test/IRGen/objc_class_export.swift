@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -I %t -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -I %t -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -112,6 +112,6 @@ struct BigStructWithNativeObjects {
   // This function is not representable in Objective-C, so don't emit the objc entry point.
   // CHECK-NOT: @_TToFC17objc_class_export3Foo23doStuffToBigSwiftStruct1ffS_FTV17objc_class_export27BigStructWithNativeObjects_T_
 
-  init() { }
+  @objc init() { }
 }
 

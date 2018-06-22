@@ -1,19 +1,19 @@
 // This file is also used by objc_properties_ios.swift.
 
-// RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
-// RUN: %swift -target x86_64-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
+// RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
+// RUN: %swift -target x86_64-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 
 @objc class SomeObject {
-  var readonly : SomeObject {
+  @objc var readonly : SomeObject {
     get {
       return self
     }
   }
 
-  var readwrite : SomeObject {
+  @objc var readwrite : SomeObject {
     get {
       return bareIvar
     }
@@ -22,20 +22,20 @@
     }
   }
 
-  var bareIvar : SomeObject
+  @objc var bareIvar : SomeObject
 
   @objc(wobble) var wibble : SomeObject
 
-  init() { 
+  @objc init() { 
     bareIvar = SomeObject()
     wibble  = SomeObject()
   }
 
-  static var sharedProp: Int64 = 0
+  @objc static var sharedProp: Int64 = 0
 }
 
 extension SomeObject {
-  var extensionProperty : SomeObject {
+  @objc var extensionProperty : SomeObject {
     get {
       return self
     }
@@ -44,7 +44,7 @@ extension SomeObject {
     }
   }
 
-  class var extensionClassProp : SomeObject.Type {
+  @objc class var extensionClassProp : SomeObject.Type {
     return self
   }
 }
@@ -52,12 +52,12 @@ extension SomeObject {
 // <rdar://problem/16952186> Crash with @lazy in @objc class
 @objc
 class LazyPropertyCrash  {
-  lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
+  @objc lazy var applicationFilesDirectory: LazyPropertyCrash = LazyPropertyCrash()
 }
 
 // <rdar://16909436>
 @objc class Tree {
-  weak var parent: Tree?
+  @objc weak var parent: Tree?
 }
 
 
@@ -68,7 +68,7 @@ func test17127126(f : Class17127126) {
 
 @objc
 class Class17127126 {
-  lazy var x = 1
+  @objc lazy var x = 1
 }
 
 @objc protocol Proto {
