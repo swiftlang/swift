@@ -29,6 +29,29 @@ public func expectPointwiseNearlyEqual<T, C1, C2>(
   }
 }
 
+// The following methods help keep the SIL code of our test cases simple.
+@inline(never)
+public func expectNearlyEqualWithScalarTensor<T : FloatingPoint & ExpressibleByFloatLiteral>(
+  _ expectedValue: T, _ x: Tensor<T>) {
+  expectNearlyEqual(expectedValue, x.scalar!)
+}
+
+@inline(never)
+public func expectEqualWithScalarTensor<T : Comparable & ExpressibleByIntegerLiteral>(
+  _ expectedValue: T, _ x: Tensor<T>) {
+  expectEqual(expectedValue, x.scalar!)
+}
+
+@inline(never)
+public func printT<Scalar>(_ x: Tensor<Scalar>) {
+  print(x)
+}
+
+@inline(never)
+public func printT(_ message: String) {
+  print(message)
+}
+
 extension TestSuite {
   // Use the three macros CPU, CUDA and TPU to differentiate the 3 associated
   // backends.

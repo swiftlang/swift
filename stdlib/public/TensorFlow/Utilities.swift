@@ -257,3 +257,34 @@ public struct RandomNumberSequence : Sequence {
     }
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Unit test utilities
+//===----------------------------------------------------------------------===//
+// TODO: Move this section to a unit-test only Swift module, once the google
+// internal lit based test infra can handle importing additional Swift modules.
+
+/// This is a generic host-only op that hides the details of its impl in the SIL
+/// code. This makes reading/writing SIL based compiler unit tests simple.
+@inline(never)
+public func _hostOp<Scalar>(_ x: Tensor<Scalar>) {
+  print(x)
+}
+
+/// Some TPU ops (e.g. infeed/outfeed) require tensor shape info, which the APIs
+/// below can provide.
+///
+/// TODO: Remove these helper APIs, when we have a better shape
+/// inference/propagation design.
+@_inlineable @inline(__always)
+public func _scalarTensorWithShape<T>(_ x: Tensor<T>) -> Tensor<T> {
+  let ret : Tensor<T> = #tfop("Identity", x, __shapes: [TensorShape()])
+  return ret
+}
+
+@_inlineable @inline(__always)
+public func _addScalarTensorsWithShape<T>(_ x: Tensor<T>, _ y: Tensor<T>
+) -> Tensor<T> {
+  let ret : Tensor<T> = #tfop("Add", x, y, __shapes: [TensorShape()])
+  return ret
+}
