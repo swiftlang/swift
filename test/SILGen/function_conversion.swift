@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name function_conversion -enable-sil-ownership -primary-file %s -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-emit-ir -module-name function_conversion -enable-sil-ownership -primary-file %s -swift-version 3
+// RUN: %target-swift-emit-silgen -module-name function_conversion -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -module-name function_conversion -enable-sil-ownership -primary-file %s
 
 // Check SILGen against various FunctionConversionExprs emitted by Sema.
 
@@ -413,7 +413,7 @@ func convTupleScalar(_ f1: @escaping (Q) -> (),
                      f3: @escaping (_ tuple: (Int, Int)?) -> ()) {
   let _: (P) -> () = f1
   let _: (P) -> () = f2
-  let _: (Int, Int) -> () = f3
+  let _: ((Int, Int)) -> () = f3
 }
 
 func convTupleScalarOpaque<T>(_ f: @escaping (T...) -> ()) -> ((_ args: T...) -> ())? {

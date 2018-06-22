@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_dictionary_bridging -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_dictionary_bridging -enable-sil-ownership %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -12,7 +12,7 @@ import gizmo
 @objc class Foo : NSObject {
   // Bridging dictionary parameters
   // CHECK-LABEL: sil hidden [thunk] @$S24objc_dictionary_bridging3FooC23bridge_Dictionary_param{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (NSDictionary, Foo) -> ()
-  func bridge_Dictionary_param(_ dict: Dictionary<Foo, Foo>) {
+  @objc func bridge_Dictionary_param(_ dict: Dictionary<Foo, Foo>) {
     // CHECK: bb0([[NSDICT:%[0-9]+]] : @unowned $NSDictionary, [[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[NSDICT_COPY:%.*]] = copy_value [[NSDICT]]
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
@@ -32,7 +32,7 @@ import gizmo
 
   // Bridging dictionary results
   // CHECK-LABEL: sil hidden [thunk] @$S24objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary
-  func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
+  @objc func bridge_Dictionary_result() -> Dictionary<Foo, Foo> { 
     // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Foo):
     // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
     // CHECK:   [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -50,7 +50,7 @@ import gizmo
   }
   // CHECK: } // end sil function '$S24objc_dictionary_bridging3FooC24bridge_Dictionary_result{{[_0-9a-zA-Z]*}}FTo'
 
-  var property: Dictionary<Foo, Foo> = [:]
+  @objc var property: Dictionary<Foo, Foo> = [:]
 
   // Property getter
   // CHECK-LABEL: sil hidden [thunk] @$S24objc_dictionary_bridging3FooC8propertySDyA2CSo8NSObjectCSH10Foundationg_GvgTo : $@convention(objc_method) (Foo) -> @autoreleased NSDictionary

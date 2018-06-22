@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name vtables_objc -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name vtables_objc -enable-sil-ownership -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -83,7 +83,7 @@ func callWotsit(_ w: Wotsit) {
 
 extension Base {
   // note: does not have a vtable slot, because it is from an extension
-  func identify() -> Int {
+  @objc func identify() -> Int {
     return 0
   }
 }
