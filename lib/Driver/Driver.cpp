@@ -700,7 +700,7 @@ computeWorkingDirectory(const llvm::opt::InputArgList *ArgList) {
     SmallString<128> workingDirectory;
     workingDirectory = A->getValue();
     llvm::sys::fs::make_absolute(workingDirectory);
-    //  Create a new string that can outlive ArgList.
+    //  Create a new string that can outlive workingDirectory.
     std::string result = workingDirectory.str().str();
     return result;
   }
