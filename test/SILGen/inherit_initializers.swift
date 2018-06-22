@@ -122,4 +122,6 @@ class Twice<X, Y> {
   init<Z>(_: Z) where Z : Q, Z.A == X, Z.B == Y, X == Y {}
 }
 
+class Pair<T, U> : Twice<T, U> {}
+
 class Once<T> : Twice<T, T> {}
