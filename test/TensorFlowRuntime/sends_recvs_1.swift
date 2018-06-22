@@ -72,6 +72,22 @@ func testSendsInALoop() {
 }
 SendsRecvsTests.testCPU("testSendsInALoop", testSendsInALoop)
 
+
+@inline(never)
+func testSendsInALoopWithNoResultTensor() {
+  let maxCount = 10
+  var count = 1
+  var a = Tensor<Float>(1.0)
+  while count < maxCount {
+    a += a
+    // One send.
+    print(a.toHost())
+    count += 1
+  }
+}
+SendsRecvsTests.testCPU("testSendsInALoopWithNoResultTensor",
+                        testSendsInALoopWithNoResultTensor)
+
 func test1RecvFloatScalar() {
   let x = Tensor<Float>(1.0)
   let y = x.scalar! + 2.0
@@ -102,7 +118,7 @@ func test1RecvFloatTensor() {
   // One send.
   print(a.toHost())
   // One recv.
-  var b = atariSimFloat(a).toDevice()
+  var b = atariSimFloat(a).toAccelerator()
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)
@@ -119,7 +135,7 @@ func test1RecvIntTensor() {
   // One send.
   print(a.toHost())
   // One recv.
-  var b = atariSimInt(a).toDevice()
+  var b = atariSimInt(a).toAccelerator()
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)

@@ -92,8 +92,8 @@ internal extension TensorHandle {
 
 extension TensorHandle : TensorSendableReceivable {
   @_inlineable @_versioned
-  static func receiveFromDevice(_ computation: _TensorComputation,
-                                _ tensorId: Int
+  static func receiveFromAccelerator(_ computation: _TensorComputation,
+                                     _ tensorId: Int
   ) -> TensorHandle<Scalar> {
     debugLog("Receiving tensor of id \(tensorId) and type \(Scalar.self).")
     let status = TF_NewStatus()
@@ -111,8 +111,8 @@ extension TensorHandle : TensorSendableReceivable {
   }
 
   @_inlineable @_versioned
-  func sendToDevice(_ computation: _TensorComputation,
-                    _ tensorId: Int) {
+  func sendToAccelerator(_ computation: _TensorComputation,
+                         _ tensorId: Int) {
     if _RuntimeConfig.printsDebugLog {
       debugLog("Sending tensor of id \(tensorId) and type \(Scalar.self) with:")
       dumpTensorContent(self.cTensorHandle, Scalar.self)

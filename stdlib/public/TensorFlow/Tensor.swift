@@ -129,9 +129,9 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 
 /// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
-  /// Mark memory transfer to device.
+  /// Mark memory transfer to accelerator.
   @_inlineable @inline(__always)
-  func toDevice() -> Tensor {
+  func toAccelerator() -> Tensor {
     return Tensor(handle: _TFSend(handle))
   }
 
@@ -623,7 +623,7 @@ public extension Tensor where Scalar == Int32 {
         return _TFTensorFromScalars(state.generate(Int(shape.contiguousSize)),
                                     shape: shape.dimensions)
       }
-    ).toDevice()
+    ).toAccelerator()
   }
 }
 

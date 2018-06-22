@@ -49,16 +49,16 @@ protocol TensorSendableReceivable {
 
   /// Receive a tensor based on a tensor computation handle (equivalent to a TF
   /// session handle), and a tensor ID.
-  static func receiveFromDevice(_ computation: _TensorComputation,
-                                _ tensorId: Int) -> Self
+  static func receiveFromAccelerator(_ computation: _TensorComputation,
+                                     _ tensorId: Int) -> Self
 
   /// Send a tensor of `this` instance based on a tensor computation handle
   /// (equivalent to a TF session handle), and a tensor ID.
-  func sendToDevice(_ computation: _TensorComputation,
-                    _ tensorId: Int)
+  func sendToAccelerator(_ computation: _TensorComputation,
+                         _ tensorId: Int)
 
   /// Create a scalar tensor. It can be used by the host program to send a
-  /// scalar value to device.
+  /// scalar value to accelerator.
   ///
   /// - Note: This is different from protocol method
   /// `AccelerableByTensorFlow._makeScalarTensor()`, a marker function to assist
