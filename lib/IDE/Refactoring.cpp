@@ -1612,8 +1612,7 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      llvm::SmallVector<Decl *, 6> accessors;
-      ASD->getAllAccessorFunctions(accessors);
+      auto accessors = ASD->getAllAccessorFunctions();
       Found.insert(accessors.begin(), accessors.end());
     }
     return true;
@@ -2776,7 +2775,7 @@ bool RefactoringActionTrailingClosure::performChange() {
     return true;
   Expr *Args = CE->getArg();
   if (auto *TSE = dyn_cast<TupleShuffleExpr>(Args))
-    Args = TSE;
+    Args = TSE->getSubExpr();
 
   Expr *ClosureArg = nullptr;
   Expr *PrevArg = nullptr;

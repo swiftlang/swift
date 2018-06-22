@@ -17,7 +17,7 @@ sil @partially_applyable_to_class : $@convention(thin) (@owned SwiftClass) -> ()
 // CHECK:   %2 = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*)* @"$S28partially_applyable_to_classTA" to i8*), %swift.refcounted* undef }, %swift.refcounted* %1, 1
 // CHECK:   ret { i8*, %swift.refcounted* } %2
 // CHECK: }
-sil @partial_apply_class : $@convention(thin) SwiftClass -> @callee_owned () -> () {
+sil @partial_apply_class : $@convention(thin) (SwiftClass) -> @callee_owned () -> () {
 entry(%c : $SwiftClass):
   %f = function_ref @partially_applyable_to_class : $@convention(thin) (@owned SwiftClass) -> ()
   %g = partial_apply %f(%c) : $@convention(thin) (@owned SwiftClass) -> ()
@@ -33,14 +33,14 @@ entry(%c : $SwiftClass):
 // CHECK:         bitcast %TSi* {{%.*}} to %swift.opaque*
 sil public_external @generic_captured_param : $@convention(thin) <T> (Int, @inout T) -> Int
 
-sil @partial_apply_generic_capture : $@convention(thin) Int -> @callee_owned Int -> Int {
+sil @partial_apply_generic_capture : $@convention(thin) (Int) -> @callee_owned (Int) -> Int {
 entry(%x : $Int):
   %a = alloc_stack $Int
   store %x to %a : $*Int
   %f = function_ref @generic_captured_param : $@convention(thin) <T> (Int, @inout T) -> Int
   %p = partial_apply %f<Int>(%a) : $@convention(thin) <T> (Int, @inout T) -> Int
   dealloc_stack %a : $*Int
-  return %p : $@callee_owned Int -> Int
+  return %p : $@callee_owned (Int) -> Int
 }
 
 sil public_external @generic_captured_and_open_param : $@convention(thin) <T> (@in T, @inout T) -> @out T
@@ -406,6 +406,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds <{ %swift.refcounted, [24 x i8], %TSi }>, <{ %swift.refcounted, [24 x i8], %TSi }>* [[T0]], i32 0, i32 1
 // CHECK-NEXT: [[BUFFER:%.*]] = bitcast [24 x i8]* [[T1]] to %swift.type**
 // CHECK-NEXT: %T = load %swift.type*, %swift.type** [[BUFFER]], align 8
+// CHECK-NEXT: store %swift.type* %T, %swift.type**
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[BUFFER]], i32 1
 // CHECK-NEXT: [[T1:%.*]] = bitcast %swift.type** [[T0]] to i8***
 // CHECK-NEXT: %T.P2 = load i8**, i8*** [[T1]], align 8

@@ -1576,7 +1576,7 @@ public:
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
           Out << "\nParameter type: ";
-          FT->getInput()->print(Out);
+          FT->printParams(Out);
           Out << "\n";
           E->dump(Out);
           abort();
@@ -2255,15 +2255,15 @@ public:
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getInterfaceType()->isMaterializable() || var->isInOut()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
-          Out << "Non-parameter VarDecl has non-materializable type: ";
+          Out << "VarDecl has non-materializable type: ";
           var->getType().print(Out);
           Out << "\n";
           abort();
         }
 
-        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
+        if (!var->isInOut() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -2340,8 +2340,7 @@ public:
 
       if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
         auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent()
-                         ->getWithoutSpecifierType();
+                         ->getReferenceStorageReferent();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2906,13 +2905,13 @@ public:
           abort();
         }
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (!selfParam->getInterfaceType()->is<InOutType>()) {
+        if (!selfParam->isInOut()) {
           Out << "mutating function does not have inout 'self'\n";
           abort();
         }
       } else {
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (selfParam && selfParam->getInterfaceType()->is<InOutType>()) {
+        if (selfParam && selfParam->isInOut()) {
           Out << "non-mutating function has inout 'self'\n";
           abort();
         }
@@ -2925,7 +2924,7 @@ public:
           abort();
         }
 
-        auto resultTy = FD->getResultInterfaceType()->getWithoutSpecifierType();
+        auto resultTy = FD->getResultInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2967,19 +2966,19 @@ public:
       }
 
       switch (FD->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();
         }
         break;
 
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
           Out << "addressor does not have an addressor kind\n";
           abort();

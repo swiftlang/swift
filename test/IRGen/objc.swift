@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -89,6 +89,10 @@ func test0(_ arg: id) -> id {
 func test1(_ cell: Blammo) {}
 // CHECK:  define hidden swiftcc void @"$S4objc5test1{{[_0-9a-zA-Z]*}}F"([[BLAMMO]]*) {{.*}} {
 // CHECK-NEXT:    entry
+// CHECK-NEXT:    alloca
+// CHECK-NEXT:    bitcast
+// CHECK-NEXT:    store
+// CHECK-NEXT:    store
 // CHECK-NEXT:    ret void
 
 

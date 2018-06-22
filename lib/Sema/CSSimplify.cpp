@@ -102,8 +102,8 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   }
   
   auto params = levelTy->getParams();
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, decl, parameterDepth, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, decl, parameterDepth);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
@@ -126,7 +126,7 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallVectorImpl<bool> &defaultMap,
+                   const llvm::SmallBitVector &defaultMap,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
@@ -441,7 +441,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (defaultMap[paramIdx])
+      if (defaultMap.test(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -701,8 +701,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   SmallVector<AnyFunctionType::Param, 4> params;
   AnyFunctionType::decomposeInput(paramType, params);
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(params, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(params, callee, calleeLevel);
   
   if (callee && cs.getASTContext().isSwiftVersion3()
       && argType->is<TupleType>()) {
@@ -1032,8 +1032,8 @@ ConstraintSystem::matchFunctionParamTypes(ArrayRef<AnyFunctionType::Param> type1
     return matchTypes(argType, paramType, kind, flags, locator);
   }
   
-  SmallVector<bool, 4> defaultMap;
-  computeDefaultMap(type1, callee, calleeLevel, defaultMap);
+  llvm::SmallBitVector defaultMap =
+    computeDefaultMap(type1, callee, calleeLevel);
   
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
@@ -3123,9 +3123,18 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // Look for members within the base.
   LookupResult &lookup = lookupMember(instanceTy, memberName);
 
+  // If this is true, we're using type construction syntax (Foo()) rather
+  // than an explicit call to `init` (Foo.init()).
+  bool isImplicitInit = false;
   TypeBase *favoredType = nullptr;
   if (memberName.isSimpleName(DeclBaseName::createConstructor())) {
-    if (auto anchor = memberLocator->getAnchor()) {
+    SmallVector<LocatorPathElt, 2> parts;
+    if (auto *anchor = memberLocator->getAnchor()) {
+      auto path = memberLocator->getPath();
+      if (!path.empty())
+        if (path.back().getKind() == ConstraintLocator::ConstructorMember)
+          isImplicitInit = true;
+
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
         auto argExpr = applyExpr->getArg();
         favoredType = getFavoredType(argExpr);
@@ -3339,6 +3348,20 @@ retry_after_fail:
     addChoice(getOverloadChoice(result.getValueDecl(),
                                 /*isBridged=*/false,
                                 /*isUnwrappedOptional=*/false));
+
+  // Backward compatibility hack. In Swift 4, `init` and init were
+  // the same name, so you could write "foo.init" to look up a
+  // method or property named `init`.
+  if (!TC.Context.isSwiftVersionAtLeast(5) &&
+      memberName.getBaseName() == DeclBaseName::createConstructor() &&
+      !isImplicitInit) {
+    auto &compatLookup = lookupMember(instanceTy,
+                                      TC.Context.getIdentifier("init"));
+    for (auto result : compatLookup)
+      addChoice(getOverloadChoice(result.getValueDecl(),
+                                  /*isBridged=*/false,
+                                  /*isUnwrappedOptional=*/false));
+  }
 
   // If the instance type is a bridged to an Objective-C type, perform
   // a lookup into that Objective-C type.
@@ -4956,10 +4979,49 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
 }
 
 void
+ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator) {
+  // If this is a subscript with a KeyPath expression, add a constraint that
+  // connects the subscript's root type to the root type of the KeyPath.
+  SmallVector<LocatorPathElt, 4> path;
+  Expr *anchor = locator.getLocatorParts(path);
+  
+  auto subscript = dyn_cast_or_null<SubscriptExpr>(anchor);
+  if (!subscript)
+    return;
+  
+  assert(path.size() == 1 && path[0].getKind() == ConstraintLocator::SubscriptMember);
+  auto indexTuple = dyn_cast<TupleExpr>(subscript->getIndex());
+  if (!indexTuple || indexTuple->getNumElements() != 1)
+    return;
+  
+  auto keyPathExpr = dyn_cast<KeyPathExpr>(indexTuple->getElement(0));
+  if (!keyPathExpr)
+    return;
+  
+  auto typeVar = getType(keyPathExpr)->getAs<TypeVariableType>();
+  if (!typeVar)
+    return;
+  
+  SmallVector<Constraint *, 4> constraints;
+  CG.gatherConstraints(typeVar, constraints,
+                       ConstraintGraph::GatheringKind::EquivalenceClass);
+  
+  for (auto constraint : constraints) {
+    if (constraint->getKind() == ConstraintKind::KeyPath &&
+        constraint->getLocator()->getAnchor() == keyPathExpr) {
+      auto keyPathRootTy = constraint->getSecondType();
+      addConstraint(ConstraintKind::Subtype, root->getWithoutSpecifierType(), keyPathRootTy, locator);
+    }
+  }
+}
+
+void
 ConstraintSystem::addKeyPathApplicationConstraint(Type keypath,
                                               Type root, Type value,
                                               ConstraintLocatorBuilder locator,
                                               bool isFavored) {
+  addKeyPathApplicationRootConstraint(root, locator);
+  
   switch (simplifyKeyPathApplicationConstraint(keypath, root, value,
                                                TMF_GenerateConstraints,
                                                locator)) {

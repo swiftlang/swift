@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_objc.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_objc.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop -swift-version 3
 // RUN: llvm-bcanalyzer %t/def_objc.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -module-name objc -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -module-name objc -emit-silgen -I %t %s -o - -swift-version 3 | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

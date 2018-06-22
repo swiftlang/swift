@@ -39,8 +39,8 @@ enum TrailingSemi {
   case A,B;
 
   // CHECK-LABEL: (subscript_decl{{.*}}trailing_semi
-  // CHECK-NOT:   (func_decl{{.*}}trailing_semi 'anonname={{.*}}' getter_for=subscript(_:)
-  // CHECK:       (accessor_decl{{.*}}'anonname={{.*}}' getter_for=subscript(_:)
+  // CHECK-NOT:   (func_decl{{.*}}trailing_semi 'anonname={{.*}}' get_for=subscript(_:)
+  // CHECK:       (accessor_decl{{.*}}'anonname={{.*}}' get_for=subscript(_:)
   subscript(x: Int) -> Int {
     // CHECK-LABEL: (pattern_binding_decl{{.*}}trailing_semi
     // CHECK-NOT:   (var_decl{{.*}}trailing_semi "y"
@@ -61,3 +61,16 @@ func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
 // CHECK-AST:         (declref_expr type='(Int) -> ()' location={{.*}} range={{.*}} decl=main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> (substitution T -> Int))] function_ref=unapplied))
 let _: (Int) -> () = generic
+
+// Closures should be marked as escaping or not.
+func escaping(_: @escaping (Int) -> Int) {}
+escaping({ $0 })
+// CHECK-AST:        (declref_expr type='(@escaping (Int) -> Int) -> ()'
+// CHECK-AST-NEXT:        (paren_expr
+// CHECK-AST-NEXT:          (closure_expr type='(Int) -> Int' {{.*}} discriminator=0 escaping single-expression
+
+func nonescaping(_: (Int) -> Int) {}
+nonescaping({ $0 })
+// CHECK-AST:        (declref_expr type='((Int) -> Int) -> ()'
+// CHECK-AST-NEXT:        (paren_expr
+// CHECK-AST-NEXT:          (closure_expr type='(Int) -> Int' {{.*}} discriminator=1 single-expression

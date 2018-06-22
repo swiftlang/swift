@@ -47,7 +47,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
   
   /// The hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   final public var hashValue: Int {
     return _hashValue(for: self)
   }
@@ -57,7 +57,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @_effects(releasenone)
   final public func hash(into hasher: inout Hasher) {
     return withBuffer {
       var buffer = $0
@@ -209,6 +209,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   // MARK: Implementation
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Kind = KeyPathKind
   @inlinable // FIXME(sil-serialize-all)
   internal class var kind: Kind { return .readOnly }
@@ -466,7 +467,7 @@ internal struct ComputedPropertyID: Hashable {
       && x.isTableOffset == x.isTableOffset
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   internal func hash(into hasher: inout Hasher) {
     hasher.combine(value)
     hasher.combine(isStoredProperty)
@@ -593,8 +594,8 @@ internal enum KeyPathComponent: Hashable {
       return false
     }
   }
-  
-  @inlinable // FIXME(sil-serialize-all)
+
+  @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
     var hasher = hasher
     func appendHashFromArgument(
@@ -650,6 +651,7 @@ internal final class ClassHolder<ProjectionType> {
 
   /// The type of the scratch record passed to the runtime to record
   /// accesses to guarantee exlcusive access.
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias AccessRecord = Builtin.UnsafeValueBuffer
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1036,8 +1038,10 @@ internal struct RawKeyPathComponent {
       as: UnsafeRawPointer.self)
   }
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias ComputedArgumentLayoutFn = @convention(thin)
     (_ patternArguments: UnsafeRawPointer) -> (size: Int, alignmentMask: Int)
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias ComputedArgumentInitializerFn = @convention(thin)
     (_ patternArguments: UnsafeRawPointer,
      _ instanceArguments: UnsafeMutableRawPointer) -> ()
@@ -2181,6 +2185,7 @@ internal func _getKeyPath_instantiateInline(
     unsafeBitCast(keyPathClass, to: OpaquePointer.self))
 }
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal typealias MetadataAccessor =
   @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
 

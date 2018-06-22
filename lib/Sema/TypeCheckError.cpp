@@ -875,6 +875,14 @@ private:
     llvm_unreachable("invalid classify result");
   }
 
+  static Context getContextForPatternBinding(PatternBindingDecl *pbd) {
+    if (!pbd->isStatic() && pbd->getDeclContext()->isTypeContext()) {
+      return Context(Kind::IVarInitializer);
+    } else {
+      return Context(Kind::GlobalVarInitializer);
+    }
+  }
+
   Kind TheKind;
   bool DiagnoseErrorOnTry = false;
   DeclContext *RethrowsDC = nullptr;
@@ -897,6 +905,23 @@ public:
       result.RethrowsDC = D;
       return result;
     }
+
+    // HACK: If the decl is the synthesized getter for a 'lazy' property, then
+    // treat the context as a property initializer in order to produce a better
+    // diagnostic; the only code we should be diagnosing on is within the
+    // initializer expression that has been transplanted from the var's pattern
+    // binding decl. We don't perform the analysis on the initializer while it's
+    // still a part of that PBD, as it doesn't get a solution applied there.
+    if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+      if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+        if (accessor->isGetter() && var->getAttrs().hasAttribute<LazyAttr>()) {
+          auto *pbd = var->getParentPatternBinding();
+          assert(pbd && "lazy var didn't have a pattern binding decl");
+          return getContextForPatternBinding(pbd);
+        }
+      }
+    }
+
     return Context(getKindForFunctionBody(
         D->getInterfaceType(), D->getNumParameterLists()));
   }
@@ -906,14 +931,10 @@ public:
       return Context(Kind::DefaultArgument);
     }
 
-    auto binding = cast<PatternBindingInitializer>(init)->getBinding();
+    auto *binding = cast<PatternBindingInitializer>(init)->getBinding();
     assert(!binding->getDeclContext()->isLocalContext() &&
            "setting up error context for local pattern binding?");
-    if (!binding->isStatic() && binding->getDeclContext()->isTypeContext()) {
-      return Context(Kind::IVarInitializer);
-    } else {
-      return Context(Kind::GlobalVarInitializer);
-    }
+    return getContextForPatternBinding(binding);
   }
 
   static Context forEnumElementInitializer(EnumElementDecl *elt) {
@@ -1411,7 +1432,8 @@ private:
 
     // HACK: functions can get queued multiple times in
     // definedFunctions, so be sure to be idempotent.
-    if (!E->isThrowsSet()) {
+    if (!E->isThrowsSet() &&
+        classification.getResult() != ThrowingKind::Invalid) {
       E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
                    classification.getResult() == ThrowingKind::Throws);
     }
@@ -1485,6 +1507,9 @@ private:
       Flags.set(ContextFlags::HasAnyThrowSite);
       if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
 
+      // We set the throwing bit of an apply expr after performing this
+      // analysis, so ensure we don't emit duplicate diagnostics for functions
+      // that have been queued multiple times.
       if (auto expr = E.dyn_cast<Expr*>())
         if (auto apply = dyn_cast<ApplyExpr>(expr))
           if (apply->isThrowsSet())

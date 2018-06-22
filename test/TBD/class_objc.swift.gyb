@@ -5,6 +5,12 @@
 
 // RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module
 
+// With -enable-testing:
+
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing
+
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -import-objc-header %S/Inputs/objc_class_header.h -validate-tbd-against-ir=all %t/main.swift -disable-objc-attr-requires-foundation-module -enable-testing
+
 // REQUIRES: objc_interop
 
 import Foundation

@@ -72,6 +72,9 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   if (!Linker.empty())
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 
+  if (context.OI.DebugInfoFormat == IRGenDebugInfoFormat::CodeView)
+      Arguments.push_back("-Wl,/DEBUG");
+
   // Configure the toolchain.
   // By default, use the system clang++ to link.
   const char *Clang = nullptr;
@@ -168,5 +171,8 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
-  return {Clang, Arguments};
+  InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
 }

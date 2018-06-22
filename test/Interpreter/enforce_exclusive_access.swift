@@ -325,8 +325,6 @@ ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathWriteClassStoredProp")
   }
 }
 
-// This does not currently trap because the standard library is compiled in Swift 3 mode,
-// which logs.
 ExclusiveAccessTestSuite.test("KeyPathInoutKeyPathReadClassStoredProp")
   .skip(.custom(
     { _isFastAssertConfiguration() },

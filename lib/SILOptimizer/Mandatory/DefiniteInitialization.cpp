@@ -999,7 +999,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     Type selfTy;
     SILLocation fnLoc = TheMemory.getFunction().getLocation();
     if (auto *ctor = fnLoc.getAsASTNode<ConstructorDecl>())
-      selfTy = ctor->getImplicitSelfDecl()->getType()->getInOutObjectType();
+      selfTy = ctor->getImplicitSelfDecl()->getType();
     else
       selfTy = TheMemory.getType();
 
@@ -2175,9 +2175,6 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       updateControlVariable(Loc, Bitmask, ControlVariableAddr, OrFn, SB);
       continue;
     }
-
-    assert(!TheMemory.isDelegatingInit() &&
-           "re-assignment of self in delegating init?");
 
     // If this ambiguous store is only of trivial types, then we don't need to
     // do anything special.  We don't even need keep the init bit for the

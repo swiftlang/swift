@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen
+// RUN: %target-swift-frontend %s -emit-silgen -swift-version 3
 
 // rdar://problem/19792730
 

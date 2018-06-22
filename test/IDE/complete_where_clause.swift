@@ -4,6 +4,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP4 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP5 | %FileCheck %s -check-prefix=TYPE1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GP6 | %FileCheck %s -check-prefix=A1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_1 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_ASSOC_NODUP_2 | %FileCheck %s -check-prefix=GEN_T_ASSOC_E
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_1 | %FileCheck %s -check-prefix=GEN_T
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2 | %FileCheck %s -check-prefix=GEN_T_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_2_ASSOC | %FileCheck %s -check-prefix=GEN_T_ASSOC_DOT
@@ -63,6 +65,22 @@ extension A1 where T1.#^GP6^# {}
 // TYPE1-NOT: T4
 // TYPE1-NOT: T5
 
+protocol A {associatedtype E}
+protocol B {associatedtype E}
+
+protocol C {associatedtype E}
+protocol D: C {associatedtype E}
+
+func ab<T: A & B>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_1^#
+
+func ab<T: D>(_ arg: T) where T.#^FUNC_ASSOC_NODUP_2^#
+
+// GEN_T_ASSOC_E: Begin completions, 2 items
+// GEN_T_ASSOC_E-NEXT: Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-NOT:  Decl[AssociatedType]/Super: E; name=E
+// GEN_T_ASSOC_E-NEXT: Keyword/None:               Type[#T.Type#];
+// GEN_T_ASSOC_E: End completions
+
 protocol Assoc {
   associatedtype Q
 }
@@ -72,13 +90,13 @@ func f1<T>(_: T) where #^FUNC_1^# {}
 func f2<T>(_: T) where T.#^FUNC_2^# {}
 // GEN_T_DOT: Begin completions
 // GEN_T_DOT-DAG: Keyword/None:                       Type[#T.Type#];
-// GEN_T_DOT-DAG: Keyword/CurrNominal:                self[#T#];
+// GEN_T_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_DOT: End completions
 func f2b<T: Assoc>(_: T) where T.#^FUNC_2_ASSOC^# {}
 // GEN_T_ASSOC_DOT: Begin completions
 // GEN_T_ASSOC_DOT-DAG: Decl[AssociatedType]/Super:         Q;
 // GEN_T_ASSOC_DOT-DAG: Keyword/None:                       Type[#T.Type#];
-// GEN_T_ASSOC_DOT-DAG: Keyword/CurrNominal:                self[#T#];
+// GEN_T_ASSOC_DOT-NOT: Keyword/CurrNominal:                self[#T#];
 // GEN_T_ASSOC_DOT: End completions
 func f3<T>(_: T) where T == #^FUNC_3^# {}
 func f3<T>(_: T) where T == T.#^FUNC_4^# {}
@@ -117,5 +135,4 @@ protocol P2 {
 // U_DOT: Begin completions
 // FIXME: Should complete Q from Assoc.
 // U_DOT-DAG: Keyword/None:                       Type[#Self.U.Type#];
-// U_DOT-DAG: Keyword/CurrNominal:                self[#Self.U#];
 // U_DOT: End completions

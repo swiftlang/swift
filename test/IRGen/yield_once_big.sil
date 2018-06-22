@@ -41,6 +41,7 @@ entry:
   // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], i8* %0, i8* bitcast (void (i8*, i1)* @"$S14yield_once_big9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i32)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
   // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], i8* %0, i8* bitcast (void (i8*, i1)* @"$S14yield_once_big9SomeClassCRbzlIet_TC" to i8*), i8* bitcast (i8* (i64)* @malloc to i8*), i8* bitcast (void (i8*)* @free to i8*))
   // CHECK-NEXT:    [[BEGIN:%.*]] = call i8* @llvm.coro.begin(token [[ID]], i8* null)
+  // CHECK-NEXT:    store %swift.type*
 
   //   Create the return temporary.  We could give this a tighter bound.
   // CHECK-NEXT:    [[T0:%.*]] = bitcast [[BIG]]* [[TEMP]] to i8*

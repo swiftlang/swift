@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name generic_closures  -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name generic_closures  -parse-stdlib -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
 
 import Swift
 

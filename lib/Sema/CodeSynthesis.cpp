@@ -22,6 +22,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -160,7 +161,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   auto getter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ loc,
-      AccessorKind::IsGetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Get, AddressorKind::NotAddressor, storage,
       staticLoc, StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr,
@@ -211,7 +212,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   Type setterRetTy = TupleType::getEmpty(TC.Context);
   auto setter = AccessorDecl::create(
       TC.Context, loc, /*AccessorKeywordLoc*/ SourceLoc(),
-      AccessorKind::IsSetter, AddressorKind::NotAddressor, storage,
+      AccessorKind::Set, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       /*GenericParams=*/nullptr, params, TypeLoc::withoutLoc(setterRetTy),
@@ -328,7 +329,7 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 
   auto *materializeForSet = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc=*/SourceLoc(),
-      AccessorKind::IsMaterializeForSet, AddressorKind::NotAddressor, storage,
+      AccessorKind::MaterializeForSet, AddressorKind::NotAddressor, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       (genericParams
@@ -396,8 +397,9 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
 static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Get = createGetterPrototype(VD, TC);
   
-  // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(SourceLoc(), Get, nullptr, nullptr, SourceLoc());
+  // Okay, we have the getter; make the VD computed.
+  VD->setAccessors(AbstractStorageDecl::Computed,
+                   SourceLoc(), {Get}, SourceLoc());
   
   // We've added some members to our containing class, add them to the members
   // list.
@@ -453,11 +455,11 @@ static Expr *buildSubscriptIndexReference(ASTContext &ctx,
   auto accessorKind = accessor->getAccessorKind();
 
   // Ignore the value/buffer parameter.
-  if (accessorKind != AccessorKind::IsGetter)
+  if (accessorKind != AccessorKind::Get)
     params = params.slice(1);
 
   // Ignore the materializeForSet callback storage parameter.
-  if (accessorKind == AccessorKind::IsMaterializeForSet)
+  if (accessorKind == AccessorKind::MaterializeForSet)
     params = params.slice(1);
   
   // Okay, everything else should be forwarded, build the expression.
@@ -657,7 +659,7 @@ static Expr *synthesizeCopyWithZoneCall(Expr *Val, VarDecl *VD,
   Expr *Call = CallExpr::createImplicit(Ctx, UDE, { Nil }, { Ctx.Id_with });
 
   TypeLoc ResultTy;
-  ResultTy.setType(VD->getType(), true);
+  ResultTy.setType(VD->getType());
 
   // If we're working with non-optional types, we're forcing the cast.
   if (!isOptional) {
@@ -817,7 +819,7 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
                                            TypeChecker &TC) {
   auto setter = storage->getSetter();
   assert(setter);
-  assert(!storage->getSetter()->getBody());
+  if (setter->getBody()) return;
   assert(storage->getStorageKind() ==
            AbstractStorageDecl::ComputedWithMutableAddress);
 
@@ -855,7 +857,7 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   auto *Set = createSetterPrototype(VD, SetValueDecl, TC);
 
   // Okay, we have both the getter and setter.  Set them in VD.
-  VD->makeComputed(SourceLoc(), Get, Set, nullptr, SourceLoc());
+  VD->setAccessors(VarDecl::Computed, SourceLoc(), {Get, Set}, SourceLoc());
 
   // We've added some members to our containing class/extension, add them to
   // the members list.
@@ -898,22 +900,26 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
 /// (trivial) getter and the setter, which calls these.
 void swift::synthesizeObservingAccessors(VarDecl *VD, TypeChecker &TC) {
   assert(VD->hasObservers());
-  assert(VD->getGetter() && VD->getSetter() &&
-         !VD->getGetter()->hasBody() && !VD->getSetter()->hasBody() &&
-         "willSet/didSet var already has a getter or setter");
+  assert(VD->getGetter() && VD->getSetter());
   
   auto &Ctx = VD->getASTContext();
   SourceLoc Loc = VD->getLoc();
+
+  // We have to be paranoid about the accessors already having bodies
+  // because there might be an (invalid) existing definition.
   
   // The getter is always trivial: just perform a (direct!) load of storage, or
   // a call of a superclass getter if this is an override.
   auto *Get = VD->getGetter();
-  synthesizeTrivialGetter(Get, VD, TC);
-  maybeMarkTransparent(Get, VD, TC);
+  if (!Get->hasBody()) {
+    synthesizeTrivialGetter(Get, VD, TC);
+    maybeMarkTransparent(Get, VD, TC);
+  }
 
   // Okay, the getter is done, create the setter now.  Start by finding the
   // decls for 'self' and 'value'.
   auto *Set = VD->getSetter();
+  if (Set->hasBody()) return;
   auto *SelfDecl = Set->getImplicitSelfDecl();
   VarDecl *ValueDecl = Set->getParameterLists().back()->get(0);
 
@@ -1690,8 +1696,11 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
         setter->setSelfAccessKind(SelfAccessKind::NonMutating);
         setter->setAccess(var->getFormalAccess());
       }
-      
-      var->makeComputed(SourceLoc(), getter, setter, nullptr, SourceLoc());
+
+      SmallVector<AccessorDecl*, 2> accessors;
+      accessors.push_back(getter);
+      if (setter) accessors.push_back(setter);
+      var->setAccessors(VarDecl::Computed, SourceLoc(), accessors, SourceLoc());
       
       // Save the conformance and 'value' decl for later type checking.
       behavior->Conformance = conformance;
@@ -1796,12 +1805,17 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     auto *setter = createSetterPrototype(var, newValueParam, TC);
 
     AccessorDecl *materializeForSet = nullptr;
-    if (dc->getAsNominalTypeOrNominalTypeExtensionContext())
+    if (dc->getAsNominalTypeOrNominalTypeExtensionContext()) {
       materializeForSet = createMaterializeForSetPrototype(var,
                                                            getter, setter,
                                                            TC);
+    }
 
-    var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
+    SmallVector<AccessorDecl *, 3> accessors;
+    accessors.push_back(getter);
+    accessors.push_back(setter);
+    if (materializeForSet) accessors.push_back(materializeForSet);
+    var->setAccessors(VarDecl::Computed, SourceLoc(), accessors, SourceLoc());
 
     addMemberToContextIfNeeded(getter, dc, var);
     addMemberToContextIfNeeded(setter, dc, getter);
@@ -1881,12 +1895,21 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
   if (ICK == ImplicitConstructorKind::Memberwise) {
     assert(isa<StructDecl>(decl) && "Only struct have memberwise constructor");
 
-    // Computed and static properties are not initialized.
-    for (auto var : decl->getStoredProperties()) {
-      if (var->isImplicit())
+    for (auto member : decl->getMembers()) {
+      auto var = dyn_cast<VarDecl>(member);
+      if (!var)
+        continue;
+      
+      // Implicit, computed, and static properties are not initialized.
+      // The exception is lazy properties, which due to batch mode we may or
+      // may not have yet finalized, so they may currently be "stored" or
+      // "computed" in the current AST state.
+      if (var->isImplicit() || var->isStatic())
         continue;
       tc.validateDecl(var);
-      
+      if (!var->hasStorage() && !var->getAttrs().hasAttribute<LazyAttr>())
+        continue;
+
       // Initialized 'let' properties have storage, but don't get an argument
       // to the memberwise initializer since they already have an initial
       // value that cannot be overridden.
@@ -1989,6 +2012,104 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setStubImplementation(true);
 }
 
+static std::tuple<GenericSignature *, GenericEnvironment *,
+                  GenericParamList *, SubstitutionMap>
+configureGenericDesignatedInitOverride(ASTContext &ctx,
+                                       ClassDecl *classDecl,
+                                       Type superclassTy,
+                                       ConstructorDecl *superclassCtor) {
+  auto *superclassDecl = superclassTy->getAnyNominal();
+
+  auto *moduleDecl = classDecl->getParentModule();
+  auto subMap = superclassTy->getContextSubstitutionMap(
+      moduleDecl, superclassDecl);
+
+  GenericSignature *genericSig;
+  GenericEnvironment *genericEnv;
+
+  // Inheriting initializers that have their own generic parameters
+  auto *genericParams = superclassCtor->getGenericParams();
+  if (genericParams) {
+    SmallVector<GenericTypeParamDecl *, 4> newParams;
+
+    // First, clone the superclass constructor's generic parameter list,
+    // but change the depth of the generic parameters to be one greater
+    // than the depth of the subclass.
+    unsigned depth = 0;
+    if (auto *genericSig = classDecl->getGenericSignature())
+      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+
+    for (auto *param : genericParams->getParams()) {
+      auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
+                                                      param->getName(),
+                                                      SourceLoc(),
+                                                      depth,
+                                                      param->getIndex());
+      newParams.push_back(newParam);
+    }
+
+    // Substitution map that maps the generic parameters of the superclass
+    // to the generic parameters of the derived class, and the generic
+    // parameters of the superclass initializer to the generic parameters
+    // of the derived class initializer.
+    auto *superclassSig = superclassCtor->getGenericSignature();
+    if (superclassSig) {
+      unsigned superclassDepth = 0;
+      if (auto *genericSig = superclassDecl->getGenericSignature())
+        superclassDepth = genericSig->getGenericParams().back()->getDepth() + 1;
+
+      subMap = SubstitutionMap::get(
+        superclassSig,
+        [&](SubstitutableType *type) -> Type {
+          auto *gp = cast<GenericTypeParamType>(type);
+          if (gp->getDepth() < superclassDepth)
+            return Type(gp).subst(subMap);
+          return CanGenericTypeParamType::get(
+              gp->getDepth() - superclassDepth + depth,
+              gp->getIndex(),
+              ctx);
+        },
+        [&](CanType depTy, Type substTy, ProtocolDecl *proto)
+            -> Optional<ProtocolConformanceRef> {
+          if (auto conf = subMap.lookupConformance(depTy, proto))
+            return conf;
+
+          return ProtocolConformanceRef(proto);
+        });
+    }
+
+    // We don't have to clone the requirements, because they're not
+    // used for anything.
+    genericParams = GenericParamList::create(ctx,
+                                             SourceLoc(),
+                                             newParams,
+                                             SourceLoc(),
+                                             ArrayRef<RequirementRepr>(),
+                                             SourceLoc());
+    genericParams->setOuterParameters(classDecl->getGenericParamsOfContext());
+
+    GenericSignatureBuilder builder(ctx);
+    builder.addGenericSignature(classDecl->getGenericSignature());
+
+    for (auto *newParam : newParams)
+      builder.addGenericParameter(newParam);
+
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+    for (auto reqt : superclassSig->getRequirements())
+      if (auto substReqt = reqt.subst(subMap))
+        builder.addRequirement(*substReqt, source, nullptr);
+
+    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    genericEnv = genericSig->createGenericEnvironment();
+  } else {
+    genericEnv = classDecl->getGenericEnvironment();
+    genericSig = classDecl->getGenericSignature();
+  }
+
+  return std::make_tuple(genericSig, genericEnv, genericParams, subMap);
+}
+
 static void configureDesignatedInitAttributes(TypeChecker &tc,
                                               ClassDecl *classDecl,
                                               ConstructorDecl *ctor,
@@ -2030,9 +2151,12 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     ctor->getAttrs().add(clonedAttr);
   }
 
-  // Make sure the constructor is only as available as its superclass's
-  // constructor.
-  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor, ctx);
+  // If the superclass has its own availability, make sure the synthesized
+  // constructor is only as available as its superclass's constructor.
+  if (superclassCtor->getAttrs().hasAttribute<AvailableAttr>()) {
+    AvailabilityInference::applyInferredAvailableAttrs(
+        ctor, {classDecl, superclassCtor}, ctx);
+  }
 
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
@@ -2063,9 +2187,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
                                     ConstructorDecl *superclassCtor,
                                     DesignatedInitKind kind) {
-  // FIXME: Inheriting initializers that have their own generic parameters
-  if (superclassCtor->getGenericParams())
-    return nullptr;
+  auto &ctx = tc.Context;
 
   // Lookup will sometimes give us initializers that are from the ancestors of
   // our immediate superclass.  So, from the superclass constructor, we look
@@ -2079,14 +2201,23 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
       superclassCtor->getDeclContext()
           ->getAsNominalTypeOrNominalTypeExtensionContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }
 
+  GenericSignature *genericSig;
+  GenericEnvironment *genericEnv;
+  GenericParamList *genericParams;
+  SubstitutionMap subMap;
+
+  std::tie(genericSig, genericEnv, genericParams, subMap) =
+      configureGenericDesignatedInitOverride(ctx,
+                                             classDecl,
+                                             superclassTy,
+                                             superclassCtor);
+
   // Determine the initializer parameters.
-  auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
@@ -2094,39 +2225,18 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
+  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->getGenericSignatureOfContext()) {
-    auto *moduleDecl = classDecl->getParentModule();
-    auto subMap = superclassTyInContext->getContextSubstitutionMap(
-        moduleDecl,
-        superclassDecl,
-        classDecl->getGenericEnvironment());
-
-    for (auto *decl : *bodyParams) {
-      auto paramTy = decl->getInterfaceType()->getInOutObjectType();
-
-      // Apply the superclass substitutions to produce a contextual
-      // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subMap);
-      decl->setType(paramSubstTy);
-
-      // Map it to an interface type in terms of the derived class
-      // generic signature.
-      decl->setInterfaceType(paramSubstTy->mapTypeOutOfContext());
-    }
-  } else {
-    for (auto *decl : *bodyParams) {
-      if (!decl->hasType())
-        decl->setType(
-          classDecl->mapTypeIntoContext(
-            decl->getInterfaceType()->getInOutObjectType()));
-    }
+  for (auto *decl : *bodyParams) {
+    auto paramTy = decl->getInterfaceType();
+    auto substTy = paramTy.subst(subMap);
+    decl->setInterfaceType(substTy);
+    decl->setType(GenericEnvironment::mapTypeIntoContext(genericEnv, substTy));
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -2139,13 +2249,14 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               selfDecl, bodyParams,
-                              /*GenericParams=*/nullptr, classDecl);
+                              genericParams, classDecl);
 
   ctor->setImplicit();
 
   // Set the interface type of the initializer.
-  ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
-  tc.configureInterfaceType(ctor, ctor->getGenericSignature());
+  ctor->setGenericEnvironment(genericEnv);
+
+  tc.configureInterfaceType(ctor, genericSig);
   ctor->setValidationStarted();
 
   configureDesignatedInitAttributes(tc, classDecl,

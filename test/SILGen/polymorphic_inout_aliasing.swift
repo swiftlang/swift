@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify %s
+// RUN: %target-swift-emit-sil -verify %s -swift-version 3
 
 struct Block {}
 

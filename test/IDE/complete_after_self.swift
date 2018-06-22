@@ -29,6 +29,9 @@
 // RUN: %FileCheck %s -check-prefix=COMMON_SELF_NO_DOT_1 < %t.self.txt
 // RUN: %FileCheck %s -check-prefix=NO_INIT < %t.self.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STATIC_SELF_PAREN > %t.self.txt
+// RUN: %FileCheck %s -check-prefix=STATIC_SELF_PAREN < %t.self.txt
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=FUNC_SELF_DOT_1 > %t.self.txt
 // RUN: %FileCheck %s -check-prefix=FUNC_SELF_DOT_1 < %t.self.txt
 // RUN: %FileCheck %s -check-prefix=COMMON_SELF_DOT_1 < %t.self.txt
@@ -166,9 +169,8 @@ class ThisDerived1 : ThisBase1 {
 
   init() {
     self#^CONSTRUCTOR_SELF_NO_DOT_1^#
-// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 24 items
-// CONSTRUCTOR_SELF_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal: .init()[#ThisDerived1#];
-// CONSTRUCTOR_SELF_NO_DOT_1-DAG: Decl[Constructor]/CurrNominal: .init({#a: Int#})[#ThisDerived1#];
+// CONSTRUCTOR_SELF_NO_DOT_1: Begin completions, 21 items
+// CONSTRUCTOR_SELF_NO_DOT_1-NOT: Decl[Constructor]
 // CONSTRUCTOR_SELF_NO_DOT_1: End completions
     let d: ThisDerived1
     d#^CONSTRUCTOR_NONSELF_NO_DOT_1^#
@@ -177,9 +179,8 @@ class ThisDerived1 : ThisBase1 {
 
   init(a : Int) {
     self.#^CONSTRUCTOR_SELF_DOT_1^#
-// CONSTRUCTOR_SELF_DOT_1: Begin completions, 19 items
-// CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init()[#ThisDerived1#];
-// CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal: init({#a: Int#})[#ThisDerived1#];
+// CONSTRUCTOR_SELF_DOT_1: Begin completions, 16 items
+// CONSTRUCTOR_SELF_DOT_1-NOT: Decl[Constructor]
 
 // CONSTRUCTOR_SELF_DOT_1: End completions
     let d: ThisDerived1
@@ -214,8 +215,8 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        .derivedStaticVar[#Int#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .derivedStaticFunc0()[#Void#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ()[#ThisDerived1#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ({#a: Int#})[#ThisDerived1#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init()[#ThisDerived1#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init({#a: Int#})[#ThisDerived1#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test1({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .test2({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     .staticTest1()[#Void#]
@@ -226,7 +227,7 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Class]/CurrNominal:            .DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Enum]/CurrNominal:             .DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        .DerivedExtNestedTypealias[#Int#]
-// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      ({#someExtensionArg: Int#})[#ThisDerived1#]
+// FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      .init({#someExtensionArg: Int#})[#ThisDerived1#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc0({#self: ThisBase1#})[#() -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[InstanceMethod]/Super:         .baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
 // FUNC_STATIC_SELF_NO_DOT_1-NEXT: Decl[StaticVar]/Super:              .baseStaticVar[#Int#]
@@ -248,6 +249,8 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   derivedFunc0({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/CurrNominal:        derivedStaticVar[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     derivedStaticFunc0()[#Void#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init()[#ThisDerived1#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init({#a: Int#})[#ThisDerived1#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test1({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/CurrNominal:   test2({#self: ThisDerived1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticMethod]/CurrNominal:     staticTest1()[#Void#]
@@ -258,6 +261,7 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Class]/CurrNominal:            DerivedExtNestedClass[#ThisDerived1.DerivedExtNestedClass#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Enum]/CurrNominal:             DerivedExtNestedEnum[#ThisDerived1.DerivedExtNestedEnum#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[TypeAlias]/CurrNominal:        DerivedExtNestedTypealias[#Int#]
+// FUNC_STATIC_SELF_DOT_1-NEXT: Decl[Constructor]/CurrNominal:      init({#someExtensionArg: Int#})[#ThisDerived1#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc0({#self: ThisBase1#})[#() -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[InstanceMethod]/Super:         baseFunc1({#self: ThisBase1#})[#(Int) -> Void#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[StaticVar]/Super:              baseStaticVar[#Int#]
@@ -270,6 +274,11 @@ class ThisDerived1 : ThisBase1 {
 // FUNC_STATIC_SELF_DOT_1-NEXT: Decl[TypeAlias]/Super:              BaseExtNestedTypealias[#Int#]
 // FUNC_STATIC_SELF_DOT_1-NEXT: End completions
   }
+}
+
+class func staticTest3() {
+  self(#^STATIC_SELF_PAREN^#
+  // STATIC_SELF_PAREN-NOT: Decl[Constructor]
 }
 
 extension ThisDerived1 {
@@ -310,10 +319,9 @@ struct S1 {
   init() {}
   init(x: Int) {
     self.#^STRUCT_CONSTRUCTOR_SELF_DOT_1^#
-// STRUCT_CONSTRUCTOR_SELF_DOT_1: Begin completions, 4 items
+// STRUCT_CONSTRUCTOR_SELF_DOT_1: Begin completions, 2 items
 // STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Keyword[self]/CurrNominal:          self[#S1#]; name=self
-// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal:      init()[#S1#];
-// STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[Constructor]/CurrNominal:      init({#x: Int#})[#S1#];
+// STRUCT_CONSTRUCTOR_SELF_DOT_1-NOT: Decl[Constructor]
 // STRUCT_CONSTRUCTOR_SELF_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   f()[#Void#];
 // STRUCT_CONSTRUCTOR_SELF_DOT_1: End completions
     let s: S1

@@ -1094,7 +1094,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   }
 
   /// The key's hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return self.rawValue.hashValue
   }
@@ -1104,7 +1104,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(self.rawValue)
   }
@@ -1490,6 +1490,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 internal final class _KeyedEncodingContainerBox<
   Concrete : KeyedEncodingContainerProtocol
 > : _KeyedEncodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline
@@ -1663,6 +1664,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 internal final class _KeyedDecodingContainerBox<
   Concrete : KeyedDecodingContainerProtocol
 > : _KeyedDecodingContainerBase<Concrete.Key> {
+  @usableFromInline
   typealias Key = Concrete.Key
 
   @usableFromInline

@@ -1121,3 +1121,9 @@ struct DynamicTypeStruct {
     self.init()
   }
 }
+
+class InOutInitializer {
+// CHECK-LABEL: sil hidden @$S21failable_initializers16InOutInitializerC1xACSiz_tcfC : $@convention(method) (@inout Int, @thick InOutInitializer.Type) -> @owned InOutInitializer {
+// CHECK: bb0(%0 : @trivial $*Int, %1 : @trivial $@thick InOutInitializer.Type):
+  init(x: inout Int) {}
+}

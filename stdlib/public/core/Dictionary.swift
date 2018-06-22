@@ -294,7 +294,7 @@ import SwiftShims
 /// dictionary called `interestingNumbers` with string keys and values that
 /// are integer arrays, then sorts each array in-place in descending order.
 ///
-///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 15],
+///     var interestingNumbers = ["primes": [2, 3, 5, 7, 11, 13, 17],
 ///                               "triangular": [1, 3, 6, 10, 15, 21, 28],
 ///                               "hexagonal": [1, 6, 15, 28, 45, 66, 91]]
 ///     for key in interestingNumbers.keys {
@@ -302,7 +302,7 @@ import SwiftShims
 ///     }
 ///
 ///     print(interestingNumbers["primes"]!)
-///     // Prints "[15, 13, 11, 7, 5, 3, 2]"
+///     // Prints "[17, 13, 11, 7, 5, 3, 2]"
 ///
 /// Iterating Over the Contents of a Dictionary
 /// ===========================================
@@ -382,8 +382,11 @@ import SwiftShims
 @_fixed_layout
 public struct Dictionary<Key: Hashable, Value> {
 
+  @usableFromInline
   internal typealias _Self = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias _VariantBuffer = _VariantDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
 
   /// The element type of a dictionary: a tuple containing an individual
@@ -408,7 +411,7 @@ public struct Dictionary<Key: Hashable, Value> {
   ///
   /// - Parameter minimumCapacity: The minimum number of key-value pairs that
   ///   the newly created dictionary should be able to store without
-  //    reallocating its storage buffer.
+  ///   reallocating its storage buffer.
   @inlinable // FIXME(sil-serialize-all)
   public init(minimumCapacity: Int) {
     _variantBuffer = .native(_NativeBuffer(minimumCapacity: minimumCapacity))
@@ -798,15 +801,63 @@ extension Dictionary: ExpressibleByDictionaryLiteral {
   /// - Parameter elements: The key-value pairs that will make up the new
   ///   dictionary. Each key in `elements` must be unique.
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.init(_nativeBuffer: _NativeDictionaryBuffer.fromArray(elements))
   }
 }
 
 extension Dictionary {
-  /// Accesses the element with the given key, or the specified default value,
-  /// if the dictionary doesn't contain the given key.
+  /// Accesses the value with the given key. If the dictionary doesn't contain
+  /// the given key, accesses the provided default value as if the key and
+  /// default value existed in the dictionary.
+  ///
+  /// Use this subscript when you want either the value for a particular key
+  /// or, when that key is not present in the dictionary, a default value. This
+  /// example uses the subscript with a message to use in case an HTTP response
+  /// code isn't recognized:
+  ///
+  ///     var responseMessages = [200: "OK",
+  ///                             403: "Access forbidden",
+  ///                             404: "File not found",
+  ///                             500: "Internal server error"]
+  ///
+  ///     let httpResponseCodes = [200, 403, 301]
+  ///     for code in httpResponseCodes {
+  ///         let message = responseMessages[code, default: "Unknown response"]
+  ///         print("Response \(code): \(message)")
+  ///     }
+  ///     // Prints "Response 200: OK"
+  ///     // Prints "Response 403: Access Forbidden"
+  ///     // Prints "Response 301: Unknown response"
+  ///
+  /// When a dictionary's `Value` type has value semantics, you can use this
+  /// subscript to perform in-place operations on values in the dictionary.
+  /// The following example uses this subscript while counting the occurences
+  /// of each letter in a string:
+  ///
+  ///     let message = "Hello, Elle!"
+  ///     var letterCounts: [Character: Int] = [:]
+  ///     for letter in message {
+  ///         letterCounts[letter, defaultValue: 0] += 1
+  ///     }
+  ///     // letterCounts == ["H": 1, "e": 2, "l": 4, "o": 1, ...]
+  ///
+  /// When `letterCounts[letter, defaultValue: 0] += 1` is executed with a
+  /// value of `letter` that isn't already a key in `letterCounts`, the
+  /// specified default value (`0`) is returned from the subscript,
+  /// incremented, and then added to the dictionary under that key.
+  ///
+  /// - Note: Do not use this subscript to modify dictionary values if the
+  ///   dictionary's `Value` type is a class. In that case, the default value
+  ///   and key are not written back to the dictionary after an operation.
+  ///
+  /// - Parameters:
+  ///   - key: The key the look up in the dictionary.
+  ///   - defaultValue: The default value to use if `key` doesn't exist in the
+  ///     dictionary.
+  /// - Returns: The value associated with `key` in the dictionary`; otherwise,
+  ///   `defaultValue`.
   @inlinable // FIXME(sil-serialize-all)
   public subscript(
     key: Key, default defaultValue: @autoclosure () -> Value
@@ -1454,7 +1505,7 @@ extension Dictionary: Hashable where Value: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     var commutativeHash = 0
     for (k, v) in self {
@@ -1787,6 +1838,7 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 internal class _RawNativeDictionaryStorage
   : _SwiftNativeNSDictionary, _NSDictionaryCore
 {
+  @usableFromInline
   internal typealias RawStorage = _RawNativeDictionaryStorage
 
   @usableFromInline // FIXME(sil-serialize-all)
@@ -1960,7 +2012,9 @@ internal class _TypedNativeDictionaryStorage<Key, Value>
 final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
   : _TypedNativeDictionaryStorage<Key, Value> {
 
+  @usableFromInline
   internal typealias FullContainer = Dictionary<Key, Value>
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
 
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -2109,11 +2163,16 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 @_fixed_layout
 internal struct _NativeDictionaryBuffer<Key, Value> {
 
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias RawStorage = _RawNativeDictionaryStorage
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias TypedStorage = _TypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (Key, Value)
 
   /// See this comments on _RawNativeDictionaryStorage and its subclasses to
@@ -2358,8 +2417,10 @@ internal struct _NativeDictionaryBuffer<Key, Value> {
 
 extension _NativeDictionaryBuffer where Key: Hashable
 {
+  @usableFromInline
   internal typealias HashTypedStorage =
     _HashableTypedNativeDictionaryStorage<Key, Value>
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2609,7 +2670,9 @@ extension _NativeDictionaryBuffer where Key: Hashable
 final internal class _NativeDictionaryNSEnumerator<Key, Value>
   : _SwiftNativeNSEnumerator, _NSEnumerator {
 
+  @usableFromInline
   internal typealias Buffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias Index = _NativeDictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2691,9 +2754,13 @@ final internal class _NativeDictionaryNSEnumerator<Key, Value>
 final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   : _SwiftNativeNSDictionary, _NSDictionaryCore {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias BridgedBuffer = _NativeDictionaryBuffer<AnyObject, AnyObject>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
+  @usableFromInline
   internal typealias BridgedIndex = _NativeDictionaryIndex<AnyObject, AnyObject>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2990,11 +3057,16 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
     self.cocoaDictionary = cocoaDictionary
   }
 
+  @usableFromInline
   internal typealias Index = _CocoaDictionaryIndex
+  @usableFromInline
   internal typealias SequenceElement = (AnyObject, AnyObject)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (AnyObject, AnyObject)
 
+  @usableFromInline
   internal typealias Key = AnyObject
+  @usableFromInline
   internal typealias Value = AnyObject
 
   @inlinable // FIXME(sil-serialize-all)
@@ -3113,13 +3185,19 @@ internal struct _CocoaDictionaryBuffer: _HashBuffer {
 @_frozen
 internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
 
+  @usableFromInline
   internal typealias NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+  @usableFromInline
   internal typealias CocoaBuffer = _CocoaDictionaryBuffer
 #endif
+  @usableFromInline
   internal typealias SequenceElement = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SequenceElementWithoutLabels = (key: Key, value: Value)
+  @usableFromInline
   internal typealias SelfType = _VariantDictionaryBuffer
 
   case native(NativeBuffer)
@@ -3341,6 +3419,7 @@ internal enum _VariantDictionaryBuffer<Key: Hashable, Value>: _HashBuffer {
   // _HashBuffer conformance
   //
 
+  @usableFromInline
   internal typealias Index = DictionaryIndex<Key, Value>
 
   @inlinable // FIXME(sil-serialize-all)
@@ -4211,9 +4290,12 @@ extension _CocoaDictionaryIndex {
 @_frozen // FIXME(sil-serialize-all)
 @usableFromInline // FIXME(sil-serialize-all)
 internal enum DictionaryIndexRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   typealias _Index = DictionaryIndex<Key, Value>
+  @usableFromInline
   typealias _NativeIndex = _Index._NativeIndex
 #if _runtime(_ObjC)
+  @usableFromInline
   typealias _CocoaIndex = _Index._CocoaIndex
 #endif
 
@@ -4244,8 +4326,10 @@ extension Dictionary {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSDictionary in terms of Cocoa enumeration facilities.
 
+    @usableFromInline
     internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 #if _runtime(_ObjC)
+    @usableFromInline
     internal typealias _CocoaIndex = _CocoaDictionaryIndex
 #endif
 
@@ -4349,7 +4433,7 @@ extension Dictionary.Index {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
   #if _runtime(_ObjC)
     if _fastPath(_guaranteedNative) {
@@ -4375,6 +4459,7 @@ extension Dictionary.Index {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 final internal class _CocoaDictionaryIterator: IteratorProtocol {
+  @usableFromInline
   internal typealias Element = (AnyObject, AnyObject)
 
   // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -4461,9 +4546,11 @@ final internal class _CocoaDictionaryIterator: IteratorProtocol {
 @usableFromInline
 @_frozen // FIXME(sil-serialize-all)
 internal enum DictionaryIteratorRepresentation<Key: Hashable, Value> {
+  @usableFromInline
   internal typealias _Iterator = DictionaryIterator<Key, Value>
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _Iterator._NativeIndex
 
   // For native buffer, we keep two indices to keep track of the iteration
@@ -4492,8 +4579,9 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
   // Index, which is multi-pass, it is suitable for implementing a
   // IteratorProtocol, which is being consumed as iteration proceeds.
 
-  internal typealias _NativeBuffer =
-    _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
+  internal typealias _NativeBuffer = _NativeDictionaryBuffer<Key, Value>
+  @usableFromInline
   internal typealias _NativeIndex = _NativeDictionaryIndex<Key, Value>
 
   @usableFromInline

@@ -1204,7 +1204,8 @@ static bool reExportedToSameModule(const ModuleDecl *fromModule,
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
-                         bool inProtocolExt, bool isStatic,
+                         bool inProtocolExt, bool importedFromClang,
+                         bool isStatic,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -1226,6 +1227,12 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
       return true;
     if (value->isStatic() != isStatic)
       return true;
+    if (value->hasClangNode() != importedFromClang)
+      return true;
+
+    if (value->getAttrs().hasAttribute<ForbidSerializingReferenceAttr>())
+      return true;
+
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
     if (expectedModule && !value->hasClangNode() &&
@@ -1299,13 +1306,14 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool inProtocolExt = false;
+    bool importedFromClang = false;
     bool isStatic = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                          inProtocolExt);
+                                          inProtocolExt, importedFromClang);
     else
       XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                           isStatic);
+                                           importedFromClang, isStatic);
 
     DeclBaseName name = getDeclBaseName(IID);
     pathTrace.addValue(name);
@@ -1333,8 +1341,8 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   /*typeResolver=*/nullptr, values);
     }
-    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
-                 None, values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
+                 importedFromClang, isStatic, None, values);
     break;
   }
 
@@ -1388,13 +1396,14 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, None, None, None);
         result = getIdentifier(IID);
         break;
       }
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None);
+        XRefValuePathPieceLayout::readRecord(scratch, None, IID, None, None,
+                                             None);
         result = getIdentifier(IID);
         break;
       }
@@ -1446,9 +1455,10 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
         // members of the parent type.
         IdentifierID IID;
         IdentifierID privateDiscriminator;
-        bool onlyInNominal = false;
+        bool importedFromClang = false;
         XRefTypePathPieceLayout::readRecord(scratch, IID, privateDiscriminator,
-                                            onlyInNominal);
+                                            /*inProtocolExt*/None,
+                                            importedFromClang);
         if (privateDiscriminator)
           goto giveUpFastPath;
 
@@ -1460,29 +1470,23 @@ ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
             "-Xfrontend -disable-serialization-nested-type-lookup-table"};
 
         auto *baseType = cast<NominalTypeDecl>(values.front());
-        TypeDecl *nestedType = nullptr;
-        if (onlyInNominal) {
-          // Only look in the file containing the type itself.
-          const DeclContext *dc = values.front()->getDeclContext();
-          auto *containingFile =
-            dyn_cast<FileUnit>(dc->getModuleScopeContext());
-          if (containingFile) {
-            nestedType = containingFile->lookupNestedType(memberName, baseType);
-          }
-        } else {
-          // Fault in extensions, then ask every file in the module.
-          ModuleDecl *extensionModule = M;
-          if (!extensionModule)
-            extensionModule = baseType->getModuleContext();
+        ModuleDecl *extensionModule = M;
+        if (!extensionModule)
+          extensionModule = baseType->getModuleContext();
 
-          (void)baseType->getExtensions();
-          for (FileUnit *file : extensionModule->getFiles()) {
-            if (file == getFile())
-              continue;
-            nestedType = file->lookupNestedType(memberName, baseType);
-            if (nestedType)
-              break;
-          }
+        // FIXME: If 'importedFromClang' is true but 'extensionModule' is an
+        // overlay module, the search below will fail and we'll fall back to
+        // the slow path.
+
+        // Fault in extensions, then ask every file in the module.
+        (void)baseType->getExtensions();
+        TypeDecl *nestedType = nullptr;
+        for (FileUnit *file : extensionModule->getFiles()) {
+          if (file == getFile())
+            continue;
+          nestedType = file->lookupNestedType(memberName, baseType);
+          if (nestedType)
+            break;
         }
 
         if (nestedType) {
@@ -1505,12 +1509,13 @@ giveUpFastPath:
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool inProtocolExt = false;
+      bool importedFromClang = false;
       bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID, discriminatorID;
         XRefTypePathPieceLayout::readRecord(scratch, IID, discriminatorID,
-                                            inProtocolExt);
+                                            inProtocolExt, importedFromClang);
         memberName = getDeclBaseName(IID);
         privateDiscriminator = getIdentifier(discriminatorID);
         isType = true;
@@ -1520,7 +1525,7 @@ giveUpFastPath:
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
         XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
-                                             isStatic);
+                                             importedFromClang, isStatic);
         memberName = getDeclBaseName(IID);
         break;
       }
@@ -1528,7 +1533,7 @@ giveUpFastPath:
       case XREF_INITIALIZER_PATH_PIECE: {
         uint8_t kind;
         XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
-                                                   kind);
+                                                   importedFromClang, kind);
         memberName = DeclBaseName::createConstructor();
         ctorInit = getActualCtorInitializerKind(kind);
         break;
@@ -1581,8 +1586,8 @@ giveUpFastPath:
         auto members = nominal->lookupDirect(memberName);
         values.append(members.begin(), members.end());
       }
-      filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
-                   ctorInit, values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt,
+                   importedFromClang, isStatic, ctorInit, values);
       break;
     }
 
@@ -1603,24 +1608,26 @@ giveUpFastPath:
       uint8_t rawKind;
       XRefOperatorOrAccessorPathPieceLayout::readRecord(scratch, None,
                                                         rawKind);
+      if (values.empty())
+        break;
 
-      if (values.size() == 1) {
+      if (!values.front()->getBaseName().isOperator()) {
+        pathTrace.addAccessor(rawKind);
         if (auto storage = dyn_cast<AbstractStorageDecl>(values.front())) {
-          pathTrace.addAccessor(rawKind);
           switch (rawKind) {
-          case Getter:
+          case Get:
             values.front() = storage->getGetter();
             break;
-          case Setter:
+          case Set:
             values.front() = storage->getSetter();
             break;
           case MaterializeForSet:
             values.front() = storage->getMaterializeForSetFunc();
             break;
-          case Addressor:
+          case Address:
             values.front() = storage->getAddressor();
             break;
-          case MutableAddressor:
+          case MutableAddress:
             values.front() = storage->getMutableAddressor();
             break;
           case WillSet:
@@ -1631,9 +1638,8 @@ giveUpFastPath:
             error();
             return nullptr;
           }
-
-          break;
         }
+        break;
       }
 
       pathTrace.addOperatorFilter(rawKind);
@@ -1745,9 +1751,8 @@ giveUpFastPath:
 
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
-    return llvm::make_error<llvm::StringError>(
-        "result is ambiguous",
-        std::error_code(EINVAL, std::generic_category()));
+    return llvm::make_error<XRefError>("result is ambiguous", pathTrace,
+                                       getXRefDeclNameForError());
   }
 
   return values.front();
@@ -2057,17 +2062,10 @@ getActualOptionalTypeKind(uint8_t raw) {
 static Optional<swift::AccessorKind>
 getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
-#define CASE(RAWKIND, KIND) \
-  case serialization::AccessorKind::RAWKIND: return swift::AccessorKind::KIND;
-  CASE(Getter, IsGetter)
-  CASE(Setter, IsSetter)
-  CASE(WillSet, IsWillSet)
-  CASE(DidSet, IsDidSet)
-  CASE(MaterializeForSet, IsMaterializeForSet)
-  CASE(Addressor, IsAddressor)
-  CASE(MutableAddressor, IsMutableAddressor)
+#define ACCESSOR(ID) \
+  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
+#include "swift/AST/AccessorKinds.def"
   }
-#undef CASE
 
   return None;
 }
@@ -2132,101 +2130,46 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   return None;
 }
 
+static Optional<AbstractStorageDecl::StorageKindTy>
+getActualStorageKind(unsigned raw) {
+  switch (serialization::StorageKind(raw)) {
+#define CASE(KIND)                       \
+  case serialization::StorageKind::KIND: \
+    return AbstractStorageDecl::KIND;
+  CASE(Stored)
+  CASE(StoredWithTrivialAccessors)
+  CASE(StoredWithObservers)
+  CASE(InheritedWithObservers)
+  CASE(Computed)
+  CASE(ComputedWithMutableAddress)
+  CASE(Addressed)
+  CASE(AddressedWithTrivialAccessors)
+  CASE(AddressedWithObservers)
+#undef CASE
+  }
+  return None;
+}
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   unsigned rawStorageKind,
-                                  serialization::DeclID getter,
-                                  serialization::DeclID setter,
-                                  serialization::DeclID materializeForSet,
-                                  serialization::DeclID addressor,
-                                  serialization::DeclID mutableAddressor,
-                                  serialization::DeclID willSet,
-                                  serialization::DeclID didSet) {
+                                  AccessorRecord &rawIDs) {
+  auto storageKind = getActualStorageKind(rawStorageKind);
+  if (!storageKind) return;
+
+  SmallVector<AccessorDecl*, 8> accessors;
+  for (DeclID id : rawIDs.IDs) {
+    auto accessor = dyn_cast_or_null<AccessorDecl>(getDecl(id));
+    if (!accessor) return;
+    accessors.push_back(accessor);
+  }
+
+  if (*storageKind == AbstractStorageDecl::Stored && accessors.empty())
+    return;
+
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  auto makeAddressed = [&] {
-    decl->makeAddressed(beginLoc,
-                        cast_or_null<AccessorDecl>(getDecl(addressor)),
-                        cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                        endLoc);
-  };
-
-  auto addTrivialAccessors = [&] {
-    decl->addTrivialAccessors(
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)));
-  };
-
-  auto setObservingAccessors = [&] {
-    decl->setObservingAccessors(
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)));
-  };
-
-  switch ((StorageKind) rawStorageKind) {
-  case StorageKind::Stored:
-    return;
-
-  case StorageKind::StoredWithTrivialAccessors:
-    addTrivialAccessors();
-    return;
-
-  case StorageKind::StoredWithObservers:
-    decl->makeStoredWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::InheritedWithObservers:
-    decl->makeInheritedWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::Addressed:
-    makeAddressed();
-    return;
-
-  case StorageKind::AddressedWithTrivialAccessors:
-    makeAddressed();
-    addTrivialAccessors();
-    return;
-
-  case StorageKind::AddressedWithObservers:
-    decl->makeAddressedWithObservers(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(addressor)),
-                       cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                       cast_or_null<AccessorDecl>(getDecl(willSet)),
-                       cast_or_null<AccessorDecl>(getDecl(didSet)),
-                       endLoc);
-    setObservingAccessors();
-    return;
-
-  case StorageKind::Computed:
-    decl->makeComputed(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)),
-                       endLoc);
-    return;
-
-  case StorageKind::ComputedWithMutableAddress:
-    decl->makeComputedWithMutableAddress(beginLoc,
-                       cast_or_null<AccessorDecl>(getDecl(getter)),
-                       cast_or_null<AccessorDecl>(getDecl(setter)),
-                       cast_or_null<AccessorDecl>(getDecl(materializeForSet)),
-                       cast_or_null<AccessorDecl>(getDecl(mutableAddressor)),
-                       endLoc);
-    return;
-  }
-  llvm_unreachable("bad storage kind");
+  decl->setAccessors(*storageKind, beginLoc, accessors, endLoc);
 }
 
 template <typename T, typename ...Args>
@@ -2949,23 +2892,22 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned rawSpecifier;
+    unsigned rawSpecifier, numAccessors;
     uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
-    DeclID getterID, setterID, materializeForSetID, willSetID, didSetID;
-    DeclID addressorID, mutableAddressorID, overriddenID;
-    ArrayRef<uint64_t> dependencyIDs;
+    AccessorRecord accessors;
+    DeclID overriddenID;
+    ArrayRef<uint64_t> accessorAndDependencyIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
-                                       storageKind, interfaceTypeID,
-                                       getterID, setterID, materializeForSetID,
-                                       addressorID, mutableAddressorID,
-                                       willSetID, didSetID, overriddenID,
+                                       storageKind, numAccessors,
+                                       interfaceTypeID,
+                                       overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
-                                       dependencyIDs);
+                                       accessorAndDependencyIDs);
 
     Identifier name = getIdentifier(nameID);
 
@@ -2975,7 +2917,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return llvm::make_error<OverrideError>(name);
     }
 
-    for (TypeID dependencyID : dependencyIDs) {
+    // Exctract the accessor IDs.
+    for (DeclID accessorID : accessorAndDependencyIDs.slice(0, numAccessors)) {
+      accessors.IDs.push_back(accessorID);
+    }
+    accessorAndDependencyIDs = accessorAndDependencyIDs.slice(numAccessors);
+
+    for (TypeID dependencyID : accessorAndDependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
         // Stored properties in classes still impact class object layout because
@@ -3031,8 +2979,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    configureStorage(var, storageKind, getterID, setterID, materializeForSetID,
-                     addressorID, mutableAddressorID, willSetID, didSetID);
+    configureStorage(var, storageKind, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       var->setAccess(*accessLevel);
@@ -3798,24 +3745,19 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isImplicit, isObjC, isGetterMutating, isSetterMutating;
     GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
-    DeclID getterID, setterID, materializeForSetID;
-    DeclID addressorID, mutableAddressorID, willSetID, didSetID;
+    AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     uint8_t rawStorageKind;
-    unsigned numArgNames;
+    unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC,
                                              isGetterMutating, isSetterMutating,
-                                             rawStorageKind,
+                                             rawStorageKind, numAccessors,
                                              genericEnvID,
                                              interfaceTypeID,
-                                             getterID, setterID,
-                                             materializeForSetID,
-                                             addressorID, mutableAddressorID,
-                                             willSetID, didSetID,
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel, numArgNames,
                                              argNameAndDependencyIDs);
@@ -3824,6 +3766,13 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     for (auto argNameID : argNameAndDependencyIDs.slice(0, numArgNames))
       argNames.push_back(getIdentifier(argNameID));
     DeclName name(ctx, DeclBaseName::createSubscript(), argNames);
+    argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numArgNames);
+
+    // Exctract the accessor IDs.
+    for (DeclID accessorID : argNameAndDependencyIDs.slice(0, numAccessors)) {
+      accessors.IDs.push_back(accessorID);
+    }
+    argNameAndDependencyIDs = argNameAndDependencyIDs.slice(numAccessors);
 
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
@@ -3831,7 +3780,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       return llvm::make_error<OverrideError>(name);
     }
 
-    for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
+    for (TypeID dependencyID : argNameAndDependencyIDs) {
       auto dependency = getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3858,9 +3807,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     subscript->setIndices(readParameterList());
 
-    configureStorage(subscript, rawStorageKind,
-                     getterID, setterID, materializeForSetID,
-                     addressorID, mutableAddressorID, willSetID, didSetID);
+    configureStorage(subscript, rawStorageKind, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       subscript->setAccess(*accessLevel);

@@ -405,7 +405,7 @@ private:
     }
   }
 
-  bool finishProcessing(SourceManager &) override {
+  bool finishProcessing() override {
     std::error_code EC;
     std::unique_ptr<llvm::raw_fd_ostream> OS;
     OS.reset(new llvm::raw_fd_ostream(FixitsOutputPath,
@@ -855,6 +855,13 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   return hadEmitIndexDataError;
 }
 
+/// Emits the request-evaluator graph to the given file in GraphViz format.
+void emitRequestEvaluatorGraphViz(ASTContext &ctx, StringRef graphVizPath) {
+  std::error_code error;
+  llvm::raw_fd_ostream out(graphVizPath, error, llvm::sys::fs::F_Text);
+  ctx.evaluator.printDependenciesGraphviz(out);
+}
+
 static bool performCompileStepsPostSILGen(
     CompilerInstance &Instance, CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
@@ -893,6 +900,17 @@ static bool performCompile(CompilerInstance &Instance,
                     Action == FrontendOptions::ActionType::EmitImportedModules);
   else
     Instance.performSema();
+
+  SWIFT_DEFER {
+    // Emit request-evaluator graph via GraphViz, if requested.
+    if (!Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath.empty() &&
+        Instance.hasASTContext()) {
+      ASTContext &ctx = Instance.getASTContext();
+      emitRequestEvaluatorGraphViz(
+        ctx,
+        Invocation.getFrontendOptions().RequestEvaluatorGraphVizPath);
+    }
+  };
 
   if (Action == FrontendOptions::ActionType::Parse)
     return Instance.getASTContext().hadError();
@@ -1070,12 +1088,15 @@ static void performSILOptimizations(CompilerInvocation &Invocation,
 /// the compile unit's flags.
 static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
                                             ModuleOrSourceFile MSF) {
-  if (IRGenOpts.DebugInfoKind == IRGenDebugInfoKind::None ||
+  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::None ||
       !MSF.is<SourceFile *>())
     return;
   Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
-  if (!PD.empty())
-    IRGenOpts.DWARFDebugFlags += (" -private-discriminator " + PD.str()).str();
+  if (!PD.empty()) {
+    if (!IRGenOpts.DebugFlags.empty())
+      IRGenOpts.DebugFlags += " ";
+    IRGenOpts.DebugFlags += ("-private-discriminator " + PD.str()).str();
+  }
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
@@ -1122,7 +1143,8 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   IRGenOpts.UseJIT = true;
-  IRGenOpts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
+  IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
@@ -1659,7 +1681,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   auto finishDiagProcessing = [&](int retValue) -> int {
     FinishDiagProcessingCheckRAII.CalledFinishDiagProcessing = true;
-    bool err = Instance->getDiags().finishProcessing(Instance->getSourceMgr());
+    bool err = Instance->getDiags().finishProcessing();
     return retValue ? retValue : err;
   };
 

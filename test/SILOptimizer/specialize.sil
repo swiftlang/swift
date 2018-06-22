@@ -630,9 +630,7 @@ bb0:
   %6 = function_ref @action_thunk : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
   %7 = partial_apply %6(%5) : $@convention(thin) (@owned @callee_owned () -> (Never, @error Error)) -> (@out Never, @error Error)
   %8 = apply [nothrow] %1<Never>(%2, %7) : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
-  dealloc_stack %2 : $*Never
-  %12 = tuple ()
-  return %12 : $()
+  unreachable
 } // end sil function 'testGenericClosureSpecialization'
 
 // Test a specialization of a self-recursive generic closure.

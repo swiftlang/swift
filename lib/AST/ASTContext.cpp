@@ -30,6 +30,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -462,6 +463,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     SearchPathOpts(SearchPathOpts),
     SourceMgr(SourceMgr),
     Diags(Diags),
+    evaluator(Diags, langOpts.EvaluatorCycleDiagnostics),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
@@ -867,24 +869,18 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
   return nullptr;
 }
 
-/// Check whether the given function is non-generic.
-static bool isNonGenericIntrinsic(FuncDecl *fn, bool allowTypeMembers,
-                                  Type &input,
-                                  Type &output) {
+/// Returns the type of an intrinsic function if it is not generic, otherwise
+/// returns nullptr.
+static FunctionType *
+getIntrinsicCandidateType(FuncDecl *fn, bool allowTypeMembers) {
   auto type = fn->getInterfaceType();
   if (allowTypeMembers && fn->getDeclContext()->isTypeContext()) {
     auto fnType = type->getAs<FunctionType>();
-    if (!fnType) return false;
+    if (!fnType) return nullptr;
 
     type = fnType->getResult();
   }
-
-  auto fnType = type->getAs<FunctionType>();
-  if (!fnType) return false;
-
-  input = fnType->getInput()->getWithoutImmediateLabel();
-  output = fnType->getResult();
-  return true;
+  return type->getAs<FunctionType>();
 }
 
 /// Check whether the given type is Builtin.Int1.
@@ -903,44 +899,42 @@ static bool isBuiltinWordType(Type type) {
 
 /// Looks up all implementations of an operator (globally and declared in types)
 /// and passes potential matches to the given callback. The search stops when
-/// the callback returns true (in which case the matching function declaration
+/// the predicate returns true (in which case the matching function declaration
 /// is returned); otherwise, nullptr is returned if there are no matches.
 /// \p C The AST context.
 /// \p oper The name of the operator.
 /// \p contextType If the operator is declared on a type, then only operators
 ///     defined on this type should be considered.
-/// \p callback A callback that takes as its two arguments the input type and
-///     result type of a candidate function declaration and returns true if the
-///     function matches the desired criteria.
+/// \p pred A callback predicate that takes as its argument the type of a
+///     candidate function declaration and returns true if the function matches
+///     the desired criteria.
 /// \return The matching function declaration, or nullptr if there was no match.
-template <int ExpectedCandidateCount, typename MatchFuncCallback>
-static FuncDecl *lookupOperatorFunc(const ASTContext &ctx, StringRef oper,
-                                    Type contextType,
-                                    MatchFuncCallback &callback) {
-  SmallVector<ValueDecl *, ExpectedCandidateCount> candidates;
+static FuncDecl *
+lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
+                   llvm::function_ref<bool(FunctionType *)> pred) {
+  SmallVector<ValueDecl *, 32> candidates;
   ctx.lookupInSwiftModule(oper, candidates);
 
   for (auto candidate : candidates) {
     // All operator declarations should be functions, but make sure.
-    auto *funcDecl = dyn_cast<FuncDecl>(candidate);
-    if (!funcDecl)
+    auto *fnDecl = dyn_cast<FuncDecl>(candidate);
+    if (!fnDecl)
       continue;
 
-    if (funcDecl->getDeclContext()->isTypeContext()) {
-      auto contextTy = funcDecl->getDeclContext()->getDeclaredInterfaceType();
+    if (fnDecl->getDeclContext()->isTypeContext()) {
+      auto contextTy = fnDecl->getDeclContext()->getDeclaredInterfaceType();
       if (!contextTy->isEqual(contextType)) continue;
     }
 
     if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveDeclSignature(funcDecl);
+      resolver->resolveDeclSignature(fnDecl);
 
-    Type inputType, resultType;
-    if (!isNonGenericIntrinsic(funcDecl, /*allowTypeMembers=*/true, inputType,
-                               resultType))
+    auto *funcTy = getIntrinsicCandidateType(fnDecl, /*allowTypeMembers=*/true);
+    if (!funcTy)
       continue;
 
-    if (callback(inputType, resultType))
-      return funcDecl;
+    if (pred(funcTy))
+      return fnDecl;
   }
 
   return nullptr;
@@ -957,19 +951,20 @@ static FuncDecl *lookupOperatorFunc(const ASTContext &ctx, StringRef oper,
 ///     result type of the candidate function declaration and returns true if
 ///     the function matches the desired criteria.
 /// \return The matching function declaration, or nullptr if there was no match.
-template <typename MatchFuncCallback>
-static FuncDecl *lookupLibraryIntrinsicFunc(const ASTContext &ctx,
-                                            StringRef name,
-                                            LazyResolver *resolver,
-                                            MatchFuncCallback &callback) {
+static FuncDecl *
+lookupLibraryIntrinsicFunc(const ASTContext &ctx, StringRef name,
+                           LazyResolver *resolver,
+                           llvm::function_ref<bool(FunctionType *)> pred) {
   Type inputType, resultType;
   auto decl = findLibraryIntrinsic(ctx, name, resolver);
-  if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, inputType,
-                             resultType))
+  if (!decl)
     return nullptr;
 
-  if (callback(inputType, resultType))
+  auto *funcTy = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
+  if (!funcTy)
+    return nullptr;
+
+  if (pred(funcTy))
     return decl;
 
   return nullptr;
@@ -984,17 +979,14 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
 
   auto intType = getIntDecl()->getDeclaredType();
   auto boolType = getBoolDecl()->getDeclaredType();
-  auto callback = [&](Type inputType, Type resultType) {
+  auto decl = lookupOperatorFunc(*this, "==",
+                                 intType, [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
-    auto tupleType = dyn_cast<TupleType>(inputType.getPointer());
-    assert(tupleType);
-    return tupleType->getNumElements() == 2 &&
-        tupleType->getElementType(0)->isEqual(intType) &&
-        tupleType->getElementType(1)->isEqual(intType) &&
-        resultType->isEqual(boolType);
-  };
-
-  auto decl = lookupOperatorFunc<32>(*this, "==", intType, callback);
+    if (type->getParams().size() != 2) return false;
+    if (!type->getParams()[0].getType()->isEqual(intType) ||
+        !type->getParams()[1].getType()->isEqual(intType)) return false;
+    return type->getResult()->isEqual(boolType);
+  });
   getImpl().EqualIntDecl = decl;
   return decl;
 }
@@ -1003,13 +995,14 @@ FuncDecl *ASTContext::getGetBoolDecl(LazyResolver *resolver) const {
   if (getImpl().GetBoolDecl)
     return getImpl().GetBoolDecl;
 
-  auto callback = [&](Type inputType, Type resultType) {
+  auto boolType = getBoolDecl()->getDeclaredType();
+  auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool",
+                                         resolver, [=](FunctionType *type) {
     // Look for the signature (Builtin.Int1) -> Bool
-    return isBuiltinInt1Type(inputType) &&
-        resultType->isEqual(getBoolDecl()->getDeclaredType());
-  };
-
-  auto decl = lookupLibraryIntrinsicFunc(*this, "_getBool", resolver, callback);
+    if (type->getParams().size() != 1) return false;
+    if (!isBuiltinInt1Type(type->getParams()[0].getType())) return false;
+    return type->getResult()->isEqual(boolType);
+  });
   getImpl().GetBoolDecl = decl;
   return decl;
 }
@@ -1156,8 +1149,10 @@ ASTContext::getUnimplementedInitializerDecl(LazyResolver *resolver) const {
   Type input, output;
   auto decl = findLibraryIntrinsic(*this, "_unimplementedInitializer",
                                    resolver);
-  if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+  if (!decl)
+    return nullptr;
+
+  if (!getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false))
     return nullptr;
 
   // FIXME: Check inputs and outputs.
@@ -1189,21 +1184,26 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
   Type input, output;
   auto decl =
       findLibraryIntrinsic(*this, "_stdlib_isOSVersionAtLeast", resolver);
-  if (!decl ||
-      !isNonGenericIntrinsic(decl, /*allowTypeMembers=*/false, input, output))
+  if (!decl)
+    return nullptr;
+
+  auto *fnType = getIntrinsicCandidateType(decl, /*allowTypeMembers=*/false);
+  if (!fnType)
     return nullptr;
 
   // Input must be (Builtin.Word, Builtin.Word, Builtin.Word)
-  auto inputTuple = input->getAs<TupleType>();
-  if (!inputTuple || inputTuple->getNumElements() != 3 ||
-      !isBuiltinWordType(inputTuple->getElementType(0)) ||
-      !isBuiltinWordType(inputTuple->getElementType(1)) ||
-      !isBuiltinWordType(inputTuple->getElementType(2))) {
+  auto intrinsicsParams = fnType->getParams();
+  if (intrinsicsParams.size() != 3)
+    return nullptr;
+
+  if (llvm::any_of(intrinsicsParams, [](const AnyFunctionType::Param &p) {
+    return !isBuiltinWordType(p.getType());
+  })) {
     return nullptr;
   }
 
   // Output must be Builtin.Int1
-  if (!isBuiltinInt1Type(output))
+  if (!isBuiltinInt1Type(fnType->getResult()))
     return nullptr;
 
   getImpl().IsOSVersionAtLeastDecl = decl;
@@ -1403,6 +1403,7 @@ void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
                                 unsigned previousGeneration) {
+  PrettyStackTraceDecl stackTrace("loading extensions for", nominal);
   for (auto &loader : getImpl().ModuleLoaders) {
     loader->loadExtensions(nominal, previousGeneration);
   }
@@ -1414,6 +1415,8 @@ void ASTContext::loadObjCMethods(
        bool isInstanceMethod,
        unsigned previousGeneration,
        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) {
+  PrettyStackTraceSelector stackTraceSelector("looking for", selector);
+  PrettyStackTraceDecl stackTraceDecl("...in", classDecl);
   for (auto &loader : getImpl().ModuleLoaders) {
     loader->loadObjCMethods(classDecl, selector, isInstanceMethod,
                             previousGeneration, methods);
@@ -2154,20 +2157,20 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
 
   if (auto accessor = dyn_cast<AccessorDecl>(member)) {
     switch (accessor->getAccessorKind()) {
-    case AccessorKind::IsAddressor:
-    case AccessorKind::IsDidSet:
-    case AccessorKind::IsMaterializeForSet:
-    case AccessorKind::IsMutableAddressor:
-    case AccessorKind::IsWillSet:
+    case AccessorKind::Address:
+    case AccessorKind::DidSet:
+    case AccessorKind::MaterializeForSet:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::WillSet:
       llvm_unreachable("Not an Objective-C entry point");
 
-    case AccessorKind::IsGetter:
+    case AccessorKind::Get:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 5, var->getFullName() };
 
       return { 6, Identifier() };
 
-    case AccessorKind::IsSetter:
+    case AccessorKind::Set:
       if (auto var = dyn_cast<VarDecl>(accessor->getStorage()))
         return { 7, var->getFullName() };
       return { 8, Identifier() };
@@ -4244,7 +4247,7 @@ CanType ArchetypeType::getAnyOpened(Type existential) {
 }
 
 void TypeLoc::setInvalidType(ASTContext &C) {
-  TAndValidBit.setPointerAndInt(ErrorType::get(C), true);
+  Ty = ErrorType::get(C);
 }
 
 namespace {

@@ -25,7 +25,7 @@ import resilient_protocol
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol22OtherResilientProtocolMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol22OtherResilientProtocolMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWp"
@@ -133,7 +133,7 @@ protocol InternalProtocol {
 // CHECK-SAME:   i16 0,
 
 // -- the protocol descriptor
-// CHECK-SAME:   @"got.$S18resilient_protocol24ProtocolWithRequirementsMp"
+// CHECK-SAME:   @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsMp"
 
 // -- the template
 // CHECK-SAME:   @"$S19protocol_resilience24ConformsWithRequirementsV010resilient_A008ProtocoldE0AAWp"
@@ -151,10 +151,10 @@ protocol InternalProtocol {
 
 // CHECK-SAME: internal constant {
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP5firstyyFTj"
 // CHECK-SAME: @firstWitness
 
-// CHECK-SAME: @"got.$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
+// CHECK-SAME: @"{{got.|__imp_}}$S18resilient_protocol24ProtocolWithRequirementsP6secondyyFTj"
 // CHECK-SAME: @secondWitness
 
 // CHECK-SAME: }
@@ -169,9 +169,10 @@ protocol InternalProtocol {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
-
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
+  // CHECK-NEXT: %[[SELF:.*]] = alloca %swift.type*
+  // CHECK-NEXT: store %swift.type* %Self, %swift.type** %[[SELF]]
   // CHECK-NEXT: ret void
   %result = tuple ()
   return %result : $()
@@ -185,7 +186,8 @@ sil @defaultD : $@convention(witness_method: ResilientProtocol) <Self where Self
 bb0(%0 : $*Self):
 
   // Make sure we can emit direct references to other default implementations
-
+  // CHECK-NEXT: %[[SELF:.*]] = alloca %swift.type*
+  // CHECK-NEXT: store %swift.type* %Self, %swift.type** %[[SELF]]
   // CHECK-NEXT: call swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
@@ -225,7 +227,8 @@ sil @defaultE : $@convention(witness_method: ResilientProtocol) <Self where Self
 bb0(%0 : $@thick Self.Type):
 
   // Make sure we can emit direct references to other default implementations
-
+  // CHECK-NEXT: %[[SELF:.*]] = alloca %swift.type*
+  // CHECK-NEXT: store %swift.type* %Self, %swift.type** %[[SELF]]
   // CHECK-NEXT: call swiftcc void @defaultF(%swift.type* swiftself %0, %swift.type* %Self, i8** %SelfWitnessTable)
   %fn1 = function_ref @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
   %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
@@ -263,7 +266,8 @@ bb0(%0 : $@thick Self.Type):
 
 sil @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):
-
+  // CHECK-NEXT: %[[SELF:.*]] = alloca %swift.type*
+  // CHECK-NEXT: store %swift.type* %Self, %swift.type** %[[SELF]]
   // CHECK-NEXT: ret void
   %result = tuple ()
   return %result : $()

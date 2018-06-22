@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit -swift-version 3 | %FileCheck %s
 
 import Foundation
 

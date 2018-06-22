@@ -121,7 +121,7 @@ namespace {
       uint32_t dataLength = sizeof(uint32_t);
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      // No need to write the data length; it's constant.
       return { keyLength, dataLength };
     }
 
@@ -136,6 +136,8 @@ namespace {
   };
 
   class SILSerializer {
+    using TypeID = serialization::TypeID;
+    
     Serializer &S;
     ASTContext &Ctx;
 
@@ -193,6 +195,9 @@ namespace {
     /// Functions that we've emitted a reference to. If the key maps
     /// to true, we want to emit a declaration only.
     llvm::DenseMap<const SILFunction *, bool> FuncsToEmit;
+
+    /// Global variables that we've emitted a reference to.
+    llvm::DenseSet<const SILGlobalVariable *> GlobalsToEmit;
 
     /// Additional functions we might need to serialize.
     llvm::SmallVector<const SILFunction *, 16> Worklist;
@@ -998,24 +1003,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AllocGlobalInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     const AllocGlobalInst *AGI = cast<AllocGlobalInst>(&SI);
+    auto *G = AGI->getReferencedGlobal();
+    GlobalsToEmit.insert(G);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0, 0, 0,
         S.addDeclBaseNameRef(
-            Ctx.getIdentifier(AGI->getReferencedGlobal()->getName())));
+            Ctx.getIdentifier(G->getName())));
     break;
   }
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::GlobalValueInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     const GlobalAccessInst *GI = cast<GlobalAccessInst>(&SI);
+    auto *G = GI->getReferencedGlobal();
+    GlobalsToEmit.insert(G);
     SILOneOperandLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILOneOperandLayout::Code],
         (unsigned)SI.getKind(), 0,
         S.addTypeRef(GI->getType().getASTType()),
         (unsigned)GI->getType().getCategory(),
         S.addDeclBaseNameRef(
-            Ctx.getIdentifier(GI->getReferencedGlobal()->getName())));
+            Ctx.getIdentifier(G->getName())));
     break;
   }
   case SILInstructionKind::BranchInst: {
@@ -2414,9 +2423,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<decls_block::GenericRequirementLayout>();
   registerSILAbbr<decls_block::LayoutRequirementLayout>();
 
-  for (const SILGlobalVariable &g : SILMod->getSILGlobals())
-    writeSILGlobalVar(g);
-
   // Write out VTables first because it may require serializations of
   // non-transparent SILFunctions (body is not needed).
   // Go through all SILVTables in SILMod and write them if we should
@@ -2488,6 +2494,15 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILFunction(F, true);
     }
   }
+
+  // Add global variables that must be emitted to the list.
+  for (const SILGlobalVariable &g : SILMod->getSILGlobals())
+    if (g.isSerialized() || ShouldSerializeAll)
+      GlobalsToEmit.insert(&g);
+
+  // Now write out all referenced global variables.
+  for (auto *g : GlobalsToEmit)
+      writeSILGlobalVar(*g);
 
   assert(Worklist.empty() && "Did not emit everything in worklist");
 }

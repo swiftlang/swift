@@ -21,7 +21,7 @@ extern "C" const SWIFT_CC(swift) WitnessTable *
   MANGLE_SYM(So10CFErrorRefas5Error10FoundationWa)();
 
 extern "C" const SWIFT_CC(swift) hashable_support::HashableWitnessTable *
-  MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWa)();
+  MANGLE_SYM(So8NSObjectCSH10ObjectiveCWa)();
 
 extern "C" SWIFT_CC(swift)
   NSDictionary *MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF)(
@@ -37,7 +37,7 @@ extern "C" const ProtocolDescriptor
 // Define the bridging info struct.
 extern "C" ErrorBridgingInfo ERROR_BRIDGING_SYMBOL_NAME = {
   MANGLE_SYM(So10CFErrorRefas5Error10FoundationWa),
-  MANGLE_SYM(So8NSObjectCs8Hashable10ObjectiveCWa),
+  MANGLE_SYM(So8NSObjectCSH10ObjectiveCWa),
   MANGLE_SYM(10Foundation24_getErrorDefaultUserInfoyyXlSgxs0C0RzlF),
   MANGLE_SYM(10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF),
   &MANGLE_SYM(10Foundation26_ObjectiveCBridgeableErrorMp)

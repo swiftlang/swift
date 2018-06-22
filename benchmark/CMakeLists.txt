@@ -125,6 +125,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Queue
     single-source/RC4
     single-source/RGBHistogram
+    single-source/Radix2CooleyTukey
     single-source/RandomShuffle
     single-source/RandomValues
     single-source/RangeAssignment
@@ -172,7 +173,7 @@ set(SWIFT_MULTISOURCE_SWIFT3_BENCHES
 
 set(PrimsSplit_sources
     multi-source/PrimsSplit/Prims.swift
-    multi-source/PrimsSplit/main.swift)
+    multi-source/PrimsSplit/Prims_main.swift)
 
 set(SWIFT_MULTISOURCE_SWIFT4_BENCHES
 )

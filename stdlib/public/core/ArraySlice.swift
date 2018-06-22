@@ -116,7 +116,8 @@
 
 @_fixed_layout
 public struct ArraySlice<Element>: _DestructorSafeContainer {
-    internal typealias _Buffer = _SliceBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _SliceBuffer<Element>
 
   @usableFromInline
   internal var _buffer: _Buffer
@@ -1406,17 +1407,12 @@ extension ArraySlice: Equatable where Element: Equatable {
 }
 
 extension ArraySlice: Hashable where Element: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-  
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
     for element in self {

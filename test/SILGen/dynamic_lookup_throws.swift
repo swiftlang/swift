@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name dynamic_lookup_throws -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name dynamic_lookup_throws -parse-as-library %s -swift-version 3 | %FileCheck %s
 
 // REQUIRES: objc_interop
 

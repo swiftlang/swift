@@ -1124,6 +1124,15 @@ private:
     /// \brief Depth of the solution stack.
     unsigned depth = 0;
 
+    /// \brief Maximum depth reached so far in exploring solutions.
+    unsigned maxDepth = 0;
+
+    /// \brief Count of the number of leaf scopes we've created. These
+    /// either result in a failure to solve, or in a solution, unlike
+    /// all the intermediate scopes. They are interesting to track as
+    /// part of a metric of whether an expression is too complex.
+    unsigned leafScopes = 0;
+
     /// \brief Whether to record failures or not.
     bool recordFixes = false;
 
@@ -1198,7 +1207,8 @@ private:
     /// \param scope The scope to associate with current solver state.
     void registerScope(SolverScope *scope) {
       ++depth;
-      ++NumStatesExplored;
+      maxDepth = std::max(maxDepth, depth);
+      scope->scopeNumber = NumStatesExplored++;
 
       CS.incrementScopeCounter();
       auto scopeInfo =
@@ -1216,6 +1226,10 @@ private:
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
       --depth;
+
+      unsigned countScopesExplored = NumStatesExplored - scope->scopeNumber;
+      if (countScopesExplored == 1)
+        ++leafScopes;
 
       SolverScope *savedScope;
       // The position of last retired constraint before given scope.
@@ -1445,6 +1459,9 @@ public:
     /// The previous score.
     Score PreviousScore;
 
+    /// The scope number of this scope. Set when the scope is registered.
+    unsigned scopeNumber = 0;
+
     /// Time in fractional seconds at which we entered this scope.
     double startTime;
 
@@ -1553,6 +1570,10 @@ private:
 
   /// Add a new type variable that was already created.
   void addTypeVariable(TypeVariableType *typeVar);
+  
+  /// \brief Add a constraint from the subscript base to the root of the key
+  /// path literal to the constraint system.
+  void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
   /// \brief Lookup for a member with the given name in the given base type.
@@ -2175,6 +2196,15 @@ public:
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
 
+  /// Given generic signature open its generic requirements,
+  /// using substitution function, and record them in the
+  /// constraint system for further processing.
+  void openGenericRequirements(DeclContext *outerDC,
+                               GenericSignature *signature,
+                               bool skipProtocolSelfConstraint,
+                               ConstraintLocatorBuilder locator,
+                               llvm::function_ref<Type(Type)> subst);
+
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
@@ -2194,6 +2224,7 @@ public:
                           ValueDecl *decl,
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
+                          DeclContext *useDC,
                           const DeclRefExpr *base = nullptr);
 
   /// \brief Retrieve the type of a reference to the given value declaration,
@@ -3087,6 +3118,15 @@ public:
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
   bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
+    auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
+    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
+    if (MaxMemory > threshold)
+      return true;
+
     auto timeoutThresholdInMillis = TC.getExpressionTimeoutThresholdInSeconds();
     if (Timer && Timer->isExpired(timeoutThresholdInMillis)) {
       // Disable warnings about expressions that go over the warning
@@ -3110,18 +3150,12 @@ public:
         return true;
 
       // Bail out once we've looked at a really large number of
-      // choices, even if we haven't used a huge amount of memory.
+      // choices.
       if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
         return true;
     }
 
-    auto used = TC.Context.getSolverMemory();
-    for (auto const& s : solutions) {
-      used += s.getTotalMemory();
-    }
-    MaxMemory = std::max(used, MaxMemory);
-    auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return MaxMemory > threshold;
+    return false;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -3226,7 +3260,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> argTuple,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallVectorImpl<bool> &defaultMap,
+                        const llvm::SmallBitVector &defaultMap,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,

@@ -168,7 +168,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(atEncodedOffset n: Int) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -233,7 +233,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(after i: Index) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -293,7 +293,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIIndex(before i: Index) -> Index {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -326,7 +326,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIIDistance(from i: Index, to j: Index) -> Int {
       let forwards = j >= i
@@ -375,7 +375,7 @@ extension String {
     }
 
     @inline(never)
-    @effects(releasenone)
+    @_effects(releasenone)
     @usableFromInline
     internal func _nonASCIISubscript(position: Index) -> UTF8.CodeUnit {
       _sanityCheck(!_guts._isASCIIOrSmallASCII)
@@ -515,7 +515,9 @@ extension String.UTF8View : _SwiftStringView {
 extension String.UTF8View {
   @_fixed_layout // FIXME(sil-serialize-all)
   public struct Iterator {
+    @usableFromInline
     internal typealias _OutputBuffer = _ValidUTF8Buffer<UInt64>
+
     @usableFromInline
     internal let _guts: _StringGuts
     @usableFromInline
@@ -648,7 +650,7 @@ extension String.UTF8View {
   }
 
   @inline(never)
-  @effects(releasenone)
+  @_effects(releasenone)
   @usableFromInline
   internal func _gutsNonASCIIUTF8Count(
     _ range: Range<Int>

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -assume-parsing-unqualified-ownership-sil -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -819,6 +819,8 @@ func unsafeGuaranteed_test(_ x: Builtin.NativeObject) -> Builtin.NativeObject {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}unsafeGuaranteedEnd_test
 // CHECK-NEXT: {{.*}}:
+// CHECK-NEXT: alloca
+// CHECK-NEXT: store
 // CHECK-NEXT: ret void
 func unsafeGuaranteedEnd_test(_ x: Builtin.Int8) {
   Builtin.unsafeGuaranteedEnd(x)
@@ -849,9 +851,8 @@ func atomicload(_ p: Builtin.RawPointer) {
 }
 
 // CHECK-LABEL: define {{.*}} @"$S8builtins14stringObjectOryS2u_SutF"(i64, i64)
-// CHECK-NEXT: {{.*}}:
-// CHECK-NEXT: %2 = or i64 %0, %1
-// CHECK-NEXT: ret i64 %2
+// CHECK:      %4 = or i64 %0, %1
+// CHECK-NEXT: ret i64 %4
 func stringObjectOr(_ x: UInt, _ y: UInt) -> UInt {
   return UInt(Builtin.stringObjectOr_Int64(
   x._value, y._value))

@@ -294,13 +294,12 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 }
 static StringRef getAccessorKindString(AccessorKind value) {
   switch (value) {
-    case AccessorKind::IsGetter: return "getter";
-    case AccessorKind::IsSetter: return "setter";
-    case AccessorKind::IsWillSet: return "willSet";
-    case AccessorKind::IsDidSet: return "didSet";
-    case AccessorKind::IsMaterializeForSet: return "materializeForSet";
-    case AccessorKind::IsAddressor: return "addressor";
-    case AccessorKind::IsMutableAddressor: return "mutableAddressor";
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  case AccessorKind::Address: return "address";
+  case AccessorKind::MutableAddress: return "mutableAddress";
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -774,7 +773,9 @@ namespace {
     void visitSourceFile(const SourceFile &SF) {
       OS.indent(Indent);
       PrintWithColorRAII(OS, ParenthesisColor) << '(';
-      PrintWithColorRAII(OS, ASTNodeColor) << "source_file";
+      PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
+      PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
+      
       for (Decl *D : SF.Decls) {
         if (D->isImplicit())
           continue;
@@ -2301,6 +2302,11 @@ public:
       OS << " ";
       E->getCaptureInfo().print(PrintWithColorRAII(OS, CapturesColor).getOS());
     }
+    // Printing a function type doesn't indicate whether it's escaping because it doesn't 
+    // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
+    if (auto Ty = GetTypeOfExpr(E))
+      if (!Ty->getAs<AnyFunctionType>()->getExtInfo().isNoEscape())
+        PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
 
     return OS;
   }
@@ -2922,10 +2928,17 @@ static void dumpProtocolConformanceRec(
       }
     }
 
-    for (auto requirement : normal->getConditionalRequirements()) {
+    if (auto condReqs = normal->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto requirement : *condReqs) {
+        out << '\n';
+        out.indent(indent + 2);
+        requirement.dump(out);
+      }
+    } else {
       out << '\n';
       out.indent(indent + 2);
-      requirement.dump(out);
+      out << "(conditional requirements unable to be computed)";
     }
     break;
   }
@@ -2953,10 +2966,16 @@ static void dumpProtocolConformanceRec(
                            SubstitutionMap::DumpStyle::Full, indent + 2,
                            visited);
     out << '\n';
-    for (auto subReq : conf->getConditionalRequirements()) {
+    if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(
+            /*computeIfPossible=*/false)) {
+      for (auto subReq : *condReqs) {
+        out.indent(indent + 2);
+        subReq.dump(out);
+        out << '\n';
+      }
+    } else {
       out.indent(indent + 2);
-      subReq.dump(out);
-      out << '\n';
+      out << "(conditional requirements unable to be computed)\n";
     }
     dumpProtocolConformanceRec(conf->getGenericConformance(), out, indent + 2,
                                visited);
@@ -3359,6 +3378,25 @@ namespace {
       OS << ")";
     }
 
+    void printAnyFunctionParams(ArrayRef<AnyFunctionType::Param> params,
+                                StringRef label) {
+      printCommon(label, "function_params");
+      printField("num_params", params.size());
+      Indent += 2;
+      for (const auto &param : params) {
+        OS << "\n";
+        OS.indent(Indent) << "(";
+        PrintWithColorRAII(OS, TypeFieldColor) << "param";
+        if (param.hasLabel())
+          printField("name", param.getLabel().str());
+        dumpParameterFlags(param.getParameterFlags());
+        printRec(param.getType());
+        OS << ")";
+      }
+      Indent -= 2;
+      OS << ")";
+    }
+
     void printAnyFunctionTypeCommon(AnyFunctionType *T, StringRef label,
                                     StringRef name) {
       printCommon(label, name);
@@ -3373,7 +3411,10 @@ namespace {
       printFlag(!T->isNoEscape(), "escaping");
       printFlag(T->throws(), "throws");
 
-      printRec("input", T->getInput());
+      OS << "\n";
+      Indent += 2;
+      printAnyFunctionParams(T->getParams(), "input");
+      Indent -=2;
       printRec("output", T->getResult());
     }
 

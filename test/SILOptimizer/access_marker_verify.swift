@@ -450,7 +450,7 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
+// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
 // CHECK: bb0(%0 : @guaranteed $Dictionary<Int, Array<Int>>):
 // CHECK:   alloc_box ${ var Dictionary<Int, Array<Int>> }, var, name "dict"
 // CHECK:   [[PROJ:%.*]] = project_box
@@ -503,7 +503,7 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   store %{{.*}} to [trivial]
 // ----- call Dictionary.subscript.setter
 // CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF'
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF'
 
 // --- Optional map.
 enum OptionalWithMap<Wrapped> {
@@ -849,7 +849,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
     return (self as CanCast as? CanCastStruct<T>)?.base
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden @$S20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
 // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*CanCastStruct<Base>):
 // CHECK: [[OUT_ENUM:%.*3]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[TEMP_SUB:%.*]] = alloc_stack $Optional<CanCastStruct<T>>
@@ -870,7 +870,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK: end_access [[ACCESS]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF'
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF'
 
 // --- open existential
 protocol Q : PBar {}

@@ -89,7 +89,7 @@ IRGenMangler::mangleTypeForReflection(IRGenModule &IGM,
   
   if (IGM.CurSourceFile
       && !isa<ClangModuleUnit>(IGM.CurSourceFile)
-      && !IGM.getOptions().UseJIT) {
+      && !IGM.getOptions().IntegratedREPL) {
     CanSymbolicReference = [&](const DeclContext *dc) -> bool {
       // Symbolically reference types that are defined in the same file unit
       // as we're referencing from.
@@ -115,7 +115,7 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
   // don't start with a digit and don't need to be quoted.
   Buffer << 'T';
   if (auto P = dyn_cast<ProtocolType>(Ty)) {
-    appendProtocolName(P->getDecl());
+    appendProtocolName(P->getDecl(), /*allowStandardSubstitution=*/false);
     appendOperator("P");
   } else {
     appendType(Ty);

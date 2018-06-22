@@ -2769,6 +2769,11 @@ void ClangImporter::loadObjCMethods(
     if (objcMethod->getClassInterface() != objcClass)
       continue;
 
+    // If we found a property accessor, import the property.
+    if (objcMethod->isPropertyAccessor())
+      (void)Impl.importDecl(objcMethod->findPropertyDecl(true),
+                            Impl.CurrentVersion);
+
     if (auto method = dyn_cast_or_null<AbstractFunctionDecl>(
                         Impl.importDecl(objcMethod, Impl.CurrentVersion))) {
       foundMethods.push_back(method);
@@ -3539,7 +3544,7 @@ EffectiveClangContext ClangImporter::Implementation::getEffectiveClangContext(
 
   // Resolve the type.
   if (auto typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(const_cast<NominalTypeDecl *>(nominal));
+    typeResolver->resolveIsObjC(const_cast<NominalTypeDecl *>(nominal));
 
   // If it's an @objc entity, go look for it.
   if (nominal->isObjC()) {
@@ -3598,7 +3603,8 @@ importName(const clang::NamedDecl *D,
     getDeclName();
 }
 
-bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
+bool ClangImporter::isInOverlayModuleForImportedModule(
+                                               const DeclContext *overlayDC,
                                                const DeclContext *importedDC) {
   overlayDC = overlayDC->getModuleScopeContext();
   importedDC = importedDC->getModuleScopeContext();
@@ -3613,7 +3619,7 @@ bool swift::isInOverlayModuleForImportedModule(const DeclContext *overlayDC,
 
   // Is this a private module that's re-exported to the public (overlay) name?
   auto clangModule =
-    importedClangModuleUnit->getClangModule()->getTopLevelModule();
+  importedClangModuleUnit->getClangModule()->getTopLevelModule();
   return !clangModule->ExportAsModule.empty() &&
     clangModule->ExportAsModule == overlayModule->getName().str();
 }

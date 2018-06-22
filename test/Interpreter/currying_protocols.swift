@@ -94,10 +94,10 @@ genericOlympicGames(Archimedes())
 func olympicGames(_ g1: Gymnast) -> Gymnast {
   // FIXME -- <rdar://problem/21391055>
 #if false
-  let f1: Double -> Gymnast = g1.backflip
+  let f1: (Double) -> Gymnast = g1.backflip
   let g2: Gymnast = f1(180)
 
-  let f2: Medal -> Gymnast = g2.compete
+  let f2: (Medal) -> Gymnast = g2.compete
   let g4: Gymnast = f2()(Medal.Gold)
 #endif
 

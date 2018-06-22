@@ -110,6 +110,9 @@ def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
+def driver_batch_count : Separate<["-"], "driver-batch-count">,
+  InternalDebugOpt,
+  HelpText<"Use the given number of batch-mode partitions, rather than default parallelism level">;
 def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
@@ -468,10 +471,18 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Verify the binary representation of debug output.">;
+
+def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit the compiler invocation in the debug info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,

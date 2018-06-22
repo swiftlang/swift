@@ -465,6 +465,58 @@ SILInstruction *SILCombiner::visitAllocRefInst(AllocRefInst *AR) {
   return nullptr;
 }
 
+/// Returns the base address if \p val is an index_addr with constant index.
+static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
+  auto *IA = dyn_cast<IndexAddrInst>(val);
+  if (!IA)
+    return nullptr;
+  auto *Index = dyn_cast<IntegerLiteralInst>(IA->getIndex());
+
+  // Limiting to 32 bits is more than enough. The reason why not limiting to 64
+  // bits is to leave room for overflow when we add two indices.
+  if (!Index || Index->getValue().getActiveBits() > 32)
+    return nullptr;
+
+  index = Index->getValue().getZExtValue();
+  return IA->getBase();
+}
+
+/// Optimize loading bytes from a string literal.
+/// Example in SIL pseudo code:
+///     %0 = string_literal "abc"
+///     %1 = integer_literal 2
+///     %2 = index_addr %0, %1
+///     %3 = load %2
+/// ->
+///     %3 = integer_literal 'c'
+SILInstruction *SILCombiner::optimizeLoadFromStringLiteral(LoadInst *LI) {
+  auto *SEA = dyn_cast<StructElementAddrInst>(LI->getOperand());
+  if (!SEA)
+    return nullptr;
+
+  SILValue addr = SEA->getOperand();
+  unsigned index = 0;
+  if (SILValue iaBase = isConstIndexAddr(addr, index))
+    addr = iaBase;
+
+  auto *PTA = dyn_cast<PointerToAddressInst>(addr);
+  if (!PTA)
+    return nullptr;
+  auto *Literal = dyn_cast<StringLiteralInst>(PTA->getOperand());
+  if (!Literal || Literal->getEncoding() != StringLiteralInst::Encoding::UTF8)
+    return nullptr;
+
+  BuiltinIntegerType *BIType = LI->getType().getAs<BuiltinIntegerType>();
+  if (!BIType || !BIType->isFixedWidth(8))
+    return nullptr;
+
+  StringRef str = Literal->getValue();
+  if (index >= str.size())
+    return nullptr;
+
+  return Builder.createIntegerLiteral(LI->getLoc(), LI->getType(), str[index]);
+}
+
 SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // (load (upcast-ptr %x)) -> (upcast-ref (load %x))
   Builder.setCurrentDebugScope(LI->getDebugScope());
@@ -473,6 +525,9 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
                                     LoadOwnershipQualifier::Unqualified);
     return Builder.createUpcast(LI->getLoc(), NewLI, LI->getType());
   }
+
+  if (SILInstruction *I = optimizeLoadFromStringLiteral(LI))
+    return I;
 
   // Given a load with multiple struct_extracts/tuple_extracts and no other
   // uses, canonicalize the load into several (struct_element_addr (load))
@@ -533,6 +588,28 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
 
   // Erase the old load.
   return eraseInstFromFunction(*LI);
+}
+
+/// Optimize nested index_addr instructions:
+/// Example in SIL pseudo code:
+///    %1 = index_addr %ptr, x
+///    %2 = index_addr %1, y
+/// ->
+///    %2 = index_addr %ptr, x+y
+SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
+  unsigned index = 0;
+  SILValue base = isConstIndexAddr(IA, index);
+  if (!base)
+    return nullptr;
+
+  unsigned index2 = 0;
+  SILValue base2 = isConstIndexAddr(base, index2);
+  if (!base2)
+    return nullptr;
+
+  auto *newIndex = Builder.createIntegerLiteral(IA->getLoc(),
+                                    IA->getIndex()->getType(), index + index2);
+  return Builder.createIndexAddr(IA->getLoc(), base2, newIndex);
 }
 
 SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
@@ -1399,6 +1476,8 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   if (auto *MI = dyn_cast<MetatypeInst>(MDVal)) {
     auto &Mod = ARDI->getModule();
     auto SILInstanceTy = MI->getType().getMetatypeInstanceType(Mod);
+    if (!SILInstanceTy.getClassOrBoundGenericClass())
+      return nullptr;
 
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                      ARDI->isObjC(), false,
@@ -1420,6 +1499,8 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
       auto &Mod = ARDI->getModule();
       auto SILInstanceTy = CCBI->getCastType().getMetatypeInstanceType(Mod);
+      if (!SILInstanceTy.getClassOrBoundGenericClass())
+        return nullptr;
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), false,
                                        ARDI->getTailAllocatedTypes(),

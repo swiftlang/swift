@@ -1,8 +1,8 @@
 // Please keep this file in alphabetical order!
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/blocks.swiftmodule -typecheck -emit-objc-header-path %t/blocks.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/blocks.swiftmodule -typecheck -emit-objc-header-path %t/blocks.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 3
 // RUN: %FileCheck %s < %t/blocks.h
 // RUN: %check-in-clang %t/blocks.h
 
@@ -10,8 +10,6 @@
 
 import ObjectiveC
 
-typealias MyTuple = (Int, AnyObject?)
-typealias MyNamedTuple = (a: Int, b: AnyObject?)
 typealias MyInt = Int
 typealias MyBlockWithEscapingParam = (@escaping () -> ()) -> Int
 typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
@@ -60,9 +58,6 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   @objc func returnsBlockWithTwoInputs() -> ((NSObject, NSObject) -> ())? {
     return nil
   }
-
-  // CHECK-NEXT: - (void)blockWithTypealias:(NSInteger (^ _Nonnull)(NSInteger, id _Nullable))input;
-  @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
   
   // CHECK-NEXT: - (void)blockWithSimpleTypealias:(NSInteger (^ _Nonnull)(NSInteger))input;
   @objc func blockWithSimpleTypealias(_ input: @escaping (MyInt) -> MyInt) {}
@@ -77,9 +72,6 @@ typealias MyBlockWithNoescapeParam = (() -> ()) -> Int
   @objc func returnsBlockWithNamedInput() -> ((_ object: NSObject) -> ())? {
     return nil
   }
-
-  // CHECK-NEXT: - (void)blockWithTypealiasWithNames:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger a, id _Nullable b))input;
-  @objc func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
 
   // CHECK-NEXT: - (void)blockWithKeyword:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger))_Nullable_;
   @objc func blockWithKeyword(_ _Nullable: (_ `class`: Int) -> Int) {}

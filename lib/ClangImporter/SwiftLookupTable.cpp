@@ -961,6 +961,7 @@ namespace {
       if (key.Kind == DeclBaseName::Kind::Normal) {
         keyLength += key.Name.size(); // The name's length
       }
+      assert(keyLength == static_cast<uint16_t>(keyLength));
 
       // # of entries
       uint32_t dataLength = sizeof(uint16_t);
@@ -982,7 +983,7 @@ namespace {
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -999,6 +1000,7 @@ namespace {
 
       // # of entries
       writer.write<uint16_t>(data.size());
+      assert(data.size() == static_cast<uint16_t>(data.size()));
 
       bool isModule = Writer.getLangOpts().isCompilingModule();
       for (auto &fullEntry : data) {
@@ -1066,10 +1068,12 @@ namespace {
       uint32_t keyLength = 1;
       if (SwiftLookupTable::contextRequiresName(key.first))
         keyLength += key.second.size();
+      assert(keyLength == static_cast<uint16_t>(keyLength));
 
       // # of entries
       uint32_t dataLength =
         sizeof(uint16_t) + sizeof(uint64_t) * data.size();
+      assert(dataLength == static_cast<uint16_t>(dataLength));
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -1225,7 +1229,7 @@ namespace {
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
       unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
       return { keyLength, dataLength };
     }
 
@@ -1602,7 +1606,8 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            inferImportAsMember);
+                            inferImportAsMember,
+                            version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,

@@ -559,7 +559,7 @@ do {
 }
 
 func rdar35890334(_ arr: inout [Int]) {
-  _ = arr.popFirst() // expected-error {{'[Int]' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent to use 'popFirst'}}
+  _ = arr.popFirst() // expected-error {{value of type '[Int]' has no member 'popFirst'}}
 }
 
 // rdar://problem/39616039
