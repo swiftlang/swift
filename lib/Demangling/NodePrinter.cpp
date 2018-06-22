@@ -282,7 +282,6 @@ private:
     case Node::Kind::Module:
     case Node::Kind::Tuple:
     case Node::Kind::Protocol:
-    case Node::Kind::QualifiedArchetype:
     case Node::Kind::ReturnType:
     case Node::Kind::SILBoxType:
     case Node::Kind::SILBoxTypeWithLayout:
@@ -1668,20 +1667,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::AssociatedType:
     // Don't print for now.
     return nullptr;
-  case Node::Kind::QualifiedArchetype: {
-    if (Options.ShortenArchetype) {
-      Printer << "(archetype)";
-      return nullptr;
-    }
-    if (Node->getNumChildren() < 2)
-      return nullptr;
-    NodePointer number = Node->getChild(0);
-    NodePointer decl_ctx = Node->getChild(1);
-    Printer << "(archetype " << number->getIndex() << " of ";
-    print(decl_ctx);
-    Printer << ")";
-    return nullptr;
-  }
   case Node::Kind::OwningAddressor:
     return printAbstractStorage(Node->getFirstChild(), asPrefixContext,
                                 "owningAddressor");

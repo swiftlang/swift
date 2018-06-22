@@ -1602,12 +1602,6 @@ void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
   Buffer << "Wa";
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  mangleChildNode(node, 1);
-  Buffer << "Qq";
-  mangleNumber(node->getFirstChild());
-}
-
 void Remangler::mangleReabstractionThunk(Node *node) {
   if (node->getNumChildren() == 3) {
     mangleChildNode(node, 1); // type 1
