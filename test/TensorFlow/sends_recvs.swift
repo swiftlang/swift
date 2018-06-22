@@ -137,6 +137,25 @@ public func testSendsInALoopGPU() {
 // CHECK:      bb2
 // CHECK:      builtin "__tfop_tfc.TensorTransfer
 
+public func testSendsInALoopWithNoResultTensor() {
+  let maxCount = 10
+  var count = 1
+  var a = Tensor<Float>(1.0)
+  while count < maxCount {
+    a += a
+    // One send.
+    print(a.toHost())
+    count += 1
+  }
+}
+
+// No result tensor from this accelerator function.
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
+//
+// CHECK:      sil {{.*}}testSendsInALoopWithNoResultTensor{{.*}} () -> () {
+// CHECK:        return {{.*}} : $()
+// CHECK-NEXT: } // end sil function {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
+
 public func testCannotSendResource() {
   // expected-error @+2 {{This value type cannot be sent/received}}
   let iterator: ResourceHandle =
