@@ -263,6 +263,9 @@ public:
   /// Optional table of counters to report, nullptr when not collecting.
   UnifiedStatsReporter *Stats = nullptr;
 
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
+
 private:
   /// \brief The current generation number, which reflects the number of
   /// times that external modules have been loaded.
