@@ -17,7 +17,7 @@ public func test1Send() {
 
 // CHECK: integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: [[TENSOR_ID:%.*]] = struct $Int
-// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK:      // function_ref static TensorHandle.receiveFromAccelerator(_:_:)
 // CHECK-NEXT:      [[RECEIVE_H:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H]]<Float>([[TC]], [[TENSOR_ID]]
 
@@ -76,7 +76,7 @@ public func test2Sends() {
 // The first receive is over tensor id 0.
 // CHECK: integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: [[TENSOR_ID0:%.*]] = struct $Int
-// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK:      // function_ref static TensorHandle.receiveFromAccelerator(_:_:)
 // CHECK-NEXT:      [[RECEIVE_H0:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H0]]<Float>([[TC]], [[TENSOR_ID0]]
 
@@ -84,7 +84,7 @@ public func test2Sends() {
 // CHECK: function_ref print(_:separator:terminator:)
 // CHECK: integer_literal $Builtin.Int64, 1
 // CHECK-NEXT: [[TENSOR_ID1:%.*]] = struct $Int
-// CHECK:      // function_ref static TensorHandle.receiveFromDevice(_:_:)
+// CHECK:      // function_ref static TensorHandle.receiveFromAccelerator(_:_:)
 // CHECK-NEXT:      [[RECEIVE_H1:%.*]] = function_ref @
 // CHECK-NEXT: apply [[RECEIVE_H1]]<Float>([[TC]], [[TENSOR_ID1]]
 
@@ -176,13 +176,13 @@ public func test1RecvScalarCPU() {
 //
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvScalarCPU{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
-// CHECK:      // function_ref static TensorHandle.receiveFromDevice
+// CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
 // CHECK-NEXT: function_ref 
 // CHECK-NEXT: [[X_HANDLE:%.*]] = apply
 // CHECK:      // function_ref static TensorHandle.scalar(_:)
 // CHECK-NEXT: [[MAKE_SCALAR_TENSOR_FN:%.*]] = function_ref
 // CHECK-NEXT: [[NEW_X_HANDLE:%.*]] = apply [[MAKE_SCALAR_TENSOR_FN]]<Float>(
-// CHECK:      // function_ref TensorHandle.sendToDevice(_:_:)
+// CHECK:      // function_ref TensorHandle.sendToAccelerator(_:_:)
 // CHECK-NEXT: [[SEND_FN:%.*]] = function_ref
 // CHECK-NEXT: apply [[SEND_FN]]<Float>({{.*}}, {{.*}}, [[NEW_X_HANDLE]])
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
@@ -223,7 +223,7 @@ public func test1RecvTensor() {
   // One send.
   print(a.toHost())
   // One recv.
-  var b = atariSim(a).toDevice()
+  var b = atariSim(a).toAccelerator()
   b += a
   let _ = b.array
 }
@@ -236,7 +236,7 @@ public func test1RecvTensor() {
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation
-// CHECK:      // function_ref static TensorHandle.receiveFromDevice
+// CHECK:      // function_ref static TensorHandle.receiveFromAccelerator
 // CHECK-NEXT: function_ref 
 // CHECK-NEXT: [[A_HANDLE:%.*]] = apply
 // CHECK-NEXT: [[A_TENSOR:%.*]] = struct $Tensor<Float> ([[A_HANDLE]]
@@ -244,7 +244,7 @@ public func test1RecvTensor() {
 // CHECK-NEXT: [[ATARI_FN:%.*]] = function_ref
 // CHECK-NEXT: [[B_TENSOR:%.*]] = apply [[ATARI_FN]]([[A_TENSOR]])
 // CHECK-NEXT: [[B_HANDLE:%.*]] = struct_extract [[B_TENSOR]] : $Tensor<Float>, #Tensor.handle
-// CHECK:      // function_ref TensorHandle.sendToDevice(_:_:)
+// CHECK:      // function_ref TensorHandle.sendToAccelerator(_:_:)
 // CHECK-NEXT: [[SEND_FN:%.*]] = function_ref
 // CHECK-NEXT: apply [[SEND_FN]]<Float>({{.*}}, {{.*}}, [[B_HANDLE]])
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation

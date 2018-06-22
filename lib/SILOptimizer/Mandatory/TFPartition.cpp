@@ -118,10 +118,11 @@ enum class PartitioningClass {
   /// friends.
   OverflowCheckingInst,
 
-  /// This is an explicit send to the device, which is sugared as '.toDevice()'.
+  /// This is an explicit send to the accelerator, which is sugared as
+  /// '.toAccelerator()'.
   ExplicitSend,
 
-  /// This is an explicit receive from the device, which is sugared as
+  /// This is an explicit receive from the accelerator, which is sugared as
   /// '.toHost()'.
   ExplicitReceive,
 };
@@ -2461,9 +2462,10 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// nodes to receive tensors from Swift host.
 ///
 /// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
-static SILValue createDeviceReceive(SILBuilder &B, SILLocation loc,
-                                    SILType valueTy, unsigned idNumber,
-                                    GraphGlobalConfiguration &configuration) {
+static SILValue
+createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
+                         unsigned idNumber,
+                         GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
   std::string instName = std::string("__tfop_") + opType + ",tensorId";
@@ -2533,9 +2535,9 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
 /// nodes to send tensors to Swift host.
 ///
 // SendToHost has type <T> (input$T, tensorId$int, device$string) -> ()
-void createDeviceSend(SILBuilder &B, SILLocation loc, SILValue value,
-                      unsigned idNumber,
-                      GraphGlobalConfiguration &configuration) {
+void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
+                           unsigned idNumber,
+                           GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
@@ -2559,7 +2561,7 @@ void createDeviceSend(SILBuilder &B, SILLocation loc, SILValue value,
 //
 // `value` can be a scalar type like $Builtin.FPIEEE32, or a TensorHandle type
 // like TensorHandle<Float>. In the former case, the scalar is converted to a
-// tensor before it's sent to device.
+// tensor before it's sent to accelerator.
 static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
                                SILValue tensorComputation, int idNumber,
                                ModuleDecl &tensorFlowModule,
@@ -2567,9 +2569,9 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
                                SILFunction *sendFn) {
   assert(sendFn);
   // Function signature:
-  // public static func sendToDevice(_ computation: _TensorComputation,
-  //                                 _ tensorId: Int,
-  //                                 _ tensor: TensorHandle<Scalar>
+  // public static func sendToAccelerator(_ computation: _TensorComputation,
+  //                                      _ tensorId: Int,
+  //                                      _ tensor: TensorHandle<Scalar>
   // ) {...}
   // SIL:
   // function_ref @... : $@convention(method)
@@ -2690,11 +2692,11 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   for (auto result : inst.getResults()) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
-    this->ValueMap[result] = createDeviceReceive(
+    this->ValueMap[result] = createAcceleratorReceive(
         BA, loc, remapType(result->getType()), nextSendID, FP.configuration);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>, before
-    // sending that value to device. We pass such a function reference to
+    // sending that value to accelerator. We pass such a function reference to
     // createHostSend() below for this scalar->tensor conversion.
     SILFunction *createScalarTensorFn = nullptr;
     if (!isTensorHandle(result->getType().getASTType())) {
@@ -2706,7 +2708,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
              "from Swift to TensorFlow.");
     }
     SILFunction *sendFn =
-        lookupSendReceiveFunction("sendToDevice", result, loc);
+        lookupSendReceiveFunction("sendToAccelerator", result, loc);
     assert(sendFn &&
            "At this point of compilation, the value must be send'able "
            "from Swift to TensorFlow.");
@@ -2721,7 +2723,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   assert(isa<SILInstruction>((SILNode*)value) || isa<SILArgument>(value) &&
          "Don't know how to receive this value");
   SILFunction *receiveFn =
-      lookupSendReceiveFunction("receiveFromDevice", value, loc);
+      lookupSendReceiveFunction("receiveFromAccelerator", value, loc);
   // If `value` is not receivable on Swift host from TensorFlow (e.g. it is a
   // tensor resource handle), reject the program.
   if (!receiveFn) return false;
@@ -2749,7 +2751,8 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
 
   // Create the send in the accelerator code.  Each send/receive pair gets
   // a unique ID to associate one with the other.
-  createDeviceSend(BA, loc, remapValue(value), nextSendID, FP.configuration);
+  createAcceleratorSend(BA, loc, remapValue(value), nextSendID,
+                        FP.configuration);
 
   // Create the receive in the host code.
   auto newVal =
