@@ -1012,6 +1012,10 @@ private:
 
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  bool diagnoseReverseAutoDiffExpr(ReverseAutoDiffExpr *GE,
+                                   bool preservingPrimalResult);
+
   /// Diagnose the usage of 'subscript' instead of the operator when calling
   /// a subscript and offer a fixit if the inputs are compatible.
   bool diagnoseSubscriptMisuse(ApplyExpr *callExpr);

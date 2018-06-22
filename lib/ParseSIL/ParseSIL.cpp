@@ -2874,17 +2874,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                                              P.Context.TheBuiltinModule, Id,
                                              Identifier());
 
-    auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
-    GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
-    
-    SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SubstitutionMap subMap;
-    if (parseSubstitutions(parsedSubs))
-      return true;
-    
-    if (!parsedSubs.empty()) {
-      if (!genericEnv) {
-        P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
+    if (!foundBuiltins.empty()) {
+      assert(foundBuiltins.size() == 1 && "ambiguous builtin name?!");
+
+      auto *builtinFunc = cast<FuncDecl>(foundBuiltins[0]);
+      GenericEnvironment *genericEnv = builtinFunc->getGenericEnvironment();
+
+      SmallVector<ParsedSubstitution, 4> parsedSubs;
+      SubstitutionMap subMap;
+      if (parseSubstitutions(parsedSubs))
         return true;
 
       if (!parsedSubs.empty()) {
@@ -2892,12 +2890,21 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           P.diagnose(P.Tok, diag::sil_substitutions_on_non_polymorphic_type);
           return true;
         }
-        if (getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs, subs))
+        subMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
+        if (!subMap)
           return true;
       }
-      subMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
-      if (!subMap)
-        return true;
+      // SWIFT_ENABLE_TENSORFLOW: TODO: We can clean this up once Swift has a
+      // better understanding of the TensorFlow operations.
+    } else if (Id.str().startswith("__tfop") ||
+      // TODO: tf_tensor_to_i1 can become a named builtin in Builtins.def when
+      // TensorHandle become a builtin type.
+               Id.str() == "tf_tensor_to_i1") {
+      // TensorFlow builtins don't have a decl associated with them, and don't
+      // have substitutions.
+    } else {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "builtin name");
+      return true;
     }
 
     if (P.Tok.getKind() != tok::l_paren) {
