@@ -3021,7 +3021,9 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   // Use the subsitution map in the context of the current function.
   // thunk->getForwardingSubstitutionMap() / thunk might have been created in a
   // different function's generic enviroment.
+  SmallVector<Substitution, 4> subs;
   if (auto genericSig = thunkType->getGenericSignature()) {
+    genericSig->getSubstitutions(interfaceSubs, subs);
     substFnTy = thunkType->substGenericArgs(F.getModule(), interfaceSubs);
   }
 
@@ -3032,7 +3034,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
   SingleValueInstruction *thunkedFn = B.createPartialApply(
       loc, thunkValue,
       SILType::getPrimitiveObjectType(substFnTy),
-      interfaceSubs,
+      subs,
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
