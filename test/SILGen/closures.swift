@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library %s -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library  %s -swift-version 3 | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -761,7 +761,7 @@ class GenericDerived<Ocean> : ConcreteBase {
 // Don't crash on this
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _, _ in () }
 }
 
 // rdar://29810997

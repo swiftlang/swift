@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -module-name constrained_extensions -enable-sil-ownership -primary-file %s -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name constrained_extensions -O -primary-file %s -swift-version 3 > /dev/null
-// RUN: %target-swift-emit-ir -module-name constrained_extensions -primary-file %s -swift-version 3 > /dev/null
+// RUN: %target-swift-emit-silgen -module-name constrained_extensions -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name constrained_extensions -O -primary-file %s > /dev/null
+// RUN: %target-swift-emit-ir -module-name constrained_extensions -primary-file %s > /dev/null
 
 extension Array where Element == Int {
   // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE1xSaySiGyt_tcfC : $@convention(method) (@thin Array<Int>.Type) -> @owned Array<Int>
@@ -43,7 +43,7 @@ extension Array where Element == Int {
     return staticProperty
   }
 
-  // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZfA_ : $@convention(thin) () -> Optional<Int>
+  // CHECK-LABEL: sil non_abi [serialized] @$SSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZfA_ : $@convention(thin) () -> Optional<Int>
   // CHECK-LABEL: sil @$SSa22constrained_extensionsSiRszlE12staticMethod1eS2iSg_tFZ : $@convention(method) (Optional<Int>, @thin Array<Int>.Type) -> Int
   public static func staticMethod(e: Element? = nil) -> Element {
     return e!
@@ -103,8 +103,8 @@ extension Dictionary where Key == Int {
     return 0
   }
 
-  // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
-  // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
+  // CHECK-LABEL: sil non_abi [serialized] @$SSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA_ : $@convention(thin) <Key, Value where Key == Int> () -> Optional<Int>
+  // CHECK-LABEL: sil non_abi [serialized] @$SSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZfA0_ : $@convention(thin) <Key, Value where Key == Int> () -> @out Optional<Value>
   // CHECK-LABEL: sil @$SSD22constrained_extensionsSiRszrlE12staticMethod1k1vq_SiSg_q_SgtFZ : $@convention(method) <Key, Value where Key == Int> (Optional<Int>, @in_guaranteed Optional<Value>, @thin Dictionary<Int, Value>.Type) -> @out Value
   public static func staticMethod(k: Key? = nil, v: Value? = nil) -> Value {
     return v!
