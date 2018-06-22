@@ -40,7 +40,7 @@ DispatchAPI.test("DispatchGroup creation") {
 }
 
 DispatchAPI.test("Dispatch sync return value") {
-  let value = 24;
+  let value = 24
   let q = DispatchQueue(label: "Test")
   let result = q.sync() { return 24 }
   expectEqual(value, result)
@@ -595,11 +595,9 @@ DispatchAPI.test("DispatchTimeInterval") {
 	expectTrue(t == t) // This would crash.
 }
 
-#if swift(>=4.0)
 DispatchAPI.test("DispatchTimeInterval.never.equals") {
 	expectTrue(DispatchTimeInterval.never == DispatchTimeInterval.never)
 	expectTrue(DispatchTimeInterval.seconds(10) != DispatchTimeInterval.never);
 	expectTrue(DispatchTimeInterval.never != DispatchTimeInterval.seconds(10));
 	expectTrue(DispatchTimeInterval.seconds(10) == DispatchTimeInterval.seconds(10));
 }
-#endif
