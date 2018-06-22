@@ -767,34 +767,73 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
-  ParserStatus Status;
   SourceLoc lParenLoc, rParenLoc;
 
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserStatus {
-    Status.setIsParseError();
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren, rParenLoc))
-        diagnose(Tok, diag::attr_expected_rparen, AttrName,
-                 /*DeclModifier=*/false);
-    }
-    return Status;
-  };
-
+  // Parse '('.
   if (!consumeIf(tok::l_paren, lParenLoc)) {
     diagnose(Tok, diag::attr_expected_lparen, AttrName,
              /*DeclModifier=*/false);
-    return errorAndSkipToEnd();
+    skipUntil(tok::r_paren);
+    if (!consumeIf(tok::r_paren, rParenLoc))
+      diagnose(Tok, diag::attr_expected_rparen, AttrName,
+               /*DeclModifier=*/false);
+    return makeParserError();
   }
 
-  // Parse 'forward' or 'reverse'.
+  using FuncSpec = DifferentiableAttr::FunctionSpecifier;
+  AutoDiffMode mode;
+  SourceLoc modeLoc;
+  SmallVector<AutoDiffParameter, 8> params;
+  Optional<FuncSpec> primalSpec;
+  FuncSpec adjointSpec;
+  TrailingWhereClause *whereClause = nullptr;
+
+  // Parse @differentiable attribute arguments.
+  if (parseDifferentiableAttributeArguments(mode, modeLoc, params, primalSpec,
+                                            adjointSpec, whereClause))
+    return makeParserError();
+
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
+    return makeParserError();
+  }
+
+  return ParserResult<DifferentiableAttr>(
+    DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
+                               mode, modeLoc, params, primalSpec, adjointSpec,
+                               whereClause));
+}
+
+bool Parser::parseDifferentiableAttributeArguments(
+    AutoDiffMode &mode, SourceLoc &modeLoc,
+    SmallVectorImpl<AutoDiffParameter> &params,
+    Optional<DifferentiableAttr::FunctionSpecifier> &primalSpec,
+    DifferentiableAttr::FunctionSpecifier &adjointSpec,
+    TrailingWhereClause *&whereClause) {
+  StringRef AttrName = "differentiable";
+
+  // Set parse error, skip until ')' and parse it.
+  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
+    for (int i = 0; i < parenDepth; i++) {
+      skipUntil(tok::r_paren);
+      if (!consumeIf(tok::r_paren))
+        diagnose(Tok, diag::attr_expected_rparen, AttrName,
+                 /*DeclModifier=*/false);
+    }
+    return true;
+  };
+
+  SyntaxParsingContext ContentContext(
+      SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
+
+  // Parse differentiation mode ('forward' or 'reverse').
   if (!Tok.is(tok::identifier)) {
     diagnose(Tok, diag::attr_differentiable_expected_mode);
     return errorAndSkipToEnd();
   }
   auto modeText = Tok.getText();
-  AutoDiffMode mode;
   if (modeText == "forward")
     mode = AutoDiffMode::Forward;
   else if (modeText == "reverse")
@@ -803,14 +842,16 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     diagnose(Tok, diag::attr_differentiable_expected_mode);
     return errorAndSkipToEnd();
   }
-  auto modeLoc = consumeToken(tok::identifier); // 'forward' or 'reverse'.
+  modeLoc = consumeToken(tok::identifier);
   // Parse comma.
-  parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+  parseToken(tok::comma, diag::attr_expected_comma, AttrName,
              /*isDeclModifier=*/false);
 
-  // Parse optional 'withRespectTo:' label.
-  SmallVector<AutoDiffParameter, 8> params;
+  // Parse optional differentiation parameters, starting with the
+  // 'withRespectTo:' label.
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+    SyntaxParsingContext DiffParamsContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
@@ -822,12 +863,17 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                    diag::attr_differentiable_expected_parameter_list)) {
       return errorAndSkipToEnd();
     }
+
     // Function that parses a parameter into `params`. Returns true if error
     // occurred.
     auto parseParam = [&]() -> bool {
+      SyntaxParsingContext DiffParamContext(
+          SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix: {
+        SyntaxParsingContext IndexParamContext(
+            SyntaxContext, SyntaxKind::DifferentiableAttributeIndexParam);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,
@@ -846,22 +892,25 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
         diagnose(Tok, diag::attr_differentiable_expected_parameter);
         return true;
       }
+      if (Tok.isNot(tok::r_paren))
+        return parseToken(tok::comma, diag::attr_expected_comma, AttrName,
+                          /*isDeclModifier=*/false);
       return false;
     };
-    // Parse first parameter.
+
+    // Parse first parameter. At least one is required.
     if (parseParam())
       return errorAndSkipToEnd(2);
     // Parse remaining parameters until ')'.
-    while (!consumeIf(tok::r_paren)) {
-      if (parseToken(tok::comma, diag::attr_expected_comma,
-                     "differentiable", /*isDeclModifier=*/false) ||
-          parseParam()) {
+    while (Tok.isNot(tok::r_paren))
+      if (parseParam())
         return errorAndSkipToEnd(2);
-      }
-    }
 
-    // Parse comma.
-    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+    SyntaxContext->collectNodesInPlace(
+        SyntaxKind::DifferentiableAttributeDiffParamList);
+    // Parse closing ')' of the parameter list and a comma.
+    consumeToken(tok::r_paren);
+    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
                /*isDeclModifier=*/false);
   }
 
@@ -886,22 +935,25 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   };
 
   // Parse 'primal: <func_name>' (optional).
-  Optional<FuncSpec> primalSpec;
   if (Tok.is(tok::identifier) && Tok.getText() == "primal") {
+    SyntaxParsingContext PrimalContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     primalSpec = FuncSpec();
     if (parseFuncSpec("primal", *primalSpec)) return errorAndSkipToEnd();
     // Parse comma.
-    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
                /*isDeclModifier=*/false);
   }
 
   // Parse 'adjoint: <func_name>'.
-  FuncSpec adjointSpec;
-  if (parseFuncSpec("adjoint", adjointSpec))
-    return errorAndSkipToEnd();
+  {
+    SyntaxParsingContext AdjointContext(
+        SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
+    if (parseFuncSpec("adjoint", adjointSpec))
+      return errorAndSkipToEnd();
+  }
 
   // Parse a trailing 'where' clause if any.
-  TrailingWhereClause *whereClause;
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
@@ -910,19 +962,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                             /*AllowLayoutConstraints=*/true);
     whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
   }
-
-  // Parse ')'.
-  if (!consumeIf(tok::r_paren, rParenLoc)) {
-    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
-             /*DeclModifier=*/false);
-    Status.setIsParseError();
-    return Status;
-  }
-
-  return ParserResult<DifferentiableAttr>(
-    DifferentiableAttr::create(Context, atLoc, SourceRange(loc, rParenLoc),
-                               mode, modeLoc, params, primalSpec, adjointSpec,
-                               whereClause));
+  return false;
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
