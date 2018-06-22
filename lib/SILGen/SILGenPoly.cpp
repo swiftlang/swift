@@ -2937,13 +2937,13 @@ static ManagedValue createThunk(SILGenFunction &SGF,
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(
     SILGenFunction &SGF, CanSILFunctionType &noEscapingType,
-    CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv) {
+    CanSILFunctionType &escapingType, GenericEnvironment *&genericEnv,
+    SubstitutionMap &interfaceSubs) {
 
   assert(escapingType->getExtInfo() ==
          noEscapingType->getExtInfo().withNoEscape(false));
 
   CanType inputSubstType, outputSubstType;
-  SubstitutionMap interfaceSubs;
   return SGF.buildThunkType(noEscapingType, escapingType,
                             inputSubstType, outputSubstType,
                             genericEnv, interfaceSubs,
@@ -2998,12 +2998,13 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
                                            ->getExtInfo()
                                            .withNoEscape(false));
 
+  SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
   auto noEscapingFnTy =
       noEscapingFunctionValue.getType().castTo<SILFunctionType>();
 
   auto thunkType = buildWithoutActuallyEscapingThunkType(
-      *this, noEscapingFnTy, escapingFnTy, genericEnv);
+      *this, noEscapingFnTy, escapingFnTy, genericEnv, interfaceSubs);
 
   auto *thunk = SGM.getOrCreateReabstractionThunk(
       thunkType, noEscapingFnTy, escapingFnTy, F.isSerialized());
@@ -3014,8 +3015,13 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
     buildWithoutActuallyEscapingThunkBody(thunkSGF);
   }
 
-  CanSILFunctionType substFnType = thunkType->substGenericArgs(
-      F.getModule(), thunk->getForwardingSubstitutionMap());
+  CanSILFunctionType substFnTy = thunkType;
+  // Use the subsitution map in the context of the current function.
+  // thunk->getForwardingSubstitutionMap() / thunk might have been created in a
+  // different function's generic enviroment.
+  if (auto genericSig = thunkType->getGenericSignature()) {
+    substFnTy = thunkType->substGenericArgs(F.getModule(), interfaceSubs);
+  }
 
   // Create it in our current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
@@ -3023,8 +3029,8 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
       noEscapingFunctionValue.ensurePlusOne(*this, loc).forward(*this);
   SingleValueInstruction *thunkedFn = B.createPartialApply(
       loc, thunkValue,
-      SILType::getPrimitiveObjectType(substFnType),
-      thunk->getForwardingSubstitutionMap(),
+      SILType::getPrimitiveObjectType(substFnTy),
+      interfaceSubs,
       noEscapeValue,
       SILType::getPrimitiveObjectType(escapingFnTy));
   // We need to ensure the 'lifetime' of the trivial values context captures. As
