@@ -3368,8 +3368,17 @@ public:
   }
 
   void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op) {
-    if (!expr->getType())
+    auto Ty = expr->getType();
+    if (!Ty)
       return;
+
+    SWIFT_DEFER {
+      // Restore type.
+      // FIXME: This is workaround for getTypeOfExpressionWithoutApplying()
+      // modifies type of 'expr'.
+      expr->setType(Ty);
+    };
+
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::PostfixOperator,
@@ -3444,6 +3453,9 @@ public:
                            LHS->getType()->is<AnyFunctionType>()))
       return;
 
+    // Preserve LHS type for restoring it.
+    Type LHSTy = LHS->getType();
+
     // We allocate these expressions on the stack because we know they can't
     // escape and there isn't a better way to allocate scratch Expr nodes.
     UnresolvedDeclRefExpr UDRE(op->getName(), DeclRefKind::BinaryOperator,
@@ -3456,6 +3468,7 @@ public:
       // Reset sequence.
       SE->setElement(SE->getNumElements() - 1, nullptr);
       SE->setElement(SE->getNumElements() - 2, nullptr);
+      LHS->setType(LHSTy);
       prepareForRetypechecking(SE);
 
       for (auto &element : sequence.drop_back(2)) {
