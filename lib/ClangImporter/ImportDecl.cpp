@@ -4887,13 +4887,18 @@ namespace {
       Impl.recordImplicitUnwrapForDecl(result,
                                        importedType.isImplicitlyUnwrapped());
 
+      // Recover from a missing getter in no-asserts builds. We're still not
+      // sure under what circumstances this occurs, but we shouldn't crash.
+      auto clangGetter = decl->getGetterMethodDecl();
+      assert(clangGetter && "ObjC property without getter");
+      if (!clangGetter)
+        return nullptr;
+
       // Import the getter.
-      AccessorDecl *getter = nullptr;
-      if (auto clangGetter = decl->getGetterMethodDecl()) {
-        getter = importAccessor(clangGetter, result, AccessorKind::IsGetter, dc);
-        if (!getter)
-          return nullptr;
-      }
+      AccessorDecl *getter = importAccessor(clangGetter, result,
+                                            AccessorKind::IsGetter, dc);
+      if (!getter)
+        return nullptr;
 
       // Import the setter, if there is one.
       AccessorDecl *setter = nullptr;
