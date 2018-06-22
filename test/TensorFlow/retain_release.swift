@@ -6,9 +6,9 @@ import TensorFlow
 // Unit tests on generating balanced retain/release SIL instructions.
 
 public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
-  let a = x.toDevice()
-  let b = y.toDevice()
-  let c = z.toDevice()
+  let a = x.toAccelerator()
+  let b = y.toAccelerator()
+  let c = z.toAccelerator()
   let _ = a + b + c
 }
 
@@ -47,7 +47,7 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 
 
 public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
-  let a = x.toDevice()
+  let a = x.toAccelerator()
   let _ = a + a + a
 }
 
@@ -78,7 +78,7 @@ public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
 // CHECK-LABEL: ---
 
 public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
-  let a = x.toDevice()
+  let a = x.toAccelerator()
   let tmp1 = a + a
   let tmp2 = tmp1 + a
   let _ = tmp1 + tmp2

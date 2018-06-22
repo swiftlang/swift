@@ -102,7 +102,7 @@ func test1RecvFloatTensor() {
   // One send.
   print(a.toHost())
   // One recv.
-  var b = atariSimFloat(a).toDevice()
+  var b = atariSimFloat(a).toAccelerator()
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)
@@ -119,7 +119,7 @@ func test1RecvIntTensor() {
   // One send.
   print(a.toHost())
   // One recv.
-  var b = atariSimInt(a).toDevice()
+  var b = atariSimInt(a).toAccelerator()
   b += a
   print("final b = \(b.toHost())")
   expectEqual(2, b.scalar)

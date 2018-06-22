@@ -11,7 +11,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
   x -= x  // expected-warning {{value implicitly copied to the host, use .toHost() to make transfer explicit}}
 
   print(x) // expected-note {{value used here}}
-  var y = b.toDevice()
+  var y = b.toAccelerator()
   y += y
   print(y)
 }
@@ -166,8 +166,8 @@ public func testExitBranch2(i: Int) {
 // This program results in a boolean parameter being passed in.
 public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
                             x: Tensor<Float>, y: Tensor<Float>) {
-  var a = x.toDevice()
-  let b = y.toDevice()
+  var a = x.toAccelerator()
+  let b = y.toAccelerator()
 
   if cond {  // expected-note {{value used here}}
     a -= b
@@ -198,8 +198,8 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
 
 public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly copied to the accelerator}}
                              x: Tensor<Float>, y: Tensor<Float>) {
-  var a = x.toDevice()
-  let b = y.toDevice()
+  var a = x.toAccelerator()
+  let b = y.toAccelerator()
 
   a += b
 
@@ -232,8 +232,8 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {
-  var a = arg1.toDevice()
-  let b = arg2.toDevice()
+  var a = arg1.toAccelerator()
+  let b = arg2.toAccelerator()
 
   a += b
 
@@ -285,7 +285,7 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // disprove away the optional check, so we'll need to send a bit back to the
 // host.
 public func scalar_manipulation(a : Float) -> Tensor<Float> {
-  // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  // expected-warning @-1 {{'a' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
 
   // expected-note @+1 {{value used here}}
   let x = Tensor<Float>(a) + Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
@@ -360,9 +360,9 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 // This should produce exactly one live out value in the call to
 // _swift_tfc_FinishTensorComputation.
 public func liveOutTest(
-  a: Tensor<Float>, // expected-warning {{'a' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
-  b: Tensor<Float>, // expected-warning {{'b' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
-  c: Tensor<Float> // expected-warning {{'c' implicitly copied to the accelerator, use .toDevice() to make transfer explicit}}
+  a: Tensor<Float>, // expected-warning {{'a' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
+  b: Tensor<Float>, // expected-warning {{'b' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
+  c: Tensor<Float> // expected-warning {{'c' implicitly copied to the accelerator, use .toAccelerator() to make transfer explicit}}
 ) -> Tensor<Float> {
   return a+b+c // expected-note 3 {{value used here}}
 }
@@ -435,7 +435,7 @@ CHECK-LABEL: ----
 // even though it has tensor operands.
 @inline(never)
 func shouldntInline(_ a: Tensor<Float>) -> Tensor<Float> {
-  let b = a.toDevice()
+  let b = a.toAccelerator()
   return (b*b).toHost()
 }
 
