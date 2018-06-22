@@ -1831,6 +1831,10 @@ extension Collection where Element: Hashable {
   }
   
   internal func _firstRange<C: BidirectionalCollection>(of pattern: C, startingAt: Index) -> Range<Index>? where C.Element == Element {
+    if let result = _customFirstRangeOfEquatableElements(pattern, index) {
+      return result
+    }
+    
     if pattern.isEmpty || isEmpty {
       return nil
     }
@@ -1876,19 +1880,6 @@ extension Collection where Element: Hashable {
   public func allRanges<C: BidirectionalCollection>(of pattern: C, overlapping: Bool = false) -> [Range<Index>] where C.Element == Element {
     let lazyCollection = LazyRangeCollection(self, pattern, overlapping: overlapping)
     let result = [Range<Index>](lazyCollection)
-    return result
-  }
-  
-  public func split<C: BidirectionalCollection>(separatedBy separator: C, separatorBehavior: SeparatorBehavior = .excluded, maxSplits: Int = Int.max, omittingEmptySubsequences: Bool = true) -> [SubSequence] where C.Element == Element {
-    _precondition(maxSplits >= 0, "Must take zero or more splits")
-    
-    if maxSplits == 0 || isEmpty || separator.isEmpty {
-      return [self[...]]
-    }
-    
-    let seq = LazySplitCollection(self, separator: separator, omittingEmptySubsequences: omittingEmptySubsequences, behavior: separatorBehavior)
-    let result = [SubSequence](seq)
-    
     return result
   }
 }
