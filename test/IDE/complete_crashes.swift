@@ -246,7 +246,6 @@ func foo_38272904(a: A_38272904) {
 }
 // RDAR_38272904: Begin completions
 
-
 // rdar://problem/41159258
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_1 | %FileCheck %s -check-prefix=RDAR_41159258
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=RDAR41159258_2 | %FileCheck %s -check-prefix=RDAR_41159258
@@ -287,3 +286,13 @@ public final class IntStore {
   }
 }
 // RDAR_41232519: Begin completions
+
+// rdar://problem/28188259
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_28188259 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_28188259
+func test_28188259(x: ((Int) -> Void) -> Void) {
+  x({_ in }#^RDAR_28188259^#)
+}
+// RDAR_28188259: Begin completions
+// RDAR_28188259-DAG: Pattern/CurrModule:                 ({#_#})[#Void#]; name=(_)
+// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
+// RDAR_28188259: End completions
