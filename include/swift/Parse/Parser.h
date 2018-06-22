@@ -811,6 +811,14 @@ public:
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
 
+  /// Parse the arguments inside the @differentiable attribute.
+  bool parseDifferentiableAttributeArguments(
+      AutoDiffMode &mode, SourceLoc &modeLoc,
+      SmallVectorImpl<AutoDiffParameter> &params,
+      Optional<DifferentiableAttr::FunctionSpecifier> &primalSpec,
+      DifferentiableAttr::FunctionSpecifier &adjointSpec,
+      TrailingWhereClause *&whereClause);
+
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 

@@ -120,6 +120,9 @@ SYNTAX_TOKENS = [
           is_keyword=True),
     Token('PoundImageLiteral', 'pound_imageLiteral', text='#imageLiteral',
           is_keyword=True),
+    # SWIFT_ENABLE_TENSORFLOW
+    Token('PoundTensorFlowOp', 'pound_tfop', text='#tfop',
+          is_keyword=True),
     Token('Arrow', 'arrow', text='->'),
     Token('AtSign', 'at_sign', text='@'),
     Token('Colon', 'colon', text=':'),
