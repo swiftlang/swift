@@ -974,12 +974,13 @@ namespace {
         }
 
         // Determine whether this Objective-C class type is bridged to
-        // a Swift type.
+        // a Swift type. Hardcode "NSString" since it's referenced from
+        // the ObjectiveC module (a level below Foundation).
         Type bridgedType;
         if (auto objcClassDef = objcClass->getDefinition())
           bridgedType = mapSwiftBridgeAttr(objcClassDef);
-        else
-          bridgedType = mapSwiftBridgeAttr(objcClass);
+        else if (objcClass->getName() == "NSString")
+          bridgedType = Impl.SwiftContext.getStringDecl()->getDeclaredType();
 
         if (bridgedType) {
           // Gather the type arguments.
