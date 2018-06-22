@@ -2460,11 +2460,12 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// Add a RecvFromHost builtin to the accelerator function, as a placeholder for
 /// the subsequent graph lowering pass to generate the appropriate TF graph
 /// nodes to receive tensors from Swift host.
+/// `isScalar` specifies whether the value being received is a promoted scalar.
 ///
 /// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
 static SILValue
 createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
-                         unsigned idNumber,
+                         bool isScalar, unsigned idNumber,
                          GraphGlobalConfiguration &configuration) {
   auto &ctx = B.getASTContext();
   auto opType = "tfc.RecvFromHost";
@@ -2475,6 +2476,40 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   operands.push_back(tensorIdAttr);
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
                                       instName);
+
+  // For XLA compilation, and when receiving a promoted scalar from the host,
+  // add a __shapes pseudo-attr to assist the XLA compiler. This special case is
+  // handled within the compiler instead of Swift code (e.g. within TensorFlow
+  // stdlib or a test util such as _scalarTensorWithShape()), because here
+  // compiler is synthesizing a tensor.
+  //
+  // TODO: Do this also for XLA-based GPU (and CPU) execution. Consider
+  // extending `configuration` with a bool indicating if we are targeting XLA.
+  if (configuration.primaryDeviceType == DeviceType::TPU && isScalar) {
+    // Add a list of operands corresponding to a scalar-tensor shaped shape
+    // array attr, with opName extension "__shapes$shapearray,$shape". Note
+    // the single element in the shape array, the scalar shape, has no
+    // dimensions.
+
+    // First add the $shapearray operand.
+    instName += std::string(",") + SHAPE_ARRAY_ATTR;
+    instName += SILTensorOpInfo::getOperandClassSuffix(
+        SILTensorOpInfo::OperandClass::ShapeArray);
+    auto int64Ty = SILType::getBuiltinIntegerType(64, B.getASTContext());
+    operands.push_back(B.createIntegerLiteral(loc, int64Ty,
+                                              /*numShapes*/ 1));
+
+    // Now add a scalar shape (with no dimensions) to the shape array.
+    instName += ",";
+    instName += SILTensorOpInfo::getOperandClassSuffix(
+        SILTensorOpInfo::OperandClass::Shape);
+    auto scalarTy = getTensorHandleElementType(valueTy.getSwiftRValueType());
+    auto metatypeType =
+        MetatypeType::get(scalarTy, MetatypeRepresentation::Thin)
+            ->getCanonicalType();
+    operands.push_back(
+        B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType)));
+  }
   auto name = ctx.getIdentifier(instName);
   auto subMap =
     getSingleSubstitutionMapForBuiltin(name, valueTy.getASTType(), ctx);
@@ -2690,19 +2725,21 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
   auto loc = getUserSourceLocation(&inst);
 
   for (auto result : inst.getResults()) {
+    bool isScalar = !isTensorHandle(result->getType().getASTType());
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
-    this->ValueMap[result] = createAcceleratorReceive(
-        BA, loc, remapType(result->getType()), nextSendID, FP.configuration);
+    this->ValueMap[result] =
+        createAcceleratorReceive(BA, loc, remapType(result->getType()),
+                                 isScalar, nextSendID, FP.configuration);
 
-    // if `result` is a scalar, we need to convert it to TensorHandle<T>, before
-    // sending that value to accelerator. We pass such a function reference to
-    // createHostSend() below for this scalar->tensor conversion.
+    // if `result` is a scalar, we need to convert it to TensorHandle<T>,
+    // before sending that value to accelerator. We pass such a function
+    // reference to createHostSend() below for this scalar->tensor conversion.
     SILFunction *createScalarTensorFn = nullptr;
-    if (!isTensorHandle(result->getType().getASTType())) {
+    if (isScalar) {
       createScalarTensorFn = lookupSendReceiveFunction("scalar", result, loc);
-      // If `result` were not a send'able data type like String, compiler would
-      // not rejected the program before reaching here.
+      // If `result` were not a send'able data type like String, compiler
+      // would not rejected the program before reaching here.
       assert(createScalarTensorFn &&
              "At this point of compilation, scalar value must be send'able "
              "from Swift to TensorFlow.");
