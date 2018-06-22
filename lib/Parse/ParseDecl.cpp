@@ -956,7 +956,6 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // Parse a trailing 'where' clause if any.
-  // TrailingWhereClause *whereClause;
   if (Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirements;
