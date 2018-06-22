@@ -463,6 +463,8 @@ func objectLiterals() {
   #fileLiteral(a)
   #colorLiteral(a, b)
   #imageLiteral(a, b, c)
+  // SWIFT_ENABLE_TENSORFLOW
+  #tfop("Add", a, b, T: Int32.self)
   #column
   #file
   #function
@@ -539,3 +541,16 @@ struct S : Q, Equatable {
 }
 
 @_alignment(16) public struct float3 { public var x, y, z: Float }
+
+// SWIFT_ENABLE_TENSORFLOW
+@differentiable(reverse, adjoint: foo(_:_:))
+func bar(_ x: Float, _: Float) -> Float { return 1 }
+
+@differentiable(reverse, adjoint: foo(_:_:) where T : FloatingPoint)
+func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
+
+@differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: foo(_:_:))
+func bar(_ x: Float, _: Float) -> Float { return 1 }
+
+@differentiable(reverse, withRespectTo: (self, .0, .1), primal: bar, adjoint: foo(_:_:) where T : FloatingPoint)
+func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
