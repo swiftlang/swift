@@ -767,7 +767,6 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
-  ParserStatus Status;
   SourceLoc lParenLoc, rParenLoc;
 
   // Parse '('.
@@ -845,7 +844,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
   modeLoc = consumeToken(tok::identifier);
   // Parse comma.
-  parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+  parseToken(tok::comma, diag::attr_expected_comma, AttrName,
              /*isDeclModifier=*/false);
 
   // Parse optional differentiation parameters, starting with the
@@ -894,8 +893,8 @@ bool Parser::parseDifferentiableAttributeArguments(
         return true;
       }
       if (Tok.isNot(tok::r_paren))
-        return parseToken(tok::comma, diag::attr_expected_comma,
-                          "differentiable", /*isDeclModifier=*/false);
+        return parseToken(tok::comma, diag::attr_expected_comma, AttrName,
+                          /*isDeclModifier=*/false);
       return false;
     };
 
@@ -911,7 +910,7 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxKind::DifferentiableAttributeDiffParamList);
     // Parse closing ')' of the parameter list and a comma.
     consumeToken(tok::r_paren);
-    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
                /*isDeclModifier=*/false);
   }
 
@@ -942,7 +941,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     primalSpec = FuncSpec();
     if (parseFuncSpec("primal", *primalSpec)) return errorAndSkipToEnd();
     // Parse comma.
-    parseToken(tok::comma, diag::attr_expected_comma, "differentiable",
+    parseToken(tok::comma, diag::attr_expected_comma, AttrName,
                /*isDeclModifier=*/false);
   }
 
