@@ -1,7 +1,12 @@
+// RUN: rm -rf %t/stats-dir
+// RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -output-request-graphviz %t.dot 2> %t.cycles
+// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
 // RUN: %FileCheck %s < %t.cycles
 // RUN: %FileCheck -check-prefix CHECK-DOT %s  < %t.dot
+
+// Check that we produced superclass type requests.
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 16' %t/stats-dir
 
 class C : B { } // expected-error{{circular class inheritance 'C' -> 'B' -> 'A' -> 'C'}}
 class B : A { } // expected-note{{class 'B' declared here}}

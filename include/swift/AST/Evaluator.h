@@ -41,6 +41,7 @@ using llvm::Optional;
 using llvm::None;
 
 class DiagnosticEngine;
+class UnifiedStatsReporter;
 
 /// Pretty stack trace handler for an arbitrary request.
 template<typename Request>
@@ -56,6 +57,12 @@ public:
     out << "\n";
   }
 };
+
+/// Report that a request of the given kind is being evaluated, so it
+/// can be recoded by the stats reporter.
+template<typename Request>
+void reportEvaluatedRequest(UnifiedStatsReporter &stats,
+                            const Request &request) { }
 
 /// Evaluation engine that evaluates and caches "requests", checking for cyclic
 /// dependencies along the way.
@@ -127,6 +134,10 @@ class Evaluator {
   /// Whether to diagnose cycles or ignore them completely.
   CycleDiagnosticKind shouldDiagnoseCycles;
 
+  /// Used to report statistics about which requests were evaluated, if
+  /// non-null.
+  UnifiedStatsReporter *stats = nullptr;
+
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<AnyRequest> activeRequests;
@@ -149,6 +160,10 @@ public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
   Evaluator(DiagnosticEngine &diags, CycleDiagnosticKind shouldDiagnoseCycles);
+
+  /// Set the unified stats reporter through which evaluated-request
+  /// statistics will be recorded.
+  void setStatsReporter(UnifiedStatsReporter *stats) { this->stats = stats; }
 
   /// Evaluate the given request and produce its result,
   /// consulting/populating the cache as required.
@@ -228,6 +243,10 @@ private:
     dependencies[request].clear();
 
     PrettyStackTraceRequest<Request> prettyStackTrace(request);
+
+    /// Update statistics.
+    if (stats) reportEvaluatedRequest(*stats, request);
+
     return request(*this);
   }
 
@@ -244,6 +263,11 @@ private:
     // Clear out the dependencies on this request; we're going to recompute
     // them now anyway.
     dependencies[request].clear();
+
+    PrettyStackTraceRequest<Request> prettyStackTrace(request);
+
+    /// Update statistics.
+    if (stats) reportEvaluatedRequest(*stats, request);
 
     // Service the request.
     auto result = request(*this);

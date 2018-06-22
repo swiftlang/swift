@@ -528,6 +528,12 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
   llvm_unreachable("bad AllocationArena");
 }
 
+/// Set a new stats reporter.
+void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
+  Stats = stats;
+  evaluator.setStatsReporter(stats);
+}
+
 syntax::SyntaxArena &ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
