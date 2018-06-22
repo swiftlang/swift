@@ -22,6 +22,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -2005,6 +2006,109 @@ static void createStubBody(TypeChecker &tc, ConstructorDecl *ctor) {
   ctor->setStubImplementation(true);
 }
 
+static std::tuple<GenericSignature *, GenericEnvironment *,
+                  GenericParamList *, SubstitutionMap>
+configureGenericDesignatedInitOverride(ASTContext &ctx,
+                                       ClassDecl *classDecl,
+                                       Type superclassTy,
+                                       ConstructorDecl *superclassCtor) {
+  auto *superclassDecl = superclassTy->getAnyNominal();
+
+  auto *moduleDecl = classDecl->getParentModule();
+  auto subMap = superclassTy->getContextSubstitutionMap(
+      moduleDecl, superclassDecl);
+
+  GenericSignature *genericSig;
+  GenericEnvironment *genericEnv;
+
+  // Inheriting initializers that have their own generic parameters
+  auto *genericParams = superclassCtor->getGenericParams();
+  if (genericParams) {
+    SmallVector<GenericTypeParamDecl *, 4> newParams;
+
+    // First, clone the superclass constructor's generic parameter list,
+    // but change the depth of the generic parameters to be one greater
+    // than the depth of the subclass.
+    unsigned depth = 0;
+    if (auto *genericSig = classDecl->getGenericSignature())
+      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+
+    for (auto *param : genericParams->getParams()) {
+      auto *newParam = new (ctx) GenericTypeParamDecl(classDecl,
+                                                      param->getName(),
+                                                      SourceLoc(),
+                                                      depth,
+                                                      param->getIndex());
+      newParams.push_back(newParam);
+    }
+
+    // We don't have to clone the requirements, because they're not
+    // used for anything.
+    genericParams = GenericParamList::create(ctx,
+                                             SourceLoc(),
+                                             newParams,
+                                             SourceLoc(),
+                                             ArrayRef<RequirementRepr>(),
+                                             SourceLoc());
+    genericParams->setOuterParameters(classDecl->getGenericParamsOfContext());
+
+    // Build a generic signature for the derived class initializer.
+    GenericSignatureBuilder builder(ctx);
+    builder.addGenericSignature(classDecl->getGenericSignature());
+
+    // Add the generic parameters.
+    for (auto *newParam : newParams)
+      builder.addGenericParameter(newParam);
+
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+    auto *superclassSig = superclassCtor->getGenericSignature();
+
+    unsigned superclassDepth = 0;
+    if (auto *genericSig = superclassDecl->getGenericSignature())
+      superclassDepth = genericSig->getGenericParams().back()->getDepth() + 1;
+
+    // We're going to be substituting the requirements of the base class
+    // initializer to form the requirements of the derived class initializer.
+    auto substFn = [&](SubstitutableType *type) -> Type {
+      auto *gp = cast<GenericTypeParamType>(type);
+      if (gp->getDepth() < superclassDepth)
+        return Type(gp).subst(subMap);
+      return CanGenericTypeParamType::get(
+        gp->getDepth() - superclassDepth + depth,
+          gp->getIndex(),
+          ctx);
+    };
+
+    auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy, ProtocolType *protoType)
+        -> Optional<ProtocolConformanceRef> {
+      auto *proto = protoType->getDecl();
+      if (!subMap.empty())
+        if (auto conf = subMap.lookupConformance(depTy, proto))
+          return conf;
+
+      return ProtocolConformanceRef(proto);
+    };
+
+    for (auto reqt : superclassSig->getRequirements())
+      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
+        builder.addRequirement(*substReqt, source, nullptr);
+
+    // Now form the substitution map that will be used to remap parameter
+    // types.
+    subMap = superclassSig->getSubstitutionMap(substFn, lookupConformanceFn);
+
+    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    genericEnv = genericSig->createGenericEnvironment();
+  } else {
+    genericEnv = classDecl->getGenericEnvironment();
+    genericSig = classDecl->getGenericSignature();
+  }
+
+  return std::make_tuple(genericSig, genericEnv, genericParams, subMap);
+}
+
 static void configureDesignatedInitAttributes(TypeChecker &tc,
                                               ClassDecl *classDecl,
                                               ConstructorDecl *ctor,
@@ -2082,9 +2186,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                                     ClassDecl *classDecl,
                                     ConstructorDecl *superclassCtor,
                                     DesignatedInitKind kind) {
-  // FIXME: Inheriting initializers that have their own generic parameters
-  if (superclassCtor->getGenericParams())
-    return nullptr;
+  auto &ctx = tc.Context;
 
   // Lookup will sometimes give us initializers that are from the ancestors of
   // our immediate superclass.  So, from the superclass constructor, we look
@@ -2098,14 +2200,23 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
       superclassCtor->getDeclContext()
           ->getAsNominalTypeOrNominalTypeExtensionContext();
   Type superclassTy = classDecl->getSuperclass();
-  Type superclassTyInContext = classDecl->mapTypeIntoContext(superclassTy);
   NominalTypeDecl *superclassDecl = superclassTy->getAnyNominal();
   if (superclassCtorDecl != superclassDecl) {
     return nullptr;
   }
 
+  GenericSignature *genericSig;
+  GenericEnvironment *genericEnv;
+  GenericParamList *genericParams;
+  SubstitutionMap subMap;
+
+  std::tie(genericSig, genericEnv, genericParams, subMap) =
+      configureGenericDesignatedInitOverride(ctx,
+                                             classDecl,
+                                             superclassTy,
+                                             superclassCtor);
+
   // Determine the initializer parameters.
-  auto &ctx = tc.Context;
 
   // Create the 'self' declaration and patterns.
   auto *selfDecl = ParamDecl::createSelf(SourceLoc(), classDecl);
@@ -2113,39 +2224,18 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
   options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx,options);
+  auto *bodyParams = superclassCtor->getParameterList(1)->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (superclassDecl->getGenericSignatureOfContext()) {
-    auto *moduleDecl = classDecl->getParentModule();
-    auto subMap = superclassTyInContext->getContextSubstitutionMap(
-        moduleDecl,
-        superclassDecl,
-        classDecl->getGenericEnvironment());
-
-    for (auto *decl : *bodyParams) {
-      auto paramTy = decl->getInterfaceType()->getInOutObjectType();
-
-      // Apply the superclass substitutions to produce a contextual
-      // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subMap);
-      decl->setType(paramSubstTy);
-
-      // Map it to an interface type in terms of the derived class
-      // generic signature.
-      decl->setInterfaceType(paramSubstTy->mapTypeOutOfContext());
-    }
-  } else {
-    for (auto *decl : *bodyParams) {
-      if (!decl->hasType())
-        decl->setType(
-          classDecl->mapTypeIntoContext(
-            decl->getInterfaceType()->getInOutObjectType()));
-    }
+  for (auto *decl : *bodyParams) {
+    auto paramTy = decl->getInterfaceType()->getInOutObjectType();
+    auto substTy = paramTy.subst(subMap);
+    decl->setInterfaceType(substTy);
+    decl->setType(GenericEnvironment::mapTypeIntoContext(genericEnv, substTy));
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -2158,13 +2248,14 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
                               selfDecl, bodyParams,
-                              /*GenericParams=*/nullptr, classDecl);
+                              genericParams, classDecl);
 
   ctor->setImplicit();
 
   // Set the interface type of the initializer.
-  ctor->setGenericEnvironment(classDecl->getGenericEnvironmentOfContext());
-  tc.configureInterfaceType(ctor, ctor->getGenericSignature());
+  ctor->setGenericEnvironment(genericEnv);
+
+  tc.configureInterfaceType(ctor, genericSig);
   ctor->setValidationStarted();
 
   configureDesignatedInitAttributes(tc, classDecl,
