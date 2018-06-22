@@ -3,7 +3,7 @@
 
 This directory contains the Swift Benchmark Suite. This is meant to be a suite
 of regression, micro, small, and medium sized benchmarks that are used to
-validate the performance of the Swift compiler and standard library.
+validate the performance of the Swift compiler and standard library. There aretwo main steps to using
 
 ## Building Swift Benchmarks
 
