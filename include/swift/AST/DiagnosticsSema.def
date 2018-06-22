@@ -622,7 +622,7 @@ ERROR(reserved_member_name,none,
 
 ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
 WARNING(invalid_redecl_swift5_warning,none,
-        "redeclaration of %0 is deprecated and will be illegal in Swift 5",
+        "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
 
 NOTE(invalid_redecl_prev,none,
