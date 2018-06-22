@@ -1414,7 +1414,8 @@ ValueDecl::getAccessSemanticsFromContext(const DeclContext *UseDC,
 
 AccessStrategy
 AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
-                                       AccessKind accessKind) const {
+                                       AccessKind accessKind,
+                                       DeclContext *accessFromDC) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     switch (getStorageKind()) {
@@ -1481,7 +1482,14 @@ AbstractStorageDecl::getAccessStrategy(AccessSemantics semantics,
       // This is done by using DirectToStorage semantics above, with the
       // understanding that the access semantics are with respect to the
       // resilience domain of the accessor's caller.
-      if (isResilient())
+      bool resilient;
+      if (accessFromDC)
+        resilient = isResilient(accessFromDC->getParentModule(),
+                                ResilienceExpansion::Maximal);
+      else
+        resilient = isResilient();
+      
+      if (resilient)
         return AccessStrategy::DirectToAccessor;
 
       if (storageKind == StoredWithObservers ||

@@ -849,7 +849,7 @@ void SILModule::setOptRecordStream(
 SILProperty *SILProperty::create(SILModule &M,
                                  bool Serialized,
                                  AbstractStorageDecl *Decl,
-                                 KeyPathPatternComponent Component) {
+                                 Optional<KeyPathPatternComponent> Component) {
   auto prop = new (M) SILProperty(Serialized, Decl, Component);
   M.properties.push_back(prop);
   return prop;

@@ -2648,10 +2648,10 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   if (auto sig = getDecl()->getInnermostDeclContext()
                           ->getGenericSignatureOfContext()) {
     sig->getCanonicalSignature()->print(OS, Options);
-    OS << ' ';
   }
-  OS << '(';
-  SILPrinter(Ctx).printKeyPathPatternComponent(getComponent());
+  OS << " (";
+  if (auto component = getComponent())
+    SILPrinter(Ctx).printKeyPathPatternComponent(*component);
   OS << ")\n";
 }
 
