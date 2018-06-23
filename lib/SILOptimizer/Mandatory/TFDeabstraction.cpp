@@ -251,7 +251,7 @@ void TFDeabstraction::inlineCalls() {
        if (callee.empty() &&
            !site.getModule().linkFunction(&callee,
                                           SILModule::LinkingMode::LinkAll))
-         return nullptr;
+         return false;
 
        if (!shouldInline(site, callee))
          return false;
