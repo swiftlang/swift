@@ -47,3 +47,80 @@ public func testDatasetWithMNIST() {
 // The operands can appear in arbitrary order here.
 // CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
 // CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
+
+
+// Creates a dataset, which produces one float scalar value in each get next
+// call.
+// TODO: declare with @convention tensorflow
+// Enforce no sends/recvs, and all logic is lowered to TF graph.
+public func createMockDataSet__magic_tf_only__() -> VariantHandle {
+  let values = Tensor<Float>([1.0, 2.0, 3.0])
+  // REGISTER_OP("TensorSliceDataset")
+  //   .Input("components: Toutput_types")
+  //   .Output("handle: variant")
+  //   .Attr("Toutput_types: list(type) >= 1")
+  //   .Attr("output_shapes: list(shape) >= 1")
+  let dataset : VariantHandle = #tfop("TensorSliceDataset",
+                                      [values],
+                                      Toutput_types: [Float.self],
+                                      output_shapes: [TensorShape()])
+  return dataset
+}
+
+// The lowered graph should only contain the graph function, and not any
+// top-level nodes.
+//
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}createMockDataSet__magic_tf_only__{{.*}}
+// CHECK-NOT:   node {
+// CHECK:       function {
+// CHECK-NEXT:    signature {
+// CHECK-NEXT:      name: "{{.*}}createMockDataSet__magic_tf_only__{{.*}}.tf_CPU.device_partition"
+// CHECK:           output_arg {
+// CHECK-NEXT:        name: "op_createmockdataset__magic_tf_only__{{.*}}"
+// CHECK-NEXT:        type: DT_VARIANT
+// CHECK-NEXT:      }
+
+// TODO: support taking the following function typed parameter.
+// _ datasetCreator : @convention(tensorflow) () -> VariantHandle
+public func model() {
+  // REGISTER_OP("OneShotIterator")
+  //   .Output("handle: resource")
+  //   .Attr("dataset_factory: func")
+  //   .Attr("output_types: list(type) >= 1")
+  //   .Attr("output_shapes: list(shape) >= 1")
+  //   .Attr("container: string = ''")
+  //   .Attr("shared_name: string = ''")  
+  let iterator: ResourceHandle = #tfop(
+    "OneShotIterator",
+    container: "",
+    dataset_factory : /*datasetCreator*/createMockDataSet__magic_tf_only__,
+    output_types: [Float.self],
+    output_shapes: [TensorShape()],
+    shared_name: ""
+  )
+
+  // REGISTER_OP("IteratorGetNext")
+  //   .Input("iterator: resource")
+  //   .Output("components: output_types")
+  //   .Attr("output_types: list(type) >= 1")
+  //   .Attr("output_shapes: list(shape) >= 1")
+  let one: Tensor<Float> = #tfop("IteratorGetNext",
+                                 iterator,
+                                 output_types: [Float.self],
+                                 output_shapes: [TensorShape()])
+  _hostOp(one)
+}
+
+// The lowered graph should only contain two graph functions, plus the
+// top-level nodes for calling the grah function lowered from model().
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}model{{.*}}
+// CHECK:      node {
+// CHECK-NEXT:   name: "{{.*}}model{{.*}}"
+// CHECK-NEXT:   op: "{{.*}}model{{.*}}.tf_CPU.device_partition"
+// CHECK:      node {
+// CHECK-NEXT:  name: "tfc_output_0_{{.*}}model{{.*}}"
+
+// CHECK:       function {
+// CHECK:       function {
+// CHECK-NOT:   function {
