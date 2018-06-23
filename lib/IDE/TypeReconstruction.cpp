@@ -786,9 +786,10 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
       cast<TypeAliasDecl>(generic_type_result._decls.front());
   GenericSignature *signature = genericTypeAlias->getGenericSignature();
   // FIXME: handle conformances.
-  SubstitutionMap subMap =
-      SubstitutionMap::get(signature, template_types_result._types,
-                           ArrayRef<ProtocolConformanceRef>({}));
+  SubstitutionMap subMap;
+  if (signature)
+    subMap = SubstitutionMap::get(signature, template_types_result._types,
+                                  ArrayRef<ProtocolConformanceRef>({}));
   Type parentType;
   if (auto nominal = genericTypeAlias->getDeclContext()
                          ->getAsNominalTypeOrNominalTypeExtensionContext()) {
