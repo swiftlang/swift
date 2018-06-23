@@ -190,20 +190,35 @@ PythonRuntimeTestSuite.test("MethodCalling") {
               greeting.format("Hey", first: "Jane", last: "Doe"))
 }
 
-PythonRuntimeTestSuite.test("PythonConvertible") {
+PythonRuntimeTestSuite.test("ConvertibleFromPython") {
   // Ensure that we cover the -1 case as this is used by Python
   // to signal conversion errors.
   let minusOne: PythonObject = -1
   let zero: PythonObject = 0
+  let five: PythonObject = 5
   let half: PythonObject = 0.5
   let string: PythonObject = "abc"
 
   expectEqual(-1, Int(minusOne))
+  expectEqual(-1, Int8(minusOne))
+  expectEqual(-1, Int16(minusOne))
+  expectEqual(-1, Int32(minusOne))
+  expectEqual(-1, Int64(minusOne))
+  expectEqual(-1.0, Float(minusOne))
   expectEqual(-1.0, Double(minusOne))
 
   expectEqual(0, Int(zero))
   expectEqual(0.0, Double(zero))
 
+  expectEqual(5, UInt(five))
+  expectEqual(5, UInt8(five))
+  expectEqual(5, UInt16(five))
+  expectEqual(5, UInt32(five))
+  expectEqual(5, UInt64(five))
+  expectEqual(5.0, Float(five))
+  expectEqual(5.0, Double(five))
+
+  expectEqual(0.5, Float(half))
   expectEqual(0.5, Double(half))
   // Python rounds down in this case.
   expectEqual(0, Int(half))
@@ -213,6 +228,27 @@ PythonRuntimeTestSuite.test("PythonConvertible") {
   expectNil(String(zero))
   expectNil(Int(string))
   expectNil(Double(string))
+}
+
+PythonRuntimeTestSuite.test("PythonConvertible") {
+  let minusOne: PythonObject = -1
+  let five: PythonObject = 5
+
+  expectEqual(minusOne, Int(-1).pythonObject)
+  expectEqual(minusOne, Int8(-1).pythonObject)
+  expectEqual(minusOne, Int16(-1).pythonObject)
+  expectEqual(minusOne, Int32(-1).pythonObject)
+  expectEqual(minusOne, Int64(-1).pythonObject)
+  expectEqual(minusOne, Float(-1).pythonObject)
+  expectEqual(minusOne, Double(-1).pythonObject)
+
+  expectEqual(five, UInt(5).pythonObject)
+  expectEqual(five, UInt8(5).pythonObject)
+  expectEqual(five, UInt16(5).pythonObject)
+  expectEqual(five, UInt32(5).pythonObject)
+  expectEqual(five, UInt64(5).pythonObject)
+  expectEqual(five, Float(5).pythonObject)
+  expectEqual(five, Double(5).pythonObject)
 }
 
 runAllTests()
