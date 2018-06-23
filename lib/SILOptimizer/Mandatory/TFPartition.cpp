@@ -844,7 +844,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
                           bool isTensorProgramArgument) {
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
-  if (auto *apply = dyn_cast<ApplyInst>((SILNode*)value))
+  if (auto *apply = dyn_cast<ApplyInst>(value))
     if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
       explicitCopyMarkers.insert(apply);
       return;
@@ -1165,7 +1165,7 @@ static ScalarPromoteClass shouldPromoteToTensorOp(SILInstruction *inst,
 
   // We can handle (struct_extract x, 0) if x is __tf_get_scalar_or_die.
   if (auto *SE = dyn_cast<StructExtractInst>(inst)) {
-    auto *op = dyn_cast<SILInstruction>((SILNode*)SE->getOperand());
+    auto *op = SE->getOperand()->getDefiningInstruction();
     if (op && SE->getFieldNo() == 0 &&
         classifyInst(op) == PartitioningClass::GetScalarOrDie)
       return ScalarPromoteClass::ShouldPromote;
@@ -1418,7 +1418,7 @@ static bool hoistValueAboveStartPoint(SILInstruction *inst,
     // We can hoist one of these instructions if all of their operands are
     // hoistable.
     for (auto &op : inst->getAllOperands()) {
-      if (auto *opInst = dyn_cast<SILInstruction>((SILNode*)op.get())) {
+      if (auto *opInst = op.get()->getDefiningInstruction()) {
         if (!hoistValueAboveStartPoint(opInst, tensorStartPoint, DI))
           return false;
       } else if (!DI.properlyDominates(op.get(), tensorStartPoint))
@@ -1550,7 +1550,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   if (auto *arg = dyn_cast<SILArgument>(value))
     return markArgument(arg, user);
 
-  auto *inst = cast<SILInstruction>((SILNode*)value);
+  auto *inst = value->getDefiningInstruction();
   if (markedInstructions.count(inst))
     return;
 
@@ -2632,9 +2632,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       // In this case we set `value` to the Float operand like %33 above.
       auto *SEI = cast<StructExtractInst>(value->getDefiningInstruction());
       assert(SEI->getFieldNo() == 0);
-      auto *structValue = cast<SILInstruction>((SILNode *)SEI->getOperand());
-      assert(structValue->getNumResults() == 1);
-      value = structValue->getResults()[0];
+      value = SEI->getOperand();
       scalarValueTy = value->getType().getASTType();
     }
     tensorValueTy =
@@ -2758,7 +2756,7 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
 }
 
 bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
-  assert(isa<SILInstruction>((SILNode*)value) || isa<SILArgument>(value) &&
+  assert(value->getDefiningInstruction() || isa<SILArgument>(value) &&
          "Don't know how to receive this value");
   SILFunction *receiveFn =
       lookupSendReceiveFunction("receiveFromAccelerator", value, loc);
@@ -2772,11 +2770,11 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   SILBuilder BH(FP.hostFn);      // Builder for the host.
   auto BA = getBuilder();        // Builder for accelerator.
 
-  if (auto *inst = dyn_cast<SILInstruction>((SILNode*)value)) {
+  if (auto *inst = value->getDefiningInstruction()) {
     assert(!isa<TermInst>(inst) && "Cannot move a terminator");
     BH.setInsertionPoint(++SILBasicBlock::iterator(inst));
 
-    auto otherInst = cast<SILInstruction>((SILNode*)ValueMap[value]);
+    auto otherInst = ValueMap[value]->getDefiningInstruction();
     BA.setInsertionPoint(++SILBasicBlock::iterator(otherInst));
 
   } else {
@@ -3854,9 +3852,10 @@ public:
     // generics.
     if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
       auto &ctx = hostFn->getASTContext();
-      diagnose(
-          ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
-          "TensorFlow partitioning does not work on generic functions yet");
+      diagnose(ctx, hostFn->getLocation().getSourceLoc(),
+               diag::tf_internal_error,
+               "TensorFlow graph program extraction does not work on generic "
+               "functions yet");
       return;
     }
 
@@ -3867,8 +3866,8 @@ public:
       diagnose(ctx, hostFn->getLocation().getSourceLoc(),
                diag::tf_internal_error,
                "nothing in the TensorFlow module should require partitioning, "
-               "did you forget @_inlineable on '" +
-                   hostFn->getName().str() + "'?");
+               "did you forget @inlinable on '" + hostFn->getName().str()
+               + "'?");
       return;
     }
 
