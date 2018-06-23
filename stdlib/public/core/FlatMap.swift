@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+public typealias LazyFlatMapSequence<Elements, SegmentOfResult> = 
+  LazySequence<FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>>
+public typealias LazyCompactMapSequence<Elements, ElementOfResult> = 
+  LazyMapSequence<LazyFilterSequence<LazyMapSequence<Elements, ElementOfResult?>>, ElementOfResult>
+
 extension LazySequenceProtocol {
   /// Returns the concatenated results of mapping the given transformation over
   /// this sequence.
@@ -23,8 +28,7 @@ extension LazySequenceProtocol {
   @inlinable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
-  ) -> LazySequence<
-    FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
+  ) -> LazyFlatMapSequence<Elements, SegmentOfResult> {
     return self.map(transform).joined()
   }
 
@@ -41,11 +45,7 @@ extension LazySequenceProtocol {
   @inlinable // FIXME(sil-serialize-all)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapSequence<
-    LazyFilterSequence<
-      LazyMapSequence<Elements, ElementOfResult?>>,
-    ElementOfResult
-  > {
+  ) -> LazyCompactMapSequence<Elements, ElementOfResult> {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 
@@ -73,6 +73,11 @@ extension LazySequenceProtocol {
   }
 }
 
+public typealias LazyFlatMapCollection<Elements, SegmentOfResult> =
+  LazyCollection<FlattenCollection<LazyMapCollection<Elements, SegmentOfResult>>>
+public typealias LazyCompactMapCollection<Elements, ElementOfResult> =
+  LazyMapCollection<LazyFilterCollection<LazyMapCollection<Elements, ElementOfResult?>>, ElementOfResult>
+
 extension LazyCollectionProtocol {
   /// Returns the concatenated results of mapping the given transformation over
   /// this collection.
@@ -86,10 +91,7 @@ extension LazyCollectionProtocol {
   @inlinable // FIXME(sil-serialize-all)
   public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Element) -> SegmentOfResult
-  ) -> LazyCollection<
-    FlattenCollection<
-      LazyMapCollection<Elements, SegmentOfResult>>
-  > {
+  ) -> LazyFlatMapCollection<Elements, SegmentOfResult> {
     return self.map(transform).joined()
   }
 
@@ -106,11 +108,7 @@ extension LazyCollectionProtocol {
   @inlinable // FIXME(sil-serialize-all)
   public func compactMap<ElementOfResult>(
     _ transform: @escaping (Elements.Element) -> ElementOfResult?
-  ) -> LazyMapCollection<
-    LazyFilterCollection<
-      LazyMapCollection<Elements, ElementOfResult?>>,
-    ElementOfResult
-  > {
+  ) -> LazyCompactMapCollection<Elements, ElementOfResult> {
     return self.map(transform).filter { $0 != nil }.map { $0! }
   }
 
