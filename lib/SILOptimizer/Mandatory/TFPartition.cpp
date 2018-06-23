@@ -711,7 +711,7 @@ static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
 
 class TFFunctionPartition {
 public:
-  SILFunction &fn;
+  SILFunction &hostFn;
   ModuleDecl &tensorFlowModule;  // TensorFlow standard library.
   GraphGlobalConfiguration configuration; // Device placement info.
   DominanceInfo &DI;
@@ -773,19 +773,19 @@ public:
 
   /// Set of all of the __tf_send calls that silence copy-in warnings.
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
+
  public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule)
-      : fn(Fn),
-        tensorFlowModule(tensorFlowModule),
-        configuration(findConfiguration(fn)),
+      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
+        configuration(findConfiguration(Fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
   bool markFunction();
 
   struct PartitionedTensorProgram {
-    SILFunction *fn;  // The function representing the tensor program.
+    SILFunction *acceleratorFn; // The function representing the tensor program.
 
     /// These are placeholder instructions inserted during partitioning to
     /// represent the tensor program itself.  These will be replaced when the
@@ -853,7 +853,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // If we are running this in the context of an expression run in the REPL or
   // playgrounds, or script mode, then we should never emit a warning: we know
   // we're going to be implicitly copying things in as warnings all the time.
-  if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+  if (hostFn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
     return;
 
   // If this is an implicit tensor program argument in a Playground, don't emit
@@ -862,7 +862,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // arguments in general.  We should have a single consistent approach and not
   // special case playgrounds here.  This only affects @noinline functions
   // though so it isn't particularly important to figure out right now.
-  if (isTensorProgramArgument && fn.getASTContext().LangOpts.Playground)
+  if (isTensorProgramArgument && hostFn.getASTContext().LangOpts.Playground)
     return;
 
   // Since we're in early development and don't support copies, we always show
@@ -927,7 +927,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
       description = "'" + pd->getName().str().str() + "'";
   }
 
-  auto &ctx = fn.getModule().getASTContext();
+  auto &ctx = hostFn.getModule().getASTContext();
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diagID, description)
@@ -938,11 +938,11 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
     // If there was no source location, then we emitted an unhelpful error at
     // line 0 of a file that doesn't exist.  At least utter the demangled
     // function name so we have some way to track this down.
-    auto name =
-      Demangle::demangleSymbolAsString(fn.getName(),
-                      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-    diagnose(ctx, fn.getLocation().getSourceLoc(), diag::tf_op_misuse,
-             "located in " + name + " aka '" + fn.getName().str() + "'");
+    auto name = Demangle::demangleSymbolAsString(
+        hostFn.getName(),
+        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+    diagnose(ctx, hostFn.getLocation().getSourceLoc(), diag::tf_op_misuse,
+             "located in " + name + " aka '" + hostFn.getName().str() + "'");
     return;
   }
 
@@ -983,7 +983,7 @@ void TFFunctionPartition::diagnoseUsesFromHost(SILValue value, SILLocation loc){
     // If we are running this in the context of an expression run in the REPL or
     // playgrounds, or script mode, then we should never emit a warning: we know
     // we're going to be implicitly copying things in as warnings all the time.
-    if (fn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
+    if (hostFn.getName() == SWIFT_ENTRY_POINT_FUNCTION)
       continue;
 
     // Only emit one warning per use.
@@ -1004,7 +1004,7 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
     outs->flush();
   }
 
-  auto &ctx = fn.getModule().getASTContext();
+  auto &ctx = hostFn.getModule().getASTContext();
 
   // Emit the warning.
   diagnose(ctx, loc.getSourceLoc(), diag::tf_value_implicitly_copied_to_host)
@@ -1015,11 +1015,11 @@ diagnoseCopyToHost(SILValue value, SILInstruction *user, SILLocation loc) {
     // If there was no source location, then we emitted an unhelpful error at
     // line 0 of a file that doesn't exist.  At least utter the demangled
     // function name so we have some way to track this down.
-    auto name =
-      Demangle::demangleSymbolAsString(fn.getName(),
-                      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
-    diagnose(ctx, fn.getLocation().getSourceLoc(), diag::tf_op_misuse,
-             "located in " + name + " aka '" + fn.getName().str() + "'");
+    auto name = Demangle::demangleSymbolAsString(
+        hostFn.getName(),
+        Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+    diagnose(ctx, hostFn.getLocation().getSourceLoc(), diag::tf_op_misuse,
+             "located in " + name + " aka '" + hostFn.getName().str() + "'");
     return;
   }
 
@@ -1735,7 +1735,7 @@ void TFFunctionPartition::markTensorBBArgumentsForDeletion() {
   // evidence, we mark them as live, which propagates this liveness upwards,
   // marking other BB arguments potentially live.
   SmallPtrSet<SILArgument*, 16> potentiallyDeadArguments;
-  for (auto *block : llvm::depth_first(&fn)) {
+  for (auto *block : llvm::depth_first(&hostFn)) {
     for (auto *arg : block->getArguments()) {
       // Ignore non-tensor arguments.
       if (!isTensorFlowValue(arg->getType()))
@@ -1856,7 +1856,7 @@ bool TFFunctionPartition::markFunction() {
   // operation.
   SmallVector<SILInstruction*, 32> tensorOps;
   bool invalidOpFound = false;
-  for (auto *BB : llvm::depth_first(&fn)) {
+  for (auto *BB : llvm::depth_first(&hostFn)) {
     for (auto I = BB->begin(), E = BB->end(); I != E; I++) {
       auto *inst = &*I;
 
@@ -1877,8 +1877,9 @@ bool TFFunctionPartition::markFunction() {
       // can diagnose the errors).
       if (!loggedInput) {
         if (auto *outs = getTFDumpIntermediateStream()) {
-          *outs << "---- INPUT FUNCTION " << fn.getName() <<" ----------\n";
-          fn.print(*outs);
+          *outs << "---- INPUT FUNCTION " << hostFn.getName()
+                << " ----------\n";
+          hostFn.print(*outs);
           *outs << "---- END OF INPUT FUNCTION ----------\n";
           outs->flush();
         }
@@ -1893,9 +1894,9 @@ bool TFFunctionPartition::markFunction() {
         // user code, not the internal op attribute.  The bookkeeping for this
         // isn't obvious though.
         auto loc = getUserSourceLocation(inst);
-        diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+        diagnose(hostFn.getModule().getASTContext(), loc.getSourceLoc(),
                  diag::tf_op_misuse, error)
-          .highlight(loc.getSourceRange());
+            .highlight(loc.getSourceRange());
         invalidOpFound = true;
         continue;
       }
@@ -2004,7 +2005,7 @@ bool TFFunctionPartition::markFunction() {
   assert(tensorEndPoint && "Failed to compute an end point");
 
   if (auto *outs = getTFDumpIntermediateStream()) {
-    *outs << "\n---- ANALYSIS STATE FOR FUNCTION " << fn.getName()
+    *outs << "\n---- ANALYSIS STATE FOR FUNCTION " << hostFn.getName()
           << " ----------\n";
     *outs << "Tensor start point: ";
     tensorStartPoint->print(*outs);
@@ -2012,7 +2013,7 @@ bool TFFunctionPartition::markFunction() {
     tensorEndPoint->print(*outs);
 
     *outs << "SIL with markings:\n";
-    for (auto &BB : fn.getBlocks()) {
+    for (auto &BB : hostFn.getBlocks()) {
       SILPrintContext Ctx(*outs);
       *outs << "\n" << Ctx.getID(&BB) << ":\n";
       for (auto *arg : BB.getArguments()) {
@@ -2693,7 +2694,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
                                                         SILValue value,
                                                         SILLocation loc) {
-  auto &ctx = FP.fn.getASTContext();
+  auto &ctx = FP.hostFn.getASTContext();
   // If `value` is not receivable, reject the program with diagnostics.
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
   SmallVector<ProtocolConformance *, 1> conformances;
@@ -2709,7 +2710,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   assert(conformances.size() == 1 && "Found multiple conformance candidates.");
   DeclName fnDeclName(ctx.getIdentifier(fnName));
   auto *fn = findSILFunctionForRequiredProtocolMember(
-      nominal, proto, fnDeclName, &tensorFlowModule, FP.fn.getModule());
+      nominal, proto, fnDeclName, &tensorFlowModule, FP.hostFn.getModule());
   assert(fn);
   return fn;
 }
@@ -2768,7 +2769,7 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
   // Diagnose implicit data transfers if they are implicit.
   FP.diagnoseUsesFromHost(value, loc);
 
-  SILBuilder BH(FP.fn);          // Builder for the host.
+  SILBuilder BH(FP.hostFn);      // Builder for the host.
   auto BA = getBuilder();        // Builder for accelerator.
 
   if (auto *inst = dyn_cast<SILInstruction>((SILNode*)value)) {
@@ -2879,7 +2880,7 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
   // them over.
   initBlock(FP.tensorStartPoint->getParent());  // First block first.
 
-  for (auto &BB : FP.fn) {
+  for (auto &BB : FP.hostFn) {
     // If the BB is unmarked, we don't need it for the accelerator.
     if (!FP.markedBlocks.count(&BB) ||
         &BB == FP.tensorStartPoint->getParent())
@@ -2895,7 +2896,7 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
   // function in depth first order copying the code over.  Because we're working
   // in depth first order and have BB Arguments resolved, we're guaranteed to
   // see all definitions before uses.
-  for (auto *BB : llvm::depth_first(&FP.fn)) {
+  for (auto *BB : llvm::depth_first(&FP.hostFn)) {
     cloneBlock(BB);
   }
 
@@ -2925,10 +2926,10 @@ void PartitionCloner::cloneFunction(ArrayRef<SILValue> resultValues) {
       for (auto r : resultValues)
         results.push_back(remapValue(r));
 
-      result = Builder.createTuple(FP.fn.getLocation(), results);
+      result = Builder.createTuple(FP.hostFn.getLocation(), results);
     }
 
-    Builder.createReturn(FP.fn.getLocation(), result);
+    Builder.createReturn(FP.hostFn.getLocation(), result);
   }
 }
 
@@ -2979,7 +2980,7 @@ bool PartitionCloner::finalizeOriginal() {
           continue;
 
         // def could be NULL, say if the operand is produced by argument passed
-        // into FP.fn.
+        // into FP.hostFn.
         auto def = op->getDefiningInstruction();
         // True if `def` is to be removed from host program. e.g. if it's a
         // tensor op or a TupleExtractInst.
@@ -3285,8 +3286,8 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
 auto TFFunctionPartition::
 insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
        -> PartitionedTensorProgram {
-  auto &ctx = fn.getASTContext();
-  auto loc = fn.getLocation();
+  auto &ctx = hostFn.getASTContext();
+  auto loc = hostFn.getLocation();
 
   // We are going to create a call to this function to kick off the tensor
   // computation:
@@ -3304,9 +3305,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   //   _ helperFunctionCount: Int,
   //   _ resultCount: Int
   // ) -> TensorComputation {
-  auto startComputationFn =
-    fn.getModule().findFunction("_swift_tfc_StartTensorComputation",
-                                SILLinkage::PublicExternal);
+  auto startComputationFn = hostFn.getModule().findFunction(
+      "_swift_tfc_StartTensorComputation", SILLinkage::PublicExternal);
 
   // We are going to create a call to this function to syncronize with the
   // completed tensor computation and collect the results.
@@ -3316,9 +3316,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   //    _ computation: TensorComputation,
   //    _ resultAddress: UnsafeMutablePointer<CTensorHandle>,
   //    _ tensorResultCount: Int) {...}
-  auto finishComputationFn =
-    fn.getModule().findFunction("_swift_tfc_FinishTensorComputation",
-                                SILLinkage::PublicExternal);
+  auto finishComputationFn = hostFn.getModule().findFunction(
+      "_swift_tfc_FinishTensorComputation", SILLinkage::PublicExternal);
 
   // We may also generate a call to this function to kill the tensor computation
   // if the host execution goes away:
@@ -3328,13 +3327,11 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   //   _ computation: TensorComputation
   // ) {...}
   //
-  auto terminateComputationFn =
-    fn.getModule().findFunction("_swift_tfc_TerminateTensorComputation",
-                                SILLinkage::PublicExternal);
+  auto terminateComputationFn = hostFn.getModule().findFunction(
+      "_swift_tfc_TerminateTensorComputation", SILLinkage::PublicExternal);
 
   if (!startComputationFn || !finishComputationFn || !terminateComputationFn) {
-    diagnose(ctx, fn.getLocation().getSourceLoc(),
-             diag::tf_internal_error,
+    diagnose(ctx, hostFn.getLocation().getSourceLoc(), diag::tf_internal_error,
              "'_swift_tfc_' entrypoints not found in TensorFlow module");
     return { nullptr, nullptr, nullptr, nullptr, nullptr, SILValue() };
   }
@@ -3366,13 +3363,12 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   auto tensorHandleMember = *tensorHandleDecl->getStoredProperties().begin();
 
   // Ownership markers for CTensorHandle accesses.
-  auto loadOwnership =
-    fn.hasQualifiedOwnership() ? LoadOwnershipQualifier::Trivial :
-                                 LoadOwnershipQualifier::Unqualified;
-  auto storeOwnership =
-    fn.hasQualifiedOwnership() ? StoreOwnershipQualifier::Trivial :
-                                 StoreOwnershipQualifier::Unqualified;
-
+  auto loadOwnership = hostFn.hasQualifiedOwnership()
+                           ? LoadOwnershipQualifier::Trivial
+                           : LoadOwnershipQualifier::Unqualified;
+  auto storeOwnership = hostFn.hasQualifiedOwnership()
+                            ? StoreOwnershipQualifier::Trivial
+                            : StoreOwnershipQualifier::Unqualified;
 
   SILBuilder B(tensorStartPoint);
 
@@ -3649,7 +3645,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   SmallVector<SILValue, 4> resultValues;
 
   // Walk the function in a determinstic order to populate resultValues.
-  for (auto *block : llvm::depth_first(&fn)) {
+  for (auto *block : llvm::depth_first(&hostFn)) {
     for (auto &inst : *block) {
       auto it = markedInstructions.find(&inst);
 
@@ -3714,7 +3710,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   }
 
   if (auto *outs = getTFDumpIntermediateStream()) {
-    *outs << "\n---- PARTITION STATE FOR FUNCTION " << fn.getName()
+    *outs << "\n---- PARTITION STATE FOR FUNCTION " << hostFn.getName()
           << " ----------\n";
     *outs << "(Possibly updated) tensor end point: ";
     tensorEndPoint->print(*outs);
@@ -3752,15 +3748,13 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
 
   // Create the partitioned function, which never has arguments or result
   // values, since they get sent and received back and forth.
-  auto newFnType =
-    SILFunctionType::get(/*genericSig*/nullptr, SILFunctionType::ExtInfo(),
-                         SILCoroutineKind::None,
-                         ParameterConvention::Direct_Owned, params,
-                         /*interfaceYields*/{},
-                         results, /*interfaceErrorResult*/None,
-                         fn.getModule().getASTContext());
-  auto resultFn = fn.getModule().getOrCreateFunction(
-      fn.getLocation(), fn.getName().str() + ".tf", SILLinkage::Private,
+  auto newFnType = SILFunctionType::get(
+      /*genericSig*/ nullptr, SILFunctionType::ExtInfo(),
+      SILCoroutineKind::None, ParameterConvention::Direct_Owned, params,
+      /*interfaceYields*/ {}, results, /*interfaceErrorResult*/ None,
+      hostFn.getModule().getASTContext());
+  auto resultFn = hostFn.getModule().getOrCreateFunction(
+      hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
       /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
 
@@ -3774,7 +3768,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   if (!PC.finalizeOriginal()) return result;
 
   // Success!
-  result.fn = resultFn;
+  result.acceleratorFn = resultFn;
   return result;
 }
 
@@ -3828,8 +3822,8 @@ public:
 
   /// The entry point to the transformation.
   void run() override {
-    SILFunction *fn = getFunction();
-    auto &ctx = fn->getASTContext();
+    SILFunction *hostFn = getFunction();
+    auto &ctx = hostFn->getASTContext();
 
     // TODO(clattner): This logic will eventually be subsumed by the
     // corresponding logic in the TFDeabstraction pass.  Until deabstraction
@@ -3846,10 +3840,10 @@ public:
     // If this function is a building block of larger tensor programs (e.g.
     // the ops defined in the TensorFlow module), then don't transform it in
     // isolation.
-    if (!tfc.shouldBePartitioned(fn))
+    if (!tfc.shouldBePartitioned(hostFn))
       return;
 
-    TFFunctionPartition partitioner(*fn, PM, *tfModule);
+    TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
 
@@ -3858,22 +3852,23 @@ public:
     // will need to be resolved in the future (possibly through a model change),
     // it's not clear if we should allow partitioning to work on unspecialized
     // generics.
-    if (fn->getLoweredFunctionType()->isPolymorphic()) {
-      auto &ctx = fn->getASTContext();
-      diagnose(ctx, fn->getLocation().getSourceLoc(),
-               diag::tf_internal_error,
-               "TensorFlow partitioning does not work on generic functions yet");
+    if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
+      auto &ctx = hostFn->getASTContext();
+      diagnose(
+          ctx, hostFn->getLocation().getSourceLoc(), diag::tf_internal_error,
+          "TensorFlow partitioning does not work on generic functions yet");
       return;
     }
 
     // Because we're in active development, it is common to do something wrong
     // in the TensorFlow module.  Detect and reject things here.
-    if (fn->getModule().getSwiftModule() == tfModule) {
-      auto &ctx = fn->getASTContext();
-      diagnose(ctx, fn->getLocation().getSourceLoc(),
+    if (hostFn->getModule().getSwiftModule() == tfModule) {
+      auto &ctx = hostFn->getASTContext();
+      diagnose(ctx, hostFn->getLocation().getSourceLoc(),
                diag::tf_internal_error,
                "nothing in the TensorFlow module should require partitioning, "
-               "did you forget @_inlineable on '" + fn->getName().str() + "'?");
+               "did you forget @_inlineable on '" +
+                   hostFn->getName().str() + "'?");
       return;
     }
 
@@ -3883,31 +3878,31 @@ public:
 
     // If the TensorFlow module is malformed, exit without breaking the SIL:
     // an error has already been emitted.
-    if (!tensorProgram.fn)
+    if (!tensorProgram.acceleratorFn)
       return;
 
     // Our partitioning can leave around lots of unconditional branches between
     // blocks that formerly had control edges.  Go through and merge those to
     // make later passes simpler.
-    contractUncondBranches(tensorProgram.fn);
+    contractUncondBranches(tensorProgram.acceleratorFn);
 
     if (auto outs = getTFDumpIntermediateStream()) {
       *outs << "--- TFPartition Accelerator Result: "
-            << tensorProgram.fn->getName() << "\n";
-      tensorProgram.fn->print(*outs);
+            << tensorProgram.acceleratorFn->getName() << "\n";
+      tensorProgram.acceleratorFn->print(*outs);
       *outs << "----\n";
       outs->flush();
     } else if (isTest) {
       llvm::outs() << "--- TFPartition Accelerator Result: "
-                   << tensorProgram.fn->getName() << "\n";
-      tensorProgram.fn->print(llvm::outs());
+                   << tensorProgram.acceleratorFn->getName() << "\n";
+      tensorProgram.acceleratorFn->print(llvm::outs());
       llvm::outs() << "----\n";
       llvm::outs().flush();
     }
 
 #ifndef NDEBUG
     // Verify that the generated function is ok.
-    tensorProgram.fn->verify();
+    tensorProgram.acceleratorFn->verify();
 #endif
 
     // If this is called from sil-opt, we currently just print out the results
@@ -3915,20 +3910,22 @@ public:
     // pass in isolation.  This is pretty unconventional for a SIL pass, but
     // this is an unconventional pass!
     if (isTest) {
-      llvm::outs() << "--- TFPartition Host Result: " << fn->getName() << "\n";
-      fn->print(llvm::outs());
+      llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
+                   << "\n";
+      hostFn->print(llvm::outs());
       llvm::outs() << "---\n";
       llvm::outs().flush();
 
       // Finally, we're done.  Remove the partitioned function so it doesn't go
       // through the normal compiler flow.
-      tensorProgram.fn->getModule().eraseFunction(tensorProgram.fn);
+      tensorProgram.acceleratorFn->getModule().eraseFunction(
+          tensorProgram.acceleratorFn);
       return;
     }
 
     // Next translate it to a graph and emit it as a global symbol.
     std::string entryFnBaseName;
-    auto bytes = lowerTFGraph(tensorProgram.fn, partitioner.configuration,
+    auto bytes = lowerTFGraph(tensorProgram.acceleratorFn, partitioner.configuration,
                               entryFnBaseName);
     assert(!StringRef(entryFnBaseName).startswith("$"));
 
@@ -3937,20 +3934,20 @@ public:
     // want to use.
     {
       SILBuilder B(tensorProgram.programPlaceholder);
-      auto data = B.createStringLiteral(fn->getLocation(),
+      auto data = B.createStringLiteral(hostFn->getLocation(),
                                         StringRef(bytes.data(), bytes.size()),
                                         StringLiteralInst::Encoding::Bytes);
-      auto len = B.createIntegerLiteral(fn->getLocation(),
-                              tensorProgram.programLengthPlaceholder->getType(),
-                                        bytes.size());
+      auto len = B.createIntegerLiteral(
+          hostFn->getLocation(),
+          tensorProgram.programLengthPlaceholder->getType(), bytes.size());
 
-      auto name =
-          B.createStringLiteral(fn->getLocation(), StringRef(entryFnBaseName),
-                                StringLiteralInst::Encoding::UTF8);
+      auto name = B.createStringLiteral(hostFn->getLocation(),
+                                        StringRef(entryFnBaseName),
+                                        StringLiteralInst::Encoding::UTF8);
       // Set the number of helper functions here based on the # devices involved
       // in this TF program.
       auto helperFunctionCount = B.createIntegerLiteral(
-          fn->getLocation(),
+          hostFn->getLocation(),
           tensorProgram.helperFunctionCountPlaceholder->getType(),
           partitioner.configuration.usedDeviceTypes.size() - 1);
       tensorProgram.programPlaceholder->replaceAllUsesWith(data);
@@ -3965,15 +3962,16 @@ public:
     }
 
     if (auto outs = getTFDumpIntermediateStream()) {
-      *outs << "--- TFPartition Host Result: " << fn->getName() << "\n";
-      fn->print(*outs);
+      *outs << "--- TFPartition Host Result: " << hostFn->getName() << "\n";
+      hostFn->print(*outs);
       *outs << "---\n";
       outs->flush();
     }
 
     // Finally, we're done.  Remove the partitioned function so it doesn't go
     // through the normal compiler flow.
-    tensorProgram.fn->getModule().eraseFunction(tensorProgram.fn);
+    tensorProgram.acceleratorFn->getModule().eraseFunction(
+        tensorProgram.acceleratorFn);
   }
 };
 
