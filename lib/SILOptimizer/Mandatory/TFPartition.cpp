@@ -3636,7 +3636,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
 /// The only way to call/use such a function is from a TF graph node (e.g. by
 /// referencing the function in a function-typed op attribute).
 static bool isAcceleratorOnly(const SILFunction &hostFn) {
-  // TODO: replace the impl with a proper function-level attribute.
+  // TODO: replace the impl with a proper function-level attribute. e.g. check
+  // hostFn.getRepresentation() == SILFunctionType::Representation::TensorFlow
   return hostFn.getName().contains("__magic_tf_only__");
 }
 

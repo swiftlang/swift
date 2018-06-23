@@ -1423,6 +1423,8 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   }
 }
 
+// TODO: It is wasteful to serialize functions into a proto and deserialize it
+// here. Revisit the long-term design.
 bool TFGraphLowering::copyGraphFunctions(const std::vector<char> &graphDefProto,
                                          SILLocation loc) {
   // Create a tmp graph to host all graph funcs in `graphDefProto`.
@@ -2740,11 +2742,16 @@ StringRef getTFCompatibleFuncName(SILFunction *fn) {
   return fnName;
 }
 
-// `graphFnNameForCaller` is for caller.
-// If `isAcceleratorOnly`, graphFnName is set to the primaryGraphFnName for a TF
-// graph node to call; otherwise, it is set to entryFnBaseName, for the host
-// runtime to call.
-static std::vector<char> lowerTFGraphHelper(
+/// This is a helper function to unify the implementation of
+/// tf::lowerTFFunction() and tf::lowerTFGraph(). Where the former calls this
+/// method with `isAcceleratorOnly` set to true, and the latter false. See their
+/// doc comments on the high-level semantics.
+///
+///  `graphFnNameForCaller` provides for the caller with a name to call this
+/// lowered graph function. If `isAcceleratorOnly` is true, it will be set to the
+/// graph function name for a TF graph node to call; otherwise, it will be set to
+/// `entryFnBaseName` in tf::lowerTFGraph(), for the host runtime to call.
+static std::vector<char> lowerTFGraphOrFunction(
     SILFunction *fn, const GraphGlobalConfiguration &configuration,
     bool isAcceleratorOnly,
     const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
@@ -2854,8 +2861,8 @@ void tf::lowerTFFunction(
     llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions) {
   std::string graphFnName;
   auto graphDefProto =
-      lowerTFGraphHelper(fn, configuration, /*isAcceleratorOnly*/ true,
-                         graphFunctions, graphFnName);
+      lowerTFGraphOrFunction(fn, configuration, /*isAcceleratorOnly*/ true,
+                             graphFunctions, graphFnName);
   assert(!graphDefProto.empty());
   assert(!graphFnName.empty());
   SerializedGraphFunction graphFn = {hostFnName, graphFnName,
@@ -2867,6 +2874,6 @@ std::vector<char> tf::lowerTFGraph(
     SILFunction *fn, const GraphGlobalConfiguration &configuration,
     const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
     std::string &entryFnBaseName) {
-  return lowerTFGraphHelper(fn, configuration, /*isAcceleratorOnly*/ false,
-                            graphFunctions, entryFnBaseName);
+  return lowerTFGraphOrFunction(fn, configuration, /*isAcceleratorOnly*/ false,
+                                graphFunctions, entryFnBaseName);
 }
