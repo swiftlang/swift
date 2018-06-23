@@ -693,6 +693,11 @@ public:
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
+  /// When false, send/receive will be generated for host-accelerator
+  /// communications. Otherwise, error out. Send/receive is disabled when the
+  /// function is @convention(tensorflow).
+  bool isTFConvention;
+
   /// These are all the tensor ops found in the initial scan over the function.
   SmallPtrSet<SILInstruction*, 8> tensorOpsSet;
 
@@ -751,12 +756,13 @@ public:
   SmallPtrSet<SILInstruction*, 8> explicitCopyMarkers;
  public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule)
+                      ModuleDecl &tensorFlowModule,
+                      bool isTFConvention = false)
       : fn(Fn),
         tensorFlowModule(tensorFlowModule),
         configuration(findConfiguration(fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
-        tensorCodeBlocks(Fn) {}
+        tensorCodeBlocks(Fn), isTFConvention(isTFConvention) {}
 
   bool markFunction();
 
@@ -1539,6 +1545,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // start point, and whether it is something we can promote into the graph.
   bool isBeforeStartPoint =
     !DI.properlyDominates(tensorStartPoint, inst);
+
   ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst, *this);
 
   // If this is a scalar operation that we really want to promote to a tensor
@@ -1909,8 +1916,8 @@ bool TFFunctionPartition::markFunction() {
     return DI.findNearestCommonDominator(B1, B2);
   });
 
-  // Compute the start point by doing a linear scan of the startBB to find the
-  // first (of possibly many) tensor operations.
+  // Compute the start point by doing a linear scan of the startBB to
+  // find the first (of possibly many) tensor operations.
   tensorStartPoint = startBB->getTerminator();
   if (!bbOps.empty()) {
     for (auto &inst : *startBB) {
@@ -1920,6 +1927,12 @@ bool TFFunctionPartition::markFunction() {
       }
     }
   }
+
+  // If the function is convention(tensorflow), arguments should be marked Move.
+  if (isTFConvention)
+    for (auto *arg : fn.getEntryBlock()->getArguments())
+      for (auto *use : arg->getUses())
+        markedInstructions.insert({use->getUser(), Marking::Move});
 
   // Now that we know the region we're extracting from, mark all of the
   // operations as being moved over to the graph, and recursively mark their
@@ -1942,10 +1955,22 @@ bool TFFunctionPartition::markFunction() {
   // Not that we know all of the instructions we'll be moving over, find the end
   // point by finding the nearest common post dominating ancestor of the marked
   // instructions.
+  //
+  // As we walk through all markings, if there's any Move/Copy while the
+  // function is @convention(tensorflow), we emit an error.
   bbOps.clear();
   SmallVector<SILInstruction*, 16> instrsToCheck;
   SmallVector<SILBasicBlock*, 16> extraBlocksToCheck;
+  bool foundError = false;
   for (auto markInfo : markedInstructions) {
+    if (isTFConvention &&
+        (markInfo.second == Marking::Copy ||
+         markInfo.second == Marking::Send)) {
+      diagnose(fn.getASTContext(), markInfo.first->getLoc().getSourceLoc(),
+               diag::tf_convention_tf_host_code_not_allowed);
+      foundError = true;
+    }
+
     // Ignore instructions that will be deleted.
     if (markInfo.second == Marking::Delete) continue;
     auto *inst = markInfo.first;
@@ -1960,11 +1985,12 @@ bool TFFunctionPartition::markFunction() {
         extraBlocksToCheck.push_back(succ.getBB());
   }
 
+  if (foundError) return false;
+
   auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps, extraBlocksToCheck,
-                                  [&] (SILBasicBlock *B1,
-                                         SILBasicBlock *B2) -> SILBasicBlock* {
-    return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
-  });
+    [&](SILBasicBlock *B1, SILBasicBlock *B2) -> SILBasicBlock* {
+      return tensorCodeBlocks.findNearestCommonPostDominator(B1, B2);
+    });
   assert(endBB && "Didn't find an end point for the tensor program");
 
   // Compute the end point by doing a backward scan.
@@ -1978,6 +2004,19 @@ bool TFFunctionPartition::markFunction() {
     }
   }
   assert(tensorEndPoint && "Failed to compute an end point");
+
+  // When the function is @convention(tensorflow), host code before the tenosr
+  // start point and the tensor end point is not allowed.
+  //
+  // TODO(rxwei): Check code before/after tenosr start/end point. This can be
+  // done either by setting the start/end point to be the first/last instruction
+  // in the function, or by checking it after normal partitioning. Currently the
+  // former approach is marking unnecessary copies (including `strong_retain`
+  // etc) and needs investigation
+  //
+  //     if (isTFConvention) {
+  //
+  //     }
 
   if (auto *outs = getTFDumpIntermediateStream()) {
     *outs << "\n---- ANALYSIS STATE FOR FUNCTION " << fn.getName()
@@ -3840,7 +3879,14 @@ public:
     if (!tfc.shouldBePartitioned(fn))
       return;
 
-    TFFunctionPartition partitioner(*fn, PM, *tfModule);
+    // If the function has @convention(tensorflow) representation, it is
+    // guaranteed to be an accelerator-only function. Send/receive is not
+    // allowed there.
+    bool isTFConvention =
+      fn->getRepresentation() == SILFunctionTypeRepresentation::TensorFlow;
+
+    TFFunctionPartition partitioner(*fn, PM, *tfModule,
+                                    /*isTFConvention*/ isTFConvention);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
 

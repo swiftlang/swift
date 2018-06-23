@@ -2105,6 +2105,9 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::Func:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
+      // SWIFT_ENABLE_TENSORFLOW
+      if (c.getDecl()->getAttrs().hasAttribute<TensorFlowGraphAttr>())
+        return SILFunctionTypeRepresentation::TensorFlow;
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Destroyer:

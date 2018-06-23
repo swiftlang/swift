@@ -2699,6 +2699,8 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
     LLVM_FALLTHROUGH;
   // SWIFT_ENABLE_TENSORFLOW
   case SILFunctionTypeRepresentation::TensorFlow:
+    llvm_unreachable(
+      "Calls to a TensorFlow graph function cannot be lowered yet");
   case SILFunctionTypeRepresentation::CFunctionPointer:
     externalizeArguments(IGF, getCallee(), original, adjusted,
                          Temporaries, isOutlined);
