@@ -234,3 +234,13 @@ public func testMultiOutputsFnResults() -> (Tensor<Float>,  Tensor<Float>) {
   return (x.toHost(),y.toHost())
 }
 
+var globalThing: Int32!
+
+public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
+  _ = x.toAccelerator() + 1
+  //	%21 = argument of bb2 : $Int32                    // user: %22
+  // [Send]	  %22 = struct_extract %21 : $Int32, #Int32._value // user: %23
+  // expected-warning @+1 {{value implicitly copied to the accelerator}}
+  return Tensor<Int32>(globalThing)
+}
+
