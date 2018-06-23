@@ -107,7 +107,7 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                           -DENABLE_SWIFT=YES
                         BUILD_BYPRODUCTS
                           ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/src/${CMAKE_SHARED_LIBRARY_PREFIX}dispatch${CMAKE_SHARED_LIBRARY_SUFFIX}
-                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
+                          ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
                         STEP_TARGETS
                           configure
                         BUILD_ALWAYS
@@ -144,11 +144,11 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
                           IMPORTED_LINK_INTERFACE_LIBRARIES
                             swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH})
 
-  add_library(BlocksRuntime STATIC IMPORTED)
+  add_library(BlocksRuntime SHARED IMPORTED)
   set_target_properties(BlocksRuntime
                         PROPERTIES
                           IMPORTED_LOCATION
-                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_STATIC_LIBRARY_PREFIX}BlocksRuntime${CMAKE_STATIC_LIBRARY_SUFFIX}
+                            ${SWIFT_PATH_TO_LIBDISPATCH_BUILD}/${CMAKE_SHARED_LIBRARY_PREFIX}BlocksRuntime${CMAKE_SHARED_LIBRARY_SUFFIX}
                           INTERFACE_INCLUDE_DIRECTORIES
                             ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime)
 
