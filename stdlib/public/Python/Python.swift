@@ -882,35 +882,101 @@ extension Double : PythonConvertible {
 
 /// Any `FixedWidthInteger` type is `PythonConvertible` via the `Int`/`UInt`
 /// implementation.
-public protocol FixedWidthIntegerPythonObject
-  : PythonConvertible, FixedWidthInteger {
-  associatedtype ParentPythonIntType : PythonConvertible, FixedWidthInteger
-}
 
-public extension FixedWidthIntegerPythonObject {
-  init?(_ pythonObject: PythonObject) {
-    guard let i = ParentPythonIntType(pythonObject) else { return nil }
-    self = Self(i)
+extension Int8 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = Int(pythonObject) else { return nil }
+    self.init(i)
   }
 
-  var pythonObject: PythonObject {
-    return ParentPythonIntType(self).pythonObject
+  public var pythonObject: PythonObject {
+    return Int(self).pythonObject
   }
 }
 
-extension Int8  : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
-extension Int16 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
-extension Int32 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
-extension Int64 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = Int }
-extension UInt8  : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
-extension UInt16 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
-extension UInt32 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
-extension UInt64 : FixedWidthIntegerPythonObject { public typealias ParentPythonIntType = UInt }
+extension Int16 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = Int(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return Int(self).pythonObject
+  }
+}
+
+extension Int32 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = Int(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return Int(self).pythonObject
+  }
+}
+
+extension Int64 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = Int(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return Int(self).pythonObject
+  }
+}
+
+extension UInt8 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = UInt(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return UInt(self).pythonObject
+  }
+}
+
+extension UInt16 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = UInt(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return UInt(self).pythonObject
+  }
+}
+
+extension UInt32 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = UInt(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return UInt(self).pythonObject
+  }
+}
+
+extension UInt64 : PythonConvertible {
+  public init?(_ pythonObject: PythonObject) {
+    guard let i = UInt(pythonObject) else { return nil }
+    self.init(i)
+  }
+
+  public var pythonObject: PythonObject {
+    return UInt(self).pythonObject
+  }
+}
+
+/// `Float` is `PythonConvertible` via the `Double` implementation.
 
 extension Float : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
     guard let v = Double(pythonObject) else { return nil }
-    self = Float(v)
+    self.init(v)
   }
 
   public var pythonObject: PythonObject {
