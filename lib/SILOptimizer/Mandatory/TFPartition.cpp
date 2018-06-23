@@ -3844,8 +3844,8 @@ public:
     // it's not clear if we should allow partitioning to work on unspecialized
     // generics.
     if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
-      auto &ctx = fn->getASTContext();
-      diagnose(ctx, fn->getLocation().getSourceLoc(),
+      auto &ctx = hostFn->getASTContext();
+      diagnose(ctx, hostFn->getLocation().getSourceLoc(),
                diag::tf_internal_error,
                "TensorFlow graph program extraction does not work on generic "
                "functions yet");
