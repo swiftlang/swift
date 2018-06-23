@@ -462,10 +462,33 @@ struct GraphGlobalConfiguration {
     SILFunction *extractFunctionForDevice(DeviceType deviceType);
   };
 
-  /// Lower the specified SIL function (which was formed by the partitioner)
-  /// into a TensorFlow graph, encode into a vector of bytes, and sets
-  /// `entryFnBaseName` accordingly for the runtime to call as a TF graph
-  /// function.
+  // Represent the TF graph of a graph function named `graphFnName`, which
+  // corresponds to the SIL host function `silHostFnName`. `graphDefProto` can
+  // contain more functions beyond `graphFnName`, if that function calls into
+  // other graph functions (e.g. if it has functional If/While ops).
+  struct SerializedGraphFunction {
+    std::string silHostFnName;
+    std::string graphFnName;
+    std::vector<char> graphDefProto;
+  };
+
+  /// Lower `fn` (which was formed by the partitioner) into a TensorFlow graph
+  /// function (along with any helper functions that it calls into), and insert
+  /// them as a single `SerializedGraphFunction` entry to `graphFunctions`,
+  /// keyed on `hostFnName`. This way a subsequent lowered graph function foo()
+  /// can call/use this function, if the corresponding SIL code of foo()
+  /// calls/uses `hostFnName`.
+  ///
+  /// If the function being lowered calls/uses another graph function bar(),
+  /// bar() must have been lowered and must exist in `graphFunctions`.
+  void lowerTFFunction(
+      StringRef hostFnName, SILFunction *fn,
+      const GraphGlobalConfiguration &configuration,
+      llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions);
+
+  /// Similar to the function above, except it returns the encoded TensorFlow
+  /// graph (still in the binary GraphDef protobuf), and sets `entryFnBaseName`
+  /// accordingly for the runtime to call as a set of graph function nodes.
   ///
   /// When configuration.usedDeviceTypes has N>1 devices, in addition to
   /// `entryFnBaseName`, also generate another N-1 nodes named
@@ -474,9 +497,10 @@ struct GraphGlobalConfiguration {
   /// runtime in a single SessionRun() call. Those N-1 helper functions take no
   /// input or output tensors, and are executed for their side-effects of
   /// sending/receiving tensors with the function of `entryFnBaseName`.
-  std::vector<char> lowerTFGraph(SILFunction *fn,
-                                 const GraphGlobalConfiguration &configuration,
-                                 std::string &entryFnBaseName);
+  std::vector<char> lowerTFGraph(
+      SILFunction *fn, const GraphGlobalConfiguration &configuration,
+      const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
+      std::string &entryFnBaseName);
 } // end namespace tf
 } // end namespace swift
 #endif

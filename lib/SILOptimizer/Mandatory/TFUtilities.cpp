@@ -561,6 +561,17 @@ void SILTensorOpInfo::removeOrDestroyArrayValue(SILValue array, SILLocation loc,
 /// If the specified value is a valid value for an attribute, return the
 /// instruction that provides the value, otherwise null.
 SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
+  // Handle a function-typed attr.
+  // TODO: enhance the deabstraction logic here.
+  if (auto *funcInst = dyn_cast<ThinToThickFunctionInst>(v)) {
+    auto callee = funcInst->getCallee();
+    if (auto *funcRefInst = dyn_cast<FunctionRefInst>(callee)) {
+      return funcRefInst;
+    }
+    // Failed to deabstract.
+    return nullptr;
+  }
+
   // If the value is a string value, then we need to peel off all the SIL
   // instructions between the String struct value and the underlying
   // string_literal instruction.
