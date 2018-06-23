@@ -203,6 +203,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   const DeviceType thisDeviceType;
   const std::string thisDeviceTypeStr;
   const GraphGlobalConfiguration &configuration;
+  const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions;
   TF_Graph *resultGraph;
   TF_Status *status;
 
@@ -235,20 +236,18 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
  public:
   /// Generate one or more TF graph functions from `fn` targeting
   /// `thisDeviceType`, and add them to `resultGraph`.
-  TFGraphLowering(SILFunction &fn, DeviceType thisDeviceType,
-                  const GraphGlobalConfiguration &configuration,
-                  TF_Graph *resultGraph, TF_Status *status)
-      : SILFn(fn),
-        thisDeviceType(thisDeviceType),
+  TFGraphLowering(
+      SILFunction &fn, DeviceType thisDeviceType,
+      const GraphGlobalConfiguration &configuration,
+      const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
+      TF_Graph *resultGraph, TF_Status *status)
+      : SILFn(fn), thisDeviceType(thisDeviceType),
         thisDeviceTypeStr(getDeviceString(thisDeviceType)),
-        configuration(configuration),
-        resultGraph(resultGraph),
-        status(status) {}
+        configuration(configuration), graphFunctions(graphFunctions),
+        resultGraph(resultGraph), status(status) {}
 
   /// Return the current graph function that is being set up.
-  GraphFunctionBody &getCurrentGraphFunction() {
-    return functionStack.back();
-  }
+  GraphFunctionBody &getCurrentGraphFunction() { return functionStack.back(); }
 
   ~TFGraphLowering() {}
 
@@ -510,6 +509,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   void visitFloatLiteralInst(FloatLiteralInst *inst) {}
   void visitMetatypeInst(MetatypeInst *inst) {}
   void visitStringLiteralInst(StringLiteralInst *inst) {}
+  void visitFunctionRefInst(FunctionRefInst *inst) {}
 
   void visitBuiltinInst(BuiltinInst *inst);
 
@@ -568,6 +568,11 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   void addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed, int transferId,
                        ArrayRef<int64_t> dims, ArrayRef<int> numDims,
                        ArrayRef<int64_t *> dimPtrs);
+
+  /// Copy the graphs functions in `graphDefProto` to `resultGraph`. Return true
+  /// if there has been an error.
+  bool copyGraphFunctions(const std::vector<char> &graphDefProto,
+                          SILLocation loc);
 };
 }
 
@@ -1418,6 +1423,44 @@ void TFGraphLowering::visitTFDataset(BuiltinInst *inst) {
   }
 }
 
+bool TFGraphLowering::copyGraphFunctions(const std::vector<char> &graphDefProto,
+                                         SILLocation loc) {
+  // Create a tmp graph to host all graph funcs in `graphDefProto`.
+  TF_Graph *tmpGraph = TF_NewGraph();
+  SWIFT_DEFER { TF_DeleteGraph(tmpGraph); };
+
+  TF_Buffer graphDefBuf{graphDefProto.data(), graphDefProto.size(), nullptr};
+  auto *graphDefOptions = TF_NewImportGraphDefOptions();
+  TF_GraphImportGraphDef(tmpGraph, &graphDefBuf, graphDefOptions, status);
+  TF_DeleteImportGraphDefOptions(graphDefOptions);
+  if (checkStatus(loc))
+    return true;
+
+  // Now get the functions and copy them cover to `resultGraph`.
+  auto funcCount = TF_GraphNumFunctions(tmpGraph);
+  std::vector<TF_Function *> funcs(funcCount);
+  int numImportedFuncs =
+      TF_GraphGetFunctions(tmpGraph, funcs.data(), funcCount, status);
+  if (checkStatus(loc))
+    return true;
+  assert(numImportedFuncs == funcCount);
+
+  SWIFT_DEFER {
+    for (auto *func : funcs) {
+      TF_DeleteFunction(func);
+    }
+  };
+
+  for (auto *func : funcs) {
+    TF_GraphCopyFunction(resultGraph, func, /*gradient*/ nullptr, status);
+    if (checkStatus(loc))
+      return true;
+  }
+
+  // All done!
+  return false;
+}
+
 /// Lower a builtin for a TFOp instruction into a TensorFlow op node.
 ///
 void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
@@ -1557,6 +1600,19 @@ void TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
         auto dtype = convertSwiftTypeToTF(ty);
         assert(dtype && "expected a valid tensorflow type");
         TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
+      } else if (auto *fri = dyn_cast<FunctionRefInst>(operand)) {
+        auto silFuncName = fri->getReferencedFunction()->getName();
+        assert(graphFunctions.count(silFuncName));
+        auto findIt = graphFunctions.find(silFuncName);
+        assert(findIt != graphFunctions.end());
+        const auto &graphFunc = findIt->second;
+        TF_SetAttrFuncName(op, name.c_str(), graphFunc.graphFnName.data(),
+                           graphFunc.graphFnName.size());
+        // Now that we are using 'graphFunc' as an attribute, copy over that
+        // function along with any helper functions called by it to the result
+        // graph.
+        if (copyGraphFunctions(graphFunc.graphDefProto, inst->getLoc()))
+          return;
       } else {
         llvm_unreachable("unexpected attribute instruction");
       }
@@ -2684,12 +2740,15 @@ StringRef getTFCompatibleFuncName(SILFunction *fn) {
   return fnName;
 }
 
-/// Lower the specified SIL function (which was formed by the partitioner)
-/// into a TensorFlow graph, and encode into a vector of bytes.
-///
-std::vector<char> tf::lowerTFGraph(
+// `graphFnNameForCaller` is for caller.
+// If `isAcceleratorOnly`, graphFnName is set to the primaryGraphFnName for a TF
+// graph node to call; otherwise, it is set to entryFnBaseName, for the host
+// runtime to call.
+static std::vector<char> lowerTFGraphHelper(
     SILFunction *fn, const GraphGlobalConfiguration &configuration,
-    std::string &entryFnBaseName) {
+    bool isAcceleratorOnly,
+    const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
+    std::string &graphFnNameForCaller) {
 #ifndef SWIFT_ENABLE_TENSORFLOW
   // This should never be called if TensorFlow support isn't enabled, but just
   // in case, emit an error message so a misconfiguration is diagnosable.
@@ -2725,15 +2784,16 @@ std::vector<char> tf::lowerTFGraph(
   };
 
   DevicePartitioner partitioner(*fn, configuration);
-  entryFnBaseName = getTFCompatibleFuncName(fn);
+  auto entryFnBaseName = getTFCompatibleFuncName(fn);
   unsigned helperFuncId = 0;
+  std::string primaryGraphFnName;
   for (const auto deviceType : configuration.usedDeviceTypes) {
     assert(deviceType != DeviceType::ALL);
     auto *perDeviceFn = partitioner.extractFunctionForDevice(deviceType);
     bool isPrimaryFn = deviceType == configuration.primaryDeviceType;
 
     TFGraphLowering graphGen(*perDeviceFn, deviceType, configuration,
-                             resultGraph, status);
+                             graphFunctions, resultGraph, status);
     auto graphFnBody = graphGen.lowerToFunction([&graphGen, perDeviceFn]() {
       // This is the top level of the function, add its formal arguments.
       graphGen.lowerArgumentsToParams(perDeviceFn->getArguments(), {},
@@ -2746,15 +2806,16 @@ std::vector<char> tf::lowerTFGraph(
       graphGen.lowerRegion(structure.get());
     });
 
-    auto fnName = getTFCompatibleFuncName(perDeviceFn);
+    auto graphFnName = getTFCompatibleFuncName(perDeviceFn);
+    assert(!graphFunctions.count(graphFnName));
 
     bool hasSideEffects = false;
     SmallVector<TF_DataType, 4> inputTypes, outputTypes;
-    if (graphGen.buildGraphFunction(graphFnBody, fnName, hasSideEffects,
+    if (graphGen.buildGraphFunction(graphFnBody, graphFnName, hasSideEffects,
                                     &inputTypes, &outputTypes))
       return {};
 
-    // The func op type is `fnName`, with the caller node name being
+    // The func op type is `graphFnName`, with the caller node name being
     // based on `funcNodeBaseName`.
     std::string funcNodeBaseName = entryFnBaseName;
     if (!isPrimaryFn) {
@@ -2764,18 +2825,48 @@ std::vector<char> tf::lowerTFGraph(
       assert(outputTypes.empty());
     }
 
-    // Create the graph function for the top level code.
-    if (graphGen.buildGraphNodesForTopLevelFunctionCall(
-            fnName.str(), funcNodeBaseName, isPrimaryFn, inputTypes,
-            outputTypes))
+    // Create the top level graph nodes, only when we are lowering to a graph
+    // for host-side invocation.
+    if (!isAcceleratorOnly && graphGen.buildGraphNodesForTopLevelFunctionCall(
+                                  graphFnName.str(), funcNodeBaseName,
+                                  isPrimaryFn, inputTypes, outputTypes))
       return {};
+    if (isPrimaryFn)
+      primaryGraphFnName = graphFnName;
 
     // Remove the partitioned function so it doesn't go through the normal
     // compiler flow.
     perDeviceFn->getModule().eraseFunction(perDeviceFn);
   }
 
-  // Ok, we're done!  Serialize the resulting graph to a protobuf and return it.
+  assert(!primaryGraphFnName.empty());
+  graphFnNameForCaller =
+      isAcceleratorOnly ? primaryGraphFnName : std::string(entryFnBaseName);
+  // Ok, we're done!  Serialize the resulting graph to a protobuf and return
+  // it.
   return serializeGraphProtoBuf(*fn, resultGraph, status);
 #endif
+}
+
+void tf::lowerTFFunction(
+    StringRef hostFnName, SILFunction *fn,
+    const GraphGlobalConfiguration &configuration,
+    llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions) {
+  std::string graphFnName;
+  auto graphDefProto =
+      lowerTFGraphHelper(fn, configuration, /*isAcceleratorOnly*/ true,
+                         graphFunctions, graphFnName);
+  assert(!graphDefProto.empty());
+  assert(!graphFnName.empty());
+  SerializedGraphFunction graphFn = {hostFnName, graphFnName,
+                                     std::move(graphDefProto)};
+  graphFunctions[graphFn.silHostFnName] = std::move(graphFn);
+}
+
+std::vector<char> tf::lowerTFGraph(
+    SILFunction *fn, const GraphGlobalConfiguration &configuration,
+    const llvm::DenseMap<StringRef, SerializedGraphFunction> &graphFunctions,
+    std::string &entryFnBaseName) {
+  return lowerTFGraphHelper(fn, configuration, /*isAcceleratorOnly*/ false,
+                            graphFunctions, entryFnBaseName);
 }

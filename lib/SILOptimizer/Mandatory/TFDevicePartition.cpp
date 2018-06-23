@@ -156,6 +156,7 @@ class DevicePartitionCloner
   void visitFloatLiteralInst(FloatLiteralInst *inst) {}
   void visitMetatypeInst(MetatypeInst *inst) {}
   void visitStringLiteralInst(StringLiteralInst *inst) {}
+  void visitFunctionRefInst(FunctionRefInst *inst) {}
 
   // These instructions are cloned over
   void visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
@@ -651,6 +652,9 @@ class DevicePartitionerImpl
     markInstForAllDevices(inst);
   }
   void visitStructExtractInst(StructExtractInst *inst) {
+    markInstForAllDevices(inst);
+  }
+  void visitFunctionRefInst(FunctionRefInst *inst) {
     markInstForAllDevices(inst);
   }
 
