@@ -1256,7 +1256,7 @@ static const char *const IntrinsicNameTable[] = {
 };
 
 #define GET_INTRINSIC_TARGET_DATA
-#include "llvm/IR/IntrinsicEnums.inc"
+#include "llvm/IR/IntrinsicImpl.inc"
 #undef GET_INTRINSIC_TARGET_DATA
 
 /// getLLVMIntrinsicID - Given an LLVM IR intrinsic name with argument types
