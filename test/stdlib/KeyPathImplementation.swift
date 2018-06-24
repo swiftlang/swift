@@ -657,7 +657,10 @@ keyPathImpl.test("equality") {
     }
 
   expectNotEqual(s_c_z_p_x, s_c_z_p_y)
+  expectNotEqual(s_c_z_p_x.hashValue, s_c_z_p_y.hashValue)
+
   expectNotEqual(s_c_z_p_y, s_c_z_p_x)
+  expectNotEqual(s_c_z_p_y.hashValue, s_c_z_p_x.hashValue)
 
   // Different path type
   let s_c_z_p = ReferenceWritableKeyPath<S<S<String>>, Point>

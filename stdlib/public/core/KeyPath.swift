@@ -597,7 +597,6 @@ internal enum KeyPathComponent: Hashable {
   
   @inlinable // FIXME(sil-serialize-all)
   internal func hash(into hasher: inout Hasher) {
-    var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
     ) {
