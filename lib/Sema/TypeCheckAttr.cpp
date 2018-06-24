@@ -2642,7 +2642,7 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
-  const FuncDecl *FD = cast<FuncDecl>(D);
+  FuncDecl *FD = cast<FuncDecl>(D);
   // The function must be top-level.
   if (FD->getImplicitSelfDecl()) {
     diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_top_level_only);
@@ -2654,6 +2654,12 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
       !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType()))
     diagnoseAndRemoveAttr(attr,
                           diag::tf_graph_attr_function_tensorflow_value_only);
+  // Assign @convention(tensorflow).
+  AnyFunctionType *fnTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto *newFnTy = fnTy->withExtInfo(
+    fnTy->getExtInfo().withRepresentation(
+      AnyFunctionType::Representation::TensorFlow));
+  FD->setInterfaceType(newFnTy);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

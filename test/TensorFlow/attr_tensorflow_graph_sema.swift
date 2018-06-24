@@ -40,3 +40,6 @@ enum SomeType {
   @TensorFlowGraph
   static func methodNotOkay2(_ x: Tensor<Float>) -> Tensor<Float> {}
 }
+
+let f: @convention(tensorflow) (Tensor<Float>) -> Tensor<Int32> = tensors(_:) // okay
+let g: (Tensor<Float>) -> Tensor<Int32> = tensors(_:) // expected-error {{TensorFlow functions cannot be converted to other function types}}

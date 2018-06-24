@@ -290,6 +290,18 @@ static SILType convertToTensorValueType(SILType ty) {
   return convertToTensorValueType(ty.getSwiftRValueType(), ty.getASTContext());
 }
 
+/// Returns true when this function must be entirely lowered to a TF graph
+/// function, with no host-side logic remaining (i.e., no sends/recvs, and no
+/// start/stop tensor computation on the host side). In other words, this
+/// function uses the tensorflow calling convention.
+///
+/// The only way to call/use such a function is from a TF graph node (e.g. by
+/// referencing the function in a function-typed op attribute).
+static bool isAcceleratorOnly(const SILFunction &hostFn) {
+  return hostFn.getRepresentation() ==
+    SILFunctionType::Representation::TensorFlow; // @convention(tensorflow)
+}
+
 //===----------------------------------------------------------------------===//
 //                  BlocksReachingTensorCode CFG Subset
 //===----------------------------------------------------------------------===//
@@ -693,11 +705,6 @@ public:
   DominanceInfo &DI;
   BlocksReachingTensorCode tensorCodeBlocks;
 
-  /// When false, send/receive will be generated for host-accelerator
-  /// communications. Otherwise, error out. Send/receive is disabled when the
-  /// function is @convention(tensorflow).
-  bool isTFConvention;
-
   /// These are all the tensor ops found in the initial scan over the function.
   SmallPtrSet<SILInstruction*, 8> tensorOpsSet;
 
@@ -757,13 +764,12 @@ public:
 
  public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
-                      ModuleDecl &tensorFlowModule,
-                      bool isTFConvention = false)
+                      ModuleDecl &tensorFlowModule)
       : hostFn(Fn),
         tensorFlowModule(tensorFlowModule),
         configuration(findConfiguration(Fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
-        tensorCodeBlocks(Fn), isTFConvention(isTFConvention) {}
+        tensorCodeBlocks(Fn) {}
 
   bool markFunction();
 
@@ -834,7 +840,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
-    if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
+   if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
       explicitCopyMarkers.insert(apply);
       return;
     }
@@ -1586,7 +1592,11 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
-    diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/true);
+
+    // If the function is not accelerator-only, diagnose implicit copy to
+    // the accelerator.
+    if (!isAcceleratorOnly(hostFn))
+      diagnoseCopyToAccelerator(value, user, /*tensorProgramArgument*/true);
     return;
   }
 
@@ -1924,8 +1934,8 @@ bool TFFunctionPartition::markFunction() {
     return DI.findNearestCommonDominator(B1, B2);
   });
 
-  // Compute the start point by doing a linear scan of the startBB to
-  // find the first (of possibly many) tensor operations.
+  // Compute the start point by doing a linear scan of the startBB to find the
+  // first (of possibly many) tensor operations.
   tensorStartPoint = startBB->getTerminator();
   if (!bbOps.empty()) {
     for (auto &inst : *startBB) {
@@ -1935,12 +1945,6 @@ bool TFFunctionPartition::markFunction() {
       }
     }
   }
-
-  // If the function is convention(tensorflow), arguments should be marked Move.
-  if (isTFConvention)
-    for (auto *arg : fn.getEntryBlock()->getArguments())
-      for (auto *use : arg->getUses())
-        markedInstructions.insert({use->getUser(), Marking::Move});
 
   // Now that we know the region we're extracting from, mark all of the
   // operations as being moved over to the graph, and recursively mark their
@@ -1964,17 +1968,17 @@ bool TFFunctionPartition::markFunction() {
   // point by finding the nearest common post dominating ancestor of the marked
   // instructions.
   //
-  // As we walk through all markings, if there's any Move/Copy while the
+  // As we walk through all markings, if there's any Copy/Send while the
   // function is @convention(tensorflow), we emit an error.
   bbOps.clear();
   SmallVector<SILInstruction*, 16> instrsToCheck;
   SmallVector<SILBasicBlock*, 16> extraBlocksToCheck;
   bool foundError = false;
   for (auto markInfo : markedInstructions) {
-    if (isTFConvention &&
+    if (isAcceleratorOnly(hostFn) &&
         (markInfo.second == Marking::Copy ||
          markInfo.second == Marking::Send)) {
-      diagnose(fn.getASTContext(), markInfo.first->getLoc().getSourceLoc(),
+      diagnose(hostFn.getASTContext(), markInfo.first->getLoc().getSourceLoc(),
                diag::tf_convention_tf_host_code_not_allowed);
       foundError = true;
     }
@@ -2013,10 +2017,10 @@ bool TFFunctionPartition::markFunction() {
   }
   assert(tensorEndPoint && "Failed to compute an end point");
 
-  // When the function is @convention(tensorflow), host code before the tenosr
+  // When the function is @convention(tensorflow), host code before the tensor
   // start point and the tensor end point is not allowed.
   //
-  // TODO(rxwei): Check code before/after tenosr start/end point. This can be
+  // TODO(rxwei): Check code before/after tensor start/end point. This can be
   // done either by setting the start/end point to be the first/last instruction
   // in the function, or by checking it after normal partitioning. Currently the
   // former approach is marking unnecessary copies (including `strong_retain`
@@ -3666,19 +3670,6 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
   };
 }
 
-/// Returns true when this function must be entirely lowered to a TF graph
-/// function, with no host-side logic remaining (i.e., no sends/recvs, and no
-/// start/stop tensor computation on the host side). In other words, this
-/// function uses the tensorflow calling convention.
-///
-/// The only way to call/use such a function is from a TF graph node (e.g. by
-/// referencing the function in a function-typed op attribute).
-static bool isAcceleratorOnly(const SILFunction &hostFn) {
-  // TODO: replace the impl with a proper function-level attribute. e.g. check
-  // hostFn.getRepresentation() == SILFunctionType::Representation::TensorFlow
-  return hostFn.getName().contains("__magic_tf_only__");
-}
-
 /// Run the TensorFlow partitioning pass.  This pass is a very close relative to
 /// the standard "Aggressive Dead Code Elimination" (ADCE) optimization which is
 /// implemented using post-dominance frontiers and control dependence
@@ -3911,14 +3902,7 @@ public:
     if (!tfc.shouldBePartitioned(hostFn))
       return;
 
-    // If the function has @convention(tensorflow) representation, it is
-    // guaranteed to be an accelerator-only function. Send/receive is not
-    // allowed there.
-    bool isTFConvention =
-      fn->getRepresentation() == SILFunctionTypeRepresentation::TensorFlow;
-
-    TFFunctionPartition partitioner(*hostFn, PM, *tfModule,
-                                    /*isTFConvention*/ isTFConvention);
+    TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
     if (!partitioner.markFunction())
       return; // No tensor ops found in the function.
 

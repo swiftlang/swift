@@ -5668,13 +5668,6 @@ public:
   /// Perform basic checking to determine whether the @IBAction attribute can
   /// be applied to this function.
   bool isPotentialIBActionTarget() const;
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// True if the function has `@TensorFlowGraph` attribute, meaning that this
-  /// function corresponds to a TensorFlow graph function.
-  bool isTensorFlowGraphFunction() const {
-    return getAttrs().hasAttribute<TensorFlowGraphAttr>();
-  }
 };
 
 /// \brief This represents an accessor function, such as a getter or setter.
