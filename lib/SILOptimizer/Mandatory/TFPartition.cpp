@@ -765,8 +765,7 @@ public:
  public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule)
-      : hostFn(Fn),
-        tensorFlowModule(tensorFlowModule),
+      : hostFn(Fn), tensorFlowModule(tensorFlowModule),
         configuration(findConfiguration(Fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
@@ -840,7 +839,7 @@ diagnoseCopyToAccelerator(SILValue value, SILInstruction *user,
   // If it isn't the result of a "send" operation, then produce a warning about
   // an implicit copy to the accelerator.
   if (auto *apply = dyn_cast<ApplyInst>(value))
-   if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
+    if (classifyInst(apply) == PartitioningClass::ExplicitSend) {
       explicitCopyMarkers.insert(apply);
       return;
     }
@@ -1558,7 +1557,6 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   // start point, and whether it is something we can promote into the graph.
   bool isBeforeStartPoint =
     !DI.properlyDominates(tensorStartPoint, inst);
-
   ScalarPromoteClass promotionClass = shouldPromoteToTensorOp(inst, *this);
 
   // If this is a scalar operation that we really want to promote to a tensor
@@ -2024,7 +2022,7 @@ bool TFFunctionPartition::markFunction() {
   // done either by setting the start/end point to be the first/last instruction
   // in the function, or by checking it after normal partitioning. Currently the
   // former approach is marking unnecessary copies (including `strong_retain`
-  // etc) and needs investigation
+  // etc) and needs investigation.
   //
   //     if (isTFConvention) {
   //
