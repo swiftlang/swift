@@ -1,6 +1,17 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil %s -verify -verify-ignore-unknown | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s -verify -verify-ignore-unknown | %FileCheck %s
+// FIXME(rxwei): Remove -verify-ignore-unknown when we fix the source location.
 
 import TensorFlow
+
+@TensorFlowGraph
+public func innout(_ x: Tensor<Float>) -> Tensor<Float> {
+  return x + 1
+}
+
+@TensorFlowGraph
+public func innout2(_ x: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
+  return (x + 1, x + 2)
+}
 
 @inline(never)
 func hostCode(_ x: Tensor<Float>) -> Tensor<Float> {
