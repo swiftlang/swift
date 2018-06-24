@@ -597,7 +597,6 @@ internal enum KeyPathComponent: Hashable {
 
   @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
-    var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
     ) {
