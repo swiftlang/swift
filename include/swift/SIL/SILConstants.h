@@ -294,7 +294,6 @@ public:
   /// version.  This only works for valid constants.
   SymbolicValue cloneInto(llvm::BumpPtrAllocator &allocator) const;
 
-
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
 };

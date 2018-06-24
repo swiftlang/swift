@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify -Xllvm -tf-strict-deabstraction -DSTRICT_DA %s  | %FileCheck %s -check-prefix=STRICTDA
+
+// TODO: Enable -verify mode.
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -DSTRICT_DA %s  | %FileCheck %s -check-prefix=STRICTDA
 import TensorFlow
 
 // This test is intended to verify that all of the operations end up in the
@@ -12,6 +13,9 @@ import TensorFlow
 // file.
 
 
+/* TODO build this out.
+STRICTDA: --- TFDeabstraction Result: {{.*}}testSelect
+*/
 public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float>)
   -> Tensor<Float> {
   let conds = conds1.toAccelerator()
