@@ -280,7 +280,7 @@ ErrorHandlingTests.test("ErrorHandling/operators") {
 
 ErrorHandlingTests.test("ErrorHandling/Sequence map") {
   let initialCount = NoisyCount
-  let sequence = AnySequence([1, 2, 3])
+  let sequence = stride(from: 1, through: 3, by: 1)
   for throwAtCount in 0...3 {
     var loopCount = 0
     do {
