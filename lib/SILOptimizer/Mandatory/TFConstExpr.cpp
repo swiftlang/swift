@@ -397,7 +397,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
     // If we were able to resolve it, then we can proceed.
     if (fn)
-      return SymbolicValue::getFunction(fn, conf);
+      return SymbolicValue::getFunction(fn);
 
     DEBUG(llvm::dbgs() << "ConstExpr Unresolved witness: " << *value << "\n");
     return SymbolicValue::getUnknown(value, UnknownReason::Default);
@@ -802,14 +802,11 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
   // Determine the callee.
   auto calleeFn = getConstantValue(apply->getOperand(0));
-  if (!calleeFn.isConstant())
+  if (calleeFn.getKind() != SymbolicValue::Function)
     return SymbolicValue::getUnknown((SILInstruction*)apply,
                                      UnknownReason::Default);
 
-  SILFunction *callee;
-  Optional<ProtocolConformanceRef> conformance;
-  std::tie(callee, conformance) = calleeFn.getFunctionValue();
-
+  SILFunction *callee = calleeFn.getFunctionValue();
 
   // If we reached an external function that hasn't been deserialized yet, make
   // sure to pull it in so we can see its body.  If that fails, then we can't
@@ -870,10 +867,21 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // Get the substitution map of the call.  This maps from the callee's space
     // into the caller's world.
     SubstitutionMap callSubMap;
-    if (conformance.hasValue()) {
+    if (calleeFnType->getRepresentation() ==
+        SILFunctionType::Representation::WitnessMethod) {
+      // Get the conformance out of the SILFunctionType and map it into our
+      // current type space.
+      auto conformance = calleeFnType->getWitnessMethodConformance();
+      auto selfTy = conformance.getRequirement()->getSelfInterfaceType();
+      auto conf = substitutionMap.lookupConformance(selfTy->getCanonicalType(),
+                                                 conformance.getRequirement());
+      if (!conf.hasValue())
+        return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                         UnknownReason::Default);
+
       // Witness methods have special magic that is required to resolve them.
       callSubMap = getWitnessMethodSubstitutions(apply->getModule(), AI, callee,
-                                                 conformance.getValue());
+                                                 conf.getValue());
     } else {
       auto requirementSig = AI.getOrigCalleeType()->getGenericSignature();
       callSubMap = SubstitutionMap::get(requirementSig,

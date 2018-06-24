@@ -45,7 +45,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "\n";
     return;
   case RK_Function: {
-    auto fn = getFunctionValue().first;
+    auto fn = getFunctionValue();
     os << "fn: " << fn->getName() << ": ";
     os << Demangle::demangleSymbolAsString(fn->getName());
     os << "\n";
