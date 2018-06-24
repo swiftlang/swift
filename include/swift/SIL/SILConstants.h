@@ -150,12 +150,6 @@ class SymbolicValue {
   union {
     UnknownReason unknown_reason;
 
-    // FIXME: Move function_conformance out of this union.  I want to make sure
-    // that SymbolicValue stays exactly equal to two words.  The witness method
-    // conformance case should be handled as a separate representation and be
-    // bump pointer allocated.
-    // TODO: Add a static_assert about the size of SymbolicValue.
-    void *function_conformance;
     //unsigned integer_bitwidth;
     // ...
   } aux;
@@ -172,8 +166,7 @@ public:
     /// This is a known metatype value.
     Metatype,
 
-    /// This is a function, potentially containing a conformance if the function
-    /// was resolved from a witness_method lookup.
+    /// This is a function, represented as a SILFunction.
     Function,
 
     /// This is an integer constant.
@@ -246,28 +239,12 @@ public:
     SymbolicValue result;
     result.representationKind = RK_Function;
     result.value.function = fn;
-    result.aux.function_conformance = nullptr;
     return result;
   }
 
-  static SymbolicValue getFunction(SILFunction *fn,
-                                   ProtocolConformanceRef conformance) {
-    assert(fn && "Function cannot be null");
-    SymbolicValue result;
-    result.representationKind = RK_Function;
-    result.value.function = fn;
-    result.aux.function_conformance = conformance.getOpaqueValue();
-    return result;
-  }
-
-  std::pair<SILFunction *, Optional<ProtocolConformanceRef>>
-  getFunctionValue() const {
+  SILFunction *getFunctionValue() const {
     assert(getKind() == Function);
-    Optional<ProtocolConformanceRef> conf;
-    if (auto opaqueConf = aux.function_conformance)
-      conf = ProtocolConformanceRef::getFromOpaqueValue(opaqueConf);
-
-    return std::make_pair(value.function, conf);
+    return value.function;
   }
 
   static SymbolicValue getConstantInst(SingleValueInstruction *inst) {
