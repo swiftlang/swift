@@ -1212,11 +1212,9 @@ public:
     case SymbolicValue::String:
       *this << QuotedString(v.getStringValue());
       return;
-    case SymbolicValue::Metatype: {
-      auto metatype = cast<AnyMetatypeType>(v.getMetatypeValue());
-      *this << SILType::getPrimitiveObjectType(metatype.getInstanceType());
+    case SymbolicValue::Metatype:
+      *this << SILType::getPrimitiveObjectType(v.getMetatypeValue());
       return;
-    }
     case SymbolicValue::Function: {
       auto function = v.getFunctionValue();
       *this << "@" << function->getName();

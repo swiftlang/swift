@@ -290,6 +290,10 @@ public:
   /// reason, we fall back to using the specified location.
   void emitUnknownDiagnosticNotes(SILLocation fallbackLoc);
 
+  /// Clone this SymbolicValue into the specified allocator and return the new
+  /// version.  This only works for valid constants.
+  SymbolicValue cloneInto(llvm::BumpPtrAllocator &allocator) const;
+
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
 };
