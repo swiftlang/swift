@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Defer.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILVisitor.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/StringExtras.h"
@@ -72,6 +73,9 @@ namespace {
   /// tuple_extract values that project multiple-result values out.  A
   /// SILOpResult holds this, allowing us to refer to each result of a
   /// multi-output op.
+  ///
+  /// FIXME: Eliminate this when GraphOperationInst has taken over the world.
+  ///
   typedef std::pair<SILValue, unsigned> SILOpResult;
 
   /// As we lower SIL instructions to tensorflow graph nodes, we traverse the
@@ -511,6 +515,7 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering> {
   void visitStringLiteralInst(StringLiteralInst *inst) {}
   void visitFunctionRefInst(FunctionRefInst *inst) {}
 
+  void visitGraphOperationInst(GraphOperationInst *inst);
   void visitBuiltinInst(BuiltinInst *inst);
 
   void visitTupleInst(TupleInst *inst);
@@ -1158,7 +1163,7 @@ void TFGraphLowering::visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo) {
 
   int transferId = tfopInfo.getIntAttrOperand(0, "transferId");
   auto srcDeviceStr = tfopInfo.getStringAttrOperand(1, "srcDevice");
-  auto srcDevice = OpDeviceType(srcDeviceStr);
+  auto srcDevice = getOpDeviceType(srcDeviceStr);
   assert(thisDeviceType != srcDevice);
 
   SmallVector<int64_t, 8> dims;
@@ -1286,7 +1291,7 @@ void TFGraphLowering::visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo) {
   assert(tfopInfo.isInput(0));
   int transferId = tfopInfo.getIntAttrOperand(1, "transferId");
   auto destDeviceStr = tfopInfo.getStringAttrOperand(2, "destDevice");
-  auto destDevice = OpDeviceType(destDeviceStr);
+  auto destDevice = getOpDeviceType(destDeviceStr);
   assert(thisDeviceType != destDevice);
 
   SmallVector<int64_t, 8> dims;
@@ -1461,6 +1466,189 @@ bool TFGraphLowering::copyGraphFunctions(const std::vector<char> &graphDefProto,
 
   // All done!
   return false;
+}
+
+/// Lower a graph_op into the TensorFlow op node.
+///
+void TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
+  auto &graphFn = getCurrentGraphFunction();
+
+  // Decode information about the graph_op.
+  GraphOperationDecoder decoder(inst);
+  SmallVector<GraphOperationDecoder::InputMarker, 4> inputInfos;
+  auto opName = decoder.decodeName(inputInfos);
+
+  // The name label we put on the op is summarized from the "stack trace" of
+  // the operation's source location.
+  auto opLocString = getUniqueName(inst->getDebugLocation(), "op");
+
+  auto *op = TF_NewOperation(graphFn.getGraph(), opName.str().c_str(),
+                             opLocString.c_str());
+
+  // TODO: We compute the "hasSideEffects" bit solely based on whether or not
+  // the op has Resource inputs.  This is a good starting point but is
+  // insufficient.  It would be much nicer to have a TensorFlow C function that
+  // returns the "SetIsStateful" bit from a TF_OperationDescription.
+  bool hasSideEffects = false;
+  bool hasDevice = false;
+
+  // Process all inputs.
+  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+    auto operand = inst->getOperand(i);
+
+    // FIXME: This needs to handle InputList operands.
+    (void)inputInfos;
+
+    auto valueKind = classifyTensorFlowValue(operand->getType());
+
+    // Keep track of whether we have any resource inputs.
+    hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+    assert(valueKind != TFValueKind::Nope &&
+           "all op inputs should be TensorFlow values");
+    auto opValue = getOperandValue(operand);
+    if (!opValue.oper) return;  // Error occurred.
+    TF_AddInput(op, opValue);
+  }
+
+  // Process all of the attributes.
+  for (auto attr : inst->getAttributes()) {
+    auto attrInfo = GraphOperationDecoder::decodeAttributeName(attr.name);
+    auto attrValue = attr.value;
+
+    // Convert the not-necessarily-nul-terminated StringRef to an std::string
+    // so we can guarantee null termination for the "const char*" taking APIs.
+    std::string name = attrInfo.first.str();
+
+    switch (attrInfo.second) {
+    case SILTensorOpInfo::OperandClass::Input:
+    case SILTensorOpInfo::OperandClass::InputElt:
+      assert(0 && "Input classes cannot exist for attributes");
+
+    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+      // We add attributes based on what the type of the value is.
+      switch (attrValue.getKind()) {
+      case SymbolicValue::Unknown:
+      case SymbolicValue::UninitMemory:
+        assert(0 && "These attribute kinds cannot happen here");
+      case SymbolicValue::Integer: {
+        auto value = attrValue.getIntegerValue();
+        if (value.getBitWidth() == 1)
+          TF_SetAttrBool(op, name.c_str(), value.isAllOnesValue());
+        else
+          TF_SetAttrInt(op, name.c_str(), (int64_t)value.getLimitedValue());
+        break;
+      }
+      case SymbolicValue::Float: {
+        auto value = attrValue.getFloatValue();
+        // TensorFlow only supports 32-bit float attributes.  If we got a 16 or
+        // 64 bit one, convert it to float.
+        bool losesInfo = false;
+        value.convert(APFloat::IEEEsingle(), APFloat::rmNearestTiesToEven,
+                      &losesInfo);
+        TF_SetAttrFloat(op, name.c_str(), value.convertToFloat());
+        break;
+      }
+      case SymbolicValue::Metatype: {
+        auto ty = attrValue.getMetatypeValue();
+        auto dtype = convertSwiftTypeToTF(ty);
+        assert(dtype && "expected a valid tensorflow type");
+        TF_SetAttrType(op, name.c_str(), (TF_DataType)dtype);
+        break;
+      }
+      case SymbolicValue::String: {
+        auto value = attrValue.getStringValue();
+        if (name != DEVICE_ATTR) {
+          TF_SetAttrString(op, name.c_str(), value.data(), value.size());
+        } else {
+          if (value == ALL_DEVICES)
+            value = thisDeviceTypeStr;
+
+          if (value.str() != DEFAULT_TPU_DEVICE) {
+            TF_SetDevice(op, value.str().c_str());
+          } else {
+            // TPU device placement is not done via TF_SetDevice().
+            markNodeAsTPUReplicated(op);
+          }
+          hasDevice = true;
+        }
+        break;
+      }
+      case SymbolicValue::Function: {
+        auto silFuncName = attrValue.getFunctionValue()->getName();
+        assert(graphFunctions.count(silFuncName));
+        auto findIt = graphFunctions.find(silFuncName);
+        assert(findIt != graphFunctions.end());
+        const auto &graphFunc = findIt->second;
+        TF_SetAttrFuncName(op, name.c_str(), graphFunc.graphFnName.data(),
+                           graphFunc.graphFnName.size());
+        // Now that we are using 'graphFunc' as an attribute, copy over that
+        // function along with any helper functions called by it to the result
+        // graph.
+        if (copyGraphFunctions(graphFunc.graphDefProto, inst->getLoc()))
+          return;
+        break;
+      }
+      case SymbolicValue::Aggregate:
+        llvm_unreachable("FIXME: Handle normal aggregate arguments");
+      }
+      // Done with normal attributes.
+      break;
+    case SILTensorOpInfo::OperandClass::DType: {
+      // This integer value is a dtype.
+      auto val = attrValue.getIntegerValue();
+      TF_SetAttrType(op, name.data(), (TF_DataType)val.getLimitedValue());
+      break;
+    }
+    case SILTensorOpInfo::OperandClass::Tensor:
+    case SILTensorOpInfo::OperandClass::Shape:
+    case SILTensorOpInfo::OperandClass::ShapeArray:
+    case SILTensorOpInfo::OperandClass::Array:
+    case SILTensorOpInfo::OperandClass::ArrayElement:
+      llvm_unreachable("FIXME: These operand classes are not yet handled");
+    }
+  }
+
+  if (!hasDevice) {
+    inst->dump();
+    llvm_unreachable("The above tensor op has no device set");
+  }
+
+  auto *result =
+      graphFn.finishOp(op, hasSideEffects, /*isEligibleForTPU*/ true, status);
+
+  // If the node builder failed, then something is wrong.  Handle a few special
+  // cases to improve the diagnostics.
+  if (TF_GetCode(status) != TF_OK) {
+    auto loc = getUserSourceLocation(inst->getDebugLocation());
+
+    StringRef message = TF_Message(status);
+    if (message.startswith("Op type not registered")) {
+      internalError(loc, opName, diag::tf_lowering_unknown_op);
+      return;
+    }
+
+    // Otherwise, emit a generic error message.
+    internalError(loc, message);
+    return;
+  }
+
+  // Check to make sure that the operation produces the number of results we
+  // expect, and wire them into the valueMapping result table.
+  unsigned numOpResults = TF_OperationNumOutputs(result);
+  if (numOpResults != inst->getNumResults()) {
+    diagnose(SILFn, inst->getLoc(),
+             diag::tfop_incorrect_definition,
+             "TensorFlow op '" + opName.str() + "' produces " +
+             llvm::utostr(numOpResults) + " result, but Swift function "
+             "produces " + llvm::utostr(inst->getNumResults()));
+    errorOccurred = true;
+    return;
+  }
+
+  // Remember each of the results.
+  for (unsigned i = 0; i != numOpResults; ++i) {
+    addValueMapping({inst->getResult(0), 0}, {result, (int)i});
+  }
 }
 
 /// Lower a builtin for a TFOp instruction into a TensorFlow op node.

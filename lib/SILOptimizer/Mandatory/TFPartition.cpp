@@ -29,9 +29,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/BitVector.h"
-#include "llvm/ADT/DepthFirstIterator.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
 
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
@@ -39,15 +36,6 @@
 using namespace swift;
 using namespace tf;
 using llvm::DenseMap;
-
-static llvm::cl::opt<bool> TFTargetTPU(
-    "tf-target-tpu", llvm::cl::init(false),
-    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
-                   "is used for unit testing only"));
-static llvm::cl::opt<bool> TFTargetGPU(
-    "tf-target-gpu", llvm::cl::init(false),
-    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
-                   "is used for unit testing only"));
 
 template<typename...T, typename...U>
 static InFlightDiagnostic
@@ -610,81 +598,6 @@ static const char *markingStr[]{
     "Copy", "Move", "Send", "Arg", "Delete",
 };
 
-/// Scan the specified function, looking for logic that configures the current
-/// graph.
-static GraphGlobalConfiguration findConfiguration(SILFunction &fn) {
-  DeviceType deviceType = DeviceType::CPU;
-  bool isTPUInfeedEnabled = false;
-
-  SILInstruction *firstFound = nullptr;
-  SmallVector<SILInstruction *, 4> configureInsts;
-  for (auto &bb : fn)
-    for (auto &inst : bb) {
-      // Scan for the device configuration ops if present.
-      auto tfopInfo = SILTensorOpInfo::decode(&inst);
-      if (!tfopInfo) continue;
-      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
-                        tfopInfo->opName == "tfc.configureGPU";
-      if (!isConfigOp) continue;
-
-      configureInsts.push_back(&inst);
-      // If we found one, make sure we don't have more than one.
-      if (firstFound) {
-        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
-                 diag::tf_multiple_device);
-        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
-                 diag::tf_multiple_device_prev);
-        continue;
-      }
-
-      // Otherwise, remember this one and decode it.
-      firstFound = &inst;
-
-      // Eventually we'll support multiple different configuration ops, so
-      // we recheck the opcode here.
-      if (tfopInfo->opName == "tfc.configureTPU") {
-        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
-        deviceType = DeviceType::TPU;
-        auto infeedEnabled =
-          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
-        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else if (tfopInfo->opName == "tfc.configureGPU") {
-        deviceType = DeviceType::GPU;
-      } else {
-        llvm_unreachable("unknown device configuration op");
-      }
-    }
-
-
-  // If the program didn't specify, fall back to the command line option.
-  if (!firstFound) {
-    // At most one of these test-only flags should be set.
-    assert (!TFTargetTPU || !TFTargetGPU);
-    if (TFTargetTPU)
-      deviceType = DeviceType::TPU;
-    if (TFTargetGPU)
-      deviceType = DeviceType::GPU;
-  }
-
-  if (firstFound) {
-    if (auto *outs = getTFDumpIntermediateStream()) {
-      *outs << "Targeting device " << getDeviceString(deviceType)
-            << " for accelerator program, based on config: \n";
-      firstFound->print(*outs);
-    }
-  }
-
-  // These instructions are not relevant to later compiler passes in TFPartition
-  // and TFLowerGraph. Removing them so that the later passes need not deal with
-  // this special builtin type.
-  for (auto *configureInst : configureInsts) {
-    assert(!configureInst->hasUsesOfAnyResult());
-    recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
-  }
-
-  return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
-}
-
 class TFFunctionPartition {
 public:
   SILFunction &hostFn;
@@ -754,7 +667,7 @@ public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule)
       : hostFn(Fn), tensorFlowModule(tensorFlowModule),
-        configuration(findConfiguration(Fn)),
+        configuration(GraphGlobalConfiguration::getForFunction(Fn)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 
@@ -1267,6 +1180,14 @@ void TFFunctionPartition::markInstruction(SILInstruction &inst, Marking mark) {
 
   // Okay, we know that the instruction is a tensor op.  Decode its argument
   // list so we know how to handle the operands.
+  if (auto *graphOp = dyn_cast<GraphOperationInst>(&inst)) {
+    for (unsigned i = 0, e = graphOp->getNumOperands(); i != e; ++i) {
+      // Tensor and scalar input operands are recursively marked.
+      markValue(graphOp->getOperand(i), graphOp);
+    }
+    return;
+  }
+
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(&inst).getValue();
   for (unsigned i = 0, e = inst.getNumOperands(); i != e; ++i) {
     // Tensor and scalar input operands are recursively marked.
@@ -1833,40 +1754,60 @@ static const char* markingEnumToStr(Marking m) {
 bool TFFunctionPartition::markFunction() {
   bool loggedInput = false;
 
+  // Print out the input to the partitioning pass on the first op we encounter.
+  auto logInput = [&]() {
+    // If this is the first op we've found, print out the input to the
+    // partitioning pass.  This would ideally be hoisted to the top level, but
+    // we want to make sure to print this even if we encounter an error (so we
+    // can diagnose the errors).
+    if (!loggedInput) {
+      if (auto *outs = getTFDumpIntermediateStream()) {
+        *outs << "---- INPUT FUNCTION " << hostFn.getName()
+        << " ----------\n";
+        hostFn.print(*outs);
+        *outs << "---- END OF INPUT FUNCTION ----------\n";
+        outs->flush();
+      }
+      loggedInput = true;
+    }
+  };
+
   // We walk the function in depth first order so that we only visit reachable
   // blocks and to slightly improve compile time performance of the 'marking'
   // operation.
   SmallVector<SILInstruction*, 32> tensorOps;
   bool invalidOpFound = false;
   for (auto *BB : llvm::depth_first(&hostFn)) {
-    for (auto I = BB->begin(), E = BB->end(); I != E; I++) {
-      auto *inst = &*I;
+    for (auto bbi = BB->begin(), e = BB->end(); bbi != e; ++bbi) {
+      auto *inst = &*bbi;
+
+      // Graph operations are tensor ops.
+      // TODO: When deabstraction is done, this is the only case that matters.
+      if (auto *graphOp = dyn_cast<GraphOperationInst>(inst)) {
+        logInput();
+        tensorOps.push_back(inst);
+        tensorOpsSet.insert(inst);
+
+        // tfc.scalarToTensor doesn't get a device.
+        if (!graphOp->getName().is("tfc.scalarToTensor,s")) {
+          auto opDevice = GraphOperationDecoder(graphOp).getDeviceType();
+          configuration.markDeviceUsed(opDevice);
+        }
+        continue;
+      }
 
       // If this is a well known function that can be transformed into an op, do
       // so first.
       if (auto apply = dyn_cast<ApplyInst>(inst)) {
         inst = SILTensorOpInfo::decodeApply(apply);
-        I = SILBasicBlock::iterator(inst);
+        bbi = SILBasicBlock::iterator(inst);
       }
 
       auto opInfo = SILTensorOpInfo::decode(inst);
       if (!opInfo)
         continue;
 
-      // If this is the first op we've found, print out the input to the
-      // partitioning pass.  This would ideally be hoisted to the top level, but
-      // we want to make sure to print this even if we encounter an error (so we
-      // can diagnose the errors).
-      if (!loggedInput) {
-        if (auto *outs = getTFDumpIntermediateStream()) {
-          *outs << "---- INPUT FUNCTION " << hostFn.getName()
-                << " ----------\n";
-          hostFn.print(*outs);
-          *outs << "---- END OF INPUT FUNCTION ----------\n";
-          outs->flush();
-        }
-        loggedInput = true;
-      }
+      logInput();
 
       // Check to see if the usage of this op looks ok.  If not, reject it with
       // an error and ignore it.
@@ -1890,8 +1831,8 @@ bool TFFunctionPartition::markFunction() {
       // partitioning pass and data flow analysis code doesn't have to reason
       // about it.
       // TODO(clattner): Remove this when deabstraction subsumes it.
-      inst = opInfo->canonicalizeOperands(&configuration);
-      I = SILBasicBlock::iterator(inst);
+      inst = opInfo->canonicalizeOperands(configuration);
+      bbi = SILBasicBlock::iterator(inst);
 
       tensorOps.push_back(inst);
       tensorOpsSet.insert(inst);
@@ -2095,6 +2036,7 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
     return convertToTensorValueType(ty);
   }
 
+  void visitGraphOperationInst(GraphOperationInst *inst);
   void visitOpInst(SingleValueInstruction *inst, SILTensorOpInfo &tfopInfo);
   void visitScalarInst(SingleValueInstruction *inst);
 
@@ -2235,6 +2177,31 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
                                    inst->getFalseBBCount()));
 }
 
+void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
+  // Handle special case "ops".
+  if (inst->getName().is("tfc.scalarToTensor,s")) {
+    assert(inst->getNumOperands() == 1 && "invalid tfc.scalarToTensor!");
+    // We just lower the result as the input, since the scalar input will have
+    // been promoted to a tensor already.  It is possible that the input will
+    // have been lowered to something like TensorHandle<Builtin.Int32> and we
+    // need a TensorHandle<Int32>. If that is the case, we insert an
+    // UncheckedRefCast to get it to the right type.  These are treated as noops
+    // by GraphGen.
+    auto result = remapValue(inst->getOperand(0));
+    auto S2TResult = inst->getResult(0);
+    if (!S2TResult->getType().getSwiftRValueType()
+          ->isEqual(result->getType().getSwiftRValueType())) {
+      auto &B = getBuilder();
+      auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
+      result = B.createUncheckedRefCast(loc, result, S2TResult->getType());
+    }
+
+    ValueMap[S2TResult] = result;
+    return;
+  }
+
+  return SILClonerWithScopes<PartitionCloner>::visitGraphOperationInst(inst);
+}
 
 // Transform ops builtin instructions to the one we need in the tensor program.
 void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
@@ -3845,178 +3812,179 @@ public:
   TFPartition(bool isTest) : isTest(isTest) {}
 
   /// The entry point to the transformation.
-  void run() override {
-    SILFunction *hostFn = getFunction();
-    if (isAcceleratorOnly(*hostFn)) {
-      DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
-                         << " is accelerator-only.\n");
-    }
+  void run() override;
+};
+} // end anonymous namespace
+
+void TFPartition::run() {
+  SILFunction *hostFn = getFunction();
+  if (isAcceleratorOnly(*hostFn)) {
+    DEBUG(llvm::dbgs() << "SIL function " << hostFn->getName()
+                       << " is accelerator-only.\n");
+  }
+  auto &ctx = hostFn->getASTContext();
+
+  // TODO(clattner): This logic will eventually be subsumed by the
+  // corresponding logic in the TFDeabstraction pass.  Until deabstraction
+  // is done, we have some amount of top-level redundancy here because we have
+  // to run partitioning after the optimization passes.
+
+  // If the TensorFlow module hasn't been imported by the program, don't do
+  // anything.  This avoids impacting compile time for non-TensorFlow using
+  // Swift programs by doing extraneous analysis.
+  auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
+  if (!tfModule)
+    return;
+
+  // If this function is a building block of larger tensor programs (e.g.
+  // the ops defined in the TensorFlow module), then don't transform it in
+  // isolation.
+  if (!tfc.shouldBePartitioned(hostFn))
+    return;
+
+  TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
+  if (!partitioner.markFunction())
+    return; // No tensor ops found in the function.
+
+  // Check to see if we cannot transform the function but should.  In this
+  // case we emit a compiler error.  This is a limitation of the compiler that
+  // will need to be resolved in the future (possibly through a model change),
+  // it's not clear if we should allow partitioning to work on unspecialized
+  // generics.
+  if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
     auto &ctx = hostFn->getASTContext();
+    diagnose(ctx, hostFn->getLocation().getSourceLoc(),
+             diag::tf_internal_error,
+             "TensorFlow graph program extraction does not work on generic "
+             "functions yet");
+    return;
+  }
 
-    // TODO(clattner): This logic will eventually be subsumed by the
-    // corresponding logic in the TFDeabstraction pass.  Until deabstraction
-    // is done, we have some amount of top-level redundancy here because we have
-    // to run partitioning after the optimization passes.
+  // Because we're in active development, it is common to do something wrong
+  // in the TensorFlow module.  Detect and reject things here.
+  if (hostFn->getModule().getSwiftModule() == tfModule) {
+    auto &ctx = hostFn->getASTContext();
+    diagnose(ctx, hostFn->getLocation().getSourceLoc(),
+             diag::tf_internal_error,
+             "nothing in the TensorFlow module should require partitioning, "
+             "did you forget @inlinable on '" + hostFn->getName().str()
+             + "'?");
+    return;
+  }
 
-    // If the TensorFlow module hasn't been imported by the program, don't do
-    // anything.  This avoids impacting compile time for non-TensorFlow using
-    // Swift programs by doing extraneous analysis.
-    auto tfModule = ctx.getLoadedModule(ctx.getIdentifier("TensorFlow"));
-    if (!tfModule)
-      return;
+  // Actually do the partitioning transformation, splitting out a new SIL
+  // function for the tensor program body.
+  auto tensorProgram = partitioner.partition();
 
-    // If this function is a building block of larger tensor programs (e.g.
-    // the ops defined in the TensorFlow module), then don't transform it in
-    // isolation.
-    if (!tfc.shouldBePartitioned(hostFn))
-      return;
+  // If the TensorFlow module is malformed, exit without breaking the SIL:
+  // an error has already been emitted.
+  if (!tensorProgram.acceleratorFn)
+    return;
 
-    TFFunctionPartition partitioner(*hostFn, PM, *tfModule);
-    if (!partitioner.markFunction())
-      return; // No tensor ops found in the function.
+  // Our partitioning can leave around lots of unconditional branches between
+  // blocks that formerly had control edges.  Go through and merge those to
+  // make later passes simpler.
+  contractUncondBranches(tensorProgram.acceleratorFn);
 
-    // Check to see if we cannot transform the function but should.  In this
-    // case we emit a compiler error.  This is a limitation of the compiler that
-    // will need to be resolved in the future (possibly through a model change),
-    // it's not clear if we should allow partitioning to work on unspecialized
-    // generics.
-    if (hostFn->getLoweredFunctionType()->isPolymorphic()) {
-      auto &ctx = hostFn->getASTContext();
-      diagnose(ctx, hostFn->getLocation().getSourceLoc(),
-               diag::tf_internal_error,
-               "TensorFlow graph program extraction does not work on generic "
-               "functions yet");
-      return;
-    }
-
-    // Because we're in active development, it is common to do something wrong
-    // in the TensorFlow module.  Detect and reject things here.
-    if (hostFn->getModule().getSwiftModule() == tfModule) {
-      auto &ctx = hostFn->getASTContext();
-      diagnose(ctx, hostFn->getLocation().getSourceLoc(),
-               diag::tf_internal_error,
-               "nothing in the TensorFlow module should require partitioning, "
-               "did you forget @inlinable on '" + hostFn->getName().str()
-               + "'?");
-      return;
-    }
-
-    // Actually do the partitioning transformation, splitting out a new SIL
-    // function for the tensor program body.
-    auto tensorProgram = partitioner.partition();
-
-    // If the TensorFlow module is malformed, exit without breaking the SIL:
-    // an error has already been emitted.
-    if (!tensorProgram.acceleratorFn)
-      return;
-
-    // Our partitioning can leave around lots of unconditional branches between
-    // blocks that formerly had control edges.  Go through and merge those to
-    // make later passes simpler.
-    contractUncondBranches(tensorProgram.acceleratorFn);
-
-    if (auto outs = getTFDumpIntermediateStream()) {
-      *outs << "--- TFPartition Accelerator Result: "
-            << tensorProgram.acceleratorFn->getName() << "\n";
-      tensorProgram.acceleratorFn->print(*outs);
-      *outs << "----\n";
-      outs->flush();
-    } else if (isTest) {
-      llvm::outs() << "--- TFPartition Accelerator Result: "
-                   << tensorProgram.acceleratorFn->getName() << "\n";
-      tensorProgram.acceleratorFn->print(llvm::outs());
-      llvm::outs() << "----\n";
-      llvm::outs().flush();
-    }
+  if (auto outs = getTFDumpIntermediateStream()) {
+    *outs << "--- TFPartition Accelerator Result: "
+          << tensorProgram.acceleratorFn->getName() << "\n";
+    tensorProgram.acceleratorFn->print(*outs);
+    *outs << "----\n";
+    outs->flush();
+  } else if (isTest) {
+    llvm::outs() << "--- TFPartition Accelerator Result: "
+                 << tensorProgram.acceleratorFn->getName() << "\n";
+    tensorProgram.acceleratorFn->print(llvm::outs());
+    llvm::outs() << "----\n";
+    llvm::outs().flush();
+  }
 
 #ifndef NDEBUG
-    // Verify that the generated function is ok.
-    tensorProgram.acceleratorFn->verify();
+  // Verify that the generated function is ok.
+  tensorProgram.acceleratorFn->verify();
 #endif
 
-    // If this is called from sil-opt, we currently just print out the results
-    // and quit.  This allows writing regression tests for the tf-partition
-    // pass in isolation.  This is pretty unconventional for a SIL pass, but
-    // this is an unconventional pass!
-    if (isTest) {
-      llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
-                   << "\n";
-      hostFn->print(llvm::outs());
-      llvm::outs() << "---\n";
-      llvm::outs().flush();
-
-      // Finally, we're done.  Remove the partitioned function so it doesn't go
-      // through the normal compiler flow.
-      tensorProgram.acceleratorFn->getModule().eraseFunction(
-          tensorProgram.acceleratorFn);
-      return;
-    }
-
-    // Next translate it to a graph.
-    if (isAcceleratorOnly(*hostFn)) {
-      assert(partitioner.configuration.usedDeviceTypes.size() == 1 &&
-             "An accelerator-only SIL function must be lowered to a single TF "
-             "device.");
-      lowerTFFunction(hostFn->getName(), tensorProgram.acceleratorFn,
-                      partitioner.configuration, graphFunctions);
-
-      // Remove the partitioned function so it doesn't go through the normal
-      // compiler flow.
-      hostFn->getModule().eraseFunction(hostFn);
-    } else {
-      std::string entryFnBaseName;
-      auto bytes =
-          lowerTFGraph(tensorProgram.acceleratorFn, partitioner.configuration,
-                       /*graphFnNames*/ graphFunctions, entryFnBaseName);
-      assert(!StringRef(entryFnBaseName).startswith("$"));
-
-      // Now that we know what the tensor program actually is, we can replace
-      // the placeholder instructions for the data + length with the actual bits
-      // we want to use.
-      // This effectively emits the encoded graph as a global symbol.
-      SILBuilder B(tensorProgram.programPlaceholder);
-      auto data = B.createStringLiteral(hostFn->getLocation(),
-                                        StringRef(bytes.data(), bytes.size()),
-                                        StringLiteralInst::Encoding::Bytes);
-      auto len = B.createIntegerLiteral(
-          hostFn->getLocation(),
-          tensorProgram.programLengthPlaceholder->getType(), bytes.size());
-
-      auto name = B.createStringLiteral(hostFn->getLocation(),
-                                        StringRef(entryFnBaseName),
-                                        StringLiteralInst::Encoding::UTF8);
-      // Set the number of helper functions here based on the # devices involved
-      // in this TF program.
-      auto helperFunctionCount = B.createIntegerLiteral(
-          hostFn->getLocation(),
-          tensorProgram.helperFunctionCountPlaceholder->getType(),
-          partitioner.configuration.usedDeviceTypes.size() - 1);
-      tensorProgram.programPlaceholder->replaceAllUsesWith(data);
-      tensorProgram.programPlaceholder->eraseFromParent();
-      tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
-      tensorProgram.programLengthPlaceholder->eraseFromParent();
-      tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
-      tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
-      tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
-          helperFunctionCount);
-      tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
-
-      if (auto outs = getTFDumpIntermediateStream()) {
-        *outs << "--- TFPartition Host Result: " << hostFn->getName() << "\n";
-        hostFn->print(*outs);
-        *outs << "---\n";
-        outs->flush();
-      }
-    }
+  // If this is called from sil-opt, we currently just print out the results
+  // and quit.  This allows writing regression tests for the tf-partition
+  // pass in isolation.  This is pretty unconventional for a SIL pass, but
+  // this is an unconventional pass!
+  if (isTest) {
+    llvm::outs() << "--- TFPartition Host Result: " << hostFn->getName()
+                 << "\n";
+    hostFn->print(llvm::outs());
+    llvm::outs() << "---\n";
+    llvm::outs().flush();
 
     // Finally, we're done.  Remove the partitioned function so it doesn't go
     // through the normal compiler flow.
     tensorProgram.acceleratorFn->getModule().eraseFunction(
         tensorProgram.acceleratorFn);
+    return;
   }
-};
 
-} // end anonymous namespace
+  // Next translate it to a graph.
+  if (isAcceleratorOnly(*hostFn)) {
+    assert(partitioner.configuration.usedDeviceTypes.size() == 1 &&
+           "An accelerator-only SIL function must be lowered to a single TF "
+           "device.");
+    lowerTFFunction(hostFn->getName(), tensorProgram.acceleratorFn,
+                    partitioner.configuration, graphFunctions);
+
+    // Remove the partitioned function so it doesn't go through the normal
+    // compiler flow.
+    hostFn->getModule().eraseFunction(hostFn);
+  } else {
+    std::string entryFnBaseName;
+    auto bytes =
+        lowerTFGraph(tensorProgram.acceleratorFn, partitioner.configuration,
+                     /*graphFnNames*/ graphFunctions, entryFnBaseName);
+    assert(!StringRef(entryFnBaseName).startswith("$"));
+
+    // Now that we know what the tensor program actually is, we can replace
+    // the placeholder instructions for the data + length with the actual bits
+    // we want to use.
+    // This effectively emits the encoded graph as a global symbol.
+    SILBuilder B(tensorProgram.programPlaceholder);
+    auto data = B.createStringLiteral(hostFn->getLocation(),
+                                      StringRef(bytes.data(), bytes.size()),
+                                      StringLiteralInst::Encoding::Bytes);
+    auto len = B.createIntegerLiteral(
+        hostFn->getLocation(),
+        tensorProgram.programLengthPlaceholder->getType(), bytes.size());
+
+    auto name = B.createStringLiteral(hostFn->getLocation(),
+                                      StringRef(entryFnBaseName),
+                                      StringLiteralInst::Encoding::UTF8);
+    // Set the number of helper functions here based on the # devices involved
+    // in this TF program.
+    auto helperFunctionCount = B.createIntegerLiteral(
+        hostFn->getLocation(),
+        tensorProgram.helperFunctionCountPlaceholder->getType(),
+        partitioner.configuration.usedDeviceTypes.size() - 1);
+    tensorProgram.programPlaceholder->replaceAllUsesWith(data);
+    tensorProgram.programPlaceholder->eraseFromParent();
+    tensorProgram.programLengthPlaceholder->replaceAllUsesWith(len);
+    tensorProgram.programLengthPlaceholder->eraseFromParent();
+    tensorProgram.entryFunctionBaseNamePlaceholder->replaceAllUsesWith(name);
+    tensorProgram.entryFunctionBaseNamePlaceholder->eraseFromParent();
+    tensorProgram.helperFunctionCountPlaceholder->replaceAllUsesWith(
+        helperFunctionCount);
+    tensorProgram.helperFunctionCountPlaceholder->eraseFromParent();
+
+    if (auto outs = getTFDumpIntermediateStream()) {
+      *outs << "--- TFPartition Host Result: " << hostFn->getName() << "\n";
+      hostFn->print(*outs);
+      *outs << "---\n";
+      outs->flush();
+    }
+  }
+
+  // Finally, we're done.  Remove the partitioned function so it doesn't go
+  // through the normal compiler flow.
+  tensorProgram.acceleratorFn->getModule().eraseFunction(
+      tensorProgram.acceleratorFn);
+}
 
 SILTransform *swift::createTFPartition() {
   return new TFPartition(/*isTest*/false);
