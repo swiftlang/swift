@@ -1575,7 +1575,7 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
 
   SILInstruction *firstFound = nullptr;
   SmallVector<SILInstruction *, 4> configureInsts;
-  for (auto &bb : fn)
+  for (auto &bb : fn) {
     for (auto &inst : bb) {
       // Scan for the device configuration ops if present.
       auto tfopInfo = SILTensorOpInfo::decode(&inst);
@@ -1585,6 +1585,7 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
       if (!isConfigOp) continue;
 
       configureInsts.push_back(&inst);
+
       // If we found one, make sure we don't have more than one.
       if (firstFound) {
         diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
@@ -1605,30 +1606,26 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
         auto infeedEnabled =
           cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
         isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
-      } else if (tfopInfo->opName == "tfc.configureGPU") {
-        deviceType = DeviceType::GPU;
       } else {
-        llvm_unreachable("unknown device configuration op");
+        assert(tfopInfo->opName == "tfc.configureGPU" &&
+               "unknown device configuration op");
+        deviceType = DeviceType::GPU;
       }
     }
-
+  }
 
   // If the program didn't specify, fall back to the command line option.
   if (!firstFound) {
     // At most one of these test-only flags should be set.
-    assert (!TFTargetTPU || !TFTargetGPU);
+    assert(!TFTargetTPU || !TFTargetGPU);
     if (TFTargetTPU)
       deviceType = DeviceType::TPU;
     if (TFTargetGPU)
       deviceType = DeviceType::GPU;
-  }
-
-  if (firstFound) {
-    if (auto *outs = getTFDumpIntermediateStream()) {
-      *outs << "Targeting device " << getDeviceString(deviceType)
-            << " for accelerator program, based on config: \n";
-      firstFound->print(*outs);
-    }
+  } else if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "Targeting device " << getDeviceString(deviceType)
+          << " for accelerator program, based on config: \n";
+    firstFound->print(*outs);
   }
 
   // These instructions are not relevant to later compiler passes in TFPartition
