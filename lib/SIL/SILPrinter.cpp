@@ -1213,10 +1213,7 @@ public:
       return;
     }
     case SymbolicValue::Function: {
-      assert(!v.getFunctionValue().second &&
-             "SILFunction SymbolicValues with protocol conformances cannot be "
-             "printed");
-      auto function = v.getFunctionValue().first;
+      auto function = v.getFunctionValue();
       *this << "@" << function->getName();
       *this << " : $" << function->getLoweredFunctionType();
       return;
