@@ -680,6 +680,24 @@ keyPathImpl.test("equality") {
   expectNotEqual(s_c_z_p_x, s_c_z_p)
   expectNotEqual(s_c_z_p, s_c_z_p_x)
 
+  let s_x = WritableKeyPath<S<String>, Int>
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
+      $0.addHeader(trivial: true, hasReferencePrefix: false)
+      $0.addStructComponent(offset: S<String>.x_offset)
+    }
+
+  let si_x = WritableKeyPath<S<Int>, Int>
+    .build(capacityInBytes: MemoryLayout<Int>.size + 4) {
+      $0.addHeader(trivial: true, hasReferencePrefix: false)
+      $0.addStructComponent(offset: S<Int>.x_offset)
+    }
+
+  expectNotEqual(s_x, si_x)
+  expectNotEqual(s_x.hashValue, si_x.hashValue)
+
+  expectNotEqual(si_x, s_x)
+  expectNotEqual(si_x.hashValue, s_x.hashValue)
+
   // Same path, no reference prefix
   let s_c_z_p_x_readonly = KeyPath<S<S<String>>, Double>
     .build(capacityInBytes: 7 * MemoryLayout<Int>.size + 4) {
