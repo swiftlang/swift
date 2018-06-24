@@ -873,8 +873,9 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       auto selfTy = conformance.getRequirement()->getSelfInterfaceType();
       auto conf = substitutionMap.lookupConformance(selfTy->getCanonicalType(),
                                                  conformance.getRequirement());
-      assert(conf.hasValue() &&
-             "Should always be able to resolve conformances");
+      if (!conf.hasValue())
+        return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                         UnknownReason::Default);
 
       // Witness methods have special magic that is required to resolve them.
       callSubMap = getWitnessMethodSubstitutions(apply->getModule(), AI, callee,
