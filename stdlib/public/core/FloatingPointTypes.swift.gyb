@@ -1880,3 +1880,7 @@ public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
 public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
   fatalError("%= is not available.")
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

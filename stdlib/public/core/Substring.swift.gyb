@@ -747,3 +747,7 @@ extension String.UnicodeScalarView {
     return element
   }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

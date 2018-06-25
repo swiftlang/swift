@@ -720,3 +720,7 @@ public func stride<T>(
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

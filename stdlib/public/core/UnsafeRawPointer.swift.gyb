@@ -1074,3 +1074,7 @@ extension UnsafeMutableRawPointer {
   @available(*, unavailable, renamed: "init(mutating:)")
   public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable(); return nil }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -515,3 +515,7 @@ struct Workload {
   )
   
 }
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

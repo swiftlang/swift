@@ -1158,3 +1158,7 @@ extension ${Self}: _AnyCollectionProtocol {
   }
 }
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
