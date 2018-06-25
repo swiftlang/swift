@@ -43,3 +43,27 @@ func letEscape(f: () -> ()) -> () -> () {
 func letEscapeThrow(f: () throws -> () -> ()) throws -> () -> () {
   return try withoutActuallyEscaping(f) { return try $0() }
 }
+
+// We used to crash on this example because we would use the wrong substitution
+// map.
+struct DontCrash {
+  private func firstEnv<L1>(
+    closure1: (L1) -> Bool,
+    closure2: (L1) -> Bool
+  ) {
+    withoutActuallyEscaping(closure1) { closure1 in
+        secondEnv(
+            closure1: closure1,
+            closure2: closure2
+        )
+    }
+  }
+
+  private func secondEnv<L2>(
+    closure1: @escaping (L2) -> Bool,
+    closure2: (L2) -> Bool
+  ) {
+    withoutActuallyEscaping(closure2) { closure2 in
+    }
+  }
+}
