@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift
 
 class A { }
 protocol P { }
@@ -34,7 +34,7 @@ struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to pr
                          // expected-note @-3 {{'S3' declares conformance to protocol 'P' here}}
 struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
-struct S7 : protocol<P, Q> { }  // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
                                 // expected-error @-1 {{'Q' requires that 'S7' inherit from 'A'}}
                                 // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
 

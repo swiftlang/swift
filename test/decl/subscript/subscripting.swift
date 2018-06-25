@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift
 
 struct X { } // expected-note * {{did you mean 'X'?}}
 
@@ -190,8 +190,8 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
   value = ovl[i]
   ovl[i] = value
 
-  value = ovl[(i, j)]
-  ovl[(i, j)] = value
+  value = ovl[i, j]
+  ovl[i, j] = value
 
   value = ovl[(i, j, i)] // expected-error{{cannot convert value of type '(Int, Int, Int)' to expected argument type 'Int'}}
 

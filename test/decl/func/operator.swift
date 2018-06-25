@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift
 
 infix operator %%%
 infix operator %%%%
@@ -204,7 +204,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
