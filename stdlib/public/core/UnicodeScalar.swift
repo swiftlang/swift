@@ -293,7 +293,6 @@ extension Unicode.Scalar : CustomStringConvertible, CustomDebugStringConvertible
 
   /// An escaped textual representation of the Unicode scalar, suitable for
   /// debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "\"\(escaped(asASCII: true))\""
   }

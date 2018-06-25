@@ -187,7 +187,6 @@ extension OpaquePointer: Hashable {
 
 extension OpaquePointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
@@ -236,7 +235,6 @@ public struct CVaListPointer {
 
 extension CVaListPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return value.debugDescription
   }

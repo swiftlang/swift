@@ -372,7 +372,6 @@ extension StrideTo: Sequence {
 }
 
 extension StrideTo: CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: ["from": _start, "to": _end, "by": _stride])
   }
@@ -588,7 +587,6 @@ extension StrideThrough: Sequence {
 }
 
 extension StrideThrough: CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self,
       children: ["from": _start, "through": _end, "by": _stride])

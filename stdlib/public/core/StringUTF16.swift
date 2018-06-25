@@ -269,7 +269,6 @@ extension String {
       return String(_guts._extractSlice(_encodedOffsetRange))
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return "StringUTF16(\(self.description.debugDescription))"
     }
@@ -430,7 +429,6 @@ extension String.UTF16View.Index {
 // Reflection
 extension String.UTF16View : CustomReflectable {
   /// Returns a mirror that reflects the UTF-16 view of a string.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
   }

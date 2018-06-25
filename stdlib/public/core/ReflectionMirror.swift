@@ -10,18 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_reflectionMirror_normalizedType")
 internal func _getNormalizedType<T>(_: T, type: Any.Type) -> Any.Type
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_reflectionMirror_count")
 internal func _getChildCount<T>(_: T, type: Any.Type) -> Int
 
-@usableFromInline // FIXME(sil-serialize-all)
 internal typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_reflectionMirror_subscript")
 internal func _getChild<T>(
   of: T,
@@ -32,11 +28,9 @@ internal func _getChild<T>(
 ) -> Any
 
 // Returns 'c' (class), 'e' (enum), 's' (struct), 't' (tuple), or '\0' (none)
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_reflectionMirror_displayStyle")
 internal func _getDisplayStyle<T>(_: T) -> CChar
 
-@inlinable // FIXME(sil-serialize-all)
 internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: String?, value: Any) {
   var nameC: UnsafePointer<CChar>? = nil
   var freeFunc: NameFreeFunc? = nil
@@ -49,20 +43,16 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
 }
 
 #if _runtime(_ObjC)
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("swift_reflectionMirror_quickLookObject")
 internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 
-@usableFromInline // FIXME(sil-serialize-all)
 @_silgen_name("_swift_stdlib_NSObject_isKindOfClass")
 internal func _isImpl(_ object: AnyObject, kindOf: AnyObject) -> Bool
 
-@inlinable // FIXME(sil-serialize-all)
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
   return _isImpl(object, kindOf: `class` as AnyObject)
 }
 
-@inlinable // FIXME(sil-serialize-all)
 internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
 ) -> PlaygroundQuickLook? {
@@ -112,7 +102,6 @@ internal func _getClassPlaygroundQuickLook(
 #endif
 
 extension Mirror {
-  @inlinable // FIXME(sil-serialize-all)
   internal init(internalReflecting subject: Any,
               subjectType: Any.Type? = nil,
               customAncestor: Mirror? = nil)
@@ -160,7 +149,6 @@ extension Mirror {
     self._defaultDescendantRepresentation = .generated
   }
   
-  @inlinable // FIXME(sil-serialize-all)
   internal static func quickLookObject(_ subject: Any) -> PlaygroundQuickLook? {
 #if _runtime(_ObjC)
     let object = _getQuickLookObject(subject)

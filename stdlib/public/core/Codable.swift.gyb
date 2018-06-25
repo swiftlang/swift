@@ -92,7 +92,6 @@ extension CodingKey {
   }
 
   /// A textual representation of this key, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return description
   }

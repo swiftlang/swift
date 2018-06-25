@@ -97,7 +97,6 @@ extension ${Self} : CustomStringConvertible {
 
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     if isFinite || isNaN {
       return _float${bits}ToString(self, debug: true)

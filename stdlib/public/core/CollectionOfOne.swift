@@ -160,14 +160,12 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 
 extension CollectionOfOne : CustomDebugStringConvertible {
   /// A textual representation of the collection, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "CollectionOfOne(\(String(reflecting: _element)))"
   }
 }
 
 extension CollectionOfOne : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, children: ["element": _element])
   }

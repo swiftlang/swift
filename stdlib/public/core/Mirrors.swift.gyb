@@ -39,7 +39,6 @@ for self_ty in all_integer_types(word_bits):
 
 extension ${Type[0]} : CustomReflectable {
   /// A mirror that reflects the `${Type[0]}` instance.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
   }

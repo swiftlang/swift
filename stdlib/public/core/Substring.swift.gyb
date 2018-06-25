@@ -325,7 +325,6 @@ extension Substring : _SwiftStringView {
 }
 
 extension Substring : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return String(self).customMirror
   }
@@ -347,7 +346,6 @@ extension Substring : CustomStringConvertible {
 }
 
 extension Substring : CustomDebugStringConvertible {
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return String(self).debugDescription
   }
