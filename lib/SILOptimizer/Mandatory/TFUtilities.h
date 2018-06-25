@@ -254,7 +254,7 @@ private:
       NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
       ModuleDecl *module, SILModule &silModule);
 
-  /// Represent information about a TensorFlow operation as represented in SIL
+  /// Holds information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
   struct SILTensorOpInfo {
     /// The instruction being analyzed.
@@ -388,7 +388,7 @@ private:
     static SILInstruction *decodeTensorFromScalarsND(ApplyInst *inst);
   };
 
-  /// Represent information about a TensorFlow operation as represented in SIL
+  /// Holds information about a TensorFlow operation as represented in SIL
   /// as GraphOperationInst.
   struct GraphOperationDecoder {
     /// The instruction being analyzed.
@@ -423,6 +423,8 @@ private:
     StringRef decodeName(SmallVectorImpl<InputMarker> &inputInfo);
 
     /// Given an attribute name like foo$dtype, decode the name and the class.
+    /// If there is no modifier specified, this defaults to
+    /// OperandClass::Normal.
     static std::pair<StringRef, SILTensorOpInfo::OperandClass>
     decodeAttributeName(Identifier name);
 

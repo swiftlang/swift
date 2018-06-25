@@ -782,6 +782,8 @@ class DevicePartitionerImpl
     if (isa<SILArgument>(opValue)) return;
 
     auto *operandInst = opValue->getDefiningInstruction();
+    assert(operandInst && "value must be defined by an instruction");
+    
     DeviceType operandDeviceType = getSomeDevicePlacement(operandInst);
     // Already on this device -- we are done.
     if (operandDeviceType == DeviceType::ALL ||

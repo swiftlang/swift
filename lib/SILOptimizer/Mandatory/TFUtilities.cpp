@@ -1544,7 +1544,8 @@ decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
   return opName;
 }
 
-/// Given an attribute name like foo$dtype, decode the name and the class.
+/// Given an attribute name like foo$dtype, decode the name and the class.  If
+/// there is no modifier specified, this defaults to OperandClass::Normal.
 std::pair<StringRef, SILTensorOpInfo::OperandClass>
 GraphOperationDecoder::decodeAttributeName(Identifier name) {
   auto nameStr = name.str();
