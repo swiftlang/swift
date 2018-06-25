@@ -59,6 +59,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///   of this instance.
   @_effects(releasenone)
   final public func hash(into hasher: inout Hasher) {
+    ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
       while true {
@@ -597,7 +598,6 @@ internal enum KeyPathComponent: Hashable {
 
   @_effects(releasenone)
   internal func hash(into hasher: inout Hasher) {
-    var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
     ) {
