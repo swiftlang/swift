@@ -307,6 +307,9 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   if (req.isInvalid())
     return true;
 
+  // Note that we are resolving within a requirement.
+  options |= TypeResolutionFlags::GenericRequirement;
+
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     // Validate the types.
