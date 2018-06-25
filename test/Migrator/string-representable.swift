@@ -54,3 +54,9 @@ func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
   _ = Wrapper.Attribute.init(rawValue: "somevalue")
   _ = b.rawValue
 }
+
+
+func bar(_ c: Container) {
+  let attr: AliasAttribute = ""
+  c.add(single: attr)
+}
