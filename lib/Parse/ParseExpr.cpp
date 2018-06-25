@@ -3644,8 +3644,8 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///     '#valueAndGradient' expr-gradient-body
 ///   expr-gradient-body:
 ///     '('
-///       'of' ':' expr
-///       (',' 'withRespectTo' ':' expr-gradient-param-list)?
+///       expr
+///       (',' 'wrt' ':' expr-gradient-param-list)?
 ///     ')'
 ///   expr-gradient-param-list:
 ///     expr-gradient-param-index (',' expr-gradient-param-index)*
@@ -3670,7 +3670,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     llvm_unreachable("Not a reverse AD expression");
   }
 
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> ParserResult<Expr> {
+  auto errorAndSkipToEnd = [&](unsigned parenDepth = 1) -> ParserResult<Expr> {
     for (unsigned i = 0; i < parenDepth; ++i) {
       skipUntilDeclStmtRBrace(tok::r_paren);
       parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName);
@@ -3679,10 +3679,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
   };
 
-  // Parse '(' 'of' ':'.
-  if (parseToken(tok::l_paren, lParenLoc, diag::expr_expected_lparen, exprName)
-   || parseSpecificIdentifier("of", diag::expr_expected_label, exprName, "of:")
-   || parseToken(tok::colon, diag::expected_parameter_colon)) {
+  // Parse '('.
+  if (parseToken(tok::l_paren, lParenLoc,
+                 diag::expr_expected_lparen, exprName)) {
     return errorAndSkipToEnd();
   }
   // Parse an expression that represents the function to be differentiated.
@@ -3695,10 +3694,15 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   // If found comma, parse 'withRespectTo:'.
   SmallVector<AutoDiffParameter, 8> params;
   if (consumeIf(tok::comma)) {
-    // Parse 'withRespectTo' ':'.
-    if (parseSpecificIdentifier("withRespectTo",
+    // Parse 'wrt' ':'.
+    // If 'withRespectTo' is used, make the user change it to 'wrt'.
+    if (Tok.getText() == "withRespectTo") {
+      diagnose(Tok, diag::gradient_expr_use_wrt_not_withrespectto);
+      return errorAndSkipToEnd();
+    }
+    if (parseSpecificIdentifier("wrt",
                                 diag::expr_expected_label,
-                                exprName, "withRespectTo:") ||
+                                exprName, "wrt:") ||
         parseToken(tok::colon, diag::expected_parameter_colon))
       return errorAndSkipToEnd();
     // Function that parses one parameter.
