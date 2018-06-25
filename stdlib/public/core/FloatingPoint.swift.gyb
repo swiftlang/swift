@@ -2587,3 +2587,7 @@ extension BinaryFloatingPoint {
 
 @available(*, unavailable, renamed: "FloatingPoint")
 public typealias FloatingPointType = FloatingPoint
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

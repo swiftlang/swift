@@ -426,3 +426,7 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   // Initialize P2.
   Builtin.initialize(tmp, p2)
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
