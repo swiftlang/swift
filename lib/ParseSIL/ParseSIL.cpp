@@ -1943,79 +1943,6 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     component =
       KeyPathPatternComponent::forStoredProperty(cast<VarDecl>(prop), ty);
     return false;
-  } else if (componentKind.str() == "external") {
-    ValueDecl *externalDecl;
-    SmallVector<ParsedSubstitution, 4> parsedSubs;
-    SmallVector<KeyPathPatternComponent::Index, 4> indexes;
-    CanType ty;
-
-    if (parseSILDottedPath(externalDecl)
-        || parseSubstitutions(parsedSubs, patternEnv))
-      return true;
-
-    if (P.consumeIf(tok::l_square)) {
-      if (parseComponentIndices(indexes))
-        return true;
-    }
-    
-    if (P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
-        || P.parseToken(tok::sil_dollar,
-                        diag::expected_tok_in_sil_instr, "$")
-        || parseASTType(ty, patternEnv))
-      return true;
-
-    SILFunction *equals = nullptr;
-    SILFunction *hash = nullptr;
-
-    while (P.consumeIf(tok::comma)) {
-      Identifier subKind;
-      SourceLoc subKindLoc;
-      if (parseSILIdentifier(subKind, subKindLoc,
-                             diag::sil_keypath_expected_component_kind))
-        return true;
-
-      if (subKind.str() == "indices_equals") {
-        if (parseSILFunctionRef(InstLoc, equals))
-          return true;
-      } else if (subKind.str() == "indices_hash") {
-        if (parseSILFunctionRef(InstLoc, hash))
-          return true;
-      } else {
-        P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
-                   subKind);
-        return true;
-      }
-    }
-
-    if (!indexes.empty() != (equals && hash)) {
-      P.diagnose(componentLoc,
-                 diag::sil_keypath_external_missing_part);
-      return true;
-    }
-
-    SubstitutionMap subsMap;
-    if (!parsedSubs.empty()) {
-      auto genericEnv = externalDecl->getInnermostDeclContext()
-                                    ->getGenericEnvironmentOfContext();
-      if (!genericEnv) {
-        P.diagnose(P.Tok,
-                   diag::sil_substitutions_on_non_polymorphic_type);
-        return true;
-      }
-      subsMap = getApplySubstitutionsFromParsed(*this, genericEnv, parsedSubs);
-      if (!subsMap) return true;
-
-      // Map the substitutions out of the pattern context so that they
-      // use interface types.
-      subsMap = subsMap.mapReplacementTypesOutOfContext().getCanonical();
-    }
-
-    auto indexesCopy = P.Context.AllocateCopy(indexes);
-
-    component = KeyPathPatternComponent::forExternal(
-        cast<AbstractStorageDecl>(externalDecl),
-        subsMap, indexesCopy, equals, hash, ty);
-    return false;
   } else if (componentKind.str() == "gettable_property"
              || componentKind.str() == "settable_property") {
     bool isSettable = componentKind.str()[0] == 's';
@@ -2033,6 +1960,8 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     SILFunction *setter = nullptr;
     SILFunction *equals = nullptr;
     SILFunction *hash = nullptr;
+    AbstractStorageDecl *externalDecl = nullptr;
+    SubstitutionMap externalSubs;
     SmallVector<KeyPathPatternComponent::Index, 4> indexes;
     while (true) {
       Identifier subKind;
@@ -2078,6 +2007,34 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
       } else if (subKind.str() == "indices_hash") {
         if (parseSILFunctionRef(InstLoc, hash))
           return true;
+      } else if (subKind.str() == "external") {
+        ValueDecl *parsedExternalDecl;
+        SmallVector<ParsedSubstitution, 4> parsedSubs;
+
+        if (parseSILDottedPath(parsedExternalDecl)
+            || parseSubstitutions(parsedSubs, patternEnv))
+          return true;
+
+        externalDecl = cast<AbstractStorageDecl>(parsedExternalDecl);
+
+        if (!parsedSubs.empty()) {
+          auto genericEnv = externalDecl->getInnermostDeclContext()
+                                        ->getGenericEnvironmentOfContext();
+          if (!genericEnv) {
+            P.diagnose(P.Tok,
+                       diag::sil_substitutions_on_non_polymorphic_type);
+            return true;
+          }
+          externalSubs = getApplySubstitutionsFromParsed(*this, genericEnv,
+                                                         parsedSubs);
+          if (!externalSubs) return true;
+
+          // Map the substitutions out of the pattern context so that they
+          // use interface types.
+          externalSubs =
+            externalSubs.mapReplacementTypesOutOfContext().getCanonical();
+        }
+
       } else {
         P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
                    subKind);
@@ -2126,11 +2083,13 @@ SILParser::parseKeyPathPatternComponent(KeyPathPatternComponent &component,
     if (isSettable) {
       component = KeyPathPatternComponent::forComputedSettableProperty(
                              id, getter, setter,
-                             indexesCopy, equals, hash, componentTy);
+                             indexesCopy, equals, hash,
+                             externalDecl, externalSubs, componentTy);
     } else {
       component = KeyPathPatternComponent::forComputedGettableProperty(
                              id, getter,
-                             indexesCopy, equals, hash, componentTy);
+                             indexesCopy, equals, hash,
+                             externalDecl, externalSubs, componentTy);
     }
     return false;
   } else if (componentKind.str() == "optional_wrap"

@@ -3637,10 +3637,38 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
                                 bool forPropertyDescriptor) {
+  /// Returns true if a key path component for the given property or
+  /// subscript should be externally referenced.
+  auto shouldUseExternalKeyPathComponent =
+    [&]() -> bool {
+      return getASTContext().LangOpts.EnableKeyPathResilience
+        && !forPropertyDescriptor
+        && storage->getModuleContext() != SwiftModule;
+    };
+  
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
                                              storage->supportsMutation()
                                                ? AccessKind::ReadWrite
-                                               : AccessKind::Read);
+                                               : AccessKind::Read,
+                                             M.getSwiftModule());
+
+  AbstractStorageDecl *externalDecl = nullptr;
+  SubstitutionMap externalSubs;
+  
+  if (shouldUseExternalKeyPathComponent()) {
+    externalDecl = storage;
+    // Map the substitutions out of context.
+    if (!subs.empty()) {
+      externalSubs = subs;
+      // If any of the substitutions involve local archetypes, then the
+      // key path pattern needs to capture the generic context, and we need
+      // to map the pattern substitutions out of this context.
+      if (externalSubs.hasArchetypes()) {
+        needsGenericContext = true;
+        externalSubs = externalSubs.mapReplacementTypesOutOfContext();
+      }
+    }
+  }
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
@@ -3698,10 +3726,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                {},
                baseTy, componentTy);
         return KeyPathPatternComponent::forComputedSettableProperty(id,
-            getter, setter, {}, nullptr, nullptr, componentTy);
+            getter, setter, {}, nullptr, nullptr,
+            externalDecl, externalSubs, componentTy);
       } else {
         return KeyPathPatternComponent::forComputedGettableProperty(id,
-            getter, {}, nullptr, nullptr, componentTy);
+            getter, {}, nullptr, nullptr,
+            externalDecl, externalSubs, componentTy);
       }
     }
     }
@@ -3754,6 +3784,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                                            indexPatternsCopy,
                                                            indexEquals,
                                                            indexHash,
+                                                           externalDecl,
+                                                           externalSubs,
                                                            componentTy);
     } else {
       return KeyPathPatternComponent::forComputedGettableProperty(id,
@@ -3761,6 +3793,8 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                                            indexPatternsCopy,
                                                            indexEquals,
                                                            indexHash,
+                                                           externalDecl,
+                                                           externalSubs,
                                                            componentTy);
     }
   }
@@ -3810,87 +3844,28 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       }
     };
   
-  /// Returns true if a key path component for the given property or
-  /// subscript should be externally referenced.
-  auto shouldUseExternalKeyPathComponent =
-    [&](AbstractStorageDecl *storage) -> bool {
-      return SGF.getASTContext().LangOpts.EnableKeyPathResilience
-        && storage->getModuleContext() != SGF.SGM.SwiftModule;
-    };
-  
-  /// Build an external key path component referencing a property or subscript
-  /// from another module.
-  auto makeExternalKeyPathComponent =
-    [&](const KeyPathExpr::Component &component) -> KeyPathPatternComponent {
-      SmallVector<KeyPathPatternComponent::Index, 4> indices;
-      SubstitutionMap subMap = component.getDeclRef().getSubstitutions();
-      auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
-      auto ty = decl->getStorageInterfaceType();
-      // Map the substitutions out of context.
-      if (!subMap.empty()) {
-        // If any of the substitutions involve local archetypes, then the
-        // key path pattern needs to capture the generic context, and we need
-        // to map the pattern substitutions out of this context.
-        if (subMap.hasArchetypes()) {
-          needsGenericContext = true;
-          subMap = subMap.mapReplacementTypesOutOfContext();
-        }
-        ty = ty.subst(subMap);
-      }
-      
-      SILFunction *indexEquals = nullptr, *indexHash = nullptr;
-      if (component.getKind() ==  KeyPathExpr::Component::Kind::Subscript) {
-        unsigned numOperands = operands.size();
-        SmallVector<IndexTypePair, 4> indexTypes;
-        auto sub = cast<SubscriptDecl>(component.getDeclRef().getDecl());
-        lowerKeyPathSubscriptIndexTypes(
-                          SGF.SGM, indexTypes, sub,
-                          component.getDeclRef().getSubstitutions(),
-                          needsGenericContext);
-        lowerKeyPathSubscriptIndexPatterns(indices, indexTypes,
-             component.getSubscriptIndexHashableConformances(),
-             numOperands);
-        
-        lowerSubscriptOperands(component);
-        
-        assert(numOperands == operands.size()
-               && "operand count out of sync");
-        getOrCreateKeyPathEqualsAndHash(SGF.SGM, SILLocation(E),
-                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
-                 indices,
-                 indexEquals, indexHash);
-      }
-      return KeyPathPatternComponent::forExternal(
-        decl, subMap, SGF.getASTContext().AllocateCopy(indices),
-        indexEquals, indexHash,
-        ty->getCanonicalType());
-    };
-  
+
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript: {
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
 
-      if (shouldUseExternalKeyPathComponent(decl)) {
-        loweredComponents.push_back(makeExternalKeyPathComponent(component));
-      } else {
-        unsigned numOperands = operands.size();
-        loweredComponents.push_back(
-          SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
-                              SGF.F.getGenericEnvironment(),
-                              numOperands,
-                              needsGenericContext,
-                              component.getDeclRef().getSubstitutions(),
-                              decl,
-                              component.getSubscriptIndexHashableConformances(),
-                              baseTy,
-                              /*for descriptor*/ false));
-        lowerSubscriptOperands(component);
-      
-        assert(numOperands == operands.size()
-               && "operand count out of sync");
-      }
+      unsigned numOperands = operands.size();
+      loweredComponents.push_back(
+        SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
+                            SGF.F.getGenericEnvironment(),
+                            numOperands,
+                            needsGenericContext,
+                            component.getDeclRef().getSubstitutions(),
+                            decl,
+                            component.getSubscriptIndexHashableConformances(),
+                            baseTy,
+                            /*for descriptor*/ false));
+      lowerSubscriptOperands(component);
+    
+      assert(numOperands == operands.size()
+             && "operand count out of sync");
       baseTy = loweredComponents.back().getComponentType();
 
       break;

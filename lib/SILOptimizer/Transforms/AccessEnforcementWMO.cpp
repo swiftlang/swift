@@ -184,7 +184,6 @@ void GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
-      case KeyPathPatternComponent::Kind::External:
       case KeyPathPatternComponent::Kind::OptionalChain:
       case KeyPathPatternComponent::Kind::OptionalForce:
       case KeyPathPatternComponent::Kind::OptionalWrap:

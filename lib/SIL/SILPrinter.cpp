@@ -2132,6 +2132,16 @@ public:
         *this << " : "
               << component.getSubscriptIndexHash()->getLoweredType();
       }
+      
+      if (auto external = component.getExternalDecl()) {
+        *this << ", external #";
+        printValueDecl(external, PrintState.OS);
+        auto subs = component.getExternalSubstitutions();
+        if (!subs.empty()) {
+          printSubstitutions(subs);
+        }
+      }
+      
       break;
     }
     case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -2152,30 +2162,6 @@ public:
       }
       *this << component.getComponentType();
       break;
-    }
-    case KeyPathPatternComponent::Kind::External: {
-      *this << "external #";
-      printValueDecl(component.getExternalDecl(), PrintState.OS);
-      if (!component.getExternalSubstitutions().empty()) {
-        printSubstitutions(component.getExternalSubstitutions());
-      }
-      
-      if (!component.getSubscriptIndices().empty()) {
-        printComponentIndices(component.getSubscriptIndices());
-      }
-      
-      *this << " : $" << component.getComponentType();
-      
-      if (!component.getSubscriptIndices().empty()) {
-        *this << ", indices_equals ";
-        component.getSubscriptIndexEquals()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexEquals()->getLoweredType();
-        *this << ", indices_hash ";
-        component.getSubscriptIndexHash()->printName(PrintState.OS);
-        *this << " : "
-              << component.getSubscriptIndexHash()->getLoweredType();
-      }
     }
     }
   }

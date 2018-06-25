@@ -144,28 +144,10 @@ entry(%s : $S, %c : $C):
 }
 
 // CHECK-LABEL: sil @external
-sil @external : $@convention(thin) <A, B: Hashable> (@in_guaranteed B) -> () {
-entry(%z : $*B):
-  // CHECK: %1 = keypath $KeyPath<External<Int>, Int>, (root $External<Int>; external #External.ro<Int> : $Int)
-  %a = keypath $KeyPath<External<Int>, Int>, (root $External<Int>; external #External.ro<Int> : $Int)
-
-  // CHECK: %2 = keypath $KeyPath<External<A>, A>, <τ_0_0, τ_0_1, τ_0_2> (root $External<τ_0_2>; external #External.ro<τ_0_2> : $τ_0_2) <A, A, A>
-  %b = keypath $KeyPath<External<A>, A>, <C, D, E> (root $External<E>; external #External.ro <E> : $E) <A, A, A>
-
-  // CHECK: %3 = keypath $KeyPath<External<Int>, Int>, <τ_0_0> (root $External<τ_0_0>; external #External.ro<τ_0_0> : $τ_0_0) <Int>
-  %c = keypath $KeyPath<External<Int>, Int>, <F> (root $External<F>; external #External.ro <F> : $F) <Int>
-
-  // CHECK: %4 = keypath $KeyPath<External<A>, A>, <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (
-  // CHECK-SAME: root $External<τ_0_1>;
-  // CHECK-SAME: external #External.subscript<τ_0_1, τ_0_0>[%$0 : $τ_0_0 : $*τ_0_0] : $τ_0_1,
-  // CHECK-SAME: indices_equals @equals_external_subscript
-  // CHECK-SAME: indices_hash @hash_external_subscript
-  // CHECK-SAME: ) <B, A> (%0)
-  %d = keypath $KeyPath<External<A>, A>, <G: Hashable, H> (
-    root $External<H>;
-    external #External.subscript <H, G> [%$0 : $G : $*G] : $H,
-      indices_equals @equals_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @hash_external_subscript : $@convention(thin) <U: Hashable, T> (UnsafeRawPointer) -> Int) <B, A> (%z)
+sil @external : $@convention(thin) <D: P, E: Q, F: R> () -> () {
+entry:
+  // CHECK: keypath $KeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; settable_property $τ_0_0, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> @out τ_0_0, setter @set_gen_a : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P, τ_0_1 : Q, τ_0_2 : R> (@in_guaranteed τ_0_0, @in_guaranteed Gen<τ_0_0, τ_0_1, τ_0_2>) -> (), external #Gen.x<τ_0_0, τ_0_1, τ_0_2>) <D, E, F>
+  %a = keypath $KeyPath<Gen<D, E, F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; settable_property $G, id @id_a : $@convention(thin) () -> (), getter @get_gen_a : $@convention(thin) <X3: P, Y3: Q, Z3: R> (@in_guaranteed Gen<X3, Y3, Z3>) -> @out X3, setter @set_gen_a : $@convention(thin) <X4: P, Y4: Q, Z4: R> (@in_guaranteed X4, @in_guaranteed Gen<X4, Y4, Z4>) -> (), external #Gen.x<G, H, I>) <D, E, F>
 
   return undef : $()
 }

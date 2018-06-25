@@ -2279,7 +2279,6 @@ public:
     StoredProperty,
     GettableProperty,
     SettableProperty,
-    External,
     OptionalChain,
     OptionalForce,
     OptionalWrap,
@@ -2298,7 +2297,6 @@ private:
   enum PackedKind: unsigned {
     PackedStored,
     PackedComputed,
-    PackedExternal,
     Unpacked,
   };
   
@@ -2311,8 +2309,6 @@ private:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return PackedComputed;
-    case Kind::External:
-      return PackedExternal;
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
@@ -2323,23 +2319,18 @@ private:
   // Value is the VarDecl* for StoredProperty, the SILFunction* of the
   // Getter for computed properties, or the Kind for other kinds
   llvm::PointerIntPair<void *, KindPackingBits, unsigned> ValueAndKind;
-  union {
-    // Valid if Kind == GettableProperty || Kind == SettableProperty
-    struct {
-      llvm::PointerIntPair<SILFunction *, 2,
-                           ComputedPropertyId::KindType> SetterAndIdKind;
-      ComputedPropertyId::ValueType IdValue;
-    } Computed;
-    // Valid if Kind == External
-    SubstitutionMap ExternalSubstitutions;
-  };
+  llvm::PointerIntPair<SILFunction *, 2,
+                       ComputedPropertyId::KindType> SetterAndIdKind;
+  ComputedPropertyId::ValueType IdValue;
   ArrayRef<Index> Indices;
   struct {
     SILFunction *Equal;
     SILFunction *Hash;
   } IndexEquality;
   CanType ComponentType;
-  
+  AbstractStorageDecl *ExternalStorage;
+  SubstitutionMap ExternalSubstitutions;
+
   /// Constructor for stored components
   KeyPathPatternComponent(VarDecl *storedProp,
                           CanType ComponentType)
@@ -2353,26 +2344,18 @@ private:
                           ArrayRef<Index> indices,
                           SILFunction *indicesEqual,
                           SILFunction *indicesHash,
+                          AbstractStorageDecl *externalStorage,
+                          SubstitutionMap externalSubstitutions,
                           CanType ComponentType)
     : ValueAndKind(getter, PackedComputed),
-      Computed{{setter, id.Kind}, {id.Value}},
+      SetterAndIdKind{setter, id.Kind},
+      IdValue{id.Value},
       Indices(indices),
       IndexEquality{indicesEqual, indicesHash},
-      ComponentType(ComponentType) {
-  }
-  
-  /// Constructor for external components
-  KeyPathPatternComponent(AbstractStorageDecl *externalStorage,
-                          SubstitutionMap substitutions,
-                          ArrayRef<Index> indices,
-                          SILFunction *indicesEqual,
-                          SILFunction *indicesHash,
-                          CanType componentType)
-    : ValueAndKind(externalStorage, PackedExternal),
-      ExternalSubstitutions(substitutions),
-      Indices(indices),
-      IndexEquality{indicesEqual, indicesHash},
-      ComponentType(componentType) {
+      ComponentType(ComponentType),
+      ExternalStorage(externalStorage),
+      ExternalSubstitutions(externalSubstitutions)
+  {
   }
   
   /// Constructor for optional components.
@@ -2396,10 +2379,8 @@ public:
     case PackedStored:
       return Kind::StoredProperty;
     case PackedComputed:
-      return Computed.SetterAndIdKind.getPointer()
+      return SetterAndIdKind.getPointer()
         ? Kind::SettableProperty : Kind::GettableProperty;
-    case PackedExternal:
-      return Kind::External;
     case Unpacked:
       return (Kind)((uintptr_t)ValueAndKind.getPointer() >> KindPackingBits);
     }
@@ -2418,7 +2399,6 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
@@ -2430,12 +2410,11 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return ComputedPropertyId(Computed.IdValue,
-                                Computed.SetterAndIdKind.getInt());
+      return ComputedPropertyId(IdValue,
+                                SetterAndIdKind.getInt());
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2446,7 +2425,6 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
@@ -2462,10 +2440,9 @@ public:
     case Kind::OptionalChain:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
-    case Kind::External:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return Computed.SetterAndIdKind.getPointer();
+      return SetterAndIdKind.getPointer();
     }
     llvm_unreachable("unhandled kind");
   }
@@ -2479,7 +2456,6 @@ public:
       return {};
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-    case Kind::External:
       return Indices;
     }
   }
@@ -2491,7 +2467,6 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
-    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Equal;
@@ -2504,7 +2479,6 @@ public:
     case Kind::OptionalForce:
     case Kind::OptionalWrap:
       llvm_unreachable("not a computed property");
-    case Kind::External:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
       return IndexEquality.Hash;
@@ -2519,15 +2493,29 @@ public:
   }
   
   AbstractStorageDecl *getExternalDecl() const {
-    assert(getKind() == Kind::External
-           && "not an external property");
-    return (AbstractStorageDecl*)ValueAndKind.getPointer();
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return ExternalStorage;
+    }
   }
   
   SubstitutionMap getExternalSubstitutions() const {
-    assert(getKind() == Kind::External
-           && "not an external property");
-    return ExternalSubstitutions;
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::OptionalChain:
+    case Kind::OptionalForce:
+    case Kind::OptionalWrap:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return ExternalSubstitutions;
+    }
   }
 
   static KeyPathPatternComponent
@@ -2536,10 +2524,14 @@ public:
                               ArrayRef<Index> indices,
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
+                              AbstractStorageDecl *externalDecl,
+                              SubstitutionMap externalSubs,
                               CanType ty) {
     return KeyPathPatternComponent(identifier,
                                    getter, nullptr, indices,
-                                   indicesEquals, indicesHash, ty);
+                                   indicesEquals, indicesHash,
+                                   externalDecl, externalSubs,
+                                   ty);
   }
 
   static KeyPathPatternComponent
@@ -2549,10 +2541,14 @@ public:
                               ArrayRef<Index> indices,
                               SILFunction *indicesEquals,
                               SILFunction *indicesHash,
+                              AbstractStorageDecl *externalDecl,
+                              SubstitutionMap externalSubs,
                               CanType ty) {
     return KeyPathPatternComponent(identifier,
                                    getter, setter, indices,
-                                   indicesEquals, indicesHash, ty);
+                                   indicesEquals, indicesHash,
+                                   externalDecl, externalSubs,
+                                   ty);
   }
   
   static KeyPathPatternComponent
@@ -2568,21 +2564,9 @@ public:
     case Kind::StoredProperty:
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-    case Kind::External:
       llvm_unreachable("not an optional kind");
     }
     return KeyPathPatternComponent(kind, ty);
-  }
-  
-  static KeyPathPatternComponent
-  forExternal(AbstractStorageDecl *externalDecl,
-              SubstitutionMap substitutions,
-              ArrayRef<Index> indices,
-              SILFunction *indicesEquals,
-              SILFunction *indicesHash,
-              CanType ty) {
-    return KeyPathPatternComponent(externalDecl, substitutions,
-                                   indices, indicesEquals, indicesHash, ty);
   }
   
   void incrementRefCounts() const;
