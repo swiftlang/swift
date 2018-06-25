@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-sil %s -verify -verify-ignore-unknown | %FileCheck %s
-// FIXME(rxwei): Remove -verify-ignore-unknown when we fix the source location.
+// RUN: %target-swift-frontend -O -emit-sil %s -verify -verify-ignore-unknown
+// FIXME: Remove -verify-ignore-unknown when we fix the source location.
 
 import TensorFlow
 
@@ -19,9 +19,9 @@ func hostCode(_ x: Tensor<Float>) -> Tensor<Float> {
 }
 
 @TensorFlowGraph
-public func send(_ x: Tensor<Float>) -> Tensor<Float> {
+public func usingHostCode(_ x: Tensor<Float>) -> Tensor<Float> {
   let y = x + x
-  // TODO(rxwei): Expected error but unknown location "host code is not allowed
+  // FIXME: Expected error but unknown location "host code is not allowed
   // in a @convention(tensorflow) function"
   let z = hostCode(y).toAccelerator()
   return z + z

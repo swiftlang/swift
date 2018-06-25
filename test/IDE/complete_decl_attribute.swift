@@ -121,4 +121,5 @@ struct S{}
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
+// KEYWORD_LAST-NEXT:             Keyword/None:                       TensorFlowGraph[#Declaration Attribute#]; name=TensorFlowGraph
 // KEYWORD_LAST-NEXT:             End completions
