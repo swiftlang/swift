@@ -2105,6 +2105,13 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::Func:
       if (c.getDecl()->getDeclContext()->isTypeContext())
         return SILFunctionTypeRepresentation::Method;
+      // SWIFT_ENABLE_TENSORFLOW
+      if (auto *FD = dyn_cast<FuncDecl>(c.getDecl())) {
+        auto *fnTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
+        if (fnTy->getExtInfo().getRepresentation() ==
+              AnyFunctionType::Representation::TensorFlow)
+          return SILFunctionTypeRepresentation::TensorFlow;
+      }
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Destroyer:
