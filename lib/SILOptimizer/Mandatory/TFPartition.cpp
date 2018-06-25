@@ -667,7 +667,8 @@ public:
   TFFunctionPartition(SILFunction &Fn, SILPassManager *PM,
                       ModuleDecl &tensorFlowModule)
       : hostFn(Fn), tensorFlowModule(tensorFlowModule),
-        configuration(GraphGlobalConfiguration::getForFunction(Fn)),
+        configuration(GraphGlobalConfiguration::getForFunction(Fn,
+                                                   /*removeConfigInst*/true)),
         DI(*PM->getAnalysis<DominanceAnalysis>()->get(&Fn)),
         tensorCodeBlocks(Fn) {}
 

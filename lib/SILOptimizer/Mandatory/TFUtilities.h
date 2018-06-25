@@ -139,7 +139,8 @@ struct GraphGlobalConfiguration {
   llvm::SetVector<DeviceType> usedDeviceTypes;
 
   /// Return the configuration for the specified function.
-  static GraphGlobalConfiguration getForFunction(SILFunction &fn);
+  static GraphGlobalConfiguration getForFunction(SILFunction &fn,
+                                                 bool removeConfigInst);
 
   void markDeviceUsed(DeviceType device) {
     if (device != DeviceType::ALL)

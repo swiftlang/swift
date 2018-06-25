@@ -1569,7 +1569,8 @@ GraphOperationDecoder::decodeAttributeName(Identifier name) {
 /// Scan the specified function, looking for logic that configures the current
 /// graph.
 GraphGlobalConfiguration
-GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
+GraphGlobalConfiguration::getForFunction(SILFunction &fn,
+                                         bool removeConfigInst) {
   DeviceType deviceType = DeviceType::CPU;
   bool isTPUInfeedEnabled = false;
 
@@ -1617,6 +1618,7 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
   // If the program didn't specify, fall back to the command line option.
   if (!firstFound) {
     // At most one of these test-only flags should be set.
+    // FIXME: Change this to a mutually exclusive flag setting an enum.
     assert(!TFTargetTPU || !TFTargetGPU);
     if (TFTargetTPU)
       deviceType = DeviceType::TPU;
@@ -1631,11 +1633,12 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn) {
   // These instructions are not relevant to later compiler passes in TFPartition
   // and TFLowerGraph. Removing them so that the later passes need not deal with
   // this special builtin type.
-  for (auto *configureInst : configureInsts) {
-    assert(!configureInst->hasUsesOfAnyResult());
-    recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+  if (removeConfigInst) {
+    for (auto *configureInst : configureInsts) {
+      assert(!configureInst->hasUsesOfAnyResult());
+      recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+    }
   }
-
   return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
 }
 

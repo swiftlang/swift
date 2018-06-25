@@ -1771,7 +1771,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
-  auto deviceConfiguration = GraphGlobalConfiguration::getForFunction(fn);
+  auto deviceConfiguration =
+    GraphGlobalConfiguration::getForFunction(fn, /*removeConfigInst*/false);
 
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
