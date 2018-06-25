@@ -31,15 +31,6 @@ extension Collection {
 }
 
 extension String {
-  internal func index(_nth n: Int) -> Index {
-    return characters.index(_nth: n)
-  }
-  internal func index(_nthLast n: Int) -> Index {
-    return characters.index(_nthLast: n)
-  }
-}
-
-extension String {
   var nativeCapacity: Int {
     precondition(_guts._isNative)
     return _guts.capacity
@@ -139,13 +130,12 @@ StringTests.test("AssociatedTypes-UnicodeScalarView") {
 }
 
 StringTests.test("AssociatedTypes-CharacterView") {
-  typealias View = String.CharacterView
   expectCollectionAssociatedTypes(
-    collectionType: View.self,
-    iteratorType: IndexingIterator<View>.self,
-    subSequenceType: View.self,
-    indexType: View.Index.self,
-    indicesType: DefaultIndices<View>.self)
+    collectionType: String.self,
+    iteratorType: IndexingIterator<String>.self,
+    subSequenceType: Substring.self,
+    indexType: String.Index.self,
+    indicesType: DefaultIndices<String>.self)
 }
 
 func checkUnicodeScalarViewIteration(
@@ -1013,27 +1003,6 @@ StringTests.test("StringGutsReplace") {
       checkRangeReplaceable(
         { StringGutsCollection(g1) },
         { Array(StringGutsCollection(g2))[0..<$0] }
-      )
-    }
-  }
-}
-
-StringTests.test("CharacterViewReplace") {
-  let narrow = "01234567890"
-  let wide = "ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪ"
-  
-  for s1 in [narrow, wide] {
-    for s2 in [narrow, wide] {
-      let g1 = makeStringGuts(s1)
-      let g2 = makeStringGuts(s2 + s2)
-      checkRangeReplaceable(
-        { () -> String._CharacterView in
-          String._CharacterView(String(g1)) },
-        { String._CharacterView(String(g2._extractSlice(0..<$0))) }
-      )
-      checkRangeReplaceable(
-        { String._CharacterView(String(g1)) },
-        { Array(String._CharacterView(String(g2)))[0..<$0] }
       )
     }
   }

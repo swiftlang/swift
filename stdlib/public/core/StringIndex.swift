@@ -158,14 +158,6 @@ extension String.Index {
     self.init(encodedOffset: _codeUnitOffset)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2)
-  @available(swift, obsoleted: 4.0)
-  public // SPI(Foundation)
-  init(_base: String.Index, in c: String.CharacterView) {
-    self = _base
-  }
-
   /// The integer offset of this index in UTF-16 code units.
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, deprecated: 3.2)
