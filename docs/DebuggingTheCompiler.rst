@@ -437,6 +437,25 @@ reducing SIL test cases by:
 For more information and a high level example, see:
 ./swift/utils/bug_reducer/README.md.
 
+Using ``clang-tidy`` to run the Static Analyzer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Recent versions of LLVM package the tool ``clang-tidy``. This can be used in
+combination with a json compilation database to run static analyzer checks as
+well as cleanups/modernizations on a code-base. Swift's cmake invocation by
+default creates one of these json databases at the root path of the swift host
+build, for example on macOS::
+
+    $PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json
+
+Using this file, one invokes ``clang-tidy`` on a specific file in the codebase
+as follows::
+
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_FILE
+
+One can also use shell regex to visit multiple files in the same directory. Example::
+
+    clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 
 Debugging Swift Executables
 ===========================
