@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t -swift-version 3
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir -parse-as-library %s -I %t -swift-version 3 | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir -parse-as-library %s -I %t | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
 
 import local_types_helper
 
@@ -27,18 +27,6 @@ public struct PatternStruct {
     return 1
   })()
 }
-
-public func singleDefaultArgument(i: Int = {
-  // CHECK-DAG: @"$S11local_types21singleDefaultArgument1iySi_tFfA_SiycfU_06SingledE6StructL_VMf" = internal constant
-  struct SingleDefaultArgumentStruct {
-    let i: Int
-  }
-  return 2
-
-  }()){
-    print(i)
-}
-
 
 #if COMPILED_OUT
 public func topLevelIfConfig() {

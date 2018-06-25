@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
 //
 // Type parameters
 //
-infix operator ~> { precedence 255 }
+infix operator ~>
 
 func ~> <Target, Args, Result> (
   target: Target,
