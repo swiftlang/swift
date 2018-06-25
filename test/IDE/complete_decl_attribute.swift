@@ -34,7 +34,7 @@
 func method(){}
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2:                  Begin completions, 13 items
+// KEYWORD2:                  Begin completions, 14 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
@@ -95,7 +95,7 @@ struct S{}
 @#^KEYWORD_LAST^#
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD_LAST:                  Begin completions, 24 items
+// KEYWORD_LAST:                  Begin completions, 25 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // SWIFT_ENABLE_TENSORFLOW
