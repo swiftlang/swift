@@ -9,7 +9,7 @@ func adjointId(_ x: Float, originalValue: Float, seed: Float) -> Float {
   return seed
 }
 
-_ = #gradient(of: id)(2)
+_ = #gradient(id)(2)
 
 // CHECK: @{{.*}}id{{.*}}__grad_src_0_wrt_0
 // CHECK-LABEL: @{{.*}}id{{.*}}__grad_src_0_wrt_0_s_p
@@ -37,8 +37,8 @@ func adjointSigmoid(_ x: Double, checkpoints: (Double, Double, Double), result: 
   return result * (1 - result)
 }
 
-let x = #gradient(of: sigmoid)(3)
-let (value: y, gradient: z) = #valueAndGradient(of: sigmoid)(4)
+let x = #gradient(sigmoid)(3)
+let (value: y, gradient: z) = #valueAndGradient(sigmoid)(4)
 print(x * z)
 
 // CHECK: @{{.*}}sigmoid{{.*}}__grad_src_0_wrt_0

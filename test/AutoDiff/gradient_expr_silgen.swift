@@ -45,12 +45,12 @@ public func foo_generic_vector<T : VectorNumeric>(x: T, y: T) -> T where T.Scala
 @_silgen_name("foo_generic_vector_and_scalar")
 public func foo_generic_vector_and_scalar<T : FloatingPoint, U : VectorNumeric>(x: T, y: U) -> U where U.ScalarElement : FloatingPoint { return y }
 
-let _ = #gradient(of: foo)
-let _ = #gradient(of: foo, withRespectTo: .0)
-let _ = #valueAndGradient(of: foo)
-let _: (Float, Float, [Int]) -> (Float, Float) = #gradient(of: foo_indir_ret, withRespectTo: .0, .1)
-let _: (Vector, Vector) -> (Vector, Vector) = #gradient(of: foo_generic_vector)
-let _: (Float, Vector) -> (Float, Vector) = #gradient(of: foo_generic_vector_and_scalar)
+let _ = #gradient(foo)
+let _ = #gradient(foo, wrt: .0)
+let _ = #valueAndGradient(foo)
+let _: (Float, Float, [Int]) -> (Float, Float) = #gradient(foo_indir_ret, wrt: .0, .1)
+let _: (Vector, Vector) -> (Vector, Vector) = #gradient(foo_generic_vector)
+let _: (Float, Vector) -> (Float, Vector) = #gradient(foo_generic_vector_and_scalar)
 
 // CHECK-LABEL: sil @main :
 // CHECK: [[FOO_1:%.*]] = function_ref @foo
