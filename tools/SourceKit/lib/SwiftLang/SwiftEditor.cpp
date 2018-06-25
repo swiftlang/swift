@@ -571,13 +571,14 @@ public:
       : SyntaxMap(SyntaxMap), TokenClassifications(TokenClassifications) {}
 
 private:
-  void print(Trivia Trivia) {
+  void print(Trivia Trivia, unsigned Offset) {
     for (auto TriviaPiece : Trivia) {
-      print(TriviaPiece);
+      print(TriviaPiece, Offset);
+      Offset += TriviaPiece.getTextLength();
     }
   }
 
-  void print(TriviaPiece TriviaPiece) {
+  void print(TriviaPiece TriviaPiece, unsigned Offset) {
     llvm::Optional<SyntaxNodeKind> Kind;
     switch (TriviaPiece.getKind()) {
     case TriviaKind::Space:
@@ -604,8 +605,11 @@ private:
       Kind = SyntaxNodeKind::DocCommentBlock;
       break;
     }
-    // FIXME: Add the trivia to the syntax map, but we don't have the necessary
-    // location data yet
+    if (Kind.hasValue()) {
+      SwiftSyntaxToken Token(Offset, TriviaPiece.getTextLength(),
+                             Kind.getValue());
+      SyntaxMap.addToken(Token);
+    }
   }
 
   llvm::Optional<SyntaxNodeKind>
@@ -650,17 +654,21 @@ private:
     if (Token.isMissing())
       return;
 
-    print(Token.getLeadingTrivia());
+    auto LeadingTriviaOffset =
+        Token.getAbsolutePositionWithLeadingTrivia().getOffset();
+    print(Token.getLeadingTrivia(), LeadingTriviaOffset);
 
     SyntaxClassification Classification = TokenClassifications[Token.getId()];
     auto Kind = getKindForSyntaxClassification(Classification);
-    if (Kind.hasValue()) {
-      unsigned Start = Token.getAbsolutePosition().getOffset();
-      unsigned Length = Token.getRaw()->getTokenText().size();
-      SyntaxMap.addToken(SwiftSyntaxToken(Start, Length, Kind.getValue()));
+    unsigned TokenStart = Token.getAbsolutePosition().getOffset();
+    unsigned TokenLength = Token.getRaw()->getTokenText().size();
+    if (Kind.hasValue() && TokenLength > 0) {
+      SwiftSyntaxToken Token(TokenStart, TokenLength, Kind.getValue());
+      SyntaxMap.addToken(Token);
     }
 
-    print(Token.getTrailingTrivia());
+    auto TrailingTriviaOffset = TokenStart + TokenLength;
+    print(Token.getTrailingTrivia(), TrailingTriviaOffset);
   }
 
 public:
