@@ -88,3 +88,5 @@ public class Wrapper {
     public typealias RawValue = String
   }
 }
+
+public typealias AliasAttribute = String

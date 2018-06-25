@@ -363,6 +363,24 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   std::vector<ConversionFunctionInfo> HelperFuncInfo;
   SourceLoc FileEndLoc;
 
+  /// For a given expression, check whether the type of this expression is
+  /// name alias type, and the name alias type is known to change to raw
+  /// representable type.
+  bool isRecognizedTypeAliasChange(Expr *E) {
+    if (auto Ty = E->getType()) {
+      if (auto *NT = dyn_cast<NameAliasType>(Ty.getPointer())) {
+        for (auto Item: getRelatedDiffItems(NT->getDecl())) {
+          if (auto CI = dyn_cast<CommonDiffItem>(Item)) {
+            if (CI->DiffKind == NodeAnnotation::TypeAliasDeclToRawRepresentable) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
     ASTMigratorPass(Editor, SF, Opts), DiffStore(Diags),
@@ -395,6 +413,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (count > 1)
         continue;
       assert(count == 1);
+
+      // A conversion function will be redundant if the expression will change
+      // from type alias to raw-value representable.
+      if (isRecognizedTypeAliasChange(Cur.ExpressionToWrap))
+        continue;
       auto FuncName = Cur.getFuncName();
 
       // Avoid inserting the helper function if it's already present.
