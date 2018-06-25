@@ -3023,8 +3023,8 @@ visitAdjointExpr(AdjointExpr *E, SGFContext C) {
   SILLocation loc(adjointDecl);
   SILDeclRef adjointDeclRef(adjointDecl);
 
-  // If adjoint has multiple parameter lists, mark as curried.
-  if (adjointDecl->getNumParameterLists() >= 2) {
+  // If adjoint is an instance method, mark as curried.
+  if (adjointDecl->isInstanceMember()) {
     adjointDeclRef = adjointDeclRef.asCurried();
   }
   auto adjointInfo = SGF.getConstantInfo(adjointDeclRef);
@@ -3043,7 +3043,11 @@ visitAdjointExpr(AdjointExpr *E, SGFContext C) {
   auto baseMeta = adjointInfo.SILFnType->substGenericArgs(SGF.SGM.M, subs)
     ->getSelfParameter().getType();
   auto metatype = SGF.B.createMetatype(loc, SGF.getLoweredType(baseMeta));
-  auto apply = SGF.B.createApply(loc, ref, subs.toList(), { metatype }, false);
+  auto partialApplyTy = SGF.B.getPartialApplyResultType(
+    adjointInfo.getSILType(), 1, SGF.getModule(), subs.toList(),
+    ParameterConvention::Direct_Guaranteed);
+  auto apply = SGF.B.createPartialApply(loc, ref, ref->getType(),
+    subs.toList(), { metatype }, partialApplyTy);
   ManagedValue adjointValue = SGF.emitManagedRValueWithCleanup(apply);
   return RValue(SGF, E, adjointValue);
 }
