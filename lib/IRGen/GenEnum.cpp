@@ -5258,6 +5258,12 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   // fixed-size from this resilience scope.
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
+  if (TC.isCompletelyFragile()) {
+    // If we forced completely fragile layout we need to check the
+    // fixed-sized'ness in the minimal scope. Otherwise, we get wrong answer for
+    // private resilient enum types that have an resilient payload.
+    layoutScope = ResilienceExpansion::Minimal;
+  }
 
   for (auto elt : theEnum->getAllElements()) {
     numElements++;
