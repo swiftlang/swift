@@ -22,6 +22,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TensorFlow.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Debug.h"
@@ -120,6 +122,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(CompilerEvaluable)
+  IGNORED_ATTR(TensorFlowGraph)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -900,6 +903,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
+  void visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2639,6 +2643,28 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
+  FuncDecl *FD = cast<FuncDecl>(D);
+  // The function must be top-level.
+  if (FD->getImplicitSelfDecl()) {
+    diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_top_level_only);
+    return;
+  }
+  // Only functions taking and returning TensorFlow values are permitted.
+  if (!tf::isTensorFlowValueOrAggregate(
+        FD->getParameterList(0)->getType(FD->getASTContext())) ||
+      !tf::isTensorFlowValueOrAggregate(FD->getResultInterfaceType()))
+    diagnoseAndRemoveAttr(attr,
+                          diag::tf_graph_attr_function_tensorflow_value_only);
+  // Assign @convention(tensorflow).
+  AnyFunctionType *fnTy = FD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto *newFnTy = fnTy->withExtInfo(
+    fnTy->getExtInfo().withRepresentation(
+      AnyFunctionType::Representation::TensorFlow));
+  FD->setInterfaceType(newFnTy);
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

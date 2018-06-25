@@ -383,10 +383,11 @@ SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
           OnFunc | LongAttribute, 78)
-
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
                  /* Not serialized */ 79)
+SIMPLE_DECL_ATTR(TensorFlowGraph, TensorFlowGraph,
+                 OnFunc, 80)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

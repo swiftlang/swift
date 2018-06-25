@@ -51,6 +51,10 @@ namespace tf {
   /// VariantHandle.
   bool isTensorFlowValue(Type ty);
 
+  /// Returns true if the specified type is a TensorFlow value or an tuple or
+  /// struct of such.
+  bool isTensorFlowValueOrAggregate(Type ty);
+
   /// This class provides an efficient implementation of a predicate that
   /// determines whether a type is or contains a TensorFlow value that will be
   /// exposed after deabstraction.  This is a class instead of a simple function

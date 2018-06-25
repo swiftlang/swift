@@ -63,6 +63,29 @@ bool tf::isTensorFlowValue(Type ty) {
   return classifyTensorFlowValue(ty) != TFValueKind::Nope;
 }
 
+/// Returns true if the specified type is a TensorFlow value or an tuple or
+/// struct of such.
+bool tf::isTensorFlowValueOrAggregate(Type ty) {
+  if (isTensorFlowValue(ty))
+    return true;
+  if (auto *tupleTy = ty->getAs<TupleType>())
+    return llvm::all_of(tupleTy->getElementTypes(),
+      [](Type eltTy) {
+        return isTensorFlowValueOrAggregate(eltTy);
+      });
+  if (auto *structTy = ty->getAs<StructType>())
+    return llvm::all_of(structTy->getDecl()->getStoredProperties(),
+      [](VarDecl *member) {
+        return isTensorFlowValueOrAggregate(member->getType());
+      });
+  if (auto *genericStructTy = ty->getAs<BoundGenericStructType>())
+    return llvm::all_of(genericStructTy->getDecl()->getStoredProperties(),
+      [](VarDecl *member) {
+        return isTensorFlowValueOrAggregate(member->getType());
+      });
+  return false;
+}
+
 /// Return true if the specified type contains a TensorFlow value type that
 /// will be exposed after deabstraction.
 bool TypeContainsTensorFlowValue::containsTensorFlowValue(Type ty) {

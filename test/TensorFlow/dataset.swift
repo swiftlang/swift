@@ -53,7 +53,8 @@ public func testDatasetWithMNIST() {
 // call.
 // TODO: declare with @convention tensorflow
 // Enforce no sends/recvs, and all logic is lowered to TF graph.
-public func createMockDataSet__magic_tf_only__() -> VariantHandle {
+@TensorFlowGraph
+public func createMockDataSet() -> VariantHandle {
   let values = Tensor<Float>([1.0, 2.0, 3.0])
   // REGISTER_OP("TensorSliceDataset")
   //   .Input("components: Toutput_types")
@@ -70,13 +71,13 @@ public func createMockDataSet__magic_tf_only__() -> VariantHandle {
 // The lowered graph should only contain the graph function, and not any
 // top-level nodes.
 //
-// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}createMockDataSet__magic_tf_only__{{.*}}
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}createMockDataSet{{.*}}
 // CHECK-NOT:   node {
 // CHECK:       function {
 // CHECK-NEXT:    signature {
-// CHECK-NEXT:      name: "{{.*}}createMockDataSet__magic_tf_only__{{.*}}.tf_CPU.device_partition"
+// CHECK-NEXT:      name: "{{.*}}createMockDataSet{{.*}}.tf_CPU.device_partition"
 // CHECK:           output_arg {
-// CHECK-NEXT:        name: "op_createmockdataset__magic_tf_only__{{.*}}"
+// CHECK-NEXT:        name: "op_createmockdataset{{.*}}"
 // CHECK-NEXT:        type: DT_VARIANT
 // CHECK-NEXT:      }
 
@@ -89,11 +90,11 @@ public func model() {
   //   .Attr("output_types: list(type) >= 1")
   //   .Attr("output_shapes: list(shape) >= 1")
   //   .Attr("container: string = ''")
-  //   .Attr("shared_name: string = ''")  
+  //   .Attr("shared_name: string = ''")
   let iterator: ResourceHandle = #tfop(
     "OneShotIterator",
     container: "",
-    dataset_factory : /*datasetCreator*/createMockDataSet__magic_tf_only__,
+    dataset_factory : /*datasetCreator*/createMockDataSet,
     output_types: [Float.self],
     output_shapes: [TensorShape()],
     shared_name: ""
