@@ -59,7 +59,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   final public func hash(into hasher: inout Hasher) {
-    hasher.combine(unsafeBitCast(type(of: self) as Any.Type, to: Int.self))
+    ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
       while true {
