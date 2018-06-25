@@ -249,4 +249,15 @@
     "RightComment": "String",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "TypeAlias",
+    "NodeAnnotation": "TypeAliasDeclToRawRepresentable",
+    "ChildIndex": "0",
+    "LeftUsr": "s:6Cities14AliasAttributea",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "Cities"
+  },
 ]
