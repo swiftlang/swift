@@ -39,19 +39,15 @@ protected:
   /// Represents a function which is implementing a vtable or witness table
   /// method.
   struct FuncImpl {
-    FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F) { Impl.Cl = Cl; }
-    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F) { Impl.Conf = C; }
+    FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F), Impl(Cl) {}
+    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F), Impl(C) {}
 
     /// The implementing function.
     SILFunction *F;
 
-    union {
-      /// In case of a vtable method.
-      ClassDecl *Cl;
-
-      /// In case of a witness method.
-      ProtocolConformance *Conf;
-    } Impl;
+    /// This is a class decl if we are tracking a class_method (i.e. a vtable
+    /// method) and a protocol conformance if we are tracking a witness_method.
+    PointerUnion<ClassDecl *, ProtocolConformance *> Impl;
   };
 
   /// Stores which functions implement a vtable or witness table method.
@@ -303,7 +299,8 @@ protected:
 
     for (FuncImpl &FImpl : mi->implementingFunctions) {
       if (!isAlive(FImpl.F) &&
-          canHaveSameImplementation(FD, MethodCl, FImpl.Impl.Cl)) {
+          canHaveSameImplementation(FD, MethodCl,
+                                    FImpl.Impl.get<ClassDecl *>())) {
         makeAlive(FImpl.F);
       } else {
         allImplsAreCalled = false;
@@ -320,9 +317,10 @@ protected:
       return;
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
-      if (FImpl.Impl.Conf) {
-        SILWitnessTable *WT = Module->lookUpWitnessTable(FImpl.Impl.Conf,
-                                                  /*deserializeLazily*/ false);
+      if (auto *Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
+        SILWitnessTable *WT =
+            Module->lookUpWitnessTable(Conf,
+                                       /*deserializeLazily*/ false);
         if (!WT || isAlive(WT))
           makeAlive(FImpl.F);
       } else {
