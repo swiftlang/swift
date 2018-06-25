@@ -13,7 +13,7 @@ var TensorADTests = TestSuite("TensorAD")
 TensorADTests.testAllBackends("SimpleAdjointCall") {
   let adjPlus = #adjoint(Tensor<Float>.+)
   let x = Tensor<Float>(1)
-  expectNearlyEqual(1, adjPlus(x, x, x + x, x).scalarized())
+  expectNearlyEqual(1, adjPlus(x, x, x + x, x).0.scalarized())
 }
 
 runAllTests()
