@@ -1007,8 +1007,7 @@ static bool parseSymbolicValue(SymbolicValue &value, SILParser &SP,
     SILType temp;
     if (SP.parseSILType(temp))
       return true;
-    auto metatype = CanMetatypeType::get(temp.getASTType());
-    value = SymbolicValue::getMetatype(metatype);
+    value = SymbolicValue::getMetatype(temp.getASTType());
     return false;
   }
   // Handle SIL function references.
