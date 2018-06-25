@@ -74,9 +74,9 @@ func testNested() {
   _ = #adjoint(A.B.C.subtract)
 }
 // CHECK-LABEL: sil hidden @test_nested
-// CHECK: [[NESTED_DADD_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@thin A.B.C.Type) -> @owned @callee_guaranteed (A.B.C, A.B.C, A.B.C, A.B.C) -> (A.B.C, A.B.C)
+// CHECK: [[NESTED_DADD_THUNK:%.*]] = function_ref {{.*}} : $@convention(method) (A.B.C, A.B.C, A.B.C, A.B.C, @thin A.B.C.Type) -> (A.B.C, A.B.C)
 // CHECK: [[NESTED_META:%.*]] = metatype $@thin A.B.C.Type
-// CHECK: {{%.*}} = apply [[NESTED_DADD_THUNK]]([[NESTED_META]])
+// CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[NESTED_DADD_THUNK]]([[NESTED_META]])
 
 // CHECK: [[NESTED_DSUB_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (A.B.C) -> @owned @callee_guaranteed (A.B.C, A.B.C, A.B.C) -> (A.B.C, A.B.C)
 // CHECK: {{%.*}} = thin_to_thick_function [[NESTED_DSUB_THUNK]]
@@ -124,9 +124,9 @@ extension Pair {
   }
 }
 // CHECK-LABEL: sil hidden @test_pair_extension
-// CHECK: [[PAIR_DADD_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (@thin Pair.Type) -> @owned @callee_guaranteed (Pair, Pair, Pair, Pair) -> (Pair, Pair)
+// CHECK: [[PAIR_DADD_THUNK:%.*]] = function_ref {{.*}} : $@convention(method) (Pair, Pair, Pair, Pair, @thin Pair.Type) -> (Pair, Pair)
 // CHECK: [[PAIR_META:%.*]] = metatype $@thin Pair.Type
-// CHECK: {{%.*}} = apply [[PAIR_DADD_THUNK]]([[PAIR_META]])
+// CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[PAIR_DADD_THUNK]]([[PAIR_META]])
 
 // CHECK: [[PAIR_DSUB_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) (Pair) -> @owned @callee_guaranteed (Pair, Pair, Pair) -> (Pair, Pair)
 // CHECK: {{%.*}} = thin_to_thick_function [[PAIR_DSUB_THUNK]]
@@ -137,9 +137,9 @@ func testPair() {
   _ = #adjoint(Pair.subtract)
 }
 // CHECK-LABEL: sil hidden @test_pair
-// CHECK: [[PAIR_DADD_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(thin) (@thin Pair.Type) -> @owned @callee_guaranteed (Pair, Pair, Pair, Pair) -> (Pair, Pair)
+// CHECK: [[PAIR_DADD_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(method) (Pair, Pair, Pair, Pair, @thin Pair.Type) -> (Pair, Pair)
 // CHECK: [[PAIR_META_2:%.*]] = metatype $@thin Pair.Type
-// CHECK: {{%.*}} = apply [[PAIR_DADD_THUNK_2]]([[PAIR_META_2]])
+// CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[PAIR_DADD_THUNK_2]]([[PAIR_META_2]])
 
 // CHECK: [[PAIR_DSUB_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(thin) (Pair) -> @owned @callee_guaranteed (Pair, Pair, Pair) -> (Pair, Pair)
 // CHECK: {{%.*}} = thin_to_thick_function [[PAIR_DSUB_THUNK_2]]
@@ -187,9 +187,9 @@ extension Vector {
   }
 }
 // CHECK-LABEL: sil hidden @test_vector_extension : $@convention(method) <T> (Vector<T>) -> ()
-// CHECK: [[VEC_DMUL_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (@thin Vector<τ_0_0>.Type) -> @owned @callee_guaranteed (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>) -> (Vector<τ_1_0>, Vector<τ_1_0>)
+// CHECK: [[VEC_DMUL_THUNK:%.*]] = function_ref {{.*}} : $@convention(method) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, @thin Vector<τ_0_0>.Type) -> (Vector<τ_1_0>, Vector<τ_1_0>)
 // CHECK: [[VEC_DMUL_META:%.*]] = metatype $@thin Vector<T>.Type
-// CHECK: {{%.*}} = apply [[VEC_DMUL_THUNK]]<T, Float>([[VEC_DMUL_META]])
+// CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[VEC_DMUL_THUNK]]<T, Float>([[VEC_DMUL_META]])
 
 // CHECK: [[VEC_DDIV_THUNK:%.*]] = function_ref {{.*}} : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (Vector<τ_0_0>) -> @owned @callee_guaranteed (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>) -> (Vector<τ_0_0>, Vector<τ_1_0>)
 // CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[VEC_DDIV_THUNK]]<T, Float>()
@@ -202,9 +202,9 @@ func testVector<T, A : FloatingPoint>(_ t: T, _ a: A) {
     = #adjoint(Vector<T>.divide)
 }
 // CHECK-LABEL: sil hidden @test_vector : $@convention(thin) <T, A where A : FloatingPoint> (@in_guaranteed T, @in_guaranteed A) -> ()
-// CHECK: [[VEC_DMUL_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (@thin Vector<τ_0_0>.Type) -> @owned @callee_guaranteed (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>) -> (Vector<τ_1_0>, Vector<τ_1_0>)
+// CHECK: [[VEC_DMUL_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(method) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>, @thin Vector<τ_0_0>.Type) -> (Vector<τ_1_0>, Vector<τ_1_0>)
 // CHECK: [[VEC_DMUL_META_2:%.*]] = metatype $@thin Vector<T>.Type
-// CHECK: {{%.*}} = apply [[VEC_DMUL_THUNK_2]]<T, A>([[VEC_DMUL_META_2]])
+// CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[VEC_DMUL_THUNK_2]]<T, A>([[VEC_DMUL_META_2]])
 
 // CHECK: [[VEC_DDIV_THUNK_2:%.*]] = function_ref {{.*}} : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : FloatingPoint> (Vector<τ_0_0>) -> @owned @callee_guaranteed (Vector<τ_1_0>, Vector<τ_1_0>, Vector<τ_1_0>) -> (Vector<τ_0_0>, Vector<τ_1_0>)
 // CHECK: {{%.*}} = partial_apply [callee_guaranteed] [[VEC_DDIV_THUNK_2]]<T, A>()
