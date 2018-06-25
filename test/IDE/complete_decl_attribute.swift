@@ -49,6 +49,7 @@ func method(){}
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// KEYWORD2-NEXT:             Keyword/None:                       TensorFlowGraph[#Func Attribute#]; name=TensorFlowGraph
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
