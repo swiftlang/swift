@@ -1,13 +1,13 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
 
 import Foundation
 
 extension NSString {
-  class var classProp: Int {
+  @objc class var classProp: Int {
     get { fatalError() }
     set { fatalError() }
   }
-  var instanceProp: Int {
+  @objc var instanceProp: Int {
     get { fatalError() }
     set { fatalError() }
   }
