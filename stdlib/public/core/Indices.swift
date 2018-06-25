@@ -119,7 +119,7 @@ extension Collection where Indices == DefaultIndices<Self> {
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public var indices: DefaultIndices<Self> {
     return DefaultIndices(
       _elements: self,

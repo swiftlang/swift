@@ -31,7 +31,7 @@ comparableOperators = [
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func ==(lhs: (), rhs: ()) -> Bool {
   return true
 }
@@ -44,7 +44,7 @@ public func ==(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func !=(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -58,7 +58,7 @@ public func !=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func <(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -72,7 +72,7 @@ public func <(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func <=(lhs: (), rhs: ()) -> Bool {
     return true
 }
@@ -86,7 +86,7 @@ public func <=(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func >(lhs: (), rhs: ()) -> Bool {
     return false
 }
@@ -100,7 +100,7 @@ public func >(lhs: (), rhs: ()) -> Bool {
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // trivial-implementation
 public func >=(lhs: (), rhs: ()) -> Bool {
     return true
 }

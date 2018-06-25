@@ -1094,7 +1094,7 @@ extension Collection {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
