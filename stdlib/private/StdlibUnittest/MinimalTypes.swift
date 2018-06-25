@@ -381,8 +381,3 @@ public struct MinimalStrideableValue : Equatable, Comparable, Strideable {
     return MinimalStrideableValue(self.value + n, identity: self.identity)
   }
 }
-
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:
