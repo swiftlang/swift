@@ -161,7 +161,7 @@ public struct Mirror {
 
   @_semantics("optimize.sil.specialize.generic.never")
   @inline(never)
-  @inlinable // FIXME(sil-serialize-all)
+  @usableFromInline
   internal static func _superclassIterator<Subject>(
     _ subject: Subject, _ ancestorRepresentation: AncestorRepresentation
   ) -> () -> Mirror? {

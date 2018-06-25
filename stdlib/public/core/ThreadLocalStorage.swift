@@ -123,8 +123,8 @@ internal let _tlsKey: __swift_thread_key_t = {
   return key
 }()
 
-@inlinable // FIXME(sil-serialize-all)
 @inline(never)
+@usableFromInline
 internal func _initializeThreadLocalStorage()
   -> UnsafeMutablePointer<_ThreadLocalStorage>
 {
