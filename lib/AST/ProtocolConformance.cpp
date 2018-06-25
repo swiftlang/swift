@@ -861,7 +861,7 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     auto &ctxt = getProtocol()->getASTContext();
     ConditionalRequirements = ctxt.AllocateCopy(newReqs);
   } else {
-    ConditionalRequirements = {};
+    ConditionalRequirements = Optional<ArrayRef<Requirement>>();
   }
 }
 
