@@ -46,29 +46,6 @@ using namespace reflection;
 #include <objc/objc.h>
 #endif
 
-#if __has_include(<mach-o/dyld_priv.h>)
-#include <mach-o/dyld_priv.h>
-#define SWIFT_HAS_DYLD_IS_MEMORY_IMMUTABLE
-#endif
-
-/// If the target platform has an API for asking whether an address is mapped
-/// from immutable pages of an executable image, this returns true if the
-/// given address is *not* from an executable image. Otherwise, this always
-/// returns false. The intent is to check that this returns false as a defense
-/// for APIs that expect to operate on immutable memory to prevent them from
-/// being fed untrusted data by an attacker, when the platform makes that
-/// possible.
-static bool isKnownToBeInMutableMemory(const void *base, size_t size) {
-#if defined(SWIFT_HAS_DYLD_IS_MEMORY_IMMUTABLE)
-  if (__builtin_available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *))
-    return !_dyld_is_memory_immutable(base, size);
-  else
-    return false;
-#else
-  return false;
-#endif
-}
-
 /// Produce a Demangler value suitable for resolving runtime type metadata
 /// strings.
 static Demangler getDemanglerForRuntimeTypeResolution() {
@@ -78,14 +55,8 @@ static Demangler getDemanglerForRuntimeTypeResolution() {
   // mangled name we can immediately find the associated metadata.
   dem.setSymbolicReferenceResolver([&](int32_t offset,
                                        const void *base) -> NodePointer {
-    // Only read symbolic references out of constant memory.
-    if (isKnownToBeInMutableMemory(base, sizeof(int)))
-      return nullptr;
-
-    auto absolute_addr = detail::applyRelativeOffset(base, offset);
-    
-    auto reference = dem.createNode(Node::Kind::SymbolicReference,
-                                    (uintptr_t)absolute_addr);
+    auto absolute_addr = (uintptr_t)detail::applyRelativeOffset(base, offset);
+    auto reference = dem.createNode(Node::Kind::SymbolicReference, absolute_addr);
     auto type = dem.createNode(Node::Kind::Type);
     type->addChild(reference, dem);
     return type;
