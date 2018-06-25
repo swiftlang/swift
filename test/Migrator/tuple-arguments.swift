@@ -39,7 +39,7 @@ _ = items.filter { (_, x) in isEven(x) }
 _ = items.filter { _ in true }
 
 func toString(indexes: Int?...) -> String {
-  let _ = indexes.enumerated().flatMap({ (i: Int, index: Int?) -> String? in
+  let _ = indexes.enumerated().map({ (i: Int, index: Int?) -> String? in
     let _: Int = i
     if index != nil {}
     return ""
