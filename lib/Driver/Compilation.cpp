@@ -114,6 +114,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableIncrementalBuild,
                          bool EnableBatchMode,
                          unsigned BatchSeed,
+                         Optional<unsigned> BatchCount,
                          bool ForceOneBatchRepartition,
                          bool SkipTaskExecution,
                          bool SaveTemps,
@@ -136,6 +137,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
         OutputCompilationRecordForModuleOnlyBuild),
     EnableBatchMode(EnableBatchMode),
     BatchSeed(BatchSeed),
+    BatchCount(BatchCount),
     ForceOneBatchRepartition(ForceOneBatchRepartition),
     SaveTemps(SaveTemps),
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
@@ -931,7 +933,9 @@ namespace driver {
         return;
       }
 
-      size_t NumPartitions = Comp.NumberOfParallelCommands;
+      size_t NumPartitions = (Comp.BatchCount.hasValue() ?
+                              Comp.BatchCount.getValue() :
+                              TQ->getNumberOfParallelTasks());
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
       bool PretendTheCommandLineIsTooLongOnce =
