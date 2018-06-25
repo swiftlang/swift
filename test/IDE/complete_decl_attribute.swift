@@ -34,7 +34,7 @@
 func method(){}
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2:                  Begin completions, 13 items
+// KEYWORD2:                  Begin completions, 14 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
@@ -49,6 +49,7 @@ func method(){}
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// KEYWORD2-NEXT:             Keyword/None:                       TensorFlowGraph[#Func Attribute#]; name=TensorFlowGraph
 // KEYWORD2-NEXT:             End completions
 
 @#^KEYWORD3^#
@@ -94,7 +95,7 @@ struct S{}
 @#^KEYWORD_LAST^#
 
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD_LAST:                  Begin completions, 24 items
+// KEYWORD_LAST:                  Begin completions, 25 items
 // KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // SWIFT_ENABLE_TENSORFLOW
@@ -121,4 +122,5 @@ struct S{}
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
+// KEYWORD_LAST-NEXT:             Keyword/None:                       TensorFlowGraph[#Declaration Attribute#]; name=TensorFlowGraph
 // KEYWORD_LAST-NEXT:             End completions
