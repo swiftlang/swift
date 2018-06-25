@@ -626,3 +626,7 @@ internal class _SwiftNativeNSSet {
 }
 
 #endif
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -1224,3 +1224,7 @@ public func run_CharIndexing_punctuatedJapanese_unicodeScalars_Backwards(_ N: In
 
 
 
+
+// Local Variables:
+// eval: (read-only-mode 1)
+// End:

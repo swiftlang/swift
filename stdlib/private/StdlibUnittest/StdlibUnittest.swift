@@ -3003,7 +3003,3 @@ public func expectEqualUnicodeScalars(
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   }
 }
-
-// Local Variables:
-// eval: (read-only-mode 1)
-// End:

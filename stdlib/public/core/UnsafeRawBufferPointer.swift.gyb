@@ -820,3 +820,7 @@ public typealias UnsafeRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iter
 
 // @available(*, deprecated, renamed: "UnsafeRawBufferPointer.Iterator")
 public typealias UnsafeMutableRawBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
