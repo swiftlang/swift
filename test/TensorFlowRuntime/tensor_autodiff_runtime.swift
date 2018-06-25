@@ -6,7 +6,6 @@
 
 import TensorFlow
 import TensorFlowUnittest
-import TensorFlowRuntime
 
 var TensorADTests = TestSuite("TensorAD")
 
