@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+
+// TODO: Enable -verify mode.
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -DSTRICT_DA %s  | %FileCheck %s -check-prefix=STRICTDA
 import TensorFlow
 
 // This test is intended to verify that all of the operations end up in the
@@ -11,6 +13,9 @@ import TensorFlow
 // file.
 
 
+/* TODO build this out.
+STRICTDA: --- TFDeabstraction Result: {{.*}}testSelect
+*/
 public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float>)
   -> Tensor<Float> {
   let conds = conds1.toAccelerator()
@@ -32,11 +37,13 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-NEXT:  return %11 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
-
 public func testEmptyScalarsArray() {
   let y = Tensor<Int32>(shape: [0, 20, 30], scalars: [])
   _ = y+y
 }
+
+// Strict deabstraction doesn't support the strides array yet.
+#if !STRICT_DA
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testEmptyScalarsArray
@@ -49,12 +56,12 @@ public func testEmptyScalarsArray() {
  CHECK: builtin "__tfop_Add,$in,$in,T,device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
-
 // This tests the attributes necessary to get arrays of integers and strings going.
 public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
   return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
                        strides: (1, 2, 3, 4), padding: .same)
 }
+#endif
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
 // CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
@@ -72,6 +79,8 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:}
 
 
+// Strict deabstraction doesn't support the value array yet.
+#if !STRICT_DA
 
 // Testcase for an op that uses the $tensor and $shape modifiers.
 public func testConstantArray() -> TensorHandle<Float> {
@@ -89,6 +98,7 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
 // CHECK:       %7 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt,device"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64
 // CHECK-NEXT:  return %7 : $TensorHandle<Float>
+#endif
 
 // Sigmoid shouldn't cause copies.  This should compile with no copy warnings/errors.
 public func testSigmoid(x: Tensor<Float>, y: Tensor<Float>) -> (Tensor<Float>, Tensor<Float>) {
@@ -145,11 +155,15 @@ public func test75494462() {
   print(x.array)
 }
 
+// Strict deabstraction doesn't support arrays yet.
+#if !STRICT_DA
+
 public func paddingTuplesHoistable() {
   let matrix: Tensor<Float> = Tensor([[1, 2, 3], [4, 5, 6]]) + 1
   let padded = matrix.padded(forSizes: [(before: 1, after: 1), (before: 2, after: 2)]).toAccelerator()
   _ = padded.array
 }
+#endif
 
 // b/76184126
 public func rangeLiteral() -> Tensor<Float> {

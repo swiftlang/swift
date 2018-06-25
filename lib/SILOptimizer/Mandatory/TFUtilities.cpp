@@ -1104,6 +1104,9 @@ SILTensorOpInfo::getOperandClass(StringRef suffix) {
 
 /// Verify that any attribute operands are passed acceptable constants,
 /// returning a non-empty error string to emit if that is not the case.
+///
+/// TODO: Remove this when deabstraction has taken over.
+///
 std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
   // Attribute values require constant values.  If we don't have one then this
   // op is invalid and must be rejected.
@@ -1136,7 +1139,7 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
         break;
       }
 
-      // TensorFloat values and metatype inputs are ok.
+      // TensorFlow values and metatype inputs are ok.
       if (isTensorFlowValue(opTy) || opTy.is<MetatypeType>())
         break;
 
@@ -1343,7 +1346,7 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// Replace any indirect memory operands with direct references to the
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
-// TODO(clattner): Move this into deabstraction when it exists.
+// TODO(clattner): Remove this when deabstraction has subsumed it.
 SILInstruction *SILTensorOpInfo::canonicalizeOperands(
     GraphGlobalConfiguration *configuration) {
   // TODO: Canonicalize metatypes into constants!

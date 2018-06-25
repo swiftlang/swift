@@ -45,7 +45,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "\n";
     return;
   case RK_Function: {
-    auto fn = getFunctionValue().first;
+    auto fn = getFunctionValue();
     os << "fn: " << fn->getName() << ": ";
     os << Demangle::demangleSymbolAsString(fn->getName());
     os << "\n";
@@ -112,6 +112,35 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
     return String;
   }
 }
+
+/// Clone this SymbolicValue into the specified allocator and return the new
+/// version.  This only works for valid constants.
+SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
+  switch (getKind()) {
+  case SymbolicValue::Unknown:
+  case SymbolicValue::UninitMemory:
+    assert(0 && "These are not constants!");
+  case SymbolicValue::Metatype:
+  case SymbolicValue::Function:
+    // These have trivial inline storage, just return a copy.
+    return *this;
+  case SymbolicValue::Integer:
+    return SymbolicValue::getInteger(getIntegerValue(), allocator);
+  case SymbolicValue::Float:
+    return SymbolicValue::getFloat(getFloatValue(), allocator);
+  case SymbolicValue::String:
+    return SymbolicValue::getString(getStringValue(), allocator);
+  case SymbolicValue::Aggregate: {
+    auto elts = getAggregateValue();
+    SmallVector<SymbolicValue, 4> results;
+    results.reserve(elts.size());
+    for (auto elt : elts)
+      results.push_back(elt.cloneInto(allocator));
+    return getAggregate(results, allocator);
+  }
+  }
+}
+
 
 
 //===----------------------------------------------------------------------===//

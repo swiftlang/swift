@@ -122,7 +122,9 @@ namespace {
     void promoteToSSA(MutableArrayRef<AllocStackInst*> allocs);
     void prepareStackAllocForPromotion(AllocStackInst *alloc);
     void propagateTensorValues();
-    void checkAndCanonicalizeAttributes();
+    void checkAttributesAndFormGraphOps();
+    void formGraphOp(SILTensorOpInfo &opInfo,
+                     DenseMap<SILValue, SymbolicValue> &constants);
   };
 }  // end anonymous namespace
 
@@ -397,7 +399,6 @@ static BuiltinInst *simplifyOperands(BuiltinInst *inst, TFDeabstraction &TFDA) {
       auto loadOwnership = hasOwnership ? LoadOwnershipQualifier::Trivial
                                         : LoadOwnershipQualifier::Unqualified;
       auto load = B.createLoad(inst->getLoc(), operand, loadOwnership);
-
       load->setDebugLocation(inst->getDebugLocation());
       operand = load;
     }
@@ -1484,7 +1485,6 @@ void TFDeabstraction::propagateTensorValues() {
   }
 }
 
-
 /// Create and return a new constant literal instruction for the specified
 /// scalar constant value.
 ///
@@ -1519,8 +1519,6 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
                                  StringLiteralInst::Encoding::UTF8);
   }
 }
-
-
 
 /// Decode the specified array constant value (which should be an
 /// array of constant integer or fp values) and add it as an expanded operand
@@ -1766,11 +1764,11 @@ tryToPromoteTensorFromScalars1D(ApplyInst *inst,
 }
 
 
-/// Canonicalize tensor ops, validating their attribute arguments have
-/// constants, and flattening array parameters.
-void TFDeabstraction::checkAndCanonicalizeAttributes() {
+/// Canonicalize tensor ops, validating that attribute arguments are constant
+/// expressions, and transform the IR to use GraphOperationInst.
+void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
-  X("TFDeabstraction::checkAndCanonicalizeAttributes");
+  X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
@@ -1873,89 +1871,186 @@ void TFDeabstraction::checkAndCanonicalizeAttributes() {
       if (!TFStrictDeabstraction)
         continue;
 
-      // Use the constants we just computed to substitute into parameter values
-      // if we don't already have them.
-      // TODO: this should eventually create a new SILInstruction to represent
-      // the graph operation instead of using SIL instructions to represent the
-      // constants.
-      bool isError = false;
-      SILBuilder B(opInfo->inst);
-      for (unsigned i = 0, e = opInfo->operandClasses.size(); i != e; ++i) {
-        // Ignore input operands.
-        if (opInfo->isInput(i))
-          continue;
-
-        // Ok, we have an attribute operand.  If it is already trivially a
-        // constant, just leave it alone.
-        auto operand = inst->getOperand(i);
-        if (isa<FloatLiteralInst>(operand) ||
-            isa<IntegerLiteralInst>(operand) ||
-            isa<StringLiteralInst>(operand) ||
-            isa<MetatypeInst>(operand))
-          continue;
-
-        // Otherwise, we should have been able to fold it through our constexpr
-        // evaluation logic.
-        SILValue newVal;
-        auto it = constants.find(operand);
-        assert(it != constants.end() &&
-               "out of sync with constant scanning loop above");
-
-        // Given that we found a constant, materialize it as an instruction and
-        // swap it in for our variable argument.
-        if (it->second.isConstant())
-          newVal = emitConstantInst(it->second, operand->getType(),
-                                    opInfo->inst->getLoc(), B);
-
-        if (!newVal) {
-          auto opClass = opInfo->operandClasses[i];
-          auto error = "attribute '" + opClass.first.str() +
-                       "' requires a constant argument";
-
-          // TODO: improve the diagnostic to talk about the parameter label in
-          // the user code, not the internal op attribute.  The bookkeeping for
-          // this isn't obvious though.
-          auto loc = getUserSourceLocation(inst);
-          diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-                   diag::tf_op_misuse, error)
-            .highlight(loc.getSourceRange());
-          isError = true;
-
-          // If we have more specific information about what went wrong, emit
-          // notes.
-          if (it->second.getKind() == SymbolicValue::Unknown)
-            it->second.emitUnknownDiagnosticNotes(opInfo->inst->getLoc());
-          break;
-        }
-
-        inst->setOperand(i, newVal);
-      }
-
-      // Don't emit a second error for this op if we already emitted one.
-      if (isError)
-        continue;
-
-      // Check to see if the usage of this op looks ok.  If not, reject it with
-      // an error and ignore it.
-      auto error = opInfo->checkAndDiagnoseOperands();
-      if (!error.empty()) {
-        // TODO: improve the diagnostic to talk about the parameter label in the
-        // user code, not the internal op attribute.  The bookkeeping for this
-        // isn't obvious though.
-        auto loc = getUserSourceLocation(inst);
-        diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
-                 diag::tf_op_misuse, error)
-          .highlight(loc.getSourceRange());
-        continue;
-      }
-
-      // If the tensor operation uses array parameters or has scalar values that
-      // are passed through memory, promote them to being simple arguments to
-      // make all subsequent analyses and promotion of the tensor operations
-      // simpler.
-      opInfo->canonicalizeOperands(/*configuration*/ nullptr);
+      formGraphOp(*opInfo, constants);
     }
   }
+}
+
+/// Replace the specified tensor operation with a GraphOperation instruction,
+/// emitting errors if attribute arguments could not be constant folded, or if
+/// the operand/attribute types are incorrect.
+void TFDeabstraction::
+formGraphOp(SILTensorOpInfo &opInfo,
+            DenseMap<SILValue, SymbolicValue> &constants) {
+  auto *inst = opInfo.inst;
+  auto &context = inst->getFunction()->getASTContext();
+  auto &allocator = context.getAllocator();
+
+  // This is a helper function to emit a diagnostic.
+  auto diagnoseInvalid = [&](const Twine &message) {
+    auto loc = getUserSourceLocation(inst);
+    diagnose(fn.getModule().getASTContext(), loc.getSourceLoc(),
+             diag::tf_op_misuse, message.str())
+      .highlight(loc.getSourceRange());
+  };
+
+  std::string opName = opInfo.opName.str();
+  SmallVector<SILValue, 4> inputs;
+  SmallVector<GraphOperationAttribute, 4> attributes;
+
+  for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
+    auto operand = inst->getOperand(i);
+    auto operandTy = operand->getType();
+    auto operandClass = opInfo.operandClasses[i];
+
+    // Collect and validate input operands.
+    if (opInfo.isInput(i)) {
+      inputs.push_back(operand);
+
+      // Each input gets a marker mangled into the op name, because we need to
+      // be able to distinguish between normal inputs and elements of an input
+      // list.
+
+      // If this is tfc.scalarToTensor, then the input must be a valid scalar.
+      if (opInfo.opName == "tfc.scalarToTensor") {
+        auto scalarType = operandTy.getSwiftRValueType();
+        if (convertSwiftTypeToTF(scalarType) == 0) {
+          diagnoseInvalid("scalarToTensor requires scalar value; unrecognized"
+                          " type '" + scalarType->getString() +
+                          "' is not allowed");
+          return;
+        }
+        opName += ",s";
+        continue;
+      }
+
+      // Tensor operand type's are ok.
+      if (isTensorFlowValue(operandTy)) {
+        opName += ",i";
+        continue;
+      }
+
+      // FIXME: We need to figure out our model for InputLists with
+      // GraphOperation instructions.
+      // Model input lists as an "L" entry in the name, followed by one "e" for
+      // each element.  This allows us to know about empty input lists.
+      diagnoseInvalid("operand has unrecognized type '" +
+                      operandTy.getSwiftRValueType()->getString() + "'");
+      return;
+    }
+
+    // Helper to diagnose invalid attributes.
+    auto diagnoseInvalidAttr = [&](const Twine &message) {
+      diagnoseInvalid(Twine("attribute '") + operandClass.first.str() +
+                      "' " + message.str());
+    };
+
+    // Ok, we have an attribute operand, we should have been able to fold it
+    // through our constexpr evaluation logic.
+    auto it = constants.find(operand);
+    assert(it != constants.end() && "out of sync with constant scanning loop");
+
+    if (!it->second.isConstant()) {
+      // TODO: improve the diagnostic to talk about the parameter label in
+      // the user code, not the internal op attribute.  The bookkeeping for
+      // this isn't obvious though.
+      diagnoseInvalidAttr("requires a constant argument");
+
+      // If we have more specific information about what went wrong, emit
+      // notes.
+      if (it->second.getKind() == SymbolicValue::Unknown)
+        it->second.emitUnknownDiagnosticNotes(opInfo.inst->getLoc());
+      return;
+    }
+
+    // Name mangle the attribute classification into the operand list so we can
+    // know the difference between a shape and an array, and a shape array, etc.
+    auto attrName = operandClass.first.str() +
+       SILTensorOpInfo::getOperandClassSuffix(operandClass.second);
+
+    auto constValue = it->second.cloneInto(allocator);
+    auto attrIdentifier = context.getIdentifier(attrName);
+    attributes.push_back({ attrIdentifier, constValue });
+
+    // Verify that the type of this attribute is ok for the OperandClass we
+    // have.
+    switch (operandClass.second) {
+    case SILTensorOpInfo::OperandClass::Input:
+    case SILTensorOpInfo::OperandClass::InputElt:
+    case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
+      break;
+    case SILTensorOpInfo::OperandClass::DType:   // This integer value is a dtype.
+      if (constValue.getKind() != SymbolicValue::Integer)
+        return diagnoseInvalidAttr("requires a constant integer");
+      break;
+    case SILTensorOpInfo::OperandClass::Shape:
+    case SILTensorOpInfo::OperandClass::Array:
+    case SILTensorOpInfo::OperandClass::ShapeArray:
+    case SILTensorOpInfo::OperandClass::ArrayElement:
+      // Match logic from checkAndDiagnoseOperands.
+      assert(0 && "FIXME: array constant exprs aren't handled yet");
+    case SILTensorOpInfo::OperandClass::Tensor:
+      // FIXME: Support array constants.
+      if (constValue.getKind() != SymbolicValue::Integer &&
+          constValue.getKind() != SymbolicValue::Float)
+        return diagnoseInvalidAttr("requires a constant that is an integer,"
+                                   " floating point, or array thereof");
+      break;
+    }
+  }
+
+  // Okay, if we got this far then we have all valid attributes and inputs.
+  // Figure out the result list.
+  SmallVector<SILType, 4> resultTypes;
+  if (auto tuple = inst->getType().getAs<TupleType>()) {
+    for (auto elt : tuple->getElements()) {
+      auto eltTy = elt.getType()->getCanonicalType();
+      resultTypes.push_back(SILType::getPrimitiveObjectType(eltTy));
+    }
+  } else {
+    resultTypes.push_back(inst->getType());
+  }
+
+  SILBuilder B(opInfo.inst);
+  auto op = B.createGraphOperation(inst->getLoc(),
+                                   context.getIdentifier(opName), inputs,
+                                   attributes, resultTypes);
+  op->setDebugLocation(inst->getDebugLocation());
+  
+  if (auto tuple = inst->getType().getAs<TupleType>()) {
+    SmallVector<SILValue, 4> elts;
+    for (unsigned i = 0, e = tuple->getNumElements(); i != e; ++i)
+      elts.push_back(op->getResult(i));
+    auto tupleResult = B.createTuple(inst->getLoc(), elts);
+    tupleResult->setDebugLocation(inst->getDebugLocation());
+
+    inst->replaceAllUsesWith(tupleResult);
+    inst->eraseFromParent();
+  } else {
+    inst->replaceAllUsesWith(op->getResult(0));
+    inst->eraseFromParent();
+  }
+
+  // TODO: Analyze the operands to the instruction and remove them if they are
+  // now dead.
+
+  /// TODO: Analyze and subsume this if necessary.
+#if 0
+
+  // Check to see if the usage of this op looks ok.  If not, reject it with
+  // an error and ignore it.
+  auto error = opInfo.checkAndDiagnoseOperands();
+  if (!error.empty()) {
+    diagnoseInvalid(error);
+    return;
+  }
+
+  // If the tensor operation uses array parameters or has scalar values that
+  // are passed through memory, promote them to being simple arguments to
+  // make all subsequent analyses and promotion of the tensor operations
+  // simpler.
+  opInfo.canonicalizeOperands(/*configuration*/ nullptr);
+#endif
 }
 
 /// Process the specified top level function as a deabstraction context: if it
@@ -2014,7 +2109,7 @@ void TFDeabstraction::doIt() {
 
   // Canonicalize attribute arguments, checking that they have constants, and
   // flattening array attributes.
-  checkAndCanonicalizeAttributes();
+  checkAttributesAndFormGraphOps();
 
   logCurrentState("Result", /*detailed*/false);
 

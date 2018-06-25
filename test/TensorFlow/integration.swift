@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
+// TODO run: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -DSTRICT_DA %s  | %FileCheck %s -check-prefix=STRICTDA
 
 import TensorFlow
 
