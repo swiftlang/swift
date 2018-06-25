@@ -5,6 +5,7 @@
 // Tensor AD runtime tests.
 
 import TensorFlow
+import StdlibUnittest
 import TensorFlowUnittest
 
 var TensorADTests = TestSuite("TensorAD")
