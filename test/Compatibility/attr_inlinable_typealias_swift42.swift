@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4.2
+
+// Only warnings in Swift 4.2 mode.
 
 private typealias PrivateAlias = Int
 // expected-note@-1 {{type alias 'PrivateAlias' is not '@usableFromInline' or public}}
