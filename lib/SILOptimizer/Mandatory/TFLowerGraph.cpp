@@ -141,7 +141,7 @@ namespace {
     /// This is a list of all of the operations that make up this function.
     std::vector<const TF_Operation*> operations;
 
-    // When true, lower effectful ops (e.g. Swift->TF send ops), if any, in the
+    // When true, lower effectful ops (e.g. TF->Swift send ops), if any, in the
     // corresponding TF function. Currently in a While op context, these ops
     // should not be run in the cond function.
     // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
@@ -965,7 +965,13 @@ void TFGraphLowering::visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo) {
   auto &graphFn = getCurrentGraphFunction();
   // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
   // the while cond function.
-  if (!graphFn.shouldLowerEffectfulOps) return;
+  if (!graphFn.shouldLowerEffectfulOps) {
+    internalError(
+        getUserSourceLocation(tfopInfo.inst->getDebugLocation()),
+        "FIXME: cannot lower a Host->TF tensor transfer in a loop header",
+        diag::tfop_invalid_tfop);
+    return;
+  }
 
   // Type check and process the parameters.
   // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
