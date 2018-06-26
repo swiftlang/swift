@@ -182,6 +182,7 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
       .Case("UInt64", TF_UINT64)
       .Case("Int8", TF_INT8)
       .Case("UInt8", TF_UINT8)
+      .Case("BFloat16", TF_BFLOAT16)
       .Case("Float", TF_FLOAT)
       .Case("Double", TF_DOUBLE)
       .Case("Int", is64(s) ? TF_INT64 : TF_INT32)

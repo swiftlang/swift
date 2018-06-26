@@ -300,6 +300,38 @@ extension UInt64 : AccelerableByTensorFlow {
   }
 }
 
+public struct BFloat16 {
+  private init() {}
+}
+
+extension BFloat16 : AccelerableByTensorFlow {
+  public static var _tensorFlowDataType: _TensorDataType {
+    return _TensorDataType(TF_BFLOAT16)
+  }
+  @_silgen_name("__tf_get_scalar_or_die_BFloat16") @inline(never)
+  public static func _getScalarOrDie
+    (_ handle: TensorHandle<BFloat16>
+  ) -> BFloat16 {
+    return _TFGetScalarOrDieImpl(handle)
+  }
+  @_silgen_name("__tf_get_scalar_BFloat16") @inline(never)
+  public static func _getScalar(_ handle: TensorHandle<BFloat16>) -> BFloat16? {
+    return _TFGetScalarImpl(handle)
+  }
+  @_inlineable @inline(__always)
+  public static func _makeScalarTensor(
+    _ scalar: BFloat16
+  ) -> TensorHandle<BFloat16> {
+    return #tfop("tfc.scalarToTensor", scalar)
+  }
+  @_silgen_name("__tf_hoistable_BFloat16") @_optimize(none) @inline(never)
+  public static func _hoistableClosure(
+    _ fn: () -> TensorHandle<BFloat16>
+  ) -> TensorHandle<BFloat16> {
+    return fn()
+  }
+}
+
 extension Float : AccelerableByTensorFlow {
   public static var _tensorFlowDataType: _TensorDataType {
     return _TensorDataType(TF_FLOAT)
