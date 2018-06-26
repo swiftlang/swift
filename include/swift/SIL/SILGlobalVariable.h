@@ -225,4 +225,38 @@ private:
 
 } // end llvm namespace
 
+//===----------------------------------------------------------------------===//
+// Utilities for verification and optimization.
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// Given an addressor, AddrF, return the global variable being addressed, or
+/// return nullptr if the addressor isn't a recognized pattern.
+SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
+
+/// Return the callee of a once call.
+SILFunction *getCalleeOfOnceCall(BuiltinInst *BI);
+
+/// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
+/// rewrite the initialization pattern.
+///
+/// Given an addressor, AddrF, find the call to the global initializer if
+/// present, otherwise return null. If an initializer is returned, then
+/// `CallsToOnce` is initialized to the corresponding builtin "once" call.
+SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
+                             BuiltinInst *&CallToOnce);
+
+/// Helper for getVariableOfGlobalInit(), so GlobalOpts can deeply inspect and
+/// rewrite the initialization pattern.
+///
+/// Given a global initializer, InitFunc, return the GlobalVariable that it
+/// statically initializes or return nullptr if it isn't an obvious static
+/// initializer. If a global variable is returned, InitVal is initialized to the
+/// the instruction producing the global's initial value.
+SILGlobalVariable *getVariableOfStaticInitializer(
+  SILFunction *InitFunc, SingleValueInstruction *&InitVal);
+
+} // namespace swift
+
 #endif
