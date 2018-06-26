@@ -1,6 +1,6 @@
 # Cross-compiling Swift for Windows with `clang`
 
-This document describes how to cross compile Swift on Windows on a non-Windows
+This document describes how to cross compile Swift for Windows on a non-Windows
 host. For more context on the status of Swift on Windows in general, see
 [Getting Started with Swift on Windows](./Windows.md)
 
