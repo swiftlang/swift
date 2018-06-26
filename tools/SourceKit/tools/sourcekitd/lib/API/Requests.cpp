@@ -37,6 +37,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/NativeFormatting.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/raw_ostream.h"
@@ -2423,6 +2424,7 @@ void serializeSyntaxTreeAsJson(
     const swift::syntax::SourceFileSyntax &SyntaxTree,
     std::unordered_set<unsigned> ReusedNodeIds,
     ResponseBuilder::Dictionary &Dict) {
+  auto StartClock = clock();
   // 4096 is a heuristic buffer size that appears to usually be able to fit an
   // incremental syntax tree
   size_t ReserveBufferSize = 4096;
@@ -2438,6 +2440,15 @@ void serializeSyntaxTreeAsJson(
     SyntaxTreeOutput << *SyntaxTree.getRaw();
   }
   Dict.set(KeySerializedSyntaxTree, SyntaxTreeString);
+
+  auto EndClock = clock();
+  LOG_SECTION("incrParse Performance", InfoLowPrio) {
+    Log->getOS() << "Serialized " << SyntaxTreeString.size() << " bytes in ";
+    llvm::write_double(Log->getOS(),
+                       (double)(EndClock - StartClock) * 1000 / CLOCKS_PER_SEC,
+                       llvm::FloatStyle::Fixed, 2);
+    Log->getOS() << "ms";
+  }
 }
 
 void SKEditorConsumer::handleSyntaxTree(
