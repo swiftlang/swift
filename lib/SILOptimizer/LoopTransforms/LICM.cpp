@@ -40,12 +40,13 @@ using namespace swift;
 
 /// Instructions which can be hoisted:
 /// loads, function calls without side effects and (some) exclusivity checks
-using HoistSet = llvm::SmallPtrSet<SILInstruction *, 8>;
+using InstSet = llvm::SmallPtrSet<SILInstruction *, 8>;
 
 /// Instruction pairs which need to be hoisted together:
 /// e.g. If we hoist a begin access, we need to sink the matching end access
-using HoistPairSet =
-    llvm::SmallVector<std::pair<SILInstruction *, SILInstruction *>, 8>;
+/// The target of each hoist instruction can be multiple sinks. As such,
+/// A pair consists of an instruction to a set of matching sink instructions
+using HoistPairSet = llvm::SmallVector<std::pair<SILInstruction *, InstSet>, 8>;
 
 /// A subset of instruction which may have side effects.
 /// Doesn't contain ones that have special handling (e.g. fix_lifetime)
@@ -149,6 +150,7 @@ static bool hoistInstruction(DominanceInfo *DT, SILInstruction *Inst,
     DEBUG(llvm::dbgs() << "   loop variant operands\n");
     return false;
   }
+
   auto mvBefore = Preheader->getTerminator();
   ArraySemanticsCall semCall(Inst);
   if (semCall.canHoist(mvBefore, DT)) {
@@ -160,7 +162,7 @@ static bool hoistInstruction(DominanceInfo *DT, SILInstruction *Inst,
 }
 
 static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
-                              HoistSet &HoistUpSet) {
+                              InstSet &HoistUpSet) {
   DEBUG(llvm::dbgs() << " Hoisting instructions.\n");
   auto Preheader = Loop->getLoopPreheader();
   assert(Preheader && "Expected a preheader");
@@ -271,7 +273,7 @@ static bool sinkInstruction(DominanceInfo *DT,
 
 static bool sinkInstructions(std::unique_ptr<LoopNestSummary> &LoopSummary,
                              DominanceInfo *DT, SILLoopInfo *LI,
-                             HoistSet &SinkDownSet) {
+                             InstSet &SinkDownSet) {
   auto *Loop = LoopSummary->Loop;
   DEBUG(llvm::errs() << " Sink instructions attempt\n");
   SmallVector<SILBasicBlock *, 8> domBlocks;
@@ -300,15 +302,18 @@ hoistAndSinkInstructionPairs(std::unique_ptr<LoopNestSummary> &LoopSummary,
   assert(Preheader && "Expected a preheader");
 
   bool Changed = false;
+
   for (auto pair : Pairs) {
     auto *Up = pair.first;
-    auto *Down = pair.second;
+    auto &SinkDownSet = pair.second;
     if (!hoistInstruction(DT, Up, Loop, Preheader)) {
       continue;
     }
     DEBUG(llvm::dbgs() << "Hoisted " << *Up);
-    if (!sinkInstruction(DT, LoopSummary, Down, LI)) {
-      llvm_unreachable("LICM: Could not perform must-sink instruction");
+    for (auto *instSink : SinkDownSet) {
+      if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
+        llvm_unreachable("LICM: Could not perform must-sink instruction");
+      }
     }
     DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     Changed = true;
@@ -333,10 +338,10 @@ class LoopTreeOptimization {
   bool RunsOnHighLevelSIL;
 
   /// Instructions that we may be able to hoist up
-  HoistSet HoistUp;
+  InstSet HoistUp;
 
   /// Instructions that we may be able to sink down
-  HoistSet SinkDown;
+  InstSet SinkDown;
 
   /// Instruction pairs that we may be able to hoist and sink
   HoistPairSet HoistingPairs;
@@ -462,7 +467,26 @@ static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
   return semCall.canHoist(Preheader->getTerminator(), DT);
 }
 
-static void analyzeBeginAccess(BeginAccessInst *&BI,
+// Check If all the end accesses of the given begin do not prevent hoisting
+// There are only two legal placements for the end access instructions:
+// 1) Inside the same loop (sink to loop exists)
+// Potential TODO: At loop exit block
+static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
+  for (auto Use : BI->getUses()) {
+    auto *User = Use->getUser();
+    if (!dyn_cast<EndAccessInst>(User)) {
+      continue;
+    }
+    auto *BB = User->getParent();
+    if (Loop->getBlocksSet().count(BB) != 0) {
+      continue;
+    }
+    return false;
+  }
+  return true;
+}
+
+static void analyzeBeginAccess(BeginAccessInst *BI,
                                SmallVector<BeginAccessInst *, 8> &BeginAccesses,
                                SmallVector<EndAccessInst *, 8> &EndAccesses,
                                HoistPairSet &HoistingPairs) {
@@ -476,23 +500,26 @@ static void analyzeBeginAccess(BeginAccessInst *&BI,
     return;
   }
 
-  // find matching end access:
+  // find matching end accesses:
+  InstSet matchingEnds;
   auto matchingEndPred = [&](EndAccessInst *EI) {
     return EI->getBeginAccess() == BI;
   };
-  auto matchingEnd =
-      std::find_if(EndAccesses.begin(), EndAccesses.end(), matchingEndPred);
-  if (matchingEnd == EndAccesses.end()) {
+  for (auto matchingEnd = std::find_if(EndAccesses.begin(), EndAccesses.end(),
+                                       matchingEndPred);
+       matchingEnd != EndAccesses.end();
+       matchingEnd =
+           std::find_if(matchingEnd, EndAccesses.end(), matchingEndPred)) {
+    auto *EI = *matchingEnd;
+    matchingEnds.insert(EI);
+    ++matchingEnd;
+  }
+  if (matchingEnds.empty()) {
     // no matching end within the loop
     return;
   }
-  auto *EI = *matchingEnd;
-  ++matchingEnd;
-  if (std::find_if(matchingEnd, EndAccesses.end(), matchingEndPred) !=
-      EndAccesses.end()) {
-    // We expect a single matching end access in the loop
-    return;
-  }
+  DEBUG(llvm::dbgs() << "Found " << matchingEnds.size() << " End accesses"
+                     << "\n");
 
   auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
@@ -504,7 +531,7 @@ static void analyzeBeginAccess(BeginAccessInst *&BI,
   };
 
   if (std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred)) {
-    HoistingPairs.push_back(std::make_pair(BI, EI));
+    HoistingPairs.emplace_back(std::make_pair(BI, std::move(matchingEnds)));
   }
 }
 
@@ -618,6 +645,12 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     }
   }
   for (auto *BI : BeginAccesses) {
+    if (!handledEndAccesses(BI, Loop)) {
+      DEBUG(llvm::dbgs() << "Skipping: " << *BI);
+      DEBUG(llvm::dbgs() << "Some end accesses can't be handled"
+                         << "\n");
+      continue;
+    }
     analyzeBeginAccess(BI, BeginAccesses, EndAccesses, HoistingPairs);
   }
 }
