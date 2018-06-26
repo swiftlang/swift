@@ -64,6 +64,7 @@ func loops1(a: Int) -> Int {
 // @constexpr
 func loops2(a: Int) -> Int {
   var x = 42
+  // expected-note @+1 {{expression not evaluable as constant here}}
   for i in 0 ... a {
     x += i
   }
@@ -136,6 +137,26 @@ func testGenericThunk() {
   // TODO: expected-error @+1 {{#assert condition not constant}}
   #assert(myTransform.fn(42) > 1)
   // expected-note @-1{{could not fold operation}}
+}
+
+//===----------------------------------------------------------------------===//
+
+func foo() -> Bool {
+  // expected-note @+1 {{expression not evaluable as constant here}}
+  print("not constexpr")
+  return true
+}
+
+func baz() -> Bool {
+  return foo() // expected-note {{when called from here}}
+}
+
+func bar() -> Bool {
+  return baz() // expected-note {{when called from here}}
+}
+
+func testCallStack() {
+  #assert(bar()) // expected-error{{#assert condition not constant}}
 }
 
 //===----------------------------------------------------------------------===//

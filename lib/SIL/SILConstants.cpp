@@ -36,9 +36,9 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "uninit\n";
     return;
   case RK_Unknown: {
-    std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
-    os << "unknown(" << (int)unknown.second << "): ";
-    unknown.first->dump();
+    const UnknownInfo& unknown = getUnknownInfo();
+    os << "unknown(" << (int)unknown.reason << "): ";
+    unknown.node->dump();
     return;
   }
   case RK_Metatype:
@@ -450,16 +450,34 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
   return loc;
 }
 
+/// Emits an explanatory note if there is useful information to note or if there
+/// is an interesting SourceLoc to point at.
+static void emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
+                               SILLocation fallbackLoc, std::string error) {
+  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
+  if (loc.isNull()) {
+    // If we have important clarifying information, make sure to emit it.
+    if (reason == UnknownReason::Default || fallbackLoc.isNull())
+      return;
+    loc = fallbackLoc;
+  }
+
+  auto &module = badInst->getModule();
+  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
+           error)
+      .highlight(loc.getSourceRange());
+}
+
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is.
 void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
-  std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
-  auto badInst = dyn_cast<SILInstruction>(unknown.first);
+  const UnknownInfo &unknown = getUnknownInfo();
+  auto badInst = dyn_cast<SILInstruction>(unknown.node);
   if (!badInst)
     return;
 
   std::string error;
-  switch (unknown.second) {
+  switch (unknown.reason) {
   case UnknownReason::Default:
     error = "could not fold operation";
     break;
@@ -478,17 +496,27 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     break;
   }
 
+  emitNoteDiagnostic(badInst, unknown.reason, fallbackLoc, error);
+
   auto &module = badInst->getModule();
+  auto &SM = module.getASTContext().SourceMgr;
+  bool emittedFirstNote = false;
+  unsigned originalDiagnosticLineNumber =
+      SM.getLineNumber(fallbackLoc.getSourceLoc());
+  for (auto &sourceLoc : llvm::reverse(unknown.call_stack)) {
+    // Skip known sources.
+    if (!sourceLoc.isValid())
+      continue;
+    // Also skip notes that point to the same line as the original error, for
+    // example in:
+    //   #assert(foo(bar()))
+    // it is not useful to get three diagnostics referring to the same line.
+    if (SM.getLineNumber(sourceLoc) == originalDiagnosticLineNumber)
+      continue;
 
-  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) {
-    // If we have important clarifying information, make sure to emit it.
-    if (unknown.second == UnknownReason::Default || fallbackLoc.isNull())
-      return;
-    loc = fallbackLoc;
+    auto diag = emittedFirstNote ? diag::constexpr_called_from
+                                 : diag::constexpr_not_evaluable;
+    diagnose(module.getASTContext(), sourceLoc, diag);
+    emittedFirstNote = true;
   }
-
-  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
-           error)
-      .highlight(loc.getSourceRange());
 }
