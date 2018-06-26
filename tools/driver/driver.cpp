@@ -180,7 +180,7 @@ static int run_driver(StringRef ExecName,
 }
 
 int main(int argc_, const char **argv_) {
-  SmallVector<const char *, 256> argv(&argv_[0], &argv_[argc_]);
+  SmallVector<const char *, 256> args(&argv_[0], &argv_[argc_]);
 
   // Expand any response files in the command line argument vector - arguments
   // may be passed through response files in the event of command line length
@@ -192,11 +192,15 @@ int main(int argc_, const char **argv_) {
       llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
       llvm::cl::TokenizeWindowsCommandLine :
       llvm::cl::TokenizeGNUCommandLine,
-      argv);
+      args);
 
   // Initialize the stack trace using the parsed argument vector with expanded
   // response files.
-  PROGRAM_START(argv.size(), argv.data());
+  int ExpandedArgc = args.size();
+  const char **ExpandedArgv = args.data();
+  PROGRAM_START(ExpandedArgc, ExpandedArgv);
+  SmallVector<const char *, 256> argv(&ExpandedArgv[0],
+                                      &ExpandedArgv[ExpandedArgc]);
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);
