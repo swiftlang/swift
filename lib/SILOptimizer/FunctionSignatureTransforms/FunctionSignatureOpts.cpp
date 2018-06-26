@@ -529,7 +529,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Create the thunk body !
-  F->setThunk(IsThunk);
+  F->setThunk(IsSignatureOptimizedThunk);
   // The thunk now carries the information on how the signature is
   // optimized. If we inline the thunk, we will get the benefit of calling
   // the signature optimized function without additional setup on the

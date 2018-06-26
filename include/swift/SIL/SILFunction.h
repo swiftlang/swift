@@ -40,7 +40,12 @@ class SILProfiler;
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
+enum IsThunk_t {
+  IsNotThunk,
+  IsThunk,
+  IsReabstractionThunk,
+  IsSignatureOptimizedThunk
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
