@@ -423,9 +423,9 @@ public:
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found. The DeclContext
 /// is never null.
-void AccessControlChecker::checkTypeAccessImpl(
+void AccessControlCheckerBase::checkTypeAccessImpl(
     TypeLoc TL, AccessScope contextAccessScope,
-    const DeclContext *useDC, bool checkUsableFromInline,
+    const DeclContext *useDC,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   if (!TC.getLangOpts().EnableAccessControl)
     return;
@@ -516,9 +516,8 @@ void AccessControlChecker::checkTypeAccessImpl(
 ///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found.
-void AccessControlChecker::checkTypeAccess(
+void AccessControlCheckerBase::checkTypeAccess(
     TypeLoc TL, const ValueDecl *context,
-    bool checkUsableFromInline,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   assert(!isa<ParamDecl>(context));
   const DeclContext *DC = context->getDeclContext();
@@ -526,8 +525,7 @@ void AccessControlChecker::checkTypeAccess(
     context->getFormalAccessScope(
       nullptr, checkUsableFromInline);
   checkTypeAccessImpl(TL, contextAccessScope,
-                      DC, checkUsableFromInline,
-                      diagnose);
+                      DC, diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -550,43 +548,36 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
   }
 }
 
-void AccessControlChecker::checkRequirementAccess(
+void AccessControlCheckerBase::checkRequirementAccess(
     ArrayRef<RequirementRepr> requirements,
     AccessScope accessScope,
     const DeclContext *useDC,
-    bool checkUsableFromInline,
     llvm::function_ref<CheckTypeAccessCallback> diagnose) {
   for (auto &requirement : requirements) {
     switch (requirement.getKind()) {
     case RequirementReprKind::TypeConstraint:
       checkTypeAccessImpl(requirement.getSubjectLoc(),
-                          accessScope, useDC, checkUsableFromInline,
-                          diagnose);
+                          accessScope, useDC, diagnose);
       checkTypeAccessImpl(requirement.getConstraintLoc(),
-                          accessScope, useDC, checkUsableFromInline,
-                          diagnose);
+                          accessScope, useDC, diagnose);
       break;
     case RequirementReprKind::LayoutConstraint:
       checkTypeAccessImpl(requirement.getSubjectLoc(),
-                          accessScope, useDC, checkUsableFromInline,
-                          diagnose);
+                          accessScope, useDC, diagnose);
       break;
     case RequirementReprKind::SameType:
       checkTypeAccessImpl(requirement.getFirstTypeLoc(),
-                          accessScope, useDC, checkUsableFromInline,
-                          diagnose);
+                          accessScope, useDC, diagnose);
       checkTypeAccessImpl(requirement.getSecondTypeLoc(),
-                          accessScope, useDC, checkUsableFromInline,
-                          diagnose);
+                          accessScope, useDC, diagnose);
       break;
     }
   }
 }
 
-void AccessControlChecker::checkGenericParamAccess(
+void AccessControlCheckerBase::checkGenericParamAccess(
     const GenericParamList *params,
     const Decl *owner,
-    bool checkUsableFromInline,
     AccessScope accessScope,
     AccessLevel contextAccess) {
   if (!params)
@@ -634,14 +625,12 @@ void AccessControlChecker::checkGenericParamAccess(
       continue;
     assert(param->getInherited().size() == 1);
     checkTypeAccessImpl(param->getInherited().front(), accessScope,
-                        DC, checkUsableFromInline,
-                        callback);
+                        DC, callback);
   }
   callbackACEK = ACEK::Requirement;
 
   checkRequirementAccess(params->getRequirements(),
-                         accessScope, owner->getDeclContext(),
-                         checkUsableFromInline, callback);
+                         accessScope, DC, callback);
 
   if (minAccessScope.isPublic())
     return;
@@ -674,11 +663,10 @@ void AccessControlChecker::checkGenericParamAccess(
   highlightOffendingType(TC, diag, complainRepr);
 }
 
-void AccessControlChecker::checkGenericParamAccess(
+void AccessControlCheckerBase::checkGenericParamAccess(
     const GenericParamList *params,
-    const ValueDecl *owner,
-    bool checkUsableFromInline) {
-  checkGenericParamAccess(params, owner, checkUsableFromInline,
+    const ValueDecl *owner) {
+  checkGenericParamAccess(params, owner,
                           owner->getFormalAccessScope(nullptr,
                                                       checkUsableFromInline),
                           owner->getFormalAccess());
@@ -688,7 +676,7 @@ void AccessControlChecker::checkGenericParamAccess(
 /// declarations that are less visible than the declaration itself.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
-void AccessControlChecker::checkAccessControl(Decl *D) {
+void AccessControlChecker::check(Decl *D) {
   if (D->isInvalid() || D->isImplicit())
     return;
 
@@ -734,7 +722,7 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
           return;
 
         checkTypeAccess(TypeLoc::withoutLoc(theVar->getType()),
-                        theVar, /*checkUsableFromInline=*/false,
+                        theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeToWarning) {
@@ -776,7 +764,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
         return;
 
       checkTypeAccess(TP->getTypeLoc(), anyVar,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -807,7 +794,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
     auto TAD = cast<TypeAliasDecl>(D);
 
     checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
-                    /*checkUsableFromInline=*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -846,7 +832,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccess(requirement, assocType,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -861,7 +846,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
-                    /*checkUsableFromInline=*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -879,7 +863,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       checkRequirementAccess(trailingWhereClause->getRequirements(),
                              assocType->getFormalAccessScope(),
                              assocType->getDeclContext(),
-                             /*checkUsableFromInline=*/false,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
@@ -915,8 +898,7 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
   case DeclKind::Enum: {
     auto ED = cast<EnumDecl>(D);
 
-    checkGenericParamAccess(ED->getGenericParams(), ED,
-                            /*checkUsableFromInline=*/false);
+    checkGenericParamAccess(ED->getGenericParams(), ED);
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
@@ -930,7 +912,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       if (rawTypeLocIter == ED->getInherited().end())
         return;
       checkTypeAccess(*rawTypeLocIter, ED,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -954,16 +935,14 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
 
   case DeclKind::Struct: {
     auto SD = cast<StructDecl>(D);
-    checkGenericParamAccess(SD->getGenericParams(), SD,
-                            /*checkUsableFromInline=*/false);
+    checkGenericParamAccess(SD->getGenericParams(), SD);
     return;
   }
 
   case DeclKind::Class: {
     auto CD = cast<ClassDecl>(D);
 
-    checkGenericParamAccess(CD->getGenericParams(), CD,
-                            /*checkUsableFromInline=*/false);
+    checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
       const NominalTypeDecl *superclassDecl =
@@ -995,7 +974,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       }
 
       checkTypeAccess(*superclassLocIter, CD,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1037,7 +1015,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccess(requirement, proto,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1056,7 +1033,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       checkRequirementAccess(trailingWhereClause->getRequirements(),
                              proto->getFormalAccessScope(),
                              proto->getDeclContext(),
-                             /*checkUsableFromInline=*/false,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *thisComplainRepr,
                                  DowngradeToWarning downgradeDiag) {
@@ -1104,7 +1080,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(P->getTypeLoc(), SD,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1119,7 +1094,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
     }
 
     checkTypeAccess(SD->getElementTypeLoc(), SD,
-                    /*checkUsableFromInline=*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *thisComplainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1162,8 +1136,7 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
-    checkGenericParamAccess(fn->getGenericParams(), fn,
-                            /*checkUsableFromInline=*/false);
+    checkGenericParamAccess(fn->getGenericParams(), fn);
 
     // This must stay in sync with diag::function_type_access.
     enum {
@@ -1179,7 +1152,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
         checkTypeAccess(P->getTypeLoc(), fn,
-                        /*checkUsableFromInline=*/false,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *thisComplainRepr,
                             DowngradeToWarning downgradeDiag) {
@@ -1197,7 +1169,6 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
     bool problemIsResult = false;
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getBodyResultTypeLoc(), FD,
-                      /*checkUsableFromInline=*/false,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *thisComplainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1245,10 +1216,9 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
       return;
     for (auto &P : *EED->getParameterList()) {
       checkTypeAccess(P->getTypeLoc(), EED,
-                      /*checkUsableFromInline=*/false,
-                             [&](AccessScope typeAccessScope,
-                                 const TypeRepr *complainRepr,
-                                 DowngradeToWarning downgradeToWarning) {
+                      [&](AccessScope typeAccessScope,
+                          const TypeRepr *complainRepr,
+                          DowngradeToWarning downgradeToWarning) {
         auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
         auto diagID = diag::enum_case_access;
         if (downgradeToWarning == DowngradeToWarning::Yes)
@@ -1268,7 +1238,7 @@ void AccessControlChecker::checkAccessControl(Decl *D) {
 /// declarations that are not @usableFromInline or public.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
-void AccessControlChecker::checkUsableFromInline(Decl *D) {
+void UsableFromInlineChecker::check(Decl *D) {
   if (!TC.Context.isSwiftVersionAtLeast(4, 2))
     return;
 
@@ -1328,7 +1298,7 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
           return;
 
         checkTypeAccess(TypeLoc::withoutLoc(theVar->getType()),
-                        theVar, /*checkUsableFromInline=*/true,
+                        theVar,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeToWarning) {
@@ -1364,7 +1334,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
         return;
 
       checkTypeAccess(TP->getTypeLoc(), anyVar,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1385,7 +1354,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
     auto TAD = cast<TypeAliasDecl>(D);
 
     checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD,
-                    /*checkUsableFromInline=*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1412,7 +1380,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
                   assocType->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccess(requirement, assocType,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
             const TypeRepr *complainRepr,
             DowngradeToWarning downgradeDiag) {
@@ -1424,7 +1391,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
       });
     });
     checkTypeAccess(assocType->getDefaultDefinitionLoc(), assocType,
-                    /*checkUsableFromInline=*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1437,12 +1403,10 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
 
     if (auto *trailingWhereClause = assocType->getTrailingWhereClause()) {
       auto accessScope =
-        assocType->getFormalAccessScope(nullptr,
-                                        /*checkUsableFromInline=*/true);
+        assocType->getFormalAccessScope(nullptr);
       checkRequirementAccess(trailingWhereClause->getRequirements(),
                              accessScope,
                              assocType->getDeclContext(),
-                             /*checkUsableFromInline=*/true,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeDiag) {
@@ -1460,8 +1424,7 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
   case DeclKind::Enum: {
     auto ED = cast<EnumDecl>(D);
 
-    checkGenericParamAccess(ED->getGenericParams(), ED,
-                            /*checkUsableFromInline=*/true);
+    checkGenericParamAccess(ED->getGenericParams(), ED);
 
     if (ED->hasRawType()) {
       Type rawType = ED->getRawType();
@@ -1475,7 +1438,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
       if (rawTypeLocIter == ED->getInherited().end())
         return;
       checkTypeAccess(*rawTypeLocIter, ED,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1492,16 +1454,14 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
 
   case DeclKind::Struct: {
     auto SD = cast<StructDecl>(D);
-    checkGenericParamAccess(SD->getGenericParams(), SD,
-                            /*checkUsableFromInline=*/true);
+    checkGenericParamAccess(SD->getGenericParams(), SD);
     return;
   }
 
   case DeclKind::Class: {
     auto CD = cast<ClassDecl>(D);
 
-    checkGenericParamAccess(CD->getGenericParams(), CD,
-                            /*checkUsableFromInline=*/true);
+    checkGenericParamAccess(CD->getGenericParams(), CD);
 
     if (CD->hasSuperclass()) {
       const NominalTypeDecl *superclassDecl =
@@ -1525,7 +1485,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
         return;
 
       checkTypeAccess(*superclassLocIter, CD,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
@@ -1554,7 +1513,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
                   proto->getInherited().end(),
                   [&](TypeLoc requirement) {
       checkTypeAccess(requirement, proto,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1567,13 +1525,11 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
     });
 
     if (auto *trailingWhereClause = proto->getTrailingWhereClause()) {
-      auto accessScope =
-        proto->getFormalAccessScope(nullptr,
-                                    /*checkUsableFromInline=*/true);
+      auto accessScope = proto->getFormalAccessScope(nullptr,
+                                                     /*checkUsableFromInline*/true);
       checkRequirementAccess(trailingWhereClause->getRequirements(),
                              accessScope,
                              proto->getDeclContext(),
-                             /*checkUsableFromInline=*/true,
                              [&](AccessScope typeAccessScope,
                                  const TypeRepr *complainRepr,
                                  DowngradeToWarning downgradeDiag) {
@@ -1593,7 +1549,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
 
     for (auto &P : *SD->getIndices()) {
       checkTypeAccess(P->getTypeLoc(), SD,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1607,7 +1562,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
     }
 
     checkTypeAccess(SD->getElementTypeLoc(), SD,
-                    /*checkUsableFromInline=*/true,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeDiag) {
@@ -1630,8 +1584,7 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
     auto fn = cast<AbstractFunctionDecl>(D);
     bool isTypeContext = fn->getDeclContext()->isTypeContext();
 
-    checkGenericParamAccess(fn->getGenericParams(), fn,
-                            /*checkUsableFromInline=*/true);
+    checkGenericParamAccess(fn->getGenericParams(), fn);
 
     // This must stay in sync with diag::function_type_usable_from_inline.
     enum {
@@ -1647,7 +1600,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
     for (auto *PL : fn->getParameterLists().slice(isTypeContext)) {
       for (auto &P : *PL) {
         checkTypeAccess(P->getTypeLoc(), fn,
-                        /*checkUsableFromInline=*/true,
                         [&](AccessScope typeAccessScope,
                             const TypeRepr *complainRepr,
                             DowngradeToWarning downgradeDiag) {
@@ -1663,7 +1615,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
 
     if (auto FD = dyn_cast<FuncDecl>(fn)) {
       checkTypeAccess(FD->getBodyResultTypeLoc(), FD,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeDiag) {
@@ -1686,7 +1637,6 @@ void AccessControlChecker::checkUsableFromInline(Decl *D) {
       return;
     for (auto &P : *EED->getParameterList()) {
       checkTypeAccess(P->getTypeLoc(), EED,
-                      /*checkUsableFromInline=*/true,
                       [&](AccessScope typeAccessScope,
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {

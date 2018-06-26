@@ -3294,9 +3294,8 @@ public:
 
     TC.checkDeclAttributes(PBD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(PBD);
-    ACC.checkUsableFromInline(PBD);
+    AccessControlChecker::checkAccessControl(TC, PBD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
@@ -3309,9 +3308,8 @@ public:
     TC.validateDecl(SD);
     TC.checkDeclAttributes(SD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(SD);
-    ACC.checkUsableFromInline(SD);
+    AccessControlChecker::checkAccessControl(TC, SD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3320,9 +3318,8 @@ public:
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(TAD);
-    ACC.checkUsableFromInline(TAD);
+    AccessControlChecker::checkAccessControl(TC, TAD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -3336,9 +3333,8 @@ public:
                   proto->getName());
     }
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(AT);
-    ACC.checkUsableFromInline(AT);
+    AccessControlChecker::checkAccessControl(TC, AT);
+    UsableFromInlineChecker::checkUsableFromInline(TC, AT);
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -3407,9 +3403,8 @@ public:
 
     TC.checkDeclAttributes(ED);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(ED);
-    ACC.checkUsableFromInline(ED);
+    AccessControlChecker::checkAccessControl(TC, ED);
+    UsableFromInlineChecker::checkUsableFromInline(TC, ED);
 
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
@@ -3439,9 +3434,8 @@ public:
 
     TC.checkDeclAttributes(SD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(SD);
-    ACC.checkUsableFromInline(SD);
+    AccessControlChecker::checkAccessControl(TC, SD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, SD);
 
     SD->getAllConformances();
 
@@ -3673,9 +3667,8 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(CD);
-    ACC.checkUsableFromInline(CD);
+    AccessControlChecker::checkAccessControl(TC, CD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
@@ -3721,9 +3714,8 @@ public:
 
     TC.checkDeclAttributes(PD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(PD);
-    ACC.checkUsableFromInline(PD);
+    AccessControlChecker::checkAccessControl(TC, PD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, PD);
 
     TC.checkInheritanceClause(PD);
 
@@ -3798,9 +3790,8 @@ public:
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(FD);
-    ACC.checkUsableFromInline(FD);
+    AccessControlChecker::checkAccessControl(TC, FD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
     if (FD->hasBody()) {
       // Record the body.
@@ -5136,9 +5127,8 @@ public:
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(EED);
-    ACC.checkUsableFromInline(EED);
+    AccessControlChecker::checkAccessControl(TC, EED);
+    UsableFromInlineChecker::checkUsableFromInline(TC, EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -5212,7 +5202,6 @@ public:
 
       AccessControlChecker ACC(TC);
       ACC.checkGenericParamAccess(ED->getGenericParams(), ED,
-                                  /*checkUsableFromInline=*/false,
                                   desiredAccessScope, access);
     }
   }
@@ -5283,9 +5272,8 @@ public:
 
     TC.checkDeclAttributes(CD);
 
-    AccessControlChecker ACC(TC);
-    ACC.checkAccessControl(CD);
-    ACC.checkUsableFromInline(CD);
+    AccessControlChecker::checkAccessControl(TC, CD);
+    UsableFromInlineChecker::checkUsableFromInline(TC, CD);
 
     if (CD->hasBody() && !CD->isMemberwiseInitializer()) {
       TC.definedFunctions.push_back(CD);

@@ -43,43 +43,63 @@ enum class DowngradeToWarning: bool {
 using CheckTypeAccessCallback =
     void(AccessScope, const TypeRepr *, DowngradeToWarning);
 
-class AccessControlChecker {
+class AccessControlCheckerBase {
+protected:
   TypeChecker &TC;
+  bool checkUsableFromInline;
 
   void checkTypeAccessImpl(
       TypeLoc TL, AccessScope contextAccessScope,
-      const DeclContext *useDC, bool checkUsableFromInline,
+      const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkTypeAccess(
       TypeLoc TL, const ValueDecl *context,
-      bool checkUsableFromInline,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
   void checkRequirementAccess(
       ArrayRef<RequirementRepr> requirements,
       AccessScope accessScope,
       const DeclContext *useDC,
-      bool checkUsableFromInline,
       llvm::function_ref<CheckTypeAccessCallback> diagnose);
 
+  AccessControlCheckerBase(TypeChecker &TC, bool checkUsableFromInline)
+    : TC(TC), checkUsableFromInline(checkUsableFromInline) {}
+
 public:
-  explicit AccessControlChecker(TypeChecker &TC) : TC(TC) {}
-
-  void checkAccessControl(Decl *D);
-  void checkUsableFromInline(Decl *D);
-
   void checkGenericParamAccess(
     const GenericParamList *params,
     const Decl *owner,
-    bool checkUsableFromInline,
     AccessScope accessScope,
     AccessLevel contextAccess);
 
   void checkGenericParamAccess(
     const GenericParamList *params,
-    const ValueDecl *owner,
-    bool checkUsableFromInline);
+    const ValueDecl *owner);
+};
+
+class AccessControlChecker : public AccessControlCheckerBase {
+public:
+  explicit AccessControlChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/false) {}
+
+  void check(Decl *D);
+
+  static void checkAccessControl(TypeChecker &TC, Decl *D) {
+    AccessControlChecker(TC).check(D);
+  }
+};
+
+class UsableFromInlineChecker : public AccessControlCheckerBase {
+public:
+  explicit UsableFromInlineChecker(TypeChecker &TC)
+    : AccessControlCheckerBase(TC, /*checkUsableFromInline=*/true) {}
+
+  void check(Decl *D);
+
+  static void checkUsableFromInline(TypeChecker &TC, Decl *D) {
+    UsableFromInlineChecker(TC).check(D);
+  }
 };
 
 } // end namespace swift
