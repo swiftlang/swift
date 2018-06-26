@@ -52,6 +52,8 @@ UID_KEYS = [
     KEY('EnableSyntaxReuseRegions', 'key.enablesyntaxreuseregions'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
+    KEY('SyntaxTreeSerializationFormat', 
+        'key.syntax_tree_serialization_format'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('Description', 'key.description'),
     KEY('TypeName', 'key.typename'),
@@ -405,4 +407,8 @@ UID_KINDS = [
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
     KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
+    KIND('SyntaxTreeSerializationJSON', 
+         'source.syntaxtree.serialization.format.json'),
+    KIND('SyntaxTreeSerializationByteTree', 
+         'source.syntaxtree.serialization.format.bytetree'),
 ]
