@@ -3,7 +3,6 @@
 
 func test(n: Int) -> Int {
   return n == 0 ? 0 : (0..<n).reduce(0) {
-  // expected-error@-1 {{reasonable time}}
     ($0 > 0 && $1 % 2 == 0) ? (($0 + $1) / ($1 - $0)) : $0
   }
 }
