@@ -54,7 +54,6 @@ enum class UnknownReason {
   Trap,
 };
 
-
 /// This is the symbolic value tracked for each SILValue in a scope.  We
 /// support multiple representational forms for the constant node in order to
 /// avoid pointless memory bloat + copying.  This is intended to be a
@@ -150,12 +149,11 @@ class SymbolicValue {
   union {
     UnknownReason unknown_reason;
 
-    //unsigned integer_bitwidth;
+    // unsigned integer_bitwidth;
     // ...
   } aux;
 
 public:
-
   /// This enum is used to indicate the sort of value held by a SymbolicValue
   /// independent of its concrete representation.  This is the public
   /// interface to SymbolicValue.
@@ -205,15 +203,13 @@ public:
     return result;
   }
 
-  bool isUnknown() const {
-    return getKind() == Unknown;
-  }
+  bool isUnknown() const { return getKind() == Unknown; }
 
   /// Return information about an unknown result, including the SIL node that
   /// is a problem, and the reason it is an issue.
   std::pair<SILNode *, UnknownReason> getUnknownValue() const {
     assert(representationKind == RK_Unknown);
-    return { value.unknown, aux.unknown_reason };
+    return {value.unknown, aux.unknown_reason};
   }
 
   static SymbolicValue getUninitMemory() {

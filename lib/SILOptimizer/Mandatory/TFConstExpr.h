@@ -24,15 +24,15 @@
 #ifndef SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
-#include "llvm/Support/Allocator.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
-  class SingleValueInstruction;
-  class SILBuilder;
-  class SILModule;
-  class SILValue;
-  class SymbolicValue;
+class SingleValueInstruction;
+class SILBuilder;
+class SILModule;
+class SILValue;
+class SymbolicValue;
 
 namespace tf {
 
@@ -45,6 +45,7 @@ class ConstExprEvaluator {
 
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
+
 public:
   explicit ConstExprEvaluator(SILModule &m);
   ~ConstExprEvaluator();
