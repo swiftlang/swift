@@ -1348,8 +1348,8 @@ extension Numeric {
 ///
 /// Use the `init?(exactly:)` initializer to create a new instance after
 /// checking whether the passed value is representable. Instead of trapping on
-/// out-of-range values, using the failable `exact` initializer results in
-/// `nil`.
+/// out-of-range values, using the failable `init?(exactly:)`
+/// initializer results in `nil`.
 ///
 ///     let x = Int16(exactly: 500)
 ///     // x == Optional(500)
@@ -1357,7 +1357,7 @@ extension Numeric {
 ///     let y = Int8(exactly: 500)
 ///     // y == nil
 ///
-/// When converting floating-point values, the `init?(exact:)` initializer
+/// When converting floating-point values, the `init?(exactly:)` initializer
 /// checks both that the passed value has no fractional part and that the
 /// value is representable in the resulting type.
 ///
