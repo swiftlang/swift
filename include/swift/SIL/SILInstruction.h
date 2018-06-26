@@ -54,6 +54,7 @@ class MultipleValueInstructionResult;
 class DestructureTupleInst;
 class DestructureStructInst;
 // SWIFT_ENABLE_TENSORFLOW
+class SymbolicValue;
 struct GraphOperationAttribute;
 class GraphOperationInst;
 class NonValueInstruction;
@@ -8215,7 +8216,7 @@ public:
     return Attributes;
   }
 
-  Optional<GraphOperationAttribute> getAttribute(StringRef name);
+  Optional<SymbolicValue> getAttribute(StringRef name);
 
   static bool classof(const SILNode *N) {
     return N->getKind() == SILNodeKind::GraphOperationInst;
