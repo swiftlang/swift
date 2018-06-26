@@ -912,6 +912,8 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isCanonical = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
+    else if (isThunk && SP.P.Tok.getText() == "signature_optimized_thunk")
+      *isThunk = IsSignatureOptimizedThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
       *isThunk = IsReabstractionThunk;
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")

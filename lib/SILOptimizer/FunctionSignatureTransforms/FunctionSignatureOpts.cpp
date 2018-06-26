@@ -506,6 +506,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewF->setUnqualifiedOwnership();
   }
 
+  if (F->isSpecialization()) {
+    NewF->setSpecializationInfo(F->getSpecializationInfo());
+  }
+
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);
 
@@ -529,7 +533,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   }
 
   // Create the thunk body !
-  F->setThunk(IsThunk);
+  F->setThunk(IsSignatureOptimizedThunk);
   // The thunk now carries the information on how the signature is
   // optimized. If we inline the thunk, we will get the benefit of calling
   // the signature optimized function without additional setup on the
