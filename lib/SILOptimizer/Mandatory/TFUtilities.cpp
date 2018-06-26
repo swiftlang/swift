@@ -222,7 +222,7 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
 
 /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
 /// it into a TensorHandle<T> type.
-SILType tf::convertToTensorValueType(Type ty, const ASTContext& ctx) {
+SILType tf::convertElementTypeToTensorValueType(Type ty, const ASTContext& ctx) {
   assert(isValidTensorFlowElementType(ty));
   auto decl = ctx.getTensorHandleDecl();
   auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
@@ -232,12 +232,13 @@ SILType tf::convertToTensorValueType(Type ty, const ASTContext& ctx) {
 
 /// If the specified type is a TensorFlow value type, return it.  Otherwise, it
 /// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
-SILType tf::convertToTensorValueType(SILType ty) {
+SILType tf::convertElementTypeToTensorValueType(SILType ty) {
   // If this is already TensorHandle<T>, return it.
   if (isTensorFlowValue(ty))
     return ty;
 
-  return convertToTensorValueType(ty.getSwiftRValueType(), ty.getASTContext());
+  return convertElementTypeToTensorValueType(ty.getSwiftRValueType(),
+                                             ty.getASTContext());
 }
 
 /// Looks up a function in the current module. If it exists, returns it.

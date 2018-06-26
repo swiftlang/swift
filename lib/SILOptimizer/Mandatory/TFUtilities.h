@@ -241,11 +241,11 @@ private:
 
   /// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
   /// it into a TensorHandle<T> type.
-  SILType convertToTensorValueType(Type ty, const ASTContext& ctx);
+  SILType convertElementTypeToTensorValueType(Type ty, const ASTContext& ctx);
 
   /// If the specified type is a TensorFlow value type, return it.  Otherwise, it
   /// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
-  SILType convertToTensorValueType(SILType ty);
+  SILType convertElementTypeToTensorValueType(SILType ty);
 
   /// Return true if the specified type is a valid tensor element type.  For
   /// example, int128 and pointers are not.
