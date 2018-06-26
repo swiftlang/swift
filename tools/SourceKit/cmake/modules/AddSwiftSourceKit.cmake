@@ -428,6 +428,11 @@ macro(add_sourcekit_xpc_service name framework_target)
 
   add_dependencies(${framework_target} ${name})
 
+  set_target_properties(${name} PROPERTIES
+                        BUILD_WITH_INSTALL_RPATH On
+                        INSTALL_RPATH "@loader_path/../lib"
+                        INSTALL_NAME_DIR "@rpath")
+
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     add_custom_command(TARGET ${name} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E create_symlink "Versions/Current/XPCServices" XPCServices
