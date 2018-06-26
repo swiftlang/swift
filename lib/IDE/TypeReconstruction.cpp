@@ -570,12 +570,10 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
             if (decl->hasInterfaceType()) {
               result._decls.push_back(decl);
               Type decl_type;
-              if (decl->hasInterfaceType()) {
-                decl_type = decl->getInterfaceType();
-                MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
-                if (meta_type)
-                  decl_type = meta_type->getInstanceType();
-              }
+              decl_type = decl->getInterfaceType();
+              MetatypeType *meta_type = decl_type->getAs<MetatypeType>();
+              if (meta_type)
+                decl_type = meta_type->getInstanceType();
               result._types.push_back(decl_type);
             }
           }
@@ -633,15 +631,11 @@ FindNamedDecls(ASTContext *ast, const DeclBaseName &name, VisitNodeResult &resul
       for (auto decl : decls) {
         if (decl->hasInterfaceType()) {
           result._decls.push_back(decl);
-          if (decl->hasInterfaceType()) {
-            result._types.push_back(decl->getInterfaceType());
-            MetatypeType *meta_type =
-                result._types.back()->getAs<MetatypeType>();
-            if (meta_type)
-              result._types.back() = meta_type->getInstanceType();
-          } else {
-            result._types.push_back(Type());
-          }
+          result._types.push_back(decl->getInterfaceType());
+          MetatypeType *meta_type =
+            result._types.back()->getAs<MetatypeType>();
+          if (meta_type)
+            result._types.back() = meta_type->getInstanceType();
         }
       }
       return result._types.size();
