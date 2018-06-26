@@ -754,7 +754,9 @@ public:
   ///
   /// The file is used to handle things like \c \@testable. A null-but-present
   /// value means the type is public.
-  llvm::DenseMap<const SourceFile *, TypeAccessScopeCacheMap>
+  llvm::DenseMap<const SourceFile *,
+                 std::pair<TypeAccessScopeCacheMap,
+                           TypeAccessScopeCacheMap>>
     TypeAccessScopeCache;
 
   // Caches whether a given declaration is "as specialized" as another.
