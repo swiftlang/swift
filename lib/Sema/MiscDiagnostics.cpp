@@ -3927,6 +3927,62 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(Walker);
 }
 
+static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
+                                              const DeclContext *DC) {
+  if (!E || isa<ErrorExpr>(E) || !E->getType())
+    return;
+
+  class DeprecatedWritableKeyPathWalker : public ASTWalker {
+    TypeChecker &TC;
+    const DeclContext *DC;
+
+    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+      if (E->hasLValueAccessKind() &&
+          E->getLValueAccessKind() == AccessKind::Read)
+        return;
+
+      if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {
+        auto *decl = keyPathExpr->getType()->getNominalOrBoundGenericNominal();
+        if (decl != TC.Context.getWritableKeyPathDecl() &&
+            decl != TC.Context.getReferenceWritableKeyPathDecl())
+          return;
+
+        assert(keyPathExpr->getComponents().size() > 0);
+        auto &component = keyPathExpr->getComponents().back();
+        if (component.getKind() == KeyPathExpr::Component::Kind::Property) {
+          auto *storage =
+            cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
+          if (!storage->isSettable(nullptr) ||
+              !storage->isSetterAccessibleFrom(DC)) {
+            TC.diagnose(keyPathExpr->getLoc(),
+                        swift::diag::expr_deprecated_writable_keypath,
+                        storage->getFullName());
+          }
+        }
+      }
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (!E || isa<ErrorExpr>(E) || !E->getType())
+        return {false, E};
+
+      if (auto *KPAE = dyn_cast<KeyPathApplicationExpr>(E)) {
+        visitKeyPathApplicationExpr(KPAE);
+        return {true, E};
+      }
+
+      return {true, E};
+    }
+
+  public:
+    DeprecatedWritableKeyPathWalker(TypeChecker &TC, const DeclContext *DC)
+        : TC(TC), DC(DC) {}
+  };
+
+  DeprecatedWritableKeyPathWalker Walker(TC, DC);
+  const_cast<Expr *>(E)->walk(Walker);
+}
+
 //===----------------------------------------------------------------------===//
 // High-level entry points.
 //===----------------------------------------------------------------------===//
@@ -3940,6 +3996,8 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagnoseUnintendedOptionalBehavior(TC, E, DC);
+  if (!TC.Context.isSwiftVersionAtLeast(5))
+    diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
     diagAvailability(TC, E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
