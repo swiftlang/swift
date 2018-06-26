@@ -1038,7 +1038,6 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   }
 
   /// A string that represents the contents of the set, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _makeCollectionDescription(for: self, withTypeName: "Set")
   }
@@ -3928,7 +3927,6 @@ public struct SetIterator<Element: Hashable>: IteratorProtocol {
 
 extension SetIterator: CustomReflectable {
   /// A mirror that reflects the iterator.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -3938,7 +3936,6 @@ extension SetIterator: CustomReflectable {
 
 extension Set: CustomReflectable {
   /// A mirror that reflects the set.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let style = Mirror.DisplayStyle.`set`
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
