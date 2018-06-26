@@ -1,5 +1,7 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=8:1 -replace='"""' -length=3 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=6:2 -replace=')' -length=1 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=2:10 -replace=' ' -length=1 | %sed_clean > %t.response
 // RUN: %FileCheck -input-file=%t.response %s
+// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=8:1 -replace='"""' -length=3 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=6:2 -replace=')' -length=1 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-multiline-string.swift -pos=2:10 -replace=' ' -length=1 -libsyntax-based-processing | %sed_clean > %t.libsyntax.response
+// RUN: %FileCheck -input-file=%t.libsyntax.response %s
 
 // Original file contents
 

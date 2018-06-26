@@ -1,5 +1,7 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=4:2 -replace=" " -length=1  == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=4:2 -replace="/" -length=1 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=1:1 -replace="//" -length=2 | %sed_clean > %t.response
 // RUN: %FileCheck -input-file=%t.response %s
+// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=4:2 -replace=" " -length=1  == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=4:2 -replace="/" -length=1 == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-block-comment.swift -pos=1:1 -replace="//" -length=2 -libsyntax-based-processing | %sed_clean > %t.libSyntax.response
+// RUN: %FileCheck -input-file=%t.libSyntax.response %s
 
 // Initial state
 
