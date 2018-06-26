@@ -2509,10 +2509,9 @@ GraphOperationInst *GraphOperationInst::create(
                                            resultTypes, resultOwnerships);
 }
 
-Optional<GraphOperationAttribute>
-GraphOperationInst::getAttribute(StringRef name) {
+Optional<SymbolicValue> GraphOperationInst::getAttribute(StringRef name) {
   for (auto attr : getAttributes())
     if (attr.name.is(name))
-      return attr;
+      return attr.value;
   return None;
 };

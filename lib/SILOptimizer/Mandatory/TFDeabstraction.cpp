@@ -124,7 +124,8 @@ namespace {
     void propagateTensorValues();
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
-                     DenseMap<SILValue, SymbolicValue> &constants);
+                     DenseMap<SILValue, SymbolicValue> &constants,
+                     GraphGlobalConfiguration &deviceConfig);
   };
 }  // end anonymous namespace
 
@@ -1770,6 +1771,9 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
+  auto deviceConfiguration =
+    GraphGlobalConfiguration::getForFunction(fn, /*removeConfigInst*/false);
+
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
   SmallVector<SILValue, 32> valuesToCheck;
@@ -1871,7 +1875,7 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       if (!TFStrictDeabstraction)
         continue;
 
-      formGraphOp(*opInfo, constants);
+      formGraphOp(*opInfo, constants, deviceConfiguration);
     }
   }
 }
@@ -1881,7 +1885,8 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
 /// the operand/attribute types are incorrect.
 void TFDeabstraction::
 formGraphOp(SILTensorOpInfo &opInfo,
-            DenseMap<SILValue, SymbolicValue> &constants) {
+            DenseMap<SILValue, SymbolicValue> &constants,
+            GraphGlobalConfiguration &deviceConfig) {
   auto *inst = opInfo.inst;
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
@@ -1897,6 +1902,9 @@ formGraphOp(SILTensorOpInfo &opInfo,
   std::string opName = opInfo.opName.str();
   SmallVector<SILValue, 4> inputs;
   SmallVector<GraphOperationAttribute, 4> attributes;
+
+  // Find the device attribute specified for the instruction if present.
+  StringRef opDevice;
 
   for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
@@ -1972,6 +1980,18 @@ formGraphOp(SILTensorOpInfo &opInfo,
     auto attrIdentifier = context.getIdentifier(attrName);
     attributes.push_back({ attrIdentifier, constValue });
 
+    // FIXME: Do we detect and reject duplicate attribute names already?
+
+    // If it's a device attribute, get the device value.
+    if (operandClass.first == DEVICE_ATTR) {
+      if (constValue.getKind() != SymbolicValue::String)
+        return diagnoseInvalidAttr("must be a string");
+      opDevice = constValue.getStringValue();
+      // User code should not specify this pseudo device.
+      if (opDevice == ALL_DEVICES)
+        return diagnoseInvalidAttr("may not use this device name");
+    }
+
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
@@ -1997,6 +2017,21 @@ formGraphOp(SILTensorOpInfo &opInfo,
                                    " floating point, or array thereof");
       break;
     }
+  }
+
+  // Finally, set a device attribute for this if there wasn't already one
+  // specified.
+  if (opInfo.opName == "tfc.scalarToTensor") {
+    if (!opDevice.empty())
+      return diagnoseInvalid("device may not be specified for this op");
+  } else if (opDevice.empty()) {
+    auto deviceID = deviceConfig.chooseDevice(opInfo.opName);
+
+    // TODO: Use integer device ID's instead of strings?
+    auto constValue = SymbolicValue::getString(getDeviceString(deviceID),
+                                               allocator);
+    auto attrIdentifier = context.getIdentifier(DEVICE_ATTR);
+    attributes.push_back({ attrIdentifier, constValue });
   }
 
   // Okay, if we got this far then we have all valid attributes and inputs.
@@ -2049,7 +2084,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
   // are passed through memory, promote them to being simple arguments to
   // make all subsequent analyses and promotion of the tensor operations
   // simpler.
-  opInfo.canonicalizeOperands(/*configuration*/ nullptr);
+  opInfo.canonicalizeOperands(deviceConfig);
 #endif
 }
 

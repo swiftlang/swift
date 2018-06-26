@@ -17,6 +17,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringExtras.h"
@@ -40,6 +41,16 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
               llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+
+
+static llvm::cl::opt<bool> TFTargetTPU(
+    "tf-target-tpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+static llvm::cl::opt<bool> TFTargetGPU(
+    "tf-target-gpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
 
 // For Mac builds, default to saving logging files to /tmp since debugging in
 // Xcode and the REPL is so challenging.
@@ -294,6 +305,28 @@ static SILValue getValueInsideStructInst(SILValue value) {
   return value;
 }
 
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
+  if (!tei || tei->getFieldNo() != 0)
+    return false;
+
+  auto *apply = dyn_cast<ApplyInst>(tei->getOperand());
+  if (!apply) return false;
+  auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
+  if (!callee) return false;
+
+  auto calleeName = callee->getReferencedFunction()->getName();
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays.
+  if (!calleeName.contains("_allocateUninitialized"))
+    return false;
+
+  auto numElements = getValueInsideStructInst(apply->getOperand(1));
+  auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
+  return ili && ili->getValue() == 0;
+}
+
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
 /// the value is not an array, this returns false.  Otherwise it decodes the
@@ -308,6 +341,16 @@ static bool decodeArrayElements(SILValue value,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
   elementType = getArrayElementType(value->getType().getASTType());
   if (!elementType) return false;
+
+  // Handle zero element pattern.
+  if (auto *tei = dyn_cast<TupleExtractInst>(value))
+    if (isZeroElementArrayAlloc(tei)) {
+      if (arrayInsts) {
+        arrayInsts->insert(tei);
+        arrayInsts->insert(tei->getOperand()->getDefiningInstruction());
+      }
+      return true;
+    }
 
   // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
@@ -674,6 +717,11 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       return si;
     }
   }
+
+  // Handle a call to allocate zero elements.
+  if (auto *tei = dyn_cast<TupleExtractInst>(v))
+    if (isZeroElementArrayAlloc(tei))
+      return tei;
 
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
@@ -1368,8 +1416,8 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Remove this when deabstraction has subsumed it.
-SILInstruction *SILTensorOpInfo::canonicalizeOperands(
-    GraphGlobalConfiguration *configuration) {
+SILInstruction *SILTensorOpInfo::
+canonicalizeOperands(GraphGlobalConfiguration &configuration) {
   // TODO: Canonicalize metatypes into constants!
 
   SmallVector<SILValue, 8> operands;
@@ -1481,17 +1529,15 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
     changed |= operands[i] != inst->getOperand(i);
 
-  if (configuration) {
-    if (!opDevice.empty()) {
-      // User code should not specify this pseudo device.
-      // FIXME: Issue diagnostics over an invalid device string.
-      assert(opDevice != ALL_DEVICES);
-    } else {
-      changed = true;
-    }
-    configuration->handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
-                                         operands, name);
+  if (!opDevice.empty()) {
+    // User code should not specify this pseudo device.
+    // FIXME: Issue diagnostics over an invalid device string.
+    assert(opDevice != ALL_DEVICES);
+  } else {
+    changed = true;
   }
+  configuration.handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
+                                      operands, name);
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)
@@ -1522,6 +1568,130 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   assert(newResult.hasValue() && "Misformed builtin when canonicalizing");
   *this = newResult.getValue();
   return newInst;
+}
+
+//===----------------------------------------------------------------------===//
+// GraphOperationDecoder implementation
+//===----------------------------------------------------------------------===//
+
+/// Return the device attribute associated with `inst`, which is required to
+/// exist.
+StringRef GraphOperationDecoder::getDeviceString() const {
+  auto attr = inst->getAttribute(DEVICE_ATTR);
+  assert(attr.hasValue() && "Tensor op instruction has no device string");
+  return attr.getValue().getStringValue();
+}
+
+/// Decode the name of a graph_op into its TensorFlow op name and a list of
+/// information about the operands.
+StringRef GraphOperationDecoder::
+decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
+  auto name = inst->getName().str();
+  auto pos = name.find(',');
+  auto opName = name.substr(0, pos);
+
+  // TODO: Fill in inputInfo when we support input lists.
+
+  return opName;
+}
+
+/// Given an attribute name like foo$dtype, decode the name and the class.  If
+/// there is no modifier specified, this defaults to OperandClass::Normal.
+std::pair<StringRef, SILTensorOpInfo::OperandClass>
+GraphOperationDecoder::decodeAttributeName(Identifier name) {
+  auto nameStr = name.str();
+  // Figure out what the suffix is (if any).
+  auto dollarLoc = nameStr.find('$');
+
+  auto opClass = OperandClass::Normal;
+  if (dollarLoc != StringRef::npos) {
+    auto suffix = nameStr.drop_front(dollarLoc+1);
+    opClass = SILTensorOpInfo::getOperandClass(suffix).getValue();
+  }
+
+  // Slice the suffix off the attribute name and add the decoded version.
+  return { nameStr.substr(0, dollarLoc), opClass };
+}
+
+
+//===----------------------------------------------------------------------===//
+// Device Partitioning Utilities
+//===----------------------------------------------------------------------===//
+
+/// Scan the specified function, looking for logic that configures the current
+/// graph.
+GraphGlobalConfiguration
+GraphGlobalConfiguration::getForFunction(SILFunction &fn,
+                                         bool removeConfigInst) {
+  DeviceType deviceType = DeviceType::CPU;
+  bool isTPUInfeedEnabled = false;
+
+  SILInstruction *firstFound = nullptr;
+  SmallVector<SILInstruction *, 4> configureInsts;
+  for (auto &bb : fn) {
+    for (auto &inst : bb) {
+      // Scan for the device configuration ops if present.
+      auto tfopInfo = SILTensorOpInfo::decode(&inst);
+      if (!tfopInfo) continue;
+      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
+                        tfopInfo->opName == "tfc.configureGPU";
+      if (!isConfigOp) continue;
+
+      configureInsts.push_back(&inst);
+
+      // If we found one, make sure we don't have more than one.
+      if (firstFound) {
+        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
+                 diag::tf_multiple_device);
+        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
+                 diag::tf_multiple_device_prev);
+        continue;
+      }
+
+      // Otherwise, remember this one and decode it.
+      firstFound = &inst;
+
+      // Eventually we'll support multiple different configuration ops, so
+      // we recheck the opcode here.
+      if (tfopInfo->opName == "tfc.configureTPU") {
+        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
+        deviceType = DeviceType::TPU;
+        auto infeedEnabled =
+          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+      } else {
+        assert(tfopInfo->opName == "tfc.configureGPU" &&
+               "unknown device configuration op");
+        deviceType = DeviceType::GPU;
+      }
+    }
+  }
+
+  // If the program didn't specify, fall back to the command line option.
+  if (!firstFound) {
+    // At most one of these test-only flags should be set.
+    // FIXME: Change this to a mutually exclusive flag setting an enum.
+    assert(!TFTargetTPU || !TFTargetGPU);
+    if (TFTargetTPU)
+      deviceType = DeviceType::TPU;
+    if (TFTargetGPU)
+      deviceType = DeviceType::GPU;
+  } else if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "Targeting device " << getDeviceString(deviceType)
+          << " for accelerator program, based on config: \n";
+    firstFound->print(*outs);
+  }
+
+  // These instructions are not relevant to later compiler passes in TFPartition
+  // and TFLowerGraph. Removing them so that the later passes need not deal with
+  // this special builtin type.
+  if (removeConfigInst) {
+    for (auto *configureInst : configureInsts) {
+      assert(!configureInst->hasUsesOfAnyResult());
+      recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+    }
+  }
+  return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
 }
 
 //===----------------------------------------------------------------------===//
