@@ -170,6 +170,3 @@ extension CollectionOfOne : CustomReflectable {
     return Mirror(self, children: ["element": _element])
   }
 }
-
-@available(*,deprecated: 4.2,renamed: "CollectionOfOne.Iterator")
-public typealias IteratorOverOne<T> = CollectionOfOne<T>.Iterator

@@ -4003,20 +4003,6 @@ extension Set {
     return remove(at: startIndex)
   }
 
-  @inlinable
-  @available(swift, obsoleted: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
-  }
-
   /// The total number of elements that the set can contain without
   /// allocating new storage.
   @inlinable // FIXME(sil-serialize-all)

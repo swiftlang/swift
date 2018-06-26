@@ -749,39 +749,6 @@ extension Sequence {
     return try _compactMap(transform)
   }
 
-  /// Returns an array containing the non-`nil` results of calling the given
-  /// transformation with each element of this sequence.
-  ///
-  /// Use this method to receive an array of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an optional `Int` value.
-  ///
-  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  ///
-  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
-  ///     // [1, 2, nil, nil, 5]
-  ///
-  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
-  ///     // [1, 2, 5]
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   sequence as its argument and returns an optional value.
-  /// - Returns: An array of the non-`nil` results of calling `transform`
-  ///   with each element of the sequence.
-  ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @inline(__always)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) rethrows -> [ElementOfResult] {
-    return try _compactMap(transform)
-  }
-
   // The implementation of flatMap accepting a closure with an optional result.
   // Factored out into a separate functions in order to be used in multiple
   // overloads.

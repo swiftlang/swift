@@ -667,9 +667,6 @@ extension UnsafeMutableBufferPointer {
   }
 }
 
-@available(*, deprecated, renamed: "UnsafeBufferPointer.Iterator")
-public typealias UnsafeBufferPointerIterator<T> = UnsafeBufferPointer<T>.Iterator
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

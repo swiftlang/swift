@@ -124,7 +124,7 @@ extension String {
     public func index(after i: Index) -> Index {
       let offset = _toCoreIndex(i)
       let length: Int = _visitGuts(_guts, args: offset,
-        ascii: { _ -> Int in return 1 },
+        ascii: { (_,_) -> Int in return 1 },
         utf16: { utf16, offset in
           return utf16.unicodeScalarWidth(startingAt: offset) },
         opaque: { opaque, offset in
@@ -140,7 +140,7 @@ extension String {
     public func index(before i: Index) -> Index {
       let offset = _toCoreIndex(i)
       let length: Int = _visitGuts(_guts, args: offset,
-        ascii: { _ -> Int in return 1 },
+        ascii: { (_,_) -> Int in return 1 },
         utf16: { utf16, offset in
           return utf16.unicodeScalarWidth(endingAt: offset) },
         opaque: { opaque, offset in
@@ -554,46 +554,6 @@ extension String.UnicodeScalarView : CustomReflectable {
   }
 }
 
-extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
-
-// backward compatibility for index interchange.
-extension String.UnicodeScalarView {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    return index(after: i!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(_ i: Index?,  offsetBy n: Int) -> Index {
-    return index(i!, offsetBy: n)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> Int {
-    return distance(from: i!, to: j!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.Scalar {
-    return self[i!]
-  }
-}
-
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,
 ///
@@ -609,35 +569,7 @@ extension String.UnicodeScalarView {
 
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4)
-  public subscript(r: Range<Index>) -> String.UnicodeScalarView.SubSequence {
-    return String.UnicodeScalarView.SubSequence(self, _bounds: r)
-  }
-
-  /// Accesses the Unicode scalar values in the given range.
-  ///
-  /// The example below uses this subscript to access the scalar values up
-  /// to, but not including, the first comma (`","`) in the string.
-  ///
-  ///     let str = "All this happened, more or less."
-  ///     let i = str.unicodeScalars.firstIndex(of: ",")!
-  ///     let substring = str.unicodeScalars[str.unicodeScalars.startIndex ..< i]
-  ///     print(String(substring))
-  ///     // Prints "All this happened"
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  @available(swift, obsoleted: 4)
-  public subscript(r: Range<Index>) -> String.UnicodeScalarView {
-    let rawSubRange: Range<Int> =
-      _toCoreIndex(r.lowerBound)..<_toCoreIndex(r.upperBound)
-    return String.UnicodeScalarView(
-      _guts._extractSlice(rawSubRange),
-      coreOffset: r.lowerBound.encodedOffset)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UnicodeScalarView {
-    return self[bounds.relative(to: self)]
+  public subscript(bounds: Range<Index>) -> String.UnicodeScalarView.SubSequence {
+    return String.UnicodeScalarView.SubSequence(self, _bounds: bounds)
   }
 }

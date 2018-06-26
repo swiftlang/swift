@@ -10,22 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements, with forward
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias IndexableBase = Collection
-
-/// A type that provides subscript access to its elements, with forward index
-/// traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias Indexable = Collection
-
 /// A type that iterates over a collection using its indices.
 ///
 /// The `IndexingIterator` type is the default iterator for any collection that
@@ -826,9 +810,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   __consuming func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Element?
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  typealias IndexDistance = Int
 }
 
 /// Default implementation for forward collections.
@@ -1801,37 +1782,5 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
-  }
-}
-
-extension Collection {
-  // FIXME: <rdar://problem/34142121>
-  // This typealias should be removed as it predates the source compatibility
-  // guarantees of Swift 3, but it cannot due to a bug.
-  @available(*, unavailable, renamed: "Iterator")
-  public typealias Generator = Iterator
-
-  @available(swift, deprecated: 3.2, renamed: "Element")
-  public typealias _Element = Element
-
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T) -> Index {
-    return index(i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T) {
-    return formIndex(&i, offsetBy: Int(n))
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func index<T: BinaryInteger>(_ i: Index, offsetBy n: T, limitedBy limit: Index) -> Index? {
-    return index(i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func formIndex<T: BinaryInteger>(_ i: inout Index, offsetBy n: T, limitedBy limit: Index) -> Bool {
-    return formIndex(&i, offsetBy: Int(n), limitedBy: limit)
-  }
-  @available(*, deprecated, message: "all index distances are now of type Int")
-  public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
-    return numericCast(distance(from: start, to: end) as Int)
   }
 }

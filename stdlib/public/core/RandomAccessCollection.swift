@@ -12,14 +12,6 @@
 
 /// A collection that supports efficient random-access index traversal.
 ///
-/// In most cases, it's best to ignore this protocol and use the
-/// `RandomAccessCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'RandomAccessCollection' instead")
-public typealias RandomAccessIndexable = RandomAccessCollection
-
-/// A collection that supports efficient random-access index traversal.
-///
 /// Random-access collections can move indices any distance and 
 /// measure the distance between indices in O(1) time. Therefore, the
 /// fundamental difference between random-access and bidirectional collections

@@ -278,7 +278,9 @@ StringTests.test("String/subscript(_:ClosedRange)") {
   expectEqual(s, actual)
 }
 
-StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
+StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1")
+.xfail(.always("Swift 3 versions don't trap: Swift 4 versions will again")) 
+.code {
   let donor = "abcdef"
   let acceptor = "uvw"
 
@@ -289,7 +291,9 @@ StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/1") {
   _ = acceptor[r]
 }
 
-StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2") {
+StringTests.test("ForeignIndexes/subscript(Range)/OutOfBoundsTrap/2")
+.xfail(.always("Swift 3 versions don't trap: Swift 4 versions will again"))
+.code {
   let donor = "abcdef"
   let acceptor = "uvw"
 

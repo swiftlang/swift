@@ -307,9 +307,3 @@ extension LazyCollectionProtocol
     return ReversedCollection(_base: elements).lazy
   }
 }
-
-// @available(*, deprecated, renamed: "ReversedCollection")
-public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = ReversedCollection<T>
-
-// @available(*, deprecated, renamed: "ReversedCollection.Index")
-public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>

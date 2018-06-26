@@ -127,8 +127,3 @@ extension Collection where Indices == DefaultIndices<Self> {
       endIndex: self.endIndex)
   }
 }
-
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "DefaultIndices")
-public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection
