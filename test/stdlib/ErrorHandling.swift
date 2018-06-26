@@ -6,6 +6,7 @@
 //
 
 import StdlibUnittest
+import StdlibCollectionUnittest
 
 
 var NoisyCount = 0
@@ -280,8 +281,8 @@ ErrorHandlingTests.test("ErrorHandling/operators") {
 
 ErrorHandlingTests.test("ErrorHandling/Sequence map") {
   let initialCount = NoisyCount
-  let sequence = AnySequence([1, 2, 3])
   for throwAtCount in 0...3 {
+    let sequence = MinimalSequence(elements: [1, 2, 3])
     var loopCount = 0
     do {
       let result: [Noisy] = try sequence.map { _ in
