@@ -165,7 +165,7 @@ public extension Tensor {
   /// scalars).
   @_inlineable @inline(__always)
   init(_ elements: [Tensor]) {
-    self = Raw.pack(values: elements)
+    self = Raw.pack(elements)
   }
 
   /// Creates a 1D tensor in from contiguous scalars in row-major order.
@@ -398,7 +398,7 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    tensor = #tfop("Pack", elements)
+    tensor = Raw.pack(elements)
   }
 }
 
@@ -413,7 +413,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: #tfop("Pack", elements))
+    self.init(handle: Raw.pack(elements))
   }
 
   /// Creates a tensor initialized with the given elements.
