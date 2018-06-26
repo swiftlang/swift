@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -verify %s | %FileCheck %s
 
-// TODO: Enable -verify mode.
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -O -emit-sil -Xllvm -tf-strict-deabstraction -DSTRICT_DA %s  | %FileCheck %s -check-prefix=STRICTDA
 import TensorFlow
 
 // This test is intended to verify that all of the operations end up in the

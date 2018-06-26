@@ -284,6 +284,28 @@ static SILValue getValueInsideStructInst(SILValue value) {
   return value;
 }
 
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
+  if (!tei || tei->getFieldNo() != 0)
+    return false;
+
+  auto *apply = dyn_cast<ApplyInst>(tei->getOperand());
+  if (!apply) return false;
+  auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
+  if (!callee) return false;
+
+  auto calleeName = callee->getReferencedFunction()->getName();
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays.
+  if (!calleeName.contains("_allocateUninitialized"))
+    return false;
+
+  auto numElements = getValueInsideStructInst(apply->getOperand(1));
+  auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
+  return ili && ili->getValue() == 0;
+}
+
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
 /// the value is not an array, this returns false.  Otherwise it decodes the
@@ -298,6 +320,16 @@ static bool decodeArrayElements(SILValue value,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
   elementType = getArrayElementType(value->getType().getSwiftRValueType());
   if (!elementType) return false;
+
+  // Handle zero element pattern.
+  if (auto *tei = dyn_cast<TupleExtractInst>(value))
+    if (isZeroElementArrayAlloc(tei)) {
+      if (arrayInsts) {
+        arrayInsts->insert(tei);
+        arrayInsts->insert(tei->getOperand()->getDefiningInstruction());
+      }
+      return true;
+    }
 
   // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
@@ -671,6 +703,11 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       return si;
     }
   }
+
+  // Handle a call to allocate zero elements.
+  if (auto *tei = dyn_cast<TupleExtractInst>(v))
+    if (isZeroElementArrayAlloc(tei))
+      return tei;
 
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
