@@ -150,6 +150,12 @@ preset=buildbot_incremental,tools=RA,stdlib=RD,smoketest=macosx,single-thread
 @swift-ci Please test macOS with preset
 
 ```
+### Build Swift Toolchain
+
+Platform       | Comment | Check Status
+------------   | ------- | ------------
+macOS platform | @swift-ci Please Build Toolchain macOS Platform| Swift Build Toolchain macOS Platform
+Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Linux Platform
 
 ### Testing Compiler Performance
 
