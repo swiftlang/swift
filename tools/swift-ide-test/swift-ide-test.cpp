@@ -1854,6 +1854,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     // Get the (sub)module to print.
     auto *M = getModuleByFullName(Context, ModuleToPrint);
     if (!M) {
+      llvm::errs() << "error: could not find module '" << ModuleToPrint
+                   << "'\n";
       ExitCode = 1;
       continue;
     }
@@ -1873,6 +1875,8 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
     if (ModuleName.size() > 1) {
       M = getModuleByFullName(Context, ModuleName[0]);
       if (!M) {
+        llvm::errs() << "error: could not find module '" << ModuleName[0]
+                     << "'\n";
         ExitCode = 1;
         continue;
       }
