@@ -302,7 +302,7 @@ extension UInt64 : AccelerableByTensorFlow {
 
 @_fixed_layout
 public struct BFloat16 {
-  @usableFromInline var data: Int16
+  @usableFromInline var data: Int16 = 0
   private init() {}
 }
 
