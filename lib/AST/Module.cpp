@@ -689,8 +689,11 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol) {
       auto subMap = type->getContextSubstitutionMap(this, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
-      return ProtocolConformanceRef(result);
+      if (auto result = ctx.getSpecializedConformance(type, conformance,
+                                                      subMap)) {
+        return ProtocolConformanceRef(result);
+      }
+      return None;
     }
   }
 
