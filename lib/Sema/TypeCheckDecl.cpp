@@ -1311,6 +1311,16 @@ static void recordSelfContextType(AbstractFunctionDecl *func) {
 
 namespace {
 
+class AccessControlChecker {
+  TypeChecker &TC;
+
+public:
+  explicit AccessControlChecker(TypeChecker &TC) : TC(TC) {}
+
+  void checkAccessControl(Decl *D);
+  void checkUsableFromInline(Decl *D);
+};
+
 class AccessScopeChecker {
   const SourceFile *File;
   bool TreatUsableFromInlineAsPublic;
@@ -1985,7 +1995,7 @@ static void checkGenericParamAccess(TypeChecker &TC,
 /// declarations that are less visible than the declaration itself.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
-static void checkAccessControl(TypeChecker &TC, const Decl *D) {
+void AccessControlChecker::checkAccessControl(Decl *D) {
   if (D->isInvalid() || D->isImplicit())
     return;
 
@@ -2565,7 +2575,7 @@ static void checkAccessControl(TypeChecker &TC, const Decl *D) {
 /// declarations that are not @usableFromInline or public.
 ///
 /// \p D must be a ValueDecl or a Decl that can appear in a type context.
-static void checkUsableFromInline(TypeChecker &TC, const Decl *D) {
+void AccessControlChecker::checkUsableFromInline(Decl *D) {
   if (!TC.Context.isSwiftVersionAtLeast(4, 2))
     return;
 
@@ -4983,8 +4993,10 @@ public:
     }
 
     TC.checkDeclAttributes(PBD);
-    checkAccessControl(TC, PBD);
-    checkUsableFromInline(TC, PBD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(PBD);
+    ACC.checkUsableFromInline(PBD);
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
@@ -4996,8 +5008,10 @@ public:
   void visitSubscriptDecl(SubscriptDecl *SD) {
     TC.validateDecl(SD);
     TC.checkDeclAttributes(SD);
-    checkAccessControl(TC, SD);
-    checkUsableFromInline(TC, SD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(SD);
+    ACC.checkUsableFromInline(SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -5005,8 +5019,10 @@ public:
 
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
-    checkAccessControl(TC, TAD);
-    checkUsableFromInline(TC, TAD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(TAD);
+    ACC.checkUsableFromInline(TAD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
@@ -5020,8 +5036,9 @@ public:
                   proto->getName());
     }
 
-    checkAccessControl(TC, AT);
-    checkUsableFromInline(TC, AT);
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(AT);
+    ACC.checkUsableFromInline(AT);
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -5089,8 +5106,10 @@ public:
       visit(member);
 
     TC.checkDeclAttributes(ED);
-    checkAccessControl(TC, ED);
-    checkUsableFromInline(TC, ED);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(ED);
+    ACC.checkUsableFromInline(ED);
 
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
@@ -5119,8 +5138,10 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(SD);
-    checkAccessControl(TC, SD);
-    checkUsableFromInline(TC, SD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(SD);
+    ACC.checkUsableFromInline(SD);
 
     SD->getAllConformances();
 
@@ -5351,8 +5372,10 @@ public:
     CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
-    checkAccessControl(TC, CD);
-    checkUsableFromInline(TC, CD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(CD);
+    ACC.checkUsableFromInline(CD);
 
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
@@ -5398,8 +5421,9 @@ public:
 
     TC.checkDeclAttributes(PD);
 
-    checkAccessControl(TC, PD);
-    checkUsableFromInline(TC, PD);
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(PD);
+    ACC.checkUsableFromInline(PD);
 
     TC.checkInheritanceClause(PD);
 
@@ -5473,8 +5497,10 @@ public:
 
   void visitFuncDecl(FuncDecl *FD) {
     TC.validateDecl(FD);
-    checkAccessControl(TC, FD);
-    checkUsableFromInline(TC, FD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(FD);
+    ACC.checkUsableFromInline(FD);
 
     if (FD->hasBody()) {
       // Record the body.
@@ -6809,8 +6835,10 @@ public:
   void visitEnumElementDecl(EnumElementDecl *EED) {
     TC.validateDecl(EED);
     TC.checkDeclAttributes(EED);
-    checkAccessControl(TC, EED);
-    checkUsableFromInline(TC, EED);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(EED);
+    ACC.checkUsableFromInline(EED);
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
@@ -6952,8 +6980,10 @@ public:
     }
 
     TC.checkDeclAttributes(CD);
-    checkAccessControl(TC, CD);
-    checkUsableFromInline(TC, CD);
+
+    AccessControlChecker ACC(TC);
+    ACC.checkAccessControl(CD);
+    ACC.checkUsableFromInline(CD);
 
     if (CD->hasBody() && !CD->isMemberwiseInitializer()) {
       TC.definedFunctions.push_back(CD);
