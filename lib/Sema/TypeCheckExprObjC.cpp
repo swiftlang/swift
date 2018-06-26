@@ -317,8 +317,10 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     // Handle property references.
     if (auto var = dyn_cast<VarDecl>(found)) {
       validateDecl(var);
-      if (var->isInvalid() || !var->hasInterfaceType())
+      if (var->isInvalid() || !var->hasInterfaceType() ||
+          var->getInterfaceType()->hasError()) {
         return None;
+      }
 
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
