@@ -273,26 +273,6 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 }
 
-/// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
-/// it into a TensorHandle<T> type.
-static SILType convertToTensorValueType(Type ty, const ASTContext& ctx) {
-  assert(isValidTensorFlowElementType(ty));
-  auto decl = ctx.getTensorHandleDecl();
-  auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
-
-  return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
-}
-
-/// If the specified type is a TensorFlow value type, return it.  Otherwise, it
-/// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
-static SILType convertToTensorValueType(SILType ty) {
-  // If this is already TensorHandle<T>, return it.
-  if (isTensorFlowValue(ty))
-    return ty;
-
-  return convertToTensorValueType(ty.getASTType(), ty.getASTContext());
-}
-
 /// Returns true when this function must be entirely lowered to a TF graph
 /// function, with no host-side logic remaining (i.e., no sends/recvs, and no
 /// start/stop tensor computation on the host side). In other words, this
@@ -2091,7 +2071,7 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
   }
 
   SILType remapType(SILType ty) {
-    return convertToTensorValueType(ty);
+    return convertElementTypeToTensorValueType(ty);
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst);
@@ -2179,7 +2159,7 @@ void PartitionCloner::initBlock(SILBasicBlock *BB) {
   // arguments.
   if (BB == FP.tensorStartPoint->getParent()) {
     for (auto arg : FP.tensorFnArguments) {
-      auto argTy = convertToTensorValueType(arg->getType());
+      auto argTy = convertElementTypeToTensorValueType(arg->getType());
       auto newArg = newBB->createFunctionArgument(argTy);
       ValueMap[arg] = SILValue(newArg);
     }
@@ -2559,7 +2539,7 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
   auto tensorHandleType =
-      convertToTensorValueType(valueTy).getASTType();
+      convertElementTypeToTensorValueType(valueTy).getASTType();
   auto metatypeType =
       MetatypeType::get(tensorHandleType, MetatypeRepresentation::Thick)
           ->getCanonicalType();
@@ -2646,7 +2626,7 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       scalarValueTy = value->getType().getASTType();
     }
     tensorValueTy =
-        convertToTensorValueType(scalarValueTy, ctx).getASTType();
+        convertElementTypeToTensorValueType(scalarValueTy, ctx).getASTType();
 
     // Convert the scalar to a tensor value.
     auto metatypeType =
@@ -2708,7 +2688,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
   SmallVector<ProtocolConformance *, 1> conformances;
   auto tensorValueTy = convertToTensorValueType(value->getType());
-  auto nominal = tensorValueTy.getASTType()->getAnyNominal();
+  auto nominal = tensorValueTy.getSwiftRValueType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
   if (!lookup) {
@@ -3762,7 +3742,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   // Calculate the parameter list for the new function.
   SmallVector<SILParameterInfo, 4> params;
   for (auto v : tensorFnArguments) {
-    auto argTy = convertToTensorValueType(v->getType());
+    auto argTy = convertElementTypeToTensorValueType(v->getType());
     params.push_back(SILParameterInfo(argTy.getASTType(),
                                       ParameterConvention::Direct_Unowned));
   }
