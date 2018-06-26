@@ -398,7 +398,7 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @_inlineable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    tensor = Raw.pack(elements)
+    tensor = #tfop("Pack", elements)
   }
 }
 
@@ -413,7 +413,7 @@ extension Tensor : ExpressibleByArrayLiteral {
   internal init(
     tensorElementLiterals elements: [TensorElementLiteral<Scalar>]
   ) {
-    self.init(handle: Raw.pack(elements))
+    self.init(handle: #tfop("Pack", elements))
   }
 
   /// Creates a tensor initialized with the given elements.
