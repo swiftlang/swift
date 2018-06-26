@@ -248,10 +248,10 @@ class Remangler {
   }
 
   void manglePureProtocol(Node *Proto) {
+    Proto = skipType(Proto);
     if (mangleStandardSubstitution(Proto))
       return;
     
-    Proto = skipType(Proto);
     mangleChildNodes(Proto);
   }
 
