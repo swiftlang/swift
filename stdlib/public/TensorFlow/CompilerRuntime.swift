@@ -415,6 +415,9 @@ internal func dumpCTensorHandleContent(
   case TF_FLOAT: dumpTensorContent(inputTensorHandle, Float.self)
   case TF_DOUBLE: dumpTensorContent(inputTensorHandle, Double.self)
   case TF_BOOL: dumpTensorContent(inputTensorHandle, Bool.self)
+  // TODO: Handle `TF_BFloat16`? BFloat16 does not have a host-side
+  // representation and cannot be printed directly. Consider calling into TF
+  // runtime.
   default: fatalError("Unsupported dtype \(dType)")
   }
 }
