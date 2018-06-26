@@ -5394,9 +5394,15 @@ bool SILParserTUState::parseDeclSILStage(Parser &P) {
 static Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
                                             SILLinkage GlobalLinkage,
                                             SILType GlobalType, Parser &P) {
+  // Create a set of DemangleOptions to produce the global variable's
+  // identifier, which is used as a search key in the declaration context.
+  Demangle::DemangleOptions demangleOpts;
+  demangleOpts.QualifyEntities = false;
+  demangleOpts.ShowPrivateDiscriminators = false;
+  demangleOpts.DisplayEntityTypes = false;
   std::string GlobalDeclName = Demangle::demangleSymbolAsString(
-      GlobalName.str(),
-      Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+    GlobalName.str(), demangleOpts);
+
   SmallVector<ValueDecl *, 4> CurModuleResults;
   P.SF.getParentModule()->lookupValue(
       {}, P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
