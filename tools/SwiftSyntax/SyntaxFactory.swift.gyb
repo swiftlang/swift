@@ -58,8 +58,7 @@ public enum SyntaxFactory {
 %         child_params.append("%s: %s" % (child.swift_name, param_type))
 %     child_params = ', '.join(child_params)
   public static func make${node.syntax_kind}(${child_params}) -> ${node.name} {
-    let data = SyntaxData(raw: RawSyntax(kind: .${node.swift_syntax_kind},
-                          layout: [
+    let layout: [RawSyntax?] = [
 %     for child in node.children:
 %       if child.is_optional:
       ${child.swift_name}?.data.raw ?? ${make_missing_swift_child(child)},
@@ -67,15 +66,18 @@ public enum SyntaxFactory {
       ${child.swift_name}.data.raw,
 %       end
 %     end
-    ], presence: .present))
+    ]
+    let raw = RawSyntax(kind: SyntaxKind.${node.swift_syntax_kind},
+                        layout: layout, presence: SourcePresence.present)
+    let data = SyntaxData(raw: raw)
     return ${node.name}(root: data, data: data)
   }
 %   elif node.is_syntax_collection():
   public static func make${node.syntax_kind}(
     _ elements: [${node.collection_element_type}]) -> ${node.name} {
-    let raw = RawSyntax(kind: .${node.swift_syntax_kind},
+    let raw = RawSyntax(kind: SyntaxKind.${node.swift_syntax_kind},
                         layout: elements.map { $0.data.raw },
-                        presence: .present)
+                        presence: SourcePresence.present)
     let data = SyntaxData(raw: raw)
     return ${node.name}(root: data, data: data)
   }

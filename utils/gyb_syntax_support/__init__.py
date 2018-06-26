@@ -77,11 +77,11 @@ def make_missing_swift_child(child):
         tok_kind = token.swift_kind() if token else "unknown"
         if not token or not token.text:
             tok_kind += '("")'
-        return 'RawSyntax.missingToken(.%s)' % tok_kind
+        return 'RawSyntax.missingToken(TokenKind.%s)' % tok_kind
     else:
         missing_kind = "unknown" if child.syntax_kind == "Syntax" \
                        else child.swift_syntax_kind
-        return 'RawSyntax.missing(.%s)' % missing_kind
+        return 'RawSyntax.missing(SyntaxKind.%s)' % missing_kind
 
 
 def create_node_map():
