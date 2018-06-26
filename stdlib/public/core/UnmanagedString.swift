@@ -12,7 +12,10 @@
 
 import SwiftShims
 
+@usableFromInline
 internal typealias _UnmanagedASCIIString = _UnmanagedString<UInt8>
+
+@usableFromInline
 internal typealias _UnmanagedUTF16String = _UnmanagedString<UTF16.CodeUnit>
 
 @inlinable
@@ -142,9 +145,12 @@ extension _UnmanagedString : RandomAccessCollection {
   // requires that SubSequence share indices with the original collection.
   // Therefore, we use pointers as the index type; however, we also provide
   // integer subscripts as a convenience, in a separate extension below.
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Index = UnsafePointer<CodeUnit>
   internal typealias IndexDistance = Int
   internal typealias Indices = Range<Index>
+
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias SubSequence = _UnmanagedString
 
   @inlinable

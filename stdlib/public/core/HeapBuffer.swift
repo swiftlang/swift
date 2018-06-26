@@ -25,6 +25,7 @@ internal protocol _HeapBufferHeader_ {
 @_fixed_layout // FIXME(sil-serialize-all)
 @usableFromInline
 internal struct _HeapBufferHeader<T> : _HeapBufferHeader_ {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Value = T
   @inlinable // FIXME(sil-serialize-all)
   internal init(_ value: T) { self.value = value }

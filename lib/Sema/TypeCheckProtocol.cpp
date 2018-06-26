@@ -2778,6 +2778,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                        requiredAccess,
                        protoAccessScope.accessLevelForDiagnostics(),
                        proto->getName());
+        if (auto *decl = dyn_cast<AbstractFunctionDecl>(witness)) {
+          auto isMemberwiseInitializer =
+              decl->getBodyKind() ==
+              AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+          if (isMemberwiseInitializer) {
+            return;
+          }
+        }
         auto fixItDiag = diags.diagnose(witness, diag::witness_fix_access,
                                         witness->getDescriptiveKind(),
                                         requiredAccess);
