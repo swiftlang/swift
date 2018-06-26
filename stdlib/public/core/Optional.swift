@@ -269,7 +269,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
 
 extension Optional : CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     switch self {
     case .some(let value):
@@ -284,7 +283,6 @@ extension Optional : CustomDebugStringConvertible {
 }
 
 extension Optional : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     switch self {
     case .some(let value):

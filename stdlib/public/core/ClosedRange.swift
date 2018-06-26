@@ -412,7 +412,6 @@ extension ClosedRange : CustomStringConvertible {
 
 extension ClosedRange : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
     + "...\(String(reflecting: upperBound)))"
@@ -420,7 +419,6 @@ extension ClosedRange : CustomDebugStringConvertible {
 }
 
 extension ClosedRange : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])

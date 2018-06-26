@@ -278,14 +278,12 @@ public struct StaticString
   }
 
   /// A textual representation of the static string, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return self.description.debugDescription
   }
 }
 
 extension StaticString {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(reflecting: description)
   }

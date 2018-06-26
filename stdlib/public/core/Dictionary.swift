@@ -1348,7 +1348,6 @@ extension Dictionary {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Keys")
     }
@@ -1419,7 +1418,6 @@ extension Dictionary {
       return _makeCollectionDescription(for: self, withTypeName: nil)
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return _makeCollectionDescription(for: self, withTypeName: "Dictionary.Values")
     }
@@ -1551,7 +1549,6 @@ extension Dictionary: CustomStringConvertible, CustomDebugStringConvertible {
 
   /// A string that represents the contents of the dictionary, suitable for
   /// debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _makeDescription()
   }
@@ -4661,7 +4658,6 @@ public struct DictionaryIterator<Key: Hashable, Value>: IteratorProtocol {
 
 extension DictionaryIterator: CustomReflectable {
   /// A mirror that reflects the iterator.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -4671,7 +4667,6 @@ extension DictionaryIterator: CustomReflectable {
 
 extension Dictionary: CustomReflectable {
   /// A mirror that reflects the dictionary.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let style = Mirror.DisplayStyle.dictionary
     return Mirror(self, unlabeledChildren: self, displayStyle: style)
