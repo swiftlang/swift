@@ -671,7 +671,7 @@ public extension AccelerableByTensorFlow {
   /// Convert to a tensor with the specified rank, with all dimensions equal to
   /// 1.
   @_inlineable @inline(__always)
-  func makeTensor(withRank rank: Int32) -> Tensor<Self> {
+  func makeTensor(rank: Int32) -> Tensor<Self> {
     return Raw.fill(
       dims: Tensor<Int32>(ones: TensorShape(rank)),
       value: Tensor(self))
