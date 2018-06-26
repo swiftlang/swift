@@ -772,13 +772,15 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
   }
 
   if (generic_type_result._decls.size() != 1 ||
-      generic_type_result._types.size() != 1 ||
-      template_types_result._types.empty())
+      generic_type_result._types.size() != 1)
     return;
 
   auto *genericTypeAlias =
       cast<TypeAliasDecl>(generic_type_result._decls.front());
   GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  if (template_types_result._types.size() != signature->getGenericParams().size())
+    return;
+
   // FIXME: handle conformances.
   SubstitutionMap subMap;
   if (signature)
