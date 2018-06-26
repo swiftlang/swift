@@ -300,6 +300,7 @@ extension UInt64 : AccelerableByTensorFlow {
   }
 }
 
+@_fixed_layout
 public struct BFloat16 {
   private init() {}
 }
