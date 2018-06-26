@@ -146,6 +146,10 @@ void SyntaxClassifier::visit(TokenSyntax TokenNode) {
     if (NativeClassification.hasValue()) {
       Classification = NativeClassification.getValue();
     }
+    if (Classification == SyntaxClassification::None &&
+        TokenNode.getTokenKind() == tok::identifier) {
+      Classification = SyntaxClassification::Identifier;
+    }
   }
 
   assert(ClassifiedTokens.count(TokenNode.getId()) == 0 &&
