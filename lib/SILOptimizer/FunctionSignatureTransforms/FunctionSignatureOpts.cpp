@@ -506,6 +506,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewF->setUnqualifiedOwnership();
   }
 
+  if (F->isSpecialization()) {
+    NewF->setSpecializationInfo(F->getSpecializationInfo());
+  }
+
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);
 
