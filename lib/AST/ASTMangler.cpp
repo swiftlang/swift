@@ -1045,6 +1045,12 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   auto decl = dc->getInnermostDeclarationDeclContext();
   if (!decl) return 0;
 
+  // For an extension declaration, use the nominal type declaration instead.
+  // This is important when extending a nested type, because the generic
+  // parameters will line up with the (semantic) nesting of the nominal type.
+  if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+
   // Handle the generic arguments of the parent.
   unsigned currentGenericParamIdx =
     appendBoundGenericArgs(decl->getDeclContext(), subs, isFirstArgList);
