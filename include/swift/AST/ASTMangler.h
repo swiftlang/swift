@@ -197,6 +197,15 @@ protected:
 
   void appendBoundGenericArgs(Type type, bool &isFirstArgList);
 
+  /// Append the bound generics arguments for the given declaration context
+  /// based on a complete substitution map.
+  ///
+  /// \returns the number of generic parameters that were emitted
+  /// thus far.
+  unsigned appendBoundGenericArgs(DeclContext *dc,
+                                  SubstitutionMap subs,
+                                  bool &isFirstArgList);
+
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
 
