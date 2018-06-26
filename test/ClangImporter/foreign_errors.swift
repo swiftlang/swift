@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library -verify %s -swift-version 3
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -O -parse-as-library -DEMIT_SIL %s -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -O -parse-as-library -DEMIT_SIL %s
 
 // REQUIRES: objc_interop
 
@@ -17,7 +17,7 @@ func test0() {
 func testAndReturnError() throws {
   try ErrorProne.fail()
   try ErrorProne.go()
-  try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+  try ErrorProne.tryAndReturnError(()) // collides with 'try' keyword
 
   ErrorProne.messUpSignatureAndReturnError(nil) // wrong signature
 }
