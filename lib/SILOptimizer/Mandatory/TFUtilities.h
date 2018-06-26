@@ -84,7 +84,7 @@ static const char DEVICE_ATTR[] = "device";
 // other TF ops (e.g. a "Const" op).
 static const char SHAPE_ARRAY_ATTR[] = "__shapes";
 
-static DeviceType OpDeviceType(StringRef device) {
+static DeviceType getOpDeviceType(StringRef device) {
   if (device.str() == DEFAULT_CPU_DEVICE) return DeviceType::CPU;
   if (device.str() == DEFAULT_GPU_DEVICE) return DeviceType::GPU;
   if (device.str() == DEFAULT_TPU_DEVICE) return DeviceType::TPU;
@@ -138,12 +138,13 @@ struct GraphGlobalConfiguration {
   // It cannot contain DeviceType::ALL.
   llvm::SetVector<DeviceType> usedDeviceTypes;
 
-  GraphGlobalConfiguration(DeviceType primaryDeviceType,
-                           bool isTPUInfeedEnabled)
-      : primaryDeviceType(primaryDeviceType),
-        isTPUInfeedEnabled(isTPUInfeedEnabled) {
-    assert(primaryDeviceType != DeviceType::ALL);
-    usedDeviceTypes.insert(primaryDeviceType);
+  /// Return the configuration for the specified function.
+  static GraphGlobalConfiguration getForFunction(SILFunction &fn,
+                                                 bool removeConfigInst);
+
+  void markDeviceUsed(DeviceType device) {
+    if (device != DeviceType::ALL)
+      usedDeviceTypes.insert(device);
   }
 
   // Chooses a device for this tfop, extends `operands` and `newInstName`
@@ -169,10 +170,13 @@ struct GraphGlobalConfiguration {
       return;
     }
 
-    auto chosenDevice = chooseDevice(opType, opDevice);
-    if (chosenDevice != DeviceType::ALL) {
-      usedDeviceTypes.insert(chosenDevice);
-    }
+    DeviceType chosenDevice;
+    if (!opDevice.empty())
+      chosenDevice = getOpDeviceType(opDevice);
+    else
+      chosenDevice = chooseDevice(opType);
+
+    markDeviceUsed(chosenDevice);
 
     // Example output SIL:
     // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
@@ -189,13 +193,11 @@ struct GraphGlobalConfiguration {
         B.createStringLiteral(loc, StringRef(deviceString),
                               StringLiteralInst::Encoding::UTF8);
     operands.push_back(deviceStrInst);
-    newInstName += ",device";
+    newInstName += ',';
+    newInstName += DEVICE_ATTR;
   }
 
- private:
-  DeviceType chooseDevice(StringRef opType, StringRef opDevice) const {
-    if (!opDevice.empty()) return OpDeviceType(opDevice);
-
+  DeviceType chooseDevice(StringRef opType) const {
     if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")
       return DeviceType::CPU;
 
@@ -204,6 +206,15 @@ struct GraphGlobalConfiguration {
     // `opType` -- if that op has no available kernel on `primaryDeviceType`, a
     // different device should be returned.
     return primaryDeviceType;
+  }
+
+private:
+  GraphGlobalConfiguration(DeviceType primaryDeviceType,
+                           bool isTPUInfeedEnabled)
+    : primaryDeviceType(primaryDeviceType),
+    isTPUInfeedEnabled(isTPUInfeedEnabled) {
+    assert(primaryDeviceType != DeviceType::ALL);
+    usedDeviceTypes.insert(primaryDeviceType);
   }
 };
 
@@ -243,7 +254,7 @@ struct GraphGlobalConfiguration {
       NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
       ModuleDecl *module, SILModule &silModule);
 
-  /// Represent information about a TensorFlow operation as represented in SIL
+  /// Holds information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.
   struct SILTensorOpInfo {
     /// The instruction being analyzed.
@@ -324,11 +335,11 @@ struct GraphGlobalConfiguration {
     /// scalars they reference.  This potentially replaces the builtin
     /// instruction, so it returns the right one to use.
     ///
-    /// When `configuration` is non-NULL, also use it to set the TF device for
-    /// the output instruction.
-    // TODO(clattner): Remove this when deabstraction exists.
+    /// This also sets the TF device for the output instruction.
+    ///
+    /// TODO(clattner): Remove this when deabstraction exists.
     SILInstruction *canonicalizeOperands(
-        GraphGlobalConfiguration *configuration);
+                                     GraphGlobalConfiguration &configuration);
 
     /// Return the constant instruction that defines the specified attribute
     /// operand, or null if the defining value isn't a valid constant for an
@@ -377,6 +388,47 @@ struct GraphGlobalConfiguration {
     static SILInstruction *decodeTensorFromScalarsND(ApplyInst *inst);
   };
 
+  /// Holds information about a TensorFlow operation as represented in SIL
+  /// as GraphOperationInst.
+  struct GraphOperationDecoder {
+    /// The instruction being analyzed.
+    GraphOperationInst *inst;
+
+    explicit GraphOperationDecoder(GraphOperationInst *inst) : inst(inst) {}
+
+    /// Return the device attribute associated with `inst`, which is required to
+    /// exist.
+    StringRef getDeviceString() const;
+
+    /// Return the device type for this instruction.
+    DeviceType getDeviceType() const {
+      return getOpDeviceType(getDeviceString());
+    }
+
+    enum InputMarker {
+      /// Scalar input, used by tfc.scalarToTensor only.
+      IM_Scalar,
+      /// Normal tensor, variant or resource input.
+      IM_Normal,
+
+      /// Marker for the start of an input list, has no corresponding operand.
+      IM_InputList,
+
+      /// Element of an input list.
+      IM_InputListElt,
+    };
+
+    /// Decode the name of a graph_op into its TensorFlow op name and a list of
+    /// information about the operands.
+    StringRef decodeName(SmallVectorImpl<InputMarker> &inputInfo);
+
+    /// Given an attribute name like foo$dtype, decode the name and the class.
+    /// If there is no modifier specified, this defaults to
+    /// OperandClass::Normal.
+    static std::pair<StringRef, SILTensorOpInfo::OperandClass>
+    decodeAttributeName(Identifier name);
+
+  };
 
   //===--------------------------------------------------------------------===//
   // Source location helpers
