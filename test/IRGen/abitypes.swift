@@ -80,6 +80,7 @@ class Foo {
   // x86_64-macosx: [[SELFCAST:%.*]] = bitcast [[SELF]]* %2 to i8*
   // x86_64-macosx: [[RESULT:%.*]] = call float bitcast (void ()* @objc_msgSend to float (i8*, i8*,  <2 x float>, <2 x float>)*)(i8* [[SELFCAST]], i8* [[SEL]], <2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
   // armv7-ios: define hidden swiftcc float @"$S8abitypes3FooC17getXFromRectSwift{{[_0-9a-zA-Z]*}}F"(float, float, float, float, [[SELF:%.*]]* swiftself) {{.*}} {
+  // armv7-ios: [[DEBUGVAR:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[COERCED:%.*]] = alloca [[MYRECT:%.*MyRect.*]], align 4
   // armv7-ios: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(getXFromRect:)", align 4
   // armv7-ios: [[CAST:%.*]] = bitcast [[MYRECT]]* [[COERCED]] to [4 x i32]*
