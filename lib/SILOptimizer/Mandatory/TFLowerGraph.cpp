@@ -1480,8 +1480,8 @@ void TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   auto &graphFn = getCurrentGraphFunction();
 
   // Decode information about the graph_op.
-  GraphOperationDecoder decoder(inst);
-  SmallVector<GraphOperationDecoder::InputMarker, 4> inputInfos;
+  GraphOperationInfo decoder(inst);
+  SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
   auto opName = decoder.decodeName(inputInfos);
 
   // The name label we put on the op is summarized from the "stack trace" of
@@ -1499,26 +1499,56 @@ void TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   bool hasDevice = false;
 
   // Process all inputs.
-  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
-    auto operand = inst->getOperand(i);
+  unsigned infoIndex = 0;
+  for (unsigned i = 0, e = inst->getNumOperands(); i != e;) {
+    switch (inputInfos[infoIndex++]) {
+    case GraphOperationInfo::IM_Scalar:
+      assert(0 && "tfc.scalarToTensor should be lowered by now");
+    case GraphOperationInfo::IM_InputListElt:
+      assert(0 && "we handle input list elements as part of the list");
+    case GraphOperationInfo::IM_Normal: {
+      // Normal tensor inputs.
+      auto operand = inst->getOperand(i++);
+      auto valueKind = classifyTensorFlowValue(operand->getType());
 
-    // FIXME: This needs to handle InputList operands.
-    (void)inputInfos;
+      // Keep track of whether we have any resource inputs.
+      hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+      assert(valueKind != TFValueKind::Nope &&
+             "all op inputs should be TensorFlow values");
+      auto opValue = getOperandValue(operand);
+      if (!opValue.oper) return;  // Error occurred.
+      TF_AddInput(op, opValue);
+      break;
+    }
+    case GraphOperationInfo::IM_InputList: {
+      // Collect all of the elements of the input list.
+      SmallVector<TF_Output, 4> elements;
 
-    auto valueKind = classifyTensorFlowValue(operand->getType());
+      // Collect all of the elements.
+      while (i < e &&
+             inputInfos[infoIndex] == GraphOperationInfo::IM_InputListElt) {
+        auto operand = inst->getOperand(i++);
+        ++infoIndex;
 
-    // Keep track of whether we have any resource inputs.
-    hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
-    assert(valueKind != TFValueKind::Nope &&
-           "all op inputs should be TensorFlow values");
-    auto opValue = getOperandValue(operand);
-    if (!opValue.oper) return;  // Error occurred.
-    TF_AddInput(op, opValue);
+        auto valueKind = classifyTensorFlowValue(operand->getType());
+
+        // Keep track of whether we have any resource inputs.
+        hasSideEffects |= valueKind == TFValueKind::ResourceHandle;
+        assert(valueKind != TFValueKind::Nope &&
+               "all op inputs should be TensorFlow values");
+        auto opValue = getOperandValue(operand);
+        if (!opValue.oper) return;  // Error occurred.
+        elements.push_back(opValue);
+      }
+      TF_AddInputList(op, elements.data(), elements.size());
+      break;
+    }
+    }
   }
 
   // Process all of the attributes.
   for (auto attr : inst->getAttributes()) {
-    auto attrInfo = GraphOperationDecoder::decodeAttributeName(attr.name);
+    auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
     auto attrValue = attr.value;
 
     // Convert the not-necessarily-nul-terminated StringRef to an std::string
