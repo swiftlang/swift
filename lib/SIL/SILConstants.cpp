@@ -36,9 +36,8 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "uninit\n";
     return;
   case RK_Unknown: {
-    std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
-    os << "unknown(" << (int)unknown.second << "): ";
-    unknown.first->dump();
+    os << "unknown(" << (int)getUnknownReason() << "): ";
+    getUnknownNode()->dump();
     return;
   }
   case RK_Metatype:
@@ -486,6 +485,88 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Unknown
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+/// When the value is Unknown, this contains information about the unfoldable
+/// part of the computation.
+struct alignas(SourceLoc) UnknownSymbolicValue final
+    : private llvm::TrailingObjects<UnknownSymbolicValue, SourceLoc> {
+  friend class llvm::TrailingObjects<UnknownSymbolicValue, SourceLoc>;
+
+  /// The value that was unfoldable.
+  SILNode *node;
+
+  /// A more explanatory reason for the value being unknown.
+  UnknownReason reason;
+
+  /// The number of elements in the call stack.
+  unsigned call_stack_size;
+
+  static UnknownSymbolicValue *create(SILNode *node, UnknownReason reason,
+                                      ArrayRef<SourceLoc> elements,
+                                      llvm::BumpPtrAllocator &allocator) {
+    auto byteSize =
+        UnknownSymbolicValue::totalSizeToAlloc<SourceLoc>(elements.size());
+    auto rawMem = allocator.Allocate(byteSize, alignof(UnknownSymbolicValue));
+
+    // Placement-new the value inside the memory we just allocated.
+    auto value = ::new (rawMem) UnknownSymbolicValue(
+        node, reason, static_cast<unsigned>(elements.size()));
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            value->getTrailingObjects<SourceLoc>());
+    return value;
+  }
+
+  ArrayRef<SourceLoc> getCallStack() const {
+    return {getTrailingObjects<SourceLoc>(), call_stack_size};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SourceLoc>) const {
+    return call_stack_size;
+  }
+
+private:
+  UnknownSymbolicValue() = delete;
+  UnknownSymbolicValue(const UnknownSymbolicValue &) = delete;
+  UnknownSymbolicValue(SILNode *node, UnknownReason reason,
+                       unsigned call_stack_size)
+      : node(node), reason(reason), call_stack_size(call_stack_size) {}
+};
+} // namespace swift
+
+SymbolicValue SymbolicValue::getUnknown(SILNode *node, UnknownReason reason,
+                                        llvm::ArrayRef<SourceLoc> callStack,
+                                        llvm::BumpPtrAllocator &allocator) {
+  auto *rawCallStack = allocator.Allocate<SourceLoc>(callStack.size());
+  std::uninitialized_copy(callStack.begin(), callStack.end(), rawCallStack);
+
+  assert(node && "node must be present");
+  SymbolicValue result;
+  result.representationKind = RK_Unknown;
+  result.value.unknown =
+      UnknownSymbolicValue::create(node, reason, callStack, allocator);
+  return result;
+}
+
+ArrayRef<SourceLoc> SymbolicValue::getUnknownCallStack() const {
+  assert(getKind() == Unknown);
+  return value.unknown->getCallStack();
+}
+
+SILNode *SymbolicValue::getUnknownNode() const {
+  assert(getKind() == Unknown);
+  return value.unknown->node;
+}
+
+UnknownReason SymbolicValue::getUnknownReason() const {
+  assert(getKind() == Unknown);
+  return value.unknown->reason;
+}
+
+//===----------------------------------------------------------------------===//
 // Enums
 //===----------------------------------------------------------------------===//
 
@@ -751,16 +832,35 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
   }
 }
 
+/// Emits an explanatory note if there is useful information to note or if there
+/// is an interesting SourceLoc to point at.
+/// Returns true if a diagnostic was emitted.
+static bool emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
+                               SILLocation fallbackLoc, std::string error) {
+  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
+  if (loc.isNull()) {
+    // If we have important clarifying information, make sure to emit it.
+    if (reason == UnknownReason::Default || fallbackLoc.isNull())
+      return false;
+    loc = fallbackLoc;
+  }
+
+  auto &module = badInst->getModule();
+  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
+           error)
+      .highlight(loc.getSourceRange());
+  return true;
+}
+
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is.
 void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
-  std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
-  auto badInst = dyn_cast<SILInstruction>(unknown.first);
+  auto badInst = dyn_cast<SILInstruction>(getUnknownNode());
   if (!badInst)
     return;
 
   std::string error;
-  switch (unknown.second) {
+  switch (getUnknownReason()) {
   case UnknownReason::Default:
     error = "could not fold operation";
     break;
@@ -779,17 +879,27 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     break;
   }
 
+  bool emittedFirstNote =
+      emitNoteDiagnostic(badInst, getUnknownReason(), fallbackLoc, error);
+
   auto &module = badInst->getModule();
+  auto &SM = module.getASTContext().SourceMgr;
+  unsigned originalDiagnosticLineNumber =
+      SM.getLineNumber(fallbackLoc.getSourceLoc());
+  for (auto &sourceLoc : llvm::reverse(getUnknownCallStack())) {
+    // Skip known sources.
+    if (!sourceLoc.isValid())
+      continue;
+    // Also skip notes that point to the same line as the original error, for
+    // example in:
+    //   #assert(foo(bar()))
+    // it is not useful to get three diagnostics referring to the same line.
+    if (SM.getLineNumber(sourceLoc) == originalDiagnosticLineNumber)
+      continue;
 
-  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) {
-    // If we have important clarifying information, make sure to emit it.
-    if (unknown.second == UnknownReason::Default || fallbackLoc.isNull())
-      return;
-    loc = fallbackLoc;
+    auto diag = emittedFirstNote ? diag::constexpr_called_from
+                                 : diag::constexpr_not_evaluable;
+    diagnose(module.getASTContext(), sourceLoc, diag);
+    emittedFirstNote = true;
   }
-
-  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
-           error)
-      .highlight(loc.getSourceRange());
 }

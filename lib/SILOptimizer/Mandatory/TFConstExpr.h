@@ -25,14 +25,17 @@
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/Allocator.h"
 
 namespace swift {
-  class ApplyInst;
-  class SILInstruction;
-  class SILModule;
-  class SILValue;
-  class SymbolicValue;
+class ApplyInst;
+class SILInstruction;
+class SILModule;
+class SILNode;
+class SILValue;
+class SymbolicValue;
+enum class UnknownReason;
 
 namespace tf {
 
@@ -43,6 +46,9 @@ class ConstExprEvaluator {
   /// result values for the cached constexpr calls we have already analyzed.
   llvm::BumpPtrAllocator allocator;
 
+  /// The current call stack, used for providing accurate diagnostics.
+  llvm::SmallVector<SourceLoc, 4> callStack;
+
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
 
@@ -51,6 +57,19 @@ public:
   ~ConstExprEvaluator();
 
   llvm::BumpPtrAllocator &getAllocator() { return allocator; }
+
+  void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
+
+  void popCallStack() {
+    assert(!callStack.empty());
+    callStack.pop_back();
+  }
+
+  const llvm::SmallVector<SourceLoc, 4> &getCallStack() { return callStack; }
+
+  // As SymbolicValue::getUnknown(), but handles passing the call stack and
+  // allocator.
+  SymbolicValue getUnknown(SILNode *node, UnknownReason reason);
 
   /// Analyze the specified values to determine if they are constant values.
   /// This is done in code that is not necessarily itself a constexpr
@@ -73,10 +92,9 @@ public:
   /// the set.  If decoding fails, then the contents of this set is undefined.
   ///
   static bool
-  decodeAllocUninitializedArray(ApplyInst *apply,
-                                uint64_t numElements,
+  decodeAllocUninitializedArray(ApplyInst *apply, uint64_t numElements,
                                 SmallVectorImpl<SILValue> &elements,
-                                SmallPtrSet<SILInstruction*, 8> *arrayInsts);
+                                SmallPtrSet<SILInstruction *, 8> *arrayInsts);
 };
 
 } // end namespace tf
