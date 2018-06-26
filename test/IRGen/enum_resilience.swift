@@ -22,10 +22,6 @@ import resilient_struct
 // ENUM_NOT_RES-NOT: @"$S14resilient_enum6MediumO6CanvasyA2CmFWC" =
 
 // CHECK: %T15enum_resilience5ClassC = type <{ %swift.refcounted }>
-
-// Because the enum is resilient we cannot pack the tag into the pointer inside of the resilient payload.
-// CHECK: %T15enum_resilience9ContainerC5Multi33_59077B69D65A4A3BEE0C93708067D5F0LLO.0 = type <{ [{{(8|4)}} x i8], [1 x i8] }>
-
 // CHECK: %T15enum_resilience9ReferenceV = type <{ %T15enum_resilience5ClassC* }>
 
 // Public fixed layout struct contains a public resilient struct,
@@ -330,18 +326,3 @@ private enum ProtGenEnumWithSize<T: Prot> {
 
 // CHECK-LABEL: define linkonce_odr hidden %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* @"$S15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLOyxGAA0C0RzlWOh"(%T15enum_resilience19ProtGenEnumWithSize
 // CHECK:   ret %T15enum_resilience19ProtGenEnumWithSize33_59077B69D65A4A3BEE0C93708067D5F0LLO* %0
-
-
-public class Container {
-  private enum Multi {
-    case none
-    case some(Container)
-    case data(ResilientRef)
-  }
-  private var e: Multi
-  var i: Int
-  init() {
-    e = .none
-    i = 0
-  }
-}
