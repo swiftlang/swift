@@ -1001,7 +1001,7 @@ public extension Tensor {
 public extension Tensor {
   @inlinable @inline(__always)
   internal func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
-    return #tfop("BroadcastTo", self, shape, Tidx: Int32.self);
+    return Raw.broadcastTo(self, shape: shape)
   }
 
   @inlinable @inline(__always)
