@@ -6,7 +6,7 @@
 // REQUIRES: objc_interop
 
 // Because the enum is resilient we cannot pack the tag into the pointer inside of the resilient payload.
-// CHECK: %T15enum_resilience9ContainerC5Multi33_59077B69D65A4A3BEE0C93708067D5F0LLO.0 = type <{ [{{(8|4)}} x i8], [1 x i8] }>
+// CHECK: %T15enum_resilience9ContainerC5Multi33_{{.*}}LLO.0 = type <{ [{{(8|4)}} x i8], [1 x i8] }>
 
 import resilient_struct
 
