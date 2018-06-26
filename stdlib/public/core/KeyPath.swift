@@ -59,6 +59,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   ///   of this instance.
   @inlinable // FIXME(sil-serialize-all)
   final public func hash(into hasher: inout Hasher) {
+    ObjectIdentifier(type(of: self)).hash(into: &hasher)
     return withBuffer {
       var buffer = $0
       while true {
@@ -597,7 +598,6 @@ internal enum KeyPathComponent: Hashable {
   
   @inlinable // FIXME(sil-serialize-all)
   internal func hash(into hasher: inout Hasher) {
-    var hasher = hasher
     func appendHashFromArgument(
       _ argument: KeyPathComponent.ArgumentRef?
     ) {
