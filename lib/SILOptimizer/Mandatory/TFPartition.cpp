@@ -258,26 +258,6 @@ classifyPromotedScalarOp(SILInstruction *inst) {
   }
 }
 
-/// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
-/// it into a TensorHandle<T> type.
-static SILType convertToTensorValueType(Type ty, const ASTContext& ctx) {
-  assert(isValidTensorFlowElementType(ty));
-  auto decl = ctx.getTensorHandleDecl();
-  auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
-
-  return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
-}
-
-/// If the specified type is a TensorFlow value type, return it.  Otherwise, it
-/// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
-static SILType convertToTensorValueType(SILType ty) {
-  // If this is already TensorHandle<T>, return it.
-  if (isTensorFlowValue(ty))
-    return ty;
-
-  return convertToTensorValueType(ty.getSwiftRValueType(), ty.getASTContext());
-}
-
 /// Returns true when this function must be entirely lowered to a TF graph
 /// function, with no host-side logic remaining (i.e., no sends/recvs, and no
 /// start/stop tensor computation on the host side). In other words, this
