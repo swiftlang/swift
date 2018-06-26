@@ -474,6 +474,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
       mangleGenericArgs(node->getChild(0), Separator);
       Buffer << Separator;
       Separator = '_';
@@ -1698,7 +1699,7 @@ void Remangler::mangleType(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node) {
-  mangleAnyGenericType(node, "a");
+  mangleAnyNominalType(node);
 }
 
 void Remangler::mangleTypeList(Node *node) {
@@ -2043,6 +2044,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType:
       return isSpecialized(node->getChild(0));
 
@@ -2059,6 +2061,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
+    case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType: {
       NodePointer result = Factory.createNode(node->getKind());
       NodePointer parentOrModule = node->getChild(0);

@@ -1240,11 +1240,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node, EntityContext &ctx) {
-  SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  Out << 'a';
-  mangleChildNodes(node); // context, identifier
-  addSubstitution(entry);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleFunctionType(Node *node) {
@@ -1825,6 +1821,9 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx) {
     break;
   case Node::Kind::Class:
     mangleNominalType(node, 'C', ctx);
+    break;
+  case Node::Kind::TypeAlias:
+    mangleNominalType(node, 'a', ctx);
     break;
   default:
     unreachable("bad nominal type kind");
