@@ -479,17 +479,21 @@ internal struct ComputedPropertyID: Hashable {
 @usableFromInline // FIXME(sil-serialize-all)
 @_fixed_layout // FIXME(sil-serialize-all)
 internal struct ComputedArgumentWitnesses {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Destroy = @convention(thin)
     (_ instanceArguments: UnsafeMutableRawPointer, _ size: Int) -> ()
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Copy = @convention(thin)
     (_ srcInstanceArguments: UnsafeRawPointer,
      _ destInstanceArguments: UnsafeMutableRawPointer,
      _ size: Int) -> ()
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Equals = @convention(thin)
     (_ xInstanceArguments: UnsafeRawPointer,
      _ yInstanceArguments: UnsafeRawPointer,
      _ size: Int) -> Bool
   // FIXME(hasher) Combine to an inout Hasher instead
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Hash = @convention(thin)
     (_ instanceArguments: UnsafeRawPointer,
      _ size: Int) -> Int

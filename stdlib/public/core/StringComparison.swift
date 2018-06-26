@@ -13,6 +13,7 @@
 import SwiftShims
 
 // TODO: pick values that give us the best branching pattern
+@usableFromInline // FIXME(sil-serialize-all)
 internal
 enum _GutsClassification: UInt {
   case smallUTF8 = 0
