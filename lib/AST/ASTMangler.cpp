@@ -750,7 +750,7 @@ void ASTMangler::appendType(Type type) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      if (aliasTy->getSubstitutionMap().hasAnySubstitutableParams()) {
+      if (!aliasTy->getSubstitutionMap().empty()) {
         // Try to mangle the entire name as a substitution.
         if (tryMangleSubstitution(tybase))
           return;
@@ -1086,6 +1086,12 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
   auto decl = dc->getInnermostDeclarationDeclContext();
   if (!decl) return 0;
 
+  // For an extension declaration, use the nominal type declaration instead.
+  // This is important when extending a nested type, because the generic
+  // parameters will line up with the (semantic) nesting of the nominal type.
+  if (auto ext = dyn_cast<ExtensionDecl>(decl))
+    decl = ext->getAsNominalTypeOrNominalTypeExtensionContext();
+
   // Handle the generic arguments of the parent.
   unsigned currentGenericParamIdx =
     appendBoundGenericArgs(decl->getDeclContext(), subs, isFirstArgList);
@@ -1106,12 +1112,12 @@ unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
       unsigned depth = genericParams[currentGenericParamIdx]->getDepth();
       assert(genericContext->getGenericParams()->getDepth() == depth &&
              "Depth mismatch mangling substitution map");
-      auto replacements = subs.getReplacementTypes();
       for (unsigned lastGenericParamIdx = genericParams.size();
            (currentGenericParamIdx != lastGenericParamIdx &&
             genericParams[currentGenericParamIdx]->getDepth() == depth);
            ++currentGenericParamIdx) {
-        Type replacementType = replacements[currentGenericParamIdx];
+        Type gp = genericParams[currentGenericParamIdx];
+        Type replacementType = gp.subst(subs);
         if (replacementType->hasArchetype())
           replacementType = replacementType->mapTypeOutOfContext();
 
