@@ -11,6 +11,7 @@
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Specific Preset Testing](#specific-preset-testing)
+    - [Build Swift Toolchain](#build-swift-toolchain)
     - [Testing Compiler Performance](#testing-compiler-performance)
 - [Cross Repository Testing](#cross-repository-testing)
 - [ci.swift.org bots](#ciswiftorg-bots)
