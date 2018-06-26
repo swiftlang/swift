@@ -1646,7 +1646,8 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
                                                      abbrCode,
                                                      addTypeRef(type),
                                                      substitutions.size());
-    writeSubstitutions(substitutions, abbrCodes, genericEnv);
+    writeSubstitutions(substitutions, abbrCodes, genericEnv,
+                       /*ignoreReplacementErrors*/true);
 
     writeConformance(conf->getGenericConformance(), abbrCodes, genericEnv);
     break;
@@ -1691,7 +1692,8 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 void
 Serializer::writeSubstitutions(SubstitutionList substitutions,
                                const std::array<unsigned, 256> &abbrCodes,
-                               GenericEnvironment *genericEnv) {
+                               GenericEnvironment *genericEnv,
+                               bool ignoreReplacementErrors) {
   using namespace decls_block;
   auto abbrCode = abbrCodes[BoundGenericSubstitutionLayout::Code];
 
@@ -1700,6 +1702,8 @@ Serializer::writeSubstitutions(SubstitutionList substitutions,
     if (genericEnv && replacementType->hasArchetype()) {
       replacementType = replacementType->mapTypeOutOfContext();
     }
+    if (replacementType->hasError() && ignoreReplacementErrors)
+      replacementType = Type();
 
     BoundGenericSubstitutionLayout::emitRecord(
       Out, ScratchRecord, abbrCode,
