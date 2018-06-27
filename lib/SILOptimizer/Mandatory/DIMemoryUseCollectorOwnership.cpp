@@ -950,16 +950,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // unchecked_take_enum_data_addr takes the address of the payload of the
-    // optional, which could be used to update the payload. So, visit the
-    // users of this instruction and ensure that there are no overwrites to an
-    // immutable optional. Note that this special handling is for checking
-    // immutability and is not for checking initialization before use.
-    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
-      collectUses(enumDataAddr, BaseEltNo);
-      continue;
-    }
-
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
       trackDestroy(User);
