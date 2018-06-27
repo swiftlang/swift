@@ -274,7 +274,7 @@ void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
 
   // TODO: visitTensorTransferInst?
 
-  GraphOperationDecoder decoder(inst);
+  GraphOperationInfo decoder(inst);
   auto deviceType = decoder.getDeviceType();
 
   // Skip this instruction if it isn't for the current device.
@@ -652,7 +652,7 @@ class DevicePartitionerImpl
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
-    auto deviceType = GraphOperationDecoder(inst).getDeviceType();
+    auto deviceType = GraphOperationInfo(inst).getDeviceType();
     markInstForDevice(deviceType, inst);
 
     // If any operand of `inst` is produced on another device, insert a

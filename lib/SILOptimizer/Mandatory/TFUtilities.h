@@ -413,11 +413,11 @@ private:
 
   /// Holds information about a TensorFlow operation as represented in SIL
   /// as GraphOperationInst.
-  struct GraphOperationDecoder {
+  struct GraphOperationInfo {
     /// The instruction being analyzed.
     GraphOperationInst *inst;
 
-    explicit GraphOperationDecoder(GraphOperationInst *inst) : inst(inst) {}
+    explicit GraphOperationInfo(GraphOperationInst *inst) : inst(inst) {}
 
     /// Return the device attribute associated with `inst`, which is required to
     /// exist.
@@ -433,13 +433,22 @@ private:
       IM_Scalar,
       /// Normal tensor, variant or resource input.
       IM_Normal,
-
       /// Marker for the start of an input list, has no corresponding operand.
       IM_InputList,
-
       /// Element of an input list.
       IM_InputListElt,
     };
+
+    /// Return a comma and letter identifier whose letter corresponds to the
+    /// specified InputMarker.
+    static const char *getInputMarker(InputMarker kind) {
+      switch (kind) {
+      case IM_Scalar:       return ",s";
+      case IM_Normal:       return ",i";
+      case IM_InputList:    return ",L";
+      case IM_InputListElt: return ",e";
+      }
+    }
 
     /// Decode the name of a graph_op into its TensorFlow op name and a list of
     /// information about the operands.
@@ -451,6 +460,18 @@ private:
     static std::pair<StringRef, SILTensorOpInfo::OperandClass>
     decodeAttributeName(Identifier name);
 
+    /// Given a SILValue that may be an array literal, attempt to decode it into
+    /// the values that make up its elements.  If this fails or if the value is
+    /// not an array, this returns a null Type.  Otherwise it decodes the array,
+    /// returns the values of each element, and returns the element type of the
+    /// array.
+    ///
+    /// If arrayInsts is non-null and if decoding succeeds, this function adds
+    /// all of the instructions relevant to the definition of this array into
+    /// the set.  If decoding fails, then the contents of this set is undefined.
+    static Type decodeArrayElements(SILValue value,
+                                    SmallVectorImpl<SILValue> &elements,
+                        SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
   };
 
   //===--------------------------------------------------------------------===//

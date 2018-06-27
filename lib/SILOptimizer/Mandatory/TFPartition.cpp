@@ -1802,7 +1802,7 @@ bool TFFunctionPartition::markFunction() {
 
         // tfc.scalarToTensor doesn't get a device.
         if (!graphOp->getName().is("tfc.scalarToTensor,s")) {
-          auto opDevice = GraphOperationDecoder(graphOp).getDeviceType();
+          auto opDevice = GraphOperationInfo(graphOp).getDeviceType();
           configuration.markDeviceUsed(opDevice);
         }
         continue;
