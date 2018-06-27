@@ -435,9 +435,10 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   auto &M = getBuilder().getFunction().getModule();
   auto InlinedAt =
       getOrCreateInlineScope(CalleeScope->InlinedCallSite);
+  auto ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
   auto *InlinedScope = new (M) SILDebugScope(
       CalleeScope->Loc, CalleeScope->Parent.dyn_cast<SILFunction *>(),
-      CalleeScope->Parent.dyn_cast<const SILDebugScope *>(), InlinedAt);
+      ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
   return InlinedScope;
 }
