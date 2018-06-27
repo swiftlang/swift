@@ -75,6 +75,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   if (isa<LoadInst>(Inst) || isa<StoreInst>(Inst) ||
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
+      isa<CopyUnownedValueInst>(Inst) ||
       isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
       isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst) ||
       isa<BeginAccessInst>(Inst) || isa<EndAccessInst>(Inst) ||
