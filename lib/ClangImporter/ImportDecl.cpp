@@ -188,10 +188,13 @@ static FuncDecl *createFuncOrAccessor(ASTContext &ctx, SourceLoc funcLoc,
 static void makeComputed(AbstractStorageDecl *storage,
                          AccessorDecl *getter, AccessorDecl *setter) {
   assert(getter);
-  AccessorDecl *buffer[] = { getter, setter };
-  auto accessors = llvm::makeArrayRef(buffer).slice(0, setter ? 2 : 1);
-  storage->setAccessors(AbstractStorageDecl::Computed,
-                        SourceLoc(), accessors, SourceLoc());
+  if (setter) {
+    storage->setAccessors(StorageImplInfo::getMutableComputed(),
+                          SourceLoc(), {getter, setter}, SourceLoc());
+  } else {
+    storage->setAccessors(StorageImplInfo::getImmutableComputed(),
+                          SourceLoc(), {getter}, SourceLoc());
+  }
 }
 
 #ifndef NDEBUG
@@ -1424,7 +1427,7 @@ static void makeStructRawValued(
   auto varGetter = makeStructRawValueGetter(
       Impl, structDecl, var, var);
 
-  var->addTrivialAccessors(varGetter, nullptr, nullptr);
+  var->setSynthesizedGetter(varGetter);
   assert(var->hasStorage());
 
   // Create constructors to initialize that value from a value of the

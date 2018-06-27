@@ -1301,7 +1301,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                  (accessorKind = getAccessorKind(Id.str())).hasValue()) {
         auto storageDecl = dyn_cast<AbstractStorageDecl>(VD);
         auto accessor = (storageDecl
-                           ? storageDecl->getAccessorFunction(*accessorKind)
+                           ? storageDecl->getAccessor(*accessorKind)
                            : nullptr);
         if (!accessor) {
           P.diagnose(IdLoc, diag::referenced_value_no_accessor, 0);
@@ -1312,8 +1312,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // Update values for this accessor kind.
         for (unsigned I = 0, E = values.size(); I < E; I++)
           if (auto otherDecl = dyn_cast<AbstractStorageDecl>(values[I]))
-            if (auto otherAccessor =
-                  otherDecl->getAccessorFunction(*accessorKind))
+            if (auto otherAccessor = otherDecl->getAccessor(*accessorKind))
               values[I] = otherAccessor;
         ParseState = 1;
       } else if (!ParseState && Id.str() == "allocator") {

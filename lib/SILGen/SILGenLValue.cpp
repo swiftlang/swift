@@ -985,7 +985,7 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
 
 static LValueOptions getBaseOptions(LValueOptions options,
                                     AccessStrategy strategy) {
-  return (strategy == AccessStrategy::Storage
+  return (strategy.getKind() == AccessStrategy::Storage
             ? options.forProjectedBaseLValue()
             : options.forComputedBaseLValue());
 }
@@ -1497,22 +1497,15 @@ namespace {
       // It could be overridden by a computed property in a subclass, but
       // that's not likely enough to be worth the strictness here.
       if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-        switch (storage->getStorageKind()) {
-        case AbstractStorageDecl::Stored:
-        case AbstractStorageDecl::StoredWithTrivialAccessors:
-        case AbstractStorageDecl::Addressed:
-        case AbstractStorageDecl::AddressedWithTrivialAccessors:
-          return;
+        auto impl = storage->getImplInfo();
         // TODO: Stored properties with didSet accessors that don't look at the
         // oldValue could also be addressed.
-        case AbstractStorageDecl::StoredWithObservers:
-        case AbstractStorageDecl::AddressedWithObservers:
-          break;
-          
-        case AbstractStorageDecl::InheritedWithObservers:
-        case AbstractStorageDecl::Computed:
-        case AbstractStorageDecl::ComputedWithMutableAddress:
-          break;
+        if ((impl.getReadImpl() == ReadImplKind::Stored ||
+             impl.getReadImpl() == ReadImplKind::Address) &&
+            (impl.getWriteImpl() == WriteImplKind::Immutable ||
+             impl.getWriteImpl() == WriteImplKind::Stored ||
+             impl.getWriteImpl() == WriteImplKind::MutableAddress)) {
+          return;
         }
       }
       
@@ -2302,22 +2295,26 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
                                             AccessSemantics semantics) {
   LValue lv;
 
-  switch (var->getAccessStrategy(semantics, accessKind)) {
+  auto strategy = var->getAccessStrategy(semantics, accessKind, SGF.FunctionDC);
+  switch (strategy.getKind()) {
 
   case AccessStrategy::DispatchToAccessor:
     llvm_unreachable("can't polymorphically access non-member variable");
 
   // If it's a computed variable, push a reference to the getter and setter.
-  case AccessStrategy::DirectToAccessor: {
+  case AccessStrategy::DirectToAccessor:
+    if (strategy.getAccessor() == AccessorKind::Address ||
+        strategy.getAccessor() == AccessorKind::MutableAddress) {
+      addNonMemberVarDeclAddressorComponent(SGF.SGM, var, formalRValueType, lv);
+      break;
+    }
+    LLVM_FALLTHROUGH;
+  case AccessStrategy::MaterializeToTemporary: {
+    // FIXME: this is not correct for all materialization-based strategies.
     auto typeData = getLogicalStorageTypeData(SGF.SGM, formalRValueType);
     lv.add<GetterSetterComponent>(var, /*isSuper=*/false, /*direct*/ true,
                                   SGF.SGM.getNonMemberVarDeclSubstitutions(var),
                                   CanType(), typeData);
-    break;
-  }
-
-  case AccessStrategy::Addressor: {
-    addNonMemberVarDeclAddressorComponent(SGF.SGM, var, formalRValueType, lv);
     break;
   }
 
@@ -2438,23 +2435,31 @@ static AccessKind getBaseAccessKindForAccessor(FuncDecl *accessor) {
 static AccessKind getBaseAccessKind(AbstractStorageDecl *member,
                                     AccessKind accessKind,
                                     AccessStrategy strategy) {
-  switch (strategy) {
+  switch (strategy.getKind()) {
   // Assume that the member only partially projects the enclosing value.
   case AccessStrategy::Storage:
     return (accessKind == AccessKind::Read
               ? AccessKind::Read : AccessKind::ReadWrite);
 
-  case AccessStrategy::Addressor:
-    return getBaseAccessKindForAccessor(
-                           member->getAddressorForAccess(accessKind));
+  case AccessStrategy::MaterializeToTemporary: {
+    assert(accessKind == AccessKind::ReadWrite);
+    auto writeBaseKind = getBaseAccessKind(member, AccessKind::Write,
+                                           strategy.getWriteStrategy());
+
+    // Fast path for the common case that the write will need to mutate
+    // the base.
+    if (writeBaseKind == AccessKind::ReadWrite)
+      return writeBaseKind;
+
+    auto readBaseKind = getBaseAccessKind(member, AccessKind::Read,
+                                          strategy.getReadStrategy());
+    return combineAccessKinds(readBaseKind, writeBaseKind);
+  }
 
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
-    if (accessKind == AccessKind::Read) {
-      return getBaseAccessKindForAccessor(member->getGetter());
-    } else {
-      return getBaseAccessKindForAccessor(member->getSetter());
-    }
+    return getBaseAccessKindForAccessor(
+             member->getAccessor(strategy.getAccessor()));
     
   case AccessStrategy::BehaviorStorage:
     // We should only access the behavior storage for initialization purposes.
@@ -2471,7 +2476,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // that can be an lvalue is a VarDecl.
   VarDecl *var = cast<VarDecl>(e->getMember().getDecl());
   AccessStrategy strategy =
-    var->getAccessStrategy(e->getAccessSemantics(), accessKind);
+    var->getAccessStrategy(e->getAccessSemantics(), accessKind, SGF.FunctionDC);
 
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(var, accessKind, strategy),
@@ -2487,6 +2492,38 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   return lv;
 }
 
+static bool isDirectAccessorUse(AccessStrategy strategy) {
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage:
+  case AccessStrategy::BehaviorStorage:
+    // This is only necessary to support because of the recursive use in
+    // MaterializeToTemporary.
+    //llvm_unreachable("not an accessor use");
+    return false;
+
+  case AccessStrategy::MaterializeToTemporary:
+    // FIXME: this case should never be handled this way.
+    return isDirectAccessorUse(strategy.getReadStrategy()) ||
+           isDirectAccessorUse(strategy.getWriteStrategy());
+
+  case AccessStrategy::DirectToAccessor:
+    return true;
+
+  case AccessStrategy::DispatchToAccessor:
+    return false;
+  }
+  llvm_unreachable("bad access strategy");
+}
+
+static AccessorKind getRepresentativeAccessor(AccessStrategy strategy) {
+  // HACK: this is only necessary because we don't do the generally-correct
+  // thing yet for MaterializeToTemporary.
+  if (strategy.getKind() == AccessStrategy::MaterializeToTemporary)
+    return AccessorKind::MaterializeForSet;
+
+  return strategy.getAccessor();
+}
+
 void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                    VarDecl *var,
                                    SubstitutionMap subs,
@@ -2498,66 +2535,79 @@ void LValue::addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                                    CanType formalRValueType) {
   CanType baseFormalType = getSubstFormalType();
 
-  // Use the property accessors if the variable has accessors and this isn't a
-  // direct access to underlying storage.
-  if (strategy == AccessStrategy::DirectToAccessor ||
-      strategy == AccessStrategy::DispatchToAccessor) {
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage: {
+    // For static variables, emit a reference to the global variable backing
+    // them.
+    // FIXME: This has to be dynamically looked up for classes, and
+    // dynamically instantiated for generics.
+    if (var->isStatic()) {
+      // FIXME: this implicitly drops the earlier components, but maybe
+      // we ought to evaluate them for side-effects even during the
+      // formal access?
+      *this = emitLValueForNonMemberVarDecl(SGF, loc, var,
+                                            formalRValueType, accessKind,
+                                            options, accessSemantics);
+      return;
+    }
+
+    // Otherwise, it's a physical member.
+    SILType varStorageType =
+      SGF.SGM.Types.getSubstitutedStorageType(var, formalRValueType);
+    auto typeData = getPhysicalStorageTypeData(SGF.SGM, var, formalRValueType);
+
+    if (baseFormalType->mayHaveSuperclass()) {
+      add<RefElementComponent>(var, options, varStorageType, typeData);
+    } else {
+      assert(baseFormalType->getStructOrBoundGenericStruct());
+      add<StructElementComponent>(var, varStorageType, typeData);
+    }
+    
+    // If the member has weak or unowned storage, convert it away.
+    if (varStorageType.is<ReferenceStorageType>()) {
+      add<OwnershipComponent>(typeData);
+    }
+    return;
+  }
+
+  case AccessStrategy::MaterializeToTemporary: // FIXME
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    auto accessor = getRepresentativeAccessor(strategy);
+
+    if (accessor == AccessorKind::Address ||
+        accessor == AccessorKind::MutableAddress) {
+      SILType varStorageType =
+        SGF.SGM.Types.getSubstitutedStorageType(var, formalRValueType);
+      auto typeData = getPhysicalStorageTypeData(SGF.SGM, var, formalRValueType);
+
+      add<AddressorComponent>(var, isSuper, /*direct*/ true, subs,
+                              baseFormalType, typeData, varStorageType);
+      return;
+    }
+
+    // Use the property accessors if the variable has accessors and this isn't a
+    // direct access to underlying storage.
+    bool isDirect = isDirectAccessorUse(strategy);
     auto typeData = getLogicalStorageTypeData(SGF.SGM, formalRValueType);
-    add<GetterSetterComponent>(var, isSuper,
-                               strategy == AccessStrategy::DirectToAccessor,
+    add<GetterSetterComponent>(var, isSuper, isDirect,
                                subs, baseFormalType, typeData);
     return;
   }
 
-  assert(strategy == AccessStrategy::Addressor ||
-         strategy == AccessStrategy::Storage ||
-         strategy == AccessStrategy::BehaviorStorage);
-
-  // Otherwise, the lvalue access is performed with a fragile element reference.
-  // Find the substituted storage type.
-  SILType varStorageType =
-    SGF.SGM.Types.getSubstitutedStorageType(var, formalRValueType);
-    
-  // For static variables, emit a reference to the global variable backing
-  // them.
-  // FIXME: This has to be dynamically looked up for classes, and
-  // dynamically instantiated for generics.
-  if (strategy == AccessStrategy::Storage && var->isStatic()) {
-    // FIXME: this implicitly drops the earlier components, but maybe
-    // we ought to evaluate them for side-effects even during the
-    // formal access?
-    *this = emitLValueForNonMemberVarDecl(SGF, loc, var,
-                                          formalRValueType, accessKind,
-                                          options, accessSemantics);
-    return;
-  }
-
-  auto typeData = getPhysicalStorageTypeData(SGF.SGM, var, formalRValueType);
-
   // For behavior initializations, we should have set up a marking proxy that
   // replaces the access path.
-  if (strategy == AccessStrategy::BehaviorStorage) {
+  case AccessStrategy::BehaviorStorage: {
     auto addr = SGF.VarLocs.find(var);
     assert(addr != SGF.VarLocs.end() && addr->second.value);
     Path.clear();
+    auto typeData = getPhysicalStorageTypeData(SGF.SGM, var, formalRValueType);
     add<ValueComponent>(ManagedValue::forUnmanaged(addr->second.value),
                         None, typeData);
-  // For member variables, this access is done w.r.t. a base computation that
-  // was already emitted.  This member is accessed off of it.
-  } else if (strategy == AccessStrategy::Addressor) {
-    add<AddressorComponent>(var, isSuper, /*direct*/ true, subs,
-                            baseFormalType, typeData, varStorageType);
-  } else if (baseFormalType->mayHaveSuperclass()) {
-    add<RefElementComponent>(var, options, varStorageType, typeData);
-  } else {
-    assert(baseFormalType->getStructOrBoundGenericStruct());
-    add<StructElementComponent>(var, varStorageType, typeData);
+    return;
   }
-  
-  // If the member has weak or unowned storage, convert it away.
-  if (varStorageType.is<ReferenceStorageType>()) {
-    add<OwnershipComponent>(typeData);
   }
+  llvm_unreachable("bad access strategy");
 }
 
 LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
@@ -2566,7 +2616,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto decl = cast<SubscriptDecl>(e->getDecl().getDecl());
 
   auto accessSemantics = e->getAccessSemantics();
-  auto strategy = decl->getAccessStrategy(accessSemantics, accessKind);
+  auto strategy =
+    decl->getAccessStrategy(accessSemantics, accessKind, SGF.FunctionDC);
   
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(decl, accessKind, strategy),
@@ -2644,22 +2695,36 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                          Expr *indexExprForDiagnostics) {
   CanType baseFormalType = getSubstFormalType();
 
-  if (strategy == AccessStrategy::DirectToAccessor ||
-      strategy == AccessStrategy::DispatchToAccessor) {
-    auto typeData = getLogicalStorageTypeData(SGF.SGM, formalRValueType);
-    add<GetterSetterComponent>(decl, isSuper,
-                               strategy == AccessStrategy::DirectToAccessor,
-                               subs, baseFormalType, typeData,
-                               indexExprForDiagnostics, &indices);
-  } else {
-    assert(strategy == AccessStrategy::Addressor);
-    auto typeData = getPhysicalStorageTypeData(SGF.SGM, decl, formalRValueType);
-    auto storageType = 
-      SGF.SGM.Types.getSubstitutedStorageType(decl, formalRValueType);
-    add<AddressorComponent>(decl, isSuper, /*direct*/ true,
-                            subs, baseFormalType, typeData, storageType,
-                            indexExprForDiagnostics, &indices);
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage:
+    llvm_unreachable("subscripts never have storage");
+
+  case AccessStrategy::BehaviorStorage:
+    llvm_unreachable("subscripts never have behaviors");
+
+  case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    auto accessor = getRepresentativeAccessor(strategy);
+    if (accessor == AccessorKind::Address ||
+        accessor == AccessorKind::MutableAddress) {
+      auto typeData = getPhysicalStorageTypeData(SGF.SGM, decl, formalRValueType);
+      auto storageType = 
+        SGF.SGM.Types.getSubstitutedStorageType(decl, formalRValueType);
+      add<AddressorComponent>(decl, isSuper, /*direct*/ true,
+                              subs, baseFormalType, typeData, storageType,
+                              indexExprForDiagnostics, &indices);
+    } else {
+      bool isDirect = isDirectAccessorUse(strategy);
+      auto typeData = getLogicalStorageTypeData(SGF.SGM, formalRValueType);
+      add<GetterSetterComponent>(decl, isSuper, isDirect,
+                                 subs, baseFormalType, typeData,
+                                 indexExprForDiagnostics, &indices);
+    }
+    return;
   }
+  }
+  llvm_unreachable("bad access strategy");
 }
 
 bool LValue::isObviouslyNonConflicting(const LValue &other,
@@ -2803,49 +2868,62 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
     ->getCanonicalType();
 
   AccessStrategy strategy =
-    ivar->getAccessStrategy(semantics, accessKind);
+    ivar->getAccessStrategy(semantics, accessKind, FunctionDC);
 
 
   // Use the property accessors if the variable has accessors and this
   // isn't a direct access to underlying storage.
-  if (strategy == AccessStrategy::DirectToAccessor ||
-      strategy == AccessStrategy::DispatchToAccessor) {
-    auto typeData = getLogicalStorageTypeData(SGM, substFormalType);
-    lv.add<GetterSetterComponent>(ivar, /*super*/ false,
-                                  strategy == AccessStrategy::DirectToAccessor,
-                                  subMap, baseFormalType, typeData);
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage: {
+    // Find the substituted storage type.
+    SILType varStorageType =
+      SGM.Types.getSubstitutedStorageType(ivar, substFormalType);
+    auto typeData = getPhysicalStorageTypeData(SGM, ivar, substFormalType);
+
+    if (baseFormalType->hasReferenceSemantics()) {
+      lv.add<RefElementComponent>(ivar, options, varStorageType, typeData);
+    } else {
+      lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+    }
+
+    if (varStorageType.is<ReferenceStorageType>()) {
+      auto formalRValueType =
+        ivar->getDeclContext()->mapTypeIntoContext(ivar->getInterfaceType())
+            ->getReferenceStorageReferent()
+            ->getCanonicalType();
+      auto typeData =
+        getPhysicalStorageTypeData(SGM, ivar, formalRValueType);
+      lv.add<OwnershipComponent>(typeData);
+    }
     return lv;
   }
 
-  assert(strategy == AccessStrategy::Addressor ||
-         strategy == AccessStrategy::Storage);
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::MaterializeToTemporary: {
+    auto accessor = getRepresentativeAccessor(strategy);
+    bool isDirect = isDirectAccessorUse(strategy);
+    if (accessor == AccessorKind::Address ||
+        accessor == AccessorKind::MutableAddress) {
+      SILType varStorageType =
+        SGM.Types.getSubstitutedStorageType(ivar, substFormalType);
+      auto typeData = getPhysicalStorageTypeData(SGM, ivar, substFormalType);
 
-  // Find the substituted storage type.
-  SILType varStorageType =
-    SGM.Types.getSubstitutedStorageType(ivar, substFormalType);
-
-  auto typeData = getPhysicalStorageTypeData(SGM, ivar, substFormalType);
-
-  if (strategy == AccessStrategy::Addressor) {
-    lv.add<AddressorComponent>(ivar, /*super*/ false, /*direct*/ true,
-                               subMap, baseFormalType, typeData, varStorageType);
-  } else if (baseFormalType->hasReferenceSemantics()) {
-    lv.add<RefElementComponent>(ivar, options, varStorageType, typeData);
-  } else {
-    lv.add<StructElementComponent>(ivar, varStorageType, typeData);
+      lv.add<AddressorComponent>(ivar, /*super*/ false, isDirect,
+                                 subMap, baseFormalType, typeData,
+                                 varStorageType);
+    } else {
+      auto typeData = getLogicalStorageTypeData(SGM, substFormalType);
+      lv.add<GetterSetterComponent>(ivar, /*super*/ false, isDirect,
+                                    subMap, baseFormalType, typeData);
+    }
+    return lv;
   }
 
-  if (varStorageType.is<ReferenceStorageType>()) {
-    auto formalRValueType =
-      ivar->getDeclContext()->mapTypeIntoContext(ivar->getInterfaceType())
-          ->getReferenceStorageReferent()
-          ->getCanonicalType();
-    auto typeData =
-      getPhysicalStorageTypeData(SGM, ivar, formalRValueType);
-    lv.add<OwnershipComponent>(typeData);
+  case AccessStrategy::BehaviorStorage:
+    llvm_unreachable("behaviors not expected here?");
   }
-
-  return lv;
+  llvm_unreachable("bad kind");
 }
 
 // This is emitLoad that will handle re-abstraction and bridging for the client.

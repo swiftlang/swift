@@ -158,7 +158,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, entry.getInitContext());
       else
         return true;
-      if (entry.getInit()) {
+      if (entry.getInit() &&
+          (!entry.isInitializerLazy() ||
+           Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
@@ -939,6 +941,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     HANDLE_SEMANTIC_EXPR(E);
+    return E;
+  }
+
+  Expr *visitLazyInitializerExpr(LazyInitializerExpr *E) {
+    // Initializer is totally opaque for most visitation purposes.
     return E;
   }
 

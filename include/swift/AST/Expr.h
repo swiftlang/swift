@@ -104,15 +104,19 @@ enum class CheckedCastKind : unsigned {
   Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
+/// What are the high-level semantics of this access?
 enum class AccessSemantics : uint8_t {
-  /// On a property or subscript reference, this is a direct access to
-  /// the underlying storage.  On a function reference, this is a
-  /// non-polymorphic access to a particular implementation.
+  /// On a storage reference, this is a direct access to the underlying
+  /// physical storage, bypassing any observers.  The declaration must be 
+  /// a variable with storage.
+  ///
+  /// On a function reference, this is a non-polymorphic access to a
+  /// particular implementation.
   DirectToStorage,
 
-  /// On a property or subscript reference, this is a direct,
-  /// non-polymorphic access to the getter/setter accessors.
-  DirectToAccessor,
+  /// On a storage reference, this is a direct access to the concrete
+  /// implementation of this storage, bypassing any possibility of override.
+  DirectToImplementation,
 
   /// On a property or subscript reference, this is an access to a property
   /// behavior that may be an initialization. Reads always go through the
@@ -4610,6 +4614,28 @@ public:
 
   Expr *getSemanticExpr() const { return SemanticExpr; }
   void setSemanticExpr(Expr *SE) { SemanticExpr = SE; }
+};
+
+/// A LazyInitializerExpr is used to embed an existing typechecked
+/// expression --- like the initializer of a lazy variable --- into an
+/// untypechecked AST.
+class LazyInitializerExpr : public Expr {
+  Expr *SubExpr;
+public:
+  LazyInitializerExpr(Expr *subExpr)
+    : Expr(ExprKind::LazyInitializer, /*implicit*/ true),
+      SubExpr(subExpr) {}
+
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LazyInitializer;
+  }
 };
 
 /// Produces the Objective-C selector of the referenced method.
