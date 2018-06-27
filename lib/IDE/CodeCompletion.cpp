@@ -3458,11 +3458,17 @@ public:
       SE->setElement(SE->getNumElements() - 2, nullptr);
       prepareForRetypechecking(SE);
 
-      // Reset any references to operators in types, so they are properly
-      // handled as operators by sequence folding.
-      //
-      // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
       for (auto &element : sequence.drop_back(2)) {
+        // Unfold AssignExpr for re-typechecking sequence.
+        if (auto *AE = dyn_cast_or_null<AssignExpr>(element)) {
+          AE->setSrc(nullptr);
+          AE->setDest(nullptr);
+        }
+
+        // Reset any references to operators in types, so they are properly
+        // handled as operators by sequence folding.
+        //
+        // FIXME: Would be better to have some kind of 'OperatorRefExpr'?
         if (auto operatorRef = element->getMemberOperatorRef()) {
           operatorRef->setType(nullptr);
           element = operatorRef;
@@ -3496,20 +3502,20 @@ public:
     }
   }
 
-  void flattenBinaryExpr(BinaryExpr *expr, SmallVectorImpl<Expr *> &sequence) {
-    auto LHS = expr->getArg()->getElement(0);
-    if (auto binexpr = dyn_cast<BinaryExpr>(LHS))
-      flattenBinaryExpr(binexpr, sequence);
-    else
-      sequence.push_back(LHS);
-
-    sequence.push_back(expr->getFn());
-
-    auto RHS = expr->getArg()->getElement(1);
-    if (auto binexpr = dyn_cast<BinaryExpr>(RHS))
-      flattenBinaryExpr(binexpr, sequence);
-    else
-      sequence.push_back(RHS);
+  void flattenBinaryExpr(Expr *expr, SmallVectorImpl<Expr *> &sequence) {
+    if (auto binExpr = dyn_cast<BinaryExpr>(expr)) {
+      flattenBinaryExpr(binExpr->getArg()->getElement(0), sequence);
+      sequence.push_back(binExpr->getFn());
+      flattenBinaryExpr(binExpr->getArg()->getElement(1), sequence);
+    } else if (auto assignExpr = dyn_cast<AssignExpr>(expr)) {
+      flattenBinaryExpr(assignExpr->getDest(), sequence);
+      sequence.push_back(assignExpr);
+      flattenBinaryExpr(assignExpr->getSrc(), sequence);
+      assignExpr->setDest(nullptr);
+      assignExpr->setSrc(nullptr);
+    } else {
+      sequence.push_back(expr);
+    }
   }
 
   void typeCheckLeadingSequence(SmallVectorImpl<Expr *> &sequence) {
@@ -3519,10 +3525,10 @@ public:
     // Take advantage of the fact the type-checker leaves the types on the AST.
     if (!typeCheckExpression(const_cast<DeclContext *>(CurrDeclContext),
                              expr)) {
-      if (auto binexpr = dyn_cast<BinaryExpr>(expr)) {
+      if (isa<BinaryExpr>(expr) || isa<AssignExpr>(expr)) {
         // Rebuild the sequence from the type-checked version.
         sequence.clear();
-        flattenBinaryExpr(binexpr, sequence);
+        flattenBinaryExpr(expr, sequence);
         return;
       }
     }
@@ -3547,6 +3553,9 @@ public:
 
     if (sequence.size() > 1)
       typeCheckLeadingSequence(sequence);
+
+    // Retrieve typechecked LHS.
+    LHS = sequence.back();
 
     // Create a single sequence expression, which we will modify for each
     // operator, filling in the operator and dummy right-hand side.
