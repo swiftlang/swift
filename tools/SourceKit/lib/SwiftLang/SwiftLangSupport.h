@@ -95,7 +95,7 @@ public:
   void parse(ImmutableTextSnapshotRef Snapshot, SwiftLangSupport &Lang,
              bool BuildSyntaxTree,
              swift::SyntaxParsingCache *SyntaxCache = nullptr);
-  void readSyntaxInfo(EditorConsumer &consumer, bool LibSyntaxBasedProcessing);
+  void readSyntaxInfo(EditorConsumer &consumer);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
 
@@ -412,8 +412,8 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
-                  EditorConsumer &Consumer, bool LibSyntaxBasedProcessing,
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer,
                   ArrayRef<const char *> Args) override;
 
   void editorOpenInterface(EditorConsumer &Consumer,
@@ -445,8 +445,7 @@ public:
 
   void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                          unsigned Offset, unsigned Length,
-                         EditorConsumer &Consumer,
-                         bool LibSyntaxBasedProcessing) override;
+                         EditorConsumer &Consumer) override;
 
   void editorApplyFormatOptions(StringRef Name,
                                 OptionsDictionary &FmtOptions) override;

@@ -1896,8 +1896,7 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   Impl.SyntaxInfo->parse();
 }
 
-void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer,
-                                         bool LibSyntaxBasedProcessing) {
+void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.ParserDiagnostics = Impl.SyntaxInfo->getDiagnostics();
@@ -1913,7 +1912,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer,
 
   SwiftSyntaxMap NewMap = SwiftSyntaxMap(Impl.SyntaxMap.Tokens.size() + 16);
 
-  if (LibSyntaxBasedProcessing) {
+  if (Consumer.forceLibSyntaxBasedProcessing()) {
     auto &&SyntaxTree = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot();
 
     SyntaxClassifier Classifier;
@@ -2193,14 +2192,12 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 //===----------------------------------------------------------------------===//
 
 void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                                  bool EnableSyntaxMap,
                                   EditorConsumer &Consumer,
-                                  bool LibSyntaxBasedProcessing,
                                   ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   const bool BuildSyntaxTree =
-      Consumer.syntaxTreeEnabled() || LibSyntaxBasedProcessing;
+      Consumer.syntaxTreeEnabled() || Consumer.forceLibSyntaxBasedProcessing();
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
@@ -2225,7 +2222,7 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
     EditorDoc->updateSemaInfo();
   }
 
-  EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
+  EditorDoc->readSyntaxInfo(Consumer);
   EditorDoc->readSemanticInfo(Snapshot, Consumer);
 }
 
@@ -2333,10 +2330,10 @@ void verifyIncrementalParse(SwiftEditorDocumentRef EditorDoc,
   }
 }
 
-void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
+void SwiftLangSupport::editorReplaceText(StringRef Name,
+                                         llvm::MemoryBuffer *Buf,
                                          unsigned Offset, unsigned Length,
-                                         EditorConsumer &Consumer,
-                                         bool LibSyntaxBasedProcessing) {
+                                         EditorConsumer &Consumer) {
   bool ValidateSyntaxTree = ::getenv("SOURCEKIT_INCREMENTAL_PARSE_VALIDATION");
 
   auto EditorDoc = EditorDocuments.getByUnresolvedName(Name);
@@ -2357,8 +2354,8 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
     Snapshot = EditorDoc->replaceText(Offset, Length, Buf,
                                       Consumer.needsSemanticInfo());
     assert(Snapshot);
-    bool BuildSyntaxTree =
-        Consumer.syntaxTreeEnabled() || LibSyntaxBasedProcessing;
+    bool BuildSyntaxTree = Consumer.syntaxTreeEnabled() ||
+                           Consumer.forceLibSyntaxBasedProcessing();
 
     llvm::Optional<SyntaxParsingCache> SyntaxCache;
     if (EditorDoc->getSyntaxTree().hasValue()) {
@@ -2402,7 +2399,7 @@ void SwiftLangSupport::editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf
       Consumer.handleSyntaxReuseRegions({});
     }
 
-    EditorDoc->readSyntaxInfo(Consumer, LibSyntaxBasedProcessing);
+    EditorDoc->readSyntaxInfo(Consumer);
 
     if (ValidateSyntaxTree) {
       verifyIncrementalParse(EditorDoc, Offset, Length, PreEditText,

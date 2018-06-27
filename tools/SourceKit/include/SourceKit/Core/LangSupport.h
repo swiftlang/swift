@@ -190,7 +190,6 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
 
 class EditorConsumer {
   virtual void anchor();
-
 public:
   virtual ~EditorConsumer() { }
 
@@ -245,6 +244,10 @@ public:
       std::vector<std::pair<unsigned, unsigned>> ReuseRegions) = 0;
 
   virtual void finished() {}
+
+  // FIXME: This is just for bootstrapping incremental syntax tree parsing.
+  // Remove it once when we are able to incrementally transfer the syntax tree
+  virtual bool forceLibSyntaxBasedProcessing() = 0;
 };
 
 class OptionsDictionary {
@@ -521,8 +524,7 @@ public:
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
   virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          bool EnableSyntaxMap, EditorConsumer &Consumer,
-                          bool LibSyntaxBasedProcessing,
+                          EditorConsumer &Consumer,
                           ArrayRef<const char *> Args) = 0;
 
   virtual void editorOpenInterface(EditorConsumer &Consumer,
@@ -554,8 +556,7 @@ public:
 
   virtual void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                  unsigned Offset, unsigned Length,
-                                 EditorConsumer &Consumer,
-                                 bool LibSyntaxBasedProcessing) = 0;
+                                 EditorConsumer &Consumer) = 0;
 
   virtual void editorApplyFormatOptions(StringRef Name,
                                         OptionsDictionary &FmtOptions) = 0;

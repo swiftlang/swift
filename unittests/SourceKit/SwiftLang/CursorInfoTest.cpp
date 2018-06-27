@@ -95,6 +95,9 @@ class NullEditorConsumer : public EditorConsumer {
       std::vector<std::pair<unsigned, unsigned>> ReuseRegions) override {
     return false;
   }
+
+  bool forceLibSyntaxBasedProcessing() override { return false; }
+
 public:
   bool needsSema = false;
 };
@@ -140,16 +143,13 @@ public:
     auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false,
-                         Consumer,
-                         /*LibSyntaxBasedProcessing=*/false, Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
                    StringRef Text) {
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer,
-                                /*LibSyntaxBasedProcessing=*/false);
+    getLang().editorReplaceText(DocName, Buf.get(), Offset, Length, Consumer);
   }
 
   TestCursorInfo getCursor(const char *DocName, unsigned Offset,
