@@ -148,6 +148,11 @@ public:
   /// Filter out any results that aren't accepted by the given predicate.
   void
   filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
+
+  /// Shift down results by dropping inner results while keeping outer
+  /// results (if any), the innermost of which are recogized as inner
+  /// results afterwards.
+  void shiftDownResults();
 };
 
 /// An individual result of a name lookup for a type.
