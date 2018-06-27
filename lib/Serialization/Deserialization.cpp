@@ -469,6 +469,10 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   unsigned kind = Cursor.readRecord(next.ID, scratch);
   switch (kind) {
+  case INVALID_PROTOCOL_CONFORMANCE: {
+    return ProtocolConformanceRef::forInvalid();
+  }
+
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);

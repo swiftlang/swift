@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 426; // SIL key path external components with local attempts
+const uint16_t VERSION_MINOR = 427; // Invalid conformances
 
 using DeclIDField = BCFixed<31>;
 
@@ -1285,6 +1285,11 @@ namespace decls_block {
   using AbstractProtocolConformanceLayout = BCRecordLayout<
     ABSTRACT_PROTOCOL_CONFORMANCE,
     DeclIDField // the protocol
+  >;
+
+  /// A placeholder for an invalid conformance.
+  using InvalidProtocolConformanceLayout = BCRecordLayout<
+    INVALID_PROTOCOL_CONFORMANCE
   >;
 
   using NormalProtocolConformanceLayout = BCRecordLayout<
