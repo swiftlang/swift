@@ -14,6 +14,7 @@
 #include "TFUtilities.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
@@ -209,18 +210,20 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
-/// Looks up a function in the current module. If it exists, returns it.
-/// Otherwise, attempt to link it from imported modules. Returns null if such
-/// function name does not exist.
-static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
-  if (auto *localFn = module.lookUpFunction(name))
-    return localFn;
-  auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
+SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
+  auto *fn = module.lookUpFunction(name);
+  if (!fn)
+    fn = module.findFunction(name, SILLinkage::PublicExternal);
   assert(fn);
-  bool loaded = module.loadFunction(fn);
-  assert(loaded); (void)loaded;
-  bool linked = module.linkFunction(fn);
-  assert(linked); (void)linked;
+  if (fn->isExternalDeclaration()) {
+    bool loaded = module.loadFunction(fn);
+    assert(loaded);
+    (void)loaded;
+    // linkFunction() can return false if this function has already been
+    // deserialized and its body available in `module`.
+    module.linkFunction(fn);
+  }
+  assert(!fn->isExternalDeclaration());
   assert(fn->isDefinition());
   return fn;
 }
@@ -255,6 +258,16 @@ SILFunction *tf::findSILFunctionForRequiredProtocolMember(
       return fn;
   }
   return nullptr;
+}
+
+SubstitutionMap tf::getSingleSubstitutionMapForElementType(Type ty,
+                                                           ASTContext &ctx) {
+  auto builder = GenericSignatureBuilder(ctx);
+  builder.addGenericParameter(GenericTypeParamType::get(0, 0, ctx));
+  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  return SubstitutionMap::get(genericSig,
+                              [&](SubstitutableType *t) { return ty; },
+                              LookUpConformanceInSignature(*genericSig));
 }
 
 /// If the specified value is a single-element struct_inst wrapper, look through

@@ -1913,7 +1913,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
       // If this is tfc.scalarToTensor, then the input must be a valid scalar.
       if (opInfo.opName == "tfc.scalarToTensor") {
-        auto scalarType = operandTy.getSwiftRValueType();
+        auto scalarType = operandTy.getASTType();
         if (convertSwiftTypeToTF(scalarType) == 0) {
           diagnoseInvalid("scalarToTensor requires scalar value; unrecognized"
                           " type '" + scalarType->getString() +
@@ -1935,7 +1935,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
       // Model input lists as an "L" entry in the name, followed by one "e" for
       // each element.  This allows us to know about empty input lists.
       diagnoseInvalid("operand has unrecognized type '" +
-                      operandTy.getSwiftRValueType()->getString() + "'");
+                      operandTy.getASTType()->getString() + "'");
       return;
     }
 

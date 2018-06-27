@@ -237,11 +237,21 @@ struct GraphGlobalConfiguration {
     return convertSwiftTypeToTF(ty) != 0;
   }
 
+  /// Looks up a function in `module`, which must exist.
+  /// If needed, load and link it, so that the function body is available to the
+  /// caller.
+  SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module);
+
   /// Looks up a function by `name` in the context of `typeDecl`, `proto` and
   /// `module`, and returns that function.
   SILFunction *findSILFunctionForRequiredProtocolMember(
       NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
       ModuleDecl *module, SILModule &silModule);
+
+  /// Given a known builtin name and a type for substitution, returns a
+  /// substitution map suitable for calling this builtin.
+  SubstitutionMap getSingleSubstitutionMapForElementType(Type ty,
+                                                         ASTContext &ctx);
 
   /// Represent information about a TensorFlow operation as represented in SIL
   /// as Builtin instructions.

@@ -158,6 +158,19 @@ class DevicePartitionCloner
   void visitStringLiteralInst(StringLiteralInst *inst) {}
   void visitFunctionRefInst(FunctionRefInst *inst) {}
 
+  void visitTupleInst(TupleInst *inst) {
+    // Tuples never exist in the graph except when they are the argument to
+    // the return instruction.
+    assert(inst->hasOneUse() &&
+           isa<ReturnInst>(inst->getSingleUse()->getUser()) &&
+           "Unexpected tuple_inst in DevicePartitionCloner");
+    if (isPrimaryFn()) {
+      // For a non-primary function, we'll create an empty tuple when cloning
+      // the return inst.
+      SILClonerWithScopes::visitTupleInst(inst);
+    }
+  }
+
   // These instructions are cloned over
   void visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
     if (!targetOps.count(inst)) return;
@@ -798,11 +811,22 @@ class DevicePartitionerImpl
         }
       }
 
-      // At this point, the operand must have been produced by a `builtin` inst.
-      auto builtinInst = cast<BuiltinInst>(operandInst);
-      auto transferInst = B.createBuiltin(
-          loc, ctx.getIdentifier(newInstName), opValue->getType(),
-          builtinInst->getSubstitutions(), operands);
+      // The operand must have been produced by a `builtin` inst or an
+      // UncheckedRefCastInst.
+      SubstitutionMap subMap;
+      if (auto *builtinInst = dyn_cast<BuiltinInst>(operandInst)) {
+        subMap = builtinInst->getSubstitutions();
+      } else {
+          assert(isa<UncheckedRefCastInst>(operandInst));
+          auto tensorTy = operandInst->getResults()[0]->getType();
+          assert(isTensorFlowValue(tensorTy));
+        auto &ctx = srcFn.getASTContext();
+        auto elementTy = getTensorHandleElementType(tensorTy.getASTType());
+        subMap = getSingleSubstitutionMapForElementType(elementTy, ctx);
+      }
+
+      auto transferInst = B.createBuiltin(loc, ctx.getIdentifier(newInstName),
+                                          opValue->getType(), subMap, operands);
       transferInstsByDestDevice[lookupKey] = transferInst;
       markInstForDevice(operandDeviceType, transferInst);
       markInstForDevice(deviceType, transferInst);

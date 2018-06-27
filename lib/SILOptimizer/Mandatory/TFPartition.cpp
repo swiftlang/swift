@@ -80,22 +80,15 @@ static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
 /// Given a generic function with a single generic parameter `<T>(...) -> ...`
 /// an a type for substitution, return a substitution map that's suitable for
 /// calling this func.
-static SubstitutionMap getSingleSubstitutionMap(SILFunction *f, Type ty) {
-  return SubstitutionMap::get(
-    f->getGenericEnvironment()->getGenericSignature(),
-    [&](SubstitutableType *t) { return ty; },
-    MakeAbstractConformanceForGenericType());
-}
-
-/// Given a known builtin name and a type for substitution, returns a
-/// substitution map suitable for calling this builtin.
-static SubstitutionMap getSingleSubstitutionMapForBuiltin(
-  Identifier builtinName, Type ty, ASTContext &ctx) {
-  auto builder = GenericSignatureBuilder(ctx);
-  builder.addGenericParameter(GenericTypeParamType::get(0, 0, ctx));
-  auto *genSig = std::move(builder).computeGenericSignature(SourceLoc());
-  return SubstitutionMap::get(genSig, [&](SubstitutableType *t) { return ty; },
-                              MakeAbstractConformanceForGenericType());
+static SubstitutionMap
+getSingleSubstitutionMapForFunction(SILFunction *f, Type ty,
+                                    SILModule &userModule) {
+  auto *loadedFunc = lookupOrLinkFunction(f->getName(), userModule);
+  assert(loadedFunc->getGenericEnvironment());
+  auto *genericSig = loadedFunc->getGenericEnvironment()->getGenericSignature();
+  return SubstitutionMap::get(genericSig,
+                              [&](SubstitutableType *t) { return ty; },
+                              LookUpConformanceInSignature(*genericSig));
 }
 
 /// Classification of instructions that are interesting to the partitioning
@@ -2552,16 +2545,16 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
     instName += ",";
     instName += SILTensorOpInfo::getOperandClassSuffix(
         SILTensorOpInfo::OperandClass::Shape);
-    auto scalarTy = getTensorHandleElementType(valueTy.getSwiftRValueType());
+    auto scalarTy = getTensorHandleElementType(valueTy.getASTType());
     auto metatypeType =
         MetatypeType::get(scalarTy, MetatypeRepresentation::Thin)
             ->getCanonicalType();
     operands.push_back(
         B.createMetatype(loc, SILType::getPrimitiveObjectType(metatypeType)));
   }
-  auto name = ctx.getIdentifier(instName);
   auto subMap =
-    getSingleSubstitutionMapForBuiltin(name, valueTy.getASTType(), ctx);
+    getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
+  auto name = ctx.getIdentifier(instName);
   return B.createBuiltin(loc, name, valueTy, subMap, operands);
 }
 
@@ -2570,6 +2563,7 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
 static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
                                   SILType valueTy, SILValue tensorComputation,
                                   int idNumber, ModuleDecl &tensorFlowModule,
+                                  SILModule &userModule,
                                   SILFunction *receiveFn) {
   assert(receiveFn);
   // The function signature is:
@@ -2593,7 +2587,8 @@ static SILValue createHostReceive(SILBuilder &B, SILLocation loc,
 
   auto scalarType = getTensorHandleElementType(valueTy.getASTType());
   assert(scalarType && "valueTy is not TensorHandle<T>");
-  auto subMap = getSingleSubstitutionMap(receiveFn, scalarType);
+  auto subMap =
+      getSingleSubstitutionMapForFunction(receiveFn, scalarType, userModule);
 
   // Generate an instruction like:
   // %3 = metatype $@thick TensorHandle<Float>.Type
@@ -2634,9 +2629,9 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   operands.push_back(tensorIdAttr);
   configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
                                       instName);
+  auto subMap = getSingleSubstitutionMapForElementType(
+      value->getType().getASTType(), ctx);
   auto name = ctx.getIdentifier(instName);
-  auto subMap = getSingleSubstitutionMapForBuiltin(
-      name, value->getType().getASTType(), ctx);
   B.createBuiltin(loc, name, voidTy, subMap, operands);
 }
 
@@ -2649,6 +2644,7 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
 static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
                                SILValue tensorComputation, int idNumber,
                                ModuleDecl &tensorFlowModule,
+                               SILModule &userModule,
                                SILFunction *createScalarTensorFn,
                                SILFunction *sendFn) {
   assert(sendFn);
@@ -2711,8 +2707,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
 
     auto createScalarTensorFnRef =
         B.createFunctionRef(loc, createScalarTensorFn);
-    SubstitutionMap subMap =
-      getSingleSubstitutionMap(createScalarTensorFn, scalarValueTy);
+    SubstitutionMap subMap = getSingleSubstitutionMapForFunction(
+        createScalarTensorFn, scalarValueTy, userModule);
     value = B.createApply(loc, createScalarTensorFnRef, subMap,
                           /*args*/ {access, metaTypeInst},
                           /*isNonThrowing*/ false);
@@ -2729,7 +2725,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
   // strong retain here to balance it.
   B.createStrongRetain(loc, tensorComputation, Atomicity::Atomic);
   auto sendFnRef = B.createFunctionRef(loc, sendFn);
-  SubstitutionMap subMap = getSingleSubstitutionMap(sendFn, scalarValueTy);
+  SubstitutionMap subMap =
+      getSingleSubstitutionMapForFunction(sendFn, scalarValueTy, userModule);
   // This is a member method of the class of `value`, so we add it as the last
   // parameter.
   return B.createApply(loc, sendFnRef, subMap,
@@ -2798,7 +2795,8 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
            "from Swift to TensorFlow.");
     // Create the send in the host code.
     createHostSend(BH, loc, result, tensorComputation, nextSendID,
-                   tensorFlowModule, createScalarTensorFn, sendFn);
+                   tensorFlowModule, FP.hostFn.getModule(),
+                   createScalarTensorFn, sendFn);
     nextSendID++;
   }
 }
@@ -2839,9 +2837,9 @@ bool PartitionCloner::insertReceive(SILValue value, SILLocation loc) {
                         FP.configuration);
 
   // Create the receive in the host code.
-  auto newVal =
-      createHostReceive(BH, loc, value->getType(), tensorComputation,
-                        nextSendID, tensorFlowModule, receiveFn);
+  auto newVal = createHostReceive(BH, loc, value->getType(), tensorComputation,
+                                  nextSendID, tensorFlowModule,
+                                  FP.hostFn.getModule(), receiveFn);
   value->replaceAllUsesWith(newVal);
   nextSendID++;
   return true;
@@ -3163,7 +3161,12 @@ bool PartitionCloner::finalizeOriginal() {
 
 /// Convert the specified scalar value (e.g. an i32) into a 0d CTensorHandle
 /// value using the TensorFlow runtime utilities.
-static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
+/// To create the function call "_swift_tfc_CreateCTensorHandle", load that
+/// function definition into `userModule` first, so that we can get the generic
+/// substitution map as needed to issue the call.
+static SILValue convertScalarToHostTensorHandle(SILValue value,
+                                                SILModule &userModule,
+                                                SILBuilder &B,
                                                 SILLocation loc) {
   // We need to create a dtype value.  It is an imported C enum value, so it is
   // modeled as a struct that wraps an integer value (itself a struct).
@@ -3202,9 +3205,11 @@ static SILValue convertScalarToHostTensorHandle(SILValue value, SILBuilder &B,
                                     SILAccessEnforcement::Static,
                                     /*noNestedConflict=*/false,
                                     /*fromBuiltin=*/false);
-  auto result = B.createApply(loc, fnRef,
-    getSingleSubstitutionMap(createFn, value->getType().getASTType()),
-    { access, dtype }, /*isNonThrowing*/false);
+  auto result =
+      B.createApply(loc, fnRef,
+                    getSingleSubstitutionMapForFunction(
+                        createFn, value->getType().getASTType(), userModule),
+                    {access, dtype}, /*isNonThrowing*/ false);
   // Finish our read access and free the stack memory.
   B.createEndAccess(loc, access, /*aborted*/false);
   B.createDeallocStack(loc, stackAlloc);
@@ -3477,7 +3482,8 @@ insertTensorComputationStartEndTerminate(ArrayRef<SILValue> resultValues)
                                                  tensorHandleMember);
       tensorValue = B.createLoad(loc, fieldAddress, loadOwnership);
     } else {
-      tensorValue = convertScalarToHostTensorHandle(tensorValue, B, loc);
+      tensorValue = convertScalarToHostTensorHandle(tensorValue,
+                                                    hostFn.getModule(), B, loc);
     }
     SILValue eltAddr = stackAlloc;
     if (numArgs >= 2)
