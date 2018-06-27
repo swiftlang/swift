@@ -1,9 +1,8 @@
-// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/typedef-with-generic-param.h -swift-version 3 2>&1
+// RUN: %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/typedef-with-generic-param.h 2>&1
 
 // REQUIRES: OS=macosx
 
-typealias Result<T> = (T?, Error?)
-typealias Handler<T> = (Result<T>) -> Void
+typealias Handler<T> = (T?, Error?) -> Void
 
 func foo<T>(_ handler: Handler<T>?) {}
 

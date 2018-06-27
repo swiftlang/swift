@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 
@@ -538,11 +538,11 @@ func testProtocolQualified(_ obj: CopyableNSObject, cell: CopyableSomeCell,
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
-  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}} {{12-14=as!}}
+  _ = cell as NSCopying
   _ = cell as SomeCell
   
   _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'NSCopying & NSObjectProtocol'); did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
-  _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
+  _ = plainCell as CopyableSomeCell // expected-error {{'SomeCell' is not convertible to 'CopyableSomeCell' (aka 'SomeCell & NSCopying'); did you mean to use 'as!' to force downcast?}}
 }
 
 extension Printing {

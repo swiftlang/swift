@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -emit-ir -g %s -o - -swift-version 3 | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -g %s -o - -swift-version 3 | %FileCheck %s --check-prefix=SIL-CHECK
+// RUN: %target-swift-frontend -emit-ir -g %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -emit-verbose-sil -g %s -o - | %FileCheck %s --check-prefix=SIL-CHECK
 // REQUIRES: objc_interop
 import Foundation
 
 class Foo : NSObject {
-  dynamic func foo(_ f: (Int64) -> Int64, x: Int64) -> Int64 {
+  @objc dynamic func foo(_ f: (Int64) -> Int64, x: Int64) -> Int64 {
     return f(x)
   }
 }
