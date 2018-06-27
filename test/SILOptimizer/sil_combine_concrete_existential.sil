@@ -1,0 +1,372 @@
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// These tests exercise the same SILCombine optimization as
+// existential_type_propagation.sil, but cover additional corner
+// cases. These are pure unit tests. They do not run the devirtualizer
+// or inliner.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+//===----------------------------------------------------------------------===//
+// testReturnSelf: Call to a protocol extension method with
+// an existential self that can be type-propagated.
+// SILCombine should bailout since it does not propagate
+// type substitutions on the return value.
+//
+// <rdar://40555427> [SR-7773]:
+// SILCombiner::propagateConcreteTypeOfInitExistential fails to full propagate
+// type substitutions.
+//===----------------------------------------------------------------------===//
+public protocol P : AnyObject {
+}
+
+extension P {
+  public func returnSelf() -> Self
+}
+
+final class C : P {
+  init()
+  deinit
+}
+
+public func testReturnSelf() -> P
+
+// P.returnSelf()
+sil @$S21extension_return_self1PPAAE0B4SelfxyF : $@convention(method) <Self where Self : P> (@guaranteed Self) -> @owned Self
+
+// C.__allocating_init()
+sil @$S21extension_return_self1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C
+
+// public func testReturnSelf() -> P {
+//   let p: P = C()
+//   return p.returnSelf().returnSelf()
+// }
+// Neither apply responds to type propagation.
+//
+// CHECK-LABEL: sil @$S21extension_return_self14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned P {
+// CHECK: [[E1:%.*]] = init_existential_ref %{{.*}} : $C : $C, $P
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $P to $@opened("{{.*}}") P
+// CHECK: [[F1:%.*]] = function_ref @$S21extension_return_self1PPAAE0B4SelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[C1:%.*]] = apply [[F1]]<@opened("{{.*}}") P>([[O1]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: [[E2:%.*]] = init_existential_ref [[C1]] : $@opened("{{.*}}") P : $@opened("{{.*}}") P, $P
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $P to $@opened("{{.*}}") P
+// CHECK: [[F2:%.*]] = function_ref @$S21extension_return_self1PPAAE0B4SelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK: apply [[F2]]<@opened("{{.*}}") P>([[O2]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+// CHECK-LABEL: } // end sil function '$S21extension_return_self14testReturnSelfAA1P_pyF'
+sil @$S21extension_return_self14testReturnSelfAA1P_pyF : $@convention(thin) () -> @owned P {
+bb0:
+  %0 = metatype $@thick C.Type
+  // function_ref C.__allocating_init()
+  %1 = function_ref @$S21extension_return_self1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C
+  %2 = apply %1(%0) : $@convention(method) (@thick C.Type) -> @owned C
+  %3 = init_existential_ref %2 : $C : $C, $P
+  %5 = open_existential_ref %3 : $P to $@opened("1217498E-72AC-11E8-9816-ACDE48001122") P
+  // function_ref P.returnSelf()
+  %6 = function_ref @$S21extension_return_self1PPAAE0B4SelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %7 = apply %6<@opened("1217498E-72AC-11E8-9816-ACDE48001122") P>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %8 = init_existential_ref %7 : $@opened("1217498E-72AC-11E8-9816-ACDE48001122") P : $@opened("1217498E-72AC-11E8-9816-ACDE48001122") P, $P
+  %9 = open_existential_ref %8 : $P to $@opened("12174BD2-72AC-11E8-9816-ACDE48001122") P
+  // function_ref P.returnSelf()
+  %10 = function_ref @$S21extension_return_self1PPAAE0B4SelfxyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %11 = apply %10<@opened("12174BD2-72AC-11E8-9816-ACDE48001122") P>(%9) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> @owned τ_0_0
+  %12 = init_existential_ref %11 : $@opened("12174BD2-72AC-11E8-9816-ACDE48001122") P : $@opened("12174BD2-72AC-11E8-9816-ACDE48001122") P, $P
+  strong_release %9 : $@opened("12174BD2-72AC-11E8-9816-ACDE48001122") P
+  strong_release %3 : $P
+  return %12 : $P
+}
+
+//===----------------------------------------------------------------------===//
+// testWitnessReturnOptionalSelf: Call to a witness method with an existential
+// self that can be type-propagated. SILCombine should bailout since it does
+// not propagate type substitutions on the return value, and it must walk the
+// Optional type to find Self in the return type.
+//===----------------------------------------------------------------------===//
+public protocol PP : AnyObject {
+  func returnOptionalSelf() -> Self?
+}
+
+final class CC : PP {
+  init()
+  final func returnOptionalSelf() -> Self?
+  deinit
+}
+
+public func testWitnessReturnOptionalSelf() -> PP?
+
+// CC.__allocating_init()
+sil @$S28witness_return_optional_self2CCCACycfC : $@convention(method) (@thick CC.Type) -> @owned CC
+
+// public func testWitnessReturnOptionalSelf() -> PP? {
+//   let p: PP = CC()
+//   return p.returnOptionalSelf()?.returnOptionalSelf()
+// }
+//
+// Although SILCombine will not replace the self operand, it will still
+// rewrite the witness_method.
+//
+// The first witness_method is rewritten for the concrete lookup type 'CC'.
+//
+// The second witness_method is rewritten for the first opened existential type.
+// Neither apply is rewritten.
+//
+// CHECK-LABEL: sil @$S28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<PP> {
+// CHECK: [[E1:%.*]] = init_existential_ref %{{.*}} : $CC : $CC, $PP
+// CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $PP to $@opened("{{.*}}") PP
+// CHECK: [[W1:%.*]] = witness_method $CC, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> @dynamic_self Self? : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: apply [[W1]]<@opened("{{.*}}") PP>([[O1]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}") PP : $@opened("{{.*}}") PP, $PP
+// CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $PP to $@opened("{{.*}}") PP
+// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> @dynamic_self Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: apply [[W2]]<@opened("{{.*}}") PP>([[O2]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK-LABEL: } // end sil function '$S28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF'
+sil @$S28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<PP> {
+bb0:
+  %0 = metatype $@thick CC.Type
+  // function_ref CC.__allocating_init()
+  %1 = function_ref @$S28witness_return_optional_self2CCCACycfC : $@convention(method) (@thick CC.Type) -> @owned CC
+  %2 = apply %1(%0) : $@convention(method) (@thick CC.Type) -> @owned CC
+  %3 = init_existential_ref %2 : $CC : $CC, $PP
+  %5 = open_existential_ref %3 : $PP to $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP
+  %6 = witness_method $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> @dynamic_self Self?, %5 : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %7 = apply %6<@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP>(%5) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %8 = unchecked_enum_data %7 : $Optional<@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt.1
+  %11 = init_existential_ref %8 : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP, $PP
+  %12 = enum $Optional<PP>, #Optional.some!enumelt.1, %11 : $PP
+  %13 = unchecked_enum_data %12 : $Optional<PP>, #Optional.some!enumelt.1
+  %18 = open_existential_ref %13 : $PP to $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP
+  %19 = witness_method $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> @dynamic_self Self?, %18 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %20 = apply %19<@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP>(%18) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %21 = unchecked_enum_data %20 : $Optional<@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt.1
+  %22 = init_existential_ref %21 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP, $PP
+  %23 = enum $Optional<PP>, #Optional.some!enumelt.1, %22 : $PP
+  strong_release %18 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP
+  strong_release %3 : $PP
+  return %23 : $Optional<PP>
+}
+
+//===----------------------------------------------------------------------===//
+// testWitnessReturnOptionalIndirectSelf: Call to a witness method with an
+// existential self that can be type-propagated. SILCombine should bailout
+// since it does not propagate type substitutions on non-self arguments. It must
+// walk the Optional type to find Self in the non-self argument.
+//===----------------------------------------------------------------------===//
+protocol PPP {
+  func returnsOptionalIndirect() -> Self?
+}
+
+struct S : PPP {
+  func returnsOptionalIndirect() -> S?
+  init()
+}
+
+public func testWitnessReturnOptionalIndirectSelf()
+
+// S.init()
+sil @$S37witness_return_optional_indirect_self1SVACycfC : $@convention(method) (@thin S.Type) -> S
+
+// testWitnessReturnOptionalIndirectSelf()
+// public func testWitnessReturnOptionalIndirectSelf() {
+//   let p: PPP = S()
+//   p.returnsOptionalIndirect()?.returnsOptionalIndirect()
+// }
+//
+// Although SILCombine will not replace the self operand, it will still
+// rewrite the witness_method. The devirtualizer could then handle the first call.
+//
+// CHECK-LABEL: sil @$S37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
+// CHECK: [[O1:%.*]] = open_existential_addr immutable_access %0 : $*PPP to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
+// CHECK: [[R1:%.*]] = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
+// CHECK: [[W1:%.*]] = witness_method $S, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> @dynamic_self Self? : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: apply [[W1]]<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>([[R1]], [[O1]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: inject_enum_addr [[OE1:%.*]] : $*Optional<PPP>, #Optional.some!enumelt.1
+// CHECK: [[E1:%.*]] = unchecked_take_enum_data_addr [[OE1]] : $*Optional<PPP>, #Optional.some!enumelt.1
+// CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[E1]] : $*PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
+// CHECK: [[R2:%.*]] = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
+// CHECK: [[W2:%.*]] = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> @dynamic_self Self?, %19 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: apply [[W2]]<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>([[R2]], [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK-LABEL: } // end sil function '$S37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF'
+sil @$S37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $PPP, let, name "p"
+  %1 = init_existential_addr %0 : $*PPP, $S
+  %2 = metatype $@thin S.Type
+  // function_ref S.init()
+  %3 = function_ref @$S37witness_return_optional_indirect_self1SVACycfC : $@convention(method) (@thin S.Type) -> S
+  %4 = apply %3(%2) : $@convention(method) (@thin S.Type) -> S
+  store %4 to %1 : $*S
+  %6 = alloc_stack $Optional<PPP>
+  %7 = alloc_stack $Optional<PPP>
+  %8 = open_existential_addr immutable_access %0 : $*PPP to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
+  %9 = init_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %10 = init_existential_addr %9 : $*PPP, $@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
+  %11 = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
+  %12 = witness_method $@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> @dynamic_self Self?, %8 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %13 = apply %12<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>(%11, %8) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %14 = unchecked_take_enum_data_addr %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt.1
+  copy_addr [take] %14 to [initialization] %10 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
+  inject_enum_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  dealloc_stack %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
+  %28 = unchecked_take_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %29 = open_existential_addr immutable_access %28 : $*PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
+  %30 = init_enum_data_addr %6 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %31 = init_existential_addr %30 : $*PPP, $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
+  %32 = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
+  %33 = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> @dynamic_self Self?, %29 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %34 = apply %33<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>(%32, %29) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %41 = unchecked_take_enum_data_addr %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt.1
+  copy_addr [take] %41 to [initialization] %31 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
+  inject_enum_addr %6 : $*Optional<PPP>, #Optional.some!enumelt.1
+  dealloc_stack %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
+  destroy_addr %28 : $*PPP
+  dealloc_stack %7 : $*Optional<PPP>
+  destroy_addr %6 : $*Optional<PPP>
+  dealloc_stack %6 : $*Optional<PPP>
+  destroy_addr %0 : $*PPP
+  dealloc_stack %0 : $*PPP
+  %52 = tuple ()
+  return %52 : $()
+}
+
+
+// ===----------------------------------------------------------------------===//
+// testOptionalSelfArg: Call a protocol extension method with an
+// existential self that can be type-propagated. SILCombine should
+// bailout since it does not know how to rewrite non-self operands.
+// SILCombine would previously generate incorrect SIL because it did
+// not properly walk all types in the function signature to find
+// dependencies on the Self type.
+// ===----------------------------------------------------------------------===//
+protocol PPPP {}
+
+extension PPPP {
+  func takeOptionalSelf(_ s: Self?)
+}
+
+class CCCC : PPPP {
+  init()
+  deinit
+}
+
+sil [noinline] @takeOptionalSelf : $@convention(method) <Self where Self : PPPP> (@in_guaranteed Optional<Self>, @in_guaranteed Self) -> ()
+
+// CHECK-LABEL: sil @testOptionalSelfArg : $@convention(thin) (@guaranteed CCCC) -> () {
+// CHECK: init_existential_addr [[A:%.*]] : $*PPPP, $CCCC   // user: %4
+// CHECK: [[OE:%.*]] = open_existential_addr immutable_access [[A]] : $*PPPP to $*@opened("{{.*}}") PPPP // users: %11, %11, %8, %6
+// CHECK: [[F:%.*]] = function_ref @takeOptionalSelf : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> () // user: %11
+// CHECK: apply [[F]]<@opened("{{.*}}") PPPP>(%{{.*}}, [[OE]]) : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> () // type-defs: %5
+// CHECK-LABEL: } // end sil function 'testOptionalSelfArg'
+sil @testOptionalSelfArg : $@convention(thin) (@guaranteed CCCC) -> () {
+bb0(%0 : $CCCC):
+  strong_retain %0 : $CCCC
+
+  %pa = alloc_stack $PPPP, let, name "p"
+  %ea = init_existential_addr %pa : $*PPPP, $CCCC
+  store %0 to %ea : $*CCCC  
+  %oe = open_existential_addr immutable_access %pa : $*PPPP to $*@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP
+
+  %optional = alloc_stack $Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>
+  %someadr = init_enum_data_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt.1
+  copy_addr %oe to [initialization] %someadr : $*@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP
+  inject_enum_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt.1
+
+  %f = function_ref @takeOptionalSelf : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> ()
+  %call = apply %f<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>(%optional, %oe) : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> ()
+
+  destroy_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>
+  dealloc_stack %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>
+
+  destroy_addr %pa : $*PPPP
+  dealloc_stack %pa : $*PPPP
+  %10 = tuple ()
+  return %10 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// testExtensionProtocolComposition: Call to a witness method with an
+// existential self that can be type-propagated. Handle an existential with
+// multiple conformances.
+//
+// This previously crashed in SILCombiner::propagateConcreteTypeOfInitExistential
+// with assertion failed: (proto == Conformance.getRequirement()).
+// ===----------------------------------------------------------------------===//
+public protocol Q {}
+
+extension P where Self : Q {
+  public func witnessComposition() {}
+}
+  
+public class C_PQ: P & Q {}
+
+// P<>.witnessComposition()
+sil @$S32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
+
+// testExtensionProtocolComposition(c:)
+// public func testExtensionProtocolComposition(c: C_PQ) {
+//   let pp: P & Q = c
+//   pp.witnessComposition()
+// }
+//
+// SILCombine substitutes the applies opened existention parameter with a concrete type <C : P & Q>
+// CHECK-LABEL: sil @$S32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF : $@convention(thin) (@guaranteed C_PQ) -> () {
+// CHECK-NOT: init_existential_ref
+// CHECK-NOT: open_existential_ref
+// function_ref P<>.witnessComposition()
+// CHECK: [[F:%.*]] = function_ref @$S32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
+// CHECK: apply [[F]]<C_PQ>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
+// CHECK-LABEL: } // end sil function '$S32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF'
+sil @$S32sil_combine_concrete_existential32testExtensionProtocolComposition1cyAA4C_PQC_tF : $@convention(thin) (@guaranteed C_PQ) -> () {
+bb0(%0 : $C_PQ):
+  strong_retain %0 : $C_PQ
+  %3 = init_existential_ref %0 : $C_PQ : $C_PQ, $P & Q
+  %5 = open_existential_ref %3 : $P & Q to $@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q
+  // function_ref P<>.witnessComposition()
+  %6 = function_ref @$S32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
+  %7 = apply %6<@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
+  strong_release %3 : $P & Q
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// ===----------------------------------------------------------------------===//
+// testDefaultStaticMethod: Test concrete type propagation into a direct
+// apply of a default witness method.
+// ===----------------------------------------------------------------------===//
+public protocol PDefaultStatic: class {
+  static func witnessDefaultStatic()
+}
+
+extension PDefaultStatic {
+  @inline(never)
+  public static func witnessDefaultStatic() {}
+}
+
+public class CDefaultStatic : PDefaultStatic {}
+
+public func callDefaultStatic() {
+  return CDefaultStatic.witnessDefaultStatic()
+}
+
+// static P<>.witnessDefaultStatic(_:)
+sil @witnessDefaultStatic : $@convention(method) <Self where Self : PDefaultStatic> (@thick Self.Type) -> ()
+
+// CHECK-LABEL: sil @testDefaultStaticMethod : $@convention(thin) () -> () {
+// CHECK: %0 = metatype $@thick CDefaultStatic.Type
+// CHECK-NOT: init_existential_metatype
+// CHECK-NOT: open_existential_metatype
+// CHECK: [[F:%.*]] = function_ref @witnessDefaultStatic : $@convention(method) <τ_0_0 where τ_0_0 : PDefaultStatic> (@thick τ_0_0.Type) -> ()
+// CHECK: apply [[F]]<CDefaultStatic>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : PDefaultStatic> (@thick τ_0_0.Type) -> ()
+// CHECK-LABEL: } // end sil function 'testDefaultStaticMethod'
+sil @testDefaultStaticMethod : $@convention(thin) () -> () {
+bb0:
+  %mt = metatype $@thick CDefaultStatic.Type
+  %em = init_existential_metatype %mt : $@thick CDefaultStatic.Type, $@thick PDefaultStatic.Type
+  %om = open_existential_metatype %em : $@thick PDefaultStatic.Type to $@thick (@opened("22222222-72AC-11E8-9816-ACDE48001122") PDefaultStatic).Type
+  %f = function_ref @witnessDefaultStatic : $@convention(method) <Self where Self : PDefaultStatic> (@thick Self.Type) -> ()
+  %call = apply %f<@opened("22222222-72AC-11E8-9816-ACDE48001122") PDefaultStatic>(%om) : $@convention(method) <Self where Self : PDefaultStatic> (@thick Self.Type) -> ()
+  %v = tuple ()
+  return %v : $()
+}
