@@ -24,7 +24,12 @@ func yes() -> Bool { return true }
 // SIL: sil_scope [[F1G:.*]] { loc "f.swift":5:5 parent [[F1]] }
 // SIL: sil_scope [[F1G1:.*]] { loc "g.swift":2:3 {{.*}}inlined_at [[F1G]] }
 // SIL: sil_scope [[F1G3:.*]] { loc "g.swift":3:5 {{.*}}inlined_at [[F1G]] }
-// SIL: sil_scope [[F1G3H2:.*]] { loc "h.swift":3:3{{.*}} inlined_at 12 }
+// SIL: sil_scope [[F1G3H:.*]] { loc "h.swift":1:24
+// SIL-SAME:                     parent @{{.*}}1h{{.*}} inlined_at [[F1G3]] }
+// SIL: sil_scope [[F1G3H1:.*]] { loc "h.swift":1:37
+// SIL-SAME:                      parent [[F1G3H]] inlined_at [[F1G3]] }
+// SIL: sil_scope [[F1G3H2:.*]] { loc "h.swift":3:3
+// SIL-SAME:                      parent [[F1G3H1]] inlined_at [[F1G3]] }
 // SIL: sil_scope [[F1G3H2_THUNK:.*]] { loc "use.swift":1:21
 // SIL-SAME:                            inlined_at [[F1G3H2]] }
 
