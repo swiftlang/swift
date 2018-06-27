@@ -185,10 +185,13 @@ public func testSendsInALoopWithNoResultTensor() {
 // CHECK:        return {{.*}} : $()
 // CHECK-NEXT: } // end sil function {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
 
+// TODO(SR-8117): Revert the artificially long strong literals below.
 public func testCannotSendResource() {
   // expected-error @+2 {{This value type cannot be sent/received}}
   let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "foo", container: "bar")
+    #tfop("Iterator",
+          shared_name: "fooLooooooooooooongWord",
+          container: "barLooooooooooooongWord")
 
   print(iterator)
   let _ = Tensor<Float>(1.0)
@@ -215,9 +218,9 @@ public func test1RecvScalarCPU() {
 // Ideally this generic type should be changed to TensorHandle<Float>
 // CHECK:      [[X2:%.*]] = builtin "__tfop_tfc.RecvFromHost
 // the promoted tensor add on "x.scalar! + 2.0"
-// CHECK:      builtin "__tfop_Add,$in,$in,device"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
+// CHECK:      builtin "__tfop_Add,$in,$in,__device"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
-// CHECK:      builtin "__tfop_Add,$in,$in,T,device"
+// CHECK:      builtin "__tfop_Add,$in,$in,T,__device"
 
 // On host, we receive x, extract its scalar value, and then make a scalar
 // tensor to send back to device.
@@ -251,7 +254,7 @@ public func test1RecvScalarGPU() {
 // "+ 2.0" is promoted to run on all devices.
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarGPU{{.*}}
 // CHECK:      builtin "__tfop_tfc.RecvFromHost
-// CHECK:      string_literal utf8 "/device:CPU:0"
+// CHECK:      string_literal utf8 "/job:localhost/replica:0/task:0/device:CPU:0"
 // CHECK-NEXT: string_literal utf8 "ALL_DEVICES"
 // CHECK-NEXT: builtin "__tfop_tfc.TensorTransfer
 
@@ -276,7 +279,7 @@ public func test1RecvScalarTPU() {
 // compilation. The shape array attr gets propagated to TensorTransfer.
 //
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarTPU{{.*}}
-// CHECK:      [[X_SCALAR_CPU:%.*]] = builtin "__tfop_tfc.RecvFromHost,tensorId,device,__shapes$shapearray,$shape
+// CHECK:      [[X_SCALAR_CPU:%.*]] = builtin "__tfop_tfc.RecvFromHost,tensorId,__device,__shapes$shapearray,$shape
 // CHECK:      [[X_SCALAR_TPU:%.*]] = builtin "__tfop_tfc.TensorTransfer,$in,transferId,srcDevice,destDevice,__shapes$shapearray,$shape"{{.*}}([[X_SCALAR_CPU]] : $TensorHandle
 // This is the promoted scalar add that computes x.scalar! + 2
 // CHECK-NEXT: builtin "__tfop_Add{{.*}}"([[X_SCALAR_TPU]] : $TensorHandle
@@ -303,7 +306,7 @@ public func test1RecvTensor() {
 //
 // CHECK:      builtin "__tfop_tfc.SendToHost{{.*}}<TensorHandle<Float>>([[A:%.*]] : $TensorHandle<Float>
 // CHECK:      [[B:%.*]] = builtin "__tfop_tfc.RecvFromHost
-// CHECK:      builtin "__tfop_Add,$in,$in,T,device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
+// CHECK:      builtin "__tfop_Add,$in,$in,T,__device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}
 // CHECK:      function_ref @_swift_tfc_StartTensorComputation

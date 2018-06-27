@@ -1,13 +1,14 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
+
+// TODO(SR-8117): Revert the artificially long strong literals below.
 
 public func testDatasetWithFakeData() {
   TensorFlow.enableTPU(infeed: true)
   let x: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "fake",
-    filePath: "dummy_path",
+    dataSource: "fakeLooooooooooongWord",
+    filePath: "dummy_pathLooooooooooongWord",
     batchSize: 1,
     outputShapes: [TensorShape()])
   let y = x + 1
@@ -17,15 +18,15 @@ public func testDatasetWithFakeData() {
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testDatasetWithFakeData{{.*}}
 // CHECK: bb0:
 // CHECK:        [[GETNEXT:%[0-9]+]] = builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $TensorHandle<Float>
-// CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in,T,device"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
+// CHECK:        [[RESULT:%[0-9]+]] = builtin "__tfop_Add,$in,$in,T,__device"([[GETNEXT]] : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
 public func testDatasetWithMNIST() {
   TensorFlow.enableTPU(infeed: true)
   let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "mnist",
-    filePath: "some_path",
+    dataSource: "mnistLooooooooooongWord",
+    filePath: "some_pathLooooooooooongWord",
     batchSize: 64,
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
   let images : Tensor<Float> = #tfop("Identity", images1)
@@ -42,8 +43,8 @@ public func testDatasetWithMNIST() {
 // CHECK:  builtin "__tfop_tfc.makeIteratorGetNextWithDatasets{{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>)
 // CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 0
 // CHECK-NEXT:  tuple_extract {{.*}} : $(TensorHandle<Float>, TensorHandle<Int32>), 1
-// CHECK: builtin "__tfop_Add,$in,$in,T,device"(
-// CHECK: builtin "__tfop_Add,$in,$in,T,device"(
+// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
+// CHECK: builtin "__tfop_Add,$in,$in,T,__device"(
 // The operands can appear in arbitrary order here.
 // CHECK:  [[RESULT:%.*]] = tuple ({{.*}} : $TensorHandle<{{.*}}>, {{.*}} : $TensorHandle<{{.*}}>)
 // CHECK-NEXT:  return [[RESULT]] : $(TensorHandle<{{.*}}>, TensorHandle<{{.*}}>)
@@ -93,11 +94,11 @@ public func model() {
   //   .Attr("shared_name: string = ''")
   let iterator: ResourceHandle = #tfop(
     "OneShotIterator",
-    container: "",
+    container: "LooooooooooongWord",
     dataset_factory : /*datasetCreator*/createMockDataSet,
     output_types: [Float.self],
     output_shapes: [TensorShape()],
-    shared_name: ""
+    shared_name: "LooooooooooongWord"
   )
 
   // REGISTER_OP("IteratorGetNext")
