@@ -271,3 +271,36 @@ class ClassWithLoadableStructWithBiggerString {
         return LoadableStructWithBiggerString(a1: BiggerString(str:"", double:0.0), a2: [], a3: [])
     }
 }
+
+//===----------------------------------------------------------------------===//
+// SR-8076
+//===----------------------------------------------------------------------===//
+public struct sr8076_BigStruct {
+    public var m1: String
+    public var m2: String
+    public var m3: String
+}
+
+public typealias sr8076_Filter = (sr8076_BigStruct) -> Bool
+
+public protocol sr8076_Query {
+    associatedtype Returned
+}
+
+public protocol sr8076_ProtoQueryHandler {
+    func forceHandle<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?)
+}
+
+public protocol sr8076_QueryHandler: sr8076_ProtoQueryHandler {
+    associatedtype Handled: sr8076_Query
+    func handle(query: Handled) throws -> (Handled.Returned, sr8076_Filter?)
+}
+
+public extension sr8076_QueryHandler {
+    func forceHandle<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
+        guard let body = handle as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return try body(query)
+    }
+}
