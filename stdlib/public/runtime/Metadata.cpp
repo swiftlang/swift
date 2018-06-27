@@ -1473,7 +1473,20 @@ bool swift::equalContexts(const ContextDescriptor *a,
         && kind <= ContextDescriptorKind::Type_Last) {
       auto typeA = cast<TypeContextDescriptor>(a);
       auto typeB = cast<TypeContextDescriptor>(b);
-      return strcmp(typeA->Name.get(), typeB->Name.get()) == 0;
+      if (strcmp(typeA->Name.get(), typeB->Name.get()) != 0)
+        return false;
+      
+      // A synthesized entity has to match the related entity tag too.
+      if (typeA->isSynthesizedRelatedEntity()) {
+        if (!typeB->isSynthesizedRelatedEntity())
+          return false;
+        
+        if (typeA->getSynthesizedDeclRelatedEntityTag()
+            != typeB->getSynthesizedDeclRelatedEntityTag())
+          return false;
+      }
+      
+      return true;
     }
     
     // Otherwise, this runtime doesn't know anything about this context kind.

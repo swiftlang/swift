@@ -264,14 +264,31 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         }
 
         auto nameNode = node->getChild(1);
-        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
-          return false;
-
-        if (nameNode->getText() != type->Name.get())
-          return false;
         
-        node = node->getChild(0);
-        break;
+        // Declarations synthesized by the Clang importer get a small tag
+        // string in addition to their name.
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
+          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+            return false;
+          
+          nameNode = nameNode->getChild(0);
+        } else if (type->isSynthesizedRelatedEntity()) {
+          return false;
+        }
+        
+        // We should only match public or internal declarations with stable
+        // names. The runtime metadata for private declarations would be
+        // anonymized.
+        if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
+          if (nameNode->getText() != type->Name.get())
+            return false;
+          
+          node = node->getChild(0);
+          break;
+        }
+        
+        return false;
+
       }
       
       // We don't know about this kind of context, or it doesn't have a stable
