@@ -86,9 +86,7 @@ getSingleSubstitutionMapForFunction(SILFunction *f, Type ty,
   auto *loadedFunc = lookupOrLinkFunction(f->getName(), userModule);
   assert(loadedFunc->getGenericEnvironment());
   auto *genericSig = loadedFunc->getGenericEnvironment()->getGenericSignature();
-  return SubstitutionMap::get(genericSig,
-                              [&](SubstitutableType *t) { return ty; },
-                              LookUpConformanceInSignature(*genericSig));
+  return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
 }
 
 /// Classification of instructions that are interesting to the partitioning

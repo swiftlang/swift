@@ -817,9 +817,9 @@ class DevicePartitionerImpl
       if (auto *builtinInst = dyn_cast<BuiltinInst>(operandInst)) {
         subMap = builtinInst->getSubstitutions();
       } else {
-          assert(isa<UncheckedRefCastInst>(operandInst));
-          auto tensorTy = operandInst->getResults()[0]->getType();
-          assert(isTensorFlowValue(tensorTy));
+        assert(isa<UncheckedRefCastInst>(operandInst));
+        auto tensorTy = operandInst->getResults()[0]->getType();
+        assert(isTensorFlowValue(tensorTy));
         auto &ctx = srcFn.getASTContext();
         auto elementTy = getTensorHandleElementType(tensorTy.getASTType());
         subMap = getSingleSubstitutionMapForElementType(elementTy, ctx);

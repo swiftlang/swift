@@ -260,14 +260,22 @@ SILFunction *tf::findSILFunctionForRequiredProtocolMember(
   return nullptr;
 }
 
-SubstitutionMap tf::getSingleSubstitutionMapForElementType(Type ty,
-                                                           ASTContext &ctx) {
-  auto builder = GenericSignatureBuilder(ctx);
-  builder.addGenericParameter(GenericTypeParamType::get(0, 0, ctx));
-  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+SubstitutionMap tf::getSingleSubstitutionMapForElementTypeAndSignature(
+    Type ty, GenericSignature *genericSig) {
+  assert(genericSig->getGenericParams().size() == 1);
   return SubstitutionMap::get(genericSig,
                               [&](SubstitutableType *t) { return ty; },
                               LookUpConformanceInSignature(*genericSig));
+}
+
+SubstitutionMap tf::getSingleSubstitutionMapForElementType(Type ty,
+                                                           ASTContext &ctx) {
+  // FIXME: consider storing `genericSig` somewhere to avoid rebuilding it
+  // each time.
+  auto builder = GenericSignatureBuilder(ctx);
+  builder.addGenericParameter(GenericTypeParamType::get(0, 0, ctx));
+  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  return getSingleSubstitutionMapForElementTypeAndSignature(ty, genericSig);
 }
 
 /// If the specified value is a single-element struct_inst wrapper, look through

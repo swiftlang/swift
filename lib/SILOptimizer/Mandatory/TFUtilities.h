@@ -248,8 +248,14 @@ struct GraphGlobalConfiguration {
       NominalTypeDecl *typeDecl, ProtocolDecl *proto, DeclName name,
       ModuleDecl *module, SILModule &silModule);
 
-  /// Given a known builtin name and a type for substitution, returns a
-  /// substitution map suitable for calling this builtin.
+  /// Given an element type like `Float` and a generic signature with a single
+  /// type parameter, returns a substitution map suitable for calling a builtin
+  /// or function with such a substitution.
+  SubstitutionMap getSingleSubstitutionMapForElementTypeAndSignature(
+      Type ty, GenericSignature *genericSig);
+
+  /// Given an element type like `Float`, returns a substitution map suitable
+  /// for calling a builtin or function with this single-entry substitution.
   SubstitutionMap getSingleSubstitutionMapForElementType(Type ty,
                                                          ASTContext &ctx);
 
