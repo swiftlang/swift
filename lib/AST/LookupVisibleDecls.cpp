@@ -441,9 +441,13 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
         continue;
       }
       if (auto *VD = dyn_cast<ValueDecl>(Member)) {
-        if (TypeResolver)
+        if (TypeResolver) {
           TypeResolver->resolveDeclSignature(VD);
-
+          if (!NormalConformance->hasWitness(VD) &&
+              (Conformance->getDeclContext()->getParentSourceFile() !=
+              FromContext->getParentSourceFile()))
+            TypeResolver->resolveWitness(NormalConformance, VD);
+        }
         // Skip value requirements that have corresponding witnesses. This cuts
         // down on duplicates.
         if (!NormalConformance->hasWitness(VD) ||
