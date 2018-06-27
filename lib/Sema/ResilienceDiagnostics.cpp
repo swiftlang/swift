@@ -129,9 +129,12 @@ bool TypeChecker::diagnoseInlinableDeclRef(SourceLoc loc,
   DowngradeToWarning downgradeToWarning = DowngradeToWarning::No;
 
   // Swift 4.2 did not perform any checks for type aliases.
-  if (!Context.isSwiftVersionAtLeast(5) &&
-      isa<TypeAliasDecl>(D))
-    downgradeToWarning = DowngradeToWarning::Yes;
+  if (isa<TypeAliasDecl>(D)) {
+    if (!Context.isSwiftVersionAtLeast(4, 2))
+      return false;
+    if (!Context.isSwiftVersionAtLeast(5))
+      downgradeToWarning = DowngradeToWarning::Yes;
+  }
 
   auto diagID = diag::resilience_decl_unavailable;
   if (downgradeToWarning == DowngradeToWarning::Yes)
