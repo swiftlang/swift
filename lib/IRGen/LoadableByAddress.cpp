@@ -452,6 +452,7 @@ SILType LargeSILTypeMapper::getNewSILType(GenericEnvironment *GenericEnv,
   }
   SILType newSILType = getNewOptionalFunctionType(GenericEnv, storageType, Mod);
   if (newSILType != storageType) {
+    oldToNewTypeMap[typePair] = newSILType;
     return newSILType;
   }
   if (auto fnType = storageType.getAs<SILFunctionType>()) {
@@ -2212,8 +2213,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
     return true;
   } else if (containsFunctionSignature(genEnv, pass.Mod, resultTy,
                                        newSILType) &&
-             (resultTy != newSILType)) {
-    assert(loweredTy->getNumResults() == 1 && "Expected a single result");
+             (resultTy != newSILType) && (loweredTy->getNumResults() == 1)) {
     SILResultInfo origResultInfo = loweredTy->getSingleResult();
     SILResultInfo newSILResultInfo(newSILType.getASTType(),
                                    origResultInfo.getConvention());
@@ -2301,6 +2301,9 @@ getOperandTypeWithCastIfNecessary(SILInstruction *containingInstr, SILValue op,
         containingInstr->getFunction()->getGenericEnvironment();
     if (!genEnv && funcType->isPolymorphic()) {
       genEnv = getGenericEnvironment(funcType);
+    }
+    if (!Mapper.shouldTransformFunctionType(genEnv, funcType, Mod)) {
+      return op;
     }
     auto newFnType = Mapper.getNewSILFunctionType(genEnv, funcType, Mod);
     SILType newSILType = SILType::getPrimitiveObjectType(newFnType);
