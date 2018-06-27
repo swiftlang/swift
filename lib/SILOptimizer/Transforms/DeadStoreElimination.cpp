@@ -149,6 +149,7 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongRetainUnownedInst:
+  case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::UnownedRetainInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DeallocStackInst:
