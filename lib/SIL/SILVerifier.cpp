@@ -1865,9 +1865,8 @@ public:
                                          "Operand of unowned_retain");
     require(unownedType->isLoadable(ResilienceExpansion::Maximal),
             "unowned_retain requires unowned type to be loadable");
-    require(F.hasQualifiedOwnership(),
-            "copy_unowned_value is only valid in functions with qualified "
-            "ownership");
+    // *NOTE* We allow copy_unowned_value to be used throughout the entire
+    // pipeline even though it is a higher level instruction.
   }
 
   void checkDestroyValueInst(DestroyValueInst *I) {

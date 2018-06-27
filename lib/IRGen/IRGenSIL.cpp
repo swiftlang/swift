@@ -965,9 +965,7 @@ public:
   void visitRetainValueInst(RetainValueInst *i);
   void visitRetainValueAddrInst(RetainValueAddrInst *i);
   void visitCopyValueInst(CopyValueInst *i);
-  void visitCopyUnownedValueInst(CopyUnownedValueInst *i) {
-    llvm_unreachable("unimplemented");
-  }
+  void visitCopyUnownedValueInst(CopyUnownedValueInst *i);
   void visitReleaseValueInst(ReleaseValueInst *i);
   void visitReleaseValueAddrInst(ReleaseValueAddrInst *i);
   void visitDestroyValueInst(DestroyValueInst *i);
@@ -3839,6 +3837,18 @@ visitStrongRetainUnownedInst(swift::StrongRetainUnownedInst *i) {
   auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
   ti.strongRetainUnowned(*this, lowered, i->isAtomic() ? irgen::Atomicity::Atomic
                                                        : irgen::Atomicity::NonAtomic);
+}
+
+void IRGenSILFunction::visitCopyUnownedValueInst(
+    swift::CopyUnownedValueInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  auto &ti = getReferentTypeInfo(*this, i->getOperand()->getType());
+  ti.strongRetainUnowned(*this, in, irgen::Atomicity::Atomic);
+  // Semantically we are just passing through the input parameter but as a
+  // strong reference... at LLVM IR level these type differences don't
+  // matter. So just set the lowered explosion appropriately.
+  Explosion output = getLoweredExplosion(i->getOperand());
+  setLoweredExplosion(i, output);
 }
 
 void IRGenSILFunction::visitUnownedRetainInst(swift::UnownedRetainInst *i) {

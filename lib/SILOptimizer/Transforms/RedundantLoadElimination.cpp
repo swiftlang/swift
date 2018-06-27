@@ -156,6 +156,7 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::IsUniqueOrPinnedInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::CopyUnownedValueInst:
     return true;
   default:
     return false;
