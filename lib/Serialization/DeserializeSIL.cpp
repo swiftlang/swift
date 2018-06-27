@@ -375,7 +375,15 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+  auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
+                                        /*declarationOnly*/ true);
+  if (!maybeFn) {
+    // Ignore the failure and just pretend the function doesn't exist
+    llvm::consumeError(maybeFn.takeError());
+    return nullptr;
+  }
+
+  return maybeFn.get();
 }
 
 /// Helper function to find a SILGlobalVariable given its name. It first checks
