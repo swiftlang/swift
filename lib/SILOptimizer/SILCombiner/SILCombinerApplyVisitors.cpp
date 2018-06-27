@@ -826,7 +826,6 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     auto *NewWMI = WMIBuilder.createWitnessMethod(
         WMI->getLoc(), CEI.ConcreteType, SelfConformance, WMI->getMember(),
         WMI->getType());
-    NewWMI->dump();
     // Replace only uses of the witness_method in the apply that was analyzed by
     // ConcreteExistentialInfo.
     MutableArrayRef<Operand> Operands =
