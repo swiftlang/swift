@@ -1647,8 +1647,8 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
 }
 
 /// Analyze the array users of an _allocateUninitialized call, to see if they
-/// are all simple things we can remove.  If so, return add them all to
-/// arrayInsts and return false.  If so, return true.
+/// are all simple things we can remove.  If so, add them all to arrayInsts and
+/// return false.  If not, return true.
 static bool analyzeArrayInitUses(SILValue v,
                                  SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
   for (auto *use : v->getUses()) {
