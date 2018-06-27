@@ -74,6 +74,8 @@ ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
 }
 
 ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
+  assert(!isInvalid());
+
   if (isConcrete()) {
     return getConcrete()->getProtocol();
   } else {
@@ -93,6 +95,9 @@ ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
                               LookupConformanceFn conformances) const {
+  if (isInvalid())
+    return *this;
+
   auto substType = origType.subst(subs, conformances,
                                   SubstFlags::UseErrorType);
 
@@ -137,6 +142,8 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
                                              Identifier name,
                                              LazyResolver *resolver) {
+  assert(!conformance.isInvalid());
+
   // Find the named requirement.
   AssociatedTypeDecl *assocType = nullptr;
   auto members = conformance.getRequirement()->lookupDirect(name);
@@ -1362,14 +1369,14 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
 /// Check of all types used by the conformance are canonical.
 bool ProtocolConformanceRef::isCanonical() const {
-  if (isAbstract())
+  if (isAbstract() || isInvalid())
     return true;
   return getConcrete()->isCanonical();
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getCanonicalConformanceRef() const {
-  if (isAbstract())
+  if (isAbstract() || isInvalid())
     return *this;
   return ProtocolConformanceRef(getConcrete()->getCanonicalConformance());
 }
