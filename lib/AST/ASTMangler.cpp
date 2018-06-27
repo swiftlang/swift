@@ -739,12 +739,15 @@ void ASTMangler::appendType(Type type) {
       auto aliasTy = cast<NameAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
-      // FIXME: We also cannot yet mangle references to typealiases that
-      // involve generics.
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
+
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      if (decl->getGenericSignature())
+        return appendSugaredType<NameAliasType>(type);
 
       // For the DWARF output we want to mangle the type alias + context,
       // unless the type alias references a builtin type.
