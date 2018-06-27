@@ -1166,7 +1166,7 @@ void swift::_swift_getFieldAt(
     if (typeInfo == nullptr) {
       typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
       warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-                 "mangled type name is '%*s'",
+                 "mangled type name is '%*s'\n",
                  (int)name.size(), name.data(),
                  (int)typeName.size(), typeName.data());
     }
@@ -1214,6 +1214,17 @@ void swift::_swift_getFieldAt(
         return;
     }
   }
+
+  // If we failed to find the field descriptor metadata for the type, fall
+  // back to returning an empty tuple as a standin.
+  auto typeName = swift_getTypeName(base, /*qualified*/ true);
+  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
+             (int)typeName.length, typeName.data);
+  callback("unknown",
+           FieldType()
+             .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
+             .withIndirect(false)
+             .withWeak(false));
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE
