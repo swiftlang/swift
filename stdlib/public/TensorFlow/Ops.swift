@@ -473,7 +473,7 @@ public extension Tensor {
   ///   leading dimension.
   @inlinable @inline(__always)
   func concatenated(with other: Tensor) -> Tensor {
-    return Raw.concatV2(values: [self, other], axis: Tensor<Int32>(0))
+    return Raw.concatV2([self, other], axis: Tensor<Int32>(0))
   }
 
   /// Concatenates tensors along the specified axis.
@@ -482,7 +482,7 @@ public extension Tensor {
   /// - Precondition: The axis must be in the range `-rank..<rank`.
   @inlinable @inline(__always)
   func concatenated(with other: Tensor, alongAxis axis: Int32) -> Tensor {
-    return Raw.concatV2(values: [self, other], axis: Tensor<Int32>(axis))
+    return Raw.concatV2([self, other], axis: Tensor<Int32>(axis))
   }
 
   /// Concatenation operator.
