@@ -569,6 +569,60 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
 
+  SmallVector<ValueDecl*, 4> ResultValues;
+  ValueDecl *localDeclAfterUse = nullptr;
+  auto isValid = [&](ValueDecl *D) {
+    // FIXME: The source-location checks won't make sense once
+    // EnableASTScopeLookup is the default.
+    if (Loc.isValid() && D->getLoc().isValid() &&
+        D->getDeclContext()->isLocalContext() &&
+        D->getDeclContext() == DC &&
+        Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
+      localDeclAfterUse = D;
+      return false;
+    }
+    return true;
+  };
+  bool AllDeclRefs = findNonMembers(
+      *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
+      ResultValues, isValid);
+
+  // If local declaration after use is found, check outer results for
+  // better matching candidates.
+  if (localDeclAfterUse) {
+    auto innerDecl = localDeclAfterUse;
+
+    // Perform a thorough lookup if outer results was not included before.
+    if (!lookupOptions.contains(NameLookupFlags::IncludeOuterResults)) {
+      auto option = lookupOptions;
+      option |= NameLookupFlags::IncludeOuterResults;
+      Lookup = lookupUnqualified(DC, Name, Loc, option);
+    }
+
+    while (localDeclAfterUse) {
+      if (Lookup.outerResults().empty()) {
+        diagnose(Loc, diag::use_local_before_declaration, Name);
+        diagnose(innerDecl, diag::decl_declared_here, Name);
+        Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
+        return error;
+      }
+
+      Lookup.shiftDownResults();
+      ResultValues.clear();
+      localDeclAfterUse = nullptr;
+      AllDeclRefs = findNonMembers(
+          *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
+          ResultValues, isValid);
+    }
+
+    // Drop outer results if they are not supposed to be included.
+    if (!lookupOptions.contains(NameLookupFlags::IncludeOuterResults)) {
+      Lookup.filter([&](LookupResultEntry Result, bool isOuter) {
+          return !isOuter;
+      });
+    }
+  }
+
   // If we have an unambiguous reference to a type decl, form a TypeExpr.
   if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
       isa<TypeDecl>(Lookup[0].getValueDecl())) {
@@ -585,27 +639,6 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                    Lookup[0].getDeclContext(),
                                    UDRE->isImplicit());
   }
-
-  SmallVector<ValueDecl*, 4> ResultValues;
-  Expr *error = nullptr;
-  bool AllDeclRefs = findNonMembers(
-      *this, Lookup.innerResults(), UDRE->getRefKind(), /*breakOnMember=*/true,
-      ResultValues, [&](ValueDecl *D) {
-        // FIXME: The source-location checks won't make sense once
-        // EnableASTScopeLookup is the default.
-        if (Loc.isValid() && D->getLoc().isValid() &&
-            D->getDeclContext()->isLocalContext() &&
-            D->getDeclContext() == DC &&
-            Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc())) {
-          diagnose(Loc, diag::use_local_before_declaration, Name);
-          diagnose(D, diag::decl_declared_here, Name);
-          error = new (Context) ErrorExpr(UDRE->getSourceRange());
-          return false;
-        }
-        return true;
-      });
-  if (error)
-    return error;
 
   if (AllDeclRefs) {
     // Diagnose uses of operators that found no matching candidates.
