@@ -1,8 +1,8 @@
 // Please keep this file in alphabetical order!
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name generic -disable-objc-attr-requires-foundation-module -swift-version 3
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/generic.swiftmodule -typecheck -emit-objc-header-path %t/generic.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name generic -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/generic.swiftmodule -typecheck -emit-objc-header-path %t/generic.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/generic.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/generic.h
 // RUN: %check-in-clang %t/generic.h
@@ -14,7 +14,7 @@ import ObjectiveC
 // CHECK-LABEL: @interface ConcreteClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class ConcreteClass {}
+@objc @objcMembers class ConcreteClass {}
 
 // CHECK-NOT: @interface GenericSubclass
 // NEGATIVE-NOT: @interface GenericSubclass
@@ -30,7 +30,7 @@ class NonGenericSubclass : GenericSubclass<ConcreteClass> {}
 // CHECK-NOT: rocky
 // NEGATIVE-NOT: rocky
 // CHECK-NEXT: @end
-@objc class TopMoviesOfAllTime {
+@objc @objcMembers class TopMoviesOfAllTime {
   func rambo(c: ConcreteClass) {}
   func rocky(c: NonGenericSubclass) {}
 }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -190,7 +190,7 @@ func useRenamedAPIs(actionable: SCNActionable, action: SCNAction, data: Data,
   let _ = SCNIKConstraint.inverseKinematicsConstraint(chainRootNode: node)
 
   let _ = geometry.material(named: "mat")
-  let _ = geometry.getGeometrySources(for: semantic)
+  let _ = geometry.sources(for: semantic)
   let geoSrc = SCNGeometrySource(data: data, semantic: semantic, vectorCount: 2,
                                  usesFloatComponents: false,
                                  componentsPerVector: 3,

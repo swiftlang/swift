@@ -1,8 +1,8 @@
 // Please keep this file in alphabetical order!
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name local -disable-objc-attr-requires-foundation-module -swift-version 3
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/local.swiftmodule -typecheck -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -module-name local -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/local.swiftmodule -typecheck -emit-objc-header-path %t/local.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/local.h
 // RUN: %check-in-clang %t/local.h
 
@@ -13,7 +13,7 @@ import ObjectiveC
 // CHECK-LABEL: @interface AFullyDefinedClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-@objc class AFullyDefinedClass {}
+@objc @objcMembers class AFullyDefinedClass {}
 
 class ANonObjCClass {}
 
@@ -65,6 +65,8 @@ class ANonObjCClass {}
 
   @objc var j: ZForwardClass3 { return ZForwardClass3() }
   @objc var k: ZForwardClass4.Type { return ZForwardClass4.self }
+
+  @objc init() {}
 }
 
 // CHECK-NOT: @class ZForwardClass1;
@@ -78,6 +80,7 @@ class ANonObjCClass {}
 @objc class UseForwardAgain {
   @objc func a(_ a: ZForwardClass1) {}
   @objc func b(_ b: ZForwardProtocol1) {}
+  @objc init() {}
 }
 
 typealias ZForwardAlias = ZForwardAliasClass
@@ -91,6 +94,7 @@ typealias ZForwardAlias = ZForwardAliasClass
 // CHECK-NEXT: @end
 @objc class ZForwardClass1 {
   @objc func circular(_ a: UseForward) {}
+  @objc init() {}
 }
 @objc class ZForwardClass2 {}
 @objc class ZForwardClass3 {}

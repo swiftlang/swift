@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -g -verify -swift-version 3
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -g -verify
 
 // REQUIRES: objc_interop
 
@@ -8,8 +8,8 @@ import Foundation
 import objc_generics
 
 public extension GenericClass {
-  func method() {}
-  class func classMethod() {}
+  @objc func method() {}
+  @objc class func classMethod() {}
 }
 
 public func takesFunction<T : AnyObject>(fn: @escaping (GenericClass<T>) -> ()) -> (GenericClass<T>) -> () {
