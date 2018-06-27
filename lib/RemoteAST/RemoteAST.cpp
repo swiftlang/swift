@@ -753,7 +753,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        Result = cast<NominalTypeDecl>(decl);
+        // A synthesized type from the Clang importer may resolve to a
+        // compatibility alias.
+        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
+          if (resultAlias->isCompatibilityAlias()) {
+            Result = resultAlias->getUnderlyingTypeLoc().getType()
+                                ->getAnyNominal();
+          }
+        } else {
+          Result = dyn_cast<NominalTypeDecl>(decl);
+        }
+        HadError |= !Result;
       } else {
         HadError = true;
         Result = nullptr;
