@@ -68,6 +68,32 @@ extension Outer.GenericInner {
   }
 }
 
+// Mangling for generic typealiases.
+protocol P {
+  associatedtype A
+}
+
+protocol Q {
+  associatedtype B: P
+  typealias ProtocolTypeAliasThing = B.A
+}
+
+struct ConformsToP: P {
+  typealias A = Int
+}
+
+struct ConformsToQ: Q {
+  typealias B = ConformsToP
+}
+
+struct Blah {
+  typealias SomeQ = ConformsToQ
+
+  func foo() {
+    let bar: SomeQ.ProtocolTypeAliasThing? = nil
+  }
+}
+
 func main() -> Int {
   var p : Patatino<Int> = Patatino(23);
   return 0

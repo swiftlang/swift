@@ -484,6 +484,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericTypeAlias: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
@@ -593,6 +594,10 @@ void Remangler::mangleBoundGenericStructure(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  mangleAnyNominalType(node);
+}
+
+void Remangler::mangleBoundGenericProtocol(Node *node) {
   mangleAnyNominalType(node);
 }
 
@@ -2053,6 +2058,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
+    case Node::Kind::BoundGenericProtocol:
       return true;
 
     case Node::Kind::Structure:
@@ -2060,6 +2066,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::Class:
     case Node::Kind::TypeAlias:
     case Node::Kind::OtherNominalType:
+    case Node::Kind::Protocol:
       return isSpecialized(node->getChild(0));
 
     case Node::Kind::Extension:
@@ -2090,8 +2097,10 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias: {
+    case Node::Kind::BoundGenericTypeAlias:
+    {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
