@@ -180,11 +180,10 @@ static int run_driver(StringRef ExecName,
 }
 
 int main(int argc_, const char **argv_) {
-  SmallVector<const char *, 256> args(&argv_[0], &argv_[argc_]);
-
   // Expand any response files in the command line argument vector - arguments
   // may be passed through response files in the event of command line length
   // restrictions.
+  SmallVector<const char *, 256> ExpandedArgs(&argv_[0], &argv_[argc_]);
   llvm::BumpPtrAllocator Allocator;
   llvm::StringSaver Saver(Allocator);
   llvm::cl::ExpandResponseFiles(
@@ -192,12 +191,12 @@ int main(int argc_, const char **argv_) {
       llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
       llvm::cl::TokenizeWindowsCommandLine :
       llvm::cl::TokenizeGNUCommandLine,
-      args);
+      ExpandedArgs);
 
   // Initialize the stack trace using the parsed argument vector with expanded
   // response files.
-  int ExpandedArgc = args.size();
-  const char **ExpandedArgv = args.data();
+  int ExpandedArgc = ExpandedArgs.size();
+  const char **ExpandedArgv = ExpandedArgs.data();
   PROGRAM_START(ExpandedArgc, ExpandedArgv);
   SmallVector<const char *, 256> argv(&ExpandedArgv[0],
                                       &ExpandedArgv[ExpandedArgc]);
