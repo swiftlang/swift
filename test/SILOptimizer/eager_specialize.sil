@@ -182,7 +182,7 @@ bb2:
 }
 
 // specialized divideNum<A where ...> (A, den : A) throws -> A
-// CHECK-LABEL: sil shared @$S16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error) {
+// CHECK-LABEL: sil shared @$S16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error) {
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: return %{{.*}}
 // CHECK: throw %{{.*}}
@@ -224,7 +224,7 @@ bb2:
 // CHECK:   %{{.*}} = unchecked_addr_cast %2 : $*T to $*Int
 // CHECK:   %{{.*}} = load %{{.*}} : $*Int
 // CHECK:   // function_ref specialized divideNum<A>(_:den:)
-// CHECK:   %{{.*}} = function_ref @$S16eager_specialize9divideNum_3denxx_xtKs13SignedIntegerRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error)
+// CHECK:   %{{.*}} = function_ref @$S16eager_specialize9divideNum_3denxx_xtKSZRzlFSi_Tg5 : $@convention(thin) (Int, Int) -> (Int, @error Error)
 // CHECK:   try_apply %{{.*}}(%{{.*}}, %{{.*}}) : $@convention(thin) (Int, Int) -> (Int, @error Error), normal bb8, error bb7
 
 // CHECK: bb7(%{{.*}} : $Error):

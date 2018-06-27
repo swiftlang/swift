@@ -49,6 +49,25 @@ class Foo<T> {
 
 typealias Patatino<T> = Foo<T>
 
+public struct Outer<T> {
+  public struct Inner { }
+  public struct GenericInner<U> { }
+
+  public typealias Foo<U> = Outer<U>.Inner
+
+  public func blah() {
+    let foo: Foo<Int> = Outer<Int>.Inner()
+  }
+}
+
+extension Outer.GenericInner {
+  public typealias Bar = Int
+
+  public func useBar() {
+    let bar: Bar = 7
+  }
+}
+
 func main() -> Int {
   var p : Patatino<Int> = Patatino(23);
   return 0
