@@ -231,10 +231,6 @@ class ElementUseCollector {
   /// element we attribute an access to.
   bool InStructSubElement = false;
 
-  /// When walking the use list, if we index into an enum slice, keep track
-  /// of this.
-  bool InEnumSubElement = false;
-
 public:
   ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
                       SmallVectorImpl<PMOMemoryUse> &Uses,
@@ -294,7 +290,7 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
-  if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
+  if (TheMemory.NumElements != 1 && !InStructSubElement)
     NumElements = getElementCountRec(Module, UseTy);
 
   Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, NumElements));
@@ -309,7 +305,7 @@ bool ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   // If we're walking into a tuple within a struct or enum, don't adjust the
   // BaseElt.  The uses hanging off the tuple_element_addr are going to be
   // counted as uses of the struct or enum itself.
-  if (InStructSubElement || InEnumSubElement)
+  if (InStructSubElement)
     return collectUses(TEAI, BaseEltNo);
 
   // tuple_element_addr P, 42 indexes into the current tuple element.
@@ -554,40 +550,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
 
-    // init_enum_data_addr is treated like a tuple_element_addr or other
-    // instruction that is looking into the memory object (i.e., the memory
-    // object needs to be explicitly initialized by a copy_addr or some other
-    // use of the projected address).
-    if (auto I = dyn_cast<InitEnumDataAddrInst>(User)) {
-      // If we are in a struct already, bail. With proper analysis, we should be
-      // able to do this optimization.
-      if (InStructSubElement) {
-        return false;
-      }
-
-      // Keep track of the fact that we're inside of an enum.  This informs our
-      // recursion that tuple stores are not scalarized outside, and that stores
-      // should not be treated as partial stores.
-      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
-      if (!collectUses(I, BaseEltNo))
-        return false;
-      continue;
-    }
-
     // init_existential_addr is modeled as an initialization store.
     if (isa<InitExistentialAddrInst>(User)) {
       // init_existential_addr should not apply to struct subelements.
-      if (InStructSubElement) {
-        return false;
-      }
-      Uses.push_back(
-          PMOMemoryUse(User, PMOUseKind::Initialization, BaseEltNo, 1));
-      continue;
-    }
-
-    // inject_enum_addr is modeled as an initialization store.
-    if (isa<InjectEnumAddrInst>(User)) {
-      // inject_enum_addr the subelement of a struct unless in a ctor.
       if (InStructSubElement) {
         return false;
       }
