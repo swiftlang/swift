@@ -3,11 +3,11 @@
 @inline(never)
 func yes() -> Bool { return true }
 
-@inline(never)
-func use<V>(_ v: V) {}
+#sourceLocation(file: "use.swift", line: 1)
+@inline(never) func use<V>(_ v: V) {}
 
-@inline(__always)
-func h<U>(_ u: U) {
+#sourceLocation(file: "h.swift", line: 1)
+@inline(__always) func h<U>(_ u: U) {
   yes()
   use(u)
 }
@@ -15,14 +15,18 @@ func h<U>(_ u: U) {
 #sourceLocation(file: "g.swift", line: 1)
 @inline(__always) func g<T>(_ t: T) {
   if (yes()) {
-    use(t)
+    h(t)
   }
 }
 
 // SIL: sil_scope [[F:.*]] { {{.*}}parent @$S1A1CC1fyyqd__lF
-// SIL: sil_scope [[F0:.*]] { loc "f.swift":1:29 parent [[F]] }
-// SIL: sil_scope [[F_G_S:.*]] { loc "f.swift":5:5 parent [[F0]] }
-// SIL: sil_scope [[G_S:.*]] { loc "g.swift":2:3 {{.*}} inlined_at [[F_G_S]] }
+// SIL: sil_scope [[F1:.*]] { loc "f.swift":1:29 parent [[F]] }
+// SIL: sil_scope [[F1G:.*]] { loc "f.swift":5:5 parent [[F1]] }
+// SIL: sil_scope [[F1G1:.*]] { loc "g.swift":2:3 {{.*}}inlined_at [[F1G]] }
+// SIL: sil_scope [[F1G3:.*]] { loc "g.swift":3:5 {{.*}}inlined_at [[F1G]] }
+// SIL: sil_scope [[F1G3H2:.*]] { loc "h.swift":3:3{{.*}} inlined_at 12 }
+// SIL: sil_scope [[F1G3H2_THUNK:.*]] { loc "use.swift":1:21
+// SIL-SAME:                            inlined_at [[F1G3H2]] }
 
 #sourceLocation(file: "C.swift", line: 1)
 public class C<R> {
@@ -32,9 +36,9 @@ public class C<R> {
   // SIL: // C.f<A>(_:)
 #sourceLocation(file: "f.swift", line: 1)
   public func f<S> (_ s: S) {
-    // SIL: debug_value_addr %0 : $*S, let, name "s", argno 1,
-    // SIL-SAME:             scope [[F]]
-    // SIL: function_ref {{.*}}yes{{.*}} scope [[G_S]]
+    // SIL: debug_value_addr %0 : $*S, let, name "s", argno 1,{{.*}} scope [[F]]
+    // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
+    // SIL: function_ref {{.*}}use{{.*}}:0:0, scope [[F1G3H2_THUNK]]
     g(s)
     g(r)
     g((s, s))
