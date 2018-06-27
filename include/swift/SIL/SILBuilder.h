@@ -92,6 +92,15 @@ public:
     this->silConv = silConv;
   }
 
+  void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
+    OpenedArchetypesTracker = Tracker;
+    OpenedArchetypes.setOpenedArchetypesTracker(OpenedArchetypesTracker);
+  }
+
+  SILOpenedArchetypesTracker *getOpenedArchetypesTracker() const {
+    return OpenedArchetypesTracker;
+  }
+
 protected:
   /// Notify the context of each new instruction after it is inserted in the
   /// instruction stream.
@@ -186,12 +195,11 @@ public:
   }
 
   void setOpenedArchetypesTracker(SILOpenedArchetypesTracker *Tracker) {
-    C.OpenedArchetypesTracker = Tracker;
-    C.OpenedArchetypes.setOpenedArchetypesTracker(C.OpenedArchetypesTracker);
+    C.setOpenedArchetypesTracker(Tracker);
   }
 
   SILOpenedArchetypesTracker *getOpenedArchetypesTracker() const {
-    return C.OpenedArchetypesTracker;
+    return C.getOpenedArchetypesTracker();
   }
 
   SILOpenedArchetypesState &getOpenedArchetypes() { return C.OpenedArchetypes; }
