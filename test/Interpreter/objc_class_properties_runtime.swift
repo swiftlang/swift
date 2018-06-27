@@ -2,7 +2,7 @@
 
 // RUN: %clang -arch x86_64 -mmacosx-version-min=10.11 -isysroot %sdk -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 
-// RUN: %swiftc_driver -target $(echo '%target-triple' | sed -E -e 's/macosx10.(9|10).*/macosx10.11/') -sdk %sdk -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out -swift-version 3
+// RUN: %swiftc_driver -target $(echo '%target-triple' | sed -E -e 's/macosx10.(9|10).*/macosx10.11/') -sdk %sdk -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %t/a.out
 
 // REQUIRES: OS=macosx
@@ -76,7 +76,7 @@ ClassProperties.test("runtime")
   let prop = class_getProperty(object_getClass(theClass), "value")
   expectNotNil(prop)
 
-  let nameAsCString = property_getName(prop)!
+  let nameAsCString = property_getName(prop!)
   expectNotNil(nameAsCString)
   expectEqual("value", String(cString: nameAsCString))
 }

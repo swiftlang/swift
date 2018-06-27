@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out -swift-version 3
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 
@@ -520,10 +520,10 @@ func presentEitherOrsOf<T, U>(t: T, u: U) {
   presentEitherOr(EitherOr<T, U>.Right(u))
 }
 
-presentEitherOr(EitherOr<(), ()>.Left())  // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), ()>.Left(()))  // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), ()>.Middle)  // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), ()>.Center)  // CHECK-NEXT: Center
-presentEitherOr(EitherOr<(), ()>.Right()) // CHECK-NEXT: Right(())
+presentEitherOr(EitherOr<(), ()>.Right(())) // CHECK-NEXT: Right(())
 
 // CHECK-NEXT: Left(())
 // CHECK-NEXT: Middle
@@ -542,7 +542,7 @@ presentEitherOr(EitherOr<Int, String>.Right("foo")) // CHECK-NEXT: Right(foo)
 // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: 1, u: "foo")
 
-presentEitherOr(EitherOr<(), String>.Left())       // CHECK-NEXT: Left(())
+presentEitherOr(EitherOr<(), String>.Left(()))       // CHECK-NEXT: Left(())
 presentEitherOr(EitherOr<(), String>.Middle)       // CHECK-NEXT: Middle
 presentEitherOr(EitherOr<(), String>.Center)       // CHECK-NEXT: Center
 presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)

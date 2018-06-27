@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O %s -emit-sil -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.
@@ -107,14 +107,14 @@ public protocol Comparable {
 }
 
 // Define a custom operator to be used instead of ==
-infix operator --- { associativity left precedence 140 } 
+infix operator ---
 
 // Simple is a protocol that simply defines an operator and
 // a few methods with different number of arguments.
 public protocol Simple {
    func foo(_: Self) -> Bool
    func boo(_: Self, _: Self) -> Bool
-   func ---(_: Self, _: Self) -> Bool
+   static func ---(_: Self, _: Self) -> Bool
 }
 
 public class C: Equatable, Comparable, Simple {
