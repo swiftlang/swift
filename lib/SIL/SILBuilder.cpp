@@ -264,7 +264,8 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
       isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
-      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
+      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst) ||
+      isa<CopyUnownedValueInst>(Inst))
     return false;
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
