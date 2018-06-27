@@ -496,11 +496,14 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewFGenericEnv = nullptr;
   }
 
+  // The specialized function is an internal detail, so we need to disconnect it
+  // from a parent class, if one exists, thus the override of the
+  // classSubclassScope.
   TransformDescriptor.OptimizedFunction = M.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
-      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
-      nullptr, F->getDebugScope());
+      /*classSubclassScope=*/SubclassScope::NotApplicable,
+      F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
   if (!F->hasQualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
