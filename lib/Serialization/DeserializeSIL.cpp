@@ -685,11 +685,23 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       if (!CurrentBB)
         return fn;
 
-      // Handle a SILInstruction record.
-      if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
-        DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
-        MF->error();
-        return fn;
+      // Handle a SILInstruction record. If there's an error, give up on
+      // reading the function body.
+      if (auto err = readSILInstruction(fn, CurrentBB, Builder, kind, scratch)){
+        llvm::handleAllErrors(std::move(err),
+                              [name](const llvm::ErrorInfoBase &errInfo) {
+          // FIXME: Can we record the error information somewhere?
+          DEBUG(
+            llvm::dbgs() << "failed to deserialize '" << name << "': ";
+            errInfo.log(llvm::dbgs());
+            llvm::dbgs() << "\n";
+          );
+        });
+
+        fn->convertToDeclaration();
+        fn->setLinkage(addExternalToLinkage(fn->getLinkage()));
+
+        break;
       }
     }
 
@@ -906,13 +918,11 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   llvm_unreachable("invalid key path component kind encoding");
 }
 
-bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
-                                         SILBuilder &Builder,
-                                         unsigned RecordKind,
-                                         SmallVectorImpl<uint64_t> &scratch) {
-  // Return error if Basic Block is null.
-  if (!BB)
-    return true;
+llvm::Error
+SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
+                                    SILBuilder &Builder, unsigned RecordKind,
+                                    SmallVectorImpl<uint64_t> &scratch) {
+  assert(BB);
 
   Builder.setInsertionPoint(BB);
   Builder.setCurrentDebugScope(Fn->getDebugScope());
@@ -1044,12 +1054,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                        cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()));
     break;
   
-#define ONETYPE_INST(ID)                      \
-  case SILInstructionKind::ID##Inst:                   \
+#define ONETYPE_INST(ID) \
+  case SILInstructionKind::ID##Inst: {                                         \
     assert(RecordKind == SIL_ONE_TYPE && "Layout should be OneType.");         \
+    auto MaybeType = MF->getTypeChecked(TyID);                                 \
+    if (!MaybeType)                                                            \
+      return MaybeType.takeError();                                            \
     ResultVal = Builder.create##ID(Loc,                                        \
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
-    break;
+                  getSILType(MaybeType.get(), (SILValueCategory)TyCategory));  \
+    break;                                                                     \
+  }
   ONETYPE_INST(AllocStack)
   ONETYPE_INST(Metatype)
 #undef ONETYPE_INST
@@ -1089,16 +1103,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                   : OpenedExistentialAccess::Mutable);
     break;
 
-#define ONEOPERAND_ONETYPE_INST(ID)           \
-  case SILInstructionKind::ID##Inst:                   \
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&       \
-           "Layout should be OneTypeOneOperand.");         \
-    ResultVal = Builder.create##ID(Loc,                    \
-                  getLocalValue(ValID,                              \
+#define ONEOPERAND_ONETYPE_INST(ID) \
+  case SILInstructionKind::ID##Inst: {                                         \
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&                           \
+           "Layout should be OneTypeOneOperand.");                             \
+    auto MaybeResultType = MF->getTypeChecked(TyID);                           \
+    if (!MaybeResultType)                                                      \
+      return MaybeResultType.takeError();                                      \
+    ResultVal = Builder.create##ID(Loc,                                        \
+                  getLocalValue(ValID,                                         \
                     getSILType(MF->getType(TyID2),                             \
                                (SILValueCategory)TyCategory2)),                \
-                  getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));\
-    break;
+                  getSILType(MaybeResultType.get(),                            \
+                             (SILValueCategory)TyCategory));                   \
+    break;                                                                     \
+  }
   ONEOPERAND_ONETYPE_INST(OpenExistentialRef)
   ONEOPERAND_ONETYPE_INST(OpenExistentialMetatype)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBox)
@@ -1538,7 +1557,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::StringLiteralInst: {
     Identifier StringVal = MF->getIdentifier(ValID);
     auto encoding = fromStableStringEncoding(Attr);
-    if (!encoding) return true;
+    if (!encoding) {
+      MF->error();
+      llvm_unreachable("this is a fatal error");
+    }
     ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
                                             encoding.getValue());
     break;
@@ -1546,8 +1568,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::ConstStringLiteralInst: {
     Identifier StringVal = MF->getIdentifier(ValID);
     auto encoding = fromStableConstStringEncoding(Attr);
-    if (!encoding)
-      return true;
+    if (!encoding) {
+      MF->error();
+      llvm_unreachable("this is a fatal error");
+    }
     ResultVal = Builder.createConstStringLiteral(Loc, StringVal.str(),
                                                  encoding.getValue());
     break;
@@ -2420,7 +2444,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     setLocalValue(result, LastValueID);
   }
 
-  return false;
+  return llvm::Error::success();
 }
 
 SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {

@@ -1,0 +1,74 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -parse-sil %s -emit-sibgen -o %t/Library.sib -module-name Library -I %S/Inputs/good-modules -parse-stdlib -enable-objc-interop
+// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/good-modules -emit-sorted-sil -enable-objc-interop | %FileCheck %s
+// RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules -emit-sorted-sil -enable-objc-interop | %FileCheck -check-prefix=CHECK-RECOVERY %s
+
+// CHECK-LABEL: sil_stage raw
+// CHECK-RECOVERY-LABEL: sil_stage raw
+
+sil_stage raw
+import Builtin
+import Types
+
+// Please keep this file in alphabetical order!
+
+// CHECK-LABEL: sil @dropBody_alloc_stack : $@convention(thin) () -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_alloc_stack : $@convention(thin) () -> (){{$}}
+sil @dropBody_alloc_stack : $@convention(thin) () -> () {
+entry:
+  // CHECK: alloc_stack $SoonToBeMissing
+  %0 = alloc_stack $SoonToBeMissing
+  dealloc_stack %0 : $*SoonToBeMissing
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_alloc_stack'
+
+// CHECK-LABEL: sil @dropBody_metatype : $@convention(thin) () -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_metatype : $@convention(thin) () -> (){{$}}
+sil @dropBody_metatype : $@convention(thin) () -> () {
+entry:
+  // CHECK: metatype $@thin SoonToBeMissing.Type
+  %0 = metatype $@thin SoonToBeMissing.Type
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_metatype'
+
+// CHECK-LABEL: sil @dropBody_unchecked_addr_cast : $@convention(thin) (@in ()) -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_unchecked_addr_cast : $@convention(thin) (@in ()) -> (){{$}}
+sil @dropBody_unchecked_addr_cast : $@convention(thin) (@in ()) -> () {
+entry(%0 : $*()):
+  // CHECK: unchecked_addr_cast %0 : $*() to $*SoonToBeMissing
+  %result = unchecked_addr_cast %0 : $*() to $*SoonToBeMissing
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_unchecked_addr_cast'
+
+// CHECK-LABEL: sil @dropBody_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> (){{$}}
+sil @dropBody_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int32) -> () {
+entry(%0 : $Builtin.Int32):
+  // CHECK: unchecked_bitwise_cast %0 : $Builtin.Int32 to $SoonToBeMissing
+  %result = unchecked_bitwise_cast %0 : $Builtin.Int32 to $SoonToBeMissing
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_unchecked_bitwise_cast'
+
+// CHECK-LABEL: sil @dropBody_unchecked_ref_cast : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_unchecked_ref_cast : $@convention(thin) (@guaranteed AnyObject) -> (){{$}}
+sil @dropBody_unchecked_ref_cast : $@convention(thin) (@guaranteed Builtin.AnyObject) -> () {
+entry(%0 : $Builtin.AnyObject):
+  // CHECK: unchecked_ref_cast %0 : $AnyObject to $SoonToBeMissingClass
+  %result = unchecked_ref_cast %0 : $Builtin.AnyObject to $SoonToBeMissingClass
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_unchecked_ref_cast'
+
+// CHECK-LABEL: sil @dropBody_unchecked_trivial_bit_cast : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK-RECOVERY-LABEL: sil @dropBody_unchecked_trivial_bit_cast : $@convention(thin) (Builtin.Int32) -> (){{$}}
+sil @dropBody_unchecked_trivial_bit_cast : $@convention(thin) (Builtin.Int32) -> () {
+entry(%0 : $Builtin.Int32):
+  // CHECK: unchecked_trivial_bit_cast %0 : $Builtin.Int32 to $SoonToBeMissing
+  %result = unchecked_trivial_bit_cast %0 : $Builtin.Int32 to $SoonToBeMissing
+  %9999 = tuple()
+  return %9999 : $()
+} // CHECK: end sil function 'dropBody_unchecked_trivial_bit_cast'
