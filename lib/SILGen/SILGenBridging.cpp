@@ -514,7 +514,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // escaped by storing a withoutActuallyEscaping closure in the block and after
   // the block is ultimately destroyed checking that the closure is uniquely
   // referenced.
-  bool useWithoutEscapingVerifcation = false;
+  bool useWithoutEscapingVerification = false;
 	ManagedValue escaping;
   if (loweredFuncTy->isNoEscape()) {
     auto escapingTy = loweredFuncTy->getWithExtInfo(
@@ -527,7 +527,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
         funcType.withExtInfo(funcType->getExtInfo().withNoEscape(false));
     funcType = escapingAnyTy;
     fn = B.createCopyValue(loc, escaping);
-    useWithoutEscapingVerifcation = true;
+    useWithoutEscapingVerification = true;
   }
 
   // Build the invoke function signature. The block will capture the original
@@ -597,7 +597,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     // another reference for the is_escaping sentinel.
     buildFuncToBlockInvokeBody(thunkSGF, loc, funcType, blockType,
                                loweredFuncTy, loweredBlockTy, storageTy,
-                               useWithoutEscapingVerifcation);
+                               useWithoutEscapingVerification);
   }
 
   // Form the block on the stack.
@@ -617,7 +617,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // copy_block_without_escaping %block withoutEscaping %closure instruction.
   // A mandatory SIL pass will replace this instruction by the required
   // verification instruction sequence.
-  auto heapBlock = useWithoutEscapingVerifcation
+  auto heapBlock = useWithoutEscapingVerification
                        ? SILValue(B.createCopyBlockWithoutEscaping(
                              loc, stackBlock, escaping.forward(*this)))
                        : SILValue(B.createCopyBlock(loc, stackBlock));
