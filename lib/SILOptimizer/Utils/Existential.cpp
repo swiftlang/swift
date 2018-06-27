@@ -240,8 +240,9 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &openedUse) {
   CanGenericSignature ExistentialSig =
       M.getASTContext().getExistentialSignature(ExistentialType,
                                                 M.getSwiftModule());
-  ExistentialSubs = SubstitutionMap::get(ExistentialSig, {ConcreteType},
-                                         ExistentialConformances);
+  ExistentialSubs = ExistentialSig->getSubstitutionMap(
+    {Substitution(ConcreteType, ExistentialConformances)});
+
   // If the concrete type is another existential, we're "forwarding" an
   // opened existential type, so we must keep track of the original
   // defining instruction.

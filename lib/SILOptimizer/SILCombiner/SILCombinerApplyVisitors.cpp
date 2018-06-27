@@ -725,7 +725,9 @@ SILCombiner::createApplyWithConcreteType(FullApplySite Apply,
 
   // Form a new set of substitutions where Self is
   // replaced by a concrete type.
-  SubstitutionMap OrigCallSubs = Apply.getSubstitutionMap();
+  auto OrigCallSubs =
+    Apply.getOrigCalleeType()->getGenericSignature()->getSubstitutionMap(
+      Apply.getSubstitutions());
   SubstitutionMap NewCallSubs = OrigCallSubs.subst(
       [&](SubstitutableType *type) -> Type {
         if (type == CEI.OpenedArchetype)
@@ -733,26 +735,30 @@ SILCombiner::createApplyWithConcreteType(FullApplySite Apply,
         return type;
       },
       [&](CanType origTy, Type substTy,
-          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+          ProtocolType *proto) -> Optional<ProtocolConformanceRef> {
         if (origTy->isEqual(CEI.OpenedArchetype)) {
           assert(substTy->isEqual(CEI.ConcreteType));
           // Do a conformance lookup on this witness requirement using the
           // existential's conformances. The witness requirement may be a base
           // type of the existential's requirements.
-          return CEI.lookupExistentialConformance(proto).getValue();
+          return CEI.lookupExistentialConformance(proto->getDecl()).getValue();
         }
-        return ProtocolConformanceRef(proto);
+        return ProtocolConformanceRef(proto->getDecl());
       });
+
+  SmallVector<Substitution, 8> Substitutions;
+  Apply.getOrigCalleeType()->getGenericSignature()->getSubstitutions(
+    NewCallSubs, Substitutions);
 
   SILBuilderWithScope ApplyBuilder(Apply.getInstruction(), BuilderCtx);
   FullApplySite NewApply;
   if (auto *TAI = dyn_cast<TryApplyInst>(Apply))
     NewApply = ApplyBuilder.createTryApply(
-        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
+        Apply.getLoc(), Apply.getCallee(), Substitutions, NewArgs,
         TAI->getNormalBB(), TAI->getErrorBB());
   else
     NewApply = ApplyBuilder.createApply(
-        Apply.getLoc(), Apply.getCallee(), NewCallSubs, NewArgs,
+        Apply.getLoc(), Apply.getCallee(), Substitutions, NewArgs,
         cast<ApplyInst>(Apply)->isNonThrowing());
 
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
@@ -825,7 +831,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite Apply,
     auto *NewWMI = WMIBuilder.createWitnessMethod(
         WMI->getLoc(), CEI.ConcreteType, SelfConformance, WMI->getMember(),
         WMI->getType());
-    NewWMI->dump();
+
     // Replace only uses of the witness_method in the apply that was analyzed by
     // ConcreteExistentialInfo.
     MutableArrayRef<Operand> Operands =

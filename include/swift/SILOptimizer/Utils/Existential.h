@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_EXISTENTIAL_H
 #define SWIFT_SILOPTIMIZER_UTILS_EXISTENTIAL_H
 
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
