@@ -772,13 +772,31 @@ static void VisitNodeGenericTypealias(ASTContext *ast,
   }
 
   if (generic_type_result._decls.size() != 1 ||
-      generic_type_result._types.size() != 1 ||
-      template_types_result._types.empty())
+      generic_type_result._types.size() != 1)
     return;
 
   auto *genericTypeAlias =
       cast<TypeAliasDecl>(generic_type_result._decls.front());
   GenericSignature *signature = genericTypeAlias->getGenericSignature();
+  if (signature &&
+      template_types_result._types.size() !=
+        signature->getGenericParams().size()) {
+    result._error = stringWithFormat(
+        "wrong number of generic arguments (%d) for generic typealias %s; "
+        "expected %d",
+        template_types_result._types.size(),
+        genericTypeAlias->getBaseName().userFacingName(),
+        signature->getGenericParams().size());
+
+    return;
+  }
+
+  if (signature && signature->getNumConformanceRequirements() != 0) {
+    result._error =
+      "cannot handle generic typealias with conformance requirements";
+    return;
+  }
+
   // FIXME: handle conformances.
   SubstitutionMap subMap;
   if (signature)
