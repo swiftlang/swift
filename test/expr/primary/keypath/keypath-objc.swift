@@ -4,7 +4,7 @@ import Foundation
 
 // REQUIRES: objc_interop
 
-@objc class A : NSObject { // expected-error {{class 'A' has no initializers}}
+@objc class A : NSObject {
   @objc var propB: B = B()
   @objc var propString: String = "" // expected-note {{did you mean 'propString'}}
   @objc var propArray: [String] = []
@@ -21,8 +21,6 @@ import Foundation
   @objc func someMethod() { }
 
   @objc var `repeat`: String?
-
-  @objc var noType // expected-error {{type annotation missing in pattern}}
 }
 
 @objc class B : NSObject  {
@@ -107,9 +105,6 @@ func testKeyPath(a: A, b: B) {
 
   // Property with keyword name.
   let _: String = #keyPath(A.repeat)
-
-  // Property with no type
-  let _: String = #keyPath(A.noType)
 
   // Nested type of a bridged type (rdar://problem/28061409).
   typealias IntArray = [Int]
