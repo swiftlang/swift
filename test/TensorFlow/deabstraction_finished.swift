@@ -57,6 +57,22 @@ public func f(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float> {
 }
 
 
+// expected-warning @+1 2 {{implicitly copied to the accelerator}}
+public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> Tensor<Float> {
+  // Pack takes an input list, not multiple inputs.  Here we're checking that
+  // we can pass in an array of Tensor's and an array of TensorHandle's.
+  let x: Tensor<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
+  let y: Tensor<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
+  return (x+y).toHost()
+}
+
+/*
+CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testInputListArguments
+CHECK: = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK: graph_op "Pack,L,e,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK-LABEL: ---- END OF INPUT FUNCTION
+*/
+
 
 #if false
 // FIXME: Constexpr propagation of tensorshape should handle this.

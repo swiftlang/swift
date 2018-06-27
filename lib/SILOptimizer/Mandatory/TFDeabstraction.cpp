@@ -202,6 +202,12 @@ void TFDeabstraction::inlineCalls() {
     if (isArrayUninitialized(site.getInstruction()))
       return false;
 
+    // Never inline _allocateUninitializedArray (even of Tensors).  It is the
+    // entrypoint used by SILGen to represent array allocations.
+    if (TFStrictDeabstraction &&
+        callee.getName().contains("_allocateUninitializedArray"))
+      return false;
+
     // FIXME: This is a specific hack to inline literal conversion operations
     // that prevent SSA promotion and bloat code.  This should be eliminated
     // when we have a proper constexpr model and can just constant fold through
@@ -1880,6 +1886,10 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   }
 }
 
+// TODO: move this from TFUtilities when deabstraction is done.
+SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                       SILBuilder &B);
+
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
 /// the operand/attribute types are incorrect.
@@ -1890,6 +1900,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
   auto *inst = opInfo.inst;
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
+  SILBuilder B(opInfo.inst);
 
   // This is a helper function to emit a diagnostic.
   auto diagnoseInvalid = [&](const Twine &message) {
@@ -1913,7 +1924,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
     // Collect and validate input operands.
     if (opInfo.isInput(i)) {
-      inputs.push_back(operand);
 
       // Each input gets a marker mangled into the op name, because we need to
       // be able to distinguish between normal inputs and elements of an input
@@ -1928,23 +1938,89 @@ formGraphOp(SILTensorOpInfo &opInfo,
                           "' is not allowed");
           return;
         }
-        opName += ",s";
+        opName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+        inputs.push_back(operand);
         continue;
       }
 
       // Tensor operand type's are ok.
       if (isTensorFlowValue(operandTy)) {
-        opName += ",i";
+        opName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+        inputs.push_back(operand);
         continue;
       }
 
-      // FIXME: We need to figure out our model for InputLists with
-      // GraphOperation instructions.
-      // Model input lists as an "L" entry in the name, followed by one "e" for
-      // each element.  This allows us to know about empty input lists.
-      diagnoseInvalid("operand has unrecognized type '" +
-                      operandTy.getSwiftRValueType()->getString() + "'");
-      return;
+      // Remove the operand so decodeArrayElements doesn't see the use.
+      inst->setOperand(i, SILUndef::get(operand->getType(),
+                                        fn.getModule()));
+
+      // Otherwise this must be an array, representing an input list.
+      SmallVector<SILValue, 4> elements;
+      SmallPtrSet<SILInstruction*, 8> arrayInsts;
+      auto elementType =
+        GraphOperationInfo::decodeArrayElements(operand, elements, &arrayInsts);
+
+      if (!elementType) {
+        diagnoseInvalid("operand has unrecognized type '" +
+                        operandTy.getSwiftRValueType()->getString() + "'");
+        return;
+      }
+
+      // Remember that we have an input list, this marker is important because
+      // the list may be empty, and we need to know it exists in graph lowering.
+      opName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
+      const char *elementMarker =
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
+
+      // Add each element to the input list we're building, drilling down
+      // through any struct wrappers (like Tensor/Tensor2D, etc) that may be
+      // around it.
+      //
+      // It is common to have arrays with repeated elements.  These will
+      // generally be uniqued on entry to this routine.  If so, make sure to
+      // reuse them as we project out the .handle members to avoid code bloat.
+      llvm::DenseMap<SILValue, SILValue> loweredElts;
+      for (auto elt : elements) {
+        auto &eltVal = loweredElts[elt];
+        if (!eltVal) {
+          eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
+          if (!eltVal) {
+            diagnoseInvalid("elements to input list have invalid type '" +
+                            elementType->getString() + "'");
+            return;
+          }
+        }
+        elt = eltVal;
+
+        opName += elementMarker;
+
+        // graph_op notationally takes its tensor operands at +1, so we need to
+        // retain them.
+        // TODO: move to a +0 model like the rest of Swift some day.
+        B.createStrongRetain(opInfo.inst->getLoc(), elt,
+                             Atomicity::Atomic);
+        inputs.push_back(elt);
+      }
+
+      // Okay, now that we updated this operand, try to remove the array.  If
+      // we can't remove it entirely, just emit a destroy_value to balance the
+      // former +1 use.
+      // TODO: When builtin's start using values as +0, this can go away.
+      if (arrayInsts.empty()) {
+        SILBuilder B2(++SILBasicBlock::iterator(opInfo.inst));
+        B2.emitDestroyValueOperation(opInfo.inst->getLoc(), operand);
+      } else {
+        // If we can remove it, drop all inter-dependent references.
+        for (auto inst : arrayInsts)
+          inst->dropAllReferences();
+        // Then erase the instructions themselves.
+        for (auto inst : arrayInsts)
+          inst->eraseFromParent();
+      }
+      continue;
     }
 
     // Helper to diagnose invalid attributes.
@@ -2046,7 +2122,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
     resultTypes.push_back(inst->getType());
   }
 
-  SILBuilder B(opInfo.inst);
   auto op = B.createGraphOperation(inst->getLoc(),
                                    context.getIdentifier(opName), inputs,
                                    attributes, resultTypes);

@@ -308,11 +308,8 @@ static SILValue getValueInsideStructInst(SILValue value) {
 
 /// Return true if this is a reference to the _allocateUninitialized helper
 /// in array in the standard library allocating zero elements.
-static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
-  if (!tei || tei->getFieldNo() != 0)
-    return false;
-
-  auto *apply = dyn_cast<ApplyInst>(tei->getOperand());
+static bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
+  auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
   if (!apply) return false;
   auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
   if (!callee) return false;
@@ -323,7 +320,19 @@ static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
   if (!calleeName.contains("_allocateUninitialized"))
     return false;
 
-  auto numElements = getValueInsideStructInst(apply->getOperand(1));
+  numElements = getValueInsideStructInst(apply->getOperand(1));
+  return true;
+}
+
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
+  if (tei->getFieldNo() != 0) return false;
+  SILValue numElements;
+
+  if (!isArrayAllocUninit(tei->getOperand(), numElements))
+    return false;
+
   auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
   return ili && ili->getValue() == 0;
 }
@@ -344,14 +353,20 @@ static bool decodeArrayElements(SILValue value,
   if (!elementType) return false;
 
   // Handle zero element pattern.
-  if (auto *tei = dyn_cast<TupleExtractInst>(value))
-    if (isZeroElementArrayAlloc(tei)) {
-      if (arrayInsts) {
-        arrayInsts->insert(tei);
-        arrayInsts->insert(tei->getOperand()->getDefiningInstruction());
+  if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
+    SILValue numElements;
+    if (tei->getFieldNo() == 0 &&
+        isArrayAllocUninit(tei->getOperand(), numElements)) {
+      auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
+      if (ili && ili->getValue() == 0) {
+        if (arrayInsts) {
+          arrayInsts->insert(tei);
+          arrayInsts->insert(tei->getOperand()->getDefiningInstruction());
+        }
+        return true;
       }
-      return true;
     }
+  }
 
   // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
@@ -1351,16 +1366,19 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
 
 /// Given something that conforms to the TensorProtocol protocol, extract the
 /// 'handle' out of it.
-static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                              SILBuilder &B) {
+/// TODO: move this to deabstraction and make static there.
+SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                       SILBuilder &B) {
   // If we already have a TensorHandle, just use it.
   if (isTensorHandle(v->getType()))
     return v;
 
-  assert(v->getType().getSwiftRValueType()->getStructOrBoundGenericStruct() &&
-         "Support more general conformances to TensorProtocol");
-
   auto module = B.getFunction().getModule().getSwiftModule();
+
+  auto vType = v->getType().getSwiftRValueType();
+  if (!vType->getStructOrBoundGenericStruct() ||
+      !conformsToTensorProtocol(vType, module))
+    return SILValue();
 
   // If this value is just a struct wrapper around a TensorHandle, use the
   // input of it.  In the case of Tensor2D, we have multiple levels of struct
@@ -1577,7 +1595,7 @@ canonicalizeOperands(GraphGlobalConfiguration &configuration) {
 
 /// Return the device attribute associated with `inst`, which is required to
 /// exist.
-StringRef GraphOperationDecoder::getDeviceString() const {
+StringRef GraphOperationInfo::getDeviceString() const {
   auto attr = inst->getAttribute(DEVICE_ATTR);
   assert(attr.hasValue() && "Tensor op instruction has no device string");
   return attr.getValue().getStringValue();
@@ -1585,13 +1603,27 @@ StringRef GraphOperationDecoder::getDeviceString() const {
 
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
 /// information about the operands.
-StringRef GraphOperationDecoder::
+StringRef GraphOperationInfo::
 decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
   auto name = inst->getName().str();
   auto pos = name.find(',');
   auto opName = name.substr(0, pos);
 
-  // TODO: Fill in inputInfo when we support input lists.
+  while (pos != StringRef::npos) {
+    name = name.drop_front(pos+1);
+    pos = name.find(',');
+    auto letter = name.substr(0, pos);
+    assert(letter.size() == 1 && "malformed graph_op instruction");
+    InputMarker kind;
+    switch (letter[0]) {
+    case 's': kind = InputMarker::IM_Scalar; break;
+    case 'i': kind = InputMarker::IM_Normal; break;
+    case 'L': kind = InputMarker::IM_InputList; break;
+    case 'e': kind = InputMarker::IM_InputListElt; break;
+    default: assert(0 && "malformed graph_op instruction");
+    }
+    inputInfo.push_back(kind);
+  }
 
   return opName;
 }
@@ -1599,7 +1631,7 @@ decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
 /// Given an attribute name like foo$dtype, decode the name and the class.  If
 /// there is no modifier specified, this defaults to OperandClass::Normal.
 std::pair<StringRef, SILTensorOpInfo::OperandClass>
-GraphOperationDecoder::decodeAttributeName(Identifier name) {
+GraphOperationInfo::decodeAttributeName(Identifier name) {
   auto nameStr = name.str();
   // Figure out what the suffix is (if any).
   auto dollarLoc = nameStr.find('$');
@@ -1612,6 +1644,143 @@ GraphOperationDecoder::decodeAttributeName(Identifier name) {
 
   // Slice the suffix off the attribute name and add the decoded version.
   return { nameStr.substr(0, dollarLoc), opClass };
+}
+
+/// Analyze the array users of an _allocateUninitialized call, to see if they
+/// are all simple things we can remove.  If so, add them all to arrayInsts and
+/// return false.  If not, return true.
+static bool analyzeArrayInitUses(SILValue v,
+                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  for (auto *use : v->getUses()) {
+    auto *user = use->getUser();
+
+    // We can always remove retain/release instructions.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      continue;
+    }
+
+    // We can look through unpacking and repacking of structs that eventually
+    // turn into a retain or release.
+    if (isa<StructExtractInst>(user) || isa<StructInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      if (analyzeArrayInitUses(user->getResults()[0], arrayInsts))
+        return true;
+      continue;
+    }
+  }
+  return false;
+}
+
+
+/// Given a SILValue that may be an array literal, attempt to decode it into the
+/// values that make up its elements.  If this fails or if the value is not an
+/// array, this returns a null Type.  Otherwise it decodes the array, returns
+/// the values of each element, and returns the element type of the array.
+///
+/// If arrayInsts is non-null and if decoding succeeds, this function adds
+/// all of the instructions relevant to the definition of this array into
+/// the set.  If decoding fails, then the contents of this set is undefined.
+Type GraphOperationInfo::
+decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
+                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  auto elementType = getArrayElementType(value->getType().getSwiftRValueType());
+  if (!elementType) return Type();
+
+  // The only pattern we support involves a call to _allocateUninitialized.
+  // The array value will be a tuple extract from the 0's result of the call.
+  auto *teiValue = dyn_cast<TupleExtractInst>(value);
+  if (!teiValue || teiValue->getFieldNo() != 0 ||
+      !isa<ApplyInst>(teiValue->getOperand()))
+    return Type();
+
+  auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+  // Verify we have a call to _allocateUninitializedArray.
+  SILValue numElementsVal;
+  if (!isArrayAllocUninit(apply, numElementsVal) ||
+      !isa<IntegerLiteralInst>(numElementsVal))
+    return Type();
+  uint64_t numElements =
+    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+
+  elements.resize(numElements);
+
+  // The apply is part of the call.
+  if (arrayInsts) arrayInsts->insert(apply);
+
+  // Keep track of whether we have any unknown users.  If so, the caller cannot
+  // remove the initializer.
+  bool hadUnknownUsers = false;
+
+  // The call has a tuple return type, see if we can walk all uses of them to
+  // analyze them and find the stores to the elements.
+  for (auto *use : apply->getUses()) {
+    auto *user = use->getUser();
+
+    auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
+    if (!tupleExtract)
+      return Type();
+    if (arrayInsts) arrayInsts->insert(tupleExtract);
+
+    // If this is the array result of _allocateUninitialized, try to determine
+    // whether there is anything that would prevent removing the allocation.
+    if (tupleExtract->getFieldNo() == 0) {
+      hadUnknownUsers |= analyzeArrayInitUses(tupleExtract, arrayInsts);
+      continue;
+    }
+
+    // Otherwise, it must be the pointer result.
+    assert(tupleExtract->getFieldNo() == 1 && "allocUninit has two results");
+
+    // Look through pointer_to_address
+    auto pointer2addr =
+      tupleExtract->getSingleUserOfType<PointerToAddressInst>();
+    if (!pointer2addr)
+      return Type();
+    if (arrayInsts) arrayInsts->insert(pointer2addr);
+
+    // Okay, process the use list of the pointer_to_address, each user is
+    // something that should result in a store of an element.
+    for (auto *use : pointer2addr->getUses()) {
+      auto *user = use->getUser();
+
+      uint64_t index = 0;
+      if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+        if (arrayInsts) arrayInsts->insert(iai);
+
+        auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
+        if (!ili)
+          return Type();
+
+        index = ili->getValue().getLimitedValue();
+        user = iai->getSingleUserOfType<StoreInst>();
+      }
+
+      // Check to see if we have a store to a valid index that hasn't been stored
+      // to yet.
+      auto *store = dyn_cast_or_null<StoreInst>(user);
+      if (!store || index >= elements.size() || elements[index] != SILValue())
+        return Type();
+
+      if (arrayInsts) arrayInsts->insert(store);
+
+      // If we got a store to a valid index, it must be our element.
+      elements[index] = store->getOperand(0);
+
+      // Track how many elements we see so we can know if we got them all.
+      --numElements;
+    }
+  }
+
+  // Make sure that all of the elements were found.
+  if (numElements != 0)
+    return Type();
+
+  if (hadUnknownUsers && arrayInsts)
+    arrayInsts->clear();
+
+  return elementType;
 }
 
 
