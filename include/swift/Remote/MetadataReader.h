@@ -264,6 +264,14 @@ public:
     return start;
   }
 
+  /// Given a pointer to an address, attemp to read the pointed value.
+  llvm::Optional<StoredPointer> readPointedValue(StoredPointer Address) {
+    StoredPointer PointedVal;
+    if (!Reader->readInteger(RemoteAddress(Address), &PointedVal))
+      return llvm::None;
+    return llvm::Optional<StoredPointer>(PointedVal);
+  }
+
   /// Given a pointer to the metadata, attempt to read the value
   /// witness table. Note that it's not safe to access any non-mandatory
   /// members of the value witness table, like extra inhabitants or enum members.
