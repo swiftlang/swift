@@ -441,7 +441,8 @@ public:
   void enterDebugScope(SILLocation Loc) {
     auto *Parent =
         DebugScopeStack.size() ? DebugScopeStack.back() : F.getDebugScope();
-    auto *DS = new (SGM.M) SILDebugScope(Loc, &getFunction(), Parent);
+    auto *DS = new (SGM.M)
+        SILDebugScope(Loc.getAsRegularLocation(), &getFunction(), Parent);
     DebugScopeStack.push_back(DS);
     B.setCurrentDebugScope(DS);
   }
