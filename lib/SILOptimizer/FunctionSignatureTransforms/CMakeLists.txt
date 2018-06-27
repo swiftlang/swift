@@ -3,4 +3,5 @@ set(FUNCTIONSIGNATURETRANSFORMS_SOURCES
   FunctionSignatureTransforms/DeadArgumentTransform.cpp
   FunctionSignatureTransforms/ArgumentExplosionTransform.cpp
   FunctionSignatureTransforms/OwnedToGuaranteedTransform.cpp
+  FunctionSignatureTransforms/ExistentialSpecializer.cpp
   PARENT_SCOPE)

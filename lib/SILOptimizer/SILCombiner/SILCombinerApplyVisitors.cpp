@@ -677,6 +677,32 @@ SILCombiner::createApplyWithConcreteType(FullApplySite AI,
   return NewAI.getInstruction();
 }
 
+/// Create a new apply instructions that uses the concrete type instead
+/// of the existential type using a substituion map that handles
+/// more than one argument and also not just self.
+SILInstruction *SILCombiner::createApplyWithConcreteType(
+    FullApplySite AI, SmallVector<SILValue, 8> &Args, SubstitutionMap &SubMap) {
+  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
+  CanSILFunctionType SFT = FnTy->substGenericArgs(AI.getModule(), SubMap);
+  SILType::getPrimitiveObjectType(SFT);
+
+  FullApplySite NewAI;
+  Builder.setCurrentDebugScope(AI.getDebugScope());
+  Builder.addOpenedArchetypeOperands(AI.getInstruction());
+  if (auto *TAI = dyn_cast<TryApplyInst>(AI))
+    NewAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(), SubMap, Args,
+                                   TAI->getNormalBB(), TAI->getErrorBB());
+  else
+    NewAI = Builder.createApply(AI.getLoc(), AI.getCallee(), SubMap, Args,
+                                cast<ApplyInst>(AI)->isNonThrowing());
+  /// Somehow "replaceDeadApply" does not work for TryApplyInst!
+  if (auto apply = dyn_cast<ApplyInst>(NewAI))
+    replaceInstUsesWith(*cast<ApplyInst>(AI.getInstruction()), apply);
+  eraseInstFromFunction(*AI.getInstruction());
+
+  return NewAI.getInstruction();
+}
+
 namespace {
 /// Record conformance and concrete type info derived from init_existential.
 struct ConformanceAndConcreteType {
@@ -1027,6 +1053,133 @@ SILCombiner::propagateConcreteTypeOfInitExistential(FullApplySite AI) {
   return propagateConcreteTypeOfInitExistential(AI, PD, PropagateIntoOperand);
 }
 
+/// A peephole optimizer that propagates concrete types of all arguments to
+/// Apply.
+SILInstruction *
+SILCombiner::propagateConcreteTypeOfInitExistentialToAllApplyArgs(
+    FullApplySite AI) {
+  /// Check if legal to perform propagation.
+  if (!AI.hasSubstitutions())
+    return nullptr;
+  auto *Callee = AI.getReferencedFunction();
+  if (!Callee || !Callee->shouldOptimize() || Callee->empty())
+    return nullptr;
+
+  auto FnTy = AI.getCallee()->getType().castTo<SILFunctionType>();
+
+  /// We target only polymorphic function types.
+  if (!FnTy->isPolymorphic())
+    return nullptr;
+
+  auto Args = Callee->begin()->getFunctionArguments();
+
+  if (Args.size() <= 0)
+    return nullptr;
+
+  llvm::SmallVector<SILValue, 8> NewApplyArgs;
+  auto OpenedType2ConcreteTypeSubMap = AI.getSubstitutionMap();
+  bool UpdatedArgs = false;
+  for (unsigned i = 0, e = Args.size(); i != e; ++i) {
+    auto ArgType = Args[i]->getType();
+    auto ArgASTType = ArgType.getASTType();
+    auto OrigApplyArg = AI.getArgument(i);
+
+    ArchetypeType *ArcheType;
+    SILInstruction *InitExistential;
+    ArchetypeType *OpenedArchetype = nullptr;
+    SILValue OpenedArchetypeDef;
+    Type ContextTy;
+    bool isCopied = false;
+
+    /// We are looking for the following  patterns:
+    /// %0 = alloc_ref $C
+    /// %1 = init_existential_ref %0 : $C : $C, $P
+    /// %2 = function_ref @specialize : $@convention(thin) (@guaranteed P) -> ()
+    /// %3 = apply %2(%1) : $@convention(thin)(@guaranteed P) -> ()
+
+    /// Another pattern with addr.
+    /// %8 =  alloc_stack $P
+    /// copy_addr %3 to [initialization] %8 : $*P
+    /// %10 = open_existential_addr %8 : $*P to $*@opened P
+    /// %11 = function_ref @$f : $@convention(thin) <τ_0_0 where τ_0_0 : P>
+    ///       (@in_guaranteed τ_0_0) -> ()
+    /// %12 = apply %11<@opened P>(%10) : $@convention(thin) <τ_0_0 where τ_0_0
+    /// :
+    ///       P> (@in_guaranteed τ_0_0) -> Int
+    InitExistential = findInitExistential(AI, OrigApplyArg, OpenedArchetype,
+                                          OpenedArchetypeDef, isCopied);
+    /// Ideally this code should go inside findInitExistential. TODO.
+    if (!InitExistential) {
+      if (auto *Open = dyn_cast<OpenExistentialAddrInst>(OrigApplyArg)) {
+        auto Op = Open->getOperand();
+        if (auto *GAI = dyn_cast<GlobalAddrInst>(Op)) {
+          SILValue IEVal =
+              findInitExistentialFromGlobalAddrAndApply(GAI, AI, i);
+          InitExistential = dyn_cast<InitExistentialAddrInst>(IEVal);
+          OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+          OpenedArchetypeDef = Open;
+        }
+      }
+    }
+    /// Bail, if we did not find InitExistential.
+    if (!InitExistential) {
+      NewApplyArgs.push_back(OrigApplyArg);
+      continue;
+    }
+
+    /// Check all conditions for pattern matching.
+    if (ArgASTType->hasArchetype() &&
+        (ArcheType = ArgASTType->getAs<ArchetypeType>()) &&
+        (ArcheType->getInterfaceType()->is<GenericTypeParamType>()) &&
+        (ContextTy =
+             Callee->mapTypeIntoContext(ArcheType->getInterfaceType()))) {
+      CanType ConcreteType;
+      SILValue NewApplyArg;
+
+      if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
+        NewApplyArg = IE;
+        ConcreteType = IE->getFormalConcreteType();
+      } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
+        NewApplyArg = IER->getOperand();
+        ConcreteType = IER->getFormalConcreteType();
+      } else {
+        NewApplyArgs.push_back(OrigApplyArg);
+        continue;
+      }
+
+      /// This case needs to be handled in future.
+      if (ConcreteType->isOpenedExistential()) {
+        NewApplyArgs.push_back(OrigApplyArg);
+        DEBUG(llvm::dbgs()
+                  << "propagateConcreteTypeOfInitExistentialToAllApplyArgs: "
+                     "Bail! ConcreteType is an OpenedExistential\n";);
+        continue;
+      }
+
+      // Update the substitution map.
+      OpenedType2ConcreteTypeSubMap = OpenedType2ConcreteTypeSubMap.subst(
+          [&](SubstitutableType *type) -> Type {
+            if (type == OpenedArchetype)
+              return ConcreteType;
+            return type;
+          },
+          LookUpConformanceInSignature(*(FnTy->getGenericSignature())));
+      NewApplyArgs.push_back(NewApplyArg);
+      UpdatedArgs = true;
+    } else {
+      NewApplyArgs.push_back(OrigApplyArg);
+    }
+  }
+  /// Bail if we did not find the pattern we were looking for.
+  if (!UpdatedArgs)
+    return nullptr;
+
+  // Create a new apply instruction that uses the concrete type.
+  auto *NewAI = createApplyWithConcreteType(AI, NewApplyArgs,
+                                            OpenedType2ConcreteTypeSubMap);
+  return NewAI;
+}
+
 /// \brief Check that all users of the apply are retain/release ignoring one
 /// user.
 static bool
@@ -1256,6 +1409,8 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (isa<FunctionRefInst>(AI->getCallee())) {
     if (propagateConcreteTypeOfInitExistential(AI)) {
       return nullptr;
+    } else if (propagateConcreteTypeOfInitExistentialToAllApplyArgs(AI)) {
+      return nullptr;
     }
   }
 
@@ -1376,6 +1531,8 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   // init_existential_ref.
   if (isa<FunctionRefInst>(AI->getCallee())) {
     if (propagateConcreteTypeOfInitExistential(AI)) {
+      return nullptr;
+    } else if (propagateConcreteTypeOfInitExistentialToAllApplyArgs(AI)) {
       return nullptr;
     }
   }
