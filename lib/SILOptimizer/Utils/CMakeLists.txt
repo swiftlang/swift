@@ -4,6 +4,7 @@ set(UTILS_SOURCES
   Utils/CheckedCastBrJumpThreading.cpp
   Utils/ConstantFolding.cpp
   Utils/Devirtualize.cpp
+  Utils/Existential.cpp
   Utils/FunctionSignatureOptUtils.cpp
   Utils/GenericCloner.cpp
   Utils/Generics.cpp
