@@ -578,28 +578,28 @@ public func cos<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.cos(x)
 }
 
-/// Computes `cos` of the specified tensor element-wise.
+/// Computes `tan` of the specified tensor element-wise.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointTan(_:originalValue:seed:))
 public func tan<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.tan(x)
 }
 
-/// Computes `cos` of the specified tensor element-wise.
+/// Computes `sinh` of the specified tensor element-wise.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointSinh(_:originalValue:seed:))
 public func sinh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.sinh(x)
 }
 
-/// Computes `cos` of the specified tensor element-wise.
+/// Computes `cosh` of the specified tensor element-wise.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointCosh(_:originalValue:seed:))
 public func cosh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
   return Raw.cosh(x)
 }
 
-/// Computes `cos` of the specified tensor element-wise.
+/// Computes `tanh` of the specified tensor element-wise.
 @inlinable @inline(__always)
 @differentiable(reverse, adjoint: _adjointTanh(_:originalValue:seed:))
 public func tanh<T : BinaryFloatingPoint>(_ x: Tensor<T>) -> Tensor<T> {
