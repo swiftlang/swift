@@ -1946,17 +1946,36 @@ CanType ValueDecl::getOverloadSignatureType() const {
   return CanType();
 }
 
-void ValueDecl::setIsObjC(bool Value) {
-  bool CurrentValue = isObjC();
-  if (CurrentValue == Value)
-    return;
+bool ValueDecl::isObjC() const {
+  if (Bits.ValueDecl.IsObjCComputed)
+    return Bits.ValueDecl.IsObjC;
 
-  if (!Value) {
+  // Fallback: look for an @objc attribute.
+  // FIXME: This should become an error, eventually.
+  return getAttrs().hasAttribute<ObjCAttr>();
+}
+
+void ValueDecl::setIsObjC(bool value) {
+  assert(!Bits.ValueDecl.IsObjCComputed || Bits.ValueDecl.IsObjC == value);
+
+  if (Bits.ValueDecl.IsObjCComputed) {
+    assert(Bits.ValueDecl.IsObjC == value);
+    return;
+  }
+
+  Bits.ValueDecl.IsObjCComputed = true;
+  Bits.ValueDecl.IsObjC = value;
+
+  // Sync up the attributes with the value; this is only interesting because
+  // some callers might look for presence of the attribute rather than
+  // using isObjC().
+  // FIXME: Fix those callers to remove this problem.
+  if (!value) {
     for (auto *Attr : getAttrs()) {
       if (auto *OA = dyn_cast<ObjCAttr>(Attr))
         OA->setInvalid();
     }
-  } else {
+  } else if (!getAttrs().hasAttribute<ObjCAttr>()) {
     getAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
   }
 }

@@ -3812,6 +3812,7 @@ namespace {
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
       decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicitName=*/true));
+      decl->setIsObjC(true);
 
       // If the declaration we attached the 'objc' attribute to is within a
       // class, record it in the class.

@@ -306,7 +306,7 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1+1+1,
     AlreadyInLookupTable : 1,
 
     /// Whether we have already checked whether this declaration is a 
@@ -315,7 +315,13 @@ protected:
 
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
-    IsUserAccessible : 1
+    IsUserAccessible : 1,
+
+    /// Whether the "IsObjC" bit has been computed yet.
+    IsObjCComputed : 1,
+
+    /// Whether this declaration is exposed to Objective-C.
+    IsObjC : 1
   );
 
   SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+4,
@@ -2174,6 +2180,8 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
+    Bits.ValueDecl.IsObjCComputed = false;
+    Bits.ValueDecl.IsObjC = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2194,7 +2202,7 @@ public:
   /// Determine whether we have already checked whether this
   /// declaration is a redeclaration.
   bool alreadyCheckedRedeclaration() const { 
-    return Bits.ValueDecl.CheckedRedeclaration; 
+    return Bits.ValueDecl.CheckedRedeclaration;
   }
 
   /// Set whether we have already checked this declaration as a
@@ -2409,10 +2417,9 @@ public:
   /// This can be true even if there is no 'objc' attribute on the declaration.
   /// In that case it was inferred by the type checker and set with a call to
   /// markAsObjC().
-  bool isObjC() const {
-    return getAttrs().hasAttribute<ObjCAttr>();
-  }
-  
+  bool isObjC() const;
+
+  /// Note whether this declaration is known to be exposed to Objective-C.
   void setIsObjC(bool Value);
 
   /// Is this declaration marked with 'final'?
