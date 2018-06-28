@@ -264,14 +264,31 @@ swift::_contextDescriptorMatchesMangling(const ContextDescriptor *context,
         }
 
         auto nameNode = node->getChild(1);
-        if (nameNode->getKind() == Demangle::Node::Kind::PrivateDeclName)
-          return false;
-
-        if (nameNode->getText() != type->Name.get())
-          return false;
         
-        node = node->getChild(0);
-        break;
+        // Declarations synthesized by the Clang importer get a small tag
+        // string in addition to their name.
+        if (nameNode->getKind() == Demangle::Node::Kind::RelatedEntityDeclName){
+          if (nameNode->getText() != type->getSynthesizedDeclRelatedEntityTag())
+            return false;
+          
+          nameNode = nameNode->getChild(0);
+        } else if (type->isSynthesizedRelatedEntity()) {
+          return false;
+        }
+        
+        // We should only match public or internal declarations with stable
+        // names. The runtime metadata for private declarations would be
+        // anonymized.
+        if (nameNode->getKind() == Demangle::Node::Kind::Identifier) {
+          if (nameNode->getText() != type->Name.get())
+            return false;
+          
+          node = node->getChild(0);
+          break;
+        }
+        
+        return false;
+
       }
       
       // We don't know about this kind of context, or it doesn't have a stable
@@ -1166,7 +1183,7 @@ void swift::_swift_getFieldAt(
     if (typeInfo == nullptr) {
       typeInfo = TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {});
       warning(0, "SWIFT RUNTIME BUG: unable to demangle type of field '%*s'. "
-                 "mangled type name is '%*s'",
+                 "mangled type name is '%*s'\n",
                  (int)name.size(), name.data(),
                  (int)typeName.size(), typeName.data());
     }
@@ -1214,6 +1231,17 @@ void swift::_swift_getFieldAt(
         return;
     }
   }
+
+  // If we failed to find the field descriptor metadata for the type, fall
+  // back to returning an empty tuple as a standin.
+  auto typeName = swift_getTypeName(base, /*qualified*/ true);
+  warning(0, "SWIFT RUNTIME BUG: unable to find field metadata for type '%*s'\n",
+             (int)typeName.length, typeName.data);
+  callback("unknown",
+           FieldType()
+             .withType(TypeInfo(&METADATA_SYM(EMPTY_TUPLE_MANGLING), {}))
+             .withIndirect(false)
+             .withWeak(false));
 }
 
 #define OVERRIDE_METADATALOOKUP COMPATIBILITY_OVERRIDE

@@ -481,11 +481,21 @@ namespace {
     }
     
     void addName() {
+      SmallString<32> nameBuf;
       StringRef name;
-      
+
+      // Use the original name with tag for synthesized decls. The tag comes
+      // after the null terminator for the name.
+      if (auto *synthesizedTypeAttr =
+            Type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        nameBuf.append(synthesizedTypeAttr->originalTypeName);
+        nameBuf.push_back('\0');
+        nameBuf.append(synthesizedTypeAttr->getManglingName());
+        
+        name = nameBuf;
       // Try to use the Clang name if there is one.
-      if (auto namedClangDecl =
-                             Mangle::ASTMangler::getClangDeclForMangling(Type)) {
+      } else if (auto namedClangDecl =
+                            Mangle::ASTMangler::getClangDeclForMangling(Type)) {
         name = namedClangDecl->getName();
       } else {
         name = Type->getName().str();
@@ -565,22 +575,18 @@ namespace {
     /// Flags to indicate Clang-imported declarations so we mangle them
     /// consistently at runtime.
     void getClangImportedFlags(TypeContextDescriptorFlags &flags) const {
-      auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type);
-      if (!clangDecl)
-        return;
-      
-      if (isa<clang::TagDecl>(clangDecl)) {
-        flags.setIsCTag(true);
-        return;
+      if (Type->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>()) {
+        flags.setIsSynthesizedRelatedEntity(true);
       }
       
-      if (isa<clang::TypedefNameDecl>(clangDecl)
-          || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
-        flags.setIsCTypedef(true);
-        return;
+      if (auto clangDecl = Mangle::ASTMangler::getClangDeclForMangling(Type)) {
+        if (isa<clang::TagDecl>(clangDecl)) {
+          flags.setIsCTag(true);
+        } else if (isa<clang::TypedefNameDecl>(clangDecl)
+                   || isa<clang::ObjCCompatibleAliasDecl>(clangDecl)) {
+          flags.setIsCTypedef(true);
+        }
       }
-      
-      return;
     }
 
     // Subclasses should provide:
