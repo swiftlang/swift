@@ -318,7 +318,6 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *Cvt) {
         Cvt->getLoc(), Cvt->getOperand(), Cvt->getType(), false, true);
     Cvt->replaceAllUsesWith(NewCvt);
     Cvt->eraseFromParent();
-    Cvt = NewCvt;
   }
 
   // Extend the lifetime.

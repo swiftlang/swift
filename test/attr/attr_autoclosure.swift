@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{@autoclosure may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -15,7 +15,7 @@ func func4(fp : @autoclosure () -> Int) {func4(fp: 0)}
 func func6(_: @autoclosure () -> Int) {func6(0)}
 
 // autoclosure + inout doesn't make sense.
-func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be used on parameters}}
+func func8(_ x: inout @autoclosure () -> Bool) -> Bool {  // expected-error {{'@autoclosure' may only be used on parameters}}
 }
 
 func func9(_ x: @autoclosure (Int) -> Bool) {} // expected-error {{argument type of @autoclosure parameter must be '()'}}
@@ -146,6 +146,7 @@ func migrateAC(@autoclosure _: () -> ()) { }
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}
+func takesThrowingAutoclosure(_: @autoclosure () throws -> Int) {}
 
 func callAutoclosureWithNoEscape(_ fn: () -> Int) {
   takesAutoclosure(1+1) // ok
@@ -157,7 +158,20 @@ func callAutoclosureWithNoEscape_3(_ fn: @autoclosure () -> Int) {
   takesAutoclosure(fn()) // ok
 }
 
-// expected-error @+1 {{@autoclosure must not be used on variadic parameters}}
+// expected-error @+1 {{'@autoclosure' must not be used on variadic parameters}}
 func variadicAutoclosure(_ fn: @autoclosure () -> ()...) {
   for _ in fn {}
+}
+
+// rdar://41219750
+// These are all arguably invalid; the autoclosure should have to be called.
+// But as long as we allow them, we shouldn't crash.
+func passNonThrowingToNonThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesAutoclosure(fn)
+}
+func passNonThrowingToThrowingAC(_ fn: @autoclosure () -> Int) {
+  takesThrowingAutoclosure(fn)
+}
+func passThrowingToThrowingAC(_ fn: @autoclosure () throws -> Int) {
+  takesThrowingAutoclosure(fn)
 }

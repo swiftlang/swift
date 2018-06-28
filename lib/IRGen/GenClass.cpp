@@ -141,9 +141,9 @@ namespace {
 
     unsigned NumInherited = 0;
 
-    // If the class has @objc ancestry, we lay out resiliently-typed fields
-    // as if they were fragile.
-    bool CompletelyFragileLayout = false;
+    // For now we always lay out resiliently-typed fields as if they
+    // were fragile.
+    bool CompletelyFragileLayout;
 
     // Does the class metadata require dynamic initialization above and
     // beyond what the runtime can automatically achieve?
@@ -171,6 +171,11 @@ namespace {
                        ReferenceCounting refcounting)
       : StructLayoutBuilder(IGM)
     {
+      // Perform fragile layout if Objective-C interop is enabled.
+      CompletelyFragileLayout =
+        (IGM.Context.LangOpts.EnableObjCInterop &&
+         !IGM.IRGen.Opts.EnableClassResilience);
+
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -249,10 +254,6 @@ namespace {
         }
 
         if (superclass->hasClangNode()) {
-          // Perform fragile layout if the class has @objc ancestry.
-          if (!IGM.IRGen.Opts.EnableClassResilience)
-            CompletelyFragileLayout = true;
-
           // If the superclass was imported from Objective-C, its size is
           // not known at compile time. However, since the field offset
           // vector only stores offsets of stored properties defined in
@@ -1643,19 +1644,19 @@ namespace {
         return emitObjCMethodDescriptor(IGM, descriptors, method);
 
       switch (accessor->getAccessorKind()) {
-      case AccessorKind::IsGetter:
+      case AccessorKind::Get:
         return emitObjCGetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsSetter:
+      case AccessorKind::Set:
         return emitObjCSetterDescriptor(IGM, descriptors,
                                         accessor->getStorage());
 
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
       llvm_unreachable("bad accessor kind");

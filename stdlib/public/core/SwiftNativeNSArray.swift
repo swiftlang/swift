@@ -161,6 +161,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       to: Optional<AnyObject>.self)
   }
 
+  @usableFromInline
   internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
 
   @inlinable

@@ -3798,6 +3798,10 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
                                 bool forPropertyDescriptor) {
+  auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
+                                          AccessKind::ReadWrite,
+                                          M.getSwiftModule());
+
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
@@ -3812,28 +3816,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                       genericEnv ? genericEnv->getGenericSignature() : nullptr);
     }
   
-    switch (auto strategy = var->getAccessStrategy(AccessSemantics::Ordinary,
-                                                    AccessKind::ReadWrite)) {
-    case AccessStrategy::Storage: {
-      // If the stored value would need to be reabstracted in fully opaque
-      // context, then we have to treat the component as computed.
-      auto componentObjTy = componentTy->getWithoutSpecifierType();
-      if (genericEnv)
-        componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-      auto storageTy = Types.getSubstitutedStorageType(var, componentObjTy);
-      auto opaqueTy = Types
-        .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
-      
-      if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
-        return KeyPathPatternComponent::forStoredProperty(var, componentTy);
-      }
-      LLVM_FALLTHROUGH;
-    }
-    case AccessStrategy::Addressor:
-    case AccessStrategy::DirectToAccessor:
-    case AccessStrategy::DispatchToAccessor: {
-      // We need thunks to bring the getter and setter to the right signature
-      // expected by the key path runtime.
+    if (Types.canStorageUseStoredKeyPathComponent(var)) {
+      return KeyPathPatternComponent::forStoredProperty(var, componentTy);
+    } else {
       auto id = getIdForKeyPathComponentComputedProperty(*this, var,
                                                          strategy);
       auto getter = getOrCreateKeyPathGetter(*this, loc,
@@ -3857,14 +3842,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
             getter, {}, nullptr, nullptr, componentTy);
       }
     }
-    case AccessStrategy::BehaviorStorage:
-      llvm_unreachable("should not occur");
-    }
   }
   
   if (auto decl = dyn_cast<SubscriptDecl>(storage)) {
-    auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
-                                            AccessKind::ReadWrite);
     auto baseSubscriptTy =
       decl->getInterfaceType()->castTo<AnyFunctionType>();
     if (auto genSubscriptTy = baseSubscriptTy->getAs<GenericFunctionType>())

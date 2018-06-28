@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -swift-version 3
 
 // -----------------------------------------------------------------------
 // Declaring optional requirements

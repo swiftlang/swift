@@ -983,6 +983,8 @@ public:
   CanSILBoxType getBoxTypeForEnumElement(SILType enumType,
                                          EnumElementDecl *elt);
 
+  bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl);
+  
 private:
   CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 

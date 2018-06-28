@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - -swift-version 3 | %FileCheck %s
 class A {
     init(handler: (() -> ())) { }
 }

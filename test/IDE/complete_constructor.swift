@@ -13,10 +13,25 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_SELECTOR_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_SELECTOR_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_VAL_META_2 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_VAL_META_2
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1 | %FileCheck %s -check-prefix=EXPLICIT_CONSTRUCTORS_BASE_DERIVED_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_NODOT | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_DOT | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_INIT_FROM_PROT_PAREN | %FileCheck %s -check-prefix=DEFAULT_INIT_FROM_PROT
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE1 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_1 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_2 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_3 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_4 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_SHOW_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_5 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_SHOW_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE2_6 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE2_NOINIT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE3 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE4 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_FROM_METATYPE5 | %FileCheck %s -check-prefix=INIT_FROM_METATYPE4
@@ -141,6 +156,17 @@ func testExplicitConstructorsSelector1() {
 // EXPLICIT_CONSTRUCTORS_SELECTOR_1: End completions
 }
 
+func testExplicitConstructorsValueMetatype() {
+  var SS = ExplicitConstructorsSelector1.self
+  SS#^EXPLICIT_CONSTRUCTORS_VAL_META_1^#
+  SS(#^EXPLICIT_CONSTRUCTORS_VAL_META_2^#
+
+// EXPLICIT_CONSTRUCTORS_VAL_META_1: Decl[Constructor]/CurrNominal: .init({#int: Int#})[#ExplicitConstructorsSelector1#]
+// EXPLICIT_CONSTRUCTORS_VAL_META_1: Decl[Constructor]/CurrNominal: .init({#int: Int#}, {#andFloat: Float#})[#ExplicitConstructorsSelector1#]
+
+// EXPLICIT_CONSTRUCTORS_VAL_META_2-NOT: Decl[Constructor]
+}
+
 struct ExplicitConstructorsSelector2 {
   init(noArgs _ : ()) {}
   init(_ a : Int) {}
@@ -197,11 +223,20 @@ func testGetInitFromMetatype1() {
 // INIT_FROM_METATYPE1-NEXT: End completions
 
 func testGetInitFromMetatype2() {
-  var SS = ExplicitConstructorsBase1.self
-  SS.#^INIT_FROM_METATYPE2^#
+  var S1 = ExplicitConstructorsBase1.self
+  var S2 = ExplicitConstructorsDerived2.self
+  S1.#^INIT_FROM_METATYPE2_1^#
+  S1#^INIT_FROM_METATYPE2_2^#
+  S1(#^INIT_FROM_METATYPE2_3^#
+  S2.#^INIT_FROM_METATYPE2_4^#
+  S2#^INIT_FROM_METATYPE2_5^#
+  S2(#^INIT_FROM_METATYPE2_6^#
 }
+// INIT_FROM_METATYPE2_NOINIT-NOT: Decl[Constructor]
 
-// INIT_FROM_METATYPE2-NOT: Decl[Constructor]/CurrNominal:      init()[#ExplicitConstructorsBase1#]{{; name=.+$}}
+// INIT_FROM_METATYPE2_SHOW_INIT-NOT: Decl[Constructor]
+// INIT_FROM_METATYPE2_SHOW_INIT: Decl[Constructor]/CurrNominal: {{init|.init}}({#a: Int#})[#ExplicitConstructorsDerived2#]
+// INIT_FROM_METATYPE2_SHOW_INIT-NOT: Decl[Constructor]
 
 func testGetInitFromMetatype3() {
   var SS = ExplicitConstructorsBase1.self
@@ -243,6 +278,24 @@ func testHaveRParen2() {
 func testHaveComma1() {
   ExplicitConstructors1(#^HAVE_COMMA_1^#,
 // HAVE_COMMA_1-NOT: Decl[Constructor]
+}
+
+//===--- Test that we show default constuctors inherited from protocols
+
+protocol ProtDefaultInit {}
+extension ProtDefaultInit { init(foo: Int) {}}
+
+class ConformsToProtDefaultInit: ProtDefaultInit {
+  init(bar: Int) {}
+}
+
+func testHasDefaultInitFromProtocol() {
+  ConformsToProtDefaultInit#^DEFAULT_INIT_FROM_PROT_NODOT^#
+  ConformsToProtDefaultInit.#^DEFAULT_INIT_FROM_PROT_DOT^#
+  ConformsToProtDefaultInit(#^DEFAULT_INIT_FROM_PROT_PAREN^#
+
+// DEFAULT_INIT_FROM_PROT-DAG: Decl[Constructor]/CurrNominal:  {{.+}}{#bar: Int#}
+// DEFAULT_INIT_FROM_PROT-DAG: Decl[Constructor]/Super:        {{.+}}{#foo: Int#}
 }
 
 class WithAlias1 {

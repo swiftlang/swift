@@ -33,7 +33,7 @@ extension _StringGuts {
 // HACK: This gets rid of some retains/releases that was slowing down the
 // memcmp fast path for comparing ascii strings. rdar://problem/37473470
 @inline(never) // @outlined
-@effects(readonly)
+@_effects(readonly)
 @usableFromInline // @opaque
 internal
 func _compareUnicode(
@@ -70,7 +70,7 @@ func _compareUnicode(
 }
 
 @inline(never) // @outlined
-@effects(readonly)
+@_effects(readonly)
 @usableFromInline // @opaque
 internal
 func _compareUnicode(

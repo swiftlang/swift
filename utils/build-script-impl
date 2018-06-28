@@ -992,7 +992,7 @@ function cmake_needs_to_specify_standard_computed_defaults() {
 function make_relative_symlink() {
     local SOURCE=$1
     local TARGET=$2
-    local TARGET_DIR=$(dirname $2)
+    local TARGET_DIR=$(dirname "$2")
     local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\"${SOURCE}\", \"${TARGET_DIR}\"))")
     call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
@@ -1751,6 +1751,7 @@ function set_lldb_xcodebuild_options() {
         LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
         SYMROOT="${lldb_build_dir}"
         OBJROOT="${lldb_build_dir}"
+        -UseNewBuildSystem=NO
         ${LLDB_EXTRA_XCODEBUILD_ARGS}
     )
     if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
@@ -2653,7 +2654,7 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[ "${product}" == "llvm" ]]; then
             # Find the location of the c++ header dir.
             if [[ "$(uname -s)" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname ${HOST_CXX})
+              HOST_CXX_DIR=$(dirname "${HOST_CXX}")
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
             elif [[ "$(uname -s)" == "Haiku" ]] ; then
               HOST_CXX_HEADERS_DIR="/boot/system/develop/headers/c++"

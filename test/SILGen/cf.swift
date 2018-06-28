@@ -1,7 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name cf -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -module-name cf -enable-objc-interop -import-cf-types -sdk %S/Inputs %s -o - | %FileCheck %s
 
 import CoreCooling
 

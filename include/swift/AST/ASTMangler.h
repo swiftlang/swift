@@ -208,7 +208,8 @@ protected:
 
   void appendModule(const ModuleDecl *module);
 
-  void appendProtocolName(const ProtocolDecl *protocol);
+  void appendProtocolName(const ProtocolDecl *protocol,
+                          bool allowStandardSubstitution = true);
 
   void appendAnyGenericType(const GenericTypeDecl *decl);
 

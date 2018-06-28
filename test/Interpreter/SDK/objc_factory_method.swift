@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -module-name FactoryTest %s -o %t/a.out
+// RUN: %target-build-swift -module-name FactoryTest %s -o %t/a.out -swift-version 3
 // RUN: %target-run %t/a.out | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx

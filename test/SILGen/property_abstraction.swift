@@ -118,7 +118,7 @@ struct T20341012 {
     // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_guaranteed (@in_guaranteed ()) -> @out ())
     // CHECK:         apply {{.*}}<(title: (), action: () -> ())>([[TMP1]],
     mutating func t() {
-        _ = self.options[].title
+        _ = self.options[()].title
     }
 }
 

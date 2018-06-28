@@ -32,7 +32,7 @@ import SwiftShims
 ///         }
 ///
 ///         static func random() -> Weekday {
-///             return Weekday.randomWeekday(using: &Random.default)
+///             return Weekday.random(using: &Random.default)
 ///         }
 ///     }
 ///
@@ -60,6 +60,7 @@ public protocol RandomNumberGenerator {
 }
 
 extension RandomNumberGenerator {
+  @inlinable
   public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
     // FIXME: Optimize
     var chunk: UInt64 = 0
@@ -132,25 +133,29 @@ extension RandomNumberGenerator {
 /// - Apple platforms use `arc4random_buf(3)`.
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
+@_fixed_layout
 public struct Random : RandomNumberGenerator {
   /// The default instance of the `Random` random number generator.
+  @inlinable
   public static var `default`: Random {
     get { return Random() }
     set { /* Discard */ }
   }
 
-  private init() {}
+  @inlinable
+  internal init() {}
 
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// - Returns: An unsigned 64-bit random value.
-  @effects(releasenone)
+  @inlinable
   public mutating func next() -> UInt64 {
     var random: UInt64 = 0
     _stdlib_random(&random, MemoryLayout<UInt64>.size)
     return random
   }
 
+  @inlinable
   public mutating func _fill(bytes buffer: UnsafeMutableRawBufferPointer) {
     if !buffer.isEmpty {
       _stdlib_random(buffer.baseAddress!, buffer.count)

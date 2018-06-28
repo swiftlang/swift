@@ -40,21 +40,21 @@ extern const int kRawInt;
 extern void takesMyInt(MyInt);
 
 typedef NSString * NSURLResourceKey __attribute((swift_newtype(struct)));
-extern NSURLResourceKey const NSURLIsRegularFileKey;
-extern NSURLResourceKey const NSURLIsDirectoryKey;
-extern NSURLResourceKey const NSURLLocalizedNameKey;
+extern _Null_unspecified NSURLResourceKey const NSURLIsRegularFileKey;
+extern _Null_unspecified NSURLResourceKey const NSURLIsDirectoryKey;
+extern _Null_unspecified NSURLResourceKey const NSURLLocalizedNameKey;
 
 // Special case: Notifications
-extern const NSString *FooNotification;
-extern const NSString *kBarNotification;
-extern const NSString *NSWibbleNotification;
+extern const NSString * _Null_unspecified FooNotification;
+extern const NSString * _Null_unspecified kBarNotification;
+extern const NSString * _Null_unspecified NSWibbleNotification;
 
 // But not just 'Notification'
-extern const NSString *kNotification;
-extern const NSString *Notification;
+extern const NSString * _Null_unspecified kNotification;
+extern const NSString * _Null_unspecified Notification;
 
 // Nor when explicitly swift_name-ed
-extern const NSString *kSNNotification
+extern const NSString * _Null_unspecified kSNNotification
     __attribute((swift_name("swiftNamedNotification")));
 
 // Test CFStringRef
@@ -62,26 +62,26 @@ typedef CFStringRef CFNewType __attribute((swift_newtype(struct)));
 
 // CF audited
 _Pragma("clang arc_cf_code_audited begin")
-extern const CFNewType MyCFNewTypeValue;
-extern CFNewType FooAudited(void);
+extern _Null_unspecified const CFNewType MyCFNewTypeValue;
+extern _Null_unspecified CFNewType FooAudited(void);
 _Pragma("clang arc_cf_code_audited end")
-extern const CFNewType MyCFNewTypeValueUnauditedButConst;
+extern _Null_unspecified const CFNewType MyCFNewTypeValueUnauditedButConst;
 
 // un-audited CFStringRef
-extern CFNewType MyCFNewTypeValueUnaudited;
-extern CFNewType FooUnaudited(void);
+extern _Null_unspecified CFNewType MyCFNewTypeValueUnaudited;
+extern _Null_unspecified CFNewType FooUnaudited(void);
 
 // Tests to show identical calling convention / binary representation for
 // new_type and non-new_type
 typedef CFStringRef MyABINewType __attribute((swift_newtype(struct)));
 typedef CFStringRef MyABIOldType;
 _Pragma("clang arc_cf_code_audited begin")
-extern const MyABINewType kMyABINewTypeGlobal;
-extern const MyABIOldType kMyABIOldTypeGlobal;
-extern MyABINewType getMyABINewType(void);
-extern MyABIOldType getMyABIOldType(void);
-extern void takeMyABINewType(MyABINewType);
-extern void takeMyABIOldType(MyABIOldType);
+extern _Null_unspecified const MyABINewType kMyABINewTypeGlobal;
+extern _Null_unspecified const MyABIOldType kMyABIOldTypeGlobal;
+extern _Null_unspecified MyABINewType getMyABINewType(void);
+extern _Null_unspecified MyABIOldType getMyABIOldType(void);
+extern void takeMyABINewType(_Null_unspecified MyABINewType);
+extern void takeMyABIOldType(_Null_unspecified MyABIOldType);
 
 extern void takeMyABINewTypeNonNull(_Nonnull MyABINewType);
 extern void takeMyABIOldTypeNonNull(_Nonnull MyABIOldType);
@@ -89,8 +89,8 @@ _Pragma("clang arc_cf_code_audited end")
 
 typedef NSString *MyABINewTypeNS __attribute((swift_newtype(struct)));
 typedef NSString *MyABIOldTypeNS;
-extern MyABINewTypeNS getMyABINewTypeNS(void);
-extern MyABIOldTypeNS getMyABIOldTypeNS(void);
+extern _Null_unspecified MyABINewTypeNS getMyABINewTypeNS(void);
+extern _Null_unspecified MyABIOldTypeNS getMyABIOldTypeNS(void);
 extern void takeMyABINewTypeNonNullNS(_Nonnull MyABINewTypeNS);
 extern void takeMyABIOldTypeNonNullNS(_Nonnull MyABIOldTypeNS);
 
@@ -100,18 +100,18 @@ typedef struct {int i;} NSSomeContext;
 typedef NSString *NSSomeContextName __attribute((swift_newtype(struct)))
 __attribute((swift_name("NSSomeContext.Name")));
 
-extern const NSSomeContextName NSMyContextName;
+extern _Null_unspecified const NSSomeContextName NSMyContextName;
 
 typedef struct T *TRef __attribute((swift_newtype(struct)));
 typedef const struct T *ConstTRef __attribute((swift_newtype(struct)));
 extern _Nonnull TRef create_T(void);
 extern _Nonnull ConstTRef create_ConstT(void);
-extern void destroy_T(TRef);
-extern void destroy_ConstT(ConstTRef);
+extern void destroy_T(_Null_unspecified TRef);
+extern void destroy_ConstT(_Null_unspecified ConstTRef);
 
-extern void mutate_TRef_Pointee(TRef) __attribute((swift_name("TRef.mutatePointee(self:)")));
-extern void mutate_TRef(TRef *) __attribute((swift_name("TRef.mutate(self:)")));
-extern void use_ConstT(ConstTRef)
+extern void mutate_TRef_Pointee(_Null_unspecified TRef) __attribute((swift_name("TRef.mutatePointee(self:)")));
+extern void mutate_TRef(_Null_unspecified TRef * _Null_unspecified) __attribute((swift_name("TRef.mutate(self:)")));
+extern void use_ConstT(_Null_unspecified ConstTRef)
     __attribute((swift_name("ConstTRef.use(self:)")));
 
 typedef struct T *_Nonnull *TRefRef __attribute((swift_newtype(struct)));
@@ -119,12 +119,15 @@ typedef struct T *_Nonnull const *ConstTRefRef
     __attribute((swift_newtype(struct)));
 extern _Nonnull TRefRef create_TRef(void);
 extern _Nonnull ConstTRefRef create_ConstTRef(void);
-extern void destroy_TRef(TRefRef);
-extern void destroy_ConstTRef(ConstTRefRef);
+extern void destroy_TRef(_Null_unspecified TRefRef);
+extern void destroy_ConstTRef(_Null_unspecified ConstTRefRef);
 
-extern void mutate_TRefRef_Pointee(TRefRef)
+extern void mutate_TRefRef_Pointee(_Null_unspecified TRefRef)
     __attribute((swift_name("TRefRef.mutatePointee(self:)")));
-extern void mutate_TRefRef(TRefRef*)
+extern void mutate_TRefRef(_Null_unspecified TRefRef* _Null_unspecified)
     __attribute((swift_name("TRefRef.mutate(self:)")));
-extern void use_ConstTRef(ConstTRefRef)
+extern void use_ConstTRef(_Null_unspecified ConstTRefRef)
     __attribute((swift_name("ConstTRefRef.use(self:)")));
+
+typedef NSString *MyString __attribute__((__swift_newtype__(struct)));
+

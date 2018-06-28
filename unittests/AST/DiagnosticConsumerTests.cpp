@@ -43,7 +43,7 @@ namespace {
       expected.erase(expected.begin());
     }
 
-    bool finishProcessing(SourceManager &) override {
+    bool finishProcessing() override {
       EXPECT_FALSE(hasFinished);
       if (previous)
         EXPECT_TRUE(previous->hasFinished);
@@ -68,7 +68,7 @@ TEST(FileSpecificDiagnosticConsumer, SubConsumersFinishInOrder) {
   consumers.emplace_back("", std::move(consumerUnaffiliated));
 
   FileSpecificDiagnosticConsumer topConsumer(consumers);
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
@@ -89,7 +89,7 @@ TEST(FileSpecificDiagnosticConsumer, InvalidLocDiagsGoToEveryConsumer) {
   FileSpecificDiagnosticConsumer topConsumer(consumers);
   topConsumer.handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Error,
                                "dummy", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
@@ -139,7 +139,7 @@ TEST(FileSpecificDiagnosticConsumer, ErrorsWithLocationsGoToExpectedConsumers) {
                                "back", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Error,
                                "back", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer,
@@ -193,7 +193,7 @@ TEST(FileSpecificDiagnosticConsumer,
                                "back", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfB, DiagnosticKind::Error,
                                "back", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
@@ -234,7 +234,7 @@ TEST(FileSpecificDiagnosticConsumer, WarningsAndRemarksAreTreatedLikeErrors) {
                                "remark", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, frontOfB, DiagnosticKind::Remark,
                                "remark", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
@@ -296,7 +296,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrors) {
                                "note", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
                                "note", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
@@ -358,7 +358,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToWarningsAndRemarks) {
                                "note", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
                                "note", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
@@ -417,7 +417,7 @@ TEST(FileSpecificDiagnosticConsumer, NotesAreAttachedToErrorsEvenAcrossFiles) {
                                "note", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
                                "note", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 TEST(FileSpecificDiagnosticConsumer,
@@ -480,7 +480,7 @@ TEST(FileSpecificDiagnosticConsumer,
                                "note", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, backOfA, DiagnosticKind::Note,
                                "note", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }
 
 
@@ -529,5 +529,5 @@ TEST(FileSpecificDiagnosticConsumer,
                                "error", {}, DiagnosticInfo());
   topConsumer.handleDiagnostic(sourceMgr, SourceLoc(), DiagnosticKind::Note,
                                "note", {}, DiagnosticInfo());
-  topConsumer.finishProcessing(sourceMgr);
+  topConsumer.finishProcessing();
 }

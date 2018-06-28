@@ -683,21 +683,6 @@ static SILValue getAccessedPointer(SILValue Pointer) {
   return Pointer;
 }
 
-/// Returns true when the instruction represents added instrumentation for
-/// run-time sanitizers.
-static bool isSanitizerInstrumentation(SILInstruction *Instruction,
-                                       ASTContext &Ctx) {
-  auto *BI = dyn_cast<BuiltinInst>(Instruction);
-  if (!BI)
-    return false;
-
-  Identifier Name = BI->getName();
-  if (Name == Ctx.getIdentifier("tsanInoutAccess"))
-    return true;
-
-  return false;
-}
-
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
@@ -877,9 +862,32 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
+      
       // If this is an @inout parameter, it is like both a load and store.
-      case ParameterConvention::Indirect_Inout:
       case ParameterConvention::Indirect_InoutAliasable: {
+        // FIXME: The @inout_aliasable convention is used for indirect captures
+        // of both 'let' and 'var' variables. Using a more specific convention
+        // for 'let' properties like @in_guaranteed unfortunately exposes bugs
+        // elsewhere in the pipeline. A 'let' capture cannot really be mutated
+        // by the callee, and this is enforced by sema, so we can consider it
+        // a nonmutating use.
+        bool isLet = true;
+        
+        for (unsigned i = 0; i < TheMemory.NumElements; ++i) {
+          if (!TheMemory.isElementLetProperty(i)) {
+            isLet = false;
+            break;
+          }
+        }
+        
+        if (isLet) {
+          addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
+          continue;
+        }
+        
+        LLVM_FALLTHROUGH;
+      }
+      case ParameterConvention::Indirect_Inout: {
         // If we're in the initializer for a struct, and this is a call to a
         // mutating method, we model that as an escape of self.  If an
         // individual sub-member is passed as inout, then we model that as an
@@ -954,7 +962,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Sanitizer instrumentation is not user visible, so it should not
     // count as a use and must not affect compile-time diagnostics.
-    if (isSanitizerInstrumentation(User, Module.getASTContext()))
+    if (isSanitizerInstrumentation(User))
       continue;
 
     // Otherwise, the use is something complicated, it escapes.

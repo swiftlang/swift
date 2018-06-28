@@ -133,3 +133,22 @@
 // RUN: not %swiftc_driver -incremental -autolink-force-load %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
 // RUN: not %swiftc_driver -autolink-force-load -incremental %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
 // AUTOLINK_FORCE_LOAD: error: '-autolink-force-load' is not supported with '-incremental'
+
+// RUN: %swift_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swift_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// RUN: %swiftc_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
+// RUN: %swiftc_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s
+// DEBUG_INFO_FORMAT_CODEVIEW: -debug-info-format=codeview
+// DEBUG_INFO_FORMAT_DWARF: -debug-info-format=dwarf
+
+// RUN: not %swift_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swift_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// RUN: not %swiftc_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
+// MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
+
+// RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// RUN: not %swiftc_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
+// BAD_DEBUG_LEVEL_ERROR: error: argument '-debug-info-format=codeview' is not allowed with '{{.*}}'

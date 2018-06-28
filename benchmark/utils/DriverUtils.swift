@@ -403,6 +403,10 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
       // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
       scale = c.fixedNumIters
     }
+    // Make integer overflow less likely on platforms where Int is 32 bits wide.
+    // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
+    // benchmarks to not let scaling get off the charts.
+    scale = min(scale, UInt(Int.max) / 10_000)
 
     // Rerun the test with the computed scale factor.
     if scale > 1 {

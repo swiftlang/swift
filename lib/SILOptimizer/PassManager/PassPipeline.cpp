@@ -383,6 +383,13 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionElimination();
   P.addDeadObjectElimination();
 
+  // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
+  // This is needed to fully optimize static small String constants.
+  P.addSimplifyCFG();
+  P.addSILCombine();
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+
   // Hoist globals out of loops.
   // Global-init functions should not be inlined GlobalOpt is done.
   P.addGlobalOpt();

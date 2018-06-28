@@ -110,7 +110,7 @@ func testAnyObjectDispatch(o: AnyObject) {
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
 class ObjCInit {
-  dynamic required init() { }
+  @objc dynamic required init() { }
 }
 
 // CHECK-LABEL: sil hidden @$S12dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()

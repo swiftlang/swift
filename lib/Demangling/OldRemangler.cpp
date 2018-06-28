@@ -1628,11 +1628,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  Out << "Qq";
-  mangleChildNodes(node); // index, declcontext
-}
-
 void Remangler::mangleDeclContext(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1757,6 +1752,9 @@ void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleProtocolWithoutPrefix(Node *node) {
+  if (mangleStandardSubstitution(node))
+    return;
+
   if (node->getKind() == Node::Kind::Type) {
     assert(node->getNumChildren() == 1);
     node = node->begin()[0];

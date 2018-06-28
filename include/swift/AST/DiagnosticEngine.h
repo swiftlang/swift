@@ -759,7 +759,7 @@ namespace swift {
 
     /// \returns true if any diagnostic consumer gave an error while invoking
     //// \c finishProcessing.
-    bool finishProcessing(SourceManager &);
+    bool finishProcessing();
 
     /// \brief Format the given diagnostic text and place the result in the given
     /// buffer.

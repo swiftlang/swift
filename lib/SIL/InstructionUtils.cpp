@@ -299,6 +299,18 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   }
 }
 
+bool swift::isSanitizerInstrumentation(SILInstruction *Instruction) {
+  auto *BI = dyn_cast<BuiltinInst>(Instruction);
+  if (!BI)
+    return false;
+
+  Identifier Name = BI->getName();
+  if (Name == BI->getModule().getASTContext().getIdentifier("tsanInoutAccess"))
+    return true;
+
+  return false;
+}
+
 SILValue swift::stripConvertFunctions(SILValue V) {
   while (true) {
     if (auto CFI = dyn_cast<ConvertFunctionInst>(V)) {

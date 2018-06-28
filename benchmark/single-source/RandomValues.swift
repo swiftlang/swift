@@ -54,10 +54,10 @@ public func run_RandomIntegersDef(_ N: Int) {
 @inline(never)
 public func run_RandomIntegersLCG(_ N: Int) {
   for _ in 0 ..< N {
-    var x = 0
+    var x: Int64 = 0
     var generator = LCRNG(seed: 0)
     for _ in 0 ..< 100_000 {
-      x &+= Int.random(in: 0...10_000, using: &generator)
+      x &+= Int64.random(in: 0...10_000, using: &generator)
     }
     CheckResults(x == 498214315)
   }

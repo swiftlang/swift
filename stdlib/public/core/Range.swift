@@ -186,7 +186,6 @@ where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Iterator = IndexingIterator<Range<Bound>>
 }
 
-// FIXME: should just be RandomAccessCollection
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
 where Bound : Strideable, Bound.Stride : SignedInteger
 {
@@ -410,7 +409,7 @@ extension Range: Hashable where Bound: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(lowerBound)
     hasher.combine(upperBound)

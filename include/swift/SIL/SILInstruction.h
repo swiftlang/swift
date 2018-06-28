@@ -8094,6 +8094,15 @@ inline EnumElementDecl **SelectEnumInstBase::getEnumElementDeclStorage() {
   llvm_unreachable("Unhandled SelectEnumInstBase subclass");
 }
 
+inline void SILSuccessor::pred_iterator::cacheBasicBlock() {
+  if (Cur != nullptr) {
+    Block = Cur->ContainingInst->getParent();
+    assert(Block != nullptr);
+  } else {
+    Block = nullptr;
+  }
+}
+
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//

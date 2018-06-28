@@ -1185,7 +1185,39 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   tryEmitPropertyDescriptor(vd);
 }
 
-static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
+bool
+TypeConverter::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl) {
+  switch (auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
+                                                  AccessKind::ReadWrite,
+                                                  M.getSwiftModule())) {
+  case AccessStrategy::Storage: {
+    // If the stored value would need to be reabstracted in fully opaque
+    // context, then we have to treat the component as computed.
+    auto componentObjTy = decl->getStorageInterfaceType()
+                              ->getWithoutSpecifierType();
+    // Keypaths rely on accessors to handle the special behavior of weak or
+    // unowned properties.
+    if (componentObjTy->is<ReferenceStorageType>())
+      return false;
+    if (auto genericEnv =
+              decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
+      componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+    auto storageTy = getSubstitutedStorageType(decl, componentObjTy);
+    auto opaqueTy =
+      getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+    
+    return storageTy.getAddressType() == opaqueTy.getAddressType();
+  }
+  case AccessStrategy::Addressor:
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+    return false;
+  case AccessStrategy::BehaviorStorage:
+    llvm_unreachable("should not occur");
+  }
+}
+
+static bool doesStorageNeedDescriptor(AbstractStorageDecl *decl) {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage.
   
@@ -1222,12 +1254,53 @@ static bool doesPropertyNeedDescriptor(AbstractStorageDecl *decl) {
   case SILLinkage::SharedExternal:
     llvm_unreachable("should be definition linkage?");
   }
-  
-  // TODO: We might be able to avoid a descriptor if the property is committed
-  // to being implemented a certain way, such as if it's promised to remain
-  // stored, or is computed with inlinable accessors, and can't change its
-  // mutability (because it's already promised to be mutable or fully immutable).
+
   return true;
+}
+
+static bool canStorageUseTrivialDescriptor(SILModule &M,
+                                           AbstractStorageDecl *decl) {
+  // A property can use a trivial property descriptor if the key path component
+  // that an external module would form given publicly-exported information
+  // about the property is never equivalent to the canonical component for the
+  // key path.
+  // This means that the property isn't stored (without promising to be always
+  // stored) and doesn't have a setter with less-than-public visibility.
+  
+  switch (M.getSwiftModule()->getResilienceStrategy()) {
+  case ResilienceStrategy::Default: {
+    if (M.Types.canStorageUseStoredKeyPathComponent(decl)) {
+      // External modules can't directly access storage, unless this is a
+      // property in a fixed-layout type.
+      return !decl->isFormallyResilient();
+    }
+    // If the type is computed and doesn't have a setter that's hidden from
+    // the public, then external components can form the canonical key path
+    // without our help.
+    auto setter = decl->getSetter();
+    if (setter == nullptr)
+      return true;
+    
+    auto setterLinkage = SILDeclRef(setter, SILDeclRef::Kind::Func)
+      .getLinkage(NotForDefinition);
+    
+    if (setterLinkage == SILLinkage::PublicExternal
+        || setterLinkage == SILLinkage::Public)
+      return true;
+    
+    return false;
+  }
+  case ResilienceStrategy::Resilient: {
+    // A resilient module needs to handle binaries compiled against its older
+    // versions. This means we have to be a bit more conservative, since in
+    // earlier versions, a settable property may have withheld the setter,
+    // or a fixed-layout type may not have been.
+    // Without availability information, only get-only computed properties
+    // can resiliently use trivial descriptors.
+    return !M.Types.canStorageUseStoredKeyPathComponent(decl)
+      && decl->getSetter() == nullptr;
+  }
+  }
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
@@ -1238,13 +1311,8 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
   
-  if (!doesPropertyNeedDescriptor(decl))
+  if (!doesStorageNeedDescriptor(decl))
     return;
-  
-  auto genericEnv = decl->getInnermostDeclContext()
-                        ->getGenericEnvironmentOfContext();
-  unsigned baseOperand = 0;
-  bool needsGenericContext = true;
   
   Type baseTy;
   if (decl->getDeclContext()->isTypeContext()) {
@@ -1261,6 +1329,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     // TODO: Global variables should eventually be referenceable as
     // key paths from ()
     //baseTy = TupleType::getEmpty(getASTContext());
+    return;
+  }
+
+  auto genericEnv = decl->getInnermostDeclContext()
+                        ->getGenericEnvironmentOfContext();
+  unsigned baseOperand = 0;
+  bool needsGenericContext = true;
+  
+  if (canStorageUseTrivialDescriptor(M, decl)) {
+    (void)SILProperty::create(M, /*serialized*/ false, decl, None);
     return;
   }
   

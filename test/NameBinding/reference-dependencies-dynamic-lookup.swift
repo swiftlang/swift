@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - -swift-version 3 > %t.swiftdeps
 // RUN: %FileCheck %s < %t.swiftdeps
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
 // Check that the output is deterministic.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -primary-file %t/main.swift -emit-reference-dependencies-path - -swift-version 3 > %t-2.swiftdeps
 // RUN: diff %t.swiftdeps %t-2.swiftdeps
 
 // REQUIRES: objc_interop

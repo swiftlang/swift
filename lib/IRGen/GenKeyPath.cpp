@@ -1218,6 +1218,33 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
 }
 
 void IRGenModule::emitSILProperty(SILProperty *prop) {
+  if (prop->isTrivial()) {
+    // All trivial property descriptors can share a single definition in the
+    // translation unit.
+    if (!TheTrivialPropertyDescriptor) {
+      // Emit a definition if we don't have one yet.
+      ConstantInitBuilder builder(*this);
+      ConstantStructBuilder fields = builder.beginStruct();
+      fields.addInt32(
+        _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker);
+      auto var = cast<llvm::GlobalVariable>(
+        getAddrOfPropertyDescriptor(prop->getDecl(),
+                                    fields.finishAndCreateFuture()));
+      var->setConstant(true);
+      var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+      var->setAlignment(4);
+      
+      TheTrivialPropertyDescriptor = var;
+    } else {
+      auto entity = LinkEntity::forPropertyDescriptor(prop->getDecl());
+      auto linkInfo = LinkInfo::get(*this, entity, ForDefinition);
+      llvm::GlobalAlias::create(linkInfo.getLinkage(),
+                                linkInfo.getName(),
+                                TheTrivialPropertyDescriptor);
+    }
+    return;
+  }
+
   ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();
   fields.setPacked(true);
@@ -1245,7 +1272,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
   
-  emitKeyPathComponent(*this, fields, prop->getComponent(),
+  emitKeyPathComponent(*this, fields, *prop->getComponent(),
                        isInstantiableInPlace, genericEnv, requirements,
                        prop->getDecl()->getInnermostDeclContext()
                                       ->getInnermostTypeContext()
@@ -1260,6 +1287,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
     getAddrOfPropertyDescriptor(prop->getDecl(),
                                 fields.finishAndCreateFuture()));
   var->setConstant(true);
+  var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   // A simple stored component descriptor can fit in four bytes. Anything else
   // needs pointer alignment.
   if (size <= Size(4))

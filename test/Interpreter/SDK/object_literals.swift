@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Test.app/Contents/MacOS)
 // RUN: cp -r %S/Inputs/object_literals-Resources %t/Test.app/Contents/Resources
-// RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main
+// RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main -swift-version 3
 // RUN: %target-run %t/Test.app/Contents/MacOS/main
 
 // REQUIRES: executable_test

@@ -977,6 +977,10 @@ public:
   ReferencedNameTracker *getReferencedNameTracker() {
     return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
   }
+  const ReferencedNameTracker *getReferencedNameTracker() const {
+    return ReferencedNames ? ReferencedNames.getPointer() : nullptr;
+  }
+
   void createReferencedNameTracker();
 
   /// \brief The buffer ID for the file that was imported, or None if there

@@ -125,81 +125,6 @@ static bool hasLoopInvariantOperands(SILInstruction *I, SILLoop *L) {
   });
 }
 
-/// Check if an address does not depend on other values in a basic block.
-static SILInstruction *addressIndependent(SILValue Addr) {
-  Addr = stripCasts(Addr);
-  if (auto *SGAI = dyn_cast<GlobalAddrInst>(Addr))
-    return SGAI;
-  if (auto *SEAI = dyn_cast<StructElementAddrInst>(Addr))
-    return addressIndependent(SEAI->getOperand());
-  return nullptr;
-}
-
-/// Check if two addresses can potentially access the same memory.
-/// For now, return true when both can be traced to the same global variable.
-static bool addressCanPairUp(SILValue Addr1, SILValue Addr2) {
-  SILInstruction *Origin1 = addressIndependent(Addr1);
-  return Origin1 && Origin1 == addressIndependent(Addr2);
-}
-
-/// Move cond_fail down if it can potentially help register promotion later.
-static bool sinkCondFail(SILLoop *Loop) {
-  // Only handle innermost loops for now.
-  if (!Loop->getSubLoops().empty())
-    return false;
-
-  bool Changed = false;
-  for (auto *BB : Loop->getBlocks()) {
-    // A list of CondFails that can be moved down.
-    SmallVector<CondFailInst*, 4> CFs;
-    // A pair of load and store that are independent of the CondFails and
-    // can potentially access the same memory.
-    LoadInst *LIOfPair = nullptr;
-    bool foundPair = false;
-
-    for (auto &Inst : *BB) {
-      if (foundPair) {
-        // Move CFs to right before Inst.
-        for (unsigned I = 0, E = CFs.size(); I < E; I++) {
-          DEBUG(llvm::dbgs() << "sinking cond_fail down ");
-          DEBUG(CFs[I]->dump());
-          DEBUG(llvm::dbgs() << "  before ");
-          DEBUG(Inst.dump());
-          CFs[I]->moveBefore(&Inst);
-        }
-        Changed = true;
-
-        foundPair = false;
-        LIOfPair = nullptr;
-      }
-
-      if (auto CF = dyn_cast<CondFailInst>(&Inst)) {
-        CFs.push_back(CF);
-      } else if (auto LI = dyn_cast<LoadInst>(&Inst)) {
-        if (addressIndependent(LI->getOperand())) {
-          LIOfPair = LI;
-        } else {
-          CFs.clear();
-          LIOfPair = nullptr;
-        }
-      } else if (auto SI = dyn_cast<StoreInst>(&Inst)) {
-        if (addressIndependent(SI->getDest())) {
-          if (LIOfPair &&
-              addressCanPairUp(SI->getDest(), LIOfPair->getOperand()))
-            foundPair = true;
-        } else {
-          CFs.clear();
-          LIOfPair = nullptr;
-        }
-      } else if (Inst.mayHaveSideEffects()) {
-        CFs.clear();
-        LIOfPair = nullptr;
-      }
-    }
-  }
-  return Changed;
-}
-
 /// Checks if \p Inst has no side effects which prevent hoisting.
 /// The \a SafeReads set contain instructions which we already proved to have
 /// no such side effects.
@@ -517,7 +442,6 @@ void LoopTreeOptimization::analyzeCurrentLoop(
 
 void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
                                         ReadSet &SafeReads) {
-  Changed |= sinkCondFail(CurrentLoop);
   Changed |= hoistInstructions(CurrentLoop, DomTree, SafeReads,
                                RunsOnHighLevelSil);
   Changed |= sinkFixLifetime(CurrentLoop, DomTree, LoopInfo);

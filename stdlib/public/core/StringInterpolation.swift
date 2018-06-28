@@ -26,7 +26,7 @@ extension String : _ExpressibleByStringInterpolation {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   public init(stringInterpolation strings: String...) {
     self.init()
     for str in strings {

@@ -32,6 +32,7 @@ func unsupportedOn32bit() -> Never { _conditionallyUnreachable() }
 @_fixed_layout
 public // @testable
 struct _SmallUTF8String {
+  @usableFromInline
   typealias _RawBitPattern = (low: UInt, high: UInt)
 
   //
@@ -129,7 +130,7 @@ extension _SmallUTF8String {
 
   @inline(__always)
   @inlinable
-  @effects(readonly)
+  @_effects(readonly)
   public // @testable
   init?(_ codeUnits: UnsafeBufferPointer<UInt8>) {
 #if arch(i386) || arch(arm)
@@ -731,7 +732,8 @@ extension _SmallUTF8String {
 }
 
 extension _SmallUTF8String {//}: _StringVariant {
-  typealias TranscodedBuffer = _SmallUTF16StringBuffer
+  @usableFromInline
+  internal typealias TranscodedBuffer = _SmallUTF16StringBuffer
 
   @inlinable
   @discardableResult

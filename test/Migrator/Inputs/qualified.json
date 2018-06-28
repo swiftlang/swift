@@ -38,5 +38,13 @@
     "OldTypeName": "",
     "NewPrintedName": "internalType",
     "NewTypeName": "ToplevelWrapper"
-  }
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedMemberSame",
+    "OldPrintedName": "orderedMemberSame",
+    "OldTypeName": "FooComparisonResult",
+    "NewPrintedName": "orderedMemberSame",
+    "NewTypeName": "NewFooComparisonResult.Nested"
+  },
 ]

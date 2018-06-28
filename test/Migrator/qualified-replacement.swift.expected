@@ -14,6 +14,11 @@ func foo() {
   _ = NewCityKind.NewTown
   _ = ToplevelWrapper.internalType()
   _ = ToplevelWrapper.internalType(recordName: "")
+  bar(NewFooComparisonResult.NewFooOrderedSame)
+  bar(.orderedMemberSame)
+  bar(NewFooComparisonResult.NewFooOrderedSame)
+  bar(NewFooComparisonResult.Nested.orderedMemberSame)
 }
 
 func foo(_: ToplevelWrapper.internalType) {}
+func bar(_ : FooComparisonResult) {}

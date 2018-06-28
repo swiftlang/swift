@@ -39,6 +39,7 @@ struct _OpaqueStringSwitchCache {
   var b: Builtin.Word
 }
 
+@usableFromInline // FIXME(sil-serialize-all)
 internal typealias _StringSwitchCache = Dictionary<String, Int>
 
 @_fixed_layout // FIXME(sil-serialize-all)

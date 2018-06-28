@@ -4814,7 +4814,6 @@ void SILProperty::verify(const SILModule &M) const {
 
   auto *decl = getDecl();
   auto *dc = decl->getInnermostDeclContext();
-  auto &component = getComponent();
   
   // TODO: base type for global/static descriptors
   auto sig = dc->getGenericSignatureOfContext();
@@ -4844,21 +4843,22 @@ void SILProperty::verify(const SILModule &M) const {
       }
     };
 
-  verifyKeyPathComponent(const_cast<SILModule&>(M),
-    require,
-    baseTy,
-    leafTy,
-    component,
-    {},
-    canSig,
-    subs,
-    /*property descriptor*/true,
-    hasIndices);
-  
-  // verifyKeyPathComponent updates baseTy to be the projected type of the
-  // component, which should be the same as the type of the declared storage
-  require(baseTy == leafTy,
-          "component type of property descriptor should match type of storage");
+  if (auto &component = getComponent()) {
+    verifyKeyPathComponent(const_cast<SILModule&>(M),
+      require,
+      baseTy,
+      leafTy,
+      *component,
+      {},
+      canSig,
+      subs,
+      /*property descriptor*/true,
+      hasIndices);
+    // verifyKeyPathComponent updates baseTy to be the projected type of the
+    // component, which should be the same as the type of the declared storage
+    require(baseTy == leafTy,
+            "component type of property descriptor should match type of storage");
+  }
 }
 
 /// Verify that a vtable follows invariants.

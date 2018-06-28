@@ -21,6 +21,10 @@ bb0:
   %2 = tuple (%199 : $())  // expected-error {{use of undefined value '%199'}}
 }
 
+sil @local_value_errors2 : $() -> () {
+bb0:
+  %0 = builtin "cmp_eq_Int1"(%0 : $() // expected-error @+1 {{expected ')' or ',' in SIL instruction}}
+} // expected-error {{extraneous '}' at top level}}
 
 sil @global_value_errors : $() -> () {
 bb0:

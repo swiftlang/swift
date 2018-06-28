@@ -19,6 +19,7 @@
 
 #include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -218,6 +219,9 @@ public:
   /// Diags - The diagnostics engine.
   DiagnosticEngine &Diags;
 
+  /// The request-evaluator that is used to process various requests.
+  Evaluator evaluator;
+
   /// The set of top-level modules we have loaded.
   /// This map is used for iteration, therefore it's a MapVector and not a
   /// DenseMap.
@@ -258,6 +262,9 @@ public:
 
   /// Optional table of counters to report, nullptr when not collecting.
   UnifiedStatsReporter *Stats = nullptr;
+
+  /// Set a new stats reporter.
+  void setStatsReporter(UnifiedStatsReporter *stats);
 
 private:
   /// \brief The current generation number, which reflects the number of
@@ -880,8 +887,8 @@ public:
   /// This is usually the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
   /// check for isSwiftVersionAtLeast(5).
-  bool isSwiftVersionAtLeast(unsigned major) const {
-    return LangOpts.isSwiftVersionAtLeast(major);
+  bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+    return LangOpts.isSwiftVersionAtLeast(major, minor);
   }
 
 private:

@@ -306,6 +306,10 @@ public:
   AbstractStorageDecl *getBehaviorDecl() const;
 
   /// Get any additional requirements that are required for this conformance to
+  /// be satisfied, if it is possible for them to be computed.
+  Optional<ArrayRef<Requirement>> getConditionalRequirementsIfAvailable() const;
+
+  /// Get any additional requirements that are required for this conformance to
   /// be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const;
 
@@ -380,7 +384,16 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   /// Any additional requirements that are required for this conformance to
   /// apply, e.g. 'Something: Baz' in 'extension Foo: Bar where Something: Baz'.
-  ArrayRef<Requirement> ConditionalRequirements;
+  mutable ArrayRef<Requirement> ConditionalRequirements;
+  enum class ConditionalRequirementsState {
+    Uncomputed,
+    Computing,
+    Complete,
+  };
+  /// The state of the ConditionalRequirements field: whether it has been
+  /// computed or not.
+  mutable ConditionalRequirementsState CRState =
+      ConditionalRequirementsState::Uncomputed;
 
   /// The lazy member loader provides callbacks for populating imported and
   /// deserialized conformances.
@@ -417,7 +430,7 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   void resolveLazyInfo() const;
 
-  void differenceAndStoreConditionalRequirements();
+  void differenceAndStoreConditionalRequirements() const;
 
 public:
   /// Get the protocol being conformed to.
@@ -438,10 +451,37 @@ public:
   }
 
   /// Get any additional requirements that are required for this conformance to
+  /// be satisfied if they can be computed.
+  ///
+  /// If \c computeIfPossible is false, this will not do the lazy computation of
+  /// the conditional requirements and will just query the current state. This
+  /// should almost certainly only be used for debugging purposes, prefer \c
+  /// getConditionalRequirementsIfAvailable (these are separate because
+  /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
+  /// parameter gets in the way of that).
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
+    if (computeIfPossible)
+      differenceAndStoreConditionalRequirements();
+
+    if (CRState == ConditionalRequirementsState::Complete)
+      return ConditionalRequirements;
+
+    return None;
+  }
+  /// Get any additional requirements that are required for this conformance to
+  /// be satisfied if they can be computed.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return getConditionalRequirementsIfAvailableOrCached(
+        /*computeIfPossible=*/true);
+  }
+
+  /// Get any additional requirements that are required for this conformance to
   /// be satisfied, e.g. for Array<T>: Equatable, T: Equatable also needs
   /// to be satisfied.
   ArrayRef<Requirement> getConditionalRequirements() const {
-    return ConditionalRequirements;
+    return *getConditionalRequirementsIfAvailable();
   }
 
   /// Retrieve the state of this conformance.
@@ -660,13 +700,15 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// Any conditional requirements, in substituted form. (E.g. given Foo<T>: Bar
   /// where T: Bar, Foo<Baz<U>> will include Baz<U>: Bar.)
-  ArrayRef<Requirement> ConditionalRequirements;
+  mutable Optional<ArrayRef<Requirement>> ConditionalRequirements;
 
   friend class ASTContext;
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
                                  SubstitutionMap substitutions);
+
+  void computeConditionalRequirements() const;
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -680,8 +722,28 @@ public:
   SubstitutionMap getSubstitutionMap() const { return GenericSubstitutions; }
 
   /// Get any requirements that must be satisfied for this conformance to apply.
-  ArrayRef<Requirement> getConditionalRequirements() const {
+  ///
+  /// If \c computeIfPossible is false, this will not do the lazy computation of
+  /// the conditional requirements and will just query the current state. This
+  /// should almost certainly only be used for debugging purposes, prefer \c
+  /// getConditionalRequirementsIfAvailable (these are separate because
+  /// CONFORMANCE_SUBCLASS_DISPATCH does some type checks and a defaulted
+  /// parameter gets in the way of that).
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailableOrCached(bool computeIfPossible) const {
+    if (computeIfPossible)
+      computeConditionalRequirements();
     return ConditionalRequirements;
+  }
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return getConditionalRequirementsIfAvailableOrCached(
+        /*computeIfPossible=*/true);
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return *getConditionalRequirementsIfAvailable();
   }
 
   /// Get the protocol being conformed to.
@@ -788,6 +850,12 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const {
     return InheritedConformance->getProtocol();
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return InheritedConformance->getConditionalRequirementsIfAvailable();
   }
 
   /// Get any requirements that must be satisfied for this conformance to apply.

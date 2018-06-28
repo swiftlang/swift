@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/ArrayTraps.swift
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone
-// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Debug -Onone -swift-version 3
+// RUN: %line-directive %t/ArrayTraps.swift -- %target-build-swift %t/ArrayTraps.swift -o %t/a.out_Release -O -swift-version 3
 //
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
 // RUN: %line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release

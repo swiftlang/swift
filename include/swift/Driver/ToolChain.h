@@ -122,6 +122,12 @@ protected:
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
 
+    // Not all platforms and jobs support the use of response files, so assume
+    // "false" by default. If the executable specified in the InvocationInfo
+    // constructor supports response files, this can be overridden and set to
+    // "true".
+    bool allowsResponseFiles = false;
+
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
         : ExecutableName(name), Arguments(std::move(args)),
@@ -196,6 +202,12 @@ protected:
                                           options::ID optionID,
                                           const llvm::opt::ArgList &args,
                                           StringRef extraEntry = "") const;
+
+  /// Specific toolchains should override this to provide additional conditions
+  /// under which the compiler invocation should be written into debug info. For
+  /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
+  /// set to match the behavior of Clang.
+  virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
 
 public:
   virtual ~ToolChain() = default;

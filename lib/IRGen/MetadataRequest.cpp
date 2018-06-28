@@ -891,9 +891,7 @@ namespace {
     }
 
     llvm::Value *getFunctionParameterRef(AnyFunctionType::CanParam &param) {
-      auto type = param.getType();
-      if (param.getParameterFlags().isInOut())
-        type = type->getInOutObjectType()->getCanonicalType();
+      auto type = param.getPlainType()->getCanonicalType();
       return IGF.emitAbstractTypeMetadataRef(type);
     }
 

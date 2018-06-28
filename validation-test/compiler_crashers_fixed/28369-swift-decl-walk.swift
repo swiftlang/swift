@@ -7,7 +7,7 @@
 
 // Credits: https://twitter.com/kiliankoe/status/752090953977036800
 
-// RUN: %target-swift-frontend %s -typecheck
+// RUN: %target-swift-frontend %s -typecheck -swift-version 3
 protocol P {
 }
 struct A<T> {

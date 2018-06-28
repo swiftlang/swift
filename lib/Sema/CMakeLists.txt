@@ -25,10 +25,7 @@ add_swift_library(swiftSema STATIC
   DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
   DerivedConformances.cpp
-  ITCDecl.cpp
-  ITCNameLookup.cpp
   InstrumenterSupport.cpp
-  IterativeTypeChecker.cpp
   MiscDiagnostics.cpp
   NameBinding.cpp
   PCMacro.cpp
@@ -50,7 +47,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckProtocol.cpp
   TypeCheckProtocolInference.cpp
   TypeCheckREPL.cpp
-  TypeCheckRequest.cpp
+  TypeCheckRequests.cpp
   TypeCheckStmt.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp

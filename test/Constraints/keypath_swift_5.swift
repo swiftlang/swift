@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %S/Inputs/keypath.swift -primary-file %s -swift-version 5
+// RUN: %target-swift-frontend -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -swift-version 5
 
 struct S {
   let i: Int

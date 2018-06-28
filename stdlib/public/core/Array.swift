@@ -299,9 +299,11 @@
 @_fixed_layout
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
-    internal typealias _Buffer = _ArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ArrayBuffer<Element>
   #else
-    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
   #endif
 
   @usableFromInline
@@ -1612,17 +1614,12 @@ extension Array: Equatable where Element: Equatable {
 }
 
 extension Array: Hashable where Element: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-  
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
     for element in self {

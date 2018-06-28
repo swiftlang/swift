@@ -15,7 +15,7 @@
 
 import OtherModule
 
-// CHECK-LABEL: define {{(protected )?}}swiftcc void @"$S4main7copyFoo3foo11OtherModule0C0VAF_tF"
+// CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$S4main7copyFoo3foo11OtherModule0C0VAF_tF"
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S11OtherModule3FooVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,
@@ -44,7 +44,7 @@ public func copyFoo(foo: Foo) -> Foo {
   return copy
 }
 
-// CHECK-LABEL: define {{(protected )?}}swiftcc void @"$S4main7copyBar3bar11OtherModule0C0VAF_tF"
+// CHECK-LABEL: define {{(dllexport |protected )?}}swiftcc void @"$S4main7copyBar3bar11OtherModule0C0VAF_tF"
 // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S11OtherModule3BarVMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK: [[VWT:%.*]] = load i8**,

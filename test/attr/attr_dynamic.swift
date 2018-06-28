@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
-// RUN: %target-swift-ide-test -enable-objc-interop -print-ast-typechecked -source-filename=%s -print-implicit-attrs
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -swift-version 3
+// RUN: %target-swift-ide-test -enable-objc-interop -print-ast-typechecked -source-filename=%s -print-implicit-attrs -swift-version 3
 
 struct NotObjCAble {
   var c: Foo

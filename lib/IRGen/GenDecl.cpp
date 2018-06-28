@@ -1111,17 +1111,25 @@ void IRGenerator::emitGlobalTopLevel(bool emitForParallelEmission) {
 
 void IRGenModule::finishEmitAfterTopLevel() {
   // Emit the implicit import of the swift standard library.
+  // FIXME: We'd get the exact set of implicit imports if we went through the
+  // SourceFile's getImportedModules instead, but then we'd lose location info
+  // for the explicit imports.
   if (DebugInfo) {
-    std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
-      { Context.StdlibModuleName, swift::SourceLoc() }
-    };
+    if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
+      if (TheStdlib != getSwiftModule()) {
+        std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+          { Context.StdlibModuleName, swift::SourceLoc() }
+        };
 
-    auto Imp = ImportDecl::create(Context,
-                                  getSwiftModule(),
-                                  SourceLoc(),
-                                  ImportKind::Module, SourceLoc(),
-                                  AccessPath);
-    DebugInfo->emitImport(Imp);
+        auto Imp = ImportDecl::create(Context,
+                                      getSwiftModule(),
+                                      SourceLoc(),
+                                      ImportKind::Module, SourceLoc(),
+                                      AccessPath);
+        Imp->setModule(TheStdlib);
+        DebugInfo->emitImport(Imp);
+      }
+    }
   }
 }
 
@@ -1957,7 +1965,7 @@ bool LinkInfo::isUsed(llvm::GlobalValue::LinkageTypes Linkage,
 llvm::GlobalVariable *swift::irgen::createVariable(
     IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *storageType,
     Alignment alignment, DebugTypeInfo DbgTy, Optional<SILLocation> DebugLoc,
-    StringRef DebugName, bool inFixedBuffer) {
+    StringRef DebugName, bool inFixedBuffer, bool indirectForDebugInfo) {
   auto name = linkInfo.getName();
   llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
   if (existingValue) {
@@ -1989,7 +1997,7 @@ llvm::GlobalVariable *swift::irgen::createVariable(
   if (IGM.DebugInfo && !DbgTy.isNull() && linkInfo.isForDefinition())
     IGM.DebugInfo->emitGlobalVariableDeclaration(
         var, DebugName.empty() ? name : DebugName, name, DbgTy,
-        var->hasInternalLinkage(), inFixedBuffer, DebugLoc);
+        var->hasInternalLinkage(), indirectForDebugInfo, DebugLoc);
 
   return var;
 }
@@ -2126,6 +2134,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   Size fixedSize;
   Alignment fixedAlignment;
   bool inFixedBuffer = false;
+  bool indirectForDebugInfo = false;
 
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
@@ -2159,6 +2168,28 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     storageType = getFixedBufferTy();
     fixedSize = Size(DataLayout.getTypeAllocSize(storageType));
     fixedAlignment = Alignment(DataLayout.getABITypeAlignment(storageType));
+
+    // DebugInfo is not resilient for now, so disable resilience to figure out
+    // if lldb needs to dereference the global variable or not.
+    //
+    // FIXME: Once lldb can make use of remote mirrors to calculate layouts
+    // at runtime, this should be removed.
+    {
+      CompletelyFragileScope Scope(*this);
+
+      SILType loweredTy = var->getLoweredType();
+      auto &nonResilientTI = cast<FixedTypeInfo>(getTypeInfo(loweredTy));
+      auto packing = nonResilientTI.getFixedPacking(*this);
+      switch (packing) {
+      case FixedPacking::OffsetZero:
+        break;
+      case FixedPacking::Allocate:
+        indirectForDebugInfo = true;
+        break;
+      default:
+        llvm_unreachable("Bad packing");
+      }
+    }
   }
 
   // Check whether we've created the global variable already.
@@ -2200,7 +2231,8 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       auto DbgTy = DebugTypeInfo::getGlobal(var, storageTypeWithContainer,
                                             fixedSize, fixedAlignment);
       gvar = createVariable(*this, link, storageTypeWithContainer,
-                            fixedAlignment, DbgTy, loc, name, inFixedBuffer);
+                            fixedAlignment, DbgTy, loc, name, inFixedBuffer,
+                            indirectForDebugInfo);
     }
     /// Add a zero initializer.
     if (forDefinition)
@@ -2222,7 +2254,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
 }
 
 /// Return True if the function \p f is a 'readonly' function. Checking
-/// for the SIL @effects(readonly) attribute is not enough because this
+/// for the SIL @_effects(readonly) attribute is not enough because this
 /// definition does not match the definition of the LLVM readonly function
 /// attribute. In this function we do the actual check.
 static bool isReadOnlyFunction(SILFunction *f) {
@@ -2235,11 +2267,11 @@ static bool isReadOnlyFunction(SILFunction *f) {
   auto Eff = f->getEffectsKind();
 
   // Swift's readonly does not automatically match LLVM's readonly.
-  // Swift SIL optimizer relies on @effects(readonly) to remove e.g.
+  // Swift SIL optimizer relies on @_effects(readonly) to remove e.g.
   // dead code remaining from initializers of strings or dictionaries
   // of variables that are not used. But those initializers are often
   // not really readonly in terms of LLVM IR. For example, the
-  // Dictionary.init() is marked as @effects(readonly) in Swift, but
+  // Dictionary.init() is marked as @_effects(readonly) in Swift, but
   // it does invoke reference-counting operations.
   if (Eff == EffectsKind::ReadOnly || Eff == EffectsKind::ReadNone) {
     // TODO: Analyze the body of function f and return true if it is
@@ -2593,12 +2625,12 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // binary, then we ought to be able to directly relative-reference the
   // symbol. However, some platforms don't have the necessary relocations to
   // represent a relative reference to an undefined symbol, so conservatively
-  // produce an indirect reference in this case. Also, some JIT modes
-  // incrementally add new definitions that refer back to existing ones
+  // produce an indirect reference in this case. Also, the integrated REPL
+  // incrementally adds new definitions that refer back to existing ones
   // relatively, so always use indirect references in this situation.
   auto entry = GlobalVars[entity];
   if (forceIndirectness == ConstantReference::Direct &&
-      !IRGen.Opts.UseJIT &&
+      !IRGen.Opts.IntegratedREPL &&
       (!entity.isAvailableExternally(*this) || isDefinition(entry))) {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
     // platforms (rdar://problem/22450593 ), so substitute an alias with its

@@ -53,7 +53,8 @@ typedef SomeItemSet SomeEnvironment;
 typedef NS_ENUM(long, FooComparisonResult) {
   FooOrderedAscending = -1L,
   FooOrderedSame,
-  FooOrderedDescending
+  FooOrderedDescending,
+  FooOrderedMemberSame,
 };
 
 @interface BarBase

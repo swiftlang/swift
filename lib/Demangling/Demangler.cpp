@@ -1195,6 +1195,17 @@ NodePointer Demangler::popTypeList() {
 }
 
 NodePointer Demangler::popProtocol() {
+  if (NodePointer Type = popNode(Node::Kind::Type)) {
+    if (Type->getNumChildren() < 1)
+      return nullptr;
+
+    NodePointer Proto = Type->getChild(0);
+    if (Proto->getKind() != Node::Kind::Protocol)
+      return nullptr;
+
+    return Type;
+  }
+
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
   NodePointer Proto = createWithChildren(Node::Kind::Protocol, Ctx, Name);
@@ -1548,13 +1559,6 @@ NodePointer Demangler::demangleArchetype() {
             createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
       addSubstitution(AssocTy);
       return AssocTy;
-    }
-    case 'q': {
-      NodePointer Idx = demangleIndexAsNode();
-      NodePointer Ctx = popContext();
-      NodePointer DeclCtx = createWithChild(Node::Kind::DeclContext, Ctx);
-      return createType(createWithChildren(Node::Kind::QualifiedArchetype,
-                                           Idx, DeclCtx));
     }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());

@@ -152,5 +152,5 @@ extension Zip2Sequence: Sequence {
   }
 }
 
-// @available(*, deprecated, renamed: "Zip2Sequence.Iterator")
+@available(*, deprecated: 4.2, renamed: "Zip2Sequence.Iterator")
 public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence

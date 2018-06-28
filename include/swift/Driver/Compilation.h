@@ -174,6 +174,9 @@ private:
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
   const unsigned BatchSeed;
 
+  /// Overrides parallelism level as count of batches, if in batch-mode.
+  const Optional<unsigned> BatchCount;
+
   /// In order to test repartitioning, set to true if
   /// -driver-force-one-batch-repartition is present.
   const bool ForceOneBatchRepartition = false;
@@ -228,6 +231,7 @@ public:
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
+              Optional<unsigned> BatchCount = None,
               bool ForceOneBatchRepartition = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,

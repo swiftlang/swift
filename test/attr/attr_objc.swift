@@ -354,6 +354,8 @@ class ConcreteContext3 {
 
   typealias NSCodingExistential = NSCoding.Type
 
+  @objc func inoutFunc(a: inout Int) {}
+  // expected-error@-1{{method cannot be marked @objc because inout parameters cannot be represented in Objective-C}}
   @objc func metatypeOfExistentialMetatypePram1(a: NSCodingExistential.Protocol) {}
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
 

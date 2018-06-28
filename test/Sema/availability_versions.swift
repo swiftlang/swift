@@ -985,6 +985,19 @@ func useUnavailableExtension() {
       // expected-note@-1 {{add 'if #available' version check}}
 }
 
+// Availability of synthesized designated initializers.
+
+@available(OSX, introduced: 10.51)
+class WidelyAvailableBase {
+  init() {}
+
+  @available(OSX, introduced: 10.52)
+  init(thing: ()) {}
+}
+
+@available(OSX, introduced: 10.53)
+class EsotericSmallBatchHipsterThing : WidelyAvailableBase {}
+
 // Useless #available(...) checks
 
 func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {

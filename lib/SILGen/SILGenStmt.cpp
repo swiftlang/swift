@@ -404,6 +404,9 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
   if (!S->hasResult())
     // Void return.
     SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, Loc);
+  else if (S->getResult()->getType()->isUninhabited())
+    // Never return.
+    SGF.emitIgnoredExpr(S->getResult());
   else
     SGF.emitReturnExpr(Loc, S->getResult());
 }

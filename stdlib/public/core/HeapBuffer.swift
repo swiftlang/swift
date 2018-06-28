@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
-typealias _HeapObject = SwiftShims.HeapObject
+
+@usableFromInline // FIXME(sil-serialize-all)
+internal typealias _HeapObject = SwiftShims.HeapObject
 
 @usableFromInline
 internal protocol _HeapBufferHeader_ {
@@ -30,13 +32,16 @@ internal struct _HeapBufferHeader<T> : _HeapBufferHeader_ {
   internal var value: T
 }
 
+@usableFromInline
 internal typealias _HeapBuffer<Value,Element>
   = ManagedBufferPointer<_HeapBufferHeader<Value>, Element>
 
+@usableFromInline
 internal typealias _HeapBufferStorage<Value,Element>
   = ManagedBuffer<_HeapBufferHeader<Value>, Element>
 
 extension ManagedBufferPointer where Header : _HeapBufferHeader_ {
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Value = Header.Value
 
   @inlinable // FIXME(sil-serialize-all)

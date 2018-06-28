@@ -15,7 +15,7 @@ DictionaryUnchecked.test("noCseOnInit") {
   func createDict() -> Dictionary<Int, Bool> {
     // CSE should not be able to combine both Dictionary.init() calls.
     // This did happen and resulted in a crash because Dictionary.init()
-    // was defined with @effects(readnone).
+    // was defined with @_effects(readnone).
     // But this was wrong because it actually reads the array buffer (from
     // the literal).
     var Dict: Dictionary<Int, Bool> = [:]

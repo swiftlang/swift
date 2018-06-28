@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 protocol P {
   associatedtype SomeType
@@ -651,7 +651,7 @@ _ = -UnaryOp() // expected-error {{unary operator '-' cannot be applied to an op
 // <rdar://problem/23433271> Swift compiler segfault in failure diagnosis
 func f23433271(_ x : UnsafePointer<Int>) {}
 func segfault23433271(_ a : UnsafeMutableRawPointer) {
-  f23433271(a[0])  // expected-error {{type 'UnsafeMutableRawPointer' has no subscript members}}
+  f23433271(a[0])  // expected-error {{value of type 'UnsafeMutableRawPointer' has no subscripts}}
 }
 
 

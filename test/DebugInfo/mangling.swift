@@ -8,7 +8,7 @@ func markUsed<T>(_ t: T) {}
 // Variable:
 // mangling.myDict : Swift.Dictionary<Swift.Int64, Swift.String>
 // CHECK: !DIGlobalVariable(name: "myDict",
-// CHECK-SAME:       linkageName: "$S8mangling6myDicts10DictionaryVys5Int64VSSGvp",
+// CHECK-SAME:       linkageName: "$S8mangling6myDictSDys5Int64VSSGvp",
 // CHECK-SAME:              line: [[@LINE+3]]
 // CHECK-SAME:              type: ![[DT:[0-9]+]]
 // CHECK: ![[DT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Dictionary"

@@ -205,11 +205,6 @@ public:
   /// True if this rvalue was emitted into context.
   bool isInContext() const & { return elementsToBeAdded == InContext; }
   
-  /// True if this represents an lvalue.
-  bool isLValue() const & {
-    return isa<InOutType>(type);
-  }
-  
   /// Add an element to the rvalue. The rvalue must not yet be complete.
   void addElement(RValue &&element) &;
   

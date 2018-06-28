@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-usrs -source-filename %s | %FileCheck %s -strict-whitespace
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -swift-version 3
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -enable-objc-interop -print-usrs -source-filename %s -swift-version 3 | %FileCheck %s -strict-whitespace
 
 import macros
 

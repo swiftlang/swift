@@ -26,6 +26,8 @@ import bug_reducer.swift_tools as swift_tools
                      'func_bug_reducer is only available on Darwin for now')
 class FuncBugReducerTestCase(unittest.TestCase):
 
+    verbose = False
+
     def setUp(self):
         self.file_dir = os.path.dirname(os.path.abspath(__file__))
         self.reducer = os.path.join(os.path.dirname(self.file_dir),
@@ -73,7 +75,23 @@ class FuncBugReducerTestCase(unittest.TestCase):
                 '-resource-dir', os.path.join(self.build_dir, 'lib', 'swift'),
                 '-o', sib_path,
                 input_file_path]
-        return subprocess.check_call(args)
+        return self.run_check_call(args)
+
+    def run_check_call(self, args):
+        if FuncBugReducerTestCase.verbose:
+            print('Cmd: {}'.format(' '.join(args)))
+        result_code = subprocess.check_call(args)
+        if FuncBugReducerTestCase.verbose:
+            print('Result Code: {}'.format(result_code))
+        return result_code
+
+    def run_check_output(self, args):
+        if FuncBugReducerTestCase.verbose:
+            print('Cmd: {}'.format(' '.join(args)))
+        raw_output = subprocess.check_output(args)
+        if FuncBugReducerTestCase.verbose:
+            print('Raw Output: {}'.format(raw_output))
+        return raw_output
 
     def test_basic(self):
         name = 'testbasic'
@@ -93,11 +111,12 @@ class FuncBugReducerTestCase(unittest.TestCase):
             '--extra-silopt-arg=-bug-reducer-tester-failure-kind=opt-crasher'
         ]
         args.extend(self.passes)
-        output = subprocess.check_output(args).split("\n")
+        output = self.run_check_output(args).split("\n")
         self.assertTrue("*** Successfully Reduced file!" in output)
-        self.assertTrue("*** Final Functions: _TF9testbasic6foo413FT_T_")
+        self.assertTrue("*** Final Functions: "
+                        "$S18testreducefunction6foo505yyF")
         re_end = 'testfuncbugreducer_testbasic_'
-        re_end += 'c36efe1eb0993b53c570bfed38933af8.sib'
+        re_end += '609e1004db568b06fd38729912380639.sib'
         output_file_re = re.compile('\*\*\* Final File: .*' + re_end)
         output_matches = [
             1 for o in output if output_file_re.match(o) is not None]

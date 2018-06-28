@@ -35,7 +35,8 @@
 /// which `ContiguousArray` shares most properties and methods.
 @_fixed_layout
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
-    internal typealias _Buffer = _ContiguousArrayBuffer<Element>
+  @usableFromInline
+  internal typealias _Buffer = _ContiguousArrayBuffer<Element>
 
   @usableFromInline
   internal var _buffer: _Buffer
@@ -1313,17 +1314,12 @@ extension ContiguousArray: Equatable where Element: Equatable {
 }
 
 extension ContiguousArray: Hashable where Element: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-  
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(count) // discriminator
     for element in self {

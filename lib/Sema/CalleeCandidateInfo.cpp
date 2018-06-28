@@ -308,9 +308,8 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallVector<bool, 4> candDefaultMap;
-  computeDefaultMap(candArgs, candidate.getDecl(), candidate.level,
-                    candDefaultMap);
+  llvm::SmallBitVector candDefaultMap =
+    computeDefaultMap(candArgs, candidate.getDecl(), candidate.level);
   
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;

@@ -130,6 +130,8 @@ class SerializedDiagnosticConsumer : public DiagnosticConsumer {
   /// \brief State shared among the various clones of this diagnostic consumer.
   llvm::IntrusiveRefCntPtr<SharedState> State;
   bool CalledFinishProcessing = false;
+  bool CompilationWasComplete = true;
+
 public:
   SerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath)
       : State(new SharedState(serializedDiagnosticsPath)) {
@@ -140,7 +142,7 @@ public:
     assert(CalledFinishProcessing && "did not call finishProcessing()");
   }
 
-  bool finishProcessing(SourceManager &SM) override {
+  bool finishProcessing() override {
     assert(!CalledFinishProcessing &&
            "called finishProcessing() multiple times");
     CalledFinishProcessing = true;
@@ -160,7 +162,8 @@ public:
                                       llvm::sys::fs::F_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
-      DiagnosticEngine DE(SM);
+      SourceManager dummyMgr;
+      DiagnosticEngine DE(dummyMgr);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
       DE.diagnose(SourceLoc(), diag::cannot_open_serialized_file,
@@ -168,9 +171,24 @@ public:
       return true;
     }
 
-    OS->write((char *)&State->Buffer.front(), State->Buffer.size());
-    OS->flush();
+    if (CompilationWasComplete) {
+      OS->write((char *)&State->Buffer.front(), State->Buffer.size());
+      OS->flush();
+    }
     return false;
+  }
+
+  /// In batch mode, if any error occurs, no primaries can be compiled.
+  /// Some primaries will have errors in their diagnostics files and so
+  /// a client (such as Xcode) can see that those primaries failed.
+  /// Other primaries will have no errors in their diagnostics files.
+  /// In order for the driver to distinguish the two cases without parsing
+  /// the diagnostics, the frontend emits a truncated diagnostics file
+  /// for the latter case.
+  /// The unfortunate aspect is that the truncation discards warnings, etc.
+  
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    CompilationWasComplete = false;
   }
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,

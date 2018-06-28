@@ -21,7 +21,6 @@
 #include "ExistentialMetadataImpl.h"
 #include "Private.h"
 #include "SwiftHashableSupport.h"
-#include "stddef.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangler.h"
@@ -41,8 +40,14 @@
 #include "SwiftValue.h"
 #endif
 
+#include <cstddef>
 #include <cstring>
 #include <type_traits>
+
+#if defined(__GLIBCXX__) && __GLIBCXX__ < 20160726
+#include <stddef.h>
+namespace std { using ::max_align_t; }
+#endif
 
 using namespace swift;
 using namespace swift::hashable_support;
@@ -1969,10 +1974,10 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
 extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sa);
 
 /// Nominal type descriptor for Swift.Dictionary.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s10Dictionary);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(SD);
 
 /// Nominal type descriptor for Swift.Set.
-extern "C" const StructDescriptor STRUCT_TYPE_DESCR_SYM(s3Set);
+extern "C" const StructDescriptor NOMINAL_TYPE_DESCR_SYM(Sh);
 
 // internal func _arrayDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Array<SourceValue>>,
@@ -2086,7 +2091,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Dictionaries.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s10Dictionary)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(SD)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_dictionaryDownCastIndirect(source, destination,
                                         sourceArgs[0], sourceArgs[1],
@@ -2102,7 +2107,7 @@ static bool _dynamicCastStructToStruct(OpaqueValue *destination,
     }
 
   // Sets.
-  } else if (descriptor == &STRUCT_TYPE_DESCR_SYM(s3Set)) {
+  } else if (descriptor == &NOMINAL_TYPE_DESCR_SYM(Sh)) {
     if (flags & DynamicCastFlags::Unconditional) {
       _swift_setDownCastIndirect(source, destination,
                                  sourceArgs[0], targetArgs[0],
@@ -2667,7 +2672,7 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
   // Allocate a buffer to store the T? returned by bridging.
   // The extra byte is for the tag.
   const std::size_t inlineValueSize = 3 * sizeof(void*);
-  alignas(max_align_t) char inlineBuffer[inlineValueSize + 1];
+  alignas(std::max_align_t) char inlineBuffer[inlineValueSize + 1];
   void *optDestBuffer;
   if (targetType->getValueWitnesses()->getStride() <= inlineValueSize) {
     // Use the inline buffer.

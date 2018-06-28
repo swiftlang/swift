@@ -284,7 +284,7 @@ var duplicateAccessors1: X {
     return _x
   }
   set { // expected-note {{previous definition of setter is here}}
-    _x = value
+    _x = newValue
   }
   get { // expected-error {{duplicate definition of getter}}
     return _x
@@ -327,10 +327,10 @@ var extraTokensInAccessorBlock4: X {
 var extraTokensInAccessorBlock5: X {
   set blah wibble // expected-error{{expected '{' to start setter definition}}
 }
-var extraTokensInAccessorBlock6: X {
+var extraTokensInAccessorBlock6: X { // expected-error{{non-member observing properties require an initializer}}
   willSet blah wibble // expected-error{{expected '{' to start willSet definition}}
 }
-var extraTokensInAccessorBlock7: X {
+var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing properties require an initializer}}
   didSet blah wibble // expected-error{{expected '{' to start didSet definition}}
 }
 
@@ -737,7 +737,7 @@ struct WillSetDidSetProperties {
       markUsed("woot")
     }
     set { // expected-error {{willSet variable must not also have a set specifier}}
-      return 4
+      return 4 // expected-error {{unexpected non-void return value in void function}}
     }
   }
 
@@ -875,10 +875,10 @@ protocol ProtocolWillSetDidSet2 {
   var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet3 {
-  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet4 {
-  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}

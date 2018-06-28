@@ -148,7 +148,7 @@ bb0(%0 : $AnyObject, %1 : $Int):
 bb1(%13 : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int): // Preds: bb0
   %14 = partial_apply %13(%11) : $@convention(objc_method) (Int, Builtin.UnknownObject) -> Int
   %15 = load %3a : $*Int
-  %16 = apply %14(%15) : $@callee_owned Int -> Int
+  %16 = apply %14(%15) : $@callee_owned (Int) -> Int
   br bb3
 
 bb2:

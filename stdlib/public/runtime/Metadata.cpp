@@ -3940,3 +3940,7 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
                    metadata, mangledName.c_str(), (const Metadata *)result);
 }
 #endif
+
+const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
+    return type->getTypeContextDescriptor();
+}

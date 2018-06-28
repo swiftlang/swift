@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 struct X { } // expected-note * {{did you mean 'X'?}}
 
@@ -102,16 +102,16 @@ protocol ProtocolGetSet4 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet2 {
-  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet3 {
-  subscript(i: Int) -> Int { willSet didSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { willSet didSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet4 {
-  subscript(i: Int) -> Int { didSet willSet } // expected-error {{expected get or set in a protocol property}}
+  subscript(i: Int) -> Int { didSet willSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 
 class DidSetInSubscript {
@@ -172,7 +172,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{computed property must have accessors specified}}
+  } // expected-error {{subscript must have accessors specified}}
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int { // expected-error{{subscript declarations must have a getter}}
@@ -182,7 +182,7 @@ struct MissingGetterSubscript2 {
 
 func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubscript,
                     ovl: inout OverloadedSubscript, ret: inout RetOverloadedSubscript) {
-  no[i] = value // expected-error{{type 'NoSubscript' has no subscript members}}
+  no[i] = value // expected-error{{value of type 'NoSubscript' has no subscripts}}
 
   value = x2[i]
   x2[i] = value
@@ -369,3 +369,20 @@ struct SR2575 {
 
 SR2575().subscript()
 // expected-error@-1 {{value of type 'SR2575' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}
+
+// SR-7890
+
+struct InOutSubscripts {
+  subscript(x1: inout Int) -> Int { return 0 }
+  // expected-error@-1 {{'inout' must not be used on subscript parameters}}
+
+  subscript(x2: inout Int, y2: inout Int) -> Int { return 0 }
+  // expected-error@-1 2{{'inout' must not be used on subscript parameters}}
+
+  subscript(x3: (inout Int) -> ()) -> Int { return 0 } // ok
+  subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
+
+  subscript(inout x5: Int) -> Int { return 0 }
+  // expected-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
+  // expected-error@-2 {{'inout' must not be used on subscript parameters}}
+}

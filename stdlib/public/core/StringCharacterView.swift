@@ -204,6 +204,7 @@ extension String._CharacterView {
 }
 
 extension String._CharacterView {
+  @usableFromInline
   internal typealias UnicodeScalarView = String.UnicodeScalarView
 
   @inlinable // FIXME(sil-serialize-all)

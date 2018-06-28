@@ -147,7 +147,7 @@ public:
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name);
+                        unsigned Depth, unsigned Index, StringRef AssocType);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();

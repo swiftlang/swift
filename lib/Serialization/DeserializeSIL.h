@@ -24,6 +24,8 @@ namespace llvm {
 
 namespace swift {
   class SILDeserializer {
+    using TypeID = serialization::TypeID;
+    
     ModuleFile *MF;
     SILModule &SILMod;
     SerializedSILLoader::Callback *Callback;
@@ -112,7 +114,7 @@ namespace swift {
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
 
-    KeyPathPatternComponent
+    Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
     
 public:

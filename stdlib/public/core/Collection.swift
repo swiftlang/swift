@@ -522,7 +522,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, but not including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(upTo end: Index) -> SubSequence
+  __consuming func prefix(upTo end: Index) -> SubSequence
 
   /// Returns a subsequence from the specified position to the end of the
   /// collection.
@@ -557,7 +557,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
-  func suffix(from start: Index) -> SubSequence
+  __consuming func suffix(from start: Index) -> SubSequence
 
   /// Returns a subsequence from the start of the collection through the
   /// specified position.
@@ -588,7 +588,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   /// - Returns: A subsequence up to, and including, the `end` position.
   ///
   /// - Complexity: O(1)
-  func prefix(through position: Index) -> SubSequence
+  __consuming func prefix(through position: Index) -> SubSequence
 
   /// A Boolean value indicating whether the collection is empty.
   ///
@@ -642,6 +642,11 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///
   /// - Complexity: Hopefully less than O(`count`).
   func _customLastIndexOfEquatableElement(_ element: Element) -> Index??
+
+  // FIXME(move-only types): `first` might not be implementable by collections
+  // with move-only elements, since they would need to be able to somehow form
+  // a temporary `Optional<Element>` value from a non-optional Element without
+  // modifying the collection.
 
   /// The first element of the collection.
   ///
@@ -818,7 +823,7 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   a random element.
   /// - Returns: A random element from the collection. If the collection is
   ///   empty, the method returns `nil`.
-  func randomElement<T: RandomNumberGenerator>(
+  __consuming func randomElement<T: RandomNumberGenerator>(
     using generator: inout T
   ) -> Element?
 

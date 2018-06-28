@@ -1,8 +1,8 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/def_transparent_std.swift
+// RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/def_transparent_std.swift -swift-version 3
 // RUN: llvm-bcanalyzer %t/def_transparent_std.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -sil-debug-serialization -parse-stdlib -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -sil-debug-serialization -parse-stdlib -I %t %s -swift-version 3 | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

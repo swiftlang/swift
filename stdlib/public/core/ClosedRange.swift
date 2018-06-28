@@ -173,7 +173,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
@@ -395,7 +395,7 @@ extension ClosedRange: Equatable {
 }
 
 extension ClosedRange: Hashable where Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(lowerBound)
     hasher.combine(upperBound)

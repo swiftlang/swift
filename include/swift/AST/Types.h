@@ -35,6 +35,7 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -2651,6 +2652,10 @@ public:
     /// Whether the parameter is marked 'owned'
     bool isOwned() const { return Flags.isOwned(); }
 
+    ValueOwnership getValueOwnership() const {
+      return Flags.getValueOwnership();
+    }
+
     bool operator==(Param const &b) const {
       return Label == b.Label && getType()->isEqual(b.getType()) &&
              Flags == b.Flags;
@@ -2889,6 +2894,10 @@ public:
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
 
+  void printParams(raw_ostream &OS,
+                   const PrintOptions &PO = PrintOptions()) const;
+  void printParams(ASTPrinter &Printer, const PrintOptions &PO) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() >= TypeKind::First_AnyFunctionType &&
@@ -2990,13 +2999,13 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 SmallVector<AnyFunctionType::Param, 4>
 decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
 
-/// Break the parameter list into an array of booleans describing whether
+/// Map the given parameter list onto a bitvector describing whether
 /// the argument type at each index has a default argument associated with
 /// it.
-void computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                       const ValueDecl *paramOwner, unsigned level,
-                       SmallVectorImpl<bool> &outDefaultMap);
-  
+llvm::SmallBitVector
+computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
+                  const ValueDecl *paramOwner, unsigned level);
+
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
 std::string getParamListAsString(ArrayRef<AnyFunctionType::Param> parameters);
@@ -3980,7 +3989,7 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-  bool isNoReturnFunction(); // Defined in SILType.cpp
+  bool isNoReturnFunction() const; // Defined in SILType.cpp
 
   class ABICompatibilityCheckResult {
     friend class SILFunctionType;

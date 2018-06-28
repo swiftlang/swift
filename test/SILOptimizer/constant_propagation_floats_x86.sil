@@ -54,3 +54,44 @@ return %1 : $Builtin.Int64
 // CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, -1
 // CHECK-NEXT: return [[RES]] : $Builtin.Int64
 }
+
+// The following tests check folding of FPTrunc instructions.
+
+sil @foldFloat80ToFloat: $@convention(thin) () -> Builtin.FPIEEE32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x407D96769950B50D88F4 // 9.99999999999999999993E+37
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE32"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE32
+return %1 : $Builtin.FPIEEE32
+
+// CHECK-LABEL: sil @foldFloat80ToFloat
+// CHECK-NOT: float_literal $Builtin.FPIEEE80
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE32, 0x7E967699 // 9.99999968E+37
+// CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE32
+}
+
+sil @foldFloat80ToDouble: $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x43FE8E679C2F5E44FF8F // 9.99999999999999999966E+307
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64
+return %1 : $Builtin.FPIEEE64
+
+// CHECK-LABEL: sil @foldFloat80ToDouble
+// CHECK-NOT: float_literal $Builtin.FPIEEE80
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE64, 0x7FE1CCF385EBC8A0 // 1.0E+308
+// CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE64
+}
+
+sil @foldFloat80ToFloat2: $@convention(thin) () -> Builtin.FPIEEE32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE80, 0x3F84881CEA14545C7575 // 9.9999999999999999995E-38
+%1 = builtin "fptrunc_FPIEEE80_FPIEEE32"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE32
+return %1 : $Builtin.FPIEEE32
+
+// CHECK-LABEL: sil @foldFloat80ToFloat2
+// CHECK-NOT: float_literal $Builtin.FPIEEE80
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE32, 0x2081CEA // 9.99999991E-38
+// CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE32
+}

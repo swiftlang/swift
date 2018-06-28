@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 func takeIntToInt(_ f: (Int) -> Int) { }
 func takeIntIntToInt(_ f: (Int, Int) -> Int) { }

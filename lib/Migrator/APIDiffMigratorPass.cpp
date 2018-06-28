@@ -250,6 +250,19 @@ static ValueDecl* getReferencedDecl(Expr *E) {
   }
 }
 
+struct ConversionFunctionInfo {
+  Expr *ExpressionToWrap;
+  SmallString<256> Buffer;
+  unsigned FuncNameStart;
+  unsigned FuncNameEnd;
+  ConversionFunctionInfo(Expr *ExpressionToWrap):
+    ExpressionToWrap(ExpressionToWrap) {}
+  StringRef getFuncDef() const { return Buffer.str(); }
+  StringRef getFuncName() const {
+    return Buffer.substr(FuncNameStart, FuncNameEnd - FuncNameStart);
+  }
+};
+
 struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
 
   APIDiffItemStore DiffStore;
@@ -260,8 +273,25 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       SF->getASTContext().SourceMgr, Range).str() == "nil";
   }
 
+  bool isDotMember(CharSourceRange Range) {
+    auto S = Range.str();
+    return S.startswith(".") && S.substr(1).find(".") == StringRef::npos;
+  }
+
+  bool isDotMember(SourceRange Range) {
+    return isDotMember(Lexer::getCharSourceRangeFromSourceRange(
+      SF->getASTContext().SourceMgr, Range));
+  }
+
+  bool isDotMember(Expr *E) {
+    auto Range = E->getSourceRange();
+    return Range.isValid() && isDotMember(Range);
+  }
+
   std::vector<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
     std::vector<APIDiffItem*> results;
+    if (!VD)
+      return results;
     auto addDiffItems = [&](ValueDecl *VD) {
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
@@ -308,11 +338,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
 
-  bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
+  bool isSimpleReplacement(APIDiffItem *Item, bool isDotMember, std::string &Text) {
     if (auto *MD = dyn_cast<TypeMemberDiffItem>(Item)) {
       if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
-        Text = (llvm::Twine(MD->newTypeName) + "." + MD->getNewName().base()).
-          str();
+        bool NeedNoTypeName = isDotMember &&
+          MD->oldPrintedName == MD->newPrintedName;
+        Text = (llvm::Twine(NeedNoTypeName ? "" : MD->newTypeName) + "." +
+          MD->getNewName().base()).str();
         return true;
       }
     }
@@ -328,20 +360,53 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return false;
   }
 
-  std::set<std::string> InsertedFunctions;
+  std::vector<ConversionFunctionInfo> HelperFuncInfo;
   SourceLoc FileEndLoc;
+
   APIDiffMigratorPass(EditorAdapter &Editor, SourceFile *SF,
                       const MigratorOptions &Opts):
     ASTMigratorPass(Editor, SF, Opts), DiffStore(Diags),
-    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {
-      SmallVector<Decl*, 16> TopDecls;
-      SF->getTopLevelDecls(TopDecls);
-      for (auto *D: TopDecls) {
-        if (auto *FD = dyn_cast<FuncDecl>(D)) {
-          InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
-        }
+    FileEndLoc(SM.getRangeForBuffer(BufferID).getEnd()) {}
+
+  ~APIDiffMigratorPass() {
+    Editor.disableCache();
+    SWIFT_DEFER { Editor.enableCache(); };
+
+    // Collect inserted functions to avoid re-insertion.
+    std::set<std::string> InsertedFunctions;
+    SmallVector<Decl*, 16> TopDecls;
+    SF->getTopLevelDecls(TopDecls);
+    for (auto *D: TopDecls) {
+      if (auto *FD = dyn_cast<FuncDecl>(D)) {
+        InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
       }
     }
+    for (auto &Cur: HelperFuncInfo) {
+      // Avoid wrapping nil expression.
+      if (isNilExpr(Cur.ExpressionToWrap))
+        continue;
+
+      // Avoid wrapping a single expression with multiple conversion functions.
+      auto count = std::count_if(HelperFuncInfo.begin(), HelperFuncInfo.end(),
+        [&] (ConversionFunctionInfo &Info) {
+          return Info.ExpressionToWrap->getSourceRange() ==
+            Cur.ExpressionToWrap->getSourceRange();
+        });
+      if (count > 1)
+        continue;
+      assert(count == 1);
+      auto FuncName = Cur.getFuncName();
+
+      // Avoid inserting the helper function if it's already present.
+      if (!InsertedFunctions.count(FuncName)) {
+        Editor.insert(FileEndLoc, Cur.getFuncDef());
+        InsertedFunctions.insert(FuncName);
+      }
+      Editor.insertBefore(Cur.ExpressionToWrap->getStartLoc(),
+        (Twine(FuncName) + "(").str());
+      Editor.insertAfterToken(Cur.ExpressionToWrap->getEndLoc(), ")");
+    }
+  }
 
   void run() {
     if (Opts.APIDigesterDataStorePaths.empty())
@@ -375,7 +440,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
                           Type T, ReferenceMetaData Data) override {
     for (auto *Item: getRelatedDiffItems(CtorTyRef ? CtorTyRef: D)) {
       std::string RepText;
-      if (isSimpleReplacement(Item, RepText)) {
+      if (isSimpleReplacement(Item, isDotMember(Range), RepText)) {
         Editor.replace(Range, RepText);
         return true;
       }
@@ -450,8 +515,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       for (auto *I: getRelatedDiffItems(VD)) {
         if (auto *Item = dyn_cast<TypeMemberDiffItem>(I)) {
           if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
-            Editor.replace(ToReplace, (llvm::Twine(Item->newTypeName) + "." +
-              Item->getNewName().base()).str());
+            bool NeedNoTypeName = isDotMember(ToReplace) &&
+              Item->oldPrintedName == Item->newPrintedName;
+            Editor.replace(ToReplace,
+              (llvm::Twine(NeedNoTypeName ? "" : Item->newTypeName) + "." +
+               Item->getNewName().base()).str());
             return true;
           }
         }
@@ -725,7 +793,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     StringRef LeftComment;
     StringRef RightComment;
     for (auto *Item: getRelatedDiffItems(RD)) {
-      if (isSimpleReplacement(Item, Rename)) {
+      if (isSimpleReplacement(Item, isDotMember(Reference), Rename)) {
       } else if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
         if (CI->isStringRepresentableChange() &&
             CI->NodeKind == SDKNodeKind::DeclVar) {
@@ -737,12 +805,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     if (!Kind.hasValue())
       return false;
-    if (Kind && !isNilExpr(WrapperTarget)) {
-      SmallString<256> Buffer;
-      auto Func = insertHelperFunction(*Kind, LeftComment, RightComment, Buffer,
-        FromString);
-      Editor.insert(WrapperTarget->getStartLoc(), (Twine(Func) + "(").str());
-      Editor.insertAfterToken(WrapperTarget->getEndLoc(), ")");
+    if (Kind) {
+      insertHelperFunction(*Kind, LeftComment, RightComment, FromString,
+        WrapperTarget);
     }
     if (!Rename.empty()) {
       replaceExpr(Reference, Rename);
@@ -751,8 +816,6 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   }
 
   bool handleAssignDestMigration(Expr *E) {
-    Editor.disableCache();
-    SWIFT_DEFER { Editor.enableCache(); };
     auto *ASE = dyn_cast<AssignExpr>(E);
     if (!ASE || !ASE->getDest() || !ASE->getSrc())
       return false;
@@ -771,14 +834,16 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return wrapAttributeReference(E, E, false);
   }
 
-  StringRef insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
-                                 StringRef NewType,
-                                 SmallString<256> &Buffer, bool FromString) {
-    llvm::raw_svector_ostream OS(Buffer);
+  void insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
+                            StringRef NewType, bool FromString,
+                            Expr *Wrappee) {
+    HelperFuncInfo.emplace_back(Wrappee);
+    ConversionFunctionInfo &Info = HelperFuncInfo.back();
+    llvm::raw_svector_ostream OS(Info.Buffer);
     OS << "\n";
     OS << "// Helper function inserted by Swift 4.2 migrator.\n";
     OS << "fileprivate func ";
-    unsigned FuncNameStart = Buffer.size();
+    Info.FuncNameStart = Info.Buffer.size();
     OS << (FromString ? "convertTo" : "convertFrom");
     SmallVector<std::string, 8> Segs;
     StringRef guard = "\tguard let input = input else { return nil }\n";
@@ -835,24 +900,17 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     for (auto P: Parts)
       OS << P;
     OS << Segs[1];
-    auto FuncName = Buffer.str().substr(FuncNameStart);
-    if (!InsertedFunctions.count(FuncName)) {
-      if (FromString) {
-        OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
-        OS << Segs[4] << "\n}\n";
-      } else {
-        OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
-        OS << Segs[5] << "\n}\n";
-      }
-      Editor.insert(FileEndLoc, OS.str());
-      InsertedFunctions.insert(FuncName);
+    Info.FuncNameEnd = Info.Buffer.size();
+    if (FromString) {
+      OS << "(_ input: " << Segs[2] << ") -> " << Segs[3] << " {\n";
+      OS << Segs[4] << "\n}\n";
+    } else {
+      OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
+      OS << Segs[5] << "\n}\n";
     }
-    return FuncName;
   }
 
   void handleStringRepresentableArg(ValueDecl *FD, Expr *Arg, Expr *Call) {
-    Editor.disableCache();
-    SWIFT_DEFER { Editor.enableCache(); };
     NodeAnnotation Kind;
     StringRef RawType;
     StringRef NewAttributeType;
@@ -880,19 +938,71 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (AllArgs.size() <= ArgIdx)
         return;
       WrapTarget = AllArgs[ArgIdx].ArgExp;
-      // Avoid wrapping nil literal.
-      if (isNilExpr(WrapTarget))
-        return;
     }
     assert(WrapTarget);
-    SmallString<256> Buffer;
-    auto FuncName = insertHelperFunction(Kind, RawType, NewAttributeType, Buffer,
-                                         FromString);
-    Editor.insert(WrapTarget->getStartLoc(), (Twine(FuncName) + "(").str());
-    Editor.insertAfterToken(WrapTarget->getEndLoc(), ")");
+    insertHelperFunction(Kind, RawType, NewAttributeType, FromString, WrapTarget);
+  }
+
+  bool hasRevertRawRepresentableChange(ValueDecl *VD) {
+    for (auto Item: getRelatedDiffItems(VD)) {
+      if (auto *CI = dyn_cast<CommonDiffItem>(Item)) {
+        if (CI->DiffKind ==
+              NodeAnnotation::RevertTypeAliasDeclToRawRepresentable)
+          return true;
+      }
+    }
+    return false;
+  }
+
+  bool handleRevertRawRepresentable(Expr *E) {
+    // Change attribute.rawValue to attribute
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+      auto Found = false;
+      if (auto *Base = MRE->getBase()) {
+        if (hasRevertRawRepresentableChange(Base->getType()->getAnyNominal())) {
+          Found = true;
+        }
+      }
+      if (!Found)
+        return false;
+      auto NL = MRE->getNameLoc().getStartLoc();
+      auto DL = MRE->getDotLoc();
+      if (NL.isInvalid() || DL.isInvalid())
+        return false;
+      CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(SM, {DL, NL});
+      if (Range.str() == ".rawValue") {
+        Editor.remove(Range);
+        return true;
+      }
+    }
+
+    // Change attribute(rawValue: "value") to "value"
+    if (auto *CE = dyn_cast<CallExpr>(E)) {
+      auto Found = false;
+      if (auto *CRC = dyn_cast<ConstructorRefCallExpr>(CE->getFn())) {
+        if (auto *TE = dyn_cast<TypeExpr>(CRC->getBase())) {
+          if (hasRevertRawRepresentableChange(TE->getInstanceType()->getAnyNominal()))
+            Found = true;
+        }
+      }
+      if (!Found)
+        return false;
+      std::vector<CallArgInfo> AllArgs =
+        getCallArgInfo(SM, CE->getArg(), LabelRangeEndAt::LabelNameOnly);
+      if (AllArgs.size() == 1 && AllArgs.front().LabelRange.str() == "rawValue") {
+        Editor.replace(CE->getSourceRange(), Lexer::getCharSourceRangeFromSourceRange(SM,
+          AllArgs.front().ArgExp->getSourceRange()).str());
+        return true;
+      }
+    }
+    return false;
   }
 
   bool walkToExprPre(Expr *E) override {
+    if (E->getSourceRange().isInvalid())
+      return false;
+    if (handleRevertRawRepresentable(E))
+      return false;
     if (handleQualifiedReplacement(E))
       return false;
     if (handleAssignDestMigration(E))

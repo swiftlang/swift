@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s > %t.log 2>&1
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s -verify -swift-version 3
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules) -emit-sil %s -swift-version 3 > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: objc_interop

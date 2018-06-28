@@ -878,18 +878,27 @@ public:
 
   struct ParsedAccessors {
     SourceLoc LBLoc, RBLoc;
-    AccessorDecl *Get = nullptr;
-    AccessorDecl *Set = nullptr;
-    AccessorDecl *Addressor = nullptr;
-    AccessorDecl *MutableAddressor = nullptr;
-    AccessorDecl *WillSet = nullptr;
-    AccessorDecl *DidSet = nullptr;
+    SmallVector<AccessorDecl*, 16> Accessors;
+
+#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
+#include "swift/AST/AccessorKinds.def"
 
     void record(Parser &P, AbstractStorageDecl *storage, bool invalid,
                 ParseDeclOptions flags, SourceLoc staticLoc,
                 const DeclAttributes &attrs,
                 TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
+
+    AbstractStorageDecl::StorageKindTy
+    classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
+             ParseDeclOptions flags, SourceLoc staticLoc,
+             const DeclAttributes &attrs,
+             TypeLoc elementTy, ParameterList *indices);
+
+    /// Add an accessor.  If there's an existing accessor of this kind,
+    /// return it.  The new accessor is still remembered but will be
+    /// ignored.
+    AccessorDecl *add(AccessorDecl *accessor);
   };
 
   void parseAccessorAttributes(DeclAttributes &Attributes);
@@ -901,15 +910,14 @@ public:
                        ParsedAccessors &accessors,
                        AbstractStorageDecl *storage,
                        SourceLoc &LastValidLoc,
-                       SourceLoc StaticLoc, SourceLoc VarLBLoc,
-                       SmallVectorImpl<Decl *> &Decls);
+                       SourceLoc StaticLoc, SourceLoc VarLBLoc);
   bool parseGetSet(ParseDeclOptions Flags,
                    GenericParamList *GenericParams,
                    ParameterList *Indices,
                    TypeLoc ElementTy,
                    ParsedAccessors &accessors,
                    AbstractStorageDecl *storage,
-                   SourceLoc StaticLoc, SmallVectorImpl<Decl *> &Decls);
+                   SourceLoc StaticLoc);
   void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
                        TypeLoc elementTy, const DeclAttributes &attrs,
                        SourceLoc staticLoc, ParsedAccessors &accessors);
@@ -1193,21 +1201,19 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
-  ParserResult<Expr> parseExpr(Diag<> ID, bool allowAmpPrefix = false) {
-    return parseExprImpl(ID, /*isExprBasic=*/false, allowAmpPrefix);
+  ParserResult<Expr> parseExpr(Diag<> ID) {
+    return parseExprImpl(ID, /*isExprBasic=*/false);
   }
   ParserResult<Expr> parseExprBasic(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
-  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic,
-                                   bool allowAmpPrefix = false);
+  ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
   ParserResult<Expr> parseExprArrow();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
-                                       bool isForConditionalDirective = false,
-                                       bool allowAmpPrefix = false);
+                                       bool isForConditionalDirective = false);
   ParserResult<Expr> parseExprSequenceElement(Diag<> ID,
                                               bool isExprBasic);
   ParserResult<Expr> parseExprPostfixSuffix(ParserResult<Expr> inner,
@@ -1311,8 +1317,7 @@ public:
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
                              Expr *&trailingClosure,
-                             syntax::SyntaxKind Kind,
-                             bool allowAmpPrefix = false);
+                             syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 

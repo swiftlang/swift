@@ -92,7 +92,9 @@ import NopDeinit
 import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
+#if !(SWIFT_PACKAGE || Xcode)
 import ObjectiveCNoBridgingStubs
+#endif
 import ObserverClosure
 import ObserverForwarderStruct
 import ObserverPartiallyAppliedMethod
@@ -252,7 +254,9 @@ registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
+#if !(SWIFT_PACKAGE || Xcode)
 registerBenchmark(ObjectiveCNoBridgingStubs)
+#endif
 registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)
 registerBenchmark(ObserverPartiallyAppliedMethod)

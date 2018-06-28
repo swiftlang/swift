@@ -111,8 +111,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-    unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
-    return { keyLength, dataLength };
+    return { keyLength, sizeof(uint32_t) };
   }
 
   static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
@@ -121,7 +120,7 @@ public:
 
   static data_type ReadData(internal_key_type key, const uint8_t *data,
                             unsigned length) {
-    assert(length == 4 && "Expect a single DeclID.");
+    assert(length == sizeof(uint32_t) && "Expect a single DeclID.");
     data_type result = endian::readNext<uint32_t, little, unaligned>(data);
     return result;
   }
@@ -763,11 +762,15 @@ static SILDeclRef getSILDeclRef(ModuleFile *MF,
   return DRef;
 }
 
-KeyPathPatternComponent
+Optional<KeyPathPatternComponent>
 SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
                                       unsigned &nextValue) {
   auto kind =
     (KeyPathComponentKindEncoding)ListOfValues[nextValue++];
+  
+  if (kind == KeyPathComponentKindEncoding::Trivial)
+    return None;
+  
   auto type = MF->getType(ListOfValues[nextValue++])
     ->getCanonicalType();
 
@@ -861,7 +864,11 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
                                                 indicesEquals, indicesHash,
                                                 type);
   }
+  case KeyPathComponentKindEncoding::Trivial:
+    llvm_unreachable("handled above");
   }
+  
+  llvm_unreachable("invalid key path component kind encoding");
 }
 
 bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
@@ -2339,7 +2346,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SmallVector<KeyPathPatternComponent, 4> components;
     components.reserve(numComponents);
     while (numComponents-- > 0) {
-      components.push_back(readKeyPathComponent(ListOfValues, nextValue));
+      components.push_back(*readKeyPathComponent(ListOfValues, nextValue));
     }
     
     SmallVector<Requirement, 4> requirements;

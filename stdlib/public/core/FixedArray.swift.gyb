@@ -60,6 +60,7 @@ extension _FixedArray${N} {
 }
 
 extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+  @usableFromInline
   internal typealias Index = Int
 
   @inlinable // FIXME(sil-serialize-all)

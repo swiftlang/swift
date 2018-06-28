@@ -229,14 +229,14 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
 
 SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   switch (AK) {
-  case AccessorKind::IsGetter:    return SymbolSubKind::AccessorGetter;
-  case AccessorKind::IsSetter:    return SymbolSubKind::AccessorSetter;
-  case AccessorKind::IsWillSet:   return SymbolSubKind::SwiftAccessorWillSet;
-  case AccessorKind::IsDidSet:    return SymbolSubKind::SwiftAccessorDidSet;
-  case AccessorKind::IsAddressor: return SymbolSubKind::SwiftAccessorAddressor;
-  case AccessorKind::IsMutableAddressor:
+  case AccessorKind::Get:    return SymbolSubKind::AccessorGetter;
+  case AccessorKind::Set:    return SymbolSubKind::AccessorSetter;
+  case AccessorKind::WillSet:   return SymbolSubKind::SwiftAccessorWillSet;
+  case AccessorKind::DidSet:    return SymbolSubKind::SwiftAccessorDidSet;
+  case AccessorKind::Address: return SymbolSubKind::SwiftAccessorAddressor;
+  case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
-  case AccessorKind::IsMaterializeForSet:
+  case AccessorKind::MaterializeForSet:
     llvm_unreachable("unexpected MaterializeForSet");
   }
 

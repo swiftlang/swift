@@ -73,6 +73,41 @@ extension ARCamera {
             return .limited(reason)
         }
     }
+    
+    @available(iOS, introduced: 12.0)
+    @nonobjc
+    public func unprojectPoint(
+      _ point: CGPoint,
+      ontoPlane planeTransform: simd_float4x4,
+      orientation: UIInterfaceOrientation,
+      viewportSize: CGSize
+    ) -> simd_float3? {
+        let result = __unprojectPoint(
+          point,
+          ontoPlaneWithTransform: planeTransform,
+          orientation: orientation,
+          viewportSize: viewportSize)
+        if result.x.isNaN || result.y.isNaN || result.z.isNaN {
+            return nil
+        }
+        
+        return result
+    }
+}
+
+@available(iOS, introduced: 12.0)
+extension ARSCNView {
+    @nonobjc public func unprojectPoint(
+      _ point: CGPoint, ontoPlane planeTransform: simd_float4x4
+    ) -> simd_float3? {
+        let result = __unprojectPoint(
+          point, ontoPlaneWithTransform: planeTransform)
+        if result.x.isNaN || result.y.isNaN || result.z.isNaN {
+            return nil
+        }
+        
+        return result
+    }
 }
 
 @available(iOS, introduced: 11.0)

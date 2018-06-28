@@ -998,7 +998,7 @@ func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
 // <rdar://problem/18275556> 'let' properties in a class should be implicitly final
 class ClassWithLetProperty {
   let p = 42
-  dynamic let q = 97
+  @objc dynamic let q = 97
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }

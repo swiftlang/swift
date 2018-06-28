@@ -413,6 +413,15 @@ private typealias PrivateInt = Int
 enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared private or fileprivate because its raw type uses a private type}}
   case A
 }
+
+// Note: fileprivate is the most visible valid access level for
+// Outer.DefaultRawPrivate, so the diagnostic should say that.
+class Outer {
+  enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared fileprivate because its raw type uses a private type}}
+    case A
+  }
+}
+
 public enum PublicRawPrivate : PrivateInt { // expected-error {{enum cannot be declared public because its raw type uses a private type}}
   case A
 }

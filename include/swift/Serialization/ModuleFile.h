@@ -50,6 +50,7 @@ class ModuleFile
   friend class SerializedASTFile;
   friend class SILDeserializer;
   using Status = serialization::Status;
+  using TypeID = serialization::TypeID;
 
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
@@ -568,16 +569,14 @@ private:
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
+  struct AccessorRecord {
+    SmallVector<serialization::DeclID, 8> IDs;
+  };
+
   /// Sets the accessors for \p storage based on \p rawStorageKind.
   void configureStorage(AbstractStorageDecl *storage,
                         unsigned rawStorageKind,
-                        serialization::DeclID getter,
-                        serialization::DeclID setter,
-                        serialization::DeclID materializeForSet,
-                        serialization::DeclID addressor,
-                        serialization::DeclID mutableAddressor,
-                        serialization::DeclID willSet,
-                        serialization::DeclID didSet);
+                        AccessorRecord &accessors);
 
 public:
   /// Loads a module from the given memory buffer.
@@ -619,6 +618,13 @@ public:
   Status getStatus() const {
     return static_cast<Status>(Bits.Status);
   }
+
+  /// Transfers ownership of a buffer that might contain source code where
+  /// other parts of the compiler could have emitted diagnostics, to keep them
+  /// alive even if the ModuleFile is destroyed.
+  ///
+  /// Should only be called when getStatus() indicates a failure.
+  std::unique_ptr<llvm::MemoryBuffer> takeBufferForDiagnostics();
 
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {

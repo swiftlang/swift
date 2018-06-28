@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -diagnostics-editor-mode -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics
+// RUN: %target-typecheck-verify-swift -diagnostics-editor-mode -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics -swift-version 3
 
 typealias TimeInterval = Double
 

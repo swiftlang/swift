@@ -245,12 +245,12 @@
                 "ninja": "release"
             }
         },
-        "swift-4.2-branch-04-30-2018" : {
-            "aliases": ["swift-4.2-branch-04-30-2018"],
+        "swift-4.2-branch-06-11-2018" : {
+            "aliases": ["swift-4.2-branch-06-11-2018"],
             "repos": {
                 "llvm": "swift-4.2-branch",
                 "clang": "swift-4.2-branch",
-                "swift": "swift-4.2-branch-04-30-2018",
+                "swift": "swift-4.2-branch-06-11-2018",
                 "lldb": "swift-4.2-branch",
                 "cmark": "swift-4.2-branch",
                 "llbuild": "swift-4.2-branch",

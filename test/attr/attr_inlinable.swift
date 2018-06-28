@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 4.2
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 

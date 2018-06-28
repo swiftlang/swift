@@ -649,7 +649,7 @@ public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
 /// Convert `x` from its Objective-C representation to its Swift
 /// representation.
 /// COMPILER_INTRINSIC
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
   _ x: T._ObjectiveCType,
   _: T.Type
@@ -662,7 +662,7 @@ public func _forceBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable> (
 /// Attempt to convert `x` from its Objective-C representation to its Swift
 /// representation.
 /// COMPILER_INTRINSIC
-@_inlineable // FIXME(sil-serialize-all)
+@inlinable // FIXME(sil-serialize-all)
 public func _conditionallyBridgeFromObjectiveC_bridgeable<T:_ObjectiveCBridgeable>(
   _ x: T._ObjectiveCType,
   _: T.Type

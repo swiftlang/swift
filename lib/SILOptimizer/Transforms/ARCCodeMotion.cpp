@@ -242,6 +242,8 @@ public:
 };
 
 bool CodeMotionContext::run() {
+  MultiIteration = requireIteration();
+
   // Initialize the data flow.
   initializeCodeMotionDataFlow();
 
@@ -332,9 +334,7 @@ public:
   RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                           SILFunction *F, PostOrderFunctionInfo *PO,
                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
-    : CodeMotionContext(BPA, F, PO, AA, RCFI) {
-    MultiIteration = requireIteration();
-  }
+      : CodeMotionContext(BPA, F, PO, AA, RCFI) {}
 
   /// virtual destructor.
   ~RetainCodeMotionContext() override {}
@@ -684,10 +684,8 @@ public:
                            AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
-    : CodeMotionContext(BPA, F, PO, AA, RCFI),
-      FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {
-    MultiIteration = requireIteration();
-  } 
+      : CodeMotionContext(BPA, F, PO, AA, RCFI),
+        FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {}
 
   /// virtual destructor.
   ~ReleaseCodeMotionContext() override {}

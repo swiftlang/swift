@@ -656,12 +656,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline) {
-  // For now, we cannot inline begin_apply at all.
-  if (isa<BeginApplyInst>(AI))
-    return nullptr;
-
   SILFunction *Callee = AI.getReferencedFunction();
-  SILFunction *EligibleCallee = nullptr;
 
   if (!Callee) {
     return nullptr;
@@ -669,7 +664,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   auto ModuleName = Callee->getModule().getSwiftModule()->getName().str();
   bool IsInStdlib = (ModuleName == STDLIB_NAME || ModuleName == SWIFT_ONONE_SUPPORT);
 
-  // Don't inline functions that are marked with the @_semantics or @effects
+  // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
@@ -776,8 +771,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  EligibleCallee = Callee;
-  return EligibleCallee;
+  return Callee;
 }
 
 /// Returns true if the instruction \I has any interesting side effects which

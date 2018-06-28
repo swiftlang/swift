@@ -828,7 +828,7 @@ void ClosureSpecCloner::populateCloned() {
 namespace {
 
 class SILClosureSpecializerTransform : public SILFunctionTransform {
-  void gatherCallSites(SILFunction *Caller,
+  bool gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
                        llvm::DenseSet<FullApplySite> &MultipleClosureAI);
   bool specialize(SILFunction *Caller,
@@ -904,7 +904,7 @@ static void markReabstractionPartialApplyAsUsed(
   llvm_unreachable("Unexpect instruction");
 }
 
-void SILClosureSpecializerTransform::gatherCallSites(
+bool SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
     llvm::DenseSet<FullApplySite> &MultipleClosureAI) {
@@ -916,6 +916,8 @@ void SILClosureSpecializerTransform::gatherCallSites(
   // We should not look at reabstraction closure twice who we ultimately ended
   // up using as an argument that we specialize on.
   llvm::DenseSet<SingleValueInstruction *> UsedReabstractionClosure;
+
+  bool CFGChanged = false;
 
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
@@ -1010,7 +1012,7 @@ void SILClosureSpecializerTransform::gatherCallSites(
         // We could fix this by inserting new arguments more carefully, or
         // changing how we model dynamic Self altogether.
         if (mayBindDynamicSelf(ApplyCallee))
-          return;
+          return CFGChanged;
 
         // Ok, we know that we can perform the optimization but not whether or
         // not the optimization is profitable. Find the index of the argument
@@ -1096,12 +1098,15 @@ void SILClosureSpecializerTransform::gatherCallSites(
       }
       if (CInfo) {
         ValueLifetimeAnalysis VLA(CInfo->Closure, UsePoints);
-        VLA.computeFrontier(CInfo->LifetimeFrontier,
-                            ValueLifetimeAnalysis::AllowToModifyCFG);
+        if (!VLA.computeFrontier(CInfo->LifetimeFrontier,
+                                 ValueLifetimeAnalysis::AllowToModifyCFG)) {
+          CFGChanged = true;
+        }
         ClosureCandidates.push_back(CInfo);
       }
     }
   }
+  return CFGChanged;
 }
 
 bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
@@ -1113,7 +1118,9 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
   // ApplyInsts. Check the profitability of specializing the closure argument.
   llvm::SmallVector<ClosureInfo*, 8> ClosureCandidates;
   llvm::DenseSet<FullApplySite> MultipleClosureAI;
-  gatherCallSites(Caller, ClosureCandidates, MultipleClosureAI);
+  if (gatherCallSites(Caller, ClosureCandidates, MultipleClosureAI)) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Branches);
+  }
 
   bool Changed = false;
   for (auto *CInfo : ClosureCandidates) {

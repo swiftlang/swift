@@ -110,19 +110,19 @@ class XRefTracePath {
         break;
       case Kind::Accessor:
         switch (getDataAs<uintptr_t>()) {
-        case Getter:
+        case Get:
           os << "(getter)";
           break;
-        case Setter:
+        case Set:
           os << "(setter)";
           break;
         case MaterializeForSet:
           os << "(materializeForSet)";
           break;
-        case Addressor:
+        case Address:
           os << "(addressor)";
           break;
-        case MutableAddressor:
+        case MutableAddress:
           os << "(mutableAddressor)";
           break;
         case WillSet:

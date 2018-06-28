@@ -453,9 +453,10 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   // %38 = enum $Optional<NSString>, #Optional.some!enumelt.1, %36 : $NSString
   ADVANCE_ITERATOR_OR_RETURN_FALSE(It);
   auto *SomeEnum = dyn_cast<EnumInst>(It);
+  if (!SomeEnum || !SomeEnum->hasOperand() || SomeEnum->getOperand() != SomeBBArg)
+    return false;
   size_t numSomeEnumUses = std::distance(SomeEnum->use_begin(), SomeEnum->use_end());
-  if (!SomeEnum || !SomeEnum->hasOperand() || SomeEnum->getOperand() != SomeBBArg
-      || numSomeEnumUses > 2)
+  if (numSomeEnumUses > 2)
     return false;
 
   // %39 = metatype $@thin String.Type

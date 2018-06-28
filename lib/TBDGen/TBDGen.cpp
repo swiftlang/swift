@@ -164,10 +164,8 @@ void TBDGenVisitor::visitAccessorDecl(AccessorDecl *AD) {
 
 void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // Explicitly look at each accessor here: see visitAccessorDecl.
-  SmallVector<Decl *, 8> accessors;
-  ASD->getAllAccessorFunctions(accessors);
-  for (auto accessor : accessors) {
-    visitAbstractFunctionDecl(cast<AbstractFunctionDecl>(accessor));
+  for (auto accessor : ASD->getAllAccessorFunctions()) {
+    visitAbstractFunctionDecl(accessor);
   }
 }
 

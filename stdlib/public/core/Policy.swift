@@ -454,22 +454,6 @@ public protocol _BitwiseOperations {
   static prefix func ~ (x: Self) -> Self
 
   /// The empty bitset.
-  ///
-  /// The `allZeros` static property is the [identity element][] for bitwise OR
-  /// and XOR operations and the [fixed point][] for bitwise AND operations.
-  /// For example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///
-  ///     // Identity
-  ///     x | .allZeros           // 0b00000101
-  ///     x ^ .allZeros           // 0b00000101
-  ///
-  ///     // Fixed point
-  ///     x & .allZeros           // 0b00000000
-  ///
-  /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
-  /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
   static var allZeros: Self { get }
 }

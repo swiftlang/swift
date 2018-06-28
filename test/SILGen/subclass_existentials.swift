@@ -166,8 +166,8 @@ func methodCalls(
   let _: () -> (Base<Int> & P) = baseAndPType.classSelfReturn
   let _: () -> (Base<Int> & P) = baseAndPType.protocolSelfReturn
 
-  let _: () -> (Base<Int> & P) = baseAndPType.init(classInit:)
-  let _: () -> (Base<Int> & P) = baseAndPType.init(protocolInit:)
+  let _: (()) -> (Base<Int> & P) = baseAndPType.init(classInit:)
+  let _: (()) -> (Base<Int> & P) = baseAndPType.init(protocolInit:)
 
   // CHECK:      return
   // CHECK-NEXT: }

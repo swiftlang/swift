@@ -836,6 +836,13 @@ public:
                           Val, DigitsLoc, Implicit)
   {}
 
+  /// Returns a new integer literal expression with the given value.
+  /// \p C The AST context.
+  /// \p value The integer value.
+  /// \return An implicit integer literal expression which evaluates to the value.
+  static IntegerLiteralExpr *
+  createFromUnsigned(ASTContext &C, unsigned value);
+
   APInt getValue() const;
   static APInt getValue(StringRef Text, unsigned BitWidth, bool Negative);
 
@@ -2300,7 +2307,7 @@ public:
     return Bits.SubscriptExpr.HasArgLabelLocs;
   }
 
-  /// Whether this call with written with a trailing closure.
+  /// Whether this call was written with a trailing closure.
   bool hasTrailingClosure() const {
     return Bits.SubscriptExpr.HasTrailingClosure;
   }

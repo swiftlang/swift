@@ -1229,11 +1229,11 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
 
 static Optional<AccessorKind> getAccessorKind(StringRef ident) {
   return llvm::StringSwitch<Optional<AccessorKind>>(ident)
-           .Case("getter", AccessorKind::IsGetter)
-           .Case("setter", AccessorKind::IsSetter)
-           .Case("addressor", AccessorKind::IsAddressor)
-           .Case("mutableAddressor", AccessorKind::IsMutableAddressor)
-           .Case("materializeForSet", AccessorKind::IsMaterializeForSet)
+           .Case("getter", AccessorKind::Get)
+           .Case("setter", AccessorKind::Set)
+           .Case("addressor", AccessorKind::Address)
+           .Case("mutableAddressor", AccessorKind::MutableAddress)
+           .Case("materializeForSet", AccessorKind::MaterializeForSet)
            .Default(None);
 }
 
@@ -2583,7 +2583,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         continue;
       if (P.consumeIf(tok::r_paren))
         break;
-      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "(' or ',");
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ")' or ',");
       return true;
     }
     
@@ -5464,18 +5464,25 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   }
 
   Identifier ComponentKind;
-  KeyPathPatternComponent Component;
+  Optional<KeyPathPatternComponent> Component;
   SourceLoc ComponentLoc;
   SmallVector<SILType, 4> OperandTypes;
 
-  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "(")
-      || P.parseIdentifier(ComponentKind, ComponentLoc,
-                           diag::expected_tok_in_sil_instr, "component kind")
-      || SP.parseKeyPathPatternComponent(Component, OperandTypes,
-               ComponentLoc, ComponentKind, InstLoc,
-               patternEnv)
-      || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+  if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
     return true;
+  
+  if (!P.consumeIf(tok::r_paren)) {
+    KeyPathPatternComponent parsedComponent;
+    if (P.parseIdentifier(ComponentKind, ComponentLoc,
+                          diag::expected_tok_in_sil_instr, "component kind")
+        || SP.parseKeyPathPatternComponent(parsedComponent, OperandTypes,
+                 ComponentLoc, ComponentKind, InstLoc,
+                 patternEnv)
+        || P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")"))
+      return true;
+    
+    Component = std::move(parsedComponent);
+  }
   
   SILProperty::create(M, Serialized,
                       cast<AbstractStorageDecl>(VD), Component);

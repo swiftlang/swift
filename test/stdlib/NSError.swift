@@ -6,11 +6,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift-swift3
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// RUN: %target-build-swift %s 2> %t.warnings.txt
+// RUN: %target-build-swift %s -swift-version 3 2> %t.warnings.txt
 // RUN: %FileCheck -check-prefix=CHECK-WARNINGS %s < %t.warnings.txt
 
 import StdlibUnittest

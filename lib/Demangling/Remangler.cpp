@@ -248,6 +248,9 @@ class Remangler {
   }
 
   void manglePureProtocol(Node *Proto) {
+    if (mangleStandardSubstitution(Proto))
+      return;
+    
     Proto = skipType(Proto);
     mangleChildNodes(Proto);
   }
@@ -354,7 +357,8 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
   if (node->getKind() != Node::Kind::Structure
-      && node->getKind() != Node::Kind::Enum)
+      && node->getKind() != Node::Kind::Enum
+      && node->getKind() != Node::Kind::Protocol)
     return false;
 
   Node *context = node->getFirstChild();
@@ -1596,12 +1600,6 @@ void Remangler::mangleProtocolWitnessTablePattern(Node *node) {
 void Remangler::mangleProtocolWitnessTableAccessor(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Wa";
-}
-
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  mangleChildNode(node, 1);
-  Buffer << "Qq";
-  mangleNumber(node->getFirstChild());
 }
 
 void Remangler::mangleReabstractionThunk(Node *node) {

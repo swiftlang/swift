@@ -2,6 +2,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_B | %FileCheck %s -check-prefix=TEST_B
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_C | %FileCheck %s -check-prefix=TEST_C
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D | %FileCheck %s -check-prefix=TEST_D
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D_DOT | %FileCheck %s -check-prefix=TEST_D_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TEST_D_PAREN | %FileCheck %s -check-prefix=TEST_D_PAREN
 
 class A {
   init(int i: Int) {}
@@ -65,6 +67,14 @@ class D : C {
 // TEST_D-NEXT: Keyword[self]/CurrNominal:          .self[#D.Type#]; name=self
 // TEST_D-NEXT: End completions
 
+// TEST_D_DOT: Decl[Constructor]/CurrNominal:       init({#d: D#})[#D#]; name=init(d: D)
+// TEST_D_DOT-NEXT: Decl[Constructor]/CurrNominal:  init({#int: Int#})[#D#]; name=init(int: Int)
+// TEST_D_DOT-NEXT: Decl[Constructor]/Super:        init({#c: C#})[#C#]; name=init(c: C)
+
+// TEST_D_PAREN: Decl[Constructor]/CurrNominal:       ['(']{#d: D#}[')'][#D#]; name=d: D
+// TEST_D_PAREN-NEXT: Decl[Constructor]/CurrNominal:  ['(']{#int: Int#}[')'][#D#]; name=int: Int
+// TEST_D_PAREN-NEXT: Decl[Constructor]/Super:        ['(']{#c: C#}[')'][#C#]; name=c: C
+
 func testA() {
   A#^TEST_A^#
 }
@@ -79,4 +89,6 @@ func testC() {
 
 func testD() {
   D#^TEST_D^#
+  D.#^TEST_D_DOT^#
+  D(#^TEST_D_PAREN^#
 }

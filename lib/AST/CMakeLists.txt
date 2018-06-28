@@ -27,6 +27,7 @@ add_swift_library(swiftAST STATIC
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  Evaluator.cpp
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp

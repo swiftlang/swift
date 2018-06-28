@@ -93,7 +93,10 @@ public:
       parameters(parameters) {}
 
   ManagedValue visitType(CanType t) {
-    auto argType = SGF.getLoweredType(t);
+    auto argType = SGF.getLoweredType(t->getInOutObjectType());
+    if (t->is<InOutType>())
+      argType = SILType::getPrimitiveAddressType(argType.getASTType());
+
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
@@ -225,11 +228,9 @@ struct ArgumentInitHelper {
     if (vd->isInOut()) {
       SILValue address = argrv.getUnmanagedValue();
 
-      CanType objectType = vd->getType()->getInOutObjectType()->getCanonicalType();
-
       // As a special case, don't introduce a local variable for
       // Builtin.UnsafeValueBuffer, which is not copyable.
-      if (isa<BuiltinUnsafeValueBufferType>(objectType)) {
+      if (isa<BuiltinUnsafeValueBufferType>(ty->getCanonicalType())) {
         // FIXME: mark a debug location?
         SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(address);
         SGF.B.createDebugValueAddr(loc, address,
@@ -265,6 +266,8 @@ struct ArgumentInitHelper {
 
   void emitParam(ParamDecl *PD) {
     auto type = PD->getType();
+    if (PD->isInOut())
+      type = InOutType::get(type); // FIXME remove InOutType
 
     ++ArgNo;
     if (PD->hasName()) {
@@ -277,6 +280,8 @@ struct ArgumentInitHelper {
 
   void emitAnonymousParam(Type type, SILLocation paramLoc, ParamDecl *PD) {
     // Allow non-materializable tuples to be bound to anonymous parameters.
+    //
+    // FIXME: Remove this once -swift-version 3 code generation goes away.
     if (!type->isMaterializable()) {
       if (auto tupleType = type->getAs<TupleType>()) {
         for (auto eltType : tupleType->getElementTypes()) {
@@ -318,8 +323,10 @@ static void makeArgument(Type ty, ParamDecl *decl,
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto arg =
-        SGF.F.begin()->createFunctionArgument(SGF.getLoweredType(ty), decl);
+    auto loweredTy = SGF.getLoweredType(ty);
+    if (decl->isInOut())
+      loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
+    auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
     args.push_back(arg);
   }
 }

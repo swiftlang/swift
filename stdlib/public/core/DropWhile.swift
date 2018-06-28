@@ -184,7 +184,7 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
 
 extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
   /// The hash value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var hashValue: Int {
     return base.hashValue
   }
@@ -194,7 +194,7 @@ extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     hasher.combine(base)
   }

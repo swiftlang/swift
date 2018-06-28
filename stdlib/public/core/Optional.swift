@@ -415,7 +415,7 @@ extension Optional: Hashable where Wrapped: Hashable {
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:

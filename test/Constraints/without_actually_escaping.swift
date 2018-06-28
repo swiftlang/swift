@@ -64,3 +64,29 @@ func rethrowThroughWAE(_ zz: (Int, Int, Int) throws -> Int, _ value: Int) throws
 let _: ((Int) -> Int, (@escaping (Int) -> Int) -> ()) -> ()
   = withoutActuallyEscaping(_:do:) // expected-error{{}}
 
+
+// Failing to propagate @noescape into non-single-expression
+// closure passed to withoutActuallyEscaping
+
+// https://bugs.swift.org/browse/SR-7886
+
+class Box<T> {
+  let value: T
+
+  init(_ value: T) {
+    self.value = value
+  }
+
+  func map1<U>(_ transform: (T) -> U) -> Box<U> {
+    return withoutActuallyEscaping(transform) { transform in
+      return Box<U>(transform(value))
+    }
+  }
+
+  func map2<U>(_ transform: (T) -> U) -> Box<U> {
+    return withoutActuallyEscaping(transform) { transform in
+      let v = Box<U>(transform(value))
+      return v
+    }
+  }
+}
