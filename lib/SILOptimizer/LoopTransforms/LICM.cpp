@@ -42,12 +42,6 @@ using namespace swift;
 /// loads, function calls without side effects and (some) exclusivity checks
 using InstSet = llvm::SmallPtrSet<SILInstruction *, 8>;
 
-/// Instruction pairs which need to be hoisted together:
-/// e.g. If we hoist a begin access, we need to sink the matching end access
-/// The target of each hoist instruction can be multiple sinks. As such,
-/// A pair consists of an instruction to a set of matching sink instructions
-using HoistPairSet = llvm::SmallVector<std::pair<SILInstruction *, InstSet>, 8>;
-
 /// A subset of instruction which may have side effects.
 /// Doesn't contain ones that have special handling (e.g. fix_lifetime)
 using WriteSet = SmallPtrSet<SILInstruction *, 8>;
@@ -171,7 +165,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   getDominatingBlocks(domBlocks, Loop, DT);
 
   for (auto *CurBB : domBlocks) {
-    // We now that the block is guaranteed to be executed. Hoist if we can.
+    // We know that the block is guaranteed to be executed. Hoist if we can.
     for (auto InstIt = CurBB->begin(), E = CurBB->end(); InstIt != E;) {
       SILInstruction *Inst = &*InstIt;
       ++InstIt;
@@ -292,10 +286,21 @@ static bool sinkInstructions(std::unique_ptr<LoopNestSummary> &LoopSummary,
   return Changed;
 }
 
+static void getEndAccesses(BeginAccessInst *BI,
+                           SmallVectorImpl<EndAccessInst *> &EndAccesses) {
+  for (auto Use : BI->getUses()) {
+    auto *User = Use->getUser();
+    auto *EI = dyn_cast<EndAccessInst>(User);
+    if (!EI) {
+      continue;
+    }
+    EndAccesses.push_back(EI);
+  }
+}
+
 static bool
-hoistAndSinkInstructionPairs(std::unique_ptr<LoopNestSummary> &LoopSummary,
-                             DominanceInfo *DT, SILLoopInfo *LI,
-                             HoistPairSet &Pairs) {
+hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
+                        DominanceInfo *DT, SILLoopInfo *LI, InstSet &Special) {
   auto *Loop = LoopSummary->Loop;
   DEBUG(llvm::errs() << " Hoist and Sink pairs attempt\n");
   auto Preheader = Loop->getLoopPreheader();
@@ -303,14 +308,16 @@ hoistAndSinkInstructionPairs(std::unique_ptr<LoopNestSummary> &LoopSummary,
 
   bool Changed = false;
 
-  for (auto pair : Pairs) {
-    auto *Up = pair.first;
-    auto &SinkDownSet = pair.second;
-    if (!hoistInstruction(DT, Up, Loop, Preheader)) {
+  for (auto *Inst : Special) {
+    auto *BI = dyn_cast<BeginAccessInst>(Inst);
+    assert(BI && "Only BeginAccessInst are supported");
+    SmallVector<EndAccessInst *, 2> Ends;
+    getEndAccesses(BI, Ends);
+    if (!hoistInstruction(DT, BI, Loop, Preheader)) {
       continue;
     }
-    DEBUG(llvm::dbgs() << "Hoisted " << *Up);
-    for (auto *instSink : SinkDownSet) {
+    DEBUG(llvm::dbgs() << "Hoisted " << *BI);
+    for (auto *instSink : Ends) {
       if (!sinkInstruction(DT, LoopSummary, instSink, LI)) {
         llvm_unreachable("LICM: Could not perform must-sink instruction");
       }
@@ -318,6 +325,7 @@ hoistAndSinkInstructionPairs(std::unique_ptr<LoopNestSummary> &LoopSummary,
     DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
     Changed = true;
   }
+
   return Changed;
 }
 
@@ -343,8 +351,9 @@ class LoopTreeOptimization {
   /// Instructions that we may be able to sink down
   InstSet SinkDown;
 
-  /// Instruction pairs that we may be able to hoist and sink
-  HoistPairSet HoistingPairs;
+  /// Hoistable Instructions that need special treatment
+  /// e.g. begin_access
+  InstSet SpecialHoist;
 
 public:
   LoopTreeOptimization(SILLoop *TopLevelLoop, SILLoopInfo *LI,
@@ -403,7 +412,7 @@ bool LoopTreeOptimization::optimize() {
       // Reset the data structures for next loop in the list
       HoistUp.clear();
       SinkDown.clear();
-      HoistingPairs.clear();
+      SpecialHoist.clear();
     } while (currChanged);
 
     // Store the summary for parent loops to use.
@@ -472,11 +481,12 @@ static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
 // 1) Inside the same loop (sink to loop exists)
 // Potential TODO: At loop exit block
 static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
-  for (auto Use : BI->getUses()) {
-    auto *User = Use->getUser();
-    if (!dyn_cast<EndAccessInst>(User)) {
-      continue;
-    }
+  SmallVector<EndAccessInst *, 2> AllEnds;
+  getEndAccesses(BI, AllEnds);
+  if (AllEnds.empty()) {
+    return false;
+  }
+  for (auto *User : AllEnds) {
     auto *BB = User->getParent();
     if (Loop->getBlocksSet().count(BB) != 0) {
       continue;
@@ -486,40 +496,18 @@ static bool handledEndAccesses(BeginAccessInst *BI, SILLoop *Loop) {
   return true;
 }
 
-static void analyzeBeginAccess(BeginAccessInst *BI,
-                               SmallVector<BeginAccessInst *, 8> &BeginAccesses,
-                               SmallVector<EndAccessInst *, 8> &EndAccesses,
-                               HoistPairSet &HoistingPairs) {
+static bool
+analyzeBeginAccess(BeginAccessInst *BI,
+                   SmallVector<BeginAccessInst *, 8> &BeginAccesses) {
   if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
-    return;
+    return false;
   }
 
   const AccessedStorage &storage =
       findAccessedStorageNonNested(BI->getSource());
   if (!storage) {
-    return;
+    return false;
   }
-
-  // find matching end accesses:
-  InstSet matchingEnds;
-  auto matchingEndPred = [&](EndAccessInst *EI) {
-    return EI->getBeginAccess() == BI;
-  };
-  for (auto matchingEnd = std::find_if(EndAccesses.begin(), EndAccesses.end(),
-                                       matchingEndPred);
-       matchingEnd != EndAccesses.end();
-       matchingEnd =
-           std::find_if(matchingEnd, EndAccesses.end(), matchingEndPred)) {
-    auto *EI = *matchingEnd;
-    matchingEnds.insert(EI);
-    ++matchingEnd;
-  }
-  if (matchingEnds.empty()) {
-    // no matching end within the loop
-    return;
-  }
-  DEBUG(llvm::dbgs() << "Found " << matchingEnds.size() << " End accesses"
-                     << "\n");
 
   auto BIAccessedStorageNonNested = findAccessedStorageNonNested(BI);
   auto safeBeginPred = [&](BeginAccessInst *OtherBI) {
@@ -530,9 +518,8 @@ static void analyzeBeginAccess(BeginAccessInst *BI,
         findAccessedStorageNonNested(OtherBI));
   };
 
-  if (std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred)) {
-    HoistingPairs.emplace_back(std::make_pair(BI, std::move(matchingEnds)));
-  }
+  return (
+      std::all_of(BeginAccesses.begin(), BeginAccesses.end(), safeBeginPred));
 }
 
 // Analyzes current loop for hosting/sinking potential:
@@ -556,8 +543,6 @@ void LoopTreeOptimization::analyzeCurrentLoop(
   SmallVector<FixLifetimeInst *, 8> FixLifetimes;
   // Contains begin_access, we might be able to hoist them.
   SmallVector<BeginAccessInst *, 8> BeginAccesses;
-  // Contains end_access, we might be able to sink them.
-  SmallVector<EndAccessInst *, 8> EndAccesses;
 
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
@@ -579,13 +564,6 @@ void LoopTreeOptimization::analyzeCurrentLoop(
         auto *BI = dyn_cast<BeginAccessInst>(&Inst);
         assert(BI && "Expected a Begin Access");
         BeginAccesses.push_back(BI);
-        checkSideEffects(Inst, MayWrites);
-        break;
-      }
-      case SILInstructionKind::EndAccessInst: {
-        auto *EI = dyn_cast<EndAccessInst>(&Inst);
-        assert(EI && "Expected an End Access");
-        EndAccesses.push_back(EI);
         checkSideEffects(Inst, MayWrites);
         break;
       }
@@ -651,7 +629,9 @@ void LoopTreeOptimization::analyzeCurrentLoop(
                          << "\n");
       continue;
     }
-    analyzeBeginAccess(BI, BeginAccesses, EndAccesses, HoistingPairs);
+    if (analyzeBeginAccess(BI, BeginAccesses)) {
+      SpecialHoist.insert(BI);
+    }
   }
 }
 
@@ -664,8 +644,8 @@ bool LoopTreeOptimization::optimizeLoop(
   bool currChanged = false;
   currChanged |= hoistInstructions(CurrentLoop, DomTree, HoistUp);
   currChanged |= sinkInstructions(CurrSummary, DomTree, LoopInfo, SinkDown);
-  currChanged |= hoistAndSinkInstructionPairs(CurrSummary, DomTree, LoopInfo,
-                                              HoistingPairs);
+  currChanged |=
+      hoistSpecialInstruction(CurrSummary, DomTree, LoopInfo, SpecialHoist);
   Changed |= currChanged;
   return currChanged;
 }
