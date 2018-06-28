@@ -133,9 +133,26 @@ extension Syntax {
     return data.positionAfterSkippingLeadingTrivia
   }
 
+  /// The absolute position where this node (excluding its trailing trivia)
+  /// ends.
+  public var endPosition: AbsolutePosition {
+    return data.endPosition
+  }
+
+  /// The absolute position where this node's trailing trivia ends
+  public var endPositionAfterTrailingTrivia: AbsolutePosition {
+    return data.endPositionAfterTrailingTrivia
+  }
+
   /// The textual byte length of this node including leading and trailing trivia.
   public var byteSize: Int {
-    return data.byteSize
+    return totalLength.utf8Length
+  }
+
+  /// The length this node takes up spelled out in the source, excluding its
+  /// leading or trailing trivia.
+  public var contentLength: SourceLength {
+    return raw.contentLength
   }
 
   /// The leading trivia of this syntax node. Leading trivia is attached to
@@ -152,6 +169,21 @@ extension Syntax {
     return raw.trailingTrivia
   }
 
+  /// The length this node's leading trivia takes up spelled out in source.
+  public var leadingTriviaLength: SourceLength {
+    return raw.leadingTriviaLength
+  }
+
+  /// The length this node's trailing trivia takes up spelled out in source.
+  public var trailingTriviaLength: SourceLength {
+    return raw.trailingTriviaLength
+  }
+
+  /// The length of this node including all of its trivia.
+  public var totalLength: SourceLength {
+    return raw.totalLength
+  }
+
   /// When isImplicit is true, the syntax node doesn't include any
   /// underlying tokens, e.g. an empty CodeBlockItemList.
   public var isImplicit: Bool {
@@ -160,8 +192,7 @@ extension Syntax {
 
   /// The textual byte length of this node exluding leading and trailing trivia.
   public var byteSizeAfterTrimmingTrivia: Int {
-    return data.byteSize - (leadingTrivia?.byteSize ?? 0) -
-      (trailingTrivia?.byteSize ?? 0)
+    return contentLength.utf8Length
   }
 
   /// The root of the tree in which this node resides.
@@ -213,8 +244,8 @@ extension Syntax {
     afterLeadingTrivia: Bool = true
   ) -> SourceLocation {
     let pos = afterLeadingTrivia ? 
-      data.position.copy() :
-      data.positionAfterSkippingLeadingTrivia.copy()
+      data.position :
+      data.positionAfterSkippingLeadingTrivia
     return SourceLocation(file: file.path, position: pos)
   }
 
@@ -228,10 +259,11 @@ extension Syntax {
     in file: URL,
     afterTrailingTrivia: Bool = false
   ) -> SourceLocation {
-    let pos = data.position.copy()
-    raw.accumulateAbsolutePosition(pos)
+    var pos = data.position
+    pos += raw.leadingTriviaLength
+    pos += raw.contentLength
     if afterTrailingTrivia {
-      raw.accumulateTrailingTrivia(pos)
+      pos += raw.trailingTriviaLength
     }
     return SourceLocation(file: file.path, position: pos)
   }
@@ -357,6 +389,27 @@ public struct TokenSyntax: _SyntaxBase, Hashable {
       fatalError("TokenSyntax must have token as its raw")
     }
     return raw.tokenKind!
+  }
+
+  /// The length this node takes up spelled out in the source, excluding its
+  /// leading or trailing trivia.
+  public var contentLength: SourceLength {
+    return raw.contentLength
+  }
+  
+  /// The length this node's leading trivia takes up spelled out in source.
+  public var leadingTriviaLength: SourceLength {
+    return raw.leadingTriviaLength
+  }
+
+  /// The length this node's trailing trivia takes up spelled out in source.
+  public var trailingTriviaLength: SourceLength {
+    return raw.trailingTriviaLength
+  }
+
+  /// The length of this node including all of its trivia.
+  public var totalLength: SourceLength {
+    return raw.totalLength
   }
 
   public static func ==(lhs: TokenSyntax, rhs: TokenSyntax) -> Bool {
