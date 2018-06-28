@@ -77,7 +77,7 @@ static const char ALL_DEVICES[] = "ALL_DEVICES";
 
 // We assume the following special attr names do not occur in the regular
 // attributes of any TF ops.
-static const char DEVICE_ATTR[] = "device";
+static const char DEVICE_ATTR[] = "__device";
 // This pseudo-attribute is propagated from a tfop inst to TensorTransfer, and
 // then to D2D send/recv insts. When lowering to TF graph, the pseudo-attribute
 // is used when creating TPU infeed/outfeed ops, and is dropped when creating
@@ -176,7 +176,7 @@ struct GraphGlobalConfiguration {
 
     // Example output SIL:
     // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
-    // %3 = builtin "__tfop_Const,dtype,value$tensor,device"(%0 : $@thin
+    // %3 = builtin "__tfop_Const,dtype,value$tensor,__device"(%0 : $@thin
     // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
     // %$TensorHandle<Float> // user: %4
     //
@@ -189,7 +189,7 @@ struct GraphGlobalConfiguration {
         B.createStringLiteral(loc, StringRef(deviceString),
                               StringLiteralInst::Encoding::UTF8);
     operands.push_back(deviceStrInst);
-    newInstName += ",device";
+    newInstName += std::string(",") + DEVICE_ATTR;
   }
 
  private:
