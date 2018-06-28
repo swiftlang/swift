@@ -1188,6 +1188,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
 
   auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
   call->setType(selfType);
+  call->setThrows(false);
 
   auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
                                          /*implicit*/ true);
