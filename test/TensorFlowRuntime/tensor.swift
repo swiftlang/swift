@@ -44,8 +44,12 @@ TensorTests.testAllBackends("NumericInitializers") {
 }
 
 TensorTests.testAllBackends("RandomInitializer") {
-  let _ = Tensor<Float>(randomUniform: [3, 4])
-  let _ = Tensor<Float>(randomNormal: [3, 4])
+  let x = Tensor<Float>(randomUniform: [3, 4])
+  let y = Tensor<Float>(randomNormal: [3, 4])
+
+  // Dummy expects because TPU tests fail when the tensors don't get used.
+  expectEqual([3, 4], x.array.shape)
+  expectEqual([3, 4], y.array.shape)
 }
 
 TensorTests.testAllBackends("ScalarToTensorConversion") {
@@ -239,10 +243,13 @@ TensorTests.testAllBackends("SimpleMath") {
 }
 
 TensorTests.testAllBackends("ReductionToScalar") {
-  let _: Tensor<Float> = [1, 2, 3, 4, 5]
+  let x: Tensor<Float> = [1, 2, 3, 4, 5]
   // expectEqual(x.mean(), 3)
   // TODO: Test other reduction ops here. Currently code motion isn't
   // smart enough to avoid send/receive.
+
+  // Dummy expect because TPU tests fail when the tensors don't get used.
+  expectEqual([5], x.array.shape)
 }
 
 TensorTests.testAllBackends("BatchNormalization") {
