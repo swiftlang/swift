@@ -264,7 +264,8 @@ KNOWN_SETTINGS=(
     build-toolchain-only               ""        "If set, only build the necessary tools to build an external toolchain"
     skip-local-host-install            ""        "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
     # SWIFT_ENABLE_TENSORFLOW
-    enable-tensorflow                  ""        "If true, enable compiling with TensorFlow"
+    enable-tensorflow                  ""        "If true, enable compiling with TensorFlow support"
+    enable-tensorflow-gpu              ""        "If true, enable compiling with TensorFlow GPU support"
     tensorflow-host-lib-dir            ""        "Path to host TensorFlow libraries"
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
@@ -2329,7 +2330,15 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_TENSORFLOW_TARGET_INCLUDE_DIR:PATH="${TENSORFLOW_TARGET_INCLUDE_DIR}"
                     )
 
-                    # Handle TensorFlow Swfit bindings file.
+                    # Propagate TensorFlow GPU support flag to CMake.
+                    if [[ "${ENABLE_TENSORFLOW_GPU}" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_ENABLE_TENSORFLOW_GPU:BOOL=TRUE
+                        )
+                    fi
+
+                    # Handle TensorFlow Swift bindings file.
                     if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
                         TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}/RawOpsGenerated.swift"
                     fi
