@@ -11,6 +11,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   PrintingDiagnosticConsumer.swift
   RawSyntax.swift
   SourcePresence.swift
+  SourceLength.swift
   SwiftcInvocation.swift
   Syntax.swift
   SyntaxData.swift

@@ -67,7 +67,42 @@ fileprivate indirect enum RawSyntaxData {
 struct RawSyntax: Codable {
   fileprivate let data: RawSyntaxData
   let presence: SourcePresence
+
+  /// A ID that uniquely identifies this node and is persistent across
+  /// incremental parses
   let id: SyntaxNodeId
+
+  var _contentLength = AtomicCache<SourceLength>()
+
+  /// The length of this node excluding its leading and trailing trivia
+  var contentLength: SourceLength {
+    return _contentLength.value() {
+      switch data {
+      case .node(kind: _, layout: let layout):
+        let firstElementIndex = layout.firstIndex(where: { $0 != nil })
+        let lastElementIndex = layout.lastIndex(where: { $0 != nil })
+
+        var contentLength = SourceLength.zero
+        for (offset, element) in layout.enumerated() {
+          guard let element = element else {
+            continue
+          }
+          // Skip the node's leading trivia
+          if offset != firstElementIndex {
+            contentLength += element.leadingTriviaLength
+          }
+          contentLength += element.contentLength
+          // Skip the node's trailing trivia
+          if offset != lastElementIndex {
+            contentLength += element.trailingTriviaLength
+          }
+        }
+        return contentLength
+      case .token(kind: let kind, leadingTrivia: _, trailingTrivia: _):
+        return SourceLength(of: kind.text)
+      }
+    }
+  }
 
   init(kind: SyntaxKind, layout: [RawSyntax?], presence: SourcePresence,
        id: SyntaxNodeId? = nil) {
@@ -289,25 +324,6 @@ extension RawSyntax: TextOutputStreamable {
 }
 
 extension RawSyntax {
-  func accumulateAbsolutePosition(_ pos: AbsolutePosition) {
-    switch data {
-    case .node(_, let layout):
-      for child in layout {
-        guard let child = child else { continue }
-        child.accumulateAbsolutePosition(pos)
-      }
-    case let .token(kind, leadingTrivia, trailingTrivia):
-      guard isPresent else { return }
-      for piece in leadingTrivia {
-        piece.accumulateAbsolutePosition(pos)
-      }
-      pos.add(text: kind.text)
-      for piece in trailingTrivia {
-        piece.accumulateAbsolutePosition(pos)
-      }
-    }
-  }
-
   var leadingTrivia: Trivia? {
     switch data {
     case .node(_, let layout):
@@ -335,18 +351,19 @@ extension RawSyntax {
       return trailingTrivia
     }
   }
+}
 
-  func accumulateLeadingTrivia(_ pos: AbsolutePosition) {
-    guard let trivia = leadingTrivia else { return }
-    for piece in trivia {
-      piece.accumulateAbsolutePosition(pos)
-    }
+extension RawSyntax {
+  var leadingTriviaLength: SourceLength {
+    return leadingTrivia?.sourceLength ?? .zero
   }
 
-  func accumulateTrailingTrivia(_ pos: AbsolutePosition) {
-    guard let trivia = trailingTrivia else { return }
-    for piece in trivia {
-      piece.accumulateAbsolutePosition(pos)
-    }
+  var trailingTriviaLength: SourceLength {
+    return trailingTrivia?.sourceLength ?? .zero
+  }
+
+  /// The length of this node including all of its trivia
+  var totalLength: SourceLength {
+    return leadingTriviaLength + contentLength + trailingTriviaLength
   }
 }
