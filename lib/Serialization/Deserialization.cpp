@@ -2681,13 +2681,14 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit;
+    bool isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     unsigned numConformances;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
-                                          isImplicit, genericEnvID,
+                                          isImplicit, isObjC, genericEnvID,
                                           rawAccessLevel,
                                           numConformances,
                                           rawInheritedIDs);
@@ -2717,6 +2718,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       theStruct->setImplicit();
+    theStruct->setIsObjC(isObjC);
 
     theStruct->computeType();
 
@@ -2856,6 +2858,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       ctor->setImplicit();
+    ctor->setIsObjC(isObjC);
     if (hasStubImplementation)
       ctor->setStubImplementation(true);
     if (initKind.hasValue())
@@ -2988,6 +2991,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       var->setImplicit();
+    var->setIsObjC(isObjC);
 
     if (auto overriddenVar = cast_or_null<VarDecl>(overridden.get())) {
       var->setOverriddenDecl(overriddenVar);
@@ -3258,6 +3262,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     fn->setStatic(isStatic);
     if (isImplicit)
       fn->setImplicit();
+    fn->setIsObjC(isObjC);
     fn->setDynamicSelf(hasDynamicSelf);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
@@ -3376,6 +3381,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       proto->setImplicit();
+    proto->setIsObjC(isObjC);
+
     proto->computeType();
 
     proto->setCircularityCheck(CircularityCheck::Checked);
@@ -3557,6 +3564,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     theClass->setAddedImplicitInitializers();
     if (isImplicit)
       theClass->setImplicit();
+    theClass->setIsObjC(isObjC);
     theClass->setSuperclass(getType(superclassID));
     if (requiresStoredPropertyInits)
       theClass->setRequiresStoredPropertyInits(true);
@@ -3583,6 +3591,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit;
+    bool isObjC;
     GenericEnvironmentID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
@@ -3590,8 +3599,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
-                                        isImplicit, genericEnvID, rawTypeID,
-                                        rawAccessLevel,
+                                        isImplicit, isObjC, genericEnvID,
+                                        rawTypeID, rawAccessLevel,
                                         numConformances, numInheritedTypes,
                                         rawInheritedAndDependencyIDs);
 
@@ -3629,6 +3638,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       theEnum->setImplicit();
+    theEnum->setIsObjC(isObjC);
+
     theEnum->setRawType(getType(rawTypeID));
 
     theEnum->computeType();
@@ -3821,6 +3832,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       subscript->setImplicit();
+    subscript->setIsObjC(isObjC);
     if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
       subscript->setOverriddenDecl(overriddenSub);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
@@ -3942,6 +3954,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     if (isImplicit)
       dtor->setImplicit();
+    dtor->setIsObjC(isObjC);
 
     break;
   }
