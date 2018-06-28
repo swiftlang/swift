@@ -304,7 +304,7 @@
                 "swift-integration-tests": "c45f48620e7a759b4d7041115581d988cf15b736",
                 "swift-xcode-playground-support": "6dfb66f47651c5ceae86f72780a69ae091ac3574",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
-                "tensorflow": "master",
+                "tensorflow": "9752b117ff63f204c4975cad52b5aab5c1f5e9a9",
                 "tensorflow-swift-bindings": "ce0a9e5561c0c6ce3af927bdfed51181da13aef1"
             }
         }
