@@ -1870,6 +1870,13 @@ function(add_swift_library name)
               FILES "${UNIVERSAL_LIBRARY_NAME}"
               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}"
               PERMISSIONS ${file_permissions})
+          swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
+
+          if(NOT is_installing)
+            set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
+          else()
+            set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
+          endif()
         endif()
 
         # If we built static variants of the library, create a lipo target for
