@@ -355,6 +355,41 @@ public:
   }
 };
 
+class SILEntityError : public llvm::ErrorInfo<SILEntityError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+  std::unique_ptr<ErrorInfoBase> underlyingReason;
+  StringRef name;
+public:
+  SILEntityError(StringRef name, std::unique_ptr<ErrorInfoBase> reason)
+      : underlyingReason(std::move(reason)), name(name) {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "could not deserialize SIL entity '" << name << "'";
+    if (underlyingReason) {
+      OS << ": ";
+      underlyingReason->log(OS);
+    }
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+LLVM_NODISCARD
+static inline std::unique_ptr<llvm::ErrorInfoBase>
+takeErrorInfo(llvm::Error error) {
+  std::unique_ptr<llvm::ErrorInfoBase> result;
+  llvm::handleAllErrors(std::move(error),
+                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
+    result = std::move(info);
+  });
+  return result;
+}
+
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;
