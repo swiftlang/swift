@@ -77,3 +77,17 @@ public struct ResilientDouble {
     self.d = d
   }
 }
+
+public class Referent {}
+
+public struct ResilientWeakRef {
+  public weak var ref: Referent?
+
+  public init (_ r: Referent) {
+    ref = r
+  }
+}
+
+public struct ResilientRef {
+  public var r: Referent
+}
