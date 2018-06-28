@@ -495,7 +495,8 @@ public:
   /// being written.
   void writeSubstitutions(SubstitutionList substitutions,
                           const std::array<unsigned, 256> &abbrCodes,
-                          GenericEnvironment *genericEnv = nullptr);
+                          GenericEnvironment *genericEnv = nullptr,
+                          bool ignoreReplacementErrors = false);
 
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);

@@ -678,6 +678,8 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
                                                           numConformances);
 
   auto replacementTy = getType(replacementID);
+  if (!replacementTy)
+    replacementTy = ErrorType::get(getContext());
   if (genericEnv) {
     replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
   }
