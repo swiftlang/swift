@@ -1371,8 +1371,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
       llvm_unreachable("module scope context handled above");
 
     case DeclContextKind::SubscriptDecl:
-      // FIXME: what do we need to check here?
-      return true;
+      return typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
 
     case DeclContextKind::TopLevelCodeDecl:
       return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
