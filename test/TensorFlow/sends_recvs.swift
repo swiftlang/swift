@@ -185,13 +185,10 @@ public func testSendsInALoopWithNoResultTensor() {
 // CHECK:        return {{.*}} : $()
 // CHECK-NEXT: } // end sil function {{.*}}testSendsInALoopWithNoResultTensor{{.*}}
 
-// TODO(SR-8117): Revert the artificially long strong literals below.
 public func testCannotSendResource() {
   // expected-error @+2 {{This value type cannot be sent/received}}
   let iterator: ResourceHandle =
-    #tfop("Iterator",
-          shared_name: "fooLooooooooooooongWord",
-          container: "barLooooooooooooongWord")
+    #tfop("Iterator", shared_name: "foo", container: "bar")
 
   print(iterator)
   let _ = Tensor<Float>(1.0)
@@ -254,7 +251,7 @@ public func test1RecvScalarGPU() {
 // "+ 2.0" is promoted to run on all devices.
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarGPU{{.*}}
 // CHECK:      builtin "__tfop_tfc.RecvFromHost
-// CHECK:      string_literal utf8 "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK:      string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT: string_literal utf8 "ALL_DEVICES"
 // CHECK-NEXT: builtin "__tfop_tfc.TensorTransfer
 

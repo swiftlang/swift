@@ -20,14 +20,14 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK:  sil private @{{.*}}testTensor{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
 // CHECK-NEXT:   %2 = metatype $@thick Float.Type
-// CHECK-NEXT:   %3 = string_literal utf8 "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK-NEXT:   %3 = string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT:   %4 = builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $Builtin.RawPointer) : $TensorHandle<Float>
 // CHECK-NEXT:   %5 = metatype $@thick Float.Type
-// CHECK-NEXT:   %6 = string_literal utf8 "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK-NEXT:   %6 = string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT:   %7 = builtin "__tfop_Sub,$in,$in,T,__device"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>, %5 : $@thick Float.Type, %6 : $Builtin.RawPointer) : $TensorHandle<Float>
 // CHECK:        builtin "__tfop_tfc.SendToHost,$in,tensorId,__device"<TensorHandle<Float>>(
 // CHECK-NEXT:   metatype $@thick Float.Type
-// CHECK-NEXT:   string_literal utf8 "/job:localhost/replica:0/task:0/device:CPU:0"
+// CHECK-NEXT:   string_literal utf8 "/device:CPU:0"
 // CHECK:        [[RESULT:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
 // CHECK-NEXT:   return [[RESULT]] : $TensorHandle<Float>
 
@@ -408,11 +408,8 @@ public func testResourceAndVariants() {
   //     .Attr("output_types: list(type) >= 1")
   //     .Attr("output_shapes: list(shape) >= 1")
   //     .SetShapeFn(shape_inference::ScalarShape);
-
-  TODO(SR-8117): Revert the artificially long strong literals below.
   let iterator: ResourceHandle =
-    #tfop("Iterator", shared_name: "fooLoooooooooooooooongWord",
-          container: "barLoooooooooooooooongWord",
+    #tfop("Iterator", shared_name: "foo", container: "bar",
           output_types: [Float.self], output_shapes: [TensorShape(1)])
 
   // REGISTER_OP("MakeIterator")

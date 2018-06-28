@@ -1,14 +1,12 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil -verify %s | %FileCheck %s
 import TensorFlow
 
-// TODO(SR-8117): Revert the artificially long strong literals below.
-
 public func testDatasetWithFakeData() {
   TensorFlow.enableTPU(infeed: true)
   let x: Tensor<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "fakeLooooooooooongWord",
-    filePath: "dummy_pathLooooooooooongWord",
+    dataSource: "fake",
+    filePath: "dummy_path",
     batchSize: 1,
     outputShapes: [TensorShape()])
   let y = x + 1
@@ -25,8 +23,8 @@ public func testDatasetWithMNIST() {
   TensorFlow.enableTPU(infeed: true)
   let (images1, labels1): (TensorHandle<Float>, TensorHandle<Int32>) = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
-    dataSource: "mnistLooooooooooongWord",
-    filePath: "some_pathLooooooooooongWord",
+    dataSource: "mnist",
+    filePath: "some_path",
     batchSize: 64,
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
   let images : Tensor<Float> = #tfop("Identity", images1)
@@ -84,6 +82,7 @@ public func createMockDataSet() -> VariantHandle {
 
 // TODO: support taking the following function typed parameter.
 // _ datasetCreator : @convention(tensorflow) () -> VariantHandle
+// TODO(SR-8117): Support "" for container and shared_name.
 public func model() {
   // REGISTER_OP("OneShotIterator")
   //   .Output("handle: resource")
@@ -94,11 +93,11 @@ public func model() {
   //   .Attr("shared_name: string = ''")
   let iterator: ResourceHandle = #tfop(
     "OneShotIterator",
-    container: "LooooooooooongWord",
+    container: "some_container",
     dataset_factory : /*datasetCreator*/createMockDataSet,
     output_types: [Float.self],
     output_shapes: [TensorShape()],
-    shared_name: "LooooooooooongWord"
+    shared_name: "some_name"
   )
 
   // REGISTER_OP("IteratorGetNext")

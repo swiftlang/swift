@@ -56,29 +56,27 @@ public func testEmptyScalarsArray() {
  CHECK: builtin "__tfop_Add,$in,$in,T,__device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
-// TODO(SR-8117): Revert the artificially long strong literals below, and re-enable this test.
 // This tests the attributes necessary to get arrays of integers and strings going.
-// public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
-//   return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
-//                        strides: (1, 2, 3, 4), padding: .same)
-// }
+public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
+  return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
+                       strides: (1, 2, 3, 4), padding: .same)
+}
 #endif
 
-// Disable the CHECKs here till we re-enable the test above.
-// HECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
-// HECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
-// HECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
-// HECK-NEXT:  %2 = metatype $@thick Float.Type
-// HECK-NEXT:  %3 = metatype $@thin Int32.Type
-// HECK-NEXT:  %4 = integer_literal $Builtin.Int32, 1
-// HECK-NEXT:  %5 = integer_literal $Builtin.Int32, 2
-// HECK-NEXT:  %6 = integer_literal $Builtin.Int32, 3
-// HECK-NEXT:  %7 = integer_literal $Builtin.Int32, 4
-// HECK-NEXT:  %8 = integer_literal $Builtin.Int1, -1
-// HECK-NEXT:  %9 = string_literal utf8 "SAME"
-// HECK:       builtin "__tfop_Conv2D,$in,$in,T,strides$array,$elt,$elt,$elt,$elt,use_cudnn_on_gpu,padding,data_format,dilations$array,$elt,$elt,$elt,$elt,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1, %9 : $Builtin.RawPointer, %10 : $Builtin.RawPointer, %11 : $@thin Int32.Type, %12 : $Builtin.Int32, %13 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.RawPointer) : $TensorHandle<Float>
-// HECK-NEXT:  return %17 : $TensorHandle<Float>
-// HECK-NEXT:}
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testConvolution
+// CHECK: sil private @{{.*}}testConvolution{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float> {
+// CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>):
+// CHECK-NEXT:  %2 = metatype $@thick Float.Type
+// CHECK-NEXT:  %3 = metatype $@thin Int32.Type
+// CHECK-NEXT:  %4 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:  %5 = integer_literal $Builtin.Int32, 2
+// CHECK-NEXT:  %6 = integer_literal $Builtin.Int32, 3
+// CHECK-NEXT:  %7 = integer_literal $Builtin.Int32, 4
+// CHECK-NEXT:  %8 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:  %9 = string_literal utf8 "SAME"
+// CHECK:       builtin "__tfop_Conv2D,$in,$in,T,strides$array,$elt,$elt,$elt,$elt,use_cudnn_on_gpu,padding,data_format,dilations$array,$elt,$elt,$elt,$elt,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1, %9 : $Builtin.RawPointer, %10 : $Builtin.RawPointer, %11 : $@thin Int32.Type, %12 : $Builtin.Int32, %13 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK-NEXT:  return %17 : $TensorHandle<Float>
+// CHECK-NEXT:}
 
 
 // Strict deabstraction doesn't support the value array yet.
