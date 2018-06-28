@@ -238,6 +238,11 @@ Type TypeChecker::getSuperclass(const ClassDecl *classDecl) {
            SuperclassTypeRequest(const_cast<ClassDecl *>(classDecl)));
 }
 
+Type TypeChecker::getSuperclass(const ProtocolDecl *protocolDecl) {
+  return Context.evaluator(
+           SuperclassTypeRequest(const_cast<ProtocolDecl *>(protocolDecl)));
+}
+
 Type TypeChecker::getRawType(EnumDecl *enumDecl) {
   return Context.evaluator(EnumRawTypeRequest(enumDecl));
 }

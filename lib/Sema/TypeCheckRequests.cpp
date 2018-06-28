@@ -148,9 +148,11 @@ void InheritedTypeRequest::cacheResult(Type value) const {
 // Superclass computation.
 //----------------------------------------------------------------------------//
 Type SuperclassTypeRequest::operator()(Evaluator &evaluator,
-                                       ClassDecl *classDecl) const {
-  for (unsigned int idx : indices(classDecl->getInherited())) {
-    Type inheritedType = evaluator(InheritedTypeRequest{classDecl, idx});
+                                       NominalTypeDecl *nominalDecl) const {
+  assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
+
+  for (unsigned int idx : indices(nominalDecl->getInherited())) {
+    Type inheritedType = evaluator(InheritedTypeRequest{nominalDecl, idx});
     if (!inheritedType) continue;
 
     // If we found a class, return it.
@@ -181,28 +183,39 @@ Type SuperclassTypeRequest::operator()(Evaluator &evaluator,
 
 void SuperclassTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
-  auto classDecl = std::get<0>(getStorage());
-  std::string className = "'" + std::string(classDecl->getNameStr()) + "'";
-  diags.diagnose(classDecl, diag::circular_class_inheritance, className);
+  auto nominalDecl = std::get<0>(getStorage());
+  std::string declName = "'" + std::string(nominalDecl->getNameStr()) + "'";
+  diags.diagnose(nominalDecl, diag::circular_class_inheritance, declName);
 }
 
 void SuperclassTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto classDecl = std::get<0>(getStorage());
+  auto nominalDecl = std::get<0>(getStorage());
   // FIXME: Customize this further.
-  diags.diagnose(classDecl, diag::circular_reference_through);
+  diags.diagnose(nominalDecl, diag::circular_reference_through);
 }
 
 Optional<Type> SuperclassTypeRequest::getCachedResult() const {
-  auto classDecl = std::get<0>(getStorage());
-  if (classDecl->LazySemanticInfo.Superclass.getInt())
-    return classDecl->LazySemanticInfo.Superclass.getPointer();
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    if (classDecl->LazySemanticInfo.Superclass.getInt())
+      return classDecl->LazySemanticInfo.Superclass.getPointer();
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    if (protocolDecl->LazySemanticInfo.Superclass.getInt())
+      return protocolDecl->LazySemanticInfo.Superclass.getPointer();
 
   return None;
 }
 
 void SuperclassTypeRequest::cacheResult(Type value) const {
-  auto classDecl = std::get<0>(getStorage());
-  classDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    classDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    protocolDecl->LazySemanticInfo.Superclass.setPointerAndInt(value, true);
 }
 
 //----------------------------------------------------------------------------//
