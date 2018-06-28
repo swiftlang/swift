@@ -266,6 +266,7 @@ private:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericStructure:
+    case Node::Kind::BoundGenericProtocol:
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericTypeAlias:
     case Node::Kind::BuiltinTypeName:
@@ -537,6 +538,15 @@ private:
     {
       // no sugar here
       printBoundGenericNoSugar(Node);
+      return;
+    }
+
+    // Print the conforming type for a "bound" protocol node "as" the protocol
+    // type.
+    if (Node->getKind() == Node::Kind::BoundGenericProtocol) {
+      printChildren(Node->getChild(1));
+      Printer << " as ";
+      print(Node->getChild(0));
       return;
     }
 
@@ -1558,6 +1568,7 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::BoundGenericClass:
   case Node::Kind::BoundGenericStructure:
   case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericProtocol:
   case Node::Kind::BoundGenericOtherNominalType:
   case Node::Kind::BoundGenericTypeAlias:
     printBoundGeneric(Node);
