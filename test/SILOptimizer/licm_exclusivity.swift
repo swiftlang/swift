@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST1
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm  -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TEST2
 // RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
-// REQUIRES: optimized_stdlib
+// REQUIRES: optimized_stdlib,asserts
 
 // TEST1-LABEL: Processing loops in {{.*}}run_ReversedArray{{.*}}
 // TEST1: Hoist and Sink pairs attempt
