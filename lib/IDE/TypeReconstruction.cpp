@@ -2268,6 +2268,14 @@ static void VisitNode(
     VisitNodeBoundGeneric(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::BoundGenericProtocol:
+    if (node->getNumChildren() < 2)
+      return;
+
+    // Only visit the conforming type.
+    VisitNode(ast, node->getChild(1), result);
+    break;
+
   case Demangle::Node::Kind::BoundGenericTypeAlias:
     VisitNodeGenericTypealias(ast, node, result);
     break;

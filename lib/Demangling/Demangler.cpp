@@ -1332,6 +1332,9 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
       break;
+    case Node::Kind::Protocol:
+      kind = Node::Kind::BoundGenericProtocol;
+      break;
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
       break;

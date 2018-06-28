@@ -1875,6 +1875,11 @@ void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
   mangleAnyNominalType(node, ctx);
 }
 
+void Remangler::mangleBoundGenericProtocol(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
 void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
