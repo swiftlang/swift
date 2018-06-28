@@ -104,4 +104,15 @@ CollectionDistance.test("Int64/advance") {
   checkBidirectionalCollection(c, [1,2,3])
 }
 
+extension Collection where Index == Int, IndexDistance == Int {
+  var myCount: Int {
+    return distance(from: startIndex, to: endIndex)
+  }
+}
+
+CollectionDistance.test("IndexDistance/constraint") {
+  let n = [1,2,3].myCount
+  expectEqual(3, n)
+}
+
 runAllTests()

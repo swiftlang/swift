@@ -586,14 +586,17 @@ extension String.UTF8View {
 extension String {
   @available(swift, obsoleted: 4)
   public subscript(bounds: Range<Index>) -> String {
+    _boundsCheck(bounds)
     return String(Substring(_slice: Slice(base: self, bounds: bounds)))
   }
 
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
+    let r = bounds.relative(to: self)
+    _boundsCheck(r)
     return String(Substring(_slice: Slice(
           base: self,
-          bounds: bounds.relative(to: self))))
+          bounds: r)))
   }
 }
 
@@ -794,12 +797,14 @@ extension Substring {
   ) -> R {
     return body(&self)
   }
-
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    return String(Substring(_slice: _slice[bounds]))
+  
+  private func _boundsCheck(_ range: Range<Index>) {
+    _precondition(range.lowerBound >= startIndex,
+      "String index range is out of bounds")
+    _precondition(range.upperBound <= endIndex,
+      "String index range is out of bounds")
   }
-
+  
   @available(swift, obsoleted: 4)
   public subscript(bounds: ClosedRange<Index>) -> String {
     return String(self[bounds.relative(to: self)])
@@ -814,9 +819,6 @@ extension Substring : _CustomPlaygroundQuickLookable {
 }
 
 extension Collection {
-  @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
-  public typealias IndexDistance = Int  
-
   // FIXME: <rdar://problem/34142121>
   // This typealias should be removed as it predates the source compatibility
   // guarantees of Swift 3, but it cannot due to a bug.
