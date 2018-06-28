@@ -218,6 +218,9 @@ WARNING(designated_init_in_cross_module_extension,none,
 NOTE(designated_init_c_struct_fix,none,
      "use \"self.init()\" to initialize the struct with zero values", ())
 
+NOTE(constexpr_called_from, none, "when called from here", ())
+NOTE(constexpr_not_evaluable, none,
+     "expression not evaluable as constant here", ())
 
 // SWIFT_ENABLE_TENSORFLOW
 // TensorFlow Support Diagnostics.
@@ -259,7 +262,6 @@ ERROR(tf_op_misuse, none,
       "%0", (StringRef))
 NOTE(tf_op_misuse_note, none,
      "%0", (StringRef))
-
 
 // Control flow diagnostics.
 ERROR(missing_return,none,

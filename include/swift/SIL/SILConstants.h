@@ -54,7 +54,6 @@ enum class UnknownReason {
   Trap,
 };
 
-
 /// This is the symbolic value tracked for each SILValue in a scope.  We
 /// support multiple representational forms for the constant node in order to
 /// avoid pointless memory bloat + copying.  This is intended to be a
@@ -64,6 +63,10 @@ enum class UnknownReason {
 /// symbolic values (e.g. to save memory).  It provides a simpler public
 /// interface though.
 class SymbolicValue {
+public:
+  struct UnknownInfo;
+
+private:
   enum RepresentationKind {
     /// This value is an alloc stack that is has not (yet) been initialized
     /// by flow-sensitive analysis.
@@ -112,11 +115,9 @@ class SymbolicValue {
   RepresentationKind representationKind : 8;
 
   union {
-    /// When the value is Unknown, this contains the value that was the
+    /// When the value is Unknown, this contains information about the
     /// unfoldable part of the computation.
-    ///
-    /// TODO: make this a more rich representation.
-    SILNode *unknown;
+    UnknownInfo *unknown;
 
     /// This is always a SILType with an object category.  This is the value
     /// of the underlying instance type, not the MetatypeType.
@@ -147,14 +148,19 @@ class SymbolicValue {
     AggregateSymbolicValue *aggregate;
   } value;
 
-  union {
-    UnknownReason unknown_reason;
-
-    //unsigned integer_bitwidth;
-    // ...
-  } aux;
-
 public:
+  /// When the value is Unknown, this contains information about the unfoldable
+  /// part of the computation.
+  struct UnknownInfo {
+    /// The value that was unfoldable.
+    SILNode *node;
+
+    /// A more explanatory reason for the value being unknown.
+    UnknownReason reason;
+
+    /// The call stack while evaluating the unknown value.
+    llvm::SmallVector<SourceLoc, 4> call_stack;
+  };
 
   /// This enum is used to indicate the sort of value held by a SymbolicValue
   /// independent of its concrete representation.  This is the public
@@ -196,24 +202,24 @@ public:
     return kind != Unknown && kind != UninitMemory;
   }
 
-  static SymbolicValue getUnknown(SILNode *node, UnknownReason reason) {
+  static SymbolicValue getUnknown(SILNode *node, UnknownReason reason,
+                                  llvm::ArrayRef<SourceLoc> callStack,
+                                  llvm::BumpPtrAllocator &allocator) {
     assert(node && "node must be present");
     SymbolicValue result;
     result.representationKind = RK_Unknown;
-    result.value.unknown = node;
-    result.aux.unknown_reason = reason;
+    result.value.unknown = new (allocator)
+        UnknownInfo{node, reason, {callStack.begin(), callStack.end()}};
     return result;
   }
 
-  bool isUnknown() const {
-    return getKind() == Unknown;
-  }
+  bool isUnknown() const { return getKind() == Unknown; }
 
   /// Return information about an unknown result, including the SIL node that
   /// is a problem, and the reason it is an issue.
-  std::pair<SILNode *, UnknownReason> getUnknownValue() const {
+  const UnknownInfo &getUnknownInfo() const {
     assert(representationKind == RK_Unknown);
-    return { value.unknown, aux.unknown_reason };
+    return *value.unknown;
   }
 
   static SymbolicValue getUninitMemory() {
