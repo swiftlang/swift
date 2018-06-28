@@ -18,29 +18,25 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 // CHECK-NOT: retain
 // CHECK-NOT: release
 
-// These 3 retains are the for x, y, z to make sure they are live across the
-// start call.
-//
+// Some possible retain/releases are emitted by the deabstraction pass, so we do
+// not check on them.
 // CHECK: [[X:%.*]] = struct_extract %0 : $Tensor<Int32>, #Tensor.handle
-// CHECK: strong_retain [[X]] : $TensorHandle<Int32>
 // CHECK: [[Y:%.*]] = struct_extract %1 : $Tensor<Int32>, #Tensor.handle
-// CHECK: strong_retain [[Y]] : $TensorHandle<Int32>
 // CHECK: [[Z:%.*]] = struct_extract %2 : $Tensor<Int32>, #Tensor.handle
-// CHECK: strong_retain [[Z]] : $TensorHandle<Int32>
 //
 // We're passing 3 TensorHandle's into the StartTensorComputation call.
 // CHECK: alloc_stack $(OpaquePointer, OpaquePointer, OpaquePointer)
 // CHECK: function_ref @_swift_tfc_StartTensorComputation
 
-// Compiler generates 3 releases to balance the above 3 retains above.
-// CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
-// CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
+// No retain/releases needed to rebalance these tensors after host code rewrite.
+// CHECK-NOT: retain
+// CHECK-NOT: release
 //
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 //
 // These final releases balances the original instructions that generated the
 // handles.
-// CHECK: strong_release {{%.*}} : $TensorHandle<Int32>
+// CHECK: strong_release {{.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
 // CHECK: strong_release {{.*}} : $TensorHandle<Int32>
 // CHECK-LABEL: ---
@@ -56,17 +52,9 @@ public func testAddsWithIntermediateTensorSingleUse(x: Tensor<Int32>) {
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
-// These 2 retains are to prepare for the first a + a.
-// CHECK: strong_retain [[H]] : $TensorHandle<Int32>
-// CHECK: strong_retain [[H]] : $TensorHandle<Int32>
-//
 // We're passing 1 TensorHandle into the StartTensorComputation call.
 // CHECK: alloc_stack $OpaquePointer
 // CHECK: function_ref @_swift_tfc_StartTensorComputation
-//
-// Compiler generates these 2 releases to balance the above 2 retains.
-// CHECK: strong_release [[H]] : $TensorHandle<Int32>
-// CHECK: strong_release [[H]] : $TensorHandle<Int32>
 //
 // For the input arg c to the second add, compiler has cancelled out the pair of
 // retain and release.
@@ -89,18 +77,9 @@ public func testAddsWithIntermediateTensorMultiUses(x: Tensor<Int32>) {
 //
 // CHECK: [[H:%.*]] = struct_extract {{.*}} : $Tensor<Int32>, #Tensor.handle
 //
-// TThese 2 retains are to prepare for a + a.
-// CHECK: strong_retain [[H]] : $TensorHandle<Int32>
-// CHECK: strong_retain [[H]] : $TensorHandle<Int32>
-//
 // We're passing 1 TensorHandle into the StartTensorComputation call.
 // CHECK: alloc_stack $OpaquePointer
 // CHECK: function_ref @_swift_tfc_StartTensorComputation
-//
-// Compiler generates these 2 releases to balance the above 2 retains.
-// CHECK: strong_release [[H]] : $TensorHandle<Int32>
-// CHECK: strong_release [[H]] : $TensorHandle<Int32>
-//
 //
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 //
@@ -121,12 +100,14 @@ public func testBalancedRetainReleases() {
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 // CHECK: [[H:%.*]] = alloc_ref $TensorHandle<Float>
 //
-// TFPartition pass generates this strong_retain to balance retain/releases.
+// Currently we generate a retain for the use of __tf_receive below
 // CHECK: strong_retain [[H]] : $TensorHandle<Float>
+// CHECK-NOT: release
 //
 // __tf_receive is called here
 // CHECK: [[RECV:%.*]] = function_ref @__tf_receive
 // CHECK: apply [[RECV]]<Float>([[H]])
 //
+// CHECK: strong_release [[H]] : $TensorHandle<Float>
 // CHECK: strong_release [[H]] : $TensorHandle<Float>
 // CHECK-LABEL: ---
