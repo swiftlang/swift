@@ -319,3 +319,19 @@ public func test1RecvTensor() {
 // CHECK-NEXT: [[SEND_FN:%.*]] = function_ref
 // CHECK-NEXT: apply [[SEND_FN]]<Float>({{.*}}, {{.*}}, [[B_HANDLE]])
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
+
+public func testRecvsInALoop() {
+  let maxCount = 10
+  var count = 1
+  var a = Tensor<Float>(1.0)
+  while count < maxCount {
+    // One recv.
+    // expected-error @+1 {{tfop invalid: FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
+    let b = atariSim(a.toHost()).toAccelerator()
+    a += b
+    count += 1
+  }
+  a += a
+  // This one should not be a send.
+  _hostOp(a.toHost())
+}

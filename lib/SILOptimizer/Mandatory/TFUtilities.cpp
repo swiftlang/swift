@@ -17,6 +17,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/StringExtras.h"
@@ -40,6 +41,16 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 static llvm::cl::opt<bool>
 TFDumpIntermediates("tf-dump-intermediates", llvm::cl::init(false),
               llvm::cl::desc("Dump intermediate results in TensorFlow passes"));
+
+
+static llvm::cl::opt<bool> TFTargetTPU(
+    "tf-target-tpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target TPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
+static llvm::cl::opt<bool> TFTargetGPU(
+    "tf-target-gpu", llvm::cl::init(false),
+    llvm::cl::desc("If true, target GPU in the generated TF graph. This flag "
+                   "is used for unit testing only"));
 
 // For Mac builds, default to saving logging files to /tmp since debugging in
 // Xcode and the REPL is so challenging.
@@ -172,6 +183,7 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
       .Case("UInt64", TF_UINT64)
       .Case("Int8", TF_INT8)
       .Case("UInt8", TF_UINT8)
+      .Case("BFloat16", TF_BFLOAT16)
       .Case("Float", TF_FLOAT)
       .Case("Double", TF_DOUBLE)
       .Case("Int", is64(s) ? TF_INT64 : TF_INT32)
@@ -210,10 +222,33 @@ unsigned tf::convertSwiftTypeToTF(Type ty) {
   return 0;
 }
 
+/// `ty` must be a valid TensorFlow element type "T", like Builtin.Int32. Turn
+/// it into a TensorHandle<T> type.
+SILType tf::convertElementTypeToTensorValueType(Type ty, const ASTContext& ctx) {
+  assert(isValidTensorFlowElementType(ty));
+  auto decl = ctx.getTensorHandleDecl();
+  auto tensorType = BoundGenericClassType::get(decl, /*parent*/ Type(), ty);
+
+  return SILType::getPrimitiveObjectType(tensorType->getCanonicalType());
+}
+
+/// If the specified type is a TensorFlow value type, return it.  Otherwise, it
+/// must be a primitive type T.  In that case, wrap it to form TensorHandle<T>.
+SILType tf::convertElementTypeToTensorValueType(SILType ty) {
+  // If this is already TensorHandle<T>, return it.
+  if (isTensorFlowValue(ty))
+    return ty;
+
+  return convertElementTypeToTensorValueType(ty.getASTType(), ty.getASTContext());
+}
+
+/// Looks up a function in the current module. If it exists, returns it.
+/// Otherwise, attempt to link it from imported modules. Returns null if such
+/// function name does not exist.
 SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
-  auto *fn = module.lookUpFunction(name);
-  if (!fn)
-    fn = module.findFunction(name, SILLinkage::PublicExternal);
+  if (auto *localFn = module.lookUpFunction(name))
+    return localFn;
+  auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
   assert(fn);
   if (fn->isExternalDeclaration()) {
     bool loaded = module.loadFunction(fn);
@@ -294,6 +329,37 @@ static SILValue getValueInsideStructInst(SILValue value) {
   return value;
 }
 
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+static bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
+  auto *apply = dyn_cast<ApplyInst>(op->getDefiningInstruction());
+  if (!apply) return false;
+  auto *callee = dyn_cast<FunctionRefInst>(apply->getOperand(0));
+  if (!callee) return false;
+
+  auto calleeName = callee->getReferencedFunction()->getName();
+  // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
+  // when deabstraction does arrays.
+  if (!calleeName.contains("_allocateUninitialized"))
+    return false;
+
+  numElements = getValueInsideStructInst(apply->getOperand(1));
+  return true;
+}
+
+/// Return true if this is a reference to the _allocateUninitialized helper
+/// in array in the standard library allocating zero elements.
+static bool isZeroElementArrayAlloc(TupleExtractInst *tei) {
+  if (tei->getFieldNo() != 0) return false;
+  SILValue numElements;
+
+  if (!isArrayAllocUninit(tei->getOperand(), numElements))
+    return false;
+
+  auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
+  return ili && ili->getValue() == 0;
+}
+
 /// Given a SILValue that may be an array, attempt to decode it into the
 /// literal constant values that make up its elements.  If this fails or if
 /// the value is not an array, this returns false.  Otherwise it decodes the
@@ -308,6 +374,22 @@ static bool decodeArrayElements(SILValue value,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr) {
   elementType = getArrayElementType(value->getType().getASTType());
   if (!elementType) return false;
+
+  // Handle zero element pattern.
+  if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
+    SILValue numElements;
+    if (tei->getFieldNo() == 0 &&
+        isArrayAllocUninit(tei->getOperand(), numElements)) {
+      auto *ili = dyn_cast<IntegerLiteralInst>(numElements);
+      if (ili && ili->getValue() == 0) {
+        if (arrayInsts) {
+          arrayInsts->insert(tei);
+          arrayInsts->insert(tei->getOperand()->getDefiningInstruction());
+        }
+        return true;
+      }
+    }
+  }
 
   // Handle the standard patterns for array initialization.  'Value' is an
   // alloc_ref that is wrapped up in abstractions like this:
@@ -674,6 +756,11 @@ SingleValueInstruction *SILTensorOpInfo::getAttrOperand(SILValue v) {
       return si;
     }
   }
+
+  // Handle a call to allocate zero elements.
+  if (auto *tei = dyn_cast<TupleExtractInst>(v))
+    if (isZeroElementArrayAlloc(tei))
+      return tei;
 
   // If we have an acceptable values for an attribute, return it.
   if (auto *fli = dyn_cast<FloatLiteralInst>(v))
@@ -1302,16 +1389,19 @@ std::string SILTensorOpInfo::checkAndDiagnoseOperands() const {
 
 /// Given something that conforms to the TensorProtocol protocol, extract the
 /// 'handle' out of it.
-static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
-                                              SILBuilder &B) {
+/// TODO: move this to deabstraction and make static there.
+SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                       SILBuilder &B) {
   // If we already have a TensorHandle, just use it.
   if (isTensorHandle(v->getType()))
     return v;
 
-  assert(v->getType().getASTType()->getStructOrBoundGenericStruct() &&
-         "Support more general conformances to TensorProtocol");
-
   auto module = B.getFunction().getModule().getSwiftModule();
+
+  auto vType = v->getType().getASTType();
+  if (!vType->getStructOrBoundGenericStruct() ||
+      !conformsToTensorProtocol(vType, module))
+    return SILValue();
 
   // If this value is just a struct wrapper around a TensorHandle, use the
   // input of it.  In the case of Tensor2D, we have multiple levels of struct
@@ -1368,8 +1458,8 @@ static SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
 /// scalars they reference.  This potentially replaces the builtin
 /// instruction, so it returns the right one to use.
 // TODO(clattner): Remove this when deabstraction has subsumed it.
-SILInstruction *SILTensorOpInfo::canonicalizeOperands(
-    GraphGlobalConfiguration *configuration) {
+SILInstruction *SILTensorOpInfo::
+canonicalizeOperands(GraphGlobalConfiguration &configuration) {
   // TODO: Canonicalize metatypes into constants!
 
   SmallVector<SILValue, 8> operands;
@@ -1481,17 +1571,15 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   for (unsigned i = 0, e = operands.size(); !changed && i != e; ++i)
     changed |= operands[i] != inst->getOperand(i);
 
-  if (configuration) {
-    if (!opDevice.empty()) {
-      // User code should not specify this pseudo device.
-      // FIXME: Issue diagnostics over an invalid device string.
-      assert(opDevice != ALL_DEVICES);
-    } else {
-      changed = true;
-    }
-    configuration->handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
-                                         operands, name);
+  if (!opDevice.empty()) {
+    // User code should not specify this pseudo device.
+    // FIXME: Issue diagnostics over an invalid device string.
+    assert(opDevice != ALL_DEVICES);
+  } else {
+    changed = true;
   }
+  configuration.handleDevicePlacement(opName, opDevice, B, inst->getLoc(),
+                                      operands, name);
 
   // If everything is already copasetic, just return our existing instruction.
   if (!changed)
@@ -1522,6 +1610,281 @@ SILInstruction *SILTensorOpInfo::canonicalizeOperands(
   assert(newResult.hasValue() && "Misformed builtin when canonicalizing");
   *this = newResult.getValue();
   return newInst;
+}
+
+//===----------------------------------------------------------------------===//
+// GraphOperationDecoder implementation
+//===----------------------------------------------------------------------===//
+
+/// Return the device attribute associated with `inst`, which is required to
+/// exist.
+StringRef GraphOperationInfo::getDeviceString() const {
+  auto attr = inst->getAttribute(DEVICE_ATTR);
+  assert(attr.hasValue() && "Tensor op instruction has no device string");
+  return attr.getValue().getStringValue();
+}
+
+/// Decode the name of a graph_op into its TensorFlow op name and a list of
+/// information about the operands.
+StringRef GraphOperationInfo::
+decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
+  auto name = inst->getName().str();
+  auto pos = name.find(',');
+  auto opName = name.substr(0, pos);
+
+  while (pos != StringRef::npos) {
+    name = name.drop_front(pos+1);
+    pos = name.find(',');
+    auto letter = name.substr(0, pos);
+    assert(letter.size() == 1 && "malformed graph_op instruction");
+    InputMarker kind;
+    switch (letter[0]) {
+    case 's': kind = InputMarker::IM_Scalar; break;
+    case 'i': kind = InputMarker::IM_Normal; break;
+    case 'L': kind = InputMarker::IM_InputList; break;
+    case 'e': kind = InputMarker::IM_InputListElt; break;
+    default: assert(0 && "malformed graph_op instruction");
+    }
+    inputInfo.push_back(kind);
+  }
+
+  return opName;
+}
+
+/// Given an attribute name like foo$dtype, decode the name and the class.  If
+/// there is no modifier specified, this defaults to OperandClass::Normal.
+std::pair<StringRef, SILTensorOpInfo::OperandClass>
+GraphOperationInfo::decodeAttributeName(Identifier name) {
+  auto nameStr = name.str();
+  // Figure out what the suffix is (if any).
+  auto dollarLoc = nameStr.find('$');
+
+  auto opClass = OperandClass::Normal;
+  if (dollarLoc != StringRef::npos) {
+    auto suffix = nameStr.drop_front(dollarLoc+1);
+    opClass = SILTensorOpInfo::getOperandClass(suffix).getValue();
+  }
+
+  // Slice the suffix off the attribute name and add the decoded version.
+  return { nameStr.substr(0, dollarLoc), opClass };
+}
+
+/// Analyze the array users of an _allocateUninitialized call, to see if they
+/// are all simple things we can remove.  If so, add them all to arrayInsts and
+/// return false.  If not, return true.
+static bool analyzeArrayInitUses(SILValue v,
+                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  for (auto *use : v->getUses()) {
+    auto *user = use->getUser();
+
+    // We can always remove retain/release instructions.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      continue;
+    }
+
+    // We can look through unpacking and repacking of structs that eventually
+    // turn into a retain or release.
+    if (isa<StructExtractInst>(user) || isa<StructInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      if (analyzeArrayInitUses(user->getResults()[0], arrayInsts))
+        return true;
+      continue;
+    }
+  }
+  return false;
+}
+
+
+/// Given a SILValue that may be an array literal, attempt to decode it into the
+/// values that make up its elements.  If this fails or if the value is not an
+/// array, this returns a null Type.  Otherwise it decodes the array, returns
+/// the values of each element, and returns the element type of the array.
+///
+/// If arrayInsts is non-null and if decoding succeeds, this function adds
+/// all of the instructions relevant to the definition of this array into
+/// the set.  If decoding fails, then the contents of this set is undefined.
+Type GraphOperationInfo::
+decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
+                    SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  auto elementType = getArrayElementType(value->getType().getASTType());
+  if (!elementType) return Type();
+
+  // The only pattern we support involves a call to _allocateUninitialized.
+  // The array value will be a tuple extract from the 0's result of the call.
+  auto *teiValue = dyn_cast<TupleExtractInst>(value);
+  if (!teiValue || teiValue->getFieldNo() != 0 ||
+      !isa<ApplyInst>(teiValue->getOperand()))
+    return Type();
+
+  auto *apply = cast<ApplyInst>(teiValue->getOperand());
+
+  // Verify we have a call to _allocateUninitializedArray.
+  SILValue numElementsVal;
+  if (!isArrayAllocUninit(apply, numElementsVal) ||
+      !isa<IntegerLiteralInst>(numElementsVal))
+    return Type();
+  uint64_t numElements =
+    cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
+
+  elements.resize(numElements);
+
+  // The apply is part of the call.
+  if (arrayInsts) arrayInsts->insert(apply);
+
+  // Keep track of whether we have any unknown users.  If so, the caller cannot
+  // remove the initializer.
+  bool hadUnknownUsers = false;
+
+  // The call has a tuple return type, see if we can walk all uses of them to
+  // analyze them and find the stores to the elements.
+  for (auto *use : apply->getUses()) {
+    auto *user = use->getUser();
+
+    auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
+    if (!tupleExtract)
+      return Type();
+    if (arrayInsts) arrayInsts->insert(tupleExtract);
+
+    // If this is the array result of _allocateUninitialized, try to determine
+    // whether there is anything that would prevent removing the allocation.
+    if (tupleExtract->getFieldNo() == 0) {
+      hadUnknownUsers |= analyzeArrayInitUses(tupleExtract, arrayInsts);
+      continue;
+    }
+
+    // Otherwise, it must be the pointer result.
+    assert(tupleExtract->getFieldNo() == 1 && "allocUninit has two results");
+
+    // Look through pointer_to_address
+    auto pointer2addr =
+      tupleExtract->getSingleUserOfType<PointerToAddressInst>();
+    if (!pointer2addr)
+      return Type();
+    if (arrayInsts) arrayInsts->insert(pointer2addr);
+
+    // Okay, process the use list of the pointer_to_address, each user is
+    // something that should result in a store of an element.
+    for (auto *use : pointer2addr->getUses()) {
+      auto *user = use->getUser();
+
+      uint64_t index = 0;
+      if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+        if (arrayInsts) arrayInsts->insert(iai);
+
+        auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
+        if (!ili)
+          return Type();
+
+        index = ili->getValue().getLimitedValue();
+        user = iai->getSingleUserOfType<StoreInst>();
+      }
+
+      // Check to see if we have a store to a valid index that hasn't been stored
+      // to yet.
+      auto *store = dyn_cast_or_null<StoreInst>(user);
+      if (!store || index >= elements.size() || elements[index] != SILValue())
+        return Type();
+
+      if (arrayInsts) arrayInsts->insert(store);
+
+      // If we got a store to a valid index, it must be our element.
+      elements[index] = store->getOperand(0);
+
+      // Track how many elements we see so we can know if we got them all.
+      --numElements;
+    }
+  }
+
+  // Make sure that all of the elements were found.
+  if (numElements != 0)
+    return Type();
+
+  if (hadUnknownUsers && arrayInsts)
+    arrayInsts->clear();
+
+  return elementType;
+}
+
+
+//===----------------------------------------------------------------------===//
+// Device Partitioning Utilities
+//===----------------------------------------------------------------------===//
+
+/// Scan the specified function, looking for logic that configures the current
+/// graph.
+GraphGlobalConfiguration
+GraphGlobalConfiguration::getForFunction(SILFunction &fn,
+                                         bool removeConfigInst) {
+  DeviceType deviceType = DeviceType::CPU;
+  bool isTPUInfeedEnabled = false;
+
+  SILInstruction *firstFound = nullptr;
+  SmallVector<SILInstruction *, 4> configureInsts;
+  for (auto &bb : fn) {
+    for (auto &inst : bb) {
+      // Scan for the device configuration ops if present.
+      auto tfopInfo = SILTensorOpInfo::decode(&inst);
+      if (!tfopInfo) continue;
+      bool isConfigOp = tfopInfo->opName == "tfc.configureTPU" ||
+                        tfopInfo->opName == "tfc.configureGPU";
+      if (!isConfigOp) continue;
+
+      configureInsts.push_back(&inst);
+
+      // If we found one, make sure we don't have more than one.
+      if (firstFound) {
+        diagnose(fn.getASTContext(), inst.getLoc().getSourceLoc(),
+                 diag::tf_multiple_device);
+        diagnose(fn.getASTContext(), firstFound->getLoc().getSourceLoc(),
+                 diag::tf_multiple_device_prev);
+        continue;
+      }
+
+      // Otherwise, remember this one and decode it.
+      firstFound = &inst;
+
+      // Eventually we'll support multiple different configuration ops, so
+      // we recheck the opcode here.
+      if (tfopInfo->opName == "tfc.configureTPU") {
+        // Decode: tfc.configureTPU(isInfeedEnabled: bool)
+        deviceType = DeviceType::TPU;
+        auto infeedEnabled =
+          cast<IntegerLiteralInst>(tfopInfo->getAttrOperand(0));
+        isTPUInfeedEnabled = !infeedEnabled->getValue().isNullValue();
+      } else {
+        assert(tfopInfo->opName == "tfc.configureGPU" &&
+               "unknown device configuration op");
+        deviceType = DeviceType::GPU;
+      }
+    }
+  }
+
+  // If the program didn't specify, fall back to the command line option.
+  if (!firstFound) {
+    // At most one of these test-only flags should be set.
+    // FIXME: Change this to a mutually exclusive flag setting an enum.
+    assert(!TFTargetTPU || !TFTargetGPU);
+    if (TFTargetTPU)
+      deviceType = DeviceType::TPU;
+    if (TFTargetGPU)
+      deviceType = DeviceType::GPU;
+  } else if (auto *outs = getTFDumpIntermediateStream()) {
+    *outs << "Targeting device " << getDeviceString(deviceType)
+          << " for accelerator program, based on config: \n";
+    firstFound->print(*outs);
+  }
+
+  // These instructions are not relevant to later compiler passes in TFPartition
+  // and TFLowerGraph. Removing them so that the later passes need not deal with
+  // this special builtin type.
+  if (removeConfigInst) {
+    for (auto *configureInst : configureInsts) {
+      assert(!configureInst->hasUsesOfAnyResult());
+      recursivelyDeleteTriviallyDeadInstructions(configureInst, /*Force*/ true);
+    }
+  }
+  return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
 }
 
 //===----------------------------------------------------------------------===//

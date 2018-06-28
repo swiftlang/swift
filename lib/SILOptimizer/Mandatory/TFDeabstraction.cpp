@@ -124,7 +124,8 @@ namespace {
     void propagateTensorValues();
     void checkAttributesAndFormGraphOps();
     void formGraphOp(SILTensorOpInfo &opInfo,
-                     DenseMap<SILValue, SymbolicValue> &constants);
+                     DenseMap<SILValue, SymbolicValue> &constants,
+                     GraphGlobalConfiguration &deviceConfig);
   };
 }  // end anonymous namespace
 
@@ -199,6 +200,12 @@ void TFDeabstraction::inlineCalls() {
     // Tensor<Float>([[1,2],[3,4]]), we prefer to see higher level array
     // construction calls beacuse we end up removing them anyway.
     if (isArrayUninitialized(site.getInstruction()))
+      return false;
+
+    // Never inline _allocateUninitializedArray (even of Tensors).  It is the
+    // entrypoint used by SILGen to represent array allocations.
+    if (TFStrictDeabstraction &&
+        callee.getName().contains("_allocateUninitializedArray"))
       return false;
 
     // FIXME: This is a specific hack to inline literal conversion operations
@@ -1770,6 +1777,9 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
   llvm::PrettyStackTraceFormat
   X("TFDeabstraction::checkAttributesAndFormGraphOps");
 
+  auto deviceConfiguration =
+    GraphGlobalConfiguration::getForFunction(fn, /*removeConfigInst*/false);
+
   // Do a big sweep over all of the operands to tensor values, collecting ones
   // that we might be interested in being constants into a single list.
   SmallVector<SILValue, 32> valuesToCheck;
@@ -1871,20 +1881,26 @@ void TFDeabstraction::checkAttributesAndFormGraphOps() {
       if (!TFStrictDeabstraction)
         continue;
 
-      formGraphOp(*opInfo, constants);
+      formGraphOp(*opInfo, constants, deviceConfiguration);
     }
   }
 }
+
+// TODO: move this from TFUtilities when deabstraction is done.
+SILValue getTensorProtocolHandleMember(SILValue v, SILLocation loc,
+                                       SILBuilder &B);
 
 /// Replace the specified tensor operation with a GraphOperation instruction,
 /// emitting errors if attribute arguments could not be constant folded, or if
 /// the operand/attribute types are incorrect.
 void TFDeabstraction::
 formGraphOp(SILTensorOpInfo &opInfo,
-            DenseMap<SILValue, SymbolicValue> &constants) {
+            DenseMap<SILValue, SymbolicValue> &constants,
+            GraphGlobalConfiguration &deviceConfig) {
   auto *inst = opInfo.inst;
   auto &context = inst->getFunction()->getASTContext();
   auto &allocator = context.getAllocator();
+  SILBuilder B(opInfo.inst);
 
   // This is a helper function to emit a diagnostic.
   auto diagnoseInvalid = [&](const Twine &message) {
@@ -1898,6 +1914,9 @@ formGraphOp(SILTensorOpInfo &opInfo,
   SmallVector<SILValue, 4> inputs;
   SmallVector<GraphOperationAttribute, 4> attributes;
 
+  // Find the device attribute specified for the instruction if present.
+  StringRef opDevice;
+
   for (unsigned i = 0, e = opInfo.operandClasses.size(); i != e; ++i) {
     auto operand = inst->getOperand(i);
     auto operandTy = operand->getType();
@@ -1905,7 +1924,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
 
     // Collect and validate input operands.
     if (opInfo.isInput(i)) {
-      inputs.push_back(operand);
 
       // Each input gets a marker mangled into the op name, because we need to
       // be able to distinguish between normal inputs and elements of an input
@@ -1920,23 +1938,89 @@ formGraphOp(SILTensorOpInfo &opInfo,
                           "' is not allowed");
           return;
         }
-        opName += ",s";
+        opName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Scalar);
+        inputs.push_back(operand);
         continue;
       }
 
       // Tensor operand type's are ok.
       if (isTensorFlowValue(operandTy)) {
-        opName += ",i";
+        opName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+        inputs.push_back(operand);
         continue;
       }
 
-      // FIXME: We need to figure out our model for InputLists with
-      // GraphOperation instructions.
-      // Model input lists as an "L" entry in the name, followed by one "e" for
-      // each element.  This allows us to know about empty input lists.
-      diagnoseInvalid("operand has unrecognized type '" +
-                      operandTy.getASTType()->getString() + "'");
-      return;
+      // Remove the operand so decodeArrayElements doesn't see the use.
+      inst->setOperand(i, SILUndef::get(operand->getType(),
+                                        fn.getModule()));
+
+      // Otherwise this must be an array, representing an input list.
+      SmallVector<SILValue, 4> elements;
+      SmallPtrSet<SILInstruction*, 8> arrayInsts;
+      auto elementType =
+        GraphOperationInfo::decodeArrayElements(operand, elements, &arrayInsts);
+
+      if (!elementType) {
+        diagnoseInvalid("operand has unrecognized type '" +
+                        operandTy.getASTType()->getString() + "'");
+        return;
+      }
+
+      // Remember that we have an input list, this marker is important because
+      // the list may be empty, and we need to know it exists in graph lowering.
+      opName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputList);
+      const char *elementMarker =
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_InputListElt);
+
+      // Add each element to the input list we're building, drilling down
+      // through any struct wrappers (like Tensor/Tensor2D, etc) that may be
+      // around it.
+      //
+      // It is common to have arrays with repeated elements.  These will
+      // generally be uniqued on entry to this routine.  If so, make sure to
+      // reuse them as we project out the .handle members to avoid code bloat.
+      llvm::DenseMap<SILValue, SILValue> loweredElts;
+      for (auto elt : elements) {
+        auto &eltVal = loweredElts[elt];
+        if (!eltVal) {
+          eltVal = getTensorProtocolHandleMember(elt, inst->getLoc(), B);
+          if (!eltVal) {
+            diagnoseInvalid("elements to input list have invalid type '" +
+                            elementType->getString() + "'");
+            return;
+          }
+        }
+        elt = eltVal;
+
+        opName += elementMarker;
+
+        // graph_op notationally takes its tensor operands at +1, so we need to
+        // retain them.
+        // TODO: move to a +0 model like the rest of Swift some day.
+        B.createStrongRetain(opInfo.inst->getLoc(), elt,
+                             Atomicity::Atomic);
+        inputs.push_back(elt);
+      }
+
+      // Okay, now that we updated this operand, try to remove the array.  If
+      // we can't remove it entirely, just emit a destroy_value to balance the
+      // former +1 use.
+      // TODO: When builtin's start using values as +0, this can go away.
+      if (arrayInsts.empty()) {
+        SILBuilder B2(++SILBasicBlock::iterator(opInfo.inst));
+        B2.emitDestroyValueOperation(opInfo.inst->getLoc(), operand);
+      } else {
+        // If we can remove it, drop all inter-dependent references.
+        for (auto inst : arrayInsts)
+          inst->dropAllReferences();
+        // Then erase the instructions themselves.
+        for (auto inst : arrayInsts)
+          inst->eraseFromParent();
+      }
+      continue;
     }
 
     // Helper to diagnose invalid attributes.
@@ -1972,6 +2056,18 @@ formGraphOp(SILTensorOpInfo &opInfo,
     auto attrIdentifier = context.getIdentifier(attrName);
     attributes.push_back({ attrIdentifier, constValue });
 
+    // FIXME: Do we detect and reject duplicate attribute names already?
+
+    // If it's a device attribute, get the device value.
+    if (operandClass.first == DEVICE_ATTR) {
+      if (constValue.getKind() != SymbolicValue::String)
+        return diagnoseInvalidAttr("must be a string");
+      opDevice = constValue.getStringValue();
+      // User code should not specify this pseudo device.
+      if (opDevice == ALL_DEVICES)
+        return diagnoseInvalidAttr("may not use this device name");
+    }
+
     // Verify that the type of this attribute is ok for the OperandClass we
     // have.
     switch (operandClass.second) {
@@ -1999,6 +2095,21 @@ formGraphOp(SILTensorOpInfo &opInfo,
     }
   }
 
+  // Finally, set a device attribute for this if there wasn't already one
+  // specified.
+  if (opInfo.opName == "tfc.scalarToTensor") {
+    if (!opDevice.empty())
+      return diagnoseInvalid("device may not be specified for this op");
+  } else if (opDevice.empty()) {
+    auto deviceID = deviceConfig.chooseDevice(opInfo.opName);
+
+    // TODO: Use integer device ID's instead of strings?
+    auto constValue = SymbolicValue::getString(getDeviceString(deviceID),
+                                               allocator);
+    auto attrIdentifier = context.getIdentifier(DEVICE_ATTR);
+    attributes.push_back({ attrIdentifier, constValue });
+  }
+
   // Okay, if we got this far then we have all valid attributes and inputs.
   // Figure out the result list.
   SmallVector<SILType, 4> resultTypes;
@@ -2011,7 +2122,6 @@ formGraphOp(SILTensorOpInfo &opInfo,
     resultTypes.push_back(inst->getType());
   }
 
-  SILBuilder B(opInfo.inst);
   auto op = B.createGraphOperation(inst->getLoc(),
                                    context.getIdentifier(opName), inputs,
                                    attributes, resultTypes);
@@ -2049,7 +2159,7 @@ formGraphOp(SILTensorOpInfo &opInfo,
   // are passed through memory, promote them to being simple arguments to
   // make all subsequent analyses and promotion of the tensor operations
   // simpler.
-  opInfo.canonicalizeOperands(/*configuration*/ nullptr);
+  opInfo.canonicalizeOperands(deviceConfig);
 #endif
 }
 

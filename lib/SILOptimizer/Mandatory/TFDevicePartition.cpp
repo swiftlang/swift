@@ -137,6 +137,7 @@ class DevicePartitionCloner
   /// Extracts the device-specific computation into `NewFn` above.
   void cloneFunction();
 
+  void visitGraphOperationInst(GraphOperationInst *inst);
   void visitTFOpInst(SILTensorOpInfo &tfopInfo);
 
   void visitBuiltinInst(BuiltinInst *inst) {
@@ -268,6 +269,41 @@ class DevicePartitionCloner
 };
 }  // end anonymous namespace
 
+void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
+  if (!targetOps.count(inst)) return;
+
+  // TODO: visitTensorTransferInst?
+
+  GraphOperationInfo decoder(inst);
+  auto deviceType = decoder.getDeviceType();
+
+  // Skip this instruction if it isn't for the current device.
+  if (deviceType != DeviceType::ALL && deviceType != thisDeviceType)
+    return;
+
+  auto &B = getBuilder();
+  auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
+
+  // Clone it over.
+  SmallVector<SILValue, 4> args;
+  for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+    auto opValue = inst->getOperand(i);
+    assert(isTensorFlowValue(opValue->getType()) &&
+           "ops should only use tensors");
+    args.push_back(remapValue(opValue));
+  }
+
+  SmallVector<SILType, 2> resultTypes;
+  for (auto r : inst->getResults())
+    resultTypes.push_back(r->getType());
+
+  auto newOp = B.createGraphOperation(loc, inst->getName(), args,
+                                      inst->getAttributes(), resultTypes);
+
+  for (unsigned i = 0, e = inst->getNumResults(); i != e; ++i)
+    ValueMap[inst->getResult(i)] = newOp->getResult(i);
+}
+
 void DevicePartitionCloner::visitTFOpInst(SILTensorOpInfo &tfopInfo) {
   if (tfopInfo.opName == "tfc.TensorTransfer") {
     visitTensorTransferInst(tfopInfo);
@@ -275,7 +311,7 @@ void DevicePartitionCloner::visitTFOpInst(SILTensorOpInfo &tfopInfo) {
   }
 
   auto deviceString = tfopInfo.getDeviceString();
-  auto deviceType = OpDeviceType(deviceString);
+  auto deviceType = getOpDeviceType(deviceString);
 
   bool shouldRunInstOnThisDevice =
       deviceType == DeviceType::ALL || deviceType == thisDeviceType;
@@ -393,9 +429,9 @@ void DevicePartitionCloner::visitTensorTransferInst(SILTensorOpInfo &tfopInfo) {
 
   int transferId = tfopInfo.getIntAttrOperand(1, "transferId");
   auto srcDeviceStr = tfopInfo.getStringAttrOperand(2, "srcDevice");
-  auto srcDevice = OpDeviceType(srcDeviceStr);
+  auto srcDevice = getOpDeviceType(srcDeviceStr);
   auto destDeviceStr = tfopInfo.getStringAttrOperand(3, "destDevice");
-  auto destDevice = OpDeviceType(destDeviceStr);
+  auto destDevice = getOpDeviceType(destDeviceStr);
   assert(srcDevice != destDevice);
   // This builtin cannot have src device set to ALL, but dest device can be ALL.
   assert(srcDevice != DeviceType::ALL);
@@ -544,7 +580,7 @@ class DevicePartitionerImpl
   /// coverage. This can be optimized for compiler performance later if it turns
   /// out to matter.
   DevicePartitionerImpl(SILFunction &srcFn,
-                   const GraphGlobalConfiguration &configuration)
+                        const GraphGlobalConfiguration &configuration)
     : srcFn(srcFn), configuration(configuration) {
     static_assert(
         NUM_DEVICE_TYPES <= 8,
@@ -605,7 +641,18 @@ class DevicePartitionerImpl
 
   void visitTFOpInst(BuiltinInst *inst, SILTensorOpInfo &tfopInfo) {
     auto deviceString = tfopInfo.getDeviceString();
-    auto deviceType = OpDeviceType(deviceString);
+    auto deviceType = getOpDeviceType(deviceString);
+    markInstForDevice(deviceType, inst);
+
+    // If any operand of `inst` is produced on another device, insert a
+    // TensorTransfer inst if that has not been done yet.
+    for (unsigned i = 0, e = inst->getNumOperands(); i != e; ++i) {
+      makeOperandLocal(deviceType, inst, i);
+    }
+  }
+
+  void visitGraphOperationInst(GraphOperationInst *inst) {
+    auto deviceType = GraphOperationInfo(inst).getDeviceType();
     markInstForDevice(deviceType, inst);
 
     // If any operand of `inst` is produced on another device, insert a
@@ -748,7 +795,9 @@ class DevicePartitionerImpl
     // BB args are replicated on all devices, so no transfer is needed.
     if (isa<SILArgument>(opValue)) return;
 
-    auto *operandInst = cast<SILInstruction>((SILNode *)opValue);
+    auto *operandInst = opValue->getDefiningInstruction();
+    assert(operandInst && "value must be defined by an instruction");
+    
     DeviceType operandDeviceType = getSomeDevicePlacement(operandInst);
     // Already on this device -- we are done.
     if (operandDeviceType == DeviceType::ALL ||
