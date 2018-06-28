@@ -1230,6 +1230,7 @@ public:
       });
       *this << "]";
       return;
+    case SymbolicValue::AbstractConstant:
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
       llvm_unreachable("Unimplemented SymbolicValue case");
@@ -2446,6 +2447,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[global_init] ";
   if (isWeakLinked())
     OS << "[_weakLinked] ";
+  if (getCompilerEvaluableAttr())
+    OS << "[compiler_evaluable] ";
 
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;

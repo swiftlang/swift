@@ -1124,6 +1124,7 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
                                  // SWIFT_ENABLE_TENSORFLOW
                     SmallVectorImpl<SILReverseDifferentiableAttr *> *RDiffAttrs,
+                    bool *isCompilerEvaluable,
                                  ValueDecl **ClangDecl,
                                  EffectsKind *MRK, SILParser &SP) {
   while (SP.P.consumeIf(tok::l_square)) {
@@ -1152,6 +1153,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isGlobalInit = true;
     else if (isWeakLinked && SP.P.Tok.getText() == "_weakLinked")
       *isWeakLinked = true;
+    // SWIFT_ENABLE_TENSORFLOW
+    else if (isCompilerEvaluable && SP.P.Tok.getText() == "compiler_evaluable")
+      *isCompilerEvaluable = true;
     else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
     else if (optimizationMode && SP.P.Tok.getText() == "Onone")
@@ -5663,6 +5667,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   SmallVector<ParsedSpecAttr, 4> SpecAttrs;
   // SWIFT_ENABLE_TENSORFLOW
   SmallVector<SILReverseDifferentiableAttr *, 4> RDiffAttrs;
+  bool isCompilerEvaluable = false;
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, P) ||
@@ -5671,7 +5676,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
                            &inlineStrategy, &optimizationMode, nullptr,
                            &isWeakLinked, &Semantics, &SpecAttrs,
                            // SWIFT_ENABLE_TENSORFLOW
-                           &RDiffAttrs,
+                           &RDiffAttrs, &isCompilerEvaluable,
                            &ClangDecl, &MRK, FunctionState) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5835,7 +5840,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
       // SWIFT_ENABLE_TENSORFLOW
       parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, &isLet, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, State) ||
+                           nullptr, nullptr, nullptr, nullptr, State) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5878,7 +5883,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, SP))
+                           nullptr, nullptr, nullptr, nullptr, SP))
     return true;
   
   ValueDecl *VD;
@@ -5940,7 +5945,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   // SWIFT_ENABLE_TENSORFLOW
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, VTableState))
+                           nullptr, nullptr, nullptr, nullptr, VTableState))
     return true;
 
   // Parse the class name.
@@ -6291,7 +6296,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   // SWIFT_ENABLE_TENSORFLOW
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, WitnessState))
+                           nullptr, nullptr, nullptr, nullptr, WitnessState))
     return true;
 
   Scope S(&P, ScopeKind::TopLevel);

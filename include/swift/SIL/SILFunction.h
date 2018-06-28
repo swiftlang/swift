@@ -145,6 +145,11 @@ public:
   void print(llvm::raw_ostream &OS) const;
 };
 
+/// @compilerEvaluable attribute lowered to SIL. Currently has no fields, but we
+/// expect to add some fields eventually to implement
+/// @compilerEvaluable(magicBehavior).
+class SILCompilerEvaluableAttr final {};
+
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -249,6 +254,9 @@ private:
   /// The function's `[reverse_differentiable]` attributes.
   llvm::SmallVector<SILReverseDifferentiableAttr *, 4>
     ReverseDifferentiableAttrs;
+
+  /// The function's `[compiler_evaluable]` attribute.
+  SILCompilerEvaluableAttr *CompilerEvaluableAttr = nullptr;
 
   /// The function's effects attribute.
   EffectsKind EffectsKindAttr;
@@ -582,6 +590,13 @@ public:
 
   void addReverseDifferentiableAttr(SILReverseDifferentiableAttr *attr) {
     ReverseDifferentiableAttrs.push_back(attr);
+  }
+
+  SILCompilerEvaluableAttr *getCompilerEvaluableAttr() const {
+    return CompilerEvaluableAttr;
+  }
+  void setCompilerEvaluableAttr(SILCompilerEvaluableAttr *Attr) {
+    CompilerEvaluableAttr = Attr;
   }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is

@@ -1504,6 +1504,7 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   assert(symVal.isConstant() && "Not a constant value");
 
   switch (symVal.getKind()) {
+  case SymbolicValue::AbstractConstant:
   case SymbolicValue::Unknown:
   case SymbolicValue::UninitMemory:
     assert(0 && "Shouldn't happen");

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-module"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -398,6 +399,28 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       addFunctionAttributes(F, storage->getAttrs(), *this);
     }
     addFunctionAttributes(F, decl->getAttrs(), *this);
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Add a [compiler_evaluable] attribute if it's a Decl with
+  // @compilerEvaluable, or if any containing DeclContext has
+  // @compilerEvaluable. This makes all closures in @compilerEvaluable functions
+  // be @compilerEvaluable themselves.
+  // TODO(before real PR): does it catch all possibilities?
+  DeclContext *context = nullptr;
+  if (constant.hasDecl())
+    context = constant.getAbstractFunctionDecl();
+  else if (auto *closure = constant.getAbstractClosureExpr())
+    context = closure;
+  while (context) {
+    if (auto *decl = context->getAsDeclOrDeclExtensionContext()) {
+      if (decl->getAttrs().hasAttribute<CompilerEvaluableAttr>()) {
+        void *mem = allocate(sizeof(SILCompilerEvaluableAttr), alignof(SILCompilerEvaluableAttr));
+        F->setCompilerEvaluableAttr(new (mem) SILCompilerEvaluableAttr());
+        break;
+      }
+    }
+    context = context->getParent();
   }
 
   // If this function has a self parameter, make sure that it has a +0 calling

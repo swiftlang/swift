@@ -130,6 +130,8 @@ PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
      "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
+PASS(DiagnoseCompilerEvaluable, "diagnose-compiler-evaluable",
+     "Diagnose @compilerEvaluable functions")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
 PASS(EagerSpecializer, "eager-specializer",

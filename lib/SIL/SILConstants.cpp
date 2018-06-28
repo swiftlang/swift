@@ -32,6 +32,7 @@ diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
 void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   os.indent(indent);
   switch (representationKind) {
+  case RK_AbstractConstant: os << "abstractconstant\n"; return;
   case RK_UninitMemory: os << "uninit\n"; return;
   case RK_Unknown: {
     std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
@@ -94,6 +95,7 @@ void SymbolicValue::dump() const {
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
+  case RK_AbstractConstant:    return AbstractConstant;
   case RK_UninitMemory: return UninitMemory;
   case RK_Unknown:      return Unknown;
   case RK_Metatype:     return Metatype;
@@ -117,6 +119,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// version.  This only works for valid constants.
 SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   switch (getKind()) {
+  case SymbolicValue::AbstractConstant:
   case SymbolicValue::Unknown:
   case SymbolicValue::UninitMemory:
     assert(0 && "These are not constants!");

@@ -65,6 +65,9 @@ enum class UnknownReason {
 /// interface though.
 class SymbolicValue {
   enum RepresentationKind {
+    /// See comment on `AbstractConstant` below.
+    RK_AbstractConstant,
+
     /// This value is an alloc stack that is has not (yet) been initialized
     /// by flow-sensitive analysis.
     RK_UninitMemory,
@@ -160,6 +163,10 @@ public:
   /// independent of its concrete representation.  This is the public
   /// interface to SymbolicValue.
   enum Kind {
+    /// Only occurs when the evaluator is in AbstractInterpretationMode.
+    /// This is a value that the evaluator will certainly be able to calculate.
+    AbstractConstant,
+
     /// This is a value that isn't a constant.
     Unknown,
 
@@ -194,6 +201,12 @@ public:
   bool isConstant() const {
     auto kind = getKind();
     return kind != Unknown && kind != UninitMemory;
+  }
+
+  static SymbolicValue getAbstractConstant() {
+    SymbolicValue result;
+    result.representationKind = RK_AbstractConstant;
+    return result;
   }
 
   static SymbolicValue getUnknown(SILNode *node, UnknownReason reason) {

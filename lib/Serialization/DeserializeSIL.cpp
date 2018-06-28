@@ -433,13 +433,14 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, optimizationMode, effect, numSpecAttrs,
-      hasQualifiedOwnership, isWeakLinked;
+      hasQualifiedOwnership, isWeakLinked, isCompilerEvaluable;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangNodeOwnerID, SemanticsIDs);
+                                hasQualifiedOwnership, isWeakLinked,
+                                isCompilerEvaluable, funcTyID, genericEnvID,
+                                clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -519,6 +520,10 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn->setEffectsKind((EffectsKind)effect);
     fn->setOptimizationMode((OptimizationMode)optimizationMode);
     fn->setWeakLinked(isWeakLinked);
+    if (isCompilerEvaluable) {
+      void *mem = SILMod.allocate(sizeof(SILCompilerEvaluableAttr), alignof(SILCompilerEvaluableAttr));
+      fn->setCompilerEvaluableAttr(new (mem) SILCompilerEvaluableAttr());
+    }
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -2453,13 +2458,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
     inlineStrategy, optimizationMode, effect, numSpecAttrs,
-    hasQualifiedOwnership, isWeakLinked;
+    hasQualifiedOwnership, isWeakLinked, isCompilerEvaluable;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy,
                                 optimizationMode, effect, numSpecAttrs,
-                                hasQualifiedOwnership, isWeakLinked, funcTyID,
-                                genericEnvID, clangOwnerID, SemanticsIDs);
+                                hasQualifiedOwnership, isWeakLinked,
+                                isCompilerEvaluable, funcTyID, genericEnvID,
+                                clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage

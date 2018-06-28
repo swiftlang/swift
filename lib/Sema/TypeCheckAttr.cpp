@@ -2590,6 +2590,7 @@ compilerEvaluableAllowedInExtensionDecl(ExtensionDecl *extensionDecl) {
 }
 
 void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
+#if 0
   // Check that the function is defined in an allowed context.
   // TODO(marcrasi): In many cases, we can probably generate a more informative
   // error message than just saying that it's "not allowed here". (Like "not
@@ -2643,6 +2644,7 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
+#endif
 }
 
 // SWIFT_ENABLE_TENSORFLOW

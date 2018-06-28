@@ -3016,7 +3016,6 @@ ${unsafeOperationComment(x.operator)}
   /// - Parameter source: An integer to convert to this type.
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
-  @compilerEvaluable
   public init<T : BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source._lowWord)

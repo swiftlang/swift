@@ -1,3 +1,10 @@
+/**
+ * ====================     BEGIN VERY MESSY CHANGES     ======================
+ *
+ * I plan to clean up this file a lot after getting high-level feedback on the
+ * approach, so please don't waste time reading these changes too closely.
+ */
+
 //===--- TFConstExpr.cpp - TensorFlow constant expressions ----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -21,23 +28,36 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
+#include "llvm/ADT/PointerSumType.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TrailingObjects.h"
+
+#include <deque>
 
 using namespace swift;
 using namespace tf;
 
 static llvm::cl::opt<unsigned>
-ConstExprLimit("constexpr-limit", llvm::cl::init(512),
+ConstExprLimit("constexpr-limit", llvm::cl::init(51200),
                llvm::cl::desc("Number of instructions interpreted in a"
                               " constexpr function"));
+
+enum EvaluationMode {
+  /// Abstractly interprets the function to prove that the evaluator, when run
+  /// in ConcreteEvaluationMode, will find constant results for all operations.
+  AbstractInterpretationMode,
+
+  /// Concretely evaluates the result of the function.
+  ConcreteEvaluationMode
+};
 
 static llvm::Optional<SymbolicValue>
 evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
-                     ConstExprEvaluator &evaluator);
+                     ConstExprEvaluator &evaluator,
+                     EvaluationMode mode);
 
 // TODO: ConstantTracker in the performance inliner and the
 // ConstantFolding.h/cpp files should be subsumed by this, as this is a more
@@ -117,17 +137,32 @@ namespace {
   /// This is a small POD value that is intended to be stored in the value of a
   /// DenseMap.
   class AddressValue {
-    typedef llvm::PointerEmbeddedInt<unsigned, 31> InlineRepresentationTy;
-    // An address value is either a directly stored integer, or a pointer that
-    // holds an access path.
-    PointerUnion<InlineRepresentationTy, DerivedAddressValue*> value;
+    typedef llvm::PointerEmbeddedInt<unsigned, 30> InlineRepresentationTy;
 
-    AddressValue(PointerUnion<InlineRepresentationTy,
-                              DerivedAddressValue*> value) : value(value) {}
+    // An address value is a directly stored integer, a pointer that holds an
+    // access path, or a pointer to an Unknown SymbolicValue.
+    enum RepresentationKinds { RK_Inline, RK_Derived, RK_Unknown };
+    typedef llvm::PointerSumType<RepresentationKinds,
+                           llvm::PointerSumTypeMember<RK_Inline,
+                                                      InlineRepresentationTy>,
+                           llvm::PointerSumTypeMember<RK_Derived,
+                                                      DerivedAddressValue*>,
+                           llvm::PointerSumTypeMember<RK_Unknown,
+                                                      SymbolicValue*>>
+            ValueTy;
+    ValueTy value;
+
+    AddressValue(ValueTy value) : value(value) {}
   public:
 
     static AddressValue get(unsigned objectID) {
-      auto val = InlineRepresentationTy(objectID);
+      auto val = ValueTy::create<RK_Inline>(InlineRepresentationTy(objectID));
+      return AddressValue(val);
+    }
+
+    static AddressValue get(SymbolicValue unknown) {
+      assert(unknown.isUnknown());
+      auto val = ValueTy::create<RK_Unknown>(new SymbolicValue(unknown));
       return AddressValue(val);
     }
 
@@ -136,14 +171,22 @@ namespace {
       if (indices.empty())
         return get(objectID);
       auto val = DerivedAddressValue::create(objectID, indices, allocator);
-      return AddressValue(val);
+      return AddressValue(ValueTy::create<RK_Derived>(val));
+    }
+
+    bool isConstant() const {
+      return value.is<RK_Inline>() || value.is<RK_Derived>();
     }
 
     /// Return the ID of the memory object being referenced.
     unsigned getObjectID() const {
-      if (value.is<InlineRepresentationTy>())
-        return value.get<InlineRepresentationTy>();
-      return value.get<DerivedAddressValue*>()->objectID;
+      if (value.is<RK_Inline>())
+        return value.get<RK_Inline>();
+      return value.get<RK_Derived>()->objectID;
+    }
+
+    SymbolicValue *getUnknown() const {
+      return value.get<RK_Unknown>();
     }
 
     /// Return the memory object of this reference along with any access path
@@ -155,10 +198,10 @@ namespace {
 } // end anonymous namespace
 
 unsigned AddressValue::getState(SmallVectorImpl<unsigned> &accessPath) const {
-  if (value.is<InlineRepresentationTy>())
-    return value.get<InlineRepresentationTy>();
+  if (value.is<RK_Inline>())
+    return value.get<RK_Inline>();
 
-  auto derived = value.get<DerivedAddressValue*>();
+  auto derived = value.get<RK_Derived>();
   auto indices = derived->getIndices();
 
   accessPath.clear();
@@ -219,12 +262,15 @@ namespace {
     /// object it is addressing and any indices into that object.
     llvm::DenseMap<SILValue, AddressValue> addressValues;
 
+    EvaluationMode mode;
+
   public:
     ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
                            SubstitutionMap substitutionMap,
+                           EvaluationMode mode,
                            unsigned &numInstEvaluated)
       : evaluator(evaluator), fn(fn), substitutionMap(substitutionMap),
-        numInstEvaluated(numInstEvaluated) {
+        mode(mode), numInstEvaluated(numInstEvaluated) {
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
@@ -251,7 +297,7 @@ namespace {
     /// In failure cases computing addresses, we want to return an address
     /// pointing to a reason address computation failed.
     AddressValue getUnknownAddress(SILValue addr, UnknownReason reason) {
-      return createMemoryObject(addr, SymbolicValue::getUnknown(addr, reason));
+      return AddressValue::get(SymbolicValue::getUnknown(addr, reason));
     }
 
     /// Return the SymbolicValue for the specified SIL value, lazily computing
@@ -320,20 +366,73 @@ static void lookupOrLinkWitnessTable(ProtocolConformanceRef confRef,
       entry.getMethodWitness().Witness->setLinkage(linkage);
 }
 
-
 SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // If this a trivial constant instruction that we can handle, then fold it
   // immediately.
   if (isa<IntegerLiteralInst>(value) || isa<FloatLiteralInst>(value) ||
-      isa<StringLiteralInst>(value))
+      isa<StringLiteralInst>(value)) {
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
     return SymbolicValue::getConstantInst(cast<SingleValueInstruction>(value));
+  }
 
-  if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getReferencedFunction());
+  if (auto *fri = dyn_cast<FunctionRefInst>(value)) {
+    auto fn = fri->getReferencedFunction();
+    if (mode == AbstractInterpretationMode) {
+      if (fn->getCompilerEvaluableAttr())
+        return SymbolicValue::getAbstractConstant();
+
+      StringRef name = Demangle::demangleSymbolAsString(fn->getName());
+
+      if (name == "_precondition" ||
+             name == "_preconditionFailure" ||
+             name == "_sanityCheck" ||
+             name == "fatalError")
+        return SymbolicValue::getAbstractConstant();
+
+      if (fn->getName().contains("String"))
+        return SymbolicValue::getAbstractConstant();
+
+      // TODO: maybe mark appropriate thunks [compiler_evaluable] during SILGen,
+      // instead of checking here.
+      if (fn->isThunk())
+        return SymbolicValue::getAbstractConstant();
+
+      return SymbolicValue::getUnknown(value, UnknownReason::Default);
+    }
+    return SymbolicValue::getFunction(fn);
+  }
+
+  // Not required for stdlib -- just required for some tests I wrote.
+  if (auto *ttt = dyn_cast<ThinToThickFunctionInst>(value)) {
+    if (mode == AbstractInterpretationMode) {
+      return SymbolicValue::getAbstractConstant();
+    }
+
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+
+  // Not required for stdlib -- just required for some tests I wrote.
+  if (auto *cf = dyn_cast<ConvertFunctionInst>(value)) {
+    if (mode == AbstractInterpretationMode) {
+      return SymbolicValue::getAbstractConstant();
+    }
+
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+
+  // Not required for stdlib -- just required for some tests I wrote.
+  if (auto *e = dyn_cast<EnumInst>(value)) {
+    if (mode == AbstractInterpretationMode) {
+      return SymbolicValue::getAbstractConstant();
+    }
+
+    // TODO implement in ConcreteEvaluationMode mode
+  }
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
   if (auto *mti = dyn_cast<MetatypeInst>(value)) {
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
     auto metatype = mti->getType().castTo<MetatypeType>();
     auto type = simplifyType(metatype->getInstanceType())->getCanonicalType();
     return SymbolicValue::getMetatype(type);
@@ -342,6 +441,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *tei = dyn_cast<TupleExtractInst>(value)) {
     auto val = getConstantValue(tei->getOperand());
     if (!val.isConstant()) return val;
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
     return val.getAggregateValue()[tei->getFieldNo()];
   }
 
@@ -350,6 +450,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   if (auto *sei = dyn_cast<StructExtractInst>(value)) {
     auto val = getConstantValue(sei->getOperand());
     if (!val.isConstant()) return val;
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
     return val.getAggregateValue()[sei->getFieldNo()];
   }
 
@@ -366,6 +467,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       elts.push_back(val);
     }
 
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
     return SymbolicValue::getAggregate(elts, evaluator.getAllocator());
   }
 
@@ -379,6 +481,8 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
 
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
+
     auto confResult = substitutionMap.lookupConformance(wmi->getLookupType(),
                          wmi->getConformance().getRequirement());
     if (!confResult)
@@ -417,6 +521,12 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return calculatedValues[apply];
   }
 
+  if (auto *apply = dyn_cast<PartialApplyInst>(value)) {
+    if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
+
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -437,6 +547,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     switch (builtin.ID) {
     default: break;
     case BuiltinValueKind::AssertConf: {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       // assert_configuration builtin gets replaces with debug/release/etc
       // constants.
       auto config = inst->getModule().getOptions().AssertConfig;
@@ -447,6 +558,10 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
         inst->getType().castTo<BuiltinIntegerType>()->getGreatestWidth();
       auto result = APInt(resultBitWidth, config);
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
+    }
+    case BuiltinValueKind::CondUnreachable: {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
+      break;
     }
     }
   }
@@ -468,6 +583,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     // TODO: We can/should diagnose statically detectable integer overflow
     // errors and subsume the ConstantFolding.cpp mandatory SIL pass.
     auto IntCheckedTruncFn = [&](bool srcSigned, bool dstSigned)->SymbolicValue{
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
@@ -501,6 +617,8 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
     switch (builtin.ID) {
     default: break;
+    case BuiltinValueKind::AssumeNonNegative:
+      return operand;
     case BuiltinValueKind::SToSCheckedTrunc:
       return IntCheckedTruncFn(true, true);
     case BuiltinValueKind::UToSCheckedTrunc:
@@ -511,6 +629,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       return IntCheckedTruncFn(false, false);
     case BuiltinValueKind::SIToFP:
     case BuiltinValueKind::UIToFP: {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
@@ -530,6 +649,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     case BuiltinValueKind::ZExtOrBitCast:
     case BuiltinValueKind::SExt:
     case BuiltinValueKind::SExtOrBitCast: {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
@@ -558,6 +678,9 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     }
 
     case BuiltinValueKind::PtrToInt: {
+      // TODO: Need to check if it comes from a String? That would be exciting.
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
+
       auto resultType = inst->getType().castTo<BuiltinIntegerType>();
       // The only ptrtoint case we handle is from a string value to Word type,
       // which happens in the wrapping up of strings.
@@ -565,6 +688,13 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
           !resultType->getWidth().isPointerWidth())
         break;
       return operand;
+    }
+
+    case BuiltinValueKind::UnexpectedError: {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
+
+      // TODO: implement in ConcreteEvaluationMode mode
+      break;
     }
     }
   }
@@ -579,6 +709,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntCompare =
       [&](const std::function<bool(const APInt &, const APInt &)> &fn)
         -> SymbolicValue {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand0.getKind() != SymbolicValue::Integer ||
           operand1.getKind() != SymbolicValue::Integer)
         return unknownResult();
@@ -590,6 +721,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldFPCompare =
       [&](const std::function<bool(APFloat::cmpResult result)> &fn)
         -> SymbolicValue {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand0.getKind() != SymbolicValue::Float ||
           operand1.getKind() != SymbolicValue::Float)
         return unknownResult();
@@ -601,6 +733,8 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     };
 
 #define REQUIRE_KIND(KIND)                          \
+  if (mode == AbstractInterpretationMode)                              \
+    return SymbolicValue::getAbstractConstant();           \
   if (operand0.getKind() != SymbolicValue::KIND ||  \
       operand1.getKind() != SymbolicValue::KIND)    \
       return unknownResult();
@@ -702,6 +836,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     auto constFoldIntOverflow =
       [&](const std::function<APInt(const APInt &, const APInt &, bool &)> &fn)
             -> SymbolicValue {
+      if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
       if (operand0.getKind() != SymbolicValue::Integer ||
           operand1.getKind() != SymbolicValue::Integer ||
           operand2.getKind() != SymbolicValue::Integer)
@@ -802,6 +937,49 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
   // Determine the callee.
   auto calleeFn = getConstantValue(apply->getOperand(0));
+
+  // Verify that we can fold all of the arguments to the call.
+  SmallVector<SymbolicValue, 4> paramConstants;
+  unsigned applyParamBaseIndex = 1+conventions.getNumIndirectSILResults();
+  auto paramInfos = conventions.getParameters();
+  for (unsigned i = 0, e = paramInfos.size(); i != e; ++i) {
+    // If any of the arguments is a non-constant value, then we can't fold this
+    // call.
+    auto op = apply->getOperand(applyParamBaseIndex+i);
+    SymbolicValue argValue;
+    if (op->getType().isObject())
+      argValue = getConstantValue(op);
+    else
+      argValue = computeLoadResult(op);
+
+    if (!argValue.isConstant())
+      return argValue;
+
+    paramConstants.push_back(argValue);
+  }
+
+  if (mode == AbstractInterpretationMode) {
+    // TODO(before PR): Copied from the bottom of this function. There's
+    // probably some way to dedupe.
+
+    // If evaluation was successful, remember the results we captured in our
+    // current function's state.
+    if (unsigned numNormalResults = conventions.getNumDirectSILResults()) {
+      // TODO: unclear when this happens, is this for tuple result values?
+      assert(numNormalResults == 1 && "Multiple results aren't supported?");
+      setValue(apply->getResults()[0], SymbolicValue::getAbstractConstant());
+    }
+
+    // Handle indirect results as well.
+    for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i){
+      auto error = computeFSStore(SymbolicValue::getAbstractConstant(), apply->getOperand(1+i));
+      if (error.hasValue())
+        return error;
+    }
+
+    return None;
+  }
+
   if (calleeFn.getKind() != SymbolicValue::Function)
     return SymbolicValue::getUnknown((SILInstruction*)apply,
                                      UnknownReason::Default);
@@ -834,26 +1012,6 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     setValue(apply->getResults()[0], result);
     return None;
   }
-  }
-
-  // Verify that we can fold all of the arguments to the call.
-  SmallVector<SymbolicValue, 4> paramConstants;
-  unsigned applyParamBaseIndex = 1+conventions.getNumIndirectSILResults();
-  auto paramInfos = conventions.getParameters();
-  for (unsigned i = 0, e = paramInfos.size(); i != e; ++i) {
-    // If any of the arguments is a non-constant value, then we can't fold this
-    // call.
-    auto op = apply->getOperand(applyParamBaseIndex+i);
-    SymbolicValue argValue;
-    if (op->getType().isObject())
-      argValue = getConstantValue(op);
-    else
-      argValue = computeLoadResult(op);
-
-    if (!argValue.isConstant())
-      return argValue;
-
-    paramConstants.push_back(argValue);
   }
 
   // Compute the substitution map for the callee, which maps from all of its
@@ -902,7 +1060,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   SmallVector<SymbolicValue, 4> results;
   auto callResult =
     evaluateAndCacheCall(*callee, calleeSubMap, paramConstants, results,
-                         numInstEvaluated, evaluator);
+                         numInstEvaluated, evaluator, ConcreteEvaluationMode);
   if (callResult.hasValue())
     return callResult.getValue();
 
@@ -1125,6 +1283,10 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 /// Given the operand to a load, resolve it to a constant if possible.
 SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
   auto addr = getAddressValue(addrVal);
+  if (!addr.isConstant())
+    return *addr.getUnknown();
+
+  if (mode == AbstractInterpretationMode) return SymbolicValue::getAbstractConstant();
 
   SmallVector<unsigned, 4> accessPath;
   unsigned objectID = addr.getState(accessPath);
@@ -1155,6 +1317,8 @@ SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
 /// Evaluate a flow sensitive store to the specified pointer address.
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
+  if (mode == AbstractInterpretationMode) return None;
+
   // Only update existing memory locations that we're tracking.
   auto it = addressValues.find(dest);
   if (it == addressValues.end())
@@ -1189,6 +1353,8 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
   if (isa<StructElementAddrInst>(addr) || isa<TupleElementAddrInst>(addr)) {
     auto inst = cast<SingleValueInstruction>(addr);
     auto baseAddr = getAddressValue(inst->getOperand(0));
+    if (!baseAddr.isConstant())
+      return baseAddr;
 
     SmallVector<unsigned, 4> accessPath;
     unsigned objectID = baseAddr.getState(accessPath);
@@ -1204,8 +1370,15 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
   }
 
   // These instructions are markers that return their first operand.
-  if (auto *bai = dyn_cast<BeginAccessInst>(addr))
+  if (auto *bai = dyn_cast<BeginAccessInst>(addr)) {
     return getAddressValue(bai->getOperand());
+  }
+
+  if (auto *take = dyn_cast<UncheckedTakeEnumDataAddrInst>(addr))
+    return getAddressValue(take->getOperand());
+
+  if (auto *ie = dyn_cast<InitEnumDataAddrInst>(addr))
+    return getAddressValue(ie->getOperand());
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
 
@@ -1245,6 +1418,9 @@ AddressValue ConstExprFunctionState::getAddressValue(SILValue addr) {
 /// the constexpr function evaluator.  This does not handle control flow
 /// statements.  This returns None on success, and an Unknown SymbolicValue with
 /// information about an error on failure.
+//
+// TODO(before PR): Check if everything that needs to take `mode` into account
+// does.
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // These are just markers.
@@ -1265,12 +1441,15 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // remove the memory from the set.  We don't *have* to do this, but it seems
   // useful for hygiene.
   if (isa<DeallocStackInst>(inst)) {
+    if (mode == AbstractInterpretationMode) return None;
     addressValues.erase(inst->getOperand(0));
     return None;
   }
 
   if (isa<CondFailInst>(inst)) {
     auto failed = getConstantValue(inst->getOperand(0));
+    if (!failed.isConstant()) return failed;
+    if (mode == AbstractInterpretationMode) return None;
     if (failed.getKind() == SymbolicValue::Integer) {
       if (failed.getIntegerValue() == 0)
         return None;
@@ -1300,6 +1479,22 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
     return computeFSStore(value, copy->getOperand(1));
   }
 
+  if (auto *inject = dyn_cast<InjectEnumAddrInst>(inst)) {
+    if (mode == AbstractInterpretationMode) return None;
+
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+
+  // Closures are reference types.
+  if (auto *retain = dyn_cast<StrongRetainInst>(inst)) {
+    if (mode == AbstractInterpretationMode) return None;
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+  if (auto *release = dyn_cast<StrongReleaseInst>(inst)) {
+    if (mode == AbstractInterpretationMode) return None;
+    // TODO implement in ConcreteEvaluationMode mode
+  }
+
   // If the instruction produces normal results, try constant folding it.
   // If this fails, then we fail.
   if (inst->getNumResults() != 0) {
@@ -1311,11 +1506,8 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
     } else {
       auto result = getAddressValue(oneResultVal);
-      // If the address could not be resolved, puts the 'unknown' code into
-      // the referenced memory object.
-      auto memVal = memoryObjects[result.getObjectID()].first;
-      if (memVal.isUnknown())
-        return memVal;
+      if (!result.isConstant())
+        return *result.getUnknown();
       DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
     }
     return None;
@@ -1336,9 +1528,10 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
                      ArrayRef<SymbolicValue> arguments,
                      SmallVectorImpl<SymbolicValue> &results,
                      unsigned &numInstEvaluated,
-                     ConstExprEvaluator &evaluator) {
+                     ConstExprEvaluator &evaluator,
+                     EvaluationMode mode) {
   assert(!fn.isExternalDeclaration() && "Can't analyze bodyless function");
-  ConstExprFunctionState state(evaluator, &fn, substitutionMap,
+  ConstExprFunctionState state(evaluator, &fn, substitutionMap, mode,
                                numInstEvaluated);
 
   // TODO: implement caching.
@@ -1378,6 +1571,46 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
   SILBasicBlock::iterator nextInst = fn.front().begin();
   visitedBlocks.insert(&fn.front());
 
+  // TODO(before real PR): It's probably better to put the abstract
+  // interpretation main loop in a separate function from the concrete
+  // interpretation main loop. Mixing them is way too messy and confusing.
+
+  // In AbstractInterpretationMode mode, a list of unvisited BBs whose predecessors have all been
+  // visited. (We require that predecessors have all been visited in order to
+  // detect loops).
+  std::deque<SILBasicBlock*> worklist;
+
+  // Add a BB to the worklist if all its predecessors have been visited.
+  auto addToWorklistIfReady = [&](SILBasicBlock *bb) -> void {
+    for (auto p : bb->getPredecessorBlocks())
+      if (!visitedBlocks.count(p))
+        return;
+    worklist.push_back(bb);
+  };
+
+  // Take the next BB from the work list, mark it visited, and set the next
+  // instruction to the beginning of the BB.
+  // Returns false if there are no BBs in the worklist.
+  auto prepareNextWorklistBB = [&]() -> bool {
+    // Take next BB.
+    if (worklist.empty()) return false;
+    auto *bb = worklist.front();
+    worklist.pop_front();
+
+    // Mark it visited.
+    bool inserted = visitedBlocks.insert(bb).second;
+    assert(inserted && "visiting the same BB twice?!");
+
+    // Set up basic block arguments and next instruction.
+    for (unsigned i = 0, e = bb->args_size(); i != e; ++i) {
+      state.setValue(bb->getArgument(i), SymbolicValue::getAbstractConstant());
+    }
+    nextInst = bb->begin();
+
+    return true;
+  };
+
+
   while (1) {
     SILInstruction *inst = &*nextInst++;
     DEBUG(llvm::dbgs() << "ConstExpr interpret: "; inst->dump());
@@ -1400,6 +1633,10 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       auto val = state.getConstantValue(inst->getOperand(0));
       if (!val.isConstant())
         return val;
+      if (mode == AbstractInterpretationMode) {
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
 
       // If we got a constant value, then we're good.  Set up the normal result
       // values as well any indirect results.
@@ -1428,6 +1665,11 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 
     if (auto *br = dyn_cast<BranchInst>(inst)) {
       auto destBB = br->getDestBB();
+      if (mode == AbstractInterpretationMode) {
+        addToWorklistIfReady(destBB);
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
 
       // If we've already visited this block then fail - we have a loop.
       if (!visitedBlocks.insert(destBB).second)
@@ -1449,6 +1691,13 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       if (!val.isConstant())
         return val;
 
+      if (mode == AbstractInterpretationMode) {
+        addToWorklistIfReady(cbr->getTrueBB());
+        addToWorklistIfReady(cbr->getFalseBB());
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
+
       SILBasicBlock *destBB;
       if (!val.getIntegerValue())
         destBB = cbr->getFalseBB();
@@ -1463,11 +1712,79 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       continue;
     }
 
+    if (auto *se = dyn_cast<SwitchEnumInst>(inst)) {
+      if (mode == AbstractInterpretationMode) {
+        auto val = state.getConstantValue(inst->getOperand(0));
+        if (!val.isConstant())
+          return val;
+        for (unsigned i = 0, e = se->getNumCases(); i != e; ++i) {
+          addToWorklistIfReady(se->getCase(i).second);
+        }
+        if (se->hasDefault()) addToWorklistIfReady(se->getDefaultBB());
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
+
+      // TODO: Implement in ConcreteEvaluationMode mode;
+    }
+
+    if (auto *sea = dyn_cast<SwitchEnumAddrInst>(inst)) {
+      if (mode == AbstractInterpretationMode) {
+        auto val = state.computeLoadResult(inst->getOperand(0));
+        if (!val.isConstant())
+          return val;
+        for (unsigned i = 0, e = sea->getNumCases(); i != e; ++i) {
+          addToWorklistIfReady(sea->getCase(i).second);
+        }
+        if (sea->hasDefault()) addToWorklistIfReady(sea->getDefaultBB());
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
+
+      // TODO: Implement in ConcreteEvaluationMode mode;
+    }
+
+    if (auto *apply = dyn_cast<TryApplyInst>(inst)) {
+      if (mode == AbstractInterpretationMode) {
+         addToWorklistIfReady(apply->getNormalBB());
+         addToWorklistIfReady(apply->getErrorBB());
+         if (!prepareNextWorklistBB()) break;
+         continue;
+      }
+      // TODO implement ConcreteEvaluationMode mode
+    }
+
+    if (auto *th = dyn_cast<ThrowInst>(inst)) {
+      if (mode == AbstractInterpretationMode) {
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
+      // TODO implement ConcreteEvaluationMode mode
+    }
+
+    if (auto *unreachable = dyn_cast<UnreachableInst>(inst)) {
+      if (mode == AbstractInterpretationMode) {
+        if (!prepareNextWorklistBB()) break;
+        continue;
+      }
+    }
+
     DEBUG(llvm::dbgs() << "ConstExpr: Unknown Terminator: " << *inst << "\n");
 
     // TODO: Enum switches when we support enums?
     return SymbolicValue::getUnknown(inst, UnknownReason::Default);
   }
+
+  if (mode == AbstractInterpretationMode && visitedBlocks.size() != fn.size()) {
+    // We didn't visit all the blocks. There is a loop!
+    for (auto &bb : fn) {
+      if (!visitedBlocks.count(&bb)) {
+        return SymbolicValue::getUnknown(&*bb.begin(), UnknownReason::Loop);
+      }
+    }
+  }
+
+  return None;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1492,7 +1809,7 @@ void ConstExprEvaluator::
 computeConstantValues(ArrayRef<SILValue> values,
                       SmallVectorImpl<SymbolicValue> &results) {
   unsigned numInstEvaluated = 0;
-  ConstExprFunctionState state(*this, nullptr, {}, numInstEvaluated);
+  ConstExprFunctionState state(*this, nullptr, {}, ConcreteEvaluationMode, numInstEvaluated);
   for (auto v : values) {
     auto symVal = state.getConstantValue(v);
     results.push_back(symVal);
@@ -1501,4 +1818,23 @@ computeConstantValues(ArrayRef<SILValue> values,
     // at.  We don't want lots of constants folded to trigger a limit.
     numInstEvaluated = 0;
   }
+}
+
+/// Checks if the function only contains operations that the evaluator knows
+/// how to fold.
+///
+/// Note that this doesn't guarantee that the evaluator will fold the
+/// operations successfully -- e.g. the evaluator might encounter overflow
+/// traps or non-@compilerEvaluable protocol function implementations.
+///
+/// Returns None if the function only has allowed operations.
+/// Returns an Unknown SymbolicValue pointing at a disallowed operation if
+/// there are disallowed operations.
+llvm::Optional<SymbolicValue> ConstExprEvaluator::checkCompilerEvaluable(SILFunction &fn) {
+  SmallVector<SymbolicValue, 4> arguments(fn.getArgumentsWithoutIndirectResults().size(), SymbolicValue::getAbstractConstant());
+  SmallVector<SymbolicValue, 4> results;
+  SubstitutionMap subMap;
+  unsigned numInstEvaluated;
+
+  return evaluateAndCacheCall(fn, subMap, arguments, results, numInstEvaluated, *this, AbstractInterpretationMode);
 }

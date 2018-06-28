@@ -368,6 +368,11 @@ ERROR(non_borrowed_indirect_addressof,none,
       "use `withUnsafePointer` or `withUnsafeBytes` unless you're implementing "
       "`withUnsafePointer` or `withUnsafeBytes`", ())
 
+// @compilerEvaluable diagnostics
+
+ERROR(compiler_evaluable_bad_operation,none,
+      "@compilerEvaluable function contains forbidden operation", ())
+
 REMARK(opt_remark_passed, none, "%0", (StringRef))
 REMARK(opt_remark_missed, none, "%0", (StringRef))
 

@@ -26,13 +26,14 @@
 
 #include "llvm/Support/Allocator.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/SILConstants.h"
 
 namespace swift {
   class SingleValueInstruction;
   class SILBuilder;
+  class SILFunction;
   class SILModule;
   class SILValue;
-  class SymbolicValue;
 
 namespace tf {
 
@@ -61,6 +62,18 @@ public:
   /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+
+  /// Checks if the function only contains operations that the evaluator knows
+  /// how to fold.
+  ///
+  /// Note that this doesn't guarantee that the evaluator will fold the
+  /// operations successfully -- e.g. the evaluator might encounter overflow
+  /// traps or non-@compilerEvaluable protocol function implementations.
+  ///
+  /// Returns None if the function only has allowed operations.
+  /// Returns an Unknown SymbolicValue pointing at a disallowed operation if
+  /// there are disallowed operations.
+  llvm::Optional<SymbolicValue> checkCompilerEvaluable(SILFunction &fn);
 };
 
 } // end namespace tf

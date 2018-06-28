@@ -19,6 +19,7 @@ set(MANDATORY_SOURCES
   Mandatory/RawSILInstLowering.cpp
   Mandatory/MandatoryOptUtils.cpp
   # SWIFT_ENABLE_TENSORFLOW
+  Mandatory/DiagnoseCompilerEvaluable.cpp
   Mandatory/TFDifferentiation.cpp
   Mandatory/TFCanonicalizeCFG.cpp
   Mandatory/TFConstExpr.cpp

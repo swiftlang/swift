@@ -1548,6 +1548,7 @@ void TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
     case SILTensorOpInfo::OperandClass::Normal:  // No modifier.
       // We add attributes based on what the type of the value is.
       switch (attrValue.getKind()) {
+      case SymbolicValue::AbstractConstant:
       case SymbolicValue::Unknown:
       case SymbolicValue::UninitMemory:
         assert(0 && "These attribute kinds cannot happen here");

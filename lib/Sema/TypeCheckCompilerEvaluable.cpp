@@ -235,6 +235,7 @@ public:
 ///
 /// The function body must already be type checked.
 void TypeChecker::checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D) {
+#if 0
   auto compilerEvaluableAttr =
       D->getAttrs().getAttribute<CompilerEvaluableAttr>();
   if (!compilerEvaluableAttr || !compilerEvaluableAttr->isValid()) return;
@@ -247,4 +248,5 @@ void TypeChecker::checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D) {
   if (!Checker.getCompilerEvaluable()) {
     compilerEvaluableAttr->setInvalid();
   }
+#endif
 }
