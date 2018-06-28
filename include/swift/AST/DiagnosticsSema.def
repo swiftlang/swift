@@ -2525,8 +2525,19 @@ ERROR(differentiable_attr_invalid_access,none,
       "@usableFromInline because the original function %1 is public or "
       "@usableFromInline", (DeclName, DeclName, bool))
 
+// @TensorFlowGraph attribute
+ERROR(tf_graph_attr_top_level_only,none,
+      "@TensorFlowGraph can only be applied to top-level functions", ())
+ERROR(tf_graph_attr_function_tensorflow_value_only,none,
+      "@TensorFlowGraph can only be applied to functions whose parameters and "
+      "return values are TensorFlow values or aggregates of TensorFlow "
+      "values", ())
+
 ERROR(compiler_evaluable_bad_context,none,
       "@compilerEvaluable functions not allowed here", ())
+ERROR(compiler_evaluable_protocol_requirement,none,
+      "protocol requirements cannot be declared @compilerEvaluable", ())
+
 ERROR(compiler_evaluable_loop,none,
       "loops not allowed in @compilerEvaluable functions", ())
 ERROR(compiler_evaluable_forbidden_expression,none,
@@ -2538,13 +2549,31 @@ ERROR(compiler_evaluable_forbidden_type,none,
 ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
       "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
 
-// @TensorFlowGraph attribute
-ERROR(tf_graph_attr_top_level_only,none,
-      "@TensorFlowGraph can only be applied to top-level functions", ())
-ERROR(tf_graph_attr_function_tensorflow_value_only,none,
-      "@TensorFlowGraph can only be applied to functions whose parameters and "
-      "return values are TensorFlow values or aggregates of TensorFlow "
-      "values", ())
+ERROR(compiler_evaluable_bad_self_parameter,none,
+      "@compilerEvaluable function not allowed in %0", (Type))
+ERROR(compiler_evaluable_bad_parameter,none,
+      "@compilerEvaluable function not allowed to have parameter of type %0", (Type))
+ERROR(compiler_evaluable_bad_result,none,
+      "@compilerEvaluable function not allowed to have result of type %0", (Type))
+
+NOTE(compiler_evaluable_unrepresentable_class,none,
+     "type %0 cannot be used because it is a class", (Type))
+NOTE(compiler_evaluable_unrepresentable_metatype,none,
+     "metatype %0 cannot be used because it is the metatype of %1", (Type, Type))
+NOTE(compiler_evaluable_unrepresentable_generic_arg,none,
+     "type %0 cannot be used because it has generic argument %1", (Type, Type))
+NOTE(compiler_evaluable_unrepresentable_stdlib_type,none,
+     "type %0 is an unsupported standard library type", (Type))
+NOTE(compiler_evaluable_unrepresentable_enum_element,none,
+     "enum %0 cannot be used because it has element %1 with payload %2", (Type, DeclName, Type))
+NOTE(compiler_evaluable_unrepresentable_field,none,
+     "struct %0 cannot be used because it has field %1 with type %2", (Type, DeclName, Type))
+NOTE(compiler_evaluable_unrepresentable_tuple_element,none,
+     "tuple %0 cannot be used because it has element %1", (Type, Type))
+NOTE(compiler_evaluable_unrepresentable_param,none,
+     "function type %0 cannot be used because it has parameter type %1", (Type, Type))
+NOTE(compiler_evaluable_unrepresentable_result,none,
+     "function type %0 cannot be used because it has result type %1", (Type, Type))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions

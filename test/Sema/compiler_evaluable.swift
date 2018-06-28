@@ -1,12 +1,12 @@
 // RUN: %target-typecheck-verify-swift -module-name ThisModule
 
 // ----------------------------------------------------------------------------
-// Test what contexts @compilerEvaluable is allowed in.
+// Test what functions @compilerEvaluable is allowed on.
 // ----------------------------------------------------------------------------
 
 protocol AProtocol {
   @compilerEvaluable
-  func protocolFunc() // expected-error{{@compilerEvaluable functions not allowed here}}
+  func protocolFunc() // expected-error{{protocol requirements cannot be declared @compilerEvaluable}}
 }
 
 extension AProtocol {
@@ -16,15 +16,18 @@ extension AProtocol {
 
 class AClass {
   @compilerEvaluable
-  init() {} // expected-error{{@compilerEvaluable functions not allowed here}}
+  init() {} // expected-error{{@compilerEvaluable function not allowed in 'AClass'}}
+  // expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
 
   @compilerEvaluable
-  func classFunc() {} // expected-error{{@compilerEvaluable functions not allowed here}}
+  func classFunc() {} // expected-error{{@compilerEvaluable function not allowed in 'AClass'}}
+  // expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
 }
 
 extension AClass {
   @compilerEvaluable
-  func extensionFunc() {} // expected-error{{@compilerEvaluable functions not allowed here}}
+  func extensionFunc() {} // expected-error{{@compilerEvaluable function not allowed in 'AClass'}}
+  // expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
 }
 
 struct AStruct {
@@ -109,6 +112,130 @@ func aGenericFunction<T>(t: T) {
 
 @compilerEvaluable
 func funcTopLevel() {}
+
+struct StructWithBadSubscriptParam {
+  @compilerEvaluable
+  subscript(i: AClass) -> Int { return 1 } // expected-error{{@compilerEvaluable function not allowed to have parameter of type 'AClass'}}
+  // expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
+}
+
+struct StructWithBadSubsriptResult {
+  @compilerEvaluable
+  subscript(i: Int) -> AClass { return AClass() } // expected-error{{@compilerEvaluable function not allowed to have result of type 'AClass'}}
+  // expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
+}
+
+@compilerEvaluable
+func funcWithBadParam(i: AClass) -> Int { // expected-error{{@compilerEvaluable function not allowed to have parameter of type 'AClass'}}
+// expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
+  return 1
+}
+
+@compilerEvaluable
+func funcWithBadResult() -> AClass { // expected-error{{@compilerEvaluable function not allowed to have result of type 'AClass'}}
+// expected-note @-1 {{type 'AClass' cannot be used because it is a class}}
+  return AClass()
+}
+
+// ----------------------------------------------------------------------------
+// Test the compiler-representable type checker.
+// ----------------------------------------------------------------------------
+
+class NotRepresentableClass {}
+
+enum NotRepresentableEnum {
+  case case1
+  case case2(field: NotRepresentableClass)
+}
+
+struct NotRepresentableStruct {
+  let field: NotRepresentableClass
+}
+
+enum RepresentableEnum {
+  case case1
+  case case2(field: Int)
+}
+
+struct RepresentableStruct {
+  let field: Int
+
+  @compilerEvaluable
+  init(field: Int) {
+    self.field = field
+  }
+}
+
+enum GenericRepresentableEnum<T> {
+  case case1
+  case case2(field: Int, genericField: T)
+}
+
+struct GenericRepresentableStruct<T> {
+  let field: Int
+  let genericField: T
+
+  @compilerEvaluable
+  init(field: Int, genericField: T) {
+    self.field = field
+    self.genericField = genericField
+  }
+}
+
+@compilerEvaluable
+func testCompilerRepresentableChecker() {
+  let _ = NotRepresentableClass() // expected-error {{type 'NotRepresentableClass' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _: NotRepresentableEnum = .case1 // expected-error {{type 'NotRepresentableEnum' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{enum 'NotRepresentableEnum' cannot be used because it has element 'case2' with payload 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = NotRepresentableStruct(field: NotRepresentableClass()) // expected-error {{type 'NotRepresentableStruct' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{struct 'NotRepresentableStruct' cannot be used because it has field 'field' with type 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _: RepresentableEnum = .case1
+
+  let _ = RepresentableStruct(field: 3)
+
+  let _: GenericRepresentableEnum<Int> = .case1
+
+  let _ = GenericRepresentableStruct(field: 1, genericField: 2)
+
+  let _: GenericRepresentableEnum<NotRepresentableClass> = .case1 // expected-error {{type 'GenericRepresentableEnum<NotRepresentableClass>' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'GenericRepresentableEnum<NotRepresentableClass>' cannot be used because it has generic argument 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = NotRepresentableClass.self // expected-error {{type 'NotRepresentableClass.Type' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{metatype 'NotRepresentableClass.Type' cannot be used because it is the metatype of 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = RepresentableStruct.self
+
+  let _ = GenericRepresentableStruct<Int>.self
+
+  let _ = GenericRepresentableStruct<NotRepresentableClass>.self // expected-error {{type 'GenericRepresentableStruct<NotRepresentableClass>.Type' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{metatype 'GenericRepresentableStruct<NotRepresentableClass>.Type' cannot be used because it is the metatype of 'GenericRepresentableStruct<NotRepresentableClass>'}}
+  // expected-note @-2 {{type 'GenericRepresentableStruct<NotRepresentableClass>' cannot be used because it has generic argument 'NotRepresentableClass'}}
+  // expected-note @-3 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = (RepresentableStruct(field: 3), 2)
+
+  let _ = (NotRepresentableClass(), 2) // expected-error {{type '(NotRepresentableClass, Int)' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{tuple '(NotRepresentableClass, Int)' cannot be used because it has element 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = { (x: RepresentableStruct) -> RepresentableStruct in return x }
+
+  let _ = { (x: NotRepresentableClass) -> Int in return 1 } // expected-error {{type '(NotRepresentableClass) -> Int' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{function type '(NotRepresentableClass) -> Int' cannot be used because it has parameter type 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+
+  let _ = { (x: Int) -> NotRepresentableClass in return NotRepresentableClass() } // expected-error {{type '(Int) -> NotRepresentableClass' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{function type '(Int) -> NotRepresentableClass' cannot be used because it has result type 'NotRepresentableClass'}}
+  // expected-note @-2 {{type 'NotRepresentableClass' cannot be used because it is a class}}
+}
 
 // ----------------------------------------------------------------------------
 // Test the AST expression checker.
@@ -199,15 +326,18 @@ func literals() {
 
   // FloatLiteral
   let _ = 1.0 // expected-error{{type 'Double' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'Double' is an unsupported standard library type}}
 
   // BooleanLiteral
   let _ = true
 
   // StringLiteral
   let _ = "hello world" // expected-error{{type 'String' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'String' is an unsupported standard library type}}
 
   // InterpolatedStringLiteral
   let _ = "hello world \(1)" // expected-error{{type 'String' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'String' is an unsupported standard library type}}
 
   // MagicIdentifierLiteral
   let _ = #line
@@ -231,7 +361,9 @@ func declRef(arg1: Int, arg2: inout Int) {
   globalVar = 2 // expected-error{{referencing non-local mutable variables not allowed in @compilerEvaluable functions}}
 
   let _ = globalStringLet // expected-error{{type 'String' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'String' is an unsupported standard library type}}
   let _ = globalStringVar // expected-error{{type 'String' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'String' is an unsupported standard library type}}
 
   let _ = compilerEvaluable
   let _ = nonCompilerEvaluable // expected-error{{@compilerEvaluable functions may not reference non-@compilerEvaluable functions}}
@@ -417,13 +549,16 @@ func miscAllowedExpressions() throws {
 @compilerEvaluable
 func miscForbiddenExpressions() {
   // Array
-  let _ = [1] // expected-error{{expression not allowed in @compilerEvaluable functions}}
+  let _ = [1] // expected-error{{type '[Int]' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'Array' is an unsupported standard library type}}
 
   // Dictionary
-  let _ = ["a": 1] // expected-error{{expression not allowed in @compilerEvaluable functions}}
+  let _ = ["a": 1] // expected-error{{type '[String : Int]' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'Dictionary' is an unsupported standard library type}}
 
   // KeyPath and KeyPathApplication
-  let keyPath = \SimpleStruct.field // expected-error{{expression not allowed in @compilerEvaluable functions}}
+  let keyPath = \SimpleStruct.field // expected-error{{type 'KeyPath<SimpleStruct, Int>' cannot be used in @compilerEvaluable functions}}
+  // expected-note @-1 {{type 'KeyPath<SimpleStruct, Int>' cannot be used because it is a class}}
   let _ = SimpleStruct()[keyPath: keyPath] // expected-error{{expression not allowed in @compilerEvaluable functions}}
 }
 
