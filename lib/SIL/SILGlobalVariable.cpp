@@ -119,6 +119,12 @@ bool SILGlobalVariable::isValidStaticInitializerInst(const SILInstruction *I,
           // a pointer+offset relocation.
           // Note that StringObjectOr requires the or'd bits in the first
           // operand to be 0, so the operation is equivalent to an addition.
+  
+          // Temporarily disable static long Strings for macos.
+          // rdar://problem/41433840
+          if (M.getASTContext().LangOpts.Target.isMacOSX())
+            return false;
+  
           if (isa<IntegerLiteralInst>(bi->getArguments()[1]))
             return true;
           break;
