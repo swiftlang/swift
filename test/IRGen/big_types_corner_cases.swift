@@ -288,17 +288,41 @@ public protocol sr8076_Query {
 }
 
 public protocol sr8076_ProtoQueryHandler {
-    func forceHandle<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?)
+    func forceHandle_1<Q: sr8076_Query>(query: Q) -> Void
+    func forceHandle_2<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_BigStruct?)
+    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?)
+    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?)
 }
 
 public protocol sr8076_QueryHandler: sr8076_ProtoQueryHandler {
     associatedtype Handled: sr8076_Query
-    func handle(query: Handled) throws -> (Handled.Returned, sr8076_Filter?)
+    func handle_1(query: Handled) -> Void
+    func handle_2(query: Handled) -> (Handled.Returned, sr8076_BigStruct?)
+    func handle_3(query: Handled) -> (Handled.Returned, sr8076_Filter?)
+    func handle_4(query: Handled) throws -> (Handled.Returned, sr8076_Filter?)
 }
 
 public extension sr8076_QueryHandler {
-    func forceHandle<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
-        guard let body = handle as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {
+    func forceHandle_4<Q: sr8076_Query>(query: Q) -> Void {
+        guard let body = handle_1 as? (Q) -> Void else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        body(query)
+    }
+    func forceHandle_4<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_BigStruct?) {
+        guard let body = handle_2 as? (Q) -> (Q.Returned, sr8076_BigStruct?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return body(query)
+    }
+    func forceHandle_3<Q: sr8076_Query>(query: Q) -> (Q.Returned, sr8076_Filter?) {
+        guard let body = handle_3 as? (Q) -> (Q.Returned, sr8076_Filter?) else {
+            fatalError("handler \(self) is expected to handle query \(query)")
+        }
+        return body(query)
+    }
+    func forceHandle_4<Q: sr8076_Query>(query: Q) throws -> (Q.Returned, sr8076_Filter?) {
+        guard let body = handle_4 as? (Q) throws -> (Q.Returned, sr8076_Filter?) else {
             fatalError("handler \(self) is expected to handle query \(query)")
         }
         return try body(query)
