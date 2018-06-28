@@ -999,8 +999,8 @@ public extension Tensor {
 //===----------------------------------------------------------------------===//
 
 public extension Tensor {
-  @_versioned @_inlineable @inline(__always)
-  internal func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
+  @_inlineable @inline(__always)
+  func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
     return Raw.broadcastTo(self, shape: shape)
   }
 
