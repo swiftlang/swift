@@ -5298,7 +5298,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
     genericSig = genericFnType.getGenericSignature();
 
-  return MaterializedLValue(ManagedValue::forUnmanaged(address),
+  return MaterializedLValue(ManagedValue::forLValue(address),
                             origSelfType, genericSig,
                             optionalCallback, callbackStorage);
 }

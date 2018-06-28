@@ -490,6 +490,15 @@ static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
   return addr;
 }
 
+static ManagedValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
+                                     ManagedValue addr, LValueTypeData typeData,
+                                     AccessKind accessKind,
+                                     SILAccessEnforcement enforcement) {
+  return ManagedValue::forLValue(
+           enterAccessScope(SGF, loc, addr.getLValueAddress(), typeData,
+                            accessKind, enforcement));
+}
+
 // Find the base of the formal access at `address`. If the base requires an
 // access marker, then create a begin_access on `address`. Return the
 // address to be used for the access.
@@ -1310,10 +1319,15 @@ namespace {
         // of whether the base is trivial because even a trivial base
         // may be value-dependent on something non-trivial.
         if (base) {
-          SILValue temporary = materialized.temporary.getValue();
-          materialized.temporary = ManagedValue::forUnmanaged(
+          SILValue temporary = materialized.temporary.getLValueAddress();
+          materialized.temporary = ManagedValue::forLValue(
               SGF.B.createMarkDependence(loc, temporary, base.getValue()));
         }
+
+        // Enter an access scope for the temporary.
+        materialized.temporary =
+          enterAccessScope(SGF, loc, materialized.temporary, getTypeData(),
+                           accessKind, SILAccessEnforcement::Unsafe);
       }
 
       // TODO: maybe needsWriteback should be a thin function pointer
@@ -1628,6 +1642,7 @@ namespace {
             IsSuper,
             IsDirectAccessorUse, std::move(args.subscripts), SubstFieldType);
       }
+
       switch (cast<AccessorDecl>(addressor.getDecl())->getAddressorKind()) {
       case AddressorKind::NotAddressor:
         llvm_unreachable("not an addressor!");
@@ -1635,13 +1650,13 @@ namespace {
       // For unsafe addressors, we have no owner pointer to manage.
       case AddressorKind::Unsafe:
         assert(!result.second);
-        return result.first;
+        break;
 
       // For owning addressors, we can just let the owner get released
       // at an appropriate point.
       case AddressorKind::Owning:
       case AddressorKind::NativeOwning:
-        return result.first;
+        break;
 
       // For pinning addressors, we have to push a writeback.
       case AddressorKind::NativePinning: {
@@ -1649,10 +1664,16 @@ namespace {
           component(new UnpinPseudoComponent(getTypeData()));
         pushWriteback(SGF, loc, std::move(component), result.second,
                       MaterializedLValue());
-        return result.first;
+        break;
       }
       }
-      llvm_unreachable("bad addressor kind");
+
+      // Enter an unsafe access scope for the access.
+      auto addr = result.first;
+      addr = enterAccessScope(SGF, loc, addr, getTypeData(), accessKind,
+                              SILAccessEnforcement::Unsafe);
+
+      return addr;
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
