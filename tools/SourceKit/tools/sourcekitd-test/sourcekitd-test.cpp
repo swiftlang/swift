@@ -646,6 +646,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxMap, true);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableStructure, false);
     sourcekitd_request_dictionary_set_int64(Req, KeyEnableSyntaxTree, false);
+    sourcekitd_request_dictionary_set_int64(
+        Req, KeyForceLibSyntaxBasedProcessing, Opts.LibSyntaxBasedProcessing);
     sourcekitd_request_dictionary_set_int64(Req, KeySyntacticOnly, !Opts.UsedSema);
     break;
 
@@ -1060,6 +1062,9 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                                                 EnableSubStructure);
         sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
                                                 !Opts.UsedSema);
+        sourcekitd_request_dictionary_set_int64(
+            EdReq, KeyForceLibSyntaxBasedProcessing,
+            Opts.LibSyntaxBasedProcessing);
 
         sourcekitd_response_t EdResp = sendRequestSync(EdReq, Opts);
         sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);

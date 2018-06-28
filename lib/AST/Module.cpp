@@ -1370,6 +1370,11 @@ bool SourceFile::shouldCollectToken() const {
   switch (Kind) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+    if (SyntaxParsingCache) {
+      // When reuse parts of the syntax tree from a SyntaxParsingCache, not
+      // all tokens are visited and thus token collection is invalid
+      return false;
+    }
     return (bool)AllCorrectedTokens;
   case SourceFileKind::REPL:
   case SourceFileKind::SIL:

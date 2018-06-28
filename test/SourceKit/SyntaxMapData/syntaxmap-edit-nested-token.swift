@@ -1,5 +1,7 @@
 // RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-nested-token.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-nested-token.swift -pos=10:43 -replace='impact' -length=6 | %sed_clean > %t.response
 // RUN: %FileCheck -input-file=%t.response %s
+// RUN: %sourcekitd-test -req=open -print-raw-response %S/Inputs/syntaxmap-edit-nested-token.swift == -req=edit -print-raw-response %S/Inputs/syntaxmap-edit-nested-token.swift -pos=10:43 -replace='impact' -length=6 -libsyntax-based-processing | %sed_clean > %t.libsyntax.response
+// RUN: %FileCheck -input-file=%t.libsyntax.response %s
 
 // Original file contents
 

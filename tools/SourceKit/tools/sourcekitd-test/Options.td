@@ -127,6 +127,9 @@ def cancel_on_subsequent_request : Separate<["-"], "cancel-on-subsequent-request
 def cancel_on_subsequent_request_EQ : Joined<["-"], "cancel-on-subsequent-request=">,
   Alias<cancel_on_subsequent_request>;
 
+def libsyntax_based_processing : Flag<["-"], "libsyntax-based-processing">,
+  HelpText<"Use libSyntax to process syntactic information">;
+
 def time_request : Flag<["-"], "time-request">,
   HelpText<"Print the time taken to process the request">;
 

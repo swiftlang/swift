@@ -86,13 +86,14 @@ DECL_NODES = [
     #    ('#if' | '#elseif' | '#else') expr? (stmt-list | switch-case-list)
     Node('IfConfigClause', kind='Syntax',
          children=[
-             Child('PoundKeyword', kind='Token',
+             Child('PoundKeyword', kind='Token', 
+                   classification='BuildConfigId',
                    token_choices=[
                        'PoundIfToken',
                        'PoundElseifToken',
                        'PoundElseToken',
                    ]),
-             Child('Condition', kind='Expr',
+             Child('Condition', kind='Expr', classification='BuildConfigId',
                    is_optional=True),
              Child('Elements', kind='Syntax',
                    node_choices=[
@@ -110,7 +111,8 @@ DECL_NODES = [
     Node('IfConfigDecl', kind='Decl',
          children=[
              Child('Clauses', kind='IfConfigClauseList'),
-             Child('PoundEndif', kind='PoundEndifToken'),
+             Child('PoundEndif', kind='PoundEndifToken', 
+                   classification='BuildConfigId'),
          ]),
 
     Node('PoundErrorDecl', kind='Decl',
@@ -155,7 +157,7 @@ DECL_NODES = [
 
     Node('DeclModifier', kind='Syntax',
          children=[
-             Child('Name', kind='Token',
+             Child('Name', kind='Token', classification='Attribute',
                    text_choices=[
                        'class', 'convenience', 'dynamic', 'final', 'infix',
                        'lazy', 'optional', 'override', 'postfix', 'prefix',
@@ -644,6 +646,7 @@ DECL_NODES = [
                    The attributes applied to the 'operator' declaration.
                    '''),
              Child('Modifiers', kind='ModifierList', is_optional=True,
+                   classification='Attribute',
                    description='''
                    The declaration modifiers applied to the 'operator'
                    declaration.
@@ -723,7 +726,8 @@ DECL_NODES = [
          groups.
          ''',
          children=[
-             Child('HigherThanOrLowerThan', kind='IdentifierToken',
+             Child('HigherThanOrLowerThan', kind='IdentifierToken', 
+                   classification='Keyword',
                    text_choices=[
                       'higherThan', 'lowerThan',
                    ],
@@ -782,8 +786,8 @@ DECL_NODES = [
          are grouped together in the absence of grouping parentheses.
          ''',
          children=[
-             Child('AssociativityKeyword', kind='IdentifierToken',
-                   text_choices=['associativity']),
+             Child('AssociativityKeyword', kind='IdentifierToken', 
+                   classification='Keyword', text_choices=['associativity']),
              Child('Colon', kind='ColonToken'),
              Child('Value', kind='IdentifierToken',
                    text_choices=['left', 'right', 'none'],

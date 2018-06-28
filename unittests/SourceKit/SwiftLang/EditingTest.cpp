@@ -99,6 +99,13 @@ private:
   bool handleSourceText(StringRef Text) override { return false; }
   bool handleSerializedSyntaxTree(StringRef Text) override { return false; }
   bool syntaxTreeEnabled() override { return false; }
+
+  bool handleSyntaxReuseRegions(
+      std::vector<std::pair<unsigned, unsigned>> ReuseRegions) override {
+    return false;
+  }
+
+  bool forceLibSyntaxBasedProcessing() override { return false; }
 };
 
 struct DocUpdateMutexState {
@@ -157,8 +164,7 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false, Consumer,
-                         Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void close(const char *DocName) {

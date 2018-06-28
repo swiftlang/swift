@@ -27,6 +27,22 @@
 namespace swift {
 namespace json {
 
+class SyntaxTreeOutput : public Output {
+  bool IncludeNodeIds;
+
+public:
+  SyntaxTreeOutput(llvm::raw_ostream &OS, bool IncludeNodeIds,
+                   bool PrettyPrint = true)
+      : Output(OS, PrettyPrint, Output::OutputKind::SyntaxTree),
+        IncludeNodeIds(IncludeNodeIds) {}
+
+  static bool classof(const Output *out) {
+    return out->getKind() == SyntaxTree;
+  }
+
+  bool shouldIncludeNodeIds() const { return IncludeNodeIds; }
+};
+
 /// Serialization traits for SourcePresence.
 template <>
 struct ScalarEnumerationTraits<syntax::SourcePresence> {
@@ -141,6 +157,16 @@ struct ObjectTraits<syntax::RawSyntax> {
     }
     auto presence = value.getPresence();
     out.mapRequired("presence", presence);
+
+    bool includeNodeId = true;
+    if (auto syntaxTreeOutput = dyn_cast<SyntaxTreeOutput>(&out)) {
+      includeNodeId = syntaxTreeOutput->shouldIncludeNodeIds();
+    }
+
+    if (includeNodeId) {
+      auto nodeId = value.getId();
+      out.mapRequired("id", nodeId);
+    }
   }
 };
 
