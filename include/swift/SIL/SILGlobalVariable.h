@@ -68,7 +68,8 @@ private:
   /// once (either in its declaration, or once later), making it immutable.
   unsigned IsLet : 1;
 
-  /// The VarDecl associated with this SILGlobalVariable. For debugger purpose.
+  /// The VarDecl associated with this SILGlobalVariable. Must by nonnull for
+  /// language-level global variables.
   VarDecl *VDecl;
 
   /// Whether or not this is a declaration.

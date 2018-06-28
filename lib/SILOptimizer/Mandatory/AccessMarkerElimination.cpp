@@ -32,9 +32,6 @@ using namespace swift;
 // This temporary option allows markers during optimization passes. Enabling
 // this flag causes this pass to preserve only dynamic checks when dynamic
 // checking is enabled. Otherwise, this pass removes all checks.
-//
-// This is currently unsupported because tail duplication results in
-// address-type block arguments.
 llvm::cl::opt<bool> EnableOptimizedAccessMarkers(
     "sil-optimized-access-markers", llvm::cl::init(true),
     llvm::cl::desc("Enable memory access markers during optimization passes."));

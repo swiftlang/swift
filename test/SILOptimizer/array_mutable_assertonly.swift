@@ -87,7 +87,6 @@ struct Array2d {
 // TEST6-LABEL: COW Array Opts in Func {{.*}}test2DArrayLoop{{.*}}
 // TEST6:        Array Opts in Loop Loop at depth 2
 // TEST6-NOT:   COW Array Opts in
-// TEST6:        Hoisting make_mutable
 // TEST6:        Array Opts in Loop Loop at depth 1
 // TEST6-NOT:   COW Array Opts in
 // TEST6:        Hoisting make_mutable

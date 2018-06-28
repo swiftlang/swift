@@ -1578,17 +1578,21 @@ public:
             "category");
   }
 
+  template <class AI>
+  void checkAccessEnforcement(AI *AccessInst) {
+    if (AccessInst->getModule().getStage() != SILStage::Raw) {
+      require(AccessInst->getEnforcement() != SILAccessEnforcement::Unknown,
+              "access must have known enforcement outside raw stage");
+    }
+  }
+
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    auto sourceOper = BAI->getOperand();
-    requireSameType(BAI->getType(), sourceOper->getType(),
+    requireSameType(BAI->getType(), BAI->getSource()->getType(),
                     "result must be same type as operand");
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
 
-    if (BAI->getModule().getStage() != SILStage::Raw) {
-      require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
-              "access must have known enforcement outside raw stage");
-    }
+    checkAccessEnforcement(BAI);
 
     switch (BAI->getAccessKind()) {
     case SILAccessKind::Init:
@@ -1602,10 +1606,25 @@ public:
       break;
     }
 
-    // For dynamic Read/Modify access, AccessEnforcementWMO assumes a valid
-    // AccessedStorage and runs very late in the optimizer pipeline.
-    // TODO: eventually, make this true for any kind of access.
-    findAccessedStorage(sourceOper);
+    // Verify that all formal accesses patterns are recognized as part of a
+    // whitelist. The presence of an unknown pattern means that analysis will
+    // silently fail, and the compiler may be introducing undefined behavior
+    // with no other way to detect it.
+    //
+    // For example, AccessEnforcementWMO runs very late in the
+    // pipeline and assumes valid storage for all dynamic Read/Modify access. It
+    // also requires that Unidentified access fit a whitelist on known
+    // non-internal globals or class properties.
+    //
+    // First check that findAccessedStorage returns without asserting. For
+    // Unsafe enforcement, that is sufficient. For any other enforcement
+    // level also require that it returns a valid AccessedStorage object.
+    // Unsafe enforcement is used for some unrecognizable access patterns,
+    // like debugger variables. The compiler never cares about the source of
+    // those accesses.
+    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
+      require(storage, "Unknown formal access pattern");
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
@@ -1620,13 +1639,34 @@ public:
     }
   }
 
-  void checkBeginUnpairedAccessInst(BeginUnpairedAccessInst *I) {
-    require(I->getEnforcement() != SILAccessEnforcement::Unknown,
+  void checkBeginUnpairedAccessInst(BeginUnpairedAccessInst *BUAI) {
+    require(BUAI->getEnforcement() != SILAccessEnforcement::Unknown,
             "unpaired access can never use unknown enforcement");
-    require(I->getSource()->getType().isAddress(),
+    require(BUAI->getSource()->getType().isAddress(),
             "address operand must have address type");
-    requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
+    requireAddressType(BuiltinUnsafeValueBufferType, BUAI->getBuffer(),
                        "scratch buffer operand");
+
+    checkAccessEnforcement(BUAI);
+
+    switch (BUAI->getAccessKind()) {
+    case SILAccessKind::Init:
+    case SILAccessKind::Deinit:
+      require(BUAI->getEnforcement() == SILAccessEnforcement::Static,
+              "init/deinit accesses cannot use non-static enforcement");
+      break;
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      break;
+    }
+
+    // First check that findAccessedStorage never asserts.
+    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
+    // Only allow Unsafe and Builtin access to have invalid storage.
+    if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
+        && !BUAI->isFromBuiltin()) {
+      require(storage, "Unknown formal access pattern");
+    }
   }
 
   void checkEndUnpairedAccessInst(EndUnpairedAccessInst *I) {
@@ -1634,6 +1674,8 @@ public:
             "unpaired access can never use unknown enforcement");
     requireAddressType(BuiltinUnsafeValueBufferType, I->getBuffer(),
                        "scratch buffer operand");
+
+    checkAccessEnforcement(I);
   }
 
   void checkStoreInst(StoreInst *SI) {
