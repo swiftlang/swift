@@ -96,14 +96,6 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
     }
     return false
   }
-
-  func _asSet() -> Set<AnyHashable>? {
-    return _canonicalBox._asSet()
-  }
-
-  func _asDictionary() -> Dictionary<AnyHashable, AnyHashable>? {
-    return _canonicalBox._asDictionary()
-  }
 }
 
 #if _runtime(_ObjC)

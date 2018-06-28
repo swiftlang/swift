@@ -54,20 +54,11 @@ internal protocol _AnyHashableBox {
   var _base: Any { get }
   func _unbox<T: Hashable>() -> T?
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
-
-  func _asSet() -> Set<AnyHashable>?
-  func _asDictionary() -> Dictionary<AnyHashable, AnyHashable>?
 }
 
 extension _AnyHashableBox {
   var _canonicalBox: _AnyHashableBox {
     return self
-  }
-  func _asSet() -> Set<AnyHashable>? {
-    return nil
-  }
-  func _asDictionary() -> Dictionary<AnyHashable, AnyHashable>? {
-    return nil
   }
 }
 
