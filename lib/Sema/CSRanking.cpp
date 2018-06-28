@@ -372,6 +372,10 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }
+  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
+    auto *param = ee->getParameterList()->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
 
   auto *subscript = cast<SubscriptDecl>(decl);
   auto *index = subscript->getIndices()->get(paramNum);
