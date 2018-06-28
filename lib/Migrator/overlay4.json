@@ -1316,4 +1316,9 @@
     "RightComment": "compactMap",
     "ModuleName": "Swift"
   },
+  {
+    "DiffItemKind": "SpecialCaseDiffItem",
+    "Usr": "c:@F@UIApplicationMain",
+    "SpecialCaseId": "UIApplicationMain"
+  }
 ]
