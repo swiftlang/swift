@@ -1965,19 +1965,6 @@ void ValueDecl::setIsObjC(bool value) {
 
   Bits.ValueDecl.IsObjCComputed = true;
   Bits.ValueDecl.IsObjC = value;
-
-  // Sync up the attributes with the value; this is only interesting because
-  // some callers might look for presence of the attribute rather than
-  // using isObjC().
-  // FIXME: Fix those callers to remove this problem.
-  if (!value) {
-    for (auto *Attr : getAttrs()) {
-      if (auto *OA = dyn_cast<ObjCAttr>(Attr))
-        OA->setInvalid();
-    }
-  } else if (!getAttrs().hasAttribute<ObjCAttr>()) {
-    getAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
-  }
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
