@@ -11,11 +11,11 @@ public func trivialAdd(a: Tensor<Float>) -> Tensor<Float> {
 
 /*
 CHECK-LABEL: --- INPUT FUNCTION {{.*}}trivialAdd
-CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK: graph_op "Add,i,i"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 
 CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}trivialAdd
 CHECK:      bb0(%0 : $TensorHandle<Float>):
-CHECK-NEXT:   %1 = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK-NEXT:   %1 = graph_op "Add,i,i"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {T: $Float, __device: "/device:CPU:0"} : $TensorHandle<Float>
 CHECK-NEXT:   return %1 : $TensorHandle<Float>
 
 CHECK-LABEL: --- TFPartition Host Result: {{.*}}trivialAdd
@@ -34,15 +34,15 @@ public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float>
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}constexprCall
- CHECK: [[A:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,device"(
- CHECK: [[AC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,device"([[A]] : $TensorHandle<Builtin.Int64>
- CHECK: [[B:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,device"(
- CHECK: [[BC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,device"([[B]] : $TensorHandle<Builtin.Int64>
- CHECK: [[C:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,device"(
+ CHECK: [[A:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
+ CHECK: [[AC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,__device"([[A]] : $TensorHandle<Builtin.Int64>
+ CHECK: [[B:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
+ CHECK: [[BC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,__device"([[B]] : $TensorHandle<Builtin.Int64>
+ CHECK: [[C:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
  CHECK: [[CX:%.*]] = unchecked_ref_cast [[C]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32> // user: %22
  CHECK: [[BX:%.*]] = unchecked_ref_cast [[BC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // user: %22
  CHECK: [[AX:%.*]] = unchecked_ref_cast [[AC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // user: %22
- CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, device: "/device:CPU:0"} : $TensorHandle<Float> // user: %23
+ CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float> // user: %23
   CHECK: return [[RESULT]]
 */
 
@@ -68,8 +68,8 @@ public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> 
 
 /*
 CHECK-LABEL: ---- INPUT FUNCTION {{.*}}testInputListArguments
-CHECK: = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {device: "/device:CPU:0"} : $TensorHandle<Float>
-CHECK: graph_op "Pack,L,e,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK: = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>) {__device: "/device:CPU:0"} : $TensorHandle<Float>
+CHECK: graph_op "Pack,L,e,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHandle<Float>) {__device: "/device:CPU:0"} : $TensorHandle<Float>
 CHECK-LABEL: ---- END OF INPUT FUNCTION
 */
 

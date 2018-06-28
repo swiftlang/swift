@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -differentiation -sil-print-all -verify | %FileCheck %s
 
+// TODO(SWIFT-8146): Re-enable this test.
+// UNSUPPORTED: tensorflow
+
 import TensorFlow
 
 @differentiable(reverse, adjoint: dConcreteTanh)

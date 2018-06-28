@@ -2687,7 +2687,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   // If `value` is not receivable, reject the program with diagnostics.
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
   SmallVector<ProtocolConformance *, 1> conformances;
-  auto tensorValueTy = convertToTensorValueType(value->getType());
+  auto tensorValueTy = convertElementTypeToTensorValueType(value->getType());
   auto nominal = tensorValueTy.getSwiftRValueType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
