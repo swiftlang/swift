@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 3 %s -enable-testing
 // RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 3 %s -O
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -O
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 3 %s -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=all -swift-version 4 %s -enable-testing -O
 
 public func publicNoArgs() {}
 public func publicSomeArgs(_: Int, x: Int) {}
