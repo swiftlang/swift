@@ -184,8 +184,8 @@ Type SuperclassTypeRequest::operator()(Evaluator &evaluator,
 void SuperclassTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto nominalDecl = std::get<0>(getStorage());
-  std::string declName = "'" + std::string(nominalDecl->getNameStr()) + "'";
-  diags.diagnose(nominalDecl, diag::circular_class_inheritance, declName);
+  diags.diagnose(nominalDecl, diag::circular_class_inheritance,
+                 nominalDecl->getName());
 }
 
 void SuperclassTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
@@ -244,8 +244,7 @@ Type EnumRawTypeRequest::operator()(Evaluator &evaluator,
 void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto enumDecl = std::get<0>(getStorage());
-  std::string className = "'" + std::string(enumDecl->getNameStr()) + "'";
-  diags.diagnose(enumDecl, diag::circular_enum_inheritance, className);
+  diags.diagnose(enumDecl, diag::circular_enum_inheritance, enumDecl->getName());
 }
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {

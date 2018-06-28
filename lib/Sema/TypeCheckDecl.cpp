@@ -629,7 +629,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
       if (allProtocols[i] == proto || allProtocols[i]->inheritsFrom(proto)) {
         if (!diagnosedCircularity) {
-          diagnose(proto, diag::circular_protocol_def, proto->getName().str());
+          diagnose(proto, diag::circular_protocol_def, proto->getName());
           diagnosedCircularity = true;
         }
 
@@ -697,7 +697,7 @@ static void breakInheritanceCycle(EnumDecl *enumDecl) {
 /// Check for circular inheritance.
 template<typename T>
 static void checkCircularity(TypeChecker &tc, T *decl,
-                             Diag<StringRef> circularDiag,
+                             Diag<Identifier> circularDiag,
                              DescriptiveDeclKind declKind,
                              SmallVectorImpl<T *> &path) {
   switch (decl->getCircularityCheck()) {
@@ -721,7 +721,7 @@ static void checkCircularity(TypeChecker &tc, T *decl,
     if (path.end() - cycleStart == 1) {
       tc.diagnose(path.back()->getLoc(),
                   circularDiag,
-                  path.back()->getName().str());
+                  path.back()->getName());
 
       decl->setInvalid();
       decl->setInterfaceType(ErrorType::get(tc.Context));
@@ -729,17 +729,9 @@ static void checkCircularity(TypeChecker &tc, T *decl,
       break;
     }
 
-    // Form the textual path illustrating the cycle.
-    llvm::SmallString<128> pathStr;
-    for (auto i = cycleStart, iEnd = path.end(); i != iEnd; ++i) {
-      if (!pathStr.empty())
-        pathStr += " -> ";
-      pathStr += ("'" + (*i)->getName().str() + "'").str();
-    }
-    pathStr += (" -> '" + decl->getName().str() + "'").str();
-
     // Diagnose the cycle.
-    tc.diagnose(decl->getLoc(), circularDiag, pathStr);
+    tc.diagnose(decl->getLoc(), circularDiag,
+                (*cycleStart)->getName());
     for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
       tc.diagnose(*i, diag::kind_identifier_declared_here,
                   declKind, (*i)->getName());
