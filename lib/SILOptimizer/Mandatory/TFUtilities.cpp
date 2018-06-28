@@ -239,13 +239,13 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
   if (isTensorFlowValue(ty))
     return ty;
 
-  return convertToTensorValueType(ty.getASTType(), ty.getASTContext());
+  return convertElementTypeToTensorValueType(ty.getASTType(), ty.getASTContext());
 }
 
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
-static SILFunction *lookupOrLinkFunction(StringRef name, SILModule &module) {
+SILFunction *tf::lookupOrLinkFunction(StringRef name, SILModule &module) {
   if (auto *localFn = module.lookUpFunction(name))
     return localFn;
   auto *fn = module.findFunction(name, SILLinkage::PublicExternal);
