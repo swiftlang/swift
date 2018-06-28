@@ -472,8 +472,18 @@ static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
     return false;
   }
 
+  // We can’t hoist everything that is hoist-able
+  // The canHoist method does not do all the required analysis
+  // Some of the work is done at COW Array Opt
+  // TODO: Refactor COW Array Opt + canHoist - radar 41601468
   ArraySemanticsCall semCall(inst);
-  return semCall.canHoist(Preheader->getTerminator(), DT);
+  switch (semCall.getKind()) {
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+    return semCall.canHoist(Preheader->getTerminator(), DT);
+  default:
+    return false;
+  }
 }
 
 // Check If all the end accesses of the given begin do not prevent hoisting
