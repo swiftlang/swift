@@ -165,7 +165,7 @@ public extension Tensor {
   /// scalars).
   @inlinable @inline(__always)
   init(_ elements: [Tensor]) {
-    self = Raw.pack(values: elements)
+    self = Raw.pack(elements)
   }
 
   /// Creates a 1D tensor in from contiguous scalars in row-major order.

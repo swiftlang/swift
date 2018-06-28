@@ -31,9 +31,9 @@ public func testSelect(conds1: Tensor<Bool>, x1: Tensor<Float>, y1: Tensor<Float
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testSelect
  CHECK: sil private @{{.*}}testSelect{{.*}} : $@callee_owned (TensorHandle<Float>, TensorHandle<Bool>, TensorHandle<Float>) -> TensorHandle<Float> {
  CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Bool>, %2 : $TensorHandle<Float>):
- CHECK:       %5 = builtin "__tfop_Add,$in,$in,T,device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
- CHECK:       %8 = builtin "__tfop_Select,$in,$in,$in,T,device"(%1 : $TensorHandle<Bool>, %5 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
- CHECK:       %11 = builtin "__tfop_Mul,$in,$in,T,device"(%8 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:       %5 = builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>
+ CHECK:       %8 = builtin "__tfop_Select,$in,$in,$in,T,__device"(%1 : $TensorHandle<Bool>, %5 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
+ CHECK:       %11 = builtin "__tfop_Mul,$in,$in,T,__device"(%8 : $TensorHandle<Float>, %2 : $TensorHandle<Float>
  CHECK-NEXT:  return %11 : $TensorHandle<Float>
  CHECK-NEXT:}
 */
@@ -52,8 +52,8 @@ public func testEmptyScalarsArray() {
  CHECK: integer_literal $Builtin.Int32, 0
  CHECK: integer_literal $Builtin.Int32, 20
  CHECK: integer_literal $Builtin.Int32, 30
- CHECK: builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype,device"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type
- CHECK: builtin "__tfop_Add,$in,$in,T,device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
+ CHECK: builtin "__tfop_Const,value$tensor,value$shape,$elt,$elt,$elt,dtype,__device"({{.*}} : $@thin Int32.Type, {{.*}} : $@thin Int32.Type, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, {{.*}} : $@thin Int32.Type
+ CHECK: builtin "__tfop_Add,$in,$in,T,__device"({{.*}} : $TensorHandle<Int32>, {{.*}} : $TensorHandle<Int32>
  */
 
 // This tests the attributes necessary to get arrays of integers and strings going.
@@ -74,7 +74,7 @@ public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<
 // CHECK-NEXT:  %7 = integer_literal $Builtin.Int32, 4
 // CHECK-NEXT:  %8 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT:  %9 = string_literal utf8 "SAME"
-// CHECK:       builtin "__tfop_Conv2D,$in,$in,T,strides$array,$elt,$elt,$elt,$elt,use_cudnn_on_gpu,padding,data_format,dilations$array,$elt,$elt,$elt,$elt,device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1, %9 : $Builtin.RawPointer, %10 : $Builtin.RawPointer, %11 : $@thin Int32.Type, %12 : $Builtin.Int32, %13 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.RawPointer) : $TensorHandle<Float>
+// CHECK:       builtin "__tfop_Conv2D,$in,$in,T,strides$array,$elt,$elt,$elt,$elt,use_cudnn_on_gpu,padding,data_format,dilations$array,$elt,$elt,$elt,$elt,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $@thick Float.Type, %3 : $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.Int32, %6 : $Builtin.Int32, %7 : $Builtin.Int32, %8 : $Builtin.Int1, %9 : $Builtin.RawPointer, %10 : $Builtin.RawPointer, %11 : $@thin Int32.Type, %12 : $Builtin.Int32, %13 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int32, %16 : $Builtin.RawPointer) : $TensorHandle<Float>
 // CHECK-NEXT:  return %17 : $TensorHandle<Float>
 // CHECK-NEXT:}
 
@@ -96,7 +96,7 @@ public func testConstantArray() -> TensorHandle<Float> {
 // CHECK-NEXT:  %3 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
 // CHECK-NEXT:  %4 = metatype $@thin Int.Type
 // CHECK-NEXT:  %5 = integer_literal $Builtin.Int64, 2
-// CHECK:       %7 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt,device"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64
+// CHECK:       %7 = builtin "__tfop_Const,dtype,value$tensor,$elt,$elt,value$shape,$elt,__device"(%0 : $@thin Float.Type, %1 : $@thin Double.Type, %2 : $Builtin.FPIEEE64, %3 : $Builtin.FPIEEE64, %4 : $@thin Int.Type, %5 : $Builtin.Int64
 // CHECK-NEXT:  return %7 : $TensorHandle<Float>
 #endif
 

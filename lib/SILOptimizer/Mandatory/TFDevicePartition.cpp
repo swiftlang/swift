@@ -75,7 +75,7 @@ static void createShapeAttr(
 ///
 /// An example input `tfopInfo` is:
 /// %6 = builtin
-///   "__tfop_Const,dtype,value$tensor,__shapes$shapearray,$shape,$elt,device"(%0
+///   "__tfop_Const,dtype,value$tensor,__shapes$shapearray,$shape,$elt,__device"(%0
 ///   : $@thin Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.Int64, %3 :
 ///   $@thin Int32.Type, %4 : $Builtin.Int32, %5 : $Builtin.RawPointer) :
 ///   $TensorHandle<Float>
@@ -325,7 +325,8 @@ void DevicePartitionCloner::addD2DSend(SILTensorOpInfo &tfopInfo,
 
   // Insert a send inst, with type <T> (T, int, str, str) -> ()
   std::string newInstName =
-      "__tfop_tfc.D2DTensorSend,$in,transferId,destDevice,device";
+      "__tfop_tfc.D2DTensorSend,$in,transferId,destDevice,";
+  newInstName += DEVICE_ATTR;
 
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto valueToSend = remapValue(inst->getOperand(0));
@@ -363,7 +364,8 @@ void DevicePartitionCloner::addD2DRecv(SILTensorOpInfo &tfopInfo,
 
   // Insert a recv inst, with type <T> (int, str, str) -> (T)
   std::string newInstName =
-      "__tfop_tfc.D2DTensorRecv,transferId,srcDevice,device";
+      "__tfop_tfc.D2DTensorRecv,transferId,srcDevice,";
+  newInstName += DEVICE_ATTR;
 
   auto srcDeviceStr = getDeviceString(srcDevice);
   auto srcDeviceAttr = B.createStringLiteral(loc, StringRef(srcDeviceStr),
