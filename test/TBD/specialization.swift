@@ -2,12 +2,12 @@
 // validating that they end up with the correct linkages):
 // RUN: %target-swift-frontend -emit-sil -o- -O -validate-tbd-against-ir=none %s | %FileCheck %s
 
-// RUN: %target-swift-frontend -emit-ir -o- -O -validate-tbd-against-ir=all %s
-// RUN: %target-swift-frontend -emit-ir -o- -O -validate-tbd-against-ir=all -enable-resilience %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-resilience %s
 
 // With -enable-testing:
-// RUN: %target-swift-frontend -emit-ir -o- -O -validate-tbd-against-ir=all -enable-testing %s
-// RUN: %target-swift-frontend -emit-ir -o- -O -validate-tbd-against-ir=all -enable-resilience -enable-testing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-testing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -O -validate-tbd-against-ir=all -enable-resilience -enable-testing %s
 
 // rdar://problem/40738913
 
