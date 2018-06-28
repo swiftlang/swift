@@ -1000,7 +1000,7 @@ public extension Tensor {
 
 public extension Tensor {
   @inlinable @inline(__always)
-  internal func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
+  func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
     return Raw.broadcastTo(self, shape: shape)
   }
 
