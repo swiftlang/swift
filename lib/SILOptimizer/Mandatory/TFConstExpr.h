@@ -24,15 +24,16 @@
 #ifndef SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 #define SWIFT_SILOPTIMIZER_TF_CONSTEXPR_H
 
-#include "llvm/Support/Allocator.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/Support/Allocator.h"
 
 namespace swift {
-  class SingleValueInstruction;
-  class SILBuilder;
-  class SILModule;
-  class SILValue;
-  class SymbolicValue;
+class SingleValueInstruction;
+class SILBuilder;
+class SILModule;
+class SILValue;
+class SymbolicValue;
 
 namespace tf {
 
@@ -43,13 +44,26 @@ class ConstExprEvaluator {
   /// result values for the cached constexpr calls we have already analyzed.
   llvm::BumpPtrAllocator allocator;
 
+  /// The current call stack, used for providing accurate diagnostics.
+  llvm::SmallVector<SourceLoc, 4> callStack;
+
   ConstExprEvaluator(const ConstExprEvaluator &) = delete;
   void operator=(const ConstExprEvaluator &) = delete;
+
 public:
   explicit ConstExprEvaluator(SILModule &m);
   ~ConstExprEvaluator();
 
   llvm::BumpPtrAllocator &getAllocator() { return allocator; }
+
+  void pushCallStack(SourceLoc loc) { callStack.push_back(std::move(loc)); }
+
+  void popCallStack() {
+    assert(!callStack.empty());
+    callStack.pop_back();
+  }
+
+  const llvm::SmallVector<SourceLoc, 4> &getCallStack() { return callStack; }
 
   /// Analyze the specified values to determine if they are constant values.
   /// This is done in code that is not necessarily itself a constexpr
