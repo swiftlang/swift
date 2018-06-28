@@ -965,7 +965,9 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
-        SDKPath.emit(ScratchRecord, M->getASTContext().SearchPathOpts.SDKPath);
+        SDKPath.emit(ScratchRecord,
+                     options.DebugPrefixMap.remapPath(
+                         M->getASTContext().SearchPathOpts.SDKPath));
         auto &Opts = options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) { 
           // FIXME: This is a hack and calls for a better design.
@@ -983,6 +985,23 @@ void Serializer::writeHeader(const SerializationOptions &options) {
               continue;
             }
           }
+          // Remap the absolute working directory path that the driver adds to
+          // the Clang arguments.
+          if (StringRef(*Arg) == "-working-directory") {
+            XCC.emit(ScratchRecord, *Arg);
+            auto Next = std::next(Arg);
+            if (Next != E) {
+              XCC.emit(ScratchRecord, options.DebugPrefixMap.remapPath(*Next));
+              ++Arg;
+              continue;
+            }
+          }
+          // Filter out any -fdebug-prefix-map flags, since they can't be
+          // meaningfully remapped. They're only needed during codegen, not when
+          // the module is loaded for debugging.
+          if (StringRef(*Arg).startswith("-fdebug-prefix-map="))
+            continue;
+
           XCC.emit(ScratchRecord, *Arg);
         }
       }
@@ -1078,9 +1097,10 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     // deserialization.
     for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
       SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                      framepath.Path);
+                      options.DebugPrefixMap.remapPath(framepath.Path));
     for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
+      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
+                      options.DebugPrefixMap.remapPath(path));
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports

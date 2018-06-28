@@ -1052,6 +1052,8 @@ computeSerializationOptions(const CompilerInvocation &Invocation,
       opts.EnableSerializationNestedTypeLookupTable;
   if (!Invocation.getIRGenOptions().ForceLoadSymbolName.empty())
     serializationOpts.AutolinkForceLoad = true;
+  serializationOpts.DebugPrefixMap =
+      Invocation.getIRGenOptions().DebugPrefixMap;
 
   // Options contain information about the developer's computer,
   // so only serialize them if the module isn't going to be shipped to
