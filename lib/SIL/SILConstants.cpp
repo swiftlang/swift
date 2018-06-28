@@ -13,15 +13,15 @@
 // SWIFT_ENABLE_TENSORFLOW
 
 #include "swift/SIL/SILConstants.h"
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "llvm/Support/TrailingObjects.h"
 using namespace swift;
 
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
-                                   Diag<T...> diag, U &&... args) {
+template<typename...T, typename...U>
+static InFlightDiagnostic
+diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag, U &&...args) {
   return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
@@ -32,13 +32,11 @@ static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
 void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   os.indent(indent);
   switch (representationKind) {
-  case RK_UninitMemory:
-    os << "uninit\n";
-    return;
+  case RK_UninitMemory: os << "uninit\n"; return;
   case RK_Unknown: {
-    const UnknownInfo& unknown = getUnknownInfo();
-    os << "unknown(" << (int)unknown.reason << "): ";
-    unknown.node->dump();
+    std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
+    os << "unknown(" << (int)unknown.second << "): ";
+    unknown.first->dump();
     return;
   }
   case RK_Metatype:
@@ -75,41 +73,35 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
       return;
     } else if (elements.size() == 1) {
       os << "agg: 1 elt: ";
-      elements[0].print(os, indent + 2);
+      elements[0].print(os, indent+2);
       return;
     }
-    os << "agg: " << elements.size() << " element"
-       << "s"[elements.size() == 1] << " [\n";
+    os << "agg: " << elements.size() << " element" << "s"[elements.size() == 1]
+       << " [\n";
     for (auto elt : elements)
-      elt.print(os, indent + 2);
+      elt.print(os, indent+2);
     os.indent(indent) << "]\n";
     return;
   }
   }
 }
 
-void SymbolicValue::dump() const { print(llvm::errs()); }
+void SymbolicValue::dump() const {
+  print(llvm::errs());
+}
 
 /// For constant values, return the classification of this value.  We have
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
-  case RK_UninitMemory:
-    return UninitMemory;
-  case RK_Unknown:
-    return Unknown;
-  case RK_Metatype:
-    return Metatype;
-  case RK_Function:
-    return Function;
-  case RK_Aggregate:
-    return Aggregate;
-  case RK_Integer:
-    return Integer;
-  case RK_Float:
-    return Float;
-  case RK_String:
-    return String;
+  case RK_UninitMemory: return UninitMemory;
+  case RK_Unknown:      return Unknown;
+  case RK_Metatype:     return Metatype;
+  case RK_Function:     return Function;
+  case RK_Aggregate:    return Aggregate;
+  case RK_Integer:      return Integer;
+  case RK_Float:        return Float;
+  case RK_String:       return String;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -123,8 +115,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 
 /// Clone this SymbolicValue into the specified allocator and return the new
 /// version.  This only works for valid constants.
-SymbolicValue
-SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const {
+SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   switch (getKind()) {
   case SymbolicValue::Unknown:
   case SymbolicValue::UninitMemory:
@@ -150,6 +141,8 @@ SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const {
   }
 }
 
+
+
 //===----------------------------------------------------------------------===//
 // Integers
 //===----------------------------------------------------------------------===//
@@ -158,8 +151,8 @@ namespace swift {
 /// This is a representation of an integer value, stored as a trailing array
 /// of words.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) APIntSymbolicValue final
-    : private llvm::TrailingObjects<APIntSymbolicValue, uint64_t> {
-  friend class llvm::TrailingObjects<APIntSymbolicValue, uint64_t>;
+  : private llvm::TrailingObjects<APIntSymbolicValue, uint64_t> {
+    friend class llvm::TrailingObjects<APIntSymbolicValue, uint64_t>;
 
   /// The number of words in the trailing array and # bits of the value.
   const unsigned numWords, numBits;
@@ -168,7 +161,7 @@ struct alignas(uint64_t) APIntSymbolicValue final
                                     ArrayRef<uint64_t> elements,
                                     llvm::BumpPtrAllocator &allocator) {
     auto byteSize =
-        APIntSymbolicValue::totalSizeToAlloc<uint64_t>(elements.size());
+      APIntSymbolicValue::totalSizeToAlloc<uint64_t>(elements.size());
     auto rawMem = allocator.Allocate(byteSize, alignof(APIntSymbolicValue));
 
     //  Placement initialize the APIntSymbolicValue.
@@ -179,26 +172,28 @@ struct alignas(uint64_t) APIntSymbolicValue final
   }
 
   APInt getValue() const {
-    return APInt(numBits, {getTrailingObjects<uint64_t>(), numWords});
+    return APInt(numBits, { getTrailingObjects<uint64_t>(), numWords });
   }
 
   // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<uint64_t>) const { return numWords; }
-
+  size_t numTrailingObjects(OverloadToken<uint64_t>) const {
+    return numWords;
+  }
 private:
   APIntSymbolicValue() = delete;
   APIntSymbolicValue(const APIntSymbolicValue &) = delete;
   APIntSymbolicValue(unsigned numBits, unsigned numWords)
-      : numWords(numWords), numBits(numBits) {}
+    : numWords(numWords), numBits(numBits) {}
 };
 } // end namespace swift
 
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
                                         llvm::BumpPtrAllocator &allocator) {
   // TODO: Could store these inline in the union in the common case.
-  auto intValue = APIntSymbolicValue::create(
-      value.getBitWidth(), {value.getRawData(), value.getNumWords()},
-      allocator);
+  auto intValue =
+    APIntSymbolicValue::create(value.getBitWidth(),
+                               { value.getRawData(), value.getNumWords()},
+                               allocator);
   assert(intValue && "Integer value must be present");
   SymbolicValue result;
   result.representationKind = RK_Integer;
@@ -224,18 +219,18 @@ namespace swift {
 /// This is a representation of a floating point value, stored as a trailing
 /// array of words.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) APFloatSymbolicValue final
-    : private llvm::TrailingObjects<APFloatSymbolicValue, uint64_t> {
-  friend class llvm::TrailingObjects<APFloatSymbolicValue, uint64_t>;
+  : private llvm::TrailingObjects<APFloatSymbolicValue, uint64_t> {
+    friend class llvm::TrailingObjects<APFloatSymbolicValue, uint64_t>;
 
   const llvm::fltSemantics &semantics;
 
   static APFloatSymbolicValue *create(const llvm::fltSemantics &semantics,
-                                      ArrayRef<uint64_t> elements,
-                                      llvm::BumpPtrAllocator &allocator) {
-    assert((APFloat::getSizeInBits(semantics) + 63) / 64 == elements.size());
+                                     ArrayRef<uint64_t> elements,
+                                     llvm::BumpPtrAllocator &allocator) {
+    assert((APFloat::getSizeInBits(semantics)+63)/64 == elements.size());
 
     auto byteSize =
-        APFloatSymbolicValue::totalSizeToAlloc<uint64_t>(elements.size());
+      APFloatSymbolicValue::totalSizeToAlloc<uint64_t>(elements.size());
     auto rawMem = allocator.Allocate(byteSize, alignof(APFloatSymbolicValue));
 
     //  Placement initialize the APFloatSymbolicValue.
@@ -247,31 +242,34 @@ struct alignas(uint64_t) APFloatSymbolicValue final
 
   APFloat getValue() const {
     auto val = APInt(APFloat::getSizeInBits(semantics),
-                     {getTrailingObjects<uint64_t>(),
-                      numTrailingObjects(OverloadToken<uint64_t>())});
+                     { getTrailingObjects<uint64_t>(),
+                       numTrailingObjects(OverloadToken<uint64_t>())
+                     });
     return APFloat(semantics, val);
   }
 
   // This is used by the llvm::TrailingObjects base class.
   size_t numTrailingObjects(OverloadToken<uint64_t>) const {
-    return (APFloat::getSizeInBits(semantics) + 63) / 64;
+    return (APFloat::getSizeInBits(semantics)+63)/64;
   }
-
 private:
   APFloatSymbolicValue() = delete;
   APFloatSymbolicValue(const APFloatSymbolicValue &) = delete;
   APFloatSymbolicValue(const llvm::fltSemantics &semantics)
-      : semantics(semantics) {}
+    : semantics(semantics) {}
 };
 } // end namespace swift
+
 
 SymbolicValue SymbolicValue::getFloat(const APFloat &value,
                                       llvm::BumpPtrAllocator &allocator) {
   APInt val = value.bitcastToAPInt();
 
   // TODO: Could store these inline in the union in the common case.
-  auto fpValue = APFloatSymbolicValue::create(
-      value.getSemantics(), {val.getRawData(), val.getNumWords()}, allocator);
+  auto fpValue =
+    APFloatSymbolicValue::create(value.getSemantics(),
+                                 { val.getRawData(), val.getNumWords()},
+                                 allocator);
   assert(fpValue && "Floating point value must be present");
   SymbolicValue result;
   result.representationKind = RK_Float;
@@ -297,8 +295,8 @@ namespace swift {
 /// This is a representation of an UTF-8 encoded string, stored as a trailing
 /// array of bytes.  Elements of this value are bump-pointer allocated.
 struct alignas(uint64_t) StringSymbolicValue final
-    : private llvm::TrailingObjects<StringSymbolicValue, char> {
-  friend class llvm::TrailingObjects<StringSymbolicValue, char>;
+  : private llvm::TrailingObjects<StringSymbolicValue, char> {
+    friend class llvm::TrailingObjects<StringSymbolicValue, char>;
 
   /// The number of bytes in the trailing array.
   const unsigned numBytes;
@@ -316,17 +314,20 @@ struct alignas(uint64_t) StringSymbolicValue final
   }
 
   StringRef getValue() const {
-    return {getTrailingObjects<char>(),
-            numTrailingObjects(OverloadToken<char>())};
+    return {
+      getTrailingObjects<char>(), numTrailingObjects(OverloadToken<char>())
+    };
   }
 
   // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<char>) const { return numBytes; }
-
+  size_t numTrailingObjects(OverloadToken<char>) const {
+    return numBytes;
+  }
 private:
   StringSymbolicValue() = delete;
   StringSymbolicValue(const StringSymbolicValue &) = delete;
-  StringSymbolicValue(unsigned numBytes) : numBytes(numBytes) {}
+  StringSymbolicValue(unsigned numBytes) :
+    numBytes(numBytes) {}
 };
 } // end namespace swift
 
@@ -363,16 +364,16 @@ namespace swift {
 /// element structs do not use this (as a performance optimization to reduce
 /// allocations).
 struct alignas(SymbolicValue) AggregateSymbolicValue final
-    : private llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue> {
+: private llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue> {
   friend class llvm::TrailingObjects<AggregateSymbolicValue, SymbolicValue>;
 
   /// This is the number of elements in the aggregate.
   const unsigned numElements;
 
   static AggregateSymbolicValue *create(ArrayRef<SymbolicValue> elements,
-                                        llvm::BumpPtrAllocator &allocator) {
-    auto byteSize = AggregateSymbolicValue::totalSizeToAlloc<SymbolicValue>(
-        elements.size());
+                                       llvm::BumpPtrAllocator &allocator) {
+    auto byteSize =
+      AggregateSymbolicValue::totalSizeToAlloc<SymbolicValue>(elements.size());
     auto rawMem = allocator.Allocate(byteSize, alignof(AggregateSymbolicValue));
 
     //  Placement initialize the AggregateSymbolicValue.
@@ -385,20 +386,20 @@ struct alignas(SymbolicValue) AggregateSymbolicValue final
   /// Return the element constants for this aggregate constant.  These are
   /// known to all be constants.
   ArrayRef<SymbolicValue> getElements() const {
-    return {getTrailingObjects<SymbolicValue>(), numElements};
+    return { getTrailingObjects<SymbolicValue>(), numElements };
   }
 
   // This is used by the llvm::TrailingObjects base class.
   size_t numTrailingObjects(OverloadToken<SymbolicValue>) const {
     return numElements;
   }
-
 private:
   AggregateSymbolicValue() = delete;
   AggregateSymbolicValue(const AggregateSymbolicValue &) = delete;
   AggregateSymbolicValue(unsigned numElements) : numElements(numElements) {}
 };
 } // end namespace swift
+
 
 /// This returns a constant Symbolic value with the specified elements in it.
 /// This assumes that the elements lifetime has been managed for this.
@@ -420,6 +421,7 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 //===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
+
 
 /// The SIL location for operations we process are usually deep in the bowels
 /// of inlined code from opaque libraries, which are all implementation details
@@ -450,34 +452,15 @@ static SILDebugLocation skipInternalLocations(SILDebugLocation loc) {
   return loc;
 }
 
-/// Emits an explanatory note if there is useful information to note or if there
-/// is an interesting SourceLoc to point at.
-static void emitNoteDiagnostic(SILInstruction *badInst, UnknownReason reason,
-                               SILLocation fallbackLoc, std::string error) {
-  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
-  if (loc.isNull()) {
-    // If we have important clarifying information, make sure to emit it.
-    if (reason == UnknownReason::Default || fallbackLoc.isNull())
-      return;
-    loc = fallbackLoc;
-  }
-
-  auto &module = badInst->getModule();
-  diagnose(module.getASTContext(), loc.getSourceLoc(), diag::tf_op_misuse_note,
-           error)
-      .highlight(loc.getSourceRange());
-}
-
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
 /// context about what the problem is.
 void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
-  const UnknownInfo &unknown = getUnknownInfo();
-  auto badInst = dyn_cast<SILInstruction>(unknown.node);
-  if (!badInst)
-    return;
+  std::pair<SILNode *, UnknownReason> unknown = getUnknownValue();
+  auto badInst = dyn_cast<SILInstruction>(unknown.first);
+  if (!badInst) return;
 
   std::string error;
-  switch (unknown.reason) {
+  switch (unknown.second) {
   case UnknownReason::Default:
     error = "could not fold operation";
     break;
@@ -496,27 +479,20 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     break;
   }
 
-  emitNoteDiagnostic(badInst, unknown.reason, fallbackLoc, error);
-
   auto &module = badInst->getModule();
-  auto &SM = module.getASTContext().SourceMgr;
-  bool emittedFirstNote = false;
-  unsigned originalDiagnosticLineNumber =
-      SM.getLineNumber(fallbackLoc.getSourceLoc());
-  for (auto &sourceLoc : llvm::reverse(unknown.call_stack)) {
-    // Skip known sources.
-    if (!sourceLoc.isValid())
-      continue;
-    // Also skip notes that point to the same line as the original error, for
-    // example in:
-    //   #assert(foo(bar()))
-    // it is not useful to get three diagnostics referring to the same line.
-    if (SM.getLineNumber(sourceLoc) == originalDiagnosticLineNumber)
-      continue;
 
-    auto diag = emittedFirstNote ? diag::constexpr_called_from
-                                 : diag::constexpr_not_evaluable;
-    diagnose(module.getASTContext(), sourceLoc, diag);
-    emittedFirstNote = true;
+  auto loc = skipInternalLocations(badInst->getDebugLocation()).getLocation();
+  if (loc.isNull()) {
+    // If we have important clarifying information, make sure to emit it.
+    if (unknown.second == UnknownReason::Default ||
+        fallbackLoc.isNull())
+      return;
+    loc = fallbackLoc;
   }
+
+  diagnose(module.getASTContext(), loc.getSourceLoc(),
+           diag::tf_op_misuse_note, error)
+    .highlight(loc.getSourceRange());
 }
+
+
