@@ -1536,9 +1536,17 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     return _value
   }
 
+  internal var _canonicalBox: _AnyHashableBox {
+    return _DictionaryAnyHashableBox<AnyHashable, AnyHashable>(_canonical)
+  }
+
   internal func _isEqual(to other: _AnyHashableBox) -> Bool? {
-    guard let other = other._asDictionary() else { return nil }
-    return _canonical == other
+    guard
+      let other = other as? _DictionaryAnyHashableBox<AnyHashable, AnyHashable>
+    else {
+      return nil
+    }
+    return _canonical == other._value
   }
 
   internal var _hashValue: Int {
@@ -1559,10 +1567,6 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     guard let value = _value as? T else { return false }
     result.initialize(to: value)
     return true
-  }
-
-  internal func _asDictionary() -> Dictionary<AnyHashable, AnyHashable>? {
-    return _canonical
   }
 }
 
