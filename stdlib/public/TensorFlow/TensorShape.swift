@@ -138,3 +138,17 @@ extension TensorShape : Equatable {
     return lhs.dimensions == rhs.dimensions
   }
 }
+
+/// Codable conformance.
+extension TensorShape : Codable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.singleValueContainer()
+    try container.encode(dimensions)
+  }
+
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.singleValueContainer()
+    let dimensions = try container.decode([Int32].self)
+    self.init(dimensions)
+  }
+}
