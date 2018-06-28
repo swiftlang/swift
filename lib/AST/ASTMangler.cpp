@@ -739,31 +739,18 @@ void ASTMangler::appendType(Type type) {
       auto aliasTy = cast<NameAliasType>(tybase);
 
       // It's not possible to mangle the context of the builtin module.
-      // For the DWARF output we want to mangle the type alias + context,
-      // unless the type alias references a builtin type.
       TypeAliasDecl *decl = aliasTy->getDecl();
       if (decl->getModuleContext() == decl->getASTContext().TheBuiltinModule) {
         return appendType(aliasTy->getSinglyDesugaredType());
       }
 
-      if (type->isSpecialized()) {
-        // Try to mangle the entire name as a substitution.
-        if (tryMangleSubstitution(tybase))
-          return;
+      // FIXME: We also cannot yet mangle references to typealiases that
+      // involve generics.
+      if (decl->getGenericSignature())
+        return appendSugaredType<NameAliasType>(type);
 
-        appendAnyGenericType(decl);
-        bool isFirstArgList = true;
-        if (auto *nominalType = type->getAs<NominalType>()) {
-          if (nominalType->getParent())
-            type = nominalType->getParent();
-        }
-        appendBoundGenericArgs(type, isFirstArgList);
-        appendRetroactiveConformances(type);
-        appendOperator("G");
-        addSubstitution(type.getPointer());
-        return;
-      }
-
+      // For the DWARF output we want to mangle the type alias + context,
+      // unless the type alias references a builtin type.
       return appendAnyGenericType(decl);
     }
 

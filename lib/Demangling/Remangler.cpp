@@ -463,7 +463,6 @@ void Remangler::mangleAnyNominalType(Node *node) {
     case Node::Kind::Enum: return mangleAnyGenericType(node, "O");
     case Node::Kind::Class: return mangleAnyGenericType(node, "C");
     case Node::Kind::OtherNominalType: return mangleAnyGenericType(node, "XY");
-    case Node::Kind::TypeAlias: return mangleAnyGenericType(node, "a");
     default:
       unreachable("bad nominal type kind");
   }
@@ -482,8 +481,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
     case Node::Kind::BoundGenericOtherNominalType:
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
-    case Node::Kind::BoundGenericClass:
-    case Node::Kind::BoundGenericTypeAlias: {
+    case Node::Kind::BoundGenericClass: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
@@ -592,10 +590,6 @@ void Remangler::mangleBoundGenericStructure(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
-  mangleAnyNominalType(node);
-}
-
-void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   mangleAnyNominalType(node);
 }
 
@@ -2037,7 +2031,6 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
     case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias:
       return true;
 
     case Node::Kind::Structure:
@@ -2073,8 +2066,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
     case Node::Kind::BoundGenericClass:
-    case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias: {
+    case Node::Kind::BoundGenericOtherNominalType: {
       NodePointer unboundType = node->getChild(0);
       assert(unboundType->getKind() == Node::Kind::Type);
       NodePointer nominalType = unboundType->getChild(0);
