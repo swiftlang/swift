@@ -243,7 +243,7 @@ SILFunction *getCalleeOfOnceCall(BuiltinInst *BI);
 ///
 /// Given an addressor, AddrF, find the call to the global initializer if
 /// present, otherwise return null. If an initializer is returned, then
-/// `CallsToOnce` is initialized to the corresponding builtin "once" call.
+/// `CallToOnce` is initialized to the corresponding builtin "once" call.
 SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
                              BuiltinInst *&CallToOnce);
 
