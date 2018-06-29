@@ -55,7 +55,7 @@ internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
 
 internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
-) -> PlaygroundQuickLook? {
+) -> _PlaygroundQuickLook? {
   if _is(object, kindOf: "NSNumber") {
     let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
     switch UInt8(number.objCType[0]) {
@@ -149,7 +149,7 @@ extension Mirror {
     self._defaultDescendantRepresentation = .generated
   }
   
-  internal static func quickLookObject(_ subject: Any) -> PlaygroundQuickLook? {
+  internal static func quickLookObject(_ subject: Any) -> _PlaygroundQuickLook? {
 #if _runtime(_ObjC)
     let object = _getQuickLookObject(subject)
     return object.flatMap(_getClassPlaygroundQuickLook)

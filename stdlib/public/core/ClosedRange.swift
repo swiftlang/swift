@@ -459,16 +459,7 @@ extension ClosedRange {
   }
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
-  /// Now that Range is conditionally a collection when Bound: Strideable,
-  /// CountableRange is no longer needed. This is a deprecated initializer
-  /// for any remaining uses of Range(countableRange).
-  @available(*,deprecated: 4.2, 
-    message: "CountableRange is now Range. No need to convert any more.")
-  public init(_ other: ClosedRange<Bound>) {
-    self = other
-  }  
-  
+extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {  
   /// Creates an instance equivalent to the given `Range`.
   ///
   /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
@@ -495,8 +486,7 @@ extension ClosedRange {
   }
 }
 
-@available(*, deprecated, renamed: "ClosedRange.Index")
-public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
-
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger

@@ -158,6 +158,3 @@ extension EnumeratedSequence: Sequence {
     return Iterator(_base: _base.makeIterator())
   }
 }
-
-@available(*, deprecated: 4.2, renamed: "EnumeratedSequence.Iterator")
-public typealias EnumeratedIterator<T: Sequence> = EnumeratedSequence<T>.Iterator

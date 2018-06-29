@@ -466,6 +466,3 @@ extension Unicode.Scalar {
     Builtin.unreachable()
   }
 }
-
-// @available(swift, obsoleted: 4.0, renamed: "Unicode.Scalar")
-public typealias UnicodeScalar = Unicode.Scalar

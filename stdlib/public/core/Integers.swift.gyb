@@ -2270,7 +2270,7 @@ extension BinaryInteger {
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
 public protocol FixedWidthInteger :
-  BinaryInteger, LosslessStringConvertible, _BitwiseOperations
+  BinaryInteger, LosslessStringConvertible
   where Magnitude : FixedWidthInteger
 {
   /// The number of bits used for the underlying binary representation of
@@ -2428,11 +2428,6 @@ ${assignmentOperatorComment(x.operator, False)}
 }
 
 extension FixedWidthInteger {
-  /// The empty bitset.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
-  public static var allZeros: Self { return 0 }
-
   /// The number of bits in the binary representation of this value.
   @inlinable
   public var bitWidth: Int { return Self.bitWidth }
@@ -4107,48 +4102,6 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #else
   return lhs &- rhs
 #endif
-}
-
-// Swift 3 compatibility APIs
-
-@available(swift, obsoleted: 4, renamed: "BinaryInteger")
-public typealias Integer = BinaryInteger
-
-@available(swift, obsoleted: 4, renamed: "BinaryInteger")
-public typealias IntegerArithmetic = BinaryInteger
-
-@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
-public typealias SignedNumber = SignedNumeric & Comparable
-
-@available(swift, obsoleted: 4, message: "Please use 'SignedNumeric & Comparable' instead.")
-public typealias AbsoluteValuable = SignedNumeric & Comparable
-
-@available(swift, obsoleted: 4, renamed: "SignedInteger")
-public typealias _SignedInteger = SignedInteger
-
-extension SignedNumeric where Self : Comparable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Please use the 'abs(_:)' free function.")
-  @_transparent
-  public static func abs(_ x: Self) -> Self {
-    return Swift.abs(x)
-  }
-}
-
-extension BinaryInteger {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public func toIntMax() -> Int64 {
-    return Int64(self)
-  }
-}
-
-extension UnsignedInteger {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public func toUIntMax() -> UInt64 {
-    return UInt64(self)
-  }
 }
 
 // FIXME(integers): These overloads allow expressions like the following in

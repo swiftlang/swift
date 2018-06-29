@@ -1153,53 +1153,6 @@ extension Dictionary {
   }
 }
 
-// Maintain old `keys` and `values` types in Swift 3 mode.
-
-extension Dictionary {
-  /// A collection containing just the keys of the dictionary.
-  ///
-  /// When iterated over, keys appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs. Each key in the keys
-  /// collection has a unique value.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for k in countryCodes.keys {
-  ///         print(k)
-  ///     }
-  ///     // Prints "BR"
-  ///     // Prints "JP"
-  ///     // Prints "GH"
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0)
-  public var keys: LazyMapCollection<[Key: Value], Key> {
-    return self.lazy.map { $0.key }
-  }
-
-  /// A collection containing just the values of the dictionary.
-  ///
-  /// When iterated over, values appear in this collection in the same order as
-  /// they occur in the dictionary's key-value pairs.
-  ///
-  ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana", "JP": "Japan"]
-  ///     print(countryCodes)
-  ///     // Prints "["BR": "Brazil", "JP": "Japan", "GH": "Ghana"]"
-  ///
-  ///     for v in countryCodes.values {
-  ///         print(v)
-  ///     }
-  ///     // Prints "Brazil"
-  ///     // Prints "Japan"
-  ///     // Prints "Ghana"
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0)
-  public var values: LazyMapCollection<[Key: Value], Value> {
-    return self.lazy.map { $0.value }
-  }
-}
-
 extension Dictionary {
   /// A collection containing just the keys of the dictionary.
   ///
@@ -4734,20 +4687,6 @@ extension Dictionary {
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
-  }
-
-  @inlinable
-  @available(swift, obsoleted: 4.0)
-  public func filter(
-    _ isIncluded: (Element) throws -> Bool, obsoletedInSwift4: () = ()
-  ) rethrows -> [Element] {
-    var result: [Element] = []
-    for x in self {
-      if try isIncluded(x) {
-        result.append(x)
-      }
-    }
-    return result
   }
 
   /// The total number of key-value pairs that the dictionary can contain without

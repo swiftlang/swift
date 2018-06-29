@@ -278,16 +278,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 }
 
-extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
-  /// Now that Range is conditionally a collection when Bound: Strideable,
-  /// CountableRange is no longer needed. This is a deprecated initializer
-  /// for any remaining uses of Range(countableRange).
-  @available(*,deprecated: 4.2, 
-    message: "CountableRange is now Range. No need to convert any more.")
-  public init(_ other: Range<Bound>) {
-    self = other
-  }  
-  
+extension Range where Bound: Strideable, Bound.Stride : SignedInteger {  
   /// Creates an instance equivalent to the given `ClosedRange`.
   ///
   /// - Parameter other: A closed range to convert to a `Range` instance.
@@ -849,6 +840,7 @@ extension Collection {
     return self[startIndex...]
   }
 }
+
 extension MutableCollection {
   @inlinable
   public subscript<R: RangeExpression>(r: R) -> SubSequence
@@ -907,8 +899,12 @@ extension Range {
   }
 }
 
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountableRange<Bound: Strideable> = Range<Bound>
   where Bound.Stride : SignedInteger
 
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride : SignedInteger

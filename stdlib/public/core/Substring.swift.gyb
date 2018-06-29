@@ -330,14 +330,6 @@ extension Substring : CustomReflectable {
   }
 }
 
-extension Substring : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "Substring.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return String(self).customPlaygroundQuickLook
-  }
-}
-
 extension Substring : CustomStringConvertible {
   @inlinable // FIXME(sil-serialize-all)
   public var description: String {
@@ -622,22 +614,6 @@ extension String {
     return Substring(
       _slice: Slice(base: self, bounds: r))
   }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(base: self, bounds: bounds)))
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    _boundsCheck(bounds)
-    return String(Substring(_slice: Slice(
-          base: self,
-          bounds: bounds.relative(to: self))))
-  }
 }
 
 extension Substring {
@@ -645,46 +621,6 @@ extension Substring {
   @available(swift, introduced: 4)
   public subscript(r: Range<Index>) -> Substring {
     return Substring(_slice: _slice[r])
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String {
-    return String(Substring(_slice: _slice[bounds]))
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String {
-    return self[bounds.relative(to: self)]
-  }
-}
-//===----------------------------------------------------------------------===//
-
-// popFirst() is only present when a collection is its own subsequence. This was
-// dropped in Swift 4.
-extension String {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.popFirst()'.")
-  public mutating func popFirst() -> String.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
-    let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...])
-    return element
-  }
-}
-extension String.UnicodeScalarView {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4, message:
-    "Please use 'first', 'dropFirst()', or 'Substring.UnicodeScalarView.popFirst()'.")
-  public mutating func popFirst() -> String.UnicodeScalarView.Element? {
-    guard !isEmpty else { return nil }
-    let element = first!
-    let nextIdx = self.index(after: self.startIndex)
-    self = String(self[nextIdx...]).unicodeScalars
-    return element
   }
 }
 

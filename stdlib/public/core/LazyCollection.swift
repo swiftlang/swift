@@ -263,8 +263,3 @@ extension Slice: LazySequenceProtocol where Base: LazySequenceProtocol { }
 extension Slice: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
 extension ReversedCollection: LazySequenceProtocol where Base: LazySequenceProtocol { }
 extension ReversedCollection: LazyCollectionProtocol where Base: LazyCollectionProtocol { }
-
-@available(*, deprecated, renamed: "LazyCollection")
-public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "LazyCollection")
-public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
