@@ -1370,6 +1370,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.LinkAction = LinkKind::None;
       break;
     case options::OPT_parse:
+    case options::OPT_namebind:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_dump_ast:
