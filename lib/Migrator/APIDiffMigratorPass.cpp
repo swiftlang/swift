@@ -329,7 +329,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (auto *MI = dyn_cast<TypeMemberDiffItem>(Item)) {
         if (MI->Subkind == TypeMemberDiffItemSubKind::FuncRename) {
           llvm::raw_svector_ostream OS(Buffer);
-          OS << MI->newTypeName << "." << MI->newPrintedName;
+          OS << MI->getNewTypeAndDot() << MI->newPrintedName;
           return DeclNameViewer(OS.str());
         }
       }
@@ -343,7 +343,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
         bool NeedNoTypeName = isDotMember &&
           MD->oldPrintedName == MD->newPrintedName;
-        Text = (llvm::Twine(NeedNoTypeName ? "" : MD->newTypeName) + "." +
+        Text = (llvm::Twine(NeedNoTypeName ? "." : MD->getNewTypeAndDot()) +
           MD->getNewName().base()).str();
         return true;
       }
@@ -541,7 +541,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
             bool NeedNoTypeName = isDotMember(ToReplace) &&
               Item->oldPrintedName == Item->newPrintedName;
             Editor.replace(ToReplace,
-              (llvm::Twine(NeedNoTypeName ? "" : Item->newTypeName) + "." +
+              (llvm::Twine(NeedNoTypeName ? "." : Item->getNewTypeAndDot()) +
                Item->getNewName().base()).str());
             return true;
           }
@@ -710,8 +710,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return false;
 
     if (Item->Subkind == TypeMemberDiffItemSubKind::GlobalFuncToStaticProperty) {
-      Editor.replace(Call->getSourceRange(), (llvm::Twine(Item->newTypeName) +
-        "." + Item->getNewName().base()).str());
+      Editor.replace(Call->getSourceRange(),
+        (llvm::Twine(Item->getNewTypeAndDot()) + Item->getNewName().base()).str());
       return true;
     }
     if (*Item->selfIndex)
