@@ -2941,6 +2941,12 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
       return true;
     }
   }
+  // Try to bridge NSError to Error.
+  if (tryDynamicCastNSErrorObjectToValue(sourceValue, destValue, nativeType,
+                                         DynamicCastFlags::Default)) {
+    return true;
+  }
+
   
   return false;
 }
