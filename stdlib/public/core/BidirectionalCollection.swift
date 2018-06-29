@@ -10,15 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements, with bidirectional
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `BidirectionalCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'BidirectionalCollection' instead")
-public typealias BidirectionalIndexable = BidirectionalCollection
-
 /// A collection that supports backward as well as forward traversal.
 ///
 /// Bidirectional collections offer traversal backward from any valid index,
