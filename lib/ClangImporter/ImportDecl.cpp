@@ -1641,9 +1641,9 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
-  auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>();
-  assert(objcAttr);
-  thunk->getAttrs().add(objcAttr->clone(C));
+  if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
+    thunk->getAttrs().add(objcAttr->clone(C));
+  thunk->setIsObjC(getter->isObjC());
   // FIXME: Should we record thunks?
 
   return thunk;
@@ -1711,9 +1711,9 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
 
   thunk->setAccess(getOverridableAccessLevel(dc));
 
-  auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>();
-  assert(objcAttr);
-  thunk->getAttrs().add(objcAttr->clone(C));
+  if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
+    thunk->getAttrs().add(objcAttr->clone(C));
+  thunk->setIsObjC(setter->isObjC());
 
   return thunk;
 }
@@ -3811,7 +3811,10 @@ namespace {
     /// The importer should use this rather than adding the attribute directly.
     void addObjCAttribute(ValueDecl *decl, Optional<ObjCSelector> name) {
       auto &ctx = Impl.SwiftContext;
-      decl->getAttrs().add(ObjCAttr::create(ctx, name, /*implicitName=*/true));
+      if (name) {
+        decl->getAttrs().add(ObjCAttr::create(ctx, name,
+                                              /*implicitName=*/true));
+      }
       decl->setIsObjC(true);
 
       // If the declaration we attached the 'objc' attribute to is within a
@@ -6516,7 +6519,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
       auto swiftSel = Impl.importSelector(sel);
       for (auto found : classDecl->lookupDirect(swiftSel, true)) {
         if (auto foundFunc = dyn_cast<FuncDecl>(found))
-          return foundFunc;
+          if (foundFunc->hasClangNode())
+            return foundFunc;
       }
     }
 

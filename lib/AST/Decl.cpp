@@ -2894,8 +2894,9 @@ void ClassDecl::addImplicitDestructor() {
   DD->setGenericEnvironment(getGenericEnvironmentOfContext());
 
   // Mark DD as ObjC, as all dtors are.
-  DD->setIsObjC(true);
-  recordObjCMethod(DD);
+  DD->setIsObjC(getASTContext().LangOpts.EnableObjCInterop);
+  if (getASTContext().LangOpts.EnableObjCInterop)
+    recordObjCMethod(DD);
 
   // Assign DD the interface type (Self) -> () -> ()
   ArrayRef<AnyFunctionType::Param> noParams;
