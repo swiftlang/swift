@@ -493,14 +493,51 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func == (
-    lhs: AutoreleasingUnsafeMutablePointer,
-    rhs: AutoreleasingUnsafeMutablePointer
-  ) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+extension AutoreleasingUnsafeMutablePointer /*: Strideable*/ {
+  /// Returns the distance from this pointer to the given pointer, counted as
+  /// instances of the pointer's `Pointee` type.
+  ///
+  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
+  /// equivalent to `q - p`.
+  ///
+  /// Typed pointers are required to be properly aligned for their `Pointee`
+  /// type. Proper alignment ensures that the result of `distance(to:)`
+  /// accurately measures the distance between the two pointers, counted in
+  /// strides of `Pointee`. To find the distance in bytes between two
+  /// pointers, convert them to `UnsafeRawPointer` instances before calling
+  /// `distance(to:)`.
+  ///
+  /// - Parameter end: The pointer to calculate the distance to.
+  /// - Returns: The distance from this pointer to `end`, in strides of the
+  ///   pointer's `Pointee` type. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`.
+  @inlinable
+  public func distance(to end: AutoreleasingUnsafeMutablePointer) -> Int {
+    return
+      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
+                           Builtin.ptrtoint_Word(_rawValue)))
+      / MemoryLayout<Pointee>.stride
+  }
+
+  /// Returns a pointer offset from this pointer by the specified number of
+  /// instances.
+  ///
+  /// With pointer `p` and distance `n`, the result of `p.advanced(by: n)` is
+  /// equivalent to `p + n`.
+  ///
+  /// The resulting pointer must be within the bounds of the same allocation as
+  /// this pointer.
+  ///
+  /// - Parameter n: The number of strides of the pointer's `Pointee` type to
+  ///   offset this pointer. To access the stride, use
+  ///   `MemoryLayout<Pointee>.stride`. `n` may be positive, negative, or
+  ///   zero.
+  /// - Returns: A pointer offset from this pointer by `n` instances of the
+  ///   `Pointee` type.
+  @inlinable
+  public func advanced(by n: Int) -> AutoreleasingUnsafeMutablePointer {
+    return AutoreleasingUnsafeMutablePointer(Builtin.gep_Word(
+      self._rawValue, n._builtinWordValue, Pointee.self))
   }
 }
 
@@ -549,14 +586,6 @@ extension UnsafeRawPointer {
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
-  }
-}
-
-extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
-  @inlinable
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
   }
 }
 

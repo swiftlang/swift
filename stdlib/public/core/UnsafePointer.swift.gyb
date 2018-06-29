@@ -274,9 +274,6 @@
 @_fixed_layout
 public struct ${Self}<Pointee>: _Pointer {
 
-  /// A type that represents the distance between two pointers.
-  public typealias Distance = Int
-
   /// The underlying raw (untyped) pointer.
   public let _rawValue: Builtin.RawPointer
 
@@ -285,78 +282,6 @@ public struct ${Self}<Pointee>: _Pointer {
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
-  }
-
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ from : OpaquePointer) {
-    _rawValue = from._rawValue
-  }
-
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer. If
-  ///   `from` is `nil`, the result of this initializer is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ from : OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
-  }
-
-  /// Creates a new typed pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// The address passed as `bitPattern` must have the correct alignment for
-  /// the pointer's `Pointee` type. That is,
-  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(bitPattern: Int) {
-    if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
-  }
-
-  /// Creates a new typed pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// The address passed as `bitPattern` must have the correct alignment for
-  /// the pointer's `Pointee` type. That is,
-  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(bitPattern: UInt) {
-    if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
-  }
-
-  /// Creates a new pointer from the given typed pointer.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ other: ${Self}<Pointee>) {
-    self = other
-  }
-
-  /// Creates a new pointer from the given typed pointer.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ other: ${Self}<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self = unwrapped
   }
 
 %  if mutable:
@@ -820,84 +745,7 @@ public struct ${Self}<Pointee>: _Pointer {
   }
 }
 
-extension ${Self}: Equatable {
-  // - Note: Strideable's implementation is potentially less efficient and cannot
-  //   handle misaligned pointers.
-  /// Returns a Boolean value indicating whether two pointers are equal.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
-  ///   otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
-extension ${Self}: Comparable {
-  // - Note: Strideable's implementation is potentially less efficient and
-  // cannot handle misaligned pointers.
-  //
-  // - Note: This is an unsigned comparison unlike Strideable's implementation.
-  /// Returns a Boolean value indicating whether the first pointer references
-  /// an earlier memory location than the second pointer.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` references a memory address earlier than
-  ///   `rhs`; otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-extension ${Self}: Hashable {
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
-  @inlinable
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(UInt(bitPattern: self))
-  }
-
-  @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
-    return Hasher._hash(seed: seed, UInt(bitPattern: self))
-  }
-}
-
 extension ${Self}: Strideable {
-  /// Returns a pointer to the next consecutive instance.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Returns: A pointer advanced from this pointer by
-  ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
-  public func successor() -> ${Self} {
-    return advanced(by: 1)
-  }
-
-  /// Returns a pointer to the previous consecutive instance.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Returns: A pointer shifted backward from this pointer by
-  ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
-  public func predecessor() -> ${Self} {
-    return self - 1
-  }
-
   /// Returns the distance from this pointer to the given pointer, counted as
   /// instances of the pointer's `Pointee` type.
   ///
@@ -945,56 +793,6 @@ extension ${Self}: Strideable {
   }
 }
 
-extension ${Self} : CustomDebugStringConvertible {
-  /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
-  }
-}
-
-extension ${Self} : CustomReflectable {
-  public var customMirror: Mirror {
-    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return Mirror(self, children: ["pointerValue": ptrValue])
-  }
-}
-
-extension Int {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init<U>(bitPattern pointer: ${Self}<U>?) {
-    if let pointer = pointer {
-      self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
-  }
-}
-
-extension UInt {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init<U>(bitPattern pointer: ${Self}<U>?) {
-    if let pointer = pointer {
-      self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
-  }
-}
-
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   internal static var _max : ${Self} {
@@ -1003,7 +801,7 @@ extension ${Self} {
     )._unsafelyUnwrappedUnchecked
   }
 }
-% end # for mutable
+% end 
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
