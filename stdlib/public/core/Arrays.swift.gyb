@@ -2420,6 +2420,73 @@ extension ArraySlice {
   }
 }
 
+extension Array: _HasCustomAnyHashableRepresentation
+  where Element: Hashable {
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _ArrayAnyHashableBox(self))
+  }
+}
+
+internal protocol _ArrayAnyHashableProtocol: _AnyHashableBox {
+  var count: Int { get }
+  subscript(index: Int) -> AnyHashable { get }
+}
+
+internal struct _ArrayAnyHashableBox<Element: Hashable>
+  : _ArrayAnyHashableProtocol {
+  internal let _value: [Element]
+
+  internal init(_ value: [Element]) {
+    self._value = value
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal var count: Int {
+    return _value.count
+  }
+
+  internal subscript(index: Int) -> AnyHashable {
+    return _value[index] as AnyHashable
+  }
+
+  func _isEqual(to other: _AnyHashableBox) -> Bool? {
+    guard let other = other as? _ArrayAnyHashableProtocol else { return nil }
+    guard _value.count == other.count else { return false }
+    for i in 0 ..< _value.count {
+      if self[i] != other[i] { return false }
+    }
+    return true
+  }
+
+  var _hashValue: Int {
+    var hasher = Hasher()
+    _hash(into: &hasher)
+    return hasher.finalize()
+  }
+
+  func _hash(into hasher: inout Hasher) {
+    hasher.combine(_value.count) // discriminator
+    for i in 0 ..< _value.count {
+      hasher.combine(self[i])
+    }
+  }
+
+  internal func _unbox<T : Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
+  }
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:
