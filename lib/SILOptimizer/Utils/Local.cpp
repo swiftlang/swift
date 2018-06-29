@@ -1409,6 +1409,10 @@ swift::analyzeStaticInitializer(SILValue V,
 /// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 /// Move into utils.
+///
+/// FIXME: this utility does not make sense as an API. How can the caller
+/// guarantee that the only uses of `I` are struct_element_addr and
+/// tuple_element_addr?
 void swift::replaceLoadSequence(SILInstruction *I,
                                 SILValue Value,
                                 SILBuilder &B) {
@@ -1433,6 +1437,18 @@ void swift::replaceLoadSequence(SILInstruction *I,
     }
     return;
   }
+
+  if (auto *BA = dyn_cast<BeginAccessInst>(I)) {
+    for (auto Use : BA->getUses()) {
+      replaceLoadSequence(Use->getUser(), Value, B);
+    }
+    return;
+  }
+
+  // Incidental uses of an addres are meaningless with regard to the loaded
+  // value.
+  if (isIncidentalUse(I) || isa<BeginUnpairedAccessInst>(I))
+    return;
 
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }

@@ -678,6 +678,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
     auto *GetterRef = B.createFunctionRef(Call->getLoc(), GetterF);
     auto *NewAI = B.createApply(Call->getLoc(), GetterRef, Args, false);
 
+    // FIXME: This is asserting that a specific SIL sequence follows an
+    // addressor! SIL passes should never do this without first specifying a
+    // structural SIL property independent of the SILOptimizer and enforced by
+    // the SILVerifier.
     for (auto Use : Call->getUses()) {
       auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
       assert(PTAI && "All uses should be pointer_to_address");

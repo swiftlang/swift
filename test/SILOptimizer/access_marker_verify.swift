@@ -1022,3 +1022,22 @@ public func testInitBox() throws {
 // CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
 // CHECK: throw [[BOXALLOC]] : $Error
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'
+
+public final class HasStaticProp {
+  public static let empty: HasStaticProp = HasStaticProp()
+}
+
+// A global addressor produces an unenforced RawPointer. This looke
+// like an Unidentified access with no access marker. Ensure that
+// verification doesn't assert.
+public func getStaticProp() -> HasStaticProp {
+  return .empty
+}
+
+// CHECK-LABEL: sil @$S20access_marker_verify13getStaticPropAA03HaseF0CyF : $@convention(thin) () -> @owned HasStaticProp {
+// function_ref HasStaticProp.empty.unsafeMutableAddressor
+// CHECK: [[F:%.*]] = function_ref @$S20access_marker_verify13HasStaticPropC5emptyACvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[RP:%.*]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
+// CHECK: load [copy] [[ADR]] : $*HasStaticProp
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify13getStaticPropAA03HaseF0CyF'

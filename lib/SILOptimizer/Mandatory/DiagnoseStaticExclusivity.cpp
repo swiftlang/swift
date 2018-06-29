@@ -1076,7 +1076,16 @@ static void checkAccessedAddress(Operand *memOper, StorageMap &Accesses) {
   // initialization, not a formal memory access. The strength of
   // verification rests on the completeness of the opcode list inside
   // findAccessedStorage.
-  if (!storage || !isPossibleFormalAccessBase(storage, memInst->getFunction()))
+  //
+  // For the purpose of verification, an unidentified access is
+  // unenforced. These occur in cases like global addressors and local buffers
+  // that make use of RawPointers.
+  if (!storage || storage.getKind() == AccessedStorage::Unidentified)
+    return;
+
+  // Some identifiable addresses can also be recognized as local initialization
+  // or other patterns that don't qualify as formal access.
+  if (!isPossibleFormalAccessBase(storage, memInst->getFunction()))
     return;
 
   // A box or stack variable may represent lvalues, but they can only conflict
