@@ -675,6 +675,23 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       }
       return false;
     }
+    case SpecialCaseId::UIApplicationMain: {
+      // If the first argument is CommandLine.argc, replace the second argument
+      // with CommandLine.unsafeArgv
+      CallArgInfo &FirstArg = AllArgs[0];
+      // handle whitespace/line splits around the first arg when matching
+      auto FirstArgSplit =
+        SM.extractText(FirstArg.getEntireCharRange(SM)).rsplit('.');
+      if (!FirstArgSplit.second.empty() &&
+          FirstArgSplit.first.trim() == "CommandLine" &&
+          FirstArgSplit.second.trim() == "argc") {
+        CallArgInfo &SecondArg = AllArgs[1];
+        Editor.replace(SecondArg.getEntireCharRange(SM),
+                       "CommandLine.unsafeArgv");
+        return true;
+      }
+      return false;
+    }
     }
   }
 
