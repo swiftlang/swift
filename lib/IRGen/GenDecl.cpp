@@ -2136,6 +2136,12 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
   bool inFixedBuffer = false;
   bool indirectForDebugInfo = false;
 
+  // FIXME: Remove this once LLDB has proper support for resilience.
+  bool isREPLVar = false;
+  if (auto *decl = var->getDecl())
+    if (decl->isREPLVar())
+      isREPLVar = true;
+
   if (var->isInitializedObject()) {
     assert(ti.isFixedSize(expansion));
     StructLayout *Layout = StaticObjectLayouts[var].get();
@@ -2155,7 +2161,7 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     fixedSize = Layout->getSize();
     fixedAlignment = Layout->getAlignment();
     assert(fixedAlignment >= TargetInfo.HeapObjectAlignment);
-  } else if (ti.isFixedSize(expansion)) {
+  } else if (isREPLVar || ti.isFixedSize(expansion)) {
     // Allocate static storage.
     auto &fixedTI = cast<FixedTypeInfo>(ti);
     storageType = fixedTI.getStorageType();
