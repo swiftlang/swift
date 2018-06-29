@@ -276,6 +276,16 @@ ErrorBridgingTests.test("Error-to-NSError bridging") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+ErrorBridgingTests.test("NSError-to-error bridging in bridged container") {
+  autoreleasepool {
+    let error = NSError(domain: "domain", code: 42, userInfo: nil)
+    let nsdictionary = ["error": error] as NSDictionary
+    let dictionary = nsdictionary as? Dictionary<String, Error>
+    expectNotNil(dictionary)
+    expectEqual(error, dictionary?["error"] as NSError?)
+  }
+}
+
 ErrorBridgingTests.test("enum-to-NSError round trip") {
   autoreleasepool {
     // Emulate throwing an error from Objective-C.
