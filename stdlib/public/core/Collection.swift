@@ -10,22 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements, with forward
-/// index traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias IndexableBase = Collection
-
-/// A type that provides subscript access to its elements, with forward index
-/// traversal.
-///
-/// In most cases, it's best to ignore this protocol and use the `Collection`
-/// protocol instead, because it has a more complete interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'Collection' instead")
-public typealias Indexable = Collection
-
 /// A type that iterates over a collection using its indices.
 ///
 /// The `IndexingIterator` type is the default iterator for any collection that
