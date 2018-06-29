@@ -575,8 +575,8 @@ func testAddressor(p: UnsafePointer<Int>) -> Int {
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[ADR]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify13testAddressor1pSiSPySiG_tF'
 
@@ -992,8 +992,8 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK-NOT: begin_access
-// CHECK: assign %0 to [[ADR]] : $*Int
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: assign %0 to [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
 
 // Verification should ignore the address operand of init_existential_addr.
