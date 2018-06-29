@@ -1564,8 +1564,21 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   if (isa<DestructorDecl>(decl))
     return;
 
+  assert(decl->isObjC() && "Must be known to be @objc");
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
-  assert(attr && "should only be called on decls already marked @objc");
+
+  /// Set the @objc name.
+  auto setObjCName = [&](ObjCSelector selector) {
+    // If there already is an @objc attribute, update its name.
+    if (attr) {
+      const_cast<ObjCAttr *>(attr)->setName(selector, /*implicit=*/true);
+      return;
+    }
+
+    // Otherwise, create an @objc attribute with the implicit name.
+    attr = ObjCAttr::create(tc.Context, selector, /*implicitName=*/true);
+    decl->getAttrs().add(attr);
+  };
 
   // If this declaration overrides an @objc declaration, use its name.
   if (auto overridden = decl->getOverriddenDecl()) {
@@ -1576,8 +1589,8 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
         ObjCSelector overriddenSelector = overriddenFunc->getObjCSelector();
 
         // Determine whether there is a name conflict.
-        bool shouldFixName = !attr->hasName();
-        if (attr->hasName() && *attr->getName() != overriddenSelector) {
+        bool shouldFixName = !attr || !attr->hasName();
+        if (attr && attr->hasName() && *attr->getName() != overriddenSelector) {
           // If the user explicitly wrote the incorrect name, complain.
           if (!attr->isNameImplicit()) {
             {
@@ -1597,8 +1610,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
         // If we have to set the name, do so.
         if (shouldFixName) {
           // Override the name on the attribute.
-          const_cast<ObjCAttr *>(attr)->setName(overriddenSelector,
-                                                /*implicit=*/true);
+          setObjCName(overriddenSelector);
         }
         return;
       }
@@ -1609,8 +1621,9 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
         ObjCSelector overriddenNameAsSel(tc.Context, 0, overriddenName);
 
         // Determine whether there is a name conflict.
-        bool shouldFixName = !attr->hasName();
-        if (attr->hasName() && *attr->getName() != overriddenNameAsSel) {
+        bool shouldFixName = !attr || !attr->hasName();
+        if (attr && attr->hasName() &&
+            *attr->getName() != overriddenNameAsSel) {
           // If the user explicitly wrote the wrong name, complain.
           if (!attr->isNameImplicit()) {
             tc.diagnose(attr->AtLoc,
@@ -1628,8 +1641,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
         // Fix the name, if needed.
         if (shouldFixName) {
-          const_cast<ObjCAttr *>(attr)->setName(overriddenNameAsSel,
-                                                /*implicit=*/true);
+          setObjCName(overriddenNameAsSel);
         }
         return;
       }
@@ -1638,7 +1650,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
   // If the decl already has a name, do nothing; the protocol conformance
   // checker will handle any mismatches.
-  if (attr->hasName()) return;
+  if (attr && attr->hasName()) return;
 
   // When no override determined the Objective-C name, look for
   // requirements for which this declaration is a witness.
@@ -1682,8 +1694,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
   // If we have a name, install it via an @objc attribute.
   if (requirementObjCName) {
-    const_cast<ObjCAttr *>(attr)->setName(*requirementObjCName,
-                                          /*implicit=*/true);
+    setObjCName(*requirementObjCName);
   }
 }
 
@@ -1831,6 +1842,10 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // Mark the attribute as having used Swift 3 inference, or create an
     // implicit @objc for that purpose.
     auto attr = D->getAttrs().getAttribute<ObjCAttr>();
+    if (!attr) {
+      attr = ObjCAttr::createUnnamedImplicit(TC.Context);
+      D->getAttrs().add(attr);
+    }
     attr->setSwift3Inferred();
   }
 }
@@ -6356,12 +6371,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           if (!isObjC) {
             // Make this accessor @objc because its property is @objc.
             isObjC = ObjCReason::Accessor;
-          } else {
+          } else if (auto storageObjCAttr =
+                       storage->getAttrs().getAttribute<ObjCAttr>()) {
             // If @objc on the storage declaration was inferred using a
             // deprecated rule, but this accessor is @objc in its own right,
             // complain.
-            auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
-            if (storageObjCAttr->isSwift3Inferred() &&
+            ;
+            if (storageObjCAttr && storageObjCAttr->isSwift3Inferred() &&
                 shouldDiagnoseObjCReason(*isObjC, Context)) {
               diagnose(storage, diag::accessor_swift3_objc_inference,
                        storage->getDescriptiveKind(), storage->getFullName(),
@@ -6635,7 +6651,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+    if (Context.LangOpts.EnableObjCInterop)
+      markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+    else
+      DD->setIsObjC(false);
 
     break;
   }
