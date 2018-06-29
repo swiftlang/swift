@@ -24,4 +24,4 @@ class IntegerClass : ExpressibleByIntegerLiteral, Equatable {
   static func ==(lhs: IntegerClass, rhs: IntegerClass) -> Bool { return true }
 }
 
-func foo<T: IntegerClass>(_ num: T) { let x =  num != 0 }
+func foo<T: IntegerClass>(_ num: T) { let _ =  num != 0 }
