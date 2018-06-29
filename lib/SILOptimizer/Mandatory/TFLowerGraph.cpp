@@ -1230,13 +1230,13 @@ void TFGraphLowering::addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed,
     if (isInfeed)
       internalError(
           getUserSourceLocation(inst->getDebugLocation()),
-          "TPU infeed enqueue support enqueuing a single tensor -- did "
+          "TPU infeed enqueue supports enqueuing a single tensor -- did "
           "you specify shape?",
           diag::tfop_invalid_tfop);
     else
       internalError(
           getUserSourceLocation(inst->getDebugLocation()),
-          "TPU outfeed enqueue support enqueuing a single tensor -- did "
+          "TPU outfeed enqueue supports enqueuing a single tensor -- did "
           "you specify shape?",
           diag::tfop_invalid_tfop);
     return;
