@@ -6649,7 +6649,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
-    markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+    if (Context.LangOpts.EnableObjCInterop)
+      markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+    else
+      DD->setIsObjC(false);
 
     break;
   }
