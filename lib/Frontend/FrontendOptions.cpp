@@ -184,6 +184,7 @@ FrontendOptions::suffixForPrincipalOutputFileForAction(ActionType action) {
 bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
+  case ActionType::Parse:
   case ActionType::DumpParse:
   case ActionType::DumpInterfaceHash:
   case ActionType::DumpAST:
@@ -194,7 +195,37 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
     return false;
+  case ActionType::Typecheck:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+  case ActionType::EmitImportedModules:
+    return true;
+  }
+}
+
+bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
   case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::Immediate:
+  case ActionType::REPL:
+    return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
