@@ -61,8 +61,7 @@ func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK-LABEL: define hidden swiftcc void @"$S8test_v7k0A5Empty{{.*}}"()
 // V7K-LABEL: _$S8test_v7k0A5Empty
 enum Empty {}
-func testEmpty(x: Empty) -> Empty {
-  return x
+func testEmpty(x: Empty) -> () {
 }
 
 // CHECK-LABEL: define hidden swiftcc i32 @"$S8test_v7k0A6Single{{.*}}"()
