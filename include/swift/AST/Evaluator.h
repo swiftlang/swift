@@ -59,7 +59,7 @@ public:
 };
 
 /// Report that a request of the given kind is being evaluated, so it
-/// can be recoded by the stats reporter.
+/// can be recorded by the stats reporter.
 template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request) { }
@@ -260,17 +260,8 @@ private:
     if (auto cached = request.getCachedResult())
       return *cached;
 
-    // Clear out the dependencies on this request; we're going to recompute
-    // them now anyway.
-    dependencies[request].clear();
-
-    PrettyStackTraceRequest<Request> prettyStackTrace(request);
-
-    /// Update statistics.
-    if (stats) reportEvaluatedRequest(*stats, request);
-
-    // Service the request.
-    auto result = request(*this);
+    // Compute the result.
+    auto result = getResultUncached(request);
 
     // Cache the result.
     request.cacheResult(result);
@@ -293,12 +284,8 @@ private:
       return known->second.castTo<typename Request::OutputType>();
     }
 
-    // Clear out the dependencies on this request; we're going to recompute
-    // them now anyway.
-    dependencies[request].clear();
-
-    // Evaluate the request.
-    auto result = request(*this);
+    // Compute the result.
+    auto result = getResultUncached(request);
 
     // Cache the result.
     cache.insert({anyRequest, result});
