@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 422; // Last change: {strong_retain,copy}_unowned
+const uint16_t VERSION_MINOR = 423; // Last change: protocol superclasses
 
 using DeclIDField = BCFixed<31>;
 
@@ -862,7 +862,7 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField, // access level
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -876,7 +876,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit flag
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // raw type
-    AccessLevelField, // access level
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
     BCArray<TypeIDField>    // inherited types, followed by dependency types
@@ -886,15 +886,15 @@ namespace decls_block {
 
   using ClassLayout = BCRecordLayout<
     CLASS_DECL,
-    IdentifierIDField, // name
-    DeclContextIDField,// context decl
-    BCFixed<1>,        // implicit?
-    BCFixed<1>,        // explicitly objc?
-    BCFixed<1>,        // requires stored property initial values?
-    BCFixed<1>,        // inherits convenience initializers from its superclass?
+    IdentifierIDField,      // name
+    DeclContextIDField,     // context decl
+    BCFixed<1>,             // implicit?
+    BCFixed<1>,             // explicitly objc?
+    BCFixed<1>,             // requires stored property initial values?
+    BCFixed<1>,             // inherits convenience initializers from its superclass?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,       // superclass
-    AccessLevelField, // access level
+    TypeIDField,            // superclass
+    AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCArray<TypeIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
@@ -910,7 +910,8 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
-    AccessLevelField, // access level
+    TypeIDField,            // superclass
+    AccessLevelField,       // access level
     BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record

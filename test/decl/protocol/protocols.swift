@@ -98,16 +98,15 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error  {{circular protocol inheritance CircleMiddle}}
-// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
 protocol CircleStart : CircleEnd { func circle_start() }
 // expected-note@-1{{protocol 'CircleStart' declared here}}
-// expected-error@-2{{circular protocol inheritance CircleStart}}
+// expected-error@-2{{protocol 'CircleStart' refines itself}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
-// expected-error@-1{{circular protocol inheritance CircleEnd}}
+// expected-error@-1{{protocol 'CircleEnd' refines itself}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error 2{{protocol 'CircleTrivial' refines itself}}
 
 struct Circle {
   func circle_start() {}

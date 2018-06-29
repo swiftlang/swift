@@ -1826,7 +1826,7 @@ ERROR(typealias_outside_of_protocol,none,
       "generic parameter base", (Identifier))
 
 ERROR(circular_protocol_def,none,
-      "circular protocol inheritance %0", (StringRef))
+      "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
@@ -2156,7 +2156,7 @@ NOTE(superclass_here,none,"superclass is declared here", ())
 ERROR(superclass_of_open_not_open,none,
   "superclass %0 of open class must be open", (Type))
 ERROR(circular_class_inheritance,none,
-      "circular class inheritance %0", (StringRef))
+      "%0 inherits from itself", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
@@ -2200,7 +2200,7 @@ ERROR(enum_stored_property,none,
 ERROR(multiple_enum_raw_types,none,
   "multiple enum raw types %0 and %1", (Type, Type))
 ERROR(circular_enum_inheritance,none,
-      "circular enum raw types %0", (StringRef))
+      "%0 has a raw type that depends on itself", (Identifier))
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,

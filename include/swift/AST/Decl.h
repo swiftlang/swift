@@ -3730,6 +3730,15 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
+  struct {
+    /// The superclass type and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<Type, 1, bool> Superclass;
+  } LazySemanticInfo;
+
+  friend class SuperclassTypeRequest;
+  friend class TypeChecker;
+
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited,
@@ -3739,6 +3748,19 @@ public:
 
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+
+  /// Determine whether this protocol has a superclass.
+  bool hasSuperclass() const { return (bool)getSuperclass(); }
+
+  /// Retrieve the superclass of this protocol, or null if there is no superclass.
+  Type getSuperclass() const;
+
+  /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
+  /// is no superclass.
+  ClassDecl *getSuperclassDecl() const;
+
+  /// Set the superclass of this protocol.
+  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of

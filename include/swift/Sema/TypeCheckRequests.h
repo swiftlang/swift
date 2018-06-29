@@ -73,7 +73,7 @@ class SuperclassTypeRequest :
     public SimpleRequest<SuperclassTypeRequest,
                          CacheKind::SeparatelyCached,
                          Type,
-                         ClassDecl *> {
+                         NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
   using SimpleRequest::operator();
@@ -82,7 +82,7 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator, ClassDecl *classDecl) const;
+  Type operator()(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
 
 public:
   // Cycle handling

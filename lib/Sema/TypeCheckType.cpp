@@ -954,7 +954,7 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
         auto decl = parentType->getAnyNominal();
         if (decl) {
           tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
-                      decl->getNameStr());
+                      decl->getName());
           return ErrorType::get(tc.Context);
         }
       }
