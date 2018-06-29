@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 423; // Last change: protocol superclasses
+const uint16_t VERSION_MINOR = 424; // Last change: isObjC bits
 
 using DeclIDField = BCFixed<31>;
 
@@ -861,6 +861,7 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    BCFixed<1>,             // isObjC
     GenericEnvironmentIDField, // generic environment
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
@@ -874,6 +875,7 @@ namespace decls_block {
     IdentifierIDField,      // name
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
+    BCFixed<1>,             // isObjC
     GenericEnvironmentIDField, // generic environment
     TypeIDField,            // raw type
     AccessLevelField,       // access level
@@ -982,7 +984,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
@@ -1011,7 +1013,7 @@ namespace decls_block {
     BCFixed<1>,   // implicit?
     BCFixed<1>,   // is 'static' or 'class'?
     StaticSpellingKindField, // spelling of 'static' or 'class'
-    BCFixed<1>,   // explicitly objc?
+    BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?

@@ -1946,19 +1946,25 @@ CanType ValueDecl::getOverloadSignatureType() const {
   return CanType();
 }
 
-void ValueDecl::setIsObjC(bool Value) {
-  bool CurrentValue = isObjC();
-  if (CurrentValue == Value)
-    return;
+bool ValueDecl::isObjC() const {
+  if (Bits.ValueDecl.IsObjCComputed)
+    return Bits.ValueDecl.IsObjC;
 
-  if (!Value) {
-    for (auto *Attr : getAttrs()) {
-      if (auto *OA = dyn_cast<ObjCAttr>(Attr))
-        OA->setInvalid();
-    }
-  } else {
-    getAttrs().add(ObjCAttr::createUnnamedImplicit(getASTContext()));
+  // Fallback: look for an @objc attribute.
+  // FIXME: This should become an error, eventually.
+  return getAttrs().hasAttribute<ObjCAttr>();
+}
+
+void ValueDecl::setIsObjC(bool value) {
+  assert(!Bits.ValueDecl.IsObjCComputed || Bits.ValueDecl.IsObjC == value);
+
+  if (Bits.ValueDecl.IsObjCComputed) {
+    assert(Bits.ValueDecl.IsObjC == value);
+    return;
   }
+
+  Bits.ValueDecl.IsObjCComputed = true;
+  Bits.ValueDecl.IsObjC = value;
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
@@ -2888,8 +2894,9 @@ void ClassDecl::addImplicitDestructor() {
   DD->setGenericEnvironment(getGenericEnvironmentOfContext());
 
   // Mark DD as ObjC, as all dtors are.
-  DD->setIsObjC(true);
-  recordObjCMethod(DD);
+  DD->setIsObjC(getASTContext().LangOpts.EnableObjCInterop);
+  if (getASTContext().LangOpts.EnableObjCInterop)
+    recordObjCMethod(DD);
 
   // Assign DD the interface type (Self) -> () -> ()
   ArrayRef<AnyFunctionType::Param> noParams;

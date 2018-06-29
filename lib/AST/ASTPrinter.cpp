@@ -740,6 +740,16 @@ void PrintAST::printAttributes(const Decl *D) {
     Options.ExcludeAttrList.push_back(DAK_Final);
   }
 
+  // If the declaration is implicitly @objc, print the attribute now.
+  if (Options.PrintImplicitAttrs) {
+    if (auto VD = dyn_cast<ValueDecl>(D)) {
+      if (VD->isObjC() && !VD->getAttrs().hasAttribute<ObjCAttr>()) {
+        Printer.printAttrName("@objc");
+        Printer << " ";
+      }
+    }
+  }
+
   D->getAttrs().print(Printer, Options, D);
 
   Options.ExcludeAttrList.resize(originalExcludeAttrCount);
