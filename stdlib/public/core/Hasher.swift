@@ -437,6 +437,7 @@ public struct Hasher {
     seed: (UInt64, UInt64),
     bytes value: UInt64,
     count: Int) -> Int {
+    _sanityCheck(count >= 0 && count < 8)
     var core = RawCore(seed: seed)
     let tbc = _HasherTailBuffer(tail: value, byteCount: count)
     return Int(truncatingIfNeeded: core.finalize(tailAndByteCount: tbc.value))
