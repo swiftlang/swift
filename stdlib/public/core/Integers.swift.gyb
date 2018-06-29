@@ -2535,93 +2535,6 @@ ${assignmentOperatorComment(x.operator, False)}
 % for Range in ['Range', 'ClosedRange']:
 %   exampleRange = '1..<100' if Range == 'Range' else '1...100'
 
-extension ${Range}
-  where Bound: FixedWidthInteger, Bound.Stride : SignedInteger,
-  Bound.Magnitude: UnsignedInteger
-{
-      
-  /// Returns a random element of the range, using the given generator as
-  /// a source for randomness.
-  ///
-  /// You can use this method to select a random element of a range when you
-  /// are using a custom random number generator. If you're generating a random
-  /// number, in most cases, you should prefer using the `random(in:using:)`
-  /// static method of the desired numeric type. That static method is available
-  /// for both integer and floating point types, and returns a non-optional
-  /// value.
-  ///
-  /// - Parameter generator: The random number generator to use when choosing
-  ///   a random element.
-  /// - Returns: A random element of the range.
-%   if 'Closed' not in Range:
-  ///   If the range is empty, the method returns `nil`.
-%   else:
-  ///   This method never returns `nil`.
-%   end
-  @inlinable
-  public func randomElement<T: RandomNumberGenerator>(
-    using generator: inout T
-  ) -> Element? {
-    guard !isEmpty else {
-      return nil
-    }
-    // Compute delta, the distance between the lower and upper bounds. This
-    // value may not representable by the type Bound if Bound is signed, but
-    // is always representable as Bound.Magnitude.
-%   if 'Closed' in Range:
-    var delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
-%   else:
-    let delta = Bound.Magnitude(truncatingIfNeeded: upperBound &- lowerBound)
-%   end
-%   if 'Closed' in Range:
-    // Subtle edge case: if the range is the whole set of representable values,
-    // then adding one to delta to account for a closed range will overflow.
-    // If we used &+ instead, the result would be zero, which isn't helpful,
-    // so we actually need to handle this case separately.
-    if delta == Bound.Magnitude.max {
-      return Bound(truncatingIfNeeded: generator.next() as Bound.Magnitude)
-    }
-    // Need to widen delta to account for the right-endpoint of a closed range.
-    delta += 1
-%   end
-    // The mathematical result we want is lowerBound plus a random value in
-    // 0 ..< delta. We need to be slightly careful about how we do this
-    // arithmetic; the Bound type cannot generally represent the random value,
-    // so we use a wrapping addition on Bound.Magnitude. This will often
-    // overflow, but produces the correct bit pattern for the result when
-    // converted back to Bound.
-    return Bound(truncatingIfNeeded:
-      Bound.Magnitude(truncatingIfNeeded: lowerBound) &+
-      generator.next(upperBound: delta)
-    )
-  }
-  
-  /// Returns a random element of the range, using the given generator as
-  /// a source for randomness.
-  ///
-  /// You can use this method to select a random element of a range when you
-  /// are using a custom random number generator. If you're generating a random
-  /// number, in most cases, you should prefer using the `random(in:)`
-  /// static method of the desired numeric type. That static method is available
-  /// for both integer and floating point types, and returns a non-optional
-  /// value.
-  ///
-  /// This method uses the default random generator, `Random.default`. Calling
-  /// `(${exampleRange}).randomElement()` is equivalent to calling
-  /// `(${exampleRange}).randomElement(using: &Random.default)`.
-  ///
-  /// - Returns: A random element of the range.
-%   if 'Closed' not in Range:
-  ///   If the range is empty, the method returns `nil`.
-%   else:
-  ///   This method never returns `nil`.
-%   end
-  @inlinable
-  public func randomElement() -> Element? {
-    return randomElement(using: &Random.default)
-  }
-}
-
 extension FixedWidthInteger
 where Self.Stride : SignedInteger,
       Self.Magnitude : UnsignedInteger {
@@ -2657,7 +2570,36 @@ where Self.Stride : SignedInteger,
       !range.isEmpty,
       "Can't get random value with an empty range"
     )
-    return range.randomElement(using: &generator)!
+
+    // Compute delta, the distance between the lower and upper bounds. This
+    // value may not representable by the type Bound if Bound is signed, but
+    // is always representable as Bound.Magnitude.
+%   if 'Closed' in Range:
+    var delta = Magnitude(truncatingIfNeeded: range.upperBound &- range.lowerBound)
+%   else:
+    let delta = Magnitude(truncatingIfNeeded: range.upperBound &- range.lowerBound)
+%   end
+%   if 'Closed' in Range:
+    // Subtle edge case: if the range is the whole set of representable values,
+    // then adding one to delta to account for a closed range will overflow.
+    // If we used &+ instead, the result would be zero, which isn't helpful,
+    // so we actually need to handle this case separately.
+    if delta == Magnitude.max {
+      return Self(truncatingIfNeeded: generator.next() as Magnitude)
+    }
+    // Need to widen delta to account for the right-endpoint of a closed range.
+    delta += 1
+%   end
+    // The mathematical result we want is lowerBound plus a random value in
+    // 0 ..< delta. We need to be slightly careful about how we do this
+    // arithmetic; the Bound type cannot generally represent the random value,
+    // so we use a wrapping addition on Bound.Magnitude. This will often
+    // overflow, but produces the correct bit pattern for the result when
+    // converted back to Bound.
+    return Self(truncatingIfNeeded:
+      Magnitude(truncatingIfNeeded: range.lowerBound) &+
+      generator.next(upperBound: delta)
+    )
   }
   
   /// Returns a random value within the specified range.
