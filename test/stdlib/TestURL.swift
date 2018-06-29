@@ -178,8 +178,8 @@ class TestURL : TestURLSuper {
     
     func testURLComponents() {
         // Not meant to be a test of all URL components functionality, just some basic bridging stuff
-        let s = "http://www.apple.com/us/search/ipad?src=globalnav"
-        let components = URLComponents(string: s)!
+        let s = "http://www.apple.com/us/search/ipad?src=global%7Cnav"
+        var components = URLComponents(string: s)!
         expectNotNil(components)
         
         expectNotNil(components.host)
@@ -201,7 +201,45 @@ class TestURL : TestURLSuper {
             
             expectEqual("src", first.name)
             expectNotNil(first.value)
-            expectEqual("globalnav", first.value)
+            expectEqual("global|nav", first.value)
+        }
+
+        if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+            components.percentEncodedQuery = "name1%E2%80%A2=value1%E2%80%A2&name2%E2%80%A2=value2%E2%80%A2"
+            var qi = components.queryItems!
+            expectNotNil(qi)
+            
+            expectEqual(2, qi.count)
+            
+            expectEqual("name1•", qi[0].name)
+            expectNotNil(qi[0].value)
+            expectEqual("value1•", qi[0].value)
+            
+            expectEqual("name2•", qi[1].name)
+            expectNotNil(qi[1].value)
+            expectEqual("value2•", qi[1].value)
+            
+            qi = components.percentEncodedQueryItems!
+            expectNotNil(qi)
+            
+            expectEqual(2, qi.count)
+            
+            expectEqual("name1%E2%80%A2", qi[0].name)
+            expectNotNil(qi[0].value)
+            expectEqual("value1%E2%80%A2", qi[0].value)
+            
+            expectEqual("name2%E2%80%A2", qi[1].name)
+            expectNotNil(qi[0].value)
+            expectEqual("value2%E2%80%A2", qi[1].value)
+            
+            qi[0].name = "%E2%80%A2name1"
+            qi[0].value = "%E2%80%A2value1"
+            qi[1].name = "%E2%80%A2name2"
+            qi[1].value = "%E2%80%A2value2"
+            
+            components.percentEncodedQueryItems = qi
+            
+            expectEqual("%E2%80%A2name1=%E2%80%A2value1&%E2%80%A2name2=%E2%80%A2value2", components.percentEncodedQuery)
         }
     }
     
