@@ -803,25 +803,6 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///   `endIndex`.
   func formIndex(after i: inout Index)
 
-  /// Returns a random element of the collection, using the given generator as
-  /// a source for randomness.
-  ///
-  /// You use this method to select a random element from a collection when you
-  /// are using a custom random number generator. For example, call
-  /// `randomElement(using:)` to select a random element from an array of names.
-  ///
-  ///     let names = ["Zoey", "Chloe", "Amani", "Amaia"]
-  ///     let randomName = names.randomElement(using: &myGenerator)!
-  ///     // randomName == "Amani"
-  ///
-  /// - Parameter generator: The random number generator to use when choosing
-  ///   a random element.
-  /// - Returns: A random element from the collection. If the collection is
-  ///   empty, the method returns `nil`.
-  func randomElement<T: RandomNumberGenerator>(
-    using generator: inout T
-  ) -> Element?
-
   @available(*, deprecated, message: "all index distances are now of type Int")
   typealias IndexDistance = Int
 }
