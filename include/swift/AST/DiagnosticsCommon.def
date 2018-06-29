@@ -93,6 +93,24 @@ ERROR(attr_only_on_parameters, none,
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
 
+//------------------------------------------------------------------------------
+// MARK: Circular reference diagnostics
+//------------------------------------------------------------------------------
+ERROR(circular_reference, none,
+      "circular reference", ())
+
+ERROR(redundant_type_alias_define, none,
+      "redundant type alias declaration", ())
+
+NOTE(circular_reference_through, none,
+     "through reference here", ())
+
+ERROR(circular_class_inheritance,none,
+      "%0 inherits from itself", (Identifier))
+
+ERROR(circular_enum_inheritance,none,
+      "%0 has a raw type that depends on itself", (Identifier))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

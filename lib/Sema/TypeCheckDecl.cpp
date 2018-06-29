@@ -40,7 +40,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
-#include "swift/Sema/TypeCheckRequests.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
