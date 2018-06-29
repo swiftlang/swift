@@ -838,8 +838,8 @@ void ASTMangler::appendType(Type type) {
       if (First)
         appendOperator("y");
 
-      if (layout.superclass) {
-        appendType(layout.superclass);
+      if (auto superclass = layout.explicitSuperclass) {
+        appendType(superclass);
         return appendOperator("Xc");
       } else if (layout.hasExplicitAnyObject) {
         return appendOperator("Xl");

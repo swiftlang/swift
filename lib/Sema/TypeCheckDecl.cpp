@@ -460,10 +460,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Protocols, generic parameters and associated types can inherit
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
+      //
+      // Classes can only inherit from subclass existentials that do not
+      // have a superclass term.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
-           !layout.superclass)) {
+           !layout.explicitSuperclass)) {
         for (auto proto : layout.getProtocols()) {
           auto *protoDecl = proto->getDecl();
           allProtocols.insert(protoDecl);
@@ -481,7 +484,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         }
 
         // Superclass inheritance is handled below.
-        inheritedTy = layout.superclass;
+        inheritedTy = layout.explicitSuperclass;
         if (!inheritedTy)
           continue;
       }

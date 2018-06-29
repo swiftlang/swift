@@ -3795,8 +3795,8 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
 
     // First, if we have a superclass constraint, the class may conform
     // concretely.
-    if (layout.superclass) {
-      if (auto result = conformsToProtocol(layout.superclass, Proto,
+    if (layout.explicitSuperclass) {
+      if (auto result = conformsToProtocol(layout.explicitSuperclass, Proto,
                                            DC, options)) {
         return result;
       }
@@ -3805,11 +3805,24 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
     // Next, check if the existential contains the protocol in question.
     for (auto P : layout.getProtocols()) {
       auto *PD = P->getDecl();
+
       // If we found the protocol we're looking for, return an abstract
       // conformance to it.
-      if (PD == Proto || PD->inheritsFrom(Proto)) {
+      if (PD == Proto)
         return ProtocolConformanceRef(Proto);
+
+      // If the protocol has a superclass constraint, we might conform
+      // concretely.
+      if (auto superclass = PD->getSuperclass()) {
+        if (auto result = conformsToProtocol(superclass, Proto,
+                                             DC, options)) {
+          return result;
+        }
       }
+
+      // Now check refined protocols.
+      if (PD->inheritsFrom(Proto))
+        return ProtocolConformanceRef(Proto);
     }
 
     return None;

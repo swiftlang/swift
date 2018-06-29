@@ -1737,8 +1737,8 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(proto);
 
     // Look into the superclasses of this archetype.
-    if (auto superclassTy = archetypeTy->getSuperclass())
-      if (auto superclassDecl = superclassTy->getAnyNominal())
+    if (auto superclass = archetypeTy->getSuperclass())
+      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
         if (visited.insert(superclassDecl).second)
           stack.push_back(superclassDecl);
   }
@@ -1756,8 +1756,8 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(protoDecl);
     }
 
-    if (layout.superclass) {
-      auto *nominalDecl = layout.superclass->getAnyNominal();
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *nominalDecl = superclass->getClassOrBoundGenericClass();
       if (visited.insert(nominalDecl).second)
         stack.push_back(nominalDecl);
     }
@@ -1852,11 +1852,16 @@ bool DeclContext::lookupQualified(Type type,
       }
 
       if (visitSuperclass) {
-        if (auto superclassType = classDecl->getSuperclass())
-          if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
-            if (visited.insert(superclassDecl).second)
-              stack.push_back(superclassDecl);
+        if (auto superclassDecl = classDecl->getSuperclassDecl())
+          if (visited.insert(superclassDecl).second)
+            stack.push_back(superclassDecl);
       }
+    }
+
+    if (auto protocolDecl = dyn_cast<ProtocolDecl>(current)) {
+      if (auto superclassDecl = protocolDecl->getSuperclassDecl())
+        if (visited.insert(superclassDecl).second)
+          stack.push_back(superclassDecl);
     }
 
     // If we're not looking at a protocol and we're not supposed to

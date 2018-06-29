@@ -1251,7 +1251,7 @@ public:
       }
 
       auto layout = srcTy->getExistentialLayout();
-      if (layout.superclass ||
+      if (layout.explicitSuperclass ||
           !layout.isObjC() ||
           layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
