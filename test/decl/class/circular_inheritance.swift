@@ -8,15 +8,15 @@
 // Check that we produced superclass type requests.
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 16' %t/stats-dir
 
-class C : B { } // expected-error{{circular class inheritance 'C' -> 'B' -> 'A' -> 'C'}}
+class C : B { } // expected-error{{'C' inherits from itself}}
 class B : A { } // expected-note{{class 'B' declared here}}
 class A : C { } // expected-note{{class 'A' declared here}}
 
-class TrivialCycle : TrivialCycle {} // expected-error{{circular class inheritance TrivialCycle}}
-protocol P : P {} // expected-error {{circular protocol inheritance P}}
+class TrivialCycle : TrivialCycle {} // expected-error{{'TrivialCycle' inherits from itself}}
+protocol P : P {} // expected-error {{protocol 'P' refines itself}}
 
 class Isomorphism : Automorphism { }
-class Automorphism : Automorphism { } // expected-error{{circular class inheritance Automorphism}}
+class Automorphism : Automorphism { } // expected-error{{'Automorphism' inherits from itself}}
 
 // FIXME: Useless error
 let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}

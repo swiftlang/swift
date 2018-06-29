@@ -3115,7 +3115,7 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   for (auto candidate : candidates) {
     // Skip nested generic types.
     if (auto *genericDecl = dyn_cast<GenericTypeDecl>(candidate.Member))
-      if (genericDecl->getGenericParams())
+      if (genericDecl->isGeneric())
         continue;
 
     // Skip typealiases with an unbound generic type as their underlying type.

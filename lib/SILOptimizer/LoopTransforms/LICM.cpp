@@ -203,6 +203,17 @@ struct LoopNestSummary {
   LoopNestSummary(LoopNestSummary &&) = delete;
 };
 
+static unsigned getEdgeIndex(SILBasicBlock *BB, SILBasicBlock *ExitingBB) {
+  auto Succs = ExitingBB->getSuccessors();
+  for (unsigned EdgeIdx = 0; EdgeIdx < Succs.size(); ++EdgeIdx) {
+    SILBasicBlock *CurrBB = Succs[EdgeIdx];
+    if (CurrBB == BB) {
+      return EdgeIdx;
+    }
+  }
+  llvm_unreachable("BB is not a Successor");
+}
+
 static bool sinkInstruction(DominanceInfo *DT,
                             std::unique_ptr<LoopNestSummary> &LoopSummary,
                             SILInstruction *Inst, SILLoopInfo *LI) {
@@ -216,14 +227,20 @@ static bool sinkInstruction(DominanceInfo *DT,
 
   bool Changed = false;
   for (auto *ExitingBB : ExitingBBs) {
+    SmallVector<SILBasicBlock *, 8> BBSuccessors;
     auto Succs = ExitingBB->getSuccessors();
     for (unsigned EdgeIdx = 0; EdgeIdx < Succs.size(); ++EdgeIdx) {
       SILBasicBlock *BB = Succs[EdgeIdx];
+      BBSuccessors.push_back(BB);
+    }
+    while (!BBSuccessors.empty()) {
+      SILBasicBlock *BB = BBSuccessors.pop_back_val();
       if (std::find(NewExitBBs.begin(), NewExitBBs.end(), BB) !=
           NewExitBBs.end()) {
         // Already got a copy there
         continue;
       }
+      auto EdgeIdx = getEdgeIndex(BB, ExitingBB);
       SILBasicBlock *OutsideBB = nullptr;
       if (std::find(ExitBBs.begin(), ExitBBs.end(), BB) != ExitBBs.end()) {
         auto *SplitBB =
@@ -472,8 +489,18 @@ static bool canHoistUpDefault(SILInstruction *inst, SILLoop *Loop,
     return false;
   }
 
+  // We can’t hoist everything that is hoist-able
+  // The canHoist method does not do all the required analysis
+  // Some of the work is done at COW Array Opt
+  // TODO: Refactor COW Array Opt + canHoist - radar 41601468
   ArraySemanticsCall semCall(inst);
-  return semCall.canHoist(Preheader->getTerminator(), DT);
+  switch (semCall.getKind()) {
+  case ArrayCallKind::kGetCount:
+  case ArrayCallKind::kGetCapacity:
+    return semCall.canHoist(Preheader->getTerminator(), DT);
+  default:
+    return false;
+  }
 }
 
 // Check If all the end accesses of the given begin do not prevent hoisting

@@ -81,6 +81,12 @@ namespace swift {
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
                                  StringRef Name, bool declarationOnly,
                                  bool errorIfEmptyBody = true);
+    /// Read a SIL function.
+    llvm::Expected<SILFunction *>
+    readSILFunctionChecked(serialization::DeclID, SILFunction *InFunc,
+                           StringRef Name, bool declarationOnly,
+                           bool errorIfEmptyBody = true);
+
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
                                      SILBasicBlock *Prev,

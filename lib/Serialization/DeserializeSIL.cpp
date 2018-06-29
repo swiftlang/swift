@@ -12,13 +12,16 @@
 
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
+
+#include "DeserializationErrors.h"
+#include "SILFormat.h"
+
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Serialization/ModuleFile.h"
-#include "SILFormat.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -38,6 +41,9 @@ using namespace swift;
 using namespace swift::serialization;
 using namespace swift::serialization::sil_block;
 using namespace llvm::support;
+
+const char SILEntityError::ID = '\0';
+void SILEntityError::anchor() {}
 
 STATISTIC(NumDeserializedFunc, "Number of deserialized SIL functions");
 
@@ -341,7 +347,14 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name,
     // Otherwise, look for a function with this name in the module.
     auto iter = FuncTable->find(name);
     if (iter != FuncTable->end()) {
-      fn = readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+      auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
+                                            /*declarationOnly*/ true);
+      if (maybeFn) {
+        fn = maybeFn.get();
+      } else {
+        // Ignore the failure; we'll synthesize a bogus function instead.
+        llvm::consumeError(maybeFn.takeError());
+      }
     }
   }
 
@@ -364,7 +377,15 @@ SILFunction *SILDeserializer::getFuncForReference(StringRef name) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  return readSILFunction(*iter, nullptr, name, /*declarationOnly*/ true);
+  auto maybeFn = readSILFunctionChecked(*iter, nullptr, name,
+                                        /*declarationOnly*/ true);
+  if (!maybeFn) {
+    // Ignore the failure and just pretend the function doesn't exist
+    llvm::consumeError(maybeFn.takeError());
+    return nullptr;
+  }
+
+  return maybeFn.get();
 }
 
 /// Helper function to find a SILGlobalVariable given its name. It first checks
@@ -388,6 +409,19 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                                               StringRef name,
                                               bool declarationOnly,
                                               bool errorIfEmptyBody) {
+  llvm::Expected<SILFunction *> deserialized =
+      readSILFunctionChecked(FID, existingFn, name, declarationOnly,
+                             errorIfEmptyBody);
+  if (!deserialized) {
+    MF->fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+llvm::Expected<SILFunction *>
+SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
+                                        StringRef name, bool declarationOnly,
+                                        bool errorIfEmptyBody) {
   // We can't deserialize function bodies after IRGen lowering passes have
   // happened since other definitions in the module will no longer be in
   // canonical SIL form.
@@ -446,7 +480,16 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     MF->error();
     return nullptr;
   }
-  auto ty = getSILType(MF->getType(funcTyID), SILValueCategory::Object);
+  auto astType = MF->getTypeChecked(funcTyID);
+  if (!astType) {
+    if (!existingFn || errorIfEmptyBody) {
+      return llvm::make_error<SILEntityError>(
+          name, takeErrorInfo(astType.takeError()));
+    }
+    llvm::consumeError(astType.takeError());
+    return existingFn;
+  }
+  auto ty = getSILType(astType.get(), SILValueCategory::Object);
   if (!ty.is<SILFunctionType>()) {
     LLVM_DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     MF->error();
@@ -2398,14 +2441,21 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, InFunc, name, /*declarationOnly*/ false);
-  if (Func) {
-    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
-          Func->dump());
-    assert(InFunc->getName() == Func->getName());
+  auto maybeFunc = readSILFunctionChecked(*iter, InFunc, name,
+                                          /*declarationOnly*/ false);
+  if (!maybeFunc) {
+    // Ignore the error; treat it as if we didn't have a definition.
+    llvm::consumeError(maybeFunc.takeError());
+    return nullptr;
   }
 
-  return Func;
+  if (maybeFunc.get()) {
+    LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
+               maybeFunc.get()->dump());
+    assert(InFunc->getName() == maybeFunc.get()->getName());
+  }
+
+  return maybeFunc.get();
 }
 
 /// Check for existence of a function with a given name and required linkage.
@@ -2482,11 +2532,20 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
   if (iter == FuncTable->end())
     return nullptr;
 
-  auto Func = readSILFunction(*iter, nullptr, name, declarationOnly);
-  if (Func)
+  auto maybeFunc = readSILFunctionChecked(*iter, nullptr, name,
+                                          declarationOnly);
+
+  if (!maybeFunc) {
+    // Ignore the error; treat it as if we didn't have a definition.
+    llvm::consumeError(maybeFunc.takeError());
+    return nullptr;
+  }
+
+  if (maybeFunc.get()) {
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n";
-          Func->dump());
-  return Func;
+               maybeFunc.get()->dump());
+  }
+  return maybeFunc.get();
 }
 
 SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
@@ -2582,8 +2641,12 @@ void SILDeserializer::getAllSILFunctions() {
     auto DI = FuncTable->find(*KI);
     assert(DI != FuncTable->end() && "There should never be a key without data.");
 
-    readSILFunction(*DI, nullptr, *KI, false,
-                    false/*errorIfEmptyBody*/);
+    auto maybeFunc = readSILFunctionChecked(*DI, nullptr, *KI, false,
+                                            false/*errorIfEmptyBody*/);
+    if (!maybeFunc) {
+      // Ignore the error; treat it as if we didn't have a definition.
+      llvm::consumeError(maybeFunc.takeError());
+    }
   }
 }
 

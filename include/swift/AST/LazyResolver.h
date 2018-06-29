@@ -74,6 +74,9 @@ public:
   /// Retrieve the superclass of the given class.
   virtual Type getSuperclass(const ClassDecl *classDecl) = 0;
 
+  /// Retrieve the superclass of the given protocol.
+  virtual Type getSuperclass(const ProtocolDecl *protocolDecl) = 0;
+
   /// Resolve the raw type of the given enum.
   virtual Type getRawType(EnumDecl *enumDecl) = 0;
 

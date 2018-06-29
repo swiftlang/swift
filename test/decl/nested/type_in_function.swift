@@ -130,7 +130,7 @@ func genericFunction<T>(t: T) {
   // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
   class Second<T> : Second { }
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
-  // expected-error@-2 2 {{circular class inheritance Second}}
+  // expected-error@-2 2 {{'Second' inherits from itself}}
 }
 
 // Spurious "Self or associated type requirements" diagnostic.

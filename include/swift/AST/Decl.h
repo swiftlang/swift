@@ -332,7 +332,7 @@ protected:
     StorageKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
@@ -351,7 +351,11 @@ protected:
 
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
-    IsDebuggerVar : 1
+    IsDebuggerVar : 1,
+
+    /// \brief Whether this is a property defined in the debugger's REPL.
+    /// FIXME: Remove this once LLDB has proper support for resilience.
+    IsREPLVar : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -3726,6 +3730,15 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
+  struct {
+    /// The superclass type and a bit to indicate whether the
+    /// superclass was computed yet or not.
+    llvm::PointerIntPair<Type, 1, bool> Superclass;
+  } LazySemanticInfo;
+
+  friend class SuperclassTypeRequest;
+  friend class TypeChecker;
+
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
                Identifier Name, MutableArrayRef<TypeLoc> Inherited,
@@ -3735,6 +3748,19 @@ public:
 
   /// Retrieve the set of protocols inherited from this protocol.
   llvm::TinyPtrVector<ProtocolDecl *> getInheritedProtocols() const;
+
+  /// Determine whether this protocol has a superclass.
+  bool hasSuperclass() const { return (bool)getSuperclass(); }
+
+  /// Retrieve the superclass of this protocol, or null if there is no superclass.
+  Type getSuperclass() const;
+
+  /// Retrieve the ClassDecl for the superclass of this protocol, or null if there
+  /// is no superclass.
+  ClassDecl *getSuperclassDecl() const;
+
+  /// Set the superclass of this protocol.
+  void setSuperclass(Type superclass);
 
   /// Retrieve the set of AssociatedTypeDecl members of this protocol; this
   /// saves loading the set of members in cases where there's no possibility of
@@ -4556,6 +4582,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
+    Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     setType(Ty);
   }
@@ -4741,6 +4768,13 @@ public:
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
+  }
+  
+  /// Is this a special debugger REPL variable?
+  /// FIXME: Remove this once LLDB has proper support for resilience.
+  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
+  void setREPLVar(bool IsREPLVar) {
+    Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
   /// Return the Objective-C runtime name for this property.

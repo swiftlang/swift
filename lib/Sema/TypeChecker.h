@@ -1547,6 +1547,9 @@ public:
   /// Get the superclass of the given class.
   Type getSuperclass(const ClassDecl *classDecl) override;
 
+  /// Get the superclass of the given protocol.
+  Type getSuperclass(const ProtocolDecl *protocolDecl) override;
+
   /// Get the raw type of the given enum.
   Type getRawType(EnumDecl *enumDecl) override;
 

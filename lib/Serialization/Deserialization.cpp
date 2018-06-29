@@ -129,17 +129,6 @@ void TypeError::anchor() {}
 const char ExtensionError::ID = '\0';
 void ExtensionError::anchor() {}
 
-LLVM_NODISCARD
-static std::unique_ptr<llvm::ErrorInfoBase> takeErrorInfo(llvm::Error error) {
-  std::unique_ptr<llvm::ErrorInfoBase> result;
-  llvm::handleAllErrors(std::move(error),
-                        [&](std::unique_ptr<llvm::ErrorInfoBase> info) {
-    result = std::move(info);
-  });
-  return result;
-}
-
-
 /// Skips a single record in the bitstream.
 ///
 /// Returns true if the next entry is a record of type \p recordKind.
@@ -3347,14 +3336,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
     GenericEnvironmentID genericEnvID;
+    TypeID superclassID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, rawAccessLevel,
-                                            rawInheritedIDs);
+                                            genericEnvID, superclassID,
+                                            rawAccessLevel, rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3365,6 +3355,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                           /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
+    proto->setSuperclass(getType(superclassID));
     proto->setRequiresClass(isClassBounded);
     proto->setExistentialTypeSupported(existentialTypeSupported);
 
@@ -4756,27 +4747,42 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     }
 
     auto processParameter = [&](TypeID typeID, uint64_t rawConvention)
-                                  -> Optional<SILParameterInfo> {
+                                  -> llvm::Expected<SILParameterInfo> {
       auto convention = getActualParameterConvention(rawConvention);
-      auto type = getType(typeID);
-      if (!convention || !type) return None;
-      return SILParameterInfo(type->getCanonicalType(), *convention);
+      if (!convention) {
+        error();
+        llvm_unreachable("an error is a fatal exit at this point");
+      }
+      auto type = getTypeChecked(typeID);
+      if (!type)
+        return type.takeError();
+      return SILParameterInfo(type.get()->getCanonicalType(), *convention);
     };
 
     auto processYield = [&](TypeID typeID, uint64_t rawConvention)
-                                  -> Optional<SILYieldInfo> {
+                                  -> llvm::Expected<SILYieldInfo> {
       auto convention = getActualParameterConvention(rawConvention);
-      auto type = getType(typeID);
-      if (!convention || !type) return None;
-      return SILYieldInfo(type->getCanonicalType(), *convention);
+      if (!convention) {
+        error();
+        llvm_unreachable("an error is a fatal exit at this point");
+      }
+      auto type = getTypeChecked(typeID);
+      if (!type)
+        return type.takeError();
+      return SILYieldInfo(type.get()->getCanonicalType(), *convention);
     };
 
     auto processResult = [&](TypeID typeID, uint64_t rawConvention)
-                               -> Optional<SILResultInfo> {
+                               -> llvm::Expected<SILResultInfo> {
       auto convention = getActualResultConvention(rawConvention);
-      auto type = getType(typeID);
-      if (!convention || !type) return None;
-      return SILResultInfo(type->getCanonicalType(), *convention);
+      if (!convention) {
+        error();
+        llvm_unreachable("an error is a fatal exit at this point");
+      }
+      auto type = getTypeChecked(typeID);
+      if (!type)
+        return type.takeError();
+      return SILResultInfo(type.get()->getCanonicalType(), *convention);
     };
 
     // Bounds check.  FIXME: overflow
@@ -4795,11 +4801,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
       auto param = processParameter(typeID, rawConvention);
-      if (!param) {
-        error();
-        return nullptr;
-      }
-      allParams.push_back(*param);
+      if (!param)
+        return param.takeError();
+      allParams.push_back(param.get());
     }
 
     // Process the yields.
@@ -4809,11 +4813,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
       auto yield = processYield(typeID, rawConvention);
-      if (!yield) {
-        error();
-        return nullptr;
-      }
-      allYields.push_back(*yield);
+      if (!yield)
+        return yield.takeError();
+      allYields.push_back(yield.get());
     }
 
     // Process the results.
@@ -4823,11 +4825,9 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
       auto result = processResult(typeID, rawConvention);
-      if (!result) {
-        error();
-        return nullptr;
-      }
-      allResults.push_back(*result);
+      if (!result)
+        return result.takeError();
+      allResults.push_back(result.get());
     }
 
     // Process the error result.
@@ -4835,11 +4835,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     if (hasErrorResult) {
       auto typeID = variableData[nextVariableDataIndex++];
       auto rawConvention = variableData[nextVariableDataIndex++];
-      errorResult = processResult(typeID, rawConvention);
-      if (!errorResult) {
-        error();
-        return nullptr;
-      }
+      auto maybeErrorResult = processResult(typeID, rawConvention);
+      if (!maybeErrorResult)
+        return maybeErrorResult.takeError();
+      errorResult = maybeErrorResult.get();
     }
 
     Optional<ProtocolConformanceRef> witnessMethodConformance;

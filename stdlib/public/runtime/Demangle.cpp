@@ -160,8 +160,14 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
         
         auto typeNode = Dem.createNode(nodeKind);
         typeNode->addChild(node, Dem);
-        auto identifier = Dem.createNode(Node::Kind::Identifier, name);
-        typeNode->addChild(identifier, Dem);
+        auto nameNode = Dem.createNode(Node::Kind::Identifier, name);
+        if (type->isSynthesizedRelatedEntity()) {
+          auto relatedName = Dem.createNode(Node::Kind::RelatedEntityDeclName,
+                                    type->getSynthesizedDeclRelatedEntityTag());
+          relatedName->addChild(nameNode, Dem);
+          nameNode = relatedName;
+        }
+        typeNode->addChild(nameNode, Dem);
         node = typeNode;
         
         // Apply generic arguments if the context is generic.

@@ -3277,6 +3277,27 @@ ProtocolDecl::getAssociatedTypeMembers() const {
   return result;
 }
 
+Type ProtocolDecl::getSuperclass() const {
+  ASTContext &ctx = getASTContext();
+  if (auto lazyResolver = ctx.getLazyResolver()) {
+    return lazyResolver->getSuperclass(this);
+  }
+
+  return LazySemanticInfo.Superclass.getPointer();
+}
+
+ClassDecl *ProtocolDecl::getSuperclassDecl() const {
+  if (auto superclass = getSuperclass())
+    return superclass->getClassOrBoundGenericClass();
+  return nullptr;
+}
+
+void ProtocolDecl::setSuperclass(Type superclass) {
+  assert((!superclass || !superclass->hasArchetype())
+         && "superclass must be interface type");
+  LazySemanticInfo.Superclass.setPointerAndInt(superclass, true);
+}
+
 bool ProtocolDecl::walkInheritedProtocols(
               llvm::function_ref<TypeWalker::Action(ProtocolDecl *)> fn) const {
   auto self = const_cast<ProtocolDecl *>(this);
