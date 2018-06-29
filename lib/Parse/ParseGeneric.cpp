@@ -375,14 +375,18 @@ ParserStatus Parser::parseGenericWhereClause(
       // requirement.
       removalRange.Start = WhereLoc;
     }
-    if (!HasNextReq && LastCommaLoc.isValid()) {
-      // Include the previous comma in the removal range of the last
-      // requirement.
-      removalRange.Start = LastCommaLoc;
-    }
     if (HasNextReq) {
       // Include the next comma in the removal range of a middle requirement.
       removalRange.End = NextCommaLoc;
+    }
+    if (!HasNextReq && LastCommaLoc.isValid()) {
+      // HACK: Don't provide removal ranges for last-but-not-only requirements.
+      // This is in order to avoid emitting removal fix-its that would require
+      // their source range to be re-calculated after the application of another
+      // fix-it.
+      // FIX-ME(SR-8102): Improve the fix-it engine to handle such 'dependant'
+      // removal fix-its.
+      removalRange = SourceRange();
     }
     req.setRemovalRange(removalRange);
 

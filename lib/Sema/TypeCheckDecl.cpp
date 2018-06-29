@@ -363,6 +363,29 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     return SourceRange(afterPriorLoc, afterMyEndLoc);
   };
 
+  bool didFixItRemoveFirst = false;
+
+  /// Attempt to emit a removal fix-it for the ith entry in the inheritance
+  /// clause. Returns \c true if a removal fix-it was emitted, \c false
+  /// otherwise.
+  auto tryAddRemovalFixIt = [&](InFlightDiagnostic &diag, unsigned i) -> bool {
+    // HACK: Don't provide a removal fix-it for the second entry if we provided
+    // a removal fix-it for the first entry. This is in order to avoid emitting
+    // removal fix-its that would require their source range to be re-calculated
+    // after the application of another fix-it (which currently causes issues
+    // with the the bulk application of fix-its).
+    // FIX-ME(SR-8102): Improve the fix-it engine to handle such 'dependant'
+    // removal fix-its.
+    if (i == 0)
+      didFixItRemoveFirst = true;
+    else if (i == 1 && didFixItRemoveFirst)
+      return false;
+
+    auto removalRange = getRemovalRange(i);
+    diag.fixItRemoveChars(removalRange.Start, removalRange.End);
+    return true;
+  };
+
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
@@ -394,12 +417,12 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedCanTy == Context.TheAnyType) {
       if (!isConstraint) {
         auto diagLoc = inherited.getSourceRange().Start;
-        auto removalRange = getRemovalRange(i);
+        auto diag = diagnose(diagLoc, diag::redundant_conformance_warning,
+                             declInterfaceTy, inheritedTy);
+        diag.highlight(inherited.getSourceRange());
+        tryAddRemovalFixIt(diag, i);
+        diag.flush();
 
-        diagnose(diagLoc, diag::redundant_conformance_warning, declInterfaceTy,
-                 inheritedTy)
-            .highlight(inherited.getSourceRange())
-            .fixItRemoveChars(removalRange.Start, removalRange.End);
         diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
       }
       continue;
@@ -417,19 +440,19 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
                                     knownType->second.second.Start)
             .is(tok::kw_class)) {
         SourceLoc classLoc = knownType->second.second.Start;
-        SourceRange removeRange = getRemovalRange(knownType->second.first);
 
-        diagnose(classLoc, diag::duplicate_anyobject_class_inheritance)
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        auto diag =
+            diagnose(classLoc, diag::duplicate_anyobject_class_inheritance);
+        tryAddRemovalFixIt(diag, knownType->second.first);
         inherited.setInvalidType(Context);
         continue;
       }
 
-      auto removeRange = getRemovalRange(i);
-      diagnose(inherited.getSourceRange().Start,
-               diag::duplicate_inheritance, inheritedTy)
-        .fixItRemoveChars(removeRange.Start, removeRange.End)
-        .highlight(knownType->second.second);
+      auto diag = diagnose(inherited.getSourceRange().Start,
+                           diag::duplicate_inheritance, inheritedTy);
+      tryAddRemovalFixIt(diag, i);
+      diag.highlight(knownType->second.second);
+
       inherited.setInvalidType(Context);
       continue;
     }
@@ -476,11 +499,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       if (Context.LangOpts.isSwiftVersion3() && isa<ClassDecl>(decl) &&
           inheritedTy->isAnyObject()) {
         auto classDecl = cast<ClassDecl>(decl);
-        auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::class_inherits_anyobject,
-                 classDecl->getDeclaredInterfaceType())
-          .fixItRemoveChars(removeRange.Start, removeRange.End);
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::class_inherits_anyobject,
+                             classDecl->getDeclaredInterfaceType());
+        tryAddRemovalFixIt(diag, i);
         continue;
       }
     }
@@ -498,13 +520,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       
       // If this is not the first entry in the inheritance clause, complain.
       if (i > 0) {
-        auto removeRange = getRemovalRange(i);
-
-        diagnose(inherited.getSourceRange().Start,
-                 diag::raw_type_not_first, inheritedTy)
-          .fixItRemoveChars(removeRange.Start, removeRange.End)
-          .fixItInsert(inheritedClause[0].getSourceRange().Start,
-                       inheritedTy.getString() + ", ");
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::raw_type_not_first, inheritedTy);
+        if (tryAddRemovalFixIt(diag, i))
+          diag.fixItInsert(inheritedClause[0].getSourceRange().Start,
+                           inheritedTy.getString() + ", ");
 
         // Fall through to record the raw type.
       }
@@ -558,12 +578,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       // If this is not the first entry in the inheritance clause, complain.
       if (isa<ClassDecl>(decl) && i > 0) {
-        auto removeRange = getRemovalRange(i);
-        diagnose(inherited.getSourceRange().Start,
-                 diag::superclass_not_first, inheritedTy)
-          .fixItRemoveChars(removeRange.Start, removeRange.End)
-          .fixItInsert(inheritedClause[0].getSourceRange().Start,
-                       inheritedTy.getString() + ", ");
+        auto diag = diagnose(inherited.getSourceRange().Start,
+                             diag::superclass_not_first, inheritedTy);
+        if (tryAddRemovalFixIt(diag, i))
+          diag.fixItInsert(inheritedClause[0].getSourceRange().Start,
+                           inheritedTy.getString() + ", ");
 
         // Fall through to record the superclass.
       }

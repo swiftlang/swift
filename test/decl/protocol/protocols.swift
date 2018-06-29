@@ -110,7 +110,7 @@ class X11 : AnyAnyAlias {} // expected-warning {{redundant conformance of 'X11' 
 struct X12 : Any, Any {}
 // expected-warning@-1 {{redundant conformance of 'X12' to 'Any'}} {{14-19=}}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
-// expected-warning@-3 {{redundant conformance of 'X12' to 'Any'}} {{17-22=}}
+// expected-warning@-3 {{redundant conformance of 'X12' to 'Any'}} // FIX-ME(SR-8102): Add expected fix-it {{17-22=}}
 // expected-note@-4 {{all types implicitly conform to 'Any'}}
 
 // Explicit conformance checks (unsuccessful)

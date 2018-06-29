@@ -1183,13 +1183,13 @@ public:
     return SeparatorLoc;
   }
 
-  /// Retrieve the source range suitable for removing the requirement. Unlike
-  /// \c getSourceRange(), this range includes everything that needs to be
-  /// removed to keep the program syntactically valid (e.g. the 'where' keyword
-  /// and commas).
+  /// Retrieve the source range suitable for removing the requirement, if any.
+  /// Unlike \c getSourceRange(), this range includes everything that needs to
+  /// be removed to keep the program syntactically valid (e.g. the 'where'
+  /// keyword and commas).
   SourceRange getRemovalRange() const { return RemovalRange; }
 
-  /// Set the source range suitable for removing the requirement. Unlike
+  /// Set the source range suitable for removing the requirement, if any. Unlike
   /// \c getSourceRange(), this range includes everything that needs to be
   /// removed to keep the program syntactically valid (e.g. the 'where' keyword
   /// and commas).
