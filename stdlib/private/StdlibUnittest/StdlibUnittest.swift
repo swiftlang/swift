@@ -1775,15 +1775,15 @@ public func _parseDottedVersionTriple(_ s: String) -> (Int, Int, Int) {
 }
 
 func _getOSVersion() -> OSVersion {
-#if os(iOS) && (arch(i386) || arch(x86_64))
+#if os(iOS) && targetEnvironment(simulator)
   // On simulator, the plist file that we try to read turns out to be host's
   // plist file, which indicates OS X.
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
-#elseif os(tvOS) && (arch(i386) || arch(x86_64))
+#elseif os(tvOS) && targetEnvironment(simulator)
   return .tvOSSimulator
-#elseif os(watchOS) && (arch(i386) || arch(x86_64))
+#elseif os(watchOS) && targetEnvironment(simulator)
   return .watchOSSimulator
 #elseif os(Linux)
   return .linux

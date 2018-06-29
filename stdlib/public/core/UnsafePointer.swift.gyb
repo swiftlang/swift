@@ -436,12 +436,6 @@ public struct ${Self}<Pointee>: _Pointer {
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(capacity _: Int) { 
-    self.deallocate()
-  }
-
 %  end
 
   /// Deallocates the memory block previously allocated at this pointer.
@@ -485,11 +479,6 @@ public struct ${Self}<Pointee>: _Pointer {
   }
 
 %  if mutable:
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initialize(repeating:count:)")
-  public func initialize(to newValue: Pointee, count: Int = 1) { 
-    initialize(repeating: newValue, count: count)
-  }
-
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
@@ -683,28 +672,6 @@ public struct ${Self}<Pointee>: _Pointer {
     // }
   }
 
-  /// Initializes memory starting at this pointer's address with the elements
-  /// of the given collection.
-  ///
-  /// The region of memory starting at this pointer and covering `source.count`
-  /// instances of the pointer's `Pointee` type must be uninitialized or
-  /// `Pointee` must be a trivial type. After calling `initialize(from:)`, the
-  /// region is initialized.
-  ///
-  /// - Parameter source: A collection of elements of the pointer's `Pointee`
-  ///   type.
-  // This is fundamentally unsafe since collections can underreport their count.
-  @inlinable
-  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
-  public func initialize<C : Collection>(from source: C)
-    where C.Element == Pointee {
-    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
-    var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
-    // ensure that exactly rhs.count elements were written
-    _precondition(remainders.next() == nil, "rhs underreported its count")
-    _precondition(writtenUpTo == buf.endIndex, "rhs overreported its count")
-  }
-
   /// Replaces the memory referenced by this pointer with the values
   /// starting at the given pointer, leaving the source memory uninitialized.
   ///
@@ -733,13 +700,6 @@ public struct ${Self}<Pointee>: _Pointer {
     // for i in 0..<count {
     //   self[i] = (source + i).move()
     // }
-  }
-  
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
-  @inlinable
-  @discardableResult
-  public func deinitialize() -> UnsafeMutableRawPointer {
-    return deinitialize(count: 1)
   }
   
   /// Deinitializes the specified number of values starting at this pointer.
@@ -996,21 +956,6 @@ extension ${Self} : CustomReflectable {
   public var customMirror: Mirror {
     let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
-  }
-}
-
-extension ${Self} : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var summary: String {
-    let selfType = "${Self}"
-    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0 ? "\(selfType)(nil)" : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "${Self}.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(summary)
   }
 }
 

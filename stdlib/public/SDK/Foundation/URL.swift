@@ -1210,7 +1210,7 @@ extension NSURL : _HasCustomAnyHashableRepresentation {
     }
 }
 
-extension URL : CustomPlaygroundQuickLookable {
+extension URL : _CustomPlaygroundQuickLookable {
     @available(*, deprecated, message: "URL.customPlaygroundQuickLook will be removed in a future Swift version")
     public var customPlaygroundQuickLook: PlaygroundQuickLook {
         return .url(absoluteString)
