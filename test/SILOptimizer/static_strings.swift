@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -O -emit-ir  %s | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -emit-ir  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-ir  %s | %FileCheck --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend -Osize -emit-ir  %s | %FileCheck --check-prefix=CHECK-%target-cpu %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -12,72 +12,88 @@
 // optimal code for static String variables.
 
 public struct S {
-  // CHECK: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} global {{.*}} inttoptr
+  // CHECK-x86_64: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} global {{.*}} inttoptr
+  // CHECK-arm64: {{^@"}}[[SMALL:.*smallstr.*pZ]]" ={{.*}} global {{.*}} inttoptr
   public static let smallstr = "abc123a"
-  // CHECK: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK-arm64: {{^@"}}[[LARGE:.*largestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
   public static let largestr = "abc123asd3sdj3basfasdf"
-  // CHECK: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
+  // CHECK-arm64: {{^@"}}[[UNICODE:.*unicodestr.*pZ]]" ={{.*}} global {{.*}} inttoptr {{.*}} add
   public static let unicodestr = "❄️gastroperiodyni"
 }
 
 // unsafeMutableAddressor for S.smallstr
-// CHECK: define {{.*smallstr.*}}u"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}} @"[[SMALL]]"
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*smallstr.*}}u"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}} @"[[SMALL]]"
+// CHECK-arm64-NEXT: }
+
+// CHECK-x86_64: define {{.*smallstr.*}}u"
+// CHECK-x86_64-NEXT: entry:
+// CHECK-x86_64-NEXT:   ret {{.*}} @"[[SMALL]]"
+// CHECK-x86_64-NEXT: }
 
 // getter for S.smallstr
-// CHECK: define {{.*smallstr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*smallstr.*}}gZ"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
+
+// CHECK-x86_64: define {{.*smallstr.*}}gZ"
+// CHECK-x86_64-NEXT: entry:
+// CHECK-x86_64-NEXT:   ret {{.*}}
+// CHECK-x86_64-NEXT: }
 
 // unsafeMutableAddressor for S.largestr
-// CHECK: define {{.*largestr.*}}u"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}} @"[[LARGE]]"
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*largestr.*}}u"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}} @"[[LARGE]]"
+// CHECK-arm64-NEXT: }
 
 // getter for S.largestr
-// CHECK: define {{.*largestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*largestr.*}}gZ"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
 
 // unsafeMutableAddressor for S.unicodestr
-// CHECK: define {{.*unicodestr.*}}u"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}} @"[[UNICODE]]"
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*unicodestr.*}}u"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}} @"[[UNICODE]]"
+// CHECK-arm64-NEXT: }
 
 // getter for S.unicodestr
-// CHECK: define {{.*unicodestr.*}}gZ"
-// CHECK-NEXT: entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64: define {{.*unicodestr.*}}gZ"
+// CHECK-arm64-NEXT: entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
 
-// CHECK-LABEL: define {{.*}}get_smallstr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64-LABEL: define {{.*}}get_smallstr
+// CHECK-arm64:      entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
+
+// CHECK-x86_64-LABEL: define {{.*}}get_smallstr
+// CHECK-x86_64:      entry:
+// CHECK-x86_64-NEXT:   ret {{.*}}
+// CHECK-x86_64-NEXT: }
 @inline(never)
 public func get_smallstr() -> String {
   return S.smallstr
 }
 
-// CHECK-LABEL: define {{.*}}get_largestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64-LABEL: define {{.*}}get_largestr
+// CHECK-arm64:      entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
 @inline(never)
 public func get_largestr() -> String {
   return S.largestr
 }
 
-// CHECK-LABEL: define {{.*}}get_unicodestr
-// CHECK:      entry:
-// CHECK-NEXT:   ret {{.*}}
-// CHECK-NEXT: }
+// CHECK-arm64-LABEL: define {{.*}}get_unicodestr
+// CHECK-arm64:      entry:
+// CHECK-arm64-NEXT:   ret {{.*}}
+// CHECK-arm64-NEXT: }
 @inline(never)
 public func get_unicodestr() -> String {
   return S.unicodestr
