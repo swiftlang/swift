@@ -412,26 +412,26 @@ public struct URLResourceValues {
     @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
     public var volumeSupportsCompression : Bool? { return _get(.volumeSupportsCompressionKey) }
     
-	/// true if the volume supports clonefile(2).
-	@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-	public var volumeSupportsFileCloning : Bool? { return _get(.volumeSupportsFileCloningKey) }
-	
-	/// true if the volume supports renamex_np(2)'s RENAME_SWAP option.
-	@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-	public var volumeSupportsSwapRenaming : Bool? { return _get(.volumeSupportsSwapRenamingKey) }
-	
-	/// true if the volume supports renamex_np(2)'s RENAME_EXCL option.
-	@available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
-	public var volumeSupportsExclusiveRenaming : Bool? { return _get(.volumeSupportsExclusiveRenamingKey) }
-	
-	/// true if the volume supports making files immutable with isUserImmutable or isSystemImmutable.
-	@available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)
-	public var volumeSupportsImmutableFiles : Bool? { return _get(.volumeSupportsImmutableFilesKey) }
-	
-	/// true if the volume supports setting POSIX access permissions with fileSecurity.
-	@available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)
-	public var volumeSupportsAccessPermissions : Bool? { return _get(.volumeSupportsAccessPermissionsKey) }
-	
+    /// true if the volume supports clonefile(2).
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    public var volumeSupportsFileCloning : Bool? { return _get(.volumeSupportsFileCloningKey) }
+    
+    /// true if the volume supports renamex_np(2)'s RENAME_SWAP option.
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    public var volumeSupportsSwapRenaming : Bool? { return _get(.volumeSupportsSwapRenamingKey) }
+    
+    /// true if the volume supports renamex_np(2)'s RENAME_EXCL option.
+    @available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *)
+    public var volumeSupportsExclusiveRenaming : Bool? { return _get(.volumeSupportsExclusiveRenamingKey) }
+    
+    /// true if the volume supports making files immutable with isUserImmutable or isSystemImmutable.
+    @available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+    public var volumeSupportsImmutableFiles : Bool? { return _get(.volumeSupportsImmutableFilesKey) }
+    
+    /// true if the volume supports setting POSIX access permissions with fileSecurity.
+    @available(macOS 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *)
+    public var volumeSupportsAccessPermissions : Bool? { return _get(.volumeSupportsAccessPermissionsKey) }
+    
     /// true if this item is synced to the cloud, false if it is only a local file. 
     public var isUbiquitousItem : Bool? { return _get(.isUbiquitousItemKey) }
 
