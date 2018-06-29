@@ -134,7 +134,7 @@ public extension Tensor {
   ///   must specify the tensor shape as required by XLA compilation.
   @inlinable @inline(__always)
   func toAccelerator(shape: TensorShape) -> Tensor {
-    let tensor = Tensor(handle: _TFSend(handle))
+    let tensor = toAccelerator()
     // If the tensor is to be sent from host to TPU, the shape is specified on
     // TF CPU first, before TF CPU sends the tensor to TPU.
     return #tfop("Identity",
@@ -160,8 +160,8 @@ public extension Tensor {
     // If the `self` tensor resides on TPU, the shape is specified on that
     // device first, before outfeeding the tensor to CPU, a required step for
     // sending the tensor to the host.
-    let tensor : Tensor<Scalar> = #tfop("Identity", self, __shapes: [shape])
-    return Tensor(handle: _TFReceive(tensor.handle))
+    let tensor: Tensor<Scalar> = #tfop("Identity", self, __shapes: [shape])
+    return tensor.toHost()
   }
 
   // TODO: Unify these two versions of toAccelerator() by making `shape` above
