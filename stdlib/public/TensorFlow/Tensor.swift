@@ -143,8 +143,6 @@ public extension Tensor {
                  __device: "/device:CPU:0")
   }
 
-  // TODO: Unify these two versions of toAccelerator() by making `shape` above
-  // optional.
   /// Mark memory transfer to accelerator.
   @inlinable @inline(__always)
   func toAccelerator() -> Tensor {
@@ -164,8 +162,6 @@ public extension Tensor {
     return tensor.toHost()
   }
 
-  // TODO: Unify these two versions of toAccelerator() by making `shape` above
-  // optional.
   /// Mark memory transfer to host.
   @inlinable @inline(__always)
   func toHost() -> Tensor {

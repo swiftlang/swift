@@ -333,7 +333,7 @@ public func test1RecvTensorTPU() {
 
 public func test1RecvTensorTPU_ToHostNoShape_Error() {
   TensorFlow.enableTPU()
-  // expected-error @+1 {{TPU outfeed enqueue supports enqueuing a single tensor -- did you specify shape?}}
+  // expected-error @+1 {{TPU outfeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
   let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()

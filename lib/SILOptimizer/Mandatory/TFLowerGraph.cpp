@@ -1224,23 +1224,6 @@ void TFGraphLowering::addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed,
                                       ArrayRef<int> numDims,
                                       ArrayRef<int64_t *> dimPtrs) {
   // Infeed enqueue runs on CPU, while outfeed enqueue runs on TPU.
-  // Otherwise they have the same op signature (except for the "shapes" as
-  // commented below).
-  if (numDims.size() != 1) {
-    if (isInfeed)
-      internalError(
-          getUserSourceLocation(inst->getDebugLocation()),
-          "TPU infeed enqueue supports enqueuing a single tensor -- did "
-          "you specify shape?",
-          diag::tfop_invalid_tfop);
-    else
-      internalError(
-          getUserSourceLocation(inst->getDebugLocation()),
-          "TPU outfeed enqueue supports enqueuing a single tensor -- did "
-          "you specify shape?",
-          diag::tfop_invalid_tfop);
-    return;
-  }
   if (isInfeed) {
     if (thisDeviceType != DeviceType::CPU) {
       internalError(getUserSourceLocation(inst->getDebugLocation()),
@@ -1273,9 +1256,11 @@ void TFGraphLowering::addTPUEnqueueOp(BuiltinInst *inst, bool isInfeed,
       getTensorFlowDataType(inputToSendVal->getType(), inst->getLoc());
   assert(tfType > 0);
   TF_SetAttrTypeList(desc, "dtypes", &tfType, 1);
-  if (isInfeed) {
-    // Interestingly, OutfeedEnqueueTuple does not take a shapes attr, unlike
-    // outfeed dequeue and infeed enqueue/dequeue tuple ops.
+  if (isInfeed && !numDims.empty()) {
+    // For InfeedEnqueueTuple, the shapes attr is optional and only used for
+    // error checking.
+    // Interestingly, OutfeedEnqueueTuple does not take a shapes attr
+    // (b/110538524).
     TF_SetAttrShapeList(desc, "shapes", dimPtrs.data(), numDims.data(),
                         numDims.size());
   }
