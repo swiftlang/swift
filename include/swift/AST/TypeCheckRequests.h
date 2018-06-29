@@ -125,7 +125,7 @@ public:
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 
 #define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
-#define SWIFT_TYPEID_HEADER "swift/Sema/TypeCheckerTypeIDZone.def"
+#define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
 // Set up reporting of evaluated requests.
@@ -135,7 +135,7 @@ inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
-#include "swift/Sema/TypeCheckerTypeIDZone.def"
+#include "swift/AST/TypeCheckerTypeIDZone.def"
 #undef SWIFT_TYPEID
 
 } // end namespace swift

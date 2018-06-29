@@ -151,4 +151,3 @@ void swift::registerTypeCheckerRequestFunctions(Evaluator &evaluator) {
   evaluator.registerRequestFunctions(SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE,
                                      typeCheckerRequestFunctions);
 }
-
