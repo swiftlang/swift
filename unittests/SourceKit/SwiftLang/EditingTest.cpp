@@ -157,8 +157,7 @@ public:
             EditorConsumer &Consumer) {
     auto Args = makeArgs(DocName, CArgs);
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), /*EnableSyntaxMap=*/false, Consumer,
-                         Args);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args);
   }
 
   void close(const char *DocName) {
