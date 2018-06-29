@@ -37,11 +37,22 @@ class raw_ostream;
 
 namespace swift {
 
+using llvm::ArrayRef;
 using llvm::Optional;
 using llvm::None;
 
 class DiagnosticEngine;
+class Evaluator;
 class UnifiedStatsReporter;
+
+/// An "abstract" request function pointer, which is the storage type
+/// used for each of the
+using AbstractRequestFunction = void(void);
+
+/// Form the specific request function for the given request type.
+template<typename Request>
+using RequestFunction =
+    typename Request::OutputType(const Request &, Evaluator &);
 
 /// Pretty stack trace handler for an arbitrary request.
 template<typename Request>
@@ -138,6 +149,18 @@ class Evaluator {
   /// non-null.
   UnifiedStatsReporter *stats = nullptr;
 
+  /// A vector containing the abstract request functions that can compute
+  /// the result of a particular request within a given zone. The
+  /// \c uint8_t is the zone number of the request, and the array is
+  /// indexed by the index of the request type within that zone. Each
+  /// entry is a function pointer that will be reinterpret_cast'd to
+  ///
+  ///   RequestType::OutputType (*)(const RequestType &request,
+  ///                               Evaluator &evaluator);
+  /// and called to satisfy the request.
+  std::vector<std::pair<uint8_t, ArrayRef<AbstractRequestFunction *>>>
+    requestFunctionsByZone;
+
   /// A vector containing all of the active evaluation requests, which
   /// is treated as a stack and is used to detect cycles.
   llvm::SetVector<AnyRequest> activeRequests;
@@ -156,6 +179,19 @@ class Evaluator {
   /// so all clients must cope with cycles.
   llvm::DenseMap<AnyRequest, std::vector<AnyRequest>> dependencies;
 
+  /// Retrieve the request function for the given zone and request IDs.
+  AbstractRequestFunction *getAbstractRequestFunction(uint8_t zoneID,
+                                                      uint8_t requestID) const;
+
+  /// Retrieve the request function for the given request type.
+  template<typename Request>
+  auto getRequestFunction() const -> RequestFunction<Request> * {
+    auto abstractFn = getAbstractRequestFunction(TypeID<Request>::zoneID,
+                                                 TypeID<Request>::localID);
+    assert(abstractFn && "No request function for request");
+    return reinterpret_cast<RequestFunction<Request> *>(abstractFn);
+  }
+
 public:
   /// Construct a new evaluator that can emit cyclic-dependency
   /// diagnostics through the given diagnostics engine.
@@ -164,6 +200,13 @@ public:
   /// Set the unified stats reporter through which evaluated-request
   /// statistics will be recorded.
   void setStatsReporter(UnifiedStatsReporter *stats) { this->stats = stats; }
+
+  /// Register the set of request functions for the given zone.
+  ///
+  /// These functions will be called to evaluate any requests within that
+  /// zone.
+  void registerRequestFunctions(uint8_t zoneID,
+                                ArrayRef<AbstractRequestFunction *> functions);
 
   /// Evaluate the given request and produce its result,
   /// consulting/populating the cache as required.
@@ -247,7 +290,7 @@ private:
     /// Update statistics.
     if (stats) reportEvaluatedRequest(*stats, request);
 
-    return request(*this);
+    return getRequestFunction<Request>()(request, *this);
   }
 
   /// Get the result of a request, consulting an external cache
@@ -301,7 +344,7 @@ public:
                          llvm::raw_ostream &out,
                          llvm::DenseSet<AnyRequest> &visitedAnywhere,
                          llvm::SmallVectorImpl<AnyRequest> &visitedAlongPath,
-                         llvm::ArrayRef<AnyRequest> highlightPath,
+                         ArrayRef<AnyRequest> highlightPath,
                          std::string &prefixStr,
                          bool lastChild) const;
 

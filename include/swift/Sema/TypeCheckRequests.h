@@ -46,7 +46,6 @@ class InheritedTypeRequest :
 
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
@@ -76,7 +75,6 @@ class SuperclassTypeRequest :
                          NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
@@ -104,7 +102,6 @@ class EnumRawTypeRequest :
                          EnumDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
@@ -124,7 +121,10 @@ public:
   void cacheResult(Type value) const;
 };
 
-#define SWIFT_TYPEID_ZONE 10
+/// The zone number for the type checker.
+#define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
+
+#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
 #define SWIFT_TYPEID_HEADER "swift/Sema/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 

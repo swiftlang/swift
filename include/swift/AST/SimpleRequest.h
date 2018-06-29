@@ -130,8 +130,10 @@ public:
   explicit SimpleRequest(const Inputs& ...inputs)
     : storage(inputs...) { }
 
-  OutputType operator()(Evaluator &evaluator) const {
-    return callDerived(evaluator, llvm::index_sequence_for<Inputs...>());
+  /// Request evaluation function that will be registered with the evaluator.
+  static OutputType evaluate(const Derived &request, Evaluator &evaluator) {
+    return request.callDerived(evaluator,
+                               llvm::index_sequence_for<Inputs...>());
   }
 
   void diagnoseCycle(DiagnosticEngine &diags) const {

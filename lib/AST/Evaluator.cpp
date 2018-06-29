@@ -32,6 +32,32 @@ std::string AnyRequest::getAsString() const {
   return result;
 }
 
+AbstractRequestFunction *
+Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
+  for (const auto &zone : requestFunctionsByZone) {
+    if (zone.first == zoneID) {
+      if (requestID < zone.second.size())
+        return zone.second[requestID];
+
+      return nullptr;
+    }
+  }
+
+  return nullptr;
+}
+
+void Evaluator::registerRequestFunctions(
+                               uint8_t zoneID,
+                               ArrayRef<AbstractRequestFunction *> functions) {
+#ifndef NDEBUG
+  for (const auto &zone : requestFunctionsByZone) {
+    assert(zone.first != zoneID);
+  }
+#endif
+
+  requestFunctionsByZone.push_back({zoneID, functions});
+}
+
 Evaluator::Evaluator(DiagnosticEngine &diags,
                      CycleDiagnosticKind shouldDiagnoseCycles)
   : diags(diags), shouldDiagnoseCycles(shouldDiagnoseCycles) { }

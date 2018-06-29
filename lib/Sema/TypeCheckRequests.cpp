@@ -16,6 +16,8 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
+#include "swift/Subsystems.h"
+
 using namespace swift;
 
 namespace swift {
@@ -264,4 +266,17 @@ Optional<Type> EnumRawTypeRequest::getCachedResult() const {
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
   enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+}
+
+// Define request evaluation functions for each of the type checker requests.
+static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
+#define SWIFT_TYPEID(Name)                                    \
+  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluate),
+#include "swift/Sema/TypeCheckerTypeIDZone.def"
+#undef SWIFT_TYPEID
+};
+
+void swift::registerTypeCheckerRequestFunctions(Evaluator &evaluator) {
+  evaluator.registerRequestFunctions(SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE,
+                                     typeCheckerRequestFunctions);
 }

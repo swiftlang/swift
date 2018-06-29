@@ -87,7 +87,6 @@ struct EvaluationRule
   : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
 {
   using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::operator();
 
   double operator()(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
@@ -179,15 +178,24 @@ struct ExternallyCachedEvaluationRule
 
 // Define the arithmetic evaluator's zone.
 namespace swift {
-#define SWIFT_TYPEID_ZONE 255
+#define SWIFT_ARITHMETIC_EVALUATOR_ZONE 255
+#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
-#define SWIFT_TYPEID_ZONE 255
+#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 
 }
+
+/// All of the arithmetic request functions.
+static AbstractRequestFunction *arithmeticRequestFunctions[] = {
+#define SWIFT_TYPEID(Name)                                    \
+  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluate),
+#include "ArithmeticEvaluatorTypeIDZone.def"
+#undef SWIFT_TYPEID
+};
 
 TEST(ArithmeticEvaluator, Simple) {
   // (3.14159 + 2.71828) * 42
@@ -201,6 +209,8 @@ TEST(ArithmeticEvaluator, Simple) {
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+                                     arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
   EXPECT_EQ(evaluator(InternallyCachedEvaluationRule(product)),
@@ -321,6 +331,8 @@ TEST(ArithmeticEvaluator, Cycle) {
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+                                     arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.
   UncachedEvaluationRule::brokeCycle = false;
