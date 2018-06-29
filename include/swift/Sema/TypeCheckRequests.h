@@ -51,9 +51,9 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator,
-                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                  unsigned index) const;
+  Type evaluate(Evaluator &evaluator,
+                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                unsigned index) const;
 
 public:
   // Cycle handling
@@ -80,7 +80,7 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
+  Type evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
 
 public:
   // Cycle handling
@@ -107,7 +107,7 @@ private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator, EnumDecl *enumDecl) const;
+  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling

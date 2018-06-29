@@ -54,7 +54,7 @@ TypeLoc &InheritedTypeRequest::getTypeLoc(
   return decl.get<ExtensionDecl *>()->getInherited()[index];
 }
 
-Type InheritedTypeRequest::operator()(
+Type InheritedTypeRequest::evaluate(
                         Evaluator &evaluator,
                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                         unsigned index) const {
@@ -149,8 +149,8 @@ void InheritedTypeRequest::cacheResult(Type value) const {
 //----------------------------------------------------------------------------//
 // Superclass computation.
 //----------------------------------------------------------------------------//
-Type SuperclassTypeRequest::operator()(Evaluator &evaluator,
-                                       NominalTypeDecl *nominalDecl) const {
+Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
+                                     NominalTypeDecl *nominalDecl) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
@@ -223,8 +223,8 @@ void SuperclassTypeRequest::cacheResult(Type value) const {
 //----------------------------------------------------------------------------//
 // Enum raw type computation.
 //----------------------------------------------------------------------------//
-Type EnumRawTypeRequest::operator()(Evaluator &evaluator,
-                                    EnumDecl *enumDecl) const {
+Type EnumRawTypeRequest::evaluate(Evaluator &evaluator,
+                                  EnumDecl *enumDecl) const {
   for (unsigned int idx : indices(enumDecl->getInherited())) {
     Type inheritedType = evaluator(InheritedTypeRequest{enumDecl, idx});
     if (!inheritedType) continue;
@@ -271,7 +271,7 @@ void EnumRawTypeRequest::cacheResult(Type value) const {
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \
-  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluate),
+  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/Sema/TypeCheckerTypeIDZone.def"
 #undef SWIFT_TYPEID
 };

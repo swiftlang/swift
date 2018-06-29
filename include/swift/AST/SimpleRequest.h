@@ -56,7 +56,7 @@ enum class CacheKind {
 /// important one takes an evaluator and the input values, then computes the
 /// final result:
 /// \code
-///   Output operator()(Evaluator &evaluator, Inputs...) const;
+///   Output evaluate(Evaluator &evaluator, Inputs...) const;
 /// \endcode
 ///
 /// The \c Derived class will also need to implement an operation to break a
@@ -105,8 +105,8 @@ class SimpleRequest {
   template<size_t ...Indices>
   Output callDerived(Evaluator &evaluator,
                      llvm::index_sequence<Indices...>) const {
-    static_assert(sizeof...(Indices) > 0, "Subclass must define operator()");
-    return asDerived()(evaluator, std::get<Indices>(storage)...);
+    static_assert(sizeof...(Indices) > 0, "Subclass must define evaluate()");
+    return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
   }
 
   template<size_t ...Indices>
@@ -131,7 +131,8 @@ public:
     : storage(inputs...) { }
 
   /// Request evaluation function that will be registered with the evaluator.
-  static OutputType evaluate(const Derived &request, Evaluator &evaluator) {
+  static OutputType evaluateRequest(const Derived &request,
+                                    Evaluator &evaluator) {
     return request.callDerived(evaluator,
                                llvm::index_sequence_for<Inputs...>());
   }

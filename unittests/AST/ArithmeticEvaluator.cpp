@@ -88,7 +88,7 @@ struct EvaluationRule
 {
   using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
 
-  double operator()(Evaluator &evaluator, ArithmeticExpr *expr) const {
+  double evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {
     switch (expr->kind) {
     case ArithmeticExpr::Kind::Literal:
       return static_cast<Literal *>(expr)->value;
@@ -192,7 +192,7 @@ namespace swift {
 /// All of the arithmetic request functions.
 static AbstractRequestFunction *arithmeticRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \
-  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluate),
+  reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "ArithmeticEvaluatorTypeIDZone.def"
 #undef SWIFT_TYPEID
 };
