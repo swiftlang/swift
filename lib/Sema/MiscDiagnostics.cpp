@@ -87,13 +87,16 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     // message.
     struct PartialApplication {
       enum : unsigned {
-        Function,
         MutatingMethod,
         SuperInit,
         SelfInit,
       };
-      // 'kind' before 'level' is better for code gen.
-      unsigned kind : 3;
+      enum : unsigned {
+        Error,
+        CompatibilityWarning,
+      };
+      unsigned compatibilityWarning: 1;
+      unsigned kind : 2;
       unsigned level : 29;
     };
 
@@ -105,49 +108,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     ~DiagnoseWalker() override {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
-        TC.diagnose(unapplied.first->getLoc(),
-                    diag::partial_application_of_function_invalid,
-                    kind);
+        if (unapplied.second.compatibilityWarning) {
+          TC.diagnose(unapplied.first->getLoc(),
+                      diag::partial_application_of_function_invalid_swift4,
+                      kind);
+        } else {
+          TC.diagnose(unapplied.first->getLoc(),
+                      diag::partial_application_of_function_invalid,
+                      kind);
+        }
       }
     }
 
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
-
-      if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
-        auto kind = expr->getArg()->isSuperExpr()
-                  ? PartialApplication::SuperInit
-                  : PartialApplication::SelfInit;
-
-        // Partial applications of delegated initializers aren't allowed, and
-        // don't really make sense to begin with.
-        InvalidPartialApplications.insert({ expr, {kind, 1} });
-        return;
-      }
-
-      auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
-      if (!fnDeclRef)
-        return;
-
-      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-      if (!fn)
-        return;
-
-      unsigned kind =
-        fn->isInstanceMember() ? PartialApplication::MutatingMethod
-                               : PartialApplication::Function;
-      
-      // Functions with inout parameters cannot be partially applied.
-      if (!expr->getArg()->getType()->isMaterializable()) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          fnExpr, {kind, fn->getNumParameterLists()}
-        });
-      }
-    }
-
-    /// This method is called in post-order over the AST to validate that
     /// methods are fully applied when they can't support partial application.
     void checkInvalidPartialApplication(Expr *E) {
       if (auto AE = dyn_cast<ApplyExpr>(E)) {
@@ -158,8 +130,18 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           fnExpr = dotSyntaxExpr->getRHS();
 
         // Check to see if this is a potentially unsupported partial
-        // application.
-        recordUnsupportedPartialApply(AE, fnExpr);
+        // application of a constructor delegation.
+        if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
+          auto kind = AE->getArg()->isSuperExpr()
+                    ? PartialApplication::SuperInit
+                    : PartialApplication::SelfInit;
+
+          // Partial applications of delegated initializers aren't allowed, and
+          // don't really make sense to begin with.
+          InvalidPartialApplications.insert(
+            {E, {PartialApplication::Error, kind, 1}});
+          return;
+        }
 
         // If this is adding a level to an active partial application, advance
         // it to the next level.
@@ -173,11 +155,36 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         InvalidPartialApplications.erase(foundApplication);
         if (level > 1) {
           // We have remaining argument clauses.
-          InvalidPartialApplications.insert({ AE, {kind, level - 1} });
+          // Partial applications were always diagnosed in Swift 4 and before,
+          // so there's no need to preserve the compatibility warning bit.
+          InvalidPartialApplications.insert(
+            {AE, {PartialApplication::Error, kind, level - 1}});
         }
         return;
       }
+      
+      /// If this is a reference to a mutating method, it cannot be partially
+      /// applied or even referenced without full application, so arrange for
+      /// us to check that it gets fully applied.
+      auto fnDeclRef = dyn_cast<DeclRefExpr>(E);
+      if (!fnDeclRef)
+        return;
 
+      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+      if (!fn || !fn->isInstanceMember() || !fn->isMutating())
+        return;
+
+      // Swift 4 and earlier failed to diagnose a reference to a mutating method
+      // without any applications at all, which would get miscompiled into a
+      // function with undefined behavior. Warn for source compatibility.
+      auto errorBehavior = TC.Context.LangOpts.isSwiftVersionAtLeast(5)
+        ? PartialApplication::Error
+        : PartialApplication::CompatibilityWarning;
+
+      InvalidPartialApplications.insert(
+        {fnDeclRef, {errorBehavior,
+                     PartialApplication::MutatingMethod,
+                     fn->getNumParameterLists()}});
     }
 
     // Not interested in going outside a basic expression.
