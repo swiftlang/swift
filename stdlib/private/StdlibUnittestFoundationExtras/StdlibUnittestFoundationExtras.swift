@@ -72,7 +72,7 @@ public func withOverriddenLocaleCurrentLocale<Result>(
 public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
   invoking body: () -> Void
 ) {
-#if arch(i386) && targetEnvironment(simulator)
+#if arch(i386) && (os(iOS) || os(watchOS))
   autoreleasepool(invoking: body)
 #else
   body()
