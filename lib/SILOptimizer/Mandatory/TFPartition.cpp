@@ -2227,8 +2227,8 @@ void PartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
     // by GraphGen.
     auto result = remapValue(inst->getOperand(0));
     auto S2TResult = inst->getResult(0);
-    if (!S2TResult->getType().getSwiftRValueType()
-          ->isEqual(result->getType().getSwiftRValueType())) {
+    if (!S2TResult->getType().getASTType()
+          ->isEqual(result->getType().getASTType())) {
       auto &B = getBuilder();
       auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
       result = B.createUncheckedRefCast(loc, result, S2TResult->getType());
@@ -2688,7 +2688,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   auto proto = ctx.getProtocol(KnownProtocolKind::TensorSendableReceivable);
   SmallVector<ProtocolConformance *, 1> conformances;
   auto tensorValueTy = convertElementTypeToTensorValueType(value->getType());
-  auto nominal = tensorValueTy.getSwiftRValueType()->getAnyNominal();
+  auto nominal = tensorValueTy.getASTType()->getAnyNominal();
   auto lookup =
       nominal->lookupConformance(&tensorFlowModule, proto, conformances);
   if (!lookup) {

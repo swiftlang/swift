@@ -289,7 +289,7 @@ public func atariSim(_ a: Tensor<Float>) -> Tensor<Float> {
   return a
 }
 
-public func test1RecvTensor() {
+public func test1RecvTensorCPU() {
   let a = Tensor<Float>(1.0) // expected-warning {{value implicitly copied to the host}}
   // One send.
   _hostOp(a.toHost())
@@ -319,6 +319,55 @@ public func test1RecvTensor() {
 // CHECK-NEXT: [[SEND_FN:%.*]] = function_ref
 // CHECK-NEXT: apply [[SEND_FN]]<Float>({{.*}}, {{.*}}, [[B_HANDLE]])
 // CHECK:      function_ref @_swift_tfc_FinishTensorComputation
+
+public func test1RecvTensorTPU() {
+  TensorFlow.enableTPU()
+  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
+  let a_host = a_tpu.toHost(shape: TensorShape())
+  // For the result of atariSim(): host -> CPU, and then CPU->TPU.
+  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  b += a_tpu
+  _hostOp(b)
+}
+
+public func test1RecvTensorTPU_ToHostNoShape_Error() {
+  TensorFlow.enableTPU()
+  // expected-error @+1 {{TPU outfeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
+  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
+  let a_host = a_tpu.toHost()
+  // For the result of atariSim(): host -> CPU, and then CPU->TPU.
+  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  b += a_tpu
+  _hostOp(b)
+}
+
+public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
+  TensorFlow.enableTPU()
+  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
+  let a_host = a_tpu.toHost(shape: TensorShape())
+  // For the result of atariSim(): host -> CPU, and then CPU->TPU.
+  var b = atariSim(a_host).toAccelerator()
+  // expected-error @+1 {{TPU infeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
+  b += a_tpu
+  _hostOp(b)
+}
+
+// Specifying shapes for CPU<->GPU sends/recvs should not hurt.
+public func test1RecvTensorGPU_WithShapes() {
+  TensorFlow.enableGPU()
+  let a_gpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
+  // One send.
+  // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
+  let a_host = a_gpu.toHost(shape: TensorShape())
+  // One recv.
+  // For the result of atariSim(): host -> CPU, and then CPU->GPU.
+  var b = atariSim(a_host).toAccelerator(shape: TensorShape())
+  b += a_gpu
+  _hostOp(b)
+}
 
 public func testRecvsInALoop() {
   let maxCount = 10

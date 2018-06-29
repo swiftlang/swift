@@ -127,12 +127,39 @@ func _TFHoistable<Scalar>(_ fn: () -> TensorHandle<Scalar>)
 // Memory transfer markers
 //===----------------------------------------------------------------------===//
 
-/// TODO: Remove when send/receive semantics gets revisited.
 public extension Tensor {
+  /// Mark memory transfer to accelerator.
+  /// - Parameters:
+  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
+  ///   must specify the tensor shape as required by XLA compilation.
+  @inlinable @inline(__always)
+  func toAccelerator(shape: TensorShape) -> Tensor {
+    let tensor = toAccelerator()
+    // If the tensor is to be sent from host to TPU, the shape is specified on
+    // TF CPU first, before TF CPU sends the tensor to TPU.
+    return #tfop("Identity",
+                 tensor,
+                 __shapes: [shape],
+                 __device: "/device:CPU:0")
+  }
+
   /// Mark memory transfer to accelerator.
   @inlinable @inline(__always)
   func toAccelerator() -> Tensor {
     return Tensor(handle: _TFSend(handle))
+  }
+
+  /// Mark memory transfer to host.
+  /// - Parameters:
+  ///   - shape: When sending the tensor to a TF XLA device (including TPU),
+  ///   must specify the tensor shape as required by XLA compilation.
+  @inlinable @inline(__always)
+  func toHost(shape: TensorShape) -> Tensor {
+    // If the `self` tensor resides on TPU, the shape is specified on that
+    // device first, before outfeeding the tensor to CPU, a required step for
+    // sending the tensor to the host.
+    let tensor: Tensor<Scalar> = #tfop("Identity", self, __shapes: [shape])
+    return tensor.toHost()
   }
 
   /// Mark memory transfer to host.
