@@ -1323,12 +1323,11 @@ namespace {
           materialized.temporary = ManagedValue::forLValue(
               SGF.B.createMarkDependence(loc, temporary, base.getValue()));
         }
-
-        // Enter an access scope for the temporary.
-        materialized.temporary =
-          enterAccessScope(SGF, loc, materialized.temporary, getTypeData(),
-                           accessKind, SILAccessEnforcement::Unsafe);
       }
+      // Enter an access scope for the temporary.
+      materialized.temporary =
+        enterAccessScope(SGF, loc, materialized.temporary, getTypeData(),
+                         accessKind, SILAccessEnforcement::Unsafe);
 
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
