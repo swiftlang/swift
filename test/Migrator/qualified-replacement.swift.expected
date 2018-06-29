@@ -12,6 +12,7 @@ func foo() {
   _ = NewFooComparisonResult.NewFooOrderedSame
   let _ : FooComparisonResult = NewFooComparisonResult.NewFooOrderedSame
   _ = NewCityKind.NewTown
+  _ = GlobalCityKindVillage
   _ = ToplevelWrapper.internalType()
   _ = ToplevelWrapper.internalType(recordName: "")
   bar(NewFooComparisonResult.NewFooOrderedSame)
