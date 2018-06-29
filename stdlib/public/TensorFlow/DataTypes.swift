@@ -320,7 +320,7 @@ extension BFloat16 : AccelerableByTensorFlow {
   public static func _getScalar(_ handle: TensorHandle<BFloat16>) -> BFloat16? {
     return _TFGetScalarImpl(handle)
   }
-  @_inlineable @inline(__always)
+  @inlinable @inline(__always)
   public static func _makeScalarTensor(
     _ scalar: BFloat16
   ) -> TensorHandle<BFloat16> {
