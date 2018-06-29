@@ -2501,9 +2501,9 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    /// When we've type checked a #tfop expression, we do some adjustment to
-    /// the argument and result types.  Specifically, if something is a type
-    /// that conforms to TensorProtocol (like Tensor or Tensor2D), we use the
+    /// When we've type checked a #tfop expression, we do some adjustment to the
+    /// argument types.  Specifically, if an argument is a type that conforms to
+    /// TensorProtocol (like Tensor or TensorElementLiteral), we use the
     /// TensorHandle that they contain instead.
     Expr *visitTFOp(ObjectLiteralExpr *expr) {
       auto &ctx = cs.getASTContext();
@@ -2560,39 +2560,6 @@ namespace {
           expr->setArg(newTuple);
         }
       }
-
-      // If the #tfop returns a type that conforms to TensorProtocol, we change
-      // it to return a TensorHandle<T> and then use the init(handle:)
-      // initializer of the expected result type to project it back to the type
-      // that we want.
-      auto type = simplifyType(cs.getType(expr));
-      assert(type && "expr Type cannot be NULL!");
-      if (tensorProto && !type->is<UnresolvedType>() &&
-          tc.conformsToProtocol(type, tensorProto, cs.DC,
-                                ConformanceCheckFlags::Used)) {
-        // Look up the handle member on our type, to get the concrete
-        // TensorHandle<T> type to use for this value.
-        auto handleId = ctx.getIdentifier("handle");
-        auto lookup = tc.lookupMember(cs.DC, type, DeclName(handleId));
-        assert(lookup && "TensorProtocol didn't have a handle member?");
-        auto decl = lookup.front().getValueDecl();
-        auto handleTy = type->getTypeOfMember(cs.DC->getParentModule(), decl);
-
-        // Now that we have the handle type, switch the ObjectLiteralExpr to be
-        // that type, and build the original TensorProtocol type by using the
-        // init(handle:) initializer.
-        cs.setType(expr, handleTy);
-
-        auto funcName =
-          DeclName(ctx, DeclBaseName::createConstructor(), {handleId});
-        return convertLiteral(expr, type, type,
-                              tensorProto, handleTy, funcName,
-                              tensorProto, handleTy, funcName,
-                              /*no filter*/nullptr,
-                              diag::string_literal_broken_proto,
-                              diag::string_literal_broken_proto);
-      }
-
       return expr;
     }
 

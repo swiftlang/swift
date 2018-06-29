@@ -102,8 +102,8 @@ SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
 // Utilities.swift in TensorFlow stdlib.
 @inline(__always)
 func _scalarTensorWithShapeOnCPU<T>(_ x: Tensor<T>) -> Tensor<T> {
-  let ret : Tensor<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
-  return ret
+  let ret : TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
+  return Tensor<T>(handle: ret)
 }
 
 func test1RecvFloatScalar() {

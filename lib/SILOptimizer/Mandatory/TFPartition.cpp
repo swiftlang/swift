@@ -3243,6 +3243,8 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
     // Ignore uses outside the tensor program region.
     if (DI.dominates(tensorEndPoint, user)) continue;
 
+    if(isa<DebugValueInst>(user)) continue;
+
     if (isa<StrongRetainInst>(user)) {
       ++retainReleaseBalance;
       continue;
@@ -3261,8 +3263,10 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
       continue;
     }
 
+    user->dump();
     oldResult->dump();
-    llvm_unreachable("Unhandled instruction type");
+    llvm_unreachable(
+        "Unhandled instruction type, as a use of a result tensor above");
   }
 
   DEBUG(llvm::dbgs() << "Creating " << retainReleaseBalance
@@ -3662,7 +3666,20 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
       // any of the results cannot be handled with a result, then we just send
       // the whole value.
       bool hasAnyNonResultUse = false, hasAnyUse = false;
-      for (auto result : inst.getResults())
+      for (auto result : inst.getResults()) {
+        // If this is a tuple type and the tuple elements are tensor values
+        // that are consumed beyond the tensor end point, the TupleExtract
+        // insts that produce these tensor values are already marked for Move,
+        // which will make them result tensors.
+        // e.g. For SIL snippet
+        //   %12 = builtin "__tfop_SoftmaxCrossEntropyWithLogits"(...) :
+        //     $(loss: TensorHandle<Float>, backprop: TensorHandle<Float>)
+        //   %13 = tuple_extract %12 : $(...), 0
+        //   %16 = tuple_extract %12 : $(...), 1
+        // %13 and %16 can be the result tensors.
+        if (isa<TupleType>(result->getType().getASTType()))
+          continue;
+
         for (auto *operand : result->getUses()) {
           auto user = operand->getUser();
 
@@ -3703,7 +3720,7 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
             break;
           }
         }
-
+      }
       // If all of the results can be handled with return values, then handle
       // them that way by appending them to our result list.
       if (hasAnyUse && !hasAnyNonResultUse)

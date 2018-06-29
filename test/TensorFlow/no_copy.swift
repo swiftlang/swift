@@ -237,9 +237,9 @@ public func testMultiOutputs() {
   let c = Tensor<Bool>(false)
   let (x1, y1): (TensorHandle<Float>, TensorHandle<Float>) = #tfop("Switch", d, c)
   // FIXME: Remove the uses of Identity nodes here.
-  let x : Tensor<Float> = #tfop("Identity", x1)
-  let y : Tensor<Float> = #tfop("Identity", y1)
-  print(x.array.scalars[0])
-  print(y.array.scalars[0])
+  let x : TensorHandle<Float> = #tfop("Identity", x1)
+  let y : TensorHandle<Float> = #tfop("Identity", y1)
+  _hostOp(x)
+  _hostOp(y)
 }
 
