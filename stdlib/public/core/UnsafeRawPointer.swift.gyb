@@ -735,19 +735,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
 }
 
 extension ${Self} /*: Strideable*/ {
-  /// Returns the distance from this pointer to the given pointer.
-  ///
-  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
-  /// equivalent to `q - p`.
-  ///
-  /// - Parameter x: The pointer to calculate the distance to.
-  /// - Returns: The distance from this pointer to `x`, in bytes.
-  @inlinable
-  public func distance(to x: ${Self}) -> Int {
-    return Int(Builtin.sub_Word(Builtin.ptrtoint_Word(x._rawValue),
-        Builtin.ptrtoint_Word(_rawValue)))
-  }
-
   /// Returns a pointer offset from this pointer by the specified number of
   /// bytes.
   ///

@@ -48,7 +48,7 @@
 
 // CHECK-MUTATING-ATTR: mutating func
 
-func foo(x: _Pointer) {} // Checks that this protocol actually exists.
+func foo<P: _Pointer>(x: P) {} // Checks that this protocol actually exists.
 // CHECK-NOT: _Pointer
 
 // NO-FIXMES-NOT: FIXME

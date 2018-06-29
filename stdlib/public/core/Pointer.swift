@@ -137,8 +137,6 @@ extension _Pointer /*: Comparable */ {
   }
 }
 
-/*
-This should be possible but currently segfaulting the compiler:
 extension _Pointer /*: Strideable*/ {
   /// Returns the distance from this pointer to the given pointer, counted as
   /// instances of the pointer's `Pointee` type.
@@ -158,7 +156,7 @@ extension _Pointer /*: Strideable*/ {
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
   @inlinable
-  public func distance(to end: AutoreleasingUnsafeMutablePointer) -> Int {
+  public func distance(to end: Self) -> Int {
     return
       Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
                            Builtin.ptrtoint_Word(_rawValue)))
@@ -181,12 +179,11 @@ extension _Pointer /*: Strideable*/ {
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
   @inlinable
-  public func advanced(by n: Int) -> AutoreleasingUnsafeMutablePointer {
-    return AutoreleasingUnsafeMutablePointer(Builtin.gep_Word(
+  public func advanced(by n: Int) -> Self {
+    return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
   }
 }
-*/
 
 extension _Pointer /*: Hashable */ {
   /// Hashes the essential components of this value by feeding them into the
