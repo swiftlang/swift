@@ -512,11 +512,8 @@ SILValue UnenforcedAccess::beginAccess(SILGenFunction &SGF, SILLocation loc,
     return address;
 
   const AccessedStorage &storage = findAccessedStorage(address);
-  if (!storage) {
-    llvm::dbgs() << "Bad memory access source: " << address;
-    llvm_unreachable("Unexpected access source.");
-  }
-  if (!isPossibleFormalAccessBase(storage, &SGF.F))
+  // Unsafe access may have invalid storage (e.g. a RawPointer).
+  if (storage && !isPossibleFormalAccessBase(storage, &SGF.F))
     return address;
 
   auto BAI =

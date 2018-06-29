@@ -734,6 +734,8 @@ static void checkCaptureAccess(ApplySite Apply, AccessState &State) {
     SILValue Argument = Apply.getArgument(ArgumentIndex);
     assert(Argument->getType().isAddress());
 
+    // A valid AccessedStorage should alway sbe found because Unsafe accesses
+    // are not tracked by AccessSummaryAnalysis.
     const AccessedStorage &Storage = findValidAccessedStorage(Argument);
     auto AccessIt = State.Accesses->find(Storage);
 
@@ -817,6 +819,9 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     SILAccessKind Kind = BAI->getAccessKind();
     const AccessedStorage &Storage =
       findValidAccessedStorage(BAI->getSource());
+    // Storage may be associated with a nested access where the outer access is
+    // "unsafe". That's ok because the outer access can itself be treated like a
+    // valid source, as long as we don't ask for its source.
     AccessInfo &Info = (*State.Accesses)[Storage];
     const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
     if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {

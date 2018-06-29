@@ -1022,3 +1022,25 @@ bb0(%0 : $UnsafeMutablePointer<Any>):
   %9999 = tuple()
   return %9999 : $()
 }
+
+sil @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+
+// An addressor produces an unsafely accessed RawPointer. Pass the
+// address to an inout can result in an enforced (unknown) access on
+// the unsafe address. We need to handle this case without asserting.
+sil @addressorAccess : $@convention(thin) (@guaranteed ClassWithStoredProperty, Int32) -> () {
+bb0(%0 : $ClassWithStoredProperty, %1 : $Int32):
+  %f = function_ref @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+  %up = apply %f() : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+  %o = unchecked_ref_cast %0 : $ClassWithStoredProperty to $Builtin.NativeObject
+  %ptr = struct_extract %up : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*Int32
+  %dep = mark_dependence %adr : $*Int32 on %o : $Builtin.NativeObject
+  %a1 = begin_access [modify] [unsafe] %dep : $*Int32
+  %a2 = begin_access [modify] [static] %a1 : $*Int32
+  store %1 to [trivial] %a2 : $*Int32
+  end_access %a2 : $*Int32
+  end_access %a1 : $*Int32
+  %v = tuple ()
+  return %v : $()
+}

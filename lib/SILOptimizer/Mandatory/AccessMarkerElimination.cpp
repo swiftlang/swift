@@ -70,8 +70,8 @@ struct AccessMarkerElimination {
 
 bool AccessMarkerElimination::shouldPreserveAccess(
     SILAccessEnforcement enforcement) {
-  if (!EnableOptimizedAccessMarkers)
-    return false;
+  if (EnableOptimizedAccessMarkers || Mod->getOptions().VerifyExclusivity)
+    return true;
 
   switch (enforcement) {
   case SILAccessEnforcement::Static:
