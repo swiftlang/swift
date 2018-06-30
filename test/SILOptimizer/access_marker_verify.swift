@@ -575,8 +575,8 @@ func testAddressor(p: UnsafePointer<Int>) -> Int {
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[ADR]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify13testAddressor1pSiSPySiG_tF'
 
@@ -992,8 +992,8 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK-NOT: begin_access
-// CHECK: assign %0 to [[ADR]] : $*Int
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: assign %0 to [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
 
 // Verification should ignore the address operand of init_existential_addr.
@@ -1022,3 +1022,22 @@ public func testInitBox() throws {
 // CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
 // CHECK: throw [[BOXALLOC]] : $Error
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'
+
+public final class HasStaticProp {
+  public static let empty: HasStaticProp = HasStaticProp()
+}
+
+// A global addressor produces an unenforced RawPointer. This looke
+// like an Unidentified access with no access marker. Ensure that
+// verification doesn't assert.
+public func getStaticProp() -> HasStaticProp {
+  return .empty
+}
+
+// CHECK-LABEL: sil @$S20access_marker_verify13getStaticPropAA03HaseF0CyF : $@convention(thin) () -> @owned HasStaticProp {
+// function_ref HasStaticProp.empty.unsafeMutableAddressor
+// CHECK: [[F:%.*]] = function_ref @$S20access_marker_verify13HasStaticPropC5emptyACvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[RP:%.*]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
+// CHECK: load [copy] [[ADR]] : $*HasStaticProp
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify13getStaticPropAA03HaseF0CyF'

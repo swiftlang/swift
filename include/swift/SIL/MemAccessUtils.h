@@ -357,7 +357,8 @@ AccessedStorage findAccessedStorage(SILValue sourceAddr);
 /// through any Nested access to find the original storage.
 ///
 /// This is identical to findAccessedStorage(), but never returns Nested
-/// storage.
+/// storage and may return invalid storage for nested access when the outer
+/// access has Unsafe enforcement.
 AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 
 /// Return true if the given address operand is used by a memory operation that
@@ -367,6 +368,8 @@ bool memInstMustInitialize(Operand *memOper);
 
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
+///
+/// `storage` must be a valid AccessedStorage object.
 ///
 /// If this returns false, then the address can be safely accessed without
 /// a begin_access marker. To determine whether to emit begin_access:

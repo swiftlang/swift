@@ -541,8 +541,9 @@ func supportFirstStructure<B: Buildable>(_ b: inout B) throws {
 // CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
 // CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
+// CHECK: [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
 // CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
 // CHECK: switch_enum [[CALLBACK]]
@@ -577,8 +578,9 @@ func supportStructure<B: Buildable>(_ b: inout B, name: String) throws {
 // CHECK:   [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*B.Structure
 // CHECK:   [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
+// CHECK:   [[T5:%.*]] = begin_access [modify] [unsafe] [[T4]] : $*B.Structure
 // CHECK:   [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
-// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T4]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK:   try_apply [[SUPPORT]]<B.Structure>([[T5]]) : $@convention(witness_method: Supportable) <τ_0_0 where τ_0_0 : Supportable> (@inout τ_0_0) -> @error Error, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 
 // CHECK: [[BB_NORMAL]]
 // CHECK:   switch_enum [[CALLBACK]] : ${{.*}}, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
@@ -691,15 +693,18 @@ func supportStructure(_ b: inout OwnedBridge, name: String) throws {
 // CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
+// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
 // CHECK:      [[SUPPORT:%.*]] = function_ref @$S6errors5PylonV7supportyyKF
-// CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK-NEXT: try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:    [[BB_NORMAL]]
+// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 // CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
+// CHECK-NEXT: end_access [[ACCESS]] : $*Pylon
 // CHECK-NEXT: destroy_value [[OWNER]] : $AnyObject
 // CHECK-NEXT: end_access [[WRITE]]
 // CHECK-NEXT: destroy_value [[ARG2_COPY]] : $String
@@ -734,15 +739,18 @@ func supportStructure(_ b: inout PinnedBridge, name: String) throws {
 // CHECK-NEXT:   [[T3:%.*]] = struct_extract [[T1]]
 // CHECK-NEXT:   [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT:   [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
+// CHECK-NEXT:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T5]] : $*Pylon
 // CHECK:        [[SUPPORT:%.*]] = function_ref @$S6errors5PylonV7supportyyKF
-// CHECK-NEXT:   try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK-NEXT:   try_apply [[SUPPORT]]([[ACCESS]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
 // CHECK:      [[BB_NORMAL]]
+// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
 // CHECK-NEXT:   strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT:   end_access [[WRITE]]
 // CHECK-NEXT:   destroy_value [[ARG2_COPY]] : $String
 // CHECK-NEXT:   tuple ()
 // CHECK-NEXT:   return
 // CHECK:      [[BB_ERROR]]([[ERROR:%.*]] : @owned $Error):
+// CHECK-NEXT:   end_access [[ACCESS]] : $*Pylon
 // CHECK-NEXT:   [[OWNER_COPY:%.*]] = copy_value [[OWNER]]
 // CHECK-NEXT:   strong_unpin [[OWNER_COPY]] : $Optional<Builtin.NativeObject>
 // CHECK-NEXT:   destroy_value [[OWNER]]

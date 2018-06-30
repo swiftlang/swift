@@ -407,13 +407,14 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
 // CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[WRITE]] : $*T
+// CHECK:      [[TEMPORARY_ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMPORARY_ADDR]] : $*Int
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @$S9protocols6modifyyySizF
-// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
+// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ACCESS]])
 // CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK:    bb1([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
 // CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
-// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ACCESS]] : $*Int to $Builtin.RawPointer
 // CHECK:      apply [[CALLBACK]]<T>
 
 public struct Val {
