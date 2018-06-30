@@ -156,8 +156,8 @@ set(SWIFTLIB_ESSENTIAL
   UnsafeBitMap.swift
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
-  UnsafePointer.swift.gyb
-  UnsafeRawPointer.swift.gyb
+  UnsafePointer.swift
+  UnsafeRawPointer.swift
   UTFEncoding.swift
   UTF8.swift
   UTF16.swift
