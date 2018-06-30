@@ -628,7 +628,8 @@ static llvm::TinyPtrVector<ProtocolDecl *>
 getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl *proto,
                           ProtocolDecl **scratch) {
-  return tc.getDirectConformsTo(proto);
+  tc.resolveInheritedProtocols(proto);
+  return proto->getInheritedProtocols();
 }
 
 /// Retrieve the superclass of the given class.
@@ -5925,6 +5926,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
+    resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
 
@@ -6836,6 +6838,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
+    resolveTrailingWhereClause(proto);
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
@@ -7357,12 +7360,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   assert(extendedType->is<NominalType>());
   assert(!nominal->isGenericContext());
-}
-
-llvm::TinyPtrVector<ProtocolDecl *>
-TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
-  resolveInheritedProtocols(proto);
-  return proto->getInheritedProtocols();
 }
 
 /// Build a default initializer string for the given pattern.

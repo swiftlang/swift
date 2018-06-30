@@ -1558,9 +1558,6 @@ public:
   void checkInheritanceClause(Decl *decl,
                               GenericTypeResolver *resolver = nullptr);
 
-  /// Retrieve the set of inherited protocols for this protocol type.
-  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
-
   /// Diagnose if the class has no designated initializers.
   void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
 
