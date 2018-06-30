@@ -3738,14 +3738,6 @@ public:
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        DescriptiveDeclKind::Protocol, path);
 
-      // Make sure the parent protocols have been fully validated.
-      for (auto inherited : PD->getLocalProtocols()) {
-        TC.validateDecl(inherited);
-        for (auto *member : inherited->getMembers())
-          if (auto *requirement = dyn_cast<ValueDecl>(member))
-            TC.validateDecl(requirement);
-      }
-
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate =
@@ -3796,6 +3788,9 @@ public:
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    // Explicitly calculate this bit.
+    (void) PD->existentialTypeSupported(&TC);
   }
 
   void visitVarDecl(VarDecl *VD) {
