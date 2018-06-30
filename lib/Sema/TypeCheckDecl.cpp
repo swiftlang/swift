@@ -40,7 +40,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
-#include "swift/Sema/TypeCheckRequests.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
@@ -232,26 +232,6 @@ static void addImplicitConformances(
 
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
-
-Type TypeChecker::getSuperclass(const ClassDecl *classDecl) {
-  return Context.evaluator(
-           SuperclassTypeRequest(const_cast<ClassDecl *>(classDecl)));
-}
-
-Type TypeChecker::getSuperclass(const ProtocolDecl *protocolDecl) {
-  return Context.evaluator(
-           SuperclassTypeRequest(const_cast<ProtocolDecl *>(protocolDecl)));
-}
-
-Type TypeChecker::getRawType(EnumDecl *enumDecl) {
-  return Context.evaluator(EnumRawTypeRequest(enumDecl));
-}
-
-Type TypeChecker::getInheritedType(
-                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                         unsigned index) {
-  return Context.evaluator(InheritedTypeRequest(decl, index));
-}
 
 void TypeChecker::resolveTrailingWhereClause(ProtocolDecl *proto) {
   ProtocolRequirementTypeResolver resolver;

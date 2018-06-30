@@ -46,15 +46,14 @@ class InheritedTypeRequest :
 
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator,
-                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                  unsigned index) const;
+  Type evaluate(Evaluator &evaluator,
+                llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                unsigned index) const;
 
 public:
   // Cycle handling
@@ -76,13 +75,12 @@ class SuperclassTypeRequest :
                          NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
+  Type evaluate(Evaluator &evaluator, NominalTypeDecl *classDecl) const;
 
 public:
   // Cycle handling
@@ -104,13 +102,12 @@ class EnumRawTypeRequest :
                          EnumDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
-  using SimpleRequest::operator();
 
 private:
   friend class SimpleRequest;
 
   // Evaluation.
-  Type operator()(Evaluator &evaluator, EnumDecl *enumDecl) const;
+  Type evaluate(Evaluator &evaluator, EnumDecl *enumDecl) const;
 
 public:
   // Cycle handling
@@ -124,8 +121,11 @@ public:
   void cacheResult(Type value) const;
 };
 
-#define SWIFT_TYPEID_ZONE 10
-#define SWIFT_TYPEID_HEADER "swift/Sema/TypeCheckerTypeIDZone.def"
+/// The zone number for the type checker.
+#define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
+
+#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
 // Set up reporting of evaluated requests.
@@ -135,7 +135,7 @@ inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
-#include "swift/Sema/TypeCheckerTypeIDZone.def"
+#include "swift/AST/TypeCheckerTypeIDZone.def"
 #undef SWIFT_TYPEID
 
 } // end namespace swift

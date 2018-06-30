@@ -35,6 +35,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "clang/Lex/MacroInfo.h"
@@ -959,12 +960,8 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 
 Type ExtensionDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
-  if (auto lazyResolver = ctx.getLazyResolver()) {
-    return lazyResolver->getInheritedType(const_cast<ExtensionDecl *>(this),
-                                          index);
-  }
-
-  return getInherited()[index].getType();
+  return ctx.evaluator(InheritedTypeRequest{const_cast<ExtensionDecl *>(this),
+                                            index});
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
@@ -2329,12 +2326,8 @@ void ValueDecl::copyFormalAccessFrom(const ValueDecl *source,
 
 Type TypeDecl::getInheritedType(unsigned index) const {
   ASTContext &ctx = getASTContext();
-  if (auto lazyResolver = ctx.getLazyResolver()) {
-    return lazyResolver->getInheritedType(const_cast<TypeDecl *>(this),
-                                          index);
-  }
-
-  return getInherited()[index].getType();
+  return ctx.evaluator(InheritedTypeRequest{const_cast<TypeDecl *>(this),
+                                            index});
 }
 
 Type TypeDecl::getDeclaredInterfaceType() const {
@@ -2829,11 +2822,7 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
-  if (auto lazyResolver = ctx.getLazyResolver()) {
-    return lazyResolver->getRawType(const_cast<EnumDecl *>(this));
-  }
-
-  return LazySemanticInfo.RawType.getPointer();
+  return ctx.evaluator(EnumRawTypeRequest{const_cast<EnumDecl *>(this)});
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -3286,11 +3275,7 @@ ProtocolDecl::getAssociatedTypeMembers() const {
 
 Type ProtocolDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
-  if (auto lazyResolver = ctx.getLazyResolver()) {
-    return lazyResolver->getSuperclass(this);
-  }
-
-  return LazySemanticInfo.Superclass.getPointer();
+  return ctx.evaluator(SuperclassTypeRequest{const_cast<ProtocolDecl *>(this)});
 }
 
 ClassDecl *ProtocolDecl::getSuperclassDecl() const {
@@ -5698,11 +5683,7 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
 
 Type ClassDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
-  if (auto lazyResolver = ctx.getLazyResolver()) {
-    return lazyResolver->getSuperclass(this);
-  }
-
-  return LazySemanticInfo.Superclass.getPointer();
+  return ctx.evaluator(SuperclassTypeRequest{const_cast<ClassDecl *>(this)});
 }
 
 ClassDecl *ClassDecl::getSuperclassDecl() const {
