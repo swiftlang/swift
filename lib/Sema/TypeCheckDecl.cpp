@@ -636,10 +636,8 @@ getInheritedForCycleCheck(TypeChecker &tc,
 static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                        ClassDecl *classDecl,
                                                        ClassDecl **scratch) {
-  tc.checkInheritanceClause(classDecl);
-
   if (classDecl->hasSuperclass()) {
-    *scratch = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+    *scratch = classDecl->getSuperclassDecl();
     return *scratch;
   }
   return { };
@@ -649,8 +647,6 @@ static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                       EnumDecl *enumDecl,
                                                       EnumDecl **scratch) {
-  tc.checkInheritanceClause(enumDecl);
-  
   if (enumDecl->hasRawType()) {
     *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
     return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
