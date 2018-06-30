@@ -1625,12 +1625,9 @@ public:
     // Unsafe enforcement is used for some unrecognizable access patterns,
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
-    findAccessedStorage(BAI->getSource());
-    // FIXME: Also require that a valid storage location is returned.
-    //
-    // AccessedStorage storage = findAccessedStorage(BAI->getSource());
-    // if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
-    //  require(storage, "Unknown formal access pattern");
+    AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
+      require(storage, "Unknown formal access pattern");
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
@@ -1667,15 +1664,12 @@ public:
     }
 
     // First check that findAccessedStorage never asserts.
-    findAccessedStorage(BUAI->getSource());
-    // FIXME: Also require that a valid storage location is returned.
-    //
+    AccessedStorage storage = findAccessedStorage(BUAI->getSource());
     // Only allow Unsafe and Builtin access to have invalid storage.
-    // AccessedStorage storage = findAccessedStorage(BAI->getSource());
-    // if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
-    //     && !BUAI->isFromBuiltin()) {
-    //   require(storage, "Unknown formal access pattern");
-    // }
+    if (BUAI->getEnforcement() != SILAccessEnforcement::Unsafe
+        && !BUAI->isFromBuiltin()) {
+      require(storage, "Unknown formal access pattern");
+    }
   }
 
   void checkEndUnpairedAccessInst(EndUnpairedAccessInst *I) {
