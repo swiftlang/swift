@@ -8,6 +8,16 @@
 // Check that we produced superclass type requests.
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 16' %t/stats-dir
 
+class Left
+    : Right.Hand {
+  class Hand {}
+}
+
+class Right
+  : Left.Hand {
+  class Hand {}
+}
+
 class C : B { } // expected-error{{'C' inherits from itself}}
 class B : A { } // expected-note{{class 'B' declared here}}
 class A : C { } // expected-note{{class 'A' declared here}}
@@ -20,16 +30,6 @@ class Automorphism : Automorphism { } // expected-error{{'Automorphism' inherits
 
 // FIXME: Useless error
 let _ = A() // expected-error{{'A' cannot be constructed because it has no accessible initializers}}
-
-class Left
-    : Right.Hand {
-  class Hand {}
-}
-
-class Right
-  : Left.Hand {
-  class Hand {}
-}
 
 class Outer {
   class Inner : Outer {}

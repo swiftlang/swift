@@ -910,7 +910,6 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     ExtendedType(extendedType),
     Inherited(inherited)
 {
-  Bits.ExtensionDecl.CheckedInheritanceClause = false;
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
   setTrailingWhereClause(trailingWhereClause);

@@ -1371,7 +1371,6 @@ public:
 
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
-    checkInheritanceClause(ext);
   }
   virtual void resolveExtensionForConformanceConstruction(
       ExtensionDecl *ext,
@@ -1557,9 +1556,6 @@ public:
   /// Check the inheritance clause of the given declaration.
   void checkInheritanceClause(Decl *decl,
                               GenericTypeResolver *resolver = nullptr);
-
-  /// Retrieve the set of inherited protocols for this protocol type.
-  llvm::TinyPtrVector<ProtocolDecl *> getDirectConformsTo(ProtocolDecl *proto);
 
   /// Diagnose if the class has no designated initializers.
   void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);

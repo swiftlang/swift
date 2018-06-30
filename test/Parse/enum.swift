@@ -148,7 +148,7 @@ enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 
   case Ladd, Elliott, Sixteenth, Harrison
 }
 
-enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{'RawTypeCircularityA' has a raw type that depends on itself}} FIXME: expected-error{{RawRepresentable}}
+enum RawTypeCircularityA : RawTypeCircularityB, ExpressibleByIntegerLiteral { // expected-error {{'RawTypeCircularityA' has a raw type that depends on itself}}
   case Morrison, Belmont, Madison, Hawthorne
 
   init(integerLiteral value: Int) {
