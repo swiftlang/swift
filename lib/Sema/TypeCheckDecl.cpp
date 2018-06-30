@@ -3314,6 +3314,8 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
     TC.validateDecl(AT);
 
+    TC.checkInheritanceClause(AT);
+
     auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
       TC.diagnose(AT->getLoc(),
@@ -3392,6 +3394,8 @@ public:
 
     TC.checkDeclAttributes(ED);
 
+    TC.checkInheritanceClause(ED);
+
     AccessControlChecker::checkAccessControl(TC, ED);
     UsableFromInlineChecker::checkUsableFromInline(TC, ED);
 
@@ -3422,6 +3426,8 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(SD);
+
+    TC.checkInheritanceClause(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
@@ -3655,6 +3661,8 @@ public:
     CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
+
+    TC.checkInheritanceClause(CD);
 
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
@@ -5786,7 +5794,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
 
     checkDeclAttributesEarly(assocType);
-    checkInheritanceClause(assocType);
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
@@ -5839,8 +5846,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     nominal->setIsBeingValidated();
     validateGenericTypeSignature(nominal);
     nominal->setIsBeingValidated(false);
-
-    checkInheritanceClause(D);
 
     validateAttributes(*this, D);
 
