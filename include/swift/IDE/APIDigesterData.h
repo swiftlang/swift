@@ -276,7 +276,7 @@ public:
     selfIndex(selfIndex), removedIndex(removedIndex), oldTypeName(oldTypeName),
     oldPrintedName(oldPrintedName), OldNameViewer(oldPrintedName),
     NewNameViewer(newPrintedName),
-    NewTypeDot(newTypeName.empty() ? "" : (llvm::Twine(newTypeName) + ".").str()),
+    NewTypeDot(isNewNameGlobal() ? "" : (llvm::Twine(newTypeName) + ".").str()),
     Subkind(getSubKind()) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
@@ -291,6 +291,7 @@ public:
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_TypeMemberDiffItem;
   }
+  bool isNewNameGlobal() const { return newTypeName.empty(); }
 private:
   TypeMemberDiffItemSubKind getSubKind() const;
 };

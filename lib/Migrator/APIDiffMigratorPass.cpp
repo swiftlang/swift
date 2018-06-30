@@ -343,8 +343,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (MD->Subkind == TypeMemberDiffItemSubKind::SimpleReplacement) {
         bool NeedNoTypeName = isDotMember &&
           MD->oldPrintedName == MD->newPrintedName;
-        Text = (llvm::Twine(NeedNoTypeName ? "." : MD->getNewTypeAndDot()) +
-          MD->getNewName().base()).str();
+        if (NeedNoTypeName) {
+          Text = (llvm::Twine(MD->isNewNameGlobal() ? "" : ".") +
+            MD->getNewName().base()).str();
+        } else {
+          Text = (llvm::Twine(MD->getNewTypeAndDot()) +
+            MD->getNewName().base()).str();
+        }
         return true;
       }
     }
@@ -540,9 +545,15 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
           if (Item->Subkind == TypeMemberDiffItemSubKind::QualifiedReplacement) {
             bool NeedNoTypeName = isDotMember(ToReplace) &&
               Item->oldPrintedName == Item->newPrintedName;
-            Editor.replace(ToReplace,
-              (llvm::Twine(NeedNoTypeName ? "." : Item->getNewTypeAndDot()) +
-               Item->getNewName().base()).str());
+            if (NeedNoTypeName) {
+              Editor.replace(ToReplace,
+                (llvm::Twine(Item->isNewNameGlobal() ? "" : ".") +
+                Item->getNewName().base()).str());
+            } else {
+              Editor.replace(ToReplace,
+                (llvm::Twine(Item->getNewTypeAndDot()) +
+                  Item->getNewName().base()).str());
+            }
             return true;
           }
         }
