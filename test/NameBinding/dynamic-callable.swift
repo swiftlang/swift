@@ -184,26 +184,33 @@ func testProtoExtension() -> Int {
 }
 
 struct CallableStruct : CallableProtocol {}
+class CallableClass : CallableProtocol {}
 
 func testExistential(
-  a: CallableProtocol, b: KeywordCallableProtocol, c: CallableStruct
+  a: CallableProtocol, b: KeywordCallableProtocol, c: CallableStruct,
+  d: CallableClass
 ) -> Int {
-  return a(1, 2, 3) + b(label1: 1, 2, label2: 3) + c(1, 2, 3)
+  return a(1, 2, 3) + b(label1: 1, 2, label2: 3) + c(1, 2, 3) + d(1, 2, 3)
 }
 
 // Verify protocol compositions and refinements work.
 protocol SubProtocol : CallableProtocol {}
 
 typealias ProtocolComp = AnyObject & CallableProtocol
+typealias ProtocolComp2 = KeywordCallableProtocol & CallableClass
 
 func testExistential2(a: AnyObject & CallableProtocol,
                       b: SubProtocol,
                       c: ProtocolComp & AnyObject,
-                      d: CallableProtocol & KeywordCallableProtocol) {
+                      d: CallableClass,
+                      e: CallableProtocol & KeywordCallableProtocol,
+                      f: CallableProtocol & ProtocolComp2) {
   print(a(1, 2, 3))
   print(b(1, 2, 3))
   print(c(1, 2, 3))
-  print(d() + d(label1: 1, 2, label2: 3))
+  print(d(1, 2, 3))
+  print(e() + e(label1: 1, 2, label2: 3))
+  print(f() + f(label1: 1, 2, label2: 3))
 }
 
 //===----------------------------------------------------------------------===//
@@ -357,7 +364,7 @@ func testGenericType4<T>(a: CallableGeneric4<T>) -> Int {
 }
 
 @dynamicCallable
-struct CallableGeneric5<T> {
+class CallableGeneric5<T> {
   func dynamicallyCall<U>(withArguments arguments: [U]) -> U {
     return arguments[0]
   }
@@ -369,5 +376,9 @@ struct CallableGeneric5<T> {
   }
 }
 func testGenericType5<T>(a: CallableGeneric5<T>) -> Double {
+  return a(1, 2, 3) + a(x1: 1, 2, x3: 3)
+}
+// TODO: Fix this failing test; archetypes seem problematic.
+func testArchetypeType5<T, C : CallableGeneric5<T>>(a: C) -> Double {
   return a(1, 2, 3) + a(x1: 1, 2, x3: 3)
 }
