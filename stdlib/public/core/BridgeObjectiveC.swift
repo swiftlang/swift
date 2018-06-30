@@ -788,7 +788,7 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   var done = false
   var result: AnyObject!
   
-  var source: Any = x
+  let source: Any = x
   
   if let dynamicSource = _extractDynamicValue(x) {
     result = dynamicSource as AnyObject
