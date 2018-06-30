@@ -212,6 +212,18 @@ func testExistential2(a: AnyObject & CallableProtocol,
   print(e() + e(label1: 1, 2, label2: 3))
   print(f() + f(label1: 1, 2, label2: 3))
 }
+// TODO: Fix this failing test.
+func testConstrainedClassType<C : AnyObject>(
+  a: C
+) -> Int where C : CallableProtocol {
+  return a(1, 2, 3)
+}
+// TODO: Fix this failing test.
+func testRefinedProtocolType<P : FloatingPoint>(
+  a: P
+) -> Int where P : CallableProtocol {
+  return a(1, 2, 3)
+}
 
 //===----------------------------------------------------------------------===//
 // Class inheritance test
