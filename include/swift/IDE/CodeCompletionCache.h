@@ -95,6 +95,7 @@ struct RequestedCachedModule {
   CodeCompletionCache::Key Key;
   const ModuleDecl *TheModule;
   bool OnlyTypes;
+  bool OnlyPrecedenceGroups;
 };
 
 } // end namespace ide

@@ -719,6 +719,11 @@ SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
 }
 
+void SerializedASTFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) const {
+  File.getPrecedenceGroups(results);
+}
+
 void
 SerializedASTFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &results) const{
   File.getLocalTypeDecls(results);

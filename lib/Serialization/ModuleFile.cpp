@@ -2006,6 +2006,17 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
   }
 }
 
+void ModuleFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &results) {
+  PrettyStackTraceModuleFile stackEntry(*this);
+  if (PrecedenceGroupDecls) {
+    for (auto entry : PrecedenceGroupDecls->data()) {
+      for (auto item : entry)
+        results.push_back(cast<PrecedenceGroupDecl>(getDecl(item.second)));
+    }
+  }
+}
+
 void
 ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   PrettyStackTraceModuleFile stackEntry(*this);

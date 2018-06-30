@@ -547,6 +547,20 @@ void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
 }
 
+void ModuleDecl::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
+  FORWARD(getPrecedenceGroups, (Results));
+}
+
+void SourceFile::getPrecedenceGroups(
+       SmallVectorImpl<PrecedenceGroupDecl*> &Results) const {
+  for (auto pair : PrecedenceGroups) {
+    if (pair.second.getPointer() && pair.second.getInt()) {
+      Results.push_back(pair.second.getPointer());
+    }
+  }
+}
+
 void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   Results.append(LocalTypeDecls.begin(), LocalTypeDecls.end());
 }
