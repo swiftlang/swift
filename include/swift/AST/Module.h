@@ -94,8 +94,6 @@ enum class FileUnitKind {
   SerializedAST,
   /// An imported Clang module.
   ClangModule,
-  /// A derived declaration.
-  Derived,
 };
 
 enum class SourceFileKind {
