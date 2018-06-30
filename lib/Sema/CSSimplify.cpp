@@ -4343,20 +4343,22 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
   auto calculate = [&]() -> DynamicCallableMethods {
     // If this is a protocol composition, check if any of the protocols have the
     // attribute.
-    if (auto protocolComp = canType->getAs<ProtocolCompositionType>()) {
+    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType)) {
       DynamicCallableMethods methods;
       for (auto protocolType : protocolComp->getMembers()) {
         auto tmp = getDynamicCallableMethods(protocolType, CS, locator, error);
         if (error) return methods;
         if (tmp.argumentsMethod) {
-          if (methods.argumentsMethod) {
+          if (methods.argumentsMethod &&
+              methods.argumentsMethod != tmp.argumentsMethod) {
             error = true;
             return methods;
           }
           methods.argumentsMethod = tmp.argumentsMethod;
         }
         if (tmp.keywordArgumentsMethod) {
-          if (methods.keywordArgumentsMethod) {
+          if (methods.keywordArgumentsMethod &&
+              methods.keywordArgumentsMethod != tmp.keywordArgumentsMethod) {
             error = true;
             return methods;
           }
@@ -4401,6 +4403,120 @@ getDynamicCallableMethods(Type type, ConstraintSystem &CS,
   };
 
   return CS.DynamicCallableCache[canType] = calculate();
+}
+
+// Simplify applicable function constraint for an application of a
+// @dynamicCallable type.
+static ConstraintSystem::SolutionKind
+simplifyDynamicCallableApplicableFnConstraint(
+    ConstraintSystem &CS, Type type1, Type type2,
+    ConstraintLocatorBuilder locator,
+    ConstraintSystem::TypeMatchOptions flags) {
+  using SolutionKind = ConstraintSystem::SolutionKind;
+
+  bool error = false;
+  auto methods = getDynamicCallableMethods(type2, CS, locator, error);
+  if (error || !methods.isValid()) return SolutionKind::Error;
+
+  auto &ctx = CS.getASTContext();
+  auto func1 = type1->castTo<FunctionType>();
+
+  // Determine whether to call the positional arguments method or the
+  // keyword arguments method.
+  bool useKwargsMethod = methods.argumentsMethod == nullptr;
+  if (!useKwargsMethod) {
+    for (auto param : func1->getParams()) {
+      if (param.hasLabel()) {
+        useKwargsMethod = true;
+        break;
+      }
+    }
+  }
+
+  auto method = useKwargsMethod
+    ? methods.keywordArgumentsMethod
+    : methods.argumentsMethod;
+
+  if (!method) {
+    assert(useKwargsMethod &&
+           "Undefined method implies kwargs method is missing");
+    // Get source loc of @dynamicCallable nominal decl to emit a diagnostic.
+    auto decl = type2->getAnyNominal();
+    if (auto protocolComp = type2->getAs<ProtocolCompositionType>()) {
+      for (auto protocol : protocolComp->getMembers())
+        if (CS.DynamicCallableCache.count(protocol->getCanonicalType()))
+          decl = protocol->getAnyNominal();
+    }
+    CS.TC.diagnose(decl->getLoc(), diag::missing_dynamic_callable_kwargs_method,
+                   type2);
+    return SolutionKind::Error;
+  }
+
+  auto memberType = CS.getTypeOfMemberReference(type2, method, CS.DC,
+                                                /*isDynamicResult*/ false,
+                                                FunctionRefKind::DoubleApply,
+                                                locator).second;
+  auto methodType = memberType->castTo<AnyFunctionType>();
+  auto argType = methodType->getParams()[0].getType();
+
+  // Attempts to solve an argument conversion constraint from each dynamic
+  // call parameter to the specified type. Returns true if the constraint can
+  // be solved.
+  auto argTypesMatch = [&](Type argElementType) {
+    // Allow argument type to default to `Any`.
+    CS.addConstraint(ConstraintKind::Defaultable, argElementType,
+                     ctx.TheAnyType, locator);
+    // Constraint each dynamic call parameter to argument type.
+    for (auto i : indices(func1->getParams())) {
+      auto param = func1->getParams()[i];
+      auto paramType = param.getType();
+      auto locatorBuilder =
+        locator.withPathElement(LocatorPathElt::getTupleElement(i));
+      if (CS.matchTypes(paramType, argElementType,
+                        ConstraintKind::ArgumentConversion, flags,
+                        locatorBuilder).isFailure()) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  // Add constraints on argument type.
+  if (!useKwargsMethod) {
+    auto arrayLitProto =
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+    auto conformance =
+      CS.TC.conformsToProtocol(argType, arrayLitProto, CS.DC,
+                               ConformanceCheckFlags::InExpression);
+    Type arrayElementType =
+      ProtocolConformanceRef::getTypeWitnessByName(
+        argType, *conformance, ctx.Id_ArrayLiteralElement, &CS.TC);
+
+    if (!argTypesMatch(arrayElementType))
+      return SolutionKind::Error;
+  } else {
+    auto dictLitProto =
+      ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
+    auto conformance =
+      CS.TC.conformsToProtocol(argType, dictLitProto, CS.DC,
+                               ConformanceCheckFlags::InExpression);
+    Type dictValueType =
+      ProtocolConformanceRef::getTypeWitnessByName(
+        argType, *conformance, ctx.Id_Value, &CS.TC);
+
+    if (!argTypesMatch(dictValueType))
+      return SolutionKind::Error;
+  }
+
+  // Add constraints on result type.
+  auto locatorBuilder =
+    locator.withPathElement(ConstraintLocator::FunctionResult);
+  if (CS.matchTypes(func1->getResult(), methodType->getResult(),
+                    ConstraintKind::Bind, flags,
+                    locatorBuilder).isFailure())
+    return SolutionKind::Error;
+
+  return SolutionKind::Solved;
 }
 
 ConstraintSystem::SolutionKind
@@ -4522,114 +4638,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // Handle @dynamicCallable applications.
-  bool error = false;
-  auto methods = getDynamicCallableMethods(desugar2, *this, locator, error);
-  if (error) return SolutionKind::Error;
-
-  if (methods.isValid()) {
-    auto &ctx = getASTContext();
-    auto func1 = type1->castTo<FunctionType>();
-
-    // Determine whether to call the positional arguments method or the
-    // keyword arguments method.
-    bool useKwargsMethod = methods.argumentsMethod == nullptr;
-    if (!useKwargsMethod) {
-      for (auto param : func1->getParams()) {
-        if (param.hasLabel()) {
-          useKwargsMethod = true;
-          break;
-        }
-      }
-    }
-
-    auto method = useKwargsMethod
-      ? methods.keywordArgumentsMethod
-      : methods.argumentsMethod;
-
-    if (!method) {
-      assert(useKwargsMethod &&
-             "Undefined method implies kwargs method is missing");
-      // Get source loc of @dynamicCallable nominal decl to emit a diagnostic.
-      auto decl = desugar2->getAnyNominal();
-      if (auto protocolComp = desugar2->getAs<ProtocolCompositionType>()) {
-        for (auto protocol : protocolComp->getMembers())
-          if (DynamicCallableCache.count(protocol->getCanonicalType()))
-            decl = protocol->getAnyNominal();
-      }
-      TC.diagnose(decl->getLoc(), diag::missing_dynamic_callable_kwargs_method,
-                  desugar2);
-      return SolutionKind::Error;
-    }
-
-    auto memberType = getTypeOfMemberReference(desugar2, method, DC,
-                                               /*isDynamicResult*/ false,
-                                               FunctionRefKind::DoubleApply,
-                                               locator).second;
-    auto methodType = memberType->castTo<AnyFunctionType>();
-    auto argType = methodType->getParams()[0].getType();
-
-    // Attempts to solve an argument conversion constraint from each dynamic
-    // call parameter to the specified type. Returns true if the constraint can
-    // be solved.
-    auto argTypesMatch = [&](Type argElementType) {
-      // Allow argument type to default to `Any`.
-      addConstraint(ConstraintKind::Defaultable, argElementType, ctx.TheAnyType,
-                    locator);
-      // Constraint each dynamic call parameter to argument type.
-      for (auto param : func1->getParams()) {
-        auto paramType = param.getType();
-        auto locatorBuilder =
-          outerLocator.withPathElement(ConstraintLocator::ApplyArgument);
-        if (matchTypes(paramType, argElementType,
-                       ConstraintKind::ArgumentConversion, subflags,
-                       locatorBuilder).isFailure()) {
-          return false;
-        }
-      }
-      return true;
-    };
-
-    // Add constraints on argument type.
-    if (!useKwargsMethod) {
-      auto arrayLitProto =
-        ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-      auto conformance =
-        TC.conformsToProtocol(argType, arrayLitProto, DC,
-                              ConformanceCheckFlags::InExpression);
-      Type arrayElementType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-          argType, *conformance, ctx.Id_ArrayLiteralElement, &TC)
-        ->getDesugaredType();
-
-      if (!argTypesMatch(arrayElementType))
-        return SolutionKind::Error;
-    } else {
-      auto dictLitProto =
-        ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-      auto conformance =
-        TC.conformsToProtocol(argType, dictLitProto, DC,
-                              ConformanceCheckFlags::InExpression);
-      Type dictValueType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-          argType, *conformance, ctx.Id_Value, &TC)
-        ->getDesugaredType();
-
-      if (!argTypesMatch(dictValueType))
-        return SolutionKind::Error;
-    }
-
-    // Add constraints on result type.
-    auto locatorBuilder =
-      locator.withPathElement(ConstraintLocator::FunctionResult);
-    if (matchTypes(func1->getResult(), methodType->getResult(),
-                   ConstraintKind::Bind, subflags,
-                   locatorBuilder).isFailure())
-      return SolutionKind::Error;
-
-    return SolutionKind::Solved;
-  } // end @dynamicCallable handling
-
-  return SolutionKind::Error;
+  return simplifyDynamicCallableApplicableFnConstraint(*this, type1, desugar2,
+                                                       locator, subflags);
 }
 
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
