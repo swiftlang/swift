@@ -55,6 +55,7 @@ typedef NS_ENUM(long, FooComparisonResult) {
   FooOrderedSame,
   FooOrderedDescending,
   FooOrderedMemberSame,
+  FooOrderedMovedToGlobal,
 };
 
 @interface BarBase

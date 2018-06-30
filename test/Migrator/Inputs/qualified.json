@@ -55,4 +55,12 @@
     "NewPrintedName": "orderedMemberSame",
     "NewTypeName": "NewFooComparisonResult.Nested"
   },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedMovedToGlobal",
+    "OldPrintedName": "orderedMovedToGlobal",
+    "OldTypeName": "FooComparisonResult",
+    "NewPrintedName": "orderedMovedToGlobal",
+    "NewTypeName": ""
+  },
 ]

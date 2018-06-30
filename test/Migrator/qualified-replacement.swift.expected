@@ -19,6 +19,8 @@ func foo() {
   bar(.orderedMemberSame)
   bar(NewFooComparisonResult.NewFooOrderedSame)
   bar(NewFooComparisonResult.Nested.orderedMemberSame)
+  bar(orderedMovedToGlobal)
+  bar(orderedMovedToGlobal)
 }
 
 func foo(_: ToplevelWrapper.internalType) {}
