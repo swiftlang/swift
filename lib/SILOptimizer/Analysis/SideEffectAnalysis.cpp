@@ -481,6 +481,7 @@ void FunctionSideEffects::analyzeInstruction(SILInstruction *I) {
     return;
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::StrongRetainUnownedInst:
+  case SILInstructionKind::CopyUnownedValueInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::UnownedRetainInst:
     getEffectsOn(I->getOperand(0))->Retains = true;

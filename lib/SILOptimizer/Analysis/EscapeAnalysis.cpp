@@ -1372,6 +1372,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::DeallocStackInst:
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongRetainUnownedInst:
+    case SILInstructionKind::CopyUnownedValueInst:
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::UnownedRetainInst:
     case SILInstructionKind::BranchInst:
