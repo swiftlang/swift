@@ -74,7 +74,9 @@ The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
 
-In Xcode Preferences, on the Locations tab, Command Line Tools should be set to Xcode 10.0 (10L176w).
+Be aware that the Command Line Tools version must match the required Xcode version. 
+Command Line Tools can be managed using the `xcode-select` tool and, in Xcode, at 
+the *Xcode>Preferences>Locations* tab.
 
 You will also need [CMake](https://cmake.org) and [Ninja](https://ninja-build.org),
 which can be installed via a package manager:
