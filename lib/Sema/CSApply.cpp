@@ -4000,6 +4000,12 @@ namespace {
       // Should already be type-checked.
       return simplifyExprType(expr);
     }
+
+    Expr *visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+      simplifyExprType(expr);
+      assert(expr->getType()->isEqual(expr->getSubExpr()->getType()));
+      return expr;
+    }
     
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       simplifyExprType(E);
@@ -7031,8 +7037,12 @@ static Type adjustSelfTypeForMember(Type baseTy, ValueDecl *member,
 
   // If we're calling an accessor, keep the base as an inout type, because the
   // getter may be mutating.
-  if (SD->hasAccessorFunctions() && baseTy->is<InOutType>() &&
-      semantics != AccessSemantics::DirectToStorage)
+  auto strategy = SD->getAccessStrategy(semantics,
+                                        isSettableFromHere
+                                          ? AccessKind::ReadWrite
+                                          : AccessKind::Read,
+                                        UseDC);
+  if (baseTy->is<InOutType>() && strategy.getKind() != AccessStrategy::Storage)
     return InOutType::get(baseObjectTy);
 
   // Accesses to non-function members in value types are done through an @lvalue

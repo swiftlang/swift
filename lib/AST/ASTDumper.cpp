@@ -213,31 +213,55 @@ getSILFunctionTypeRepresentationString(SILFunctionType::Representation value) {
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
-static StringRef
-getAbstractStorageDeclKindString(AbstractStorageDecl::StorageKindTy value) {
-  switch (value) {
-  case AbstractStorageDecl::Stored:
-    return "stored";
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return "stored_with_trivial_accessors";
-  case AbstractStorageDecl::StoredWithObservers:
-    return "stored_with_observers";
-  case AbstractStorageDecl::InheritedWithObservers:
-    return "inherited_with_observers";
-  case AbstractStorageDecl::Addressed:
-    return "addressed";
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    return "addressed_with_trivial_accessors";
-  case AbstractStorageDecl::AddressedWithObservers:
-    return "addressed_with_observers";
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    return "computed_with_mutable_address";
-  case AbstractStorageDecl::Computed:
-    return "computed";
-  }
 
-  llvm_unreachable("Unhandled AbstractStorageDecl in switch.");
+StringRef swift::getReadImplKindName(ReadImplKind kind) {
+  switch (kind) {
+  case ReadImplKind::Stored:
+    return "stored";
+  case ReadImplKind::Inherited:
+    return "inherited";
+  case ReadImplKind::Get:
+    return "getter";
+  case ReadImplKind::Address:
+    return "addressor";
+  }
+  llvm_unreachable("bad kind");
 }
+
+StringRef swift::getWriteImplKindName(WriteImplKind kind) {
+  switch (kind) {
+  case WriteImplKind::Immutable:
+    return "immutable";
+  case WriteImplKind::Stored:
+    return "stored";
+  case WriteImplKind::StoredWithObservers:
+    return "stored_with_observers";
+  case WriteImplKind::InheritedWithObservers:
+    return "inherited_with_observers";
+  case WriteImplKind::Set:
+    return "setter";
+  case WriteImplKind::MutableAddress:
+    return "mutable_addressor";
+  }
+  llvm_unreachable("bad kind");
+}
+
+StringRef swift::getReadWriteImplKindName(ReadWriteImplKind kind) {
+  switch (kind) {
+  case ReadWriteImplKind::Immutable:
+    return "immutable";
+  case ReadWriteImplKind::Stored:
+    return "stored";
+  case ReadWriteImplKind::MaterializeForSet:
+    return "materialize_for_set";
+  case ReadWriteImplKind::MutableAddress:
+    return "mutable_addressor";
+  case ReadWriteImplKind::MaterializeToTemporary:
+    return "materialize_to_temporary";
+  }
+  llvm_unreachable("bad kind");
+}
+
 static StringRef getImportKindString(ImportKind value) {
   switch (value) {
   case ImportKind::Module: return "module";
@@ -339,7 +363,7 @@ static StringRef getAccessSemanticsString(AccessSemantics value) {
   switch (value) {
     case AccessSemantics::Ordinary: return "ordinary";
     case AccessSemantics::DirectToStorage: return "direct_to_storage";
-    case AccessSemantics::DirectToAccessor: return "direct_to_accessor";
+    case AccessSemantics::DirectToImplementation: return "direct_to_impl";
     case AccessSemantics::BehaviorInitialization: return "behavior_init";
   }
 
@@ -794,48 +818,35 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " let";
       if (VD->hasNonPatternBindingInit())
         PrintWithColorRAII(OS, DeclModifierColor) << " non_pattern_init";
-      PrintWithColorRAII(OS, DeclModifierColor)
-        << " storage_kind="
-        << getAbstractStorageDeclKindString(VD->getStorageKind());
       if (VD->getAttrs().hasAttribute<LazyAttr>())
         PrintWithColorRAII(OS, DeclModifierColor) << " lazy";
-
+      printStorageImpl(VD);
       printAccessors(VD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
 
+    void printStorageImpl(AbstractStorageDecl *D) {
+      auto impl = D->getImplInfo();
+      PrintWithColorRAII(OS, DeclModifierColor)
+        << " readImpl="
+        << getReadImplKindName(impl.getReadImpl());
+      if (!impl.supportsMutation()) {
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " immutable";
+      } else {
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " writeImpl="
+          << getWriteImplKindName(impl.getWriteImpl());
+        PrintWithColorRAII(OS, DeclModifierColor)
+          << " readWriteImpl="
+          << getReadWriteImplKindName(impl.getReadWriteImpl());
+      }
+    }
+
     void printAccessors(AbstractStorageDecl *D) {
-      if (FuncDecl *Get = D->getGetter()) {
+      for (auto accessor : D->getAllAccessors()) {
         OS << "\n";
-        printRec(Get);
-      }
-      if (FuncDecl *Set = D->getSetter()) {
-        OS << "\n";
-        printRec(Set);
-      }
-      if (FuncDecl *MaterializeForSet = D->getMaterializeForSetFunc()) {
-        OS << "\n";
-        printRec(MaterializeForSet);
-      }
-      if (D->hasObservers()) {
-        if (FuncDecl *WillSet = D->getWillSetFunc()) {
-          OS << "\n";
-          printRec(WillSet);
-        }
-        if (FuncDecl *DidSet = D->getDidSetFunc()) {
-          OS << "\n";
-          printRec(DidSet);
-        }
-      }
-      if (D->hasAddressors()) {
-        if (FuncDecl *addressor = D->getAddressor()) {
-          OS << "\n";
-          printRec(addressor);
-        }
-        if (FuncDecl *mutableAddressor = D->getMutableAddressor()) {
-          OS << "\n";
-          printRec(mutableAddressor);
-        }
+        printRec(accessor);
       }
     }
 
@@ -907,8 +918,7 @@ namespace {
 
     void visitSubscriptDecl(SubscriptDecl *SD) {
       printCommon(SD, "subscript_decl");
-      OS << " storage_kind="
-         << getAbstractStorageDeclKindString(SD->getStorageKind());
+      printStorageImpl(SD);
       printAccessors(SD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -2512,6 +2522,11 @@ public:
       printRec(ExpTyR);
     }
     printSemanticExpr(E->getSemanticExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+  void visitLazyInitializerExpr(LazyInitializerExpr *E) {
+    printCommon(E, "lazy_initializer_expr") << '\n';
+    printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitObjCSelectorExpr(ObjCSelectorExpr *E) {

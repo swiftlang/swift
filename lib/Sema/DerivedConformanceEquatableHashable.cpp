@@ -1087,8 +1087,8 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
   hashValueDecl->setValidationStarted();
-  hashValueDecl->setAccessors(VarDecl::Computed, SourceLoc(), {getterDecl},
-                              SourceLoc());
+  hashValueDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
+                              SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,
                                       /*sourceIsParentContext*/ true);
 

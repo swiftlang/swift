@@ -1141,7 +1141,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD,
 
   // If an initial value expression was specified by the decl, emit it into
   // the initialization. Otherwise, mark it uninitialized for DI to resolve.
-  if (auto *Init = entry.getInit()) {
+  if (auto *Init = entry.getNonLazyInit()) {
     FullExpr Scope(Cleanups, CleanupLocation(Init));
     emitExprInto(Init, initialization.get(), SILLocation(PBD));
   } else {

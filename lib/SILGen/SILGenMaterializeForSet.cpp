@@ -345,18 +345,16 @@ public:
     emitter.RequirementStoragePattern = emitter.WitnessStoragePattern;
     emitter.RequirementStorageType = emitter.WitnessStorageType;
 
-    // When we're emitting a standard implementation, use direct semantics.
-    // If we used TheAccessSemantics::Ordinary here, the only downside would
-    // be unnecessary vtable dispatching for class materializeForSets.
-    if (!emitter.WitnessStorage->hasObservers() &&
-        (emitter.WitnessStorage->hasStorage() ||
-         emitter.WitnessStorage->hasAddressors()))
-      emitter.TheAccessSemantics = AccessSemantics::DirectToStorage;
-    else if (emitter.WitnessStorage->hasClangNode() ||
-             emitter.WitnessStorage->isDynamic())
+    if (emitter.WitnessStorage->hasClangNode() ||
+        emitter.WitnessStorage->isDynamic()) {
       emitter.TheAccessSemantics = AccessSemantics::Ordinary;
-    else
-      emitter.TheAccessSemantics = AccessSemantics::DirectToAccessor;
+
+    // When we're emitting a standard implementation, use direct semantics.
+    // If we used AccessSemantics::Ordinary here, the only downside would
+    // be unnecessary vtable dispatching for class materializeForSets.
+    } else {
+      emitter.TheAccessSemantics = AccessSemantics::DirectToImplementation;
+    }
 
     emitter.CallbackName = getMaterializeForSetCallbackName(
         /*conformance=*/None, witness);
@@ -491,7 +489,8 @@ public:
     LValue lv = buildSelfLValue(SGF, loc, self);
 
     auto strategy =
-      WitnessStorage->getAccessStrategy(TheAccessSemantics, accessKind);
+      WitnessStorage->getAccessStrategy(TheAccessSemantics, accessKind,
+                                        SGF.FunctionDC);
 
     // Drill down to the member storage.
     lv.addMemberComponent(SGF, loc, WitnessStorage, WitnessSubs,
@@ -557,14 +556,22 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
 
   // If there's an abstraction difference, we always need to use the
   // get/set pattern.
-  AccessStrategy strategy;
-  if (WitnessStorage->getInterfaceType()->is<ReferenceStorageType>() ||
-      (RequirementStorageType != WitnessStorageType)) {
-    strategy = AccessStrategy::DispatchToAccessor;
-  } else {
-    strategy = WitnessStorage->getAccessStrategy(TheAccessSemantics,
-                                                 AccessKind::ReadWrite);
-  }
+  AccessStrategy strategy = [&] {
+    if (WitnessStorage->getInterfaceType()->is<ReferenceStorageType>() ||
+        (RequirementStorageType != WitnessStorageType)) {
+      return AccessStrategy::getMaterializeToTemporary(
+               WitnessStorage->getAccessStrategy(TheAccessSemantics,
+                                                 AccessKind::Read,
+                                                 SGF.FunctionDC),
+               WitnessStorage->getAccessStrategy(TheAccessSemantics,
+                                                 AccessKind::Write,
+                                                 SGF.FunctionDC));
+    } else {
+      return WitnessStorage->getAccessStrategy(TheAccessSemantics,
+                                               AccessKind::ReadWrite,
+                                               SGF.FunctionDC);
+    }
+  }();
 
   // Handle the indices.
   RValue indicesRV;
@@ -579,7 +586,7 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
   // Choose the right implementation.
   SILValue address;
   SILFunction *callbackFn = nullptr;
-  switch (strategy) {
+  switch (strategy.getKind()) {
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("materializeForSet should never engage in behavior init");
   
@@ -588,13 +595,15 @@ void MaterializeForSetEmitter::emit(SILGenFunction &SGF) {
                                callbackBuffer, callbackFn);
     break;
 
-  case AccessStrategy::Addressor:
-    address = emitUsingAddressor(SGF, loc, self, std::move(indicesRV),
-                                 callbackBuffer, callbackFn);
-    break;
-
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor:
+    if (strategy.getAccessor() == AccessorKind::MutableAddress) {
+      address = emitUsingAddressor(SGF, loc, self, std::move(indicesRV),
+                                   callbackBuffer, callbackFn);
+      break;      
+    }
+    LLVM_FALLTHROUGH;
+  case AccessStrategy::MaterializeToTemporary:
     address = emitUsingGetterSetter(SGF, loc, self, std::move(indicesRV),
                                     resultBuffer, callbackBuffer, callbackFn);
     break;
@@ -719,7 +728,8 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
   PrettyStackTraceSILFunction X("silgen materializeForSet callback", callback);
   {
-    SILGenFunction SGF(SGM, *callback);
+    SILGenFunction SGF(SGM, *callback,
+                       WitnessStorage->getMaterializeForSetFunc());
 
     auto makeParam = [&](unsigned index) -> SILArgument * {
       SILType type = SGF.F.mapTypeIntoContext(

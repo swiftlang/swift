@@ -4,7 +4,7 @@ class ReferenceSelfInLazyProperty {
   lazy var refs = (i, f())
   // expected-error@-1 {{cannot use instance member 'i' within property initializer; property initializers run before 'self' is available}}
   lazy var trefs: (Int, Int) = (i, f())
-  // expected-error@-1 {{instance member 'i' cannot be used on type 'ReferenceSelfInLazyProperty'}}
+  // expected-error@-1 {{cannot use instance member 'i' within property initializer; property initializers run before 'self' is available}}
 
   lazy var qrefs = (self.i, self.f())
   lazy var qtrefs: (Int, Int) = (self.i, self.f())
@@ -53,5 +53,5 @@ class ReferenceStaticInLazyProperty {
 
   static var i = 42
   static func f() -> Int { return 0 }
-  // expected-note@-1 {{did you mean 'f'?}}
+  // expected-note@-1 2 {{did you mean 'f'?}}
 }

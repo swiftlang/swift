@@ -27,6 +27,7 @@
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/StorageImpl.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
@@ -324,7 +325,7 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+4,
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+1,
     /// Whether we are overridden later
     Overridden : 1,
 
@@ -334,8 +335,11 @@ protected:
     /// Whether the setter is mutating.
     IsSetterMutating : 1,
 
-    /// The storage kind.
-    StorageKind : 4
+    /// Whether this represents physical storage.
+    HasStorage : 1,
+
+    /// Whether this storage supports semantic mutation in some way.
+    SupportsMutation : 1
   );
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
@@ -1802,13 +1806,14 @@ class PatternBindingEntry {
 
   enum class Flags {
     Checked = 1 << 0,
-    Removed = 1 << 1
+    Removed = 1 << 1,
+    Lazy    = 1 << 2,
   };
 
   // When the initializer is removed we don't actually clear the pointer
   // because we might need to get initializer's source range. Since the
   // initializer is ASTContext-allocated it is safe.
-  llvm::PointerIntPair<Expr *, 2, OptionSet<Flags>> InitCheckedAndRemoved;
+  llvm::PointerIntPair<Expr *, 3, OptionSet<Flags>> InitAndFlags;
 
   /// The initializer context used for this pattern binding entry.
   DeclContext *InitContext = nullptr;
@@ -1817,26 +1822,35 @@ class PatternBindingEntry {
 
 public:
   PatternBindingEntry(Pattern *P, Expr *E, DeclContext *InitContext)
-    : ThePattern(P), InitCheckedAndRemoved(E, {}), InitContext(InitContext) {}
+    : ThePattern(P), InitAndFlags(E, {}), InitContext(InitContext) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
   Expr *getInit() const {
-    return (InitCheckedAndRemoved.getInt().contains(Flags::Removed))
-      ? nullptr : InitCheckedAndRemoved.getPointer();
+    return (InitAndFlags.getInt().contains(Flags::Removed))
+      ? nullptr : InitAndFlags.getPointer();
+  }
+  Expr *getNonLazyInit() const {
+    return isInitializerLazy() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
 
   /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const { return InitCheckedAndRemoved.getPointer(); }
+  Expr *getInitAsWritten() const { return InitAndFlags.getPointer(); }
 
   bool isInitializerChecked() const {
-    return InitCheckedAndRemoved.getInt().contains(Flags::Checked);
+    return InitAndFlags.getInt().contains(Flags::Checked);
   }
   void setInitializerChecked() {
-    InitCheckedAndRemoved.setInt(
-      InitCheckedAndRemoved.getInt() | Flags::Checked);
+    InitAndFlags.setInt(InitAndFlags.getInt() | Flags::Checked);
+  }
+
+  bool isInitializerLazy() const {
+    return InitAndFlags.getInt().contains(Flags::Lazy);
+  }
+  void setInitializerLazy() {
+    InitAndFlags.setInt(InitAndFlags.getInt() | Flags::Lazy);
   }
 
   // Return the first variable initialized by this pattern.
@@ -1917,6 +1931,9 @@ public:
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
+  Expr *getNonLazyInit(unsigned i) const {
+    return getPatternList()[i].getNonLazyInit();
+  }
   
   SourceRange getOrigInitRange(unsigned i) const {
     return getPatternList()[i].getOrigInitRange();
@@ -1953,6 +1970,14 @@ public:
 
   void setInitializerChecked(unsigned i) {
     getMutablePatternList()[i].setInitializerChecked();
+  }
+
+  bool isInitializerLazy(unsigned i) const {
+    return getPatternList()[i].isInitializerLazy();
+  }
+
+  void setInitializerLazy(unsigned i) {
+    getMutablePatternList()[i].setInitializerLazy();
   }
   
   /// Does this binding declare something that requires storage?
@@ -3951,71 +3976,6 @@ public:
   }
 };
 
-// Note that the values of these enums line up with %select values in
-// diagnostics.
-enum class AccessorKind {
-#define ACCESSOR(ID) ID,
-#define LAST_ACCESSOR(ID) Last = ID
-#include "swift/AST/AccessorKinds.def"
-};
-
-const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
-
-static inline IntRange<AccessorKind> allAccessorKinds() {
-  return IntRange<AccessorKind>(AccessorKind(0),
-                                AccessorKind(NumAccessorKinds));
-}
-
-/// The safety semantics of this addressor.
-enum class AddressorKind : uint8_t {
-  /// \brief This is not an addressor.
-  NotAddressor,
-  /// \brief This is an unsafe addressor; it simply returns an address.
-  Unsafe,
-  /// \brief This is an owning addressor; it returns an AnyObject
-  /// which should be released when the caller is done with the object.
-  Owning,
-  /// \brief This is an owning addressor; it returns a Builtin.NativeObject
-  /// which should be released when the caller is done with the object.
-  NativeOwning,
-  /// \brief This is a pinning addressor; it returns a Builtin.NativeObject?
-  /// which should be unpinned when the caller is done with the object.
-  NativePinning,
-};
-
-/// Whether an access to storage is for reading, writing, or both.
-enum class AccessKind : uint8_t {
-  /// The access is just to read the current value.
-  Read,
-
-  /// The access is just to overwrite the current value.
-  Write,
-
-  /// The access may require either reading or writing the current value.
-  ReadWrite
-};
-
-/// The way to actually evaluate an access to storage.
-enum class AccessStrategy : uint8_t {
-  /// The decl is a VarDecl with its own backing storage; evaluate its
-  /// address directly.
-  Storage,
-
-  /// The decl is a VarDecl with storage defined by a property behavior;
-  /// this access may initialize or reassign the storage based on dataflow.
-  BehaviorStorage,
-
-  /// The decl has addressors; call the appropriate addressor for the
-  /// access kind.  These calls are currently always direct.
-  Addressor,
-
-  /// Directly call the getter, setter, or materializeForSet accessor.
-  DirectToAccessor,
-
-  /// Indirectly call the getter, setter, or materializeForSet accessor.
-  DispatchToAccessor,
-};
-
 /// Information about a behavior instantiated by a storage declaration.
 ///
 /// TODO: Accessors, composed behaviors
@@ -4052,75 +4012,6 @@ struct alignas(1 << 3) BehaviorRecord {
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
 public:
-  enum StorageKindTy {
-    /// There are bits stored in memory for this object, and they are accessed
-    /// directly.  This is not valid for a SubscriptDecl.
-    Stored,
-    
-    /// This is a stored property with trivial accessors which simply get and
-    /// set the underlying storage.  This is not valid for a SubscriptDecl.
-    ///
-    /// These accessors are used for several different purposes:
-    ///   1) In an @objc variable, these accessors are dynamically dispatched
-    ///      to and may be overridden.
-    ///   2) When a stored property satisfies a protocol requirement, these
-    ///      accessors end up as entries in the witness table.
-    ///   3) When a stored property is accessed outside of the storage
-    ///      declaration's resilience domain, when the owning type or
-    ///      global variable is resilient.
-    StoredWithTrivialAccessors,
-
-    /// This is a stored property with either a didSet specifier or a
-    /// willSet specifier (or both).  Sema synthesizes a setter which
-    /// calls them at the appropriate points.
-    StoredWithObservers,
-
-    /// There are bits stored in memory for this object, but they are
-    /// not allocated directly within the container; instead, there
-    /// are accessors which return the address of the memory.  The
-    /// value is accessed directly through the returned address.
-    ///
-    /// This is legal on both VarDecls and SubscriptDecls.
-    ///
-    /// There is always at least an 'address' accessor; if the object
-    /// is mutable, there will also be a 'mutableAddress' accessor.
-    Addressed,
-    
-    /// Like Addressed, this object has address accessors.  Like
-    /// StoredWithTrivialAccessors, accessors have been synthesized
-    /// which simply read and write through the addresses returned by
-    /// the addressors.
-    AddressedWithTrivialAccessors,
-
-    /// Like Addressed, this object has address accessors.  Like
-    /// StoredWithObservers, it also has either a willSet specifier or
-    /// a didSet specifier.  Accessors have been synthesized, like
-    /// with StoredWithObservers but using the address returned from
-    /// the appropriate accessor instead.
-    AddressedWithObservers,
-
-    /// This is an override of an object which adds either a didSet
-    /// specifier or a willSet specifier (or both).  Sema synthesizes
-    /// a setter which calls them at the appropriate points around
-    /// delegating to the superclass's setter.
-    InheritedWithObservers,
-
-    /// There is no memory associated with this decl anywhere.  It is
-    /// accessed by calling a getter and setter.  If the setter is
-    /// absent, then the value is only loadable, but not storable.
-    Computed,
-
-    /// This object was specified with non-trivial getter and
-    /// mutableAddress accessors.  If it is accessed in a read-only
-    /// manner, the getter is called; otherwise, mutableAddress is
-    /// called.
-    ///
-    /// This turns out to the be the right thing for certain core data
-    /// structures which, when they store a bridged object, cannot
-    /// return the address at which the object is stored.
-    ComputedWithMutableAddress,
-  };
-
   static const size_t MaxNumAccessors = 255;
 private:
   AbstractStorageDecl *OverriddenDecl;
@@ -4133,7 +4024,14 @@ private:
     using AccessorIndex = uint8_t;
     static const AccessorIndex InvalidIndex = 0;
 
+    /// The range of the braces around the accessor clause.
     SourceRange Braces;
+
+    /// The implementation info for the accessors.  If there's no
+    /// AccessorRecord for a storage decl, the decl is just stored.
+    StorageImplInfo ImplInfo;
+
+    /// The number of accessors currently stored in this record.
     AccessorIndex NumAccessors;
 
     /// The storage capacity of this record for accessors.  Always includes
@@ -4146,13 +4044,18 @@ private:
     /// or the index+1 of the accessor in the accessors array.
     AccessorIndex AccessorIndices[NumAccessorKinds];
 
-    AccessorRecord(SourceRange braces, ArrayRef<AccessorDecl*> accessors,
+    AccessorRecord(SourceRange braces, StorageImplInfo implInfo,
+                   ArrayRef<AccessorDecl*> accessors,
                    AccessorIndex accessorsCapacity);
   public:
     static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
+                                  StorageImplInfo implInfo,
                                   ArrayRef<AccessorDecl*> accessors);
 
     SourceRange getBracesRange() const { return Braces; }
+
+    const StorageImplInfo &getImplInfo() const { return ImplInfo; }
+    void overwriteImplInfo(StorageImplInfo newInfo) { ImplInfo = newInfo; }
 
     inline AccessorDecl *getAccessor(AccessorKind kind) const;
 
@@ -4174,21 +4077,33 @@ private:
   llvm::PointerIntPair<BehaviorRecord*, 3, OptionalEnum<AccessLevel>>
     BehaviorInfo;
 
-  void setStorageKind(StorageKindTy K) {
-    Bits.AbstractStorageDecl.StorageKind = unsigned(K);
-  }
-
   void configureAccessor(AccessorDecl *accessor);
+  void setFieldsFromImplInfo(StorageImplInfo implInfo) {
+    Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
+    Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
+  }
 
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
-                      SourceLoc NameLoc)
+                      SourceLoc NameLoc, bool supportsMutation)
     : ValueDecl(Kind, DC, Name, NameLoc), OverriddenDecl(nullptr) {
-    Bits.AbstractStorageDecl.StorageKind = Stored;
+    Bits.AbstractStorageDecl.HasStorage = true;
+    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
     Bits.AbstractStorageDecl.IsGetterMutating = false;
     Bits.AbstractStorageDecl.IsSetterMutating = true;
     Bits.AbstractStorageDecl.Overridden = false;
   }
+
+  void setSupportsMutationIfStillStored(bool supportsMutation) {
+    if (auto ptr = Accessors.getPointer()) {
+      auto impl = ptr->getImplInfo();
+      if (!impl.isSimpleStored()) return;
+      impl = StorageImplInfo::getSimpleStored(supportsMutation);
+      ptr->overwriteImplInfo(impl);
+    }
+    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
+  }
+
 public:
 
   /// \brief Should this declaration be treated as if annotated with transparent
@@ -4199,113 +4114,49 @@ public:
   /// is a member.  Currently only variables can be static.
   inline bool isStatic() const; // defined in this header
 
-  /// \brief Determine whether this variable is computed, which means it
-  /// has no storage but does have a user-defined getter or setter.
-  ///
-  StorageKindTy getStorageKind() const {
-    return (StorageKindTy) Bits.AbstractStorageDecl.StorageKind;
+  /// \brief Determine how this storage is implemented.
+  StorageImplInfo getImplInfo() const {
+    if (auto ptr = Accessors.getPointer())
+      return ptr->getImplInfo();
+    return StorageImplInfo::getSimpleStored(supportsMutation());
   }
+
+  ReadImplKind getReadImpl() const {
+    return getImplInfo().getReadImpl();
+  }
+  WriteImplKind getWriteImpl() const {
+    return getImplInfo().getWriteImpl();
+  }
+  ReadWriteImplKind getReadWriteImpl() const {
+    return getImplInfo().getReadWriteImpl();
+  }
+
+  /// Overwrite the registered implementation-info.  This should be
+  /// used carefully.
+  void overwriteImplInfo(StorageImplInfo implInfo);
 
   /// \brief Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    switch (getStorageKind()) {
-    case Stored:
-    case StoredWithTrivialAccessors:
-    case StoredWithObservers:
-      return true;
-    case InheritedWithObservers:
-    case Computed:
-    case ComputedWithMutableAddress:
-    case Addressed:
-    case AddressedWithTrivialAccessors:
-    case AddressedWithObservers:
-      return false;
-    }
-    llvm_unreachable("bad storage kind");
+    return Bits.AbstractStorageDecl.HasStorage;
   }
 
-  /// \brief Return true if this is a VarDecl that has storage associated with
-  /// it which can be trivially accessed.
-  bool hasTrivialStorage() const {
-    switch (getStorageKind()) {
-    case Stored:
-    case StoredWithTrivialAccessors:
-      return true;
-    case StoredWithObservers:
-    case InheritedWithObservers:
-    case Computed:
-    case ComputedWithMutableAddress:
-    case Addressed:
-    case AddressedWithTrivialAccessors:
-    case AddressedWithObservers:
-      return false;
-    }
-    llvm_unreachable("bad storage kind");
-  }
-
-  /// \brief Return true if this object has a getter (and, if mutable,
-  /// a setter and a materializeForSet).
-  bool hasAccessorFunctions() const {
-    switch (getStorageKind()) {
-    case Addressed:
-    case Stored:
-      return false;
-    case StoredWithTrivialAccessors:
-    case StoredWithObservers:
-    case InheritedWithObservers:
-    case Computed:
-    case ComputedWithMutableAddress:
-    case AddressedWithTrivialAccessors:
-    case AddressedWithObservers:
-      return true;
-    }
-    llvm_unreachable("bad storage kind");
-  }
-
-  /// \brief Return true if this object has observing accessors.
+  /// \brief Return true if this storage has the basic accessors/capability
+  /// to be mutated.  This is generally constant after the accessors are
+  /// installed by the parser/importer/whatever.
   ///
-  /// It's generally not appropriate to use this predicate directly in
-  /// a condition; instead, you should be switching on the storage kind.
-  bool hasObservers() const {
-    switch (getStorageKind()) {
-    case Stored:
-    case StoredWithTrivialAccessors:
-    case Computed:
-    case ComputedWithMutableAddress:
-    case Addressed:
-    case AddressedWithTrivialAccessors:
-      return false;
-    case StoredWithObservers:
-    case InheritedWithObservers:
-    case AddressedWithObservers:
-      return true;
-    }
-    llvm_unreachable("bad storage kind");
+  /// Note that this is different from the mutability of the declaration
+  /// in the user language: sometimes we can assign to declarations that
+  /// don't support mutation (e.g. to initialize them), and sometimes we
+  /// can't mutate things that do support mutation (e.g. because their
+  /// setter is private).
+  bool supportsMutation() const {
+    return Bits.AbstractStorageDecl.SupportsMutation;
   }
 
-  /// \brief Return true if this object has either an addressor or a
-  /// mutable addressor.
-  ///
-  /// It's generally not appropriate to use this predicate directly in
-  /// a condition; instead, you should be switching on the storage
-  /// kind.  Only use this for diagnostic, AST exploration, or
-  /// assertion purposes.
-  bool hasAddressors() const {
-    switch (getStorageKind()) {
-    case Stored:
-    case StoredWithTrivialAccessors:
-    case StoredWithObservers:
-    case InheritedWithObservers:
-    case Computed:
-      return false;
-    case ComputedWithMutableAddress:
-    case Addressed:
-    case AddressedWithTrivialAccessors:
-    case AddressedWithObservers:
-      return true;
-    }
-    llvm_unreachable("bad storage kind");
+  /// Are there any accessors for this declaration, including implicit ones?
+  bool hasAnyAccessors() const {
+    return !getAllAccessors().empty();
   }
   
   /// \brief Return true if reading this storage requires the ability to
@@ -4326,25 +4177,21 @@ public:
     Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
   }
 
-  AccessorDecl *getAccessorFunction(AccessorKind kind) const {
+  AccessorDecl *getAccessor(AccessorKind kind) const {
     if (auto info = Accessors.getPointer())
       return info->getAccessor(kind);
     return nullptr;
   }
 
-  ArrayRef<AccessorDecl*> getAllAccessorFunctions() const {
+  ArrayRef<AccessorDecl*> getAllAccessors() const {
     if (const auto *info = Accessors.getPointer())
       return info->getAllAccessors();
     return {};
   }
 
-  void setAccessors(StorageKindTy storageKind,
+  void setAccessors(StorageImplInfo storageImpl,
                     SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
-
-  /// \brief Add trivial accessors to this Stored or Addressed object.
-  void addTrivialAccessors(AccessorDecl *Get, AccessorDecl *Set,
-                           AccessorDecl *MaterializeForSet);
 
   /// \brief Add a setter to an existing Computed var.
   ///
@@ -4354,10 +4201,14 @@ public:
   /// \brief Add a behavior to a property.
   void addBehavior(TypeRepr *Type, Expr *Param);
 
-  /// \brief Set a materializeForSet accessor for this declaration.
-  ///
-  /// This should only be used by Sema.
-  void setMaterializeForSetFunc(AccessorDecl *materializeForSet);
+  /// \brief Add a synthesized getter.
+  void setSynthesizedGetter(AccessorDecl *getter);
+
+  /// \brief Add a synthesized setter.
+  void setSynthesizedSetter(AccessorDecl *setter);
+
+  /// \brief Add a synthesized materializeForSet accessor.
+  void setSynthesizedMaterializeForSet(AccessorDecl *materializeForSet);
 
   SourceRange getBracesRange() const {
     if (auto info = Accessors.getPointer())
@@ -4367,12 +4218,12 @@ public:
 
   /// \brief Retrieve the getter used to access the value of this variable.
   AccessorDecl *getGetter() const {
-    return getAccessorFunction(AccessorKind::Get);
+    return getAccessor(AccessorKind::Get);
   }
   
   /// \brief Retrieve the setter used to mutate the value of this variable.
   AccessorDecl *getSetter() const {
-    return getAccessorFunction(AccessorKind::Set);
+    return getAccessor(AccessorKind::Set);
   }
 
   AccessLevel getSetterFormalAccess() const {
@@ -4391,18 +4242,18 @@ public:
   /// \brief Retrieve the materializeForSet function, if this
   /// declaration has one.
   AccessorDecl *getMaterializeForSetFunc() const {
-    return getAccessorFunction(AccessorKind::MaterializeForSet);
+    return getAccessor(AccessorKind::MaterializeForSet);
   }
 
   /// \brief Return the decl for the immutable addressor if it exists.
   AccessorDecl *getAddressor() const {
-    return getAccessorFunction(AccessorKind::Address);
+    return getAccessor(AccessorKind::Address);
   }
 
   /// \brief Return the decl for the 'mutableAddress' accessors if
   /// it exists; this is only valid on a declaration with addressors.
   AccessorDecl *getMutableAddressor() const {
-    return getAccessorFunction(AccessorKind::MutableAddress);
+    return getAccessor(AccessorKind::MutableAddress);
   }
 
   /// \brief Return the appropriate addressor for the given access kind.
@@ -4415,13 +4266,13 @@ public:
   /// \brief Return the decl for the willSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   AccessorDecl *getWillSetFunc() const {
-    return getAccessorFunction(AccessorKind::WillSet);
+    return getAccessor(AccessorKind::WillSet);
   }
 
   /// \brief Return the decl for the didSet specifier if it exists, this is
   /// only valid on a declaration with Observing storage.
   AccessorDecl *getDidSetFunc() const {
-    return getAccessorFunction(AccessorKind::DidSet);
+    return getAccessor(AccessorKind::DidSet);
   }
 
   /// Given that this is an Objective-C property or subscript declaration,
@@ -4548,7 +4399,7 @@ protected:
 
   VarDecl(DeclKind Kind, bool IsStatic, Specifier Sp, bool IsCaptureList,
           SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
-    : AbstractStorageDecl(Kind, DC, Name, NameLoc)
+    : AbstractStorageDecl(Kind, DC, Name, NameLoc, !isImmutableSpecifier(Sp))
   {
     Bits.VarDecl.IsStatic = IsStatic;
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
@@ -4668,9 +4519,7 @@ public:
   Specifier getSpecifier() const {
     return static_cast<Specifier>(Bits.VarDecl.Specifier);
   }
-  void setSpecifier(Specifier Spec) {
-    Bits.VarDecl.Specifier = static_cast<unsigned>(Spec);
-  }
+  void setSpecifier(Specifier Spec);
   
   /// Is the type of this parameter 'inout'?
   ///
@@ -4691,7 +4540,10 @@ public:
   StaticSpellingKind getCorrectStaticSpelling() const;
 
   bool isImmutable() const {
-    switch (getSpecifier()) {
+    return isImmutableSpecifier(getSpecifier());
+  }
+  static bool isImmutableSpecifier(Specifier sp) {
+    switch (sp) {
     case Specifier::Let:
     case Specifier::Shared:
     case Specifier::Owned:
@@ -4940,7 +4792,8 @@ public:
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
     : GenericContext(DeclContextKind::SubscriptDecl, Parent),
-      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc),
+      AbstractStorageDecl(DeclKind::Subscript, Parent, Name, SubscriptLoc,
+                          /*supports mutation (will be overwritten)*/ true),
       ArrowLoc(ArrowLoc), Indices(nullptr), ElementTy(ElementTy) {
     setIndices(Indices);
     setGenericParams(GenericParams);

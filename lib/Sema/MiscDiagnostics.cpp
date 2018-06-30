@@ -1586,7 +1586,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
       if (auto *DRE = dyn_cast<DeclRefExpr>(subExpr)) {
         if (DRE->getDecl() == Var) {
           // Handle local and top-level computed variables.
-          if (DRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+          if (DRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
             if (Accessor->isGetter())
@@ -1623,7 +1623,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
             isa<DeclRefExpr>(MRE->getBase()) &&
             isImplicitSelfUse(MRE->getBase())) {
           
-          if (MRE->getAccessSemantics() != AccessSemantics::DirectToStorage) {
+          if (MRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
             if (Accessor->isGetter())

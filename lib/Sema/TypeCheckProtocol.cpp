@@ -206,38 +206,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   return std::make_tuple(reqtType, witnessType, optAdjustment);
 }
 
-// Given that we're looking at a stored property, should we use the
-// mutating rules for the setter or the getter when trying to match
-// the given requirement?
-static bool shouldUseSetterRequirements(AccessorKind reqtKind) {
-  // We have cases for addressors here because we might reasonably
-  // allow them as protocol requirements someday.
-
-  switch (reqtKind) {
-  case AccessorKind::Get:
-  case AccessorKind::Address:
-    return false;
-
-  case AccessorKind::Set:
-  case AccessorKind::MutableAddress:
-  case AccessorKind::MaterializeForSet:
-    return true;
-
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-    llvm_unreachable("willSet/didSet protocol requirement?");
-  }
-  llvm_unreachable("bad accessor kind");
-}
-
-static AccessorDecl *getAddressorForRequirement(AbstractStorageDecl *witness,
-                                                AccessorKind reqtKind) {
-  assert(witness->hasAddressors());
-  if (shouldUseSetterRequirements(reqtKind))
-    return witness->getMutableAddressor();
-  return witness->getAddressor();
-}
-
 // Verify that the mutating bit is correct between a protocol requirement and a
 // witness.  This returns true on invalid.
 static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
@@ -257,31 +225,70 @@ static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
   else {
     auto reqtAsAccessor = cast<AccessorDecl>(requirement);
     auto storage = cast<AbstractStorageDecl>(witnessDecl);
-    switch (storage->getStorageKind()) {
 
-    // A stored property on a value type will have a mutating setter
-    // and a non-mutating getter.
-    case AbstractStorageDecl::Stored:
-      witnessMutating = reqtAsAccessor->isInstanceMember() &&
-        shouldUseSetterRequirements(reqtAsAccessor->getAccessorKind());
+    auto isReadMutating = [&] {
+      switch (storage->getReadImpl()) {
+      case ReadImplKind::Stored:
+        return false;
+      case ReadImplKind::Address:
+        return storage->getAddressor()->isMutating();
+      case ReadImplKind::Inherited:
+      case ReadImplKind::Get:
+        llvm_unreachable("should have a getter");
+      }
+    };
+
+    auto isStoredSetterMutating = [&] {
+      // A stored property on a value type will have a mutating setter
+      // and a non-mutating getter.
+      return reqtAsAccessor->isInstanceMember();
+    };
+
+    auto isWriteMutating = [&] {
+      switch (storage->getWriteImpl()) {
+      case WriteImplKind::Stored:
+        return isStoredSetterMutating();
+      case WriteImplKind::MutableAddress:
+        return storage->getMutableAddressor()->isMutating();
+      case WriteImplKind::Immutable:
+        llvm_unreachable("asking for setter for immutable storage");
+      case WriteImplKind::Set:
+      case WriteImplKind::StoredWithObservers:
+      case WriteImplKind::InheritedWithObservers:
+        llvm_unreachable("should have a setter");
+      }
+    };
+
+    auto isReadWriteMutating = [&] {
+      switch (storage->getReadWriteImpl()) {
+      case ReadWriteImplKind::Stored:
+        return isStoredSetterMutating();
+      case ReadWriteImplKind::MutableAddress:
+        return storage->getMutableAddressor()->isMutating();
+      case ReadWriteImplKind::MaterializeToTemporary:
+        return isReadMutating() || isWriteMutating();
+      case ReadWriteImplKind::Immutable:
+        llvm_unreachable("asking for setter for immutable storage");
+      case ReadWriteImplKind::MaterializeForSet:
+        llvm_unreachable("should have a materializeForSet");
+      }
+    };
+
+    switch (reqtAsAccessor->getAccessorKind()) {
+    case AccessorKind::Get:
+      witnessMutating = isReadMutating();
       break;
 
-    // For an addressed property, consider the appropriate addressor.
-    case AbstractStorageDecl::Addressed: {
-      AccessorDecl *addressor =
-        getAddressorForRequirement(storage, reqtAsAccessor->getAccessorKind());
-      witnessMutating = addressor->isMutating();
+    case AccessorKind::Set:
+      witnessMutating = isWriteMutating();
       break;
-    }
 
-    case AbstractStorageDecl::StoredWithObservers:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
-    case AbstractStorageDecl::InheritedWithObservers:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    case AbstractStorageDecl::AddressedWithObservers:
-    case AbstractStorageDecl::ComputedWithMutableAddress:
-    case AbstractStorageDecl::Computed:
-      llvm_unreachable("missing witness reference for kind with accessors");
+    case AccessorKind::MaterializeForSet:
+      witnessMutating = isReadWriteMutating();
+      break;
+
+    default:
+      llvm_unreachable("unexpected accessor requirement");
     }
   }
 
@@ -341,6 +348,48 @@ static ParameterList *getParameterList(ValueDecl *value) {
 
   auto subscript = cast<SubscriptDecl>(value);
   return subscript->getIndices();
+}
+
+// Find a standin declaration to place the diagnostic at for the
+// given accessor kind.
+static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
+                                        AccessorKind requirementKind) {
+  auto getExplicitAccessor = [&](AccessorKind kind) -> AccessorDecl* {
+    if (auto accessor = witnessStorage->getAccessor(kind)) {
+      if (!accessor->isImplicit())
+        return accessor;
+    }
+    return nullptr;
+  };
+
+  // If the storage actually explicitly provides that accessor, great.
+  if (auto accessor = getExplicitAccessor(requirementKind))
+    return accessor;
+
+  // If it didn't, check to see if it provides something else that corresponds
+  // to the requirement.
+  switch (requirementKind) {
+  case AccessorKind::Get:
+    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+      return addressor;
+    break;
+
+  case AccessorKind::MaterializeForSet:
+    if (auto setter = getExplicitAccessor(AccessorKind::Set))
+      return setter;
+    LLVM_FALLTHROUGH;
+
+  case AccessorKind::Set:
+    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+      return addressor;
+    break;
+
+  default:
+    break;
+  }
+
+  // Otherwise, just diagnose starting at the storage declaration itself.
+  return witnessStorage;
 }
 
 RequirementMatch
@@ -420,34 +469,15 @@ swift::matchWitness(
         !witness->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
-    // Find a standin declaration to place the diagnostic at for the
-    // given accessor kind.
-    auto getStandinForAccessor = [&](AccessorKind kind) -> ValueDecl* {
-      // If the witness actually explicitly provided that accessor,
-      // then great.
-      if (auto accessor = witnessASD->getAccessorFunction(kind))
-        if (!accessor->isImplicit())
-          return accessor;
-
-      // If it didn't, check to see if it provides something else.
-      if (witnessASD->hasAddressors()) {
-        return getAddressorForRequirement(witnessASD, kind);
-      }
-
-      // Otherwise, just diagnose starting at the storage declaration
-      // itself.
-      return witnessASD;
-    };
-    
     // Validate that the 'mutating' bit lines up for getters and setters.
     if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
                       witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::Get),
+      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
     
     if (req->isSettable(req->getDeclContext()) &&
         checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(getStandinForAccessor(AccessorKind::Set),
+      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                               MatchKind::MutatingConflict);
 
     // Decompose the parameters for subscript declarations.
@@ -4924,7 +4954,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
               continue;
-            req = storageReq->getAccessorFunction(*accessorKind);
+            req = storageReq->getAccessor(*accessorKind);
             if (!req)
               continue;
           }
@@ -4942,10 +4972,10 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
         auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
         if (!storageReq || !storageFound)
           continue;
-        req = storageReq->getAccessorFunction(*accessorKind);
+        req = storageReq->getAccessor(*accessorKind);
         if (!req)
           continue;
-        found = storageFound->getAccessorFunction(*accessorKind);
+        found = storageFound->getAccessor(*accessorKind);
       }
 
       // Determine whether the witness for this conformance is in fact

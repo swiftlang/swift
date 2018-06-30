@@ -283,9 +283,9 @@ ERROR(var_set_without_get,none,
 ERROR(observingproperty_with_getset,none,
       "%select{willSet|didSet}0 variable must not also have a "
       "%select{get|set}1 specifier", (unsigned, unsigned))
-ERROR(observingproperty_without_mutableaddress,none,
-      "%select{willSet|didSet}0 variable with addressor must provide a "
-      "'mutableAddress' accessor", (unsigned))
+ERROR(observingproperty_with_address,none,
+      "variable with addressor may not have %select{willSet|didSet}0",
+      (unsigned))
 ERROR(observingproperty_in_subscript,none,
       "%select{willSet|didSet}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_init,none,

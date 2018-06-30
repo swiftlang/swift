@@ -2119,31 +2119,67 @@ getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
   return None;
 }
 
-static Optional<AbstractStorageDecl::StorageKindTy>
-getActualStorageKind(unsigned raw) {
-  switch (serialization::StorageKind(raw)) {
-#define CASE(KIND)                       \
-  case serialization::StorageKind::KIND: \
-    return AbstractStorageDecl::KIND;
+static Optional<swift::ReadImplKind>
+getActualReadImplKind(unsigned rawKind) {
+  switch (serialization::ReadImplKind(rawKind)) {
+#define CASE(KIND)                        \
+  case serialization::ReadImplKind::KIND: \
+    return swift::ReadImplKind::KIND;
   CASE(Stored)
-  CASE(StoredWithTrivialAccessors)
+  CASE(Get)
+  CASE(Inherited)
+  CASE(Address)
+#undef CASE
+  }
+  return None;
+}
+
+static Optional<swift::WriteImplKind>
+getActualWriteImplKind(unsigned rawKind) {
+  switch (serialization::WriteImplKind(rawKind)) {
+#define CASE(KIND)                         \
+  case serialization::WriteImplKind::KIND: \
+    return swift::WriteImplKind::KIND;
+  CASE(Immutable)
+  CASE(Stored)
+  CASE(Set)
   CASE(StoredWithObservers)
   CASE(InheritedWithObservers)
-  CASE(Computed)
-  CASE(ComputedWithMutableAddress)
-  CASE(Addressed)
-  CASE(AddressedWithTrivialAccessors)
-  CASE(AddressedWithObservers)
+  CASE(MutableAddress)
+#undef CASE
+  }
+  return None;
+}
+
+static Optional<swift::ReadWriteImplKind>
+getActualReadWriteImplKind(unsigned rawKind) {
+  switch (serialization::ReadWriteImplKind(rawKind)) {
+#define CASE(KIND)                             \
+  case serialization::ReadWriteImplKind::KIND: \
+    return swift::ReadWriteImplKind::KIND;
+  CASE(Immutable)
+  CASE(Stored)
+  CASE(MaterializeForSet)
+  CASE(MutableAddress)
+  CASE(MaterializeToTemporary)
 #undef CASE
   }
   return None;
 }
 
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
-                                  unsigned rawStorageKind,
+                                  uint8_t rawReadImplKind,
+                                  uint8_t rawWriteImplKind,
+                                  uint8_t rawReadWriteImplKind,
                                   AccessorRecord &rawIDs) {
-  auto storageKind = getActualStorageKind(rawStorageKind);
-  if (!storageKind) return;
+  auto readImpl = getActualReadImplKind(rawReadImplKind);
+  if (!readImpl) return;
+
+  auto writeImpl = getActualWriteImplKind(rawWriteImplKind);
+  if (!writeImpl) return;
+
+  auto readWriteImpl = getActualReadWriteImplKind(rawReadWriteImplKind);
+  if (!readWriteImpl) return;
 
   SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {
@@ -2152,13 +2188,14 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
     accessors.push_back(accessor);
   }
 
-  if (*storageKind == AbstractStorageDecl::Stored && accessors.empty())
+  auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
+  if (implInfo.isSimpleStored() && accessors.empty())
     return;
 
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  decl->setAccessors(*storageKind, beginLoc, accessors, endLoc);
+  decl->setAccessors(implInfo, beginLoc, accessors, endLoc);
 }
 
 template <typename T, typename ...Args>
@@ -2881,7 +2918,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
     unsigned rawSpecifier, numAccessors;
-    uint8_t storageKind, rawAccessLevel, rawSetterAccessLevel;
+    uint8_t readImpl, writeImpl, readWriteImpl;
+    uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     AccessorRecord accessors;
     DeclID overriddenID;
@@ -2891,7 +2929,8 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
-                                       storageKind, numAccessors,
+                                       readImpl, writeImpl, readWriteImpl,
+                                       numAccessors,
                                        interfaceTypeID,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
@@ -2919,20 +2958,9 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
         DeclDeserializationError::Flags flags;
         
         if (!isStatic) {
-          switch ((StorageKind)storageKind) {
-          case StorageKind::Stored:
-          case StorageKind::StoredWithObservers:
-          case StorageKind::StoredWithTrivialAccessors:
+          auto actualReadImpl = getActualReadImplKind(readImpl);
+          if (actualReadImpl && *actualReadImpl == ReadImplKind::Stored) {
             flags |= DeclDeserializationError::Flag::NeedsFieldOffsetVectorEntry;
-            break;
-            
-          case StorageKind::Addressed:
-          case StorageKind::AddressedWithObservers:
-          case StorageKind::AddressedWithTrivialAccessors:
-          case StorageKind::Computed:
-          case StorageKind::ComputedWithMutableAddress:
-          case StorageKind::InheritedWithObservers:
-            break;
           }
         }
         
@@ -2967,7 +2995,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       AddAttribute(
           new (ctx) ReferenceOwnershipAttr(referenceStorage->getOwnership()));
 
-    configureStorage(var, storageKind, accessors);
+    configureStorage(var, readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       var->setAccess(*accessLevel);
@@ -3123,7 +3151,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       // into this code.  When we come out, don't create the accessor twice.
       // TODO: find some better way of breaking this cycle, like lazily
       // deserializing the accessors.
-      if (auto accessor = storage->getAccessorFunction(accessorKind))
+      if (auto accessor = storage->getAccessor(accessorKind))
         return accessor;
     }
 
@@ -3746,14 +3774,15 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     AccessorRecord accessors;
     DeclID overriddenID;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
-    uint8_t rawStorageKind;
+    uint8_t readImpl, writeImpl, readWriteImpl;
     unsigned numArgNames, numAccessors;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC,
                                              isGetterMutating, isSetterMutating,
-                                             rawStorageKind, numAccessors,
+                                             readImpl, writeImpl, readWriteImpl,
+                                             numAccessors,
                                              genericEnvID,
                                              interfaceTypeID,
                                              overriddenID, rawAccessLevel,
@@ -3805,7 +3834,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
 
     subscript->setIndices(readParameterList());
 
-    configureStorage(subscript, rawStorageKind, accessors);
+    configureStorage(subscript, readImpl, writeImpl, readWriteImpl, accessors);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
       subscript->setAccess(*accessLevel);

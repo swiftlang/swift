@@ -2810,6 +2810,10 @@ namespace {
       return CS.getASTContext().getBoolDecl()->getDeclaredType();
     }
 
+    Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+      return expr->getType();
+    }
+
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       if (E->getTypeLoc().isNull()) {
         auto locator = CS.getConstraintLocator(E);

@@ -1128,10 +1128,12 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
+    // We used to not apply the solution to lazy bindings here, but that's
+    // unnecessary: the code for building lazy getters already has to handle
+    // initializers which have had solutions applied, and not applying the
+    // solution blocks other diagnostics if we decide not to synthesize the
+    // getter.
     bool skipApplyingSolution = false;
-    if (auto var = binding->getSingleVar())
-      skipApplyingSolution = var->getAttrs().hasAttribute<LazyAttr>();
-
     if (tc.typeCheckPatternBinding(binding, entryNumber, skipApplyingSolution))
       return;
   }
@@ -1156,8 +1158,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
 
   // If we have any type-adjusting attributes, apply them here.
   assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
-  if (auto var = binding->getSingleVar())
+  if (auto var = binding->getSingleVar()) {
     tc.checkTypeModifyingDeclAttributes(var);
+  }
 }
 
 /// Validate the entries in the given pattern binding declaration.
@@ -2775,50 +2778,40 @@ static bool validateAccessorIsMutating(TypeChecker &TC, FuncDecl *accessor) {
 
 static bool computeIsGetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
+  switch (storage->getReadImpl()) {
+  case ReadImplKind::Stored:
     return false;
 
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
+  case ReadImplKind::Get:
+  case ReadImplKind::Inherited:
     return validateAccessorIsMutating(TC, storage->getGetter());
 
-  case AbstractStorageDecl::Addressed:
+  case ReadImplKind::Address:
     return validateAccessorIsMutating(TC, storage->getAddressor());
   }
 
-  llvm_unreachable("bad storage kind");
+  llvm_unreachable("bad impl kind");
 }
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
+  switch (storage->getWriteImpl()) {
+  case WriteImplKind::Immutable:
+  case WriteImplKind::Stored:
     // Instance member setters are mutating; static property setters and
     // top-level setters are not.
+    // It's important that we use this logic for "immutable" storage
+    // in order to handle initialization of let-properties.
     return storage->isInstanceMember() &&
            doesContextHaveValueSemantics(storage->getDeclContext());
 
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::Computed:
-    if (auto setter = storage->getSetter())
-      return validateAccessorIsMutating(TC, setter);
-    return false;
+  case WriteImplKind::StoredWithObservers:
+  case WriteImplKind::InheritedWithObservers:
+  case WriteImplKind::Set:
+    return validateAccessorIsMutating(TC, storage->getSetter());
 
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    if (auto addressor = storage->getMutableAddressor())
-      return validateAccessorIsMutating(TC, addressor);
-    return false;
+  case WriteImplKind::MutableAddress:
+    return validateAccessorIsMutating(TC, storage->getMutableAddressor());
   }
   llvm_unreachable("bad storage kind");
 }
@@ -2830,6 +2823,9 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
   storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
 
+  // Add any mandatory accessors now.
+  maybeAddAccessorsToStorage(TC, storage);
+
   // We can't delay validation of getters and setters on @objc properties,
   // because if they never get validated at all then conformance checkers
   // will complain about selector mismatches.
@@ -2840,31 +2836,16 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
       TC.validateDecl(setter);
   }
 
-  // Create a materializeForSet function if necessary.  This needs to
-  // happen immediately so that subclass materializeForSet functions
-  // will be properly marked as overriding it.
-  if (storage->hasAccessorFunctions())
-    maybeAddMaterializeForSet(storage, TC);
-  if (storage->isFinal())
-    makeFinal(TC.Context, storage->getMaterializeForSetFunc());
-
   // Everything else about the accessors can wait until finalization.
+  // This will validate all the accessors.
   TC.DeclsToFinalize.insert(storage);
 }
 
 static void finalizeAbstractStorageDecl(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
-  if (auto getter = storage->getGetter())
-    TC.validateDecl(getter);
-  if (auto setter = storage->getSetter())
-    TC.validateDecl(setter);
-  if (auto materializeForSet = storage->getMaterializeForSetFunc())
-    TC.validateDecl(materializeForSet);
-  if (storage->hasAddressors()) {
-    if (auto addressor = storage->getAddressor())
-      TC.validateDecl(addressor);
-    if (auto addressor = storage->getMutableAddressor())
-      TC.validateDecl(addressor);
+  for (auto accessor : storage->getAllAccessors()) {
+    // Are there accessors we can safely ignore here, like maybe observers?
+    TC.validateDecl(accessor);
   }
 }
 
@@ -3061,7 +3042,7 @@ public:
     // allowed.
     if (VD->hasStorage()) {
       // Stored properties in protocols are diagnosed in
-      // maybeAddAccessorsToVariable(), to ensure they run when a
+      // maybeAddAccessorsToStorage(), to ensure they run when a
       // protocol requirement is validated but not type checked.
 
       // Enums and extensions cannot have stored instance properties.
@@ -3117,37 +3098,9 @@ public:
       }
     }
 
-    // Synthesize accessors for lazy, all checking already been performed.
-    if (VD->getAttrs().hasAttribute<LazyAttr>() && !VD->isStatic() &&
-        !VD->getGetter()->hasBody())
-      TC.completeLazyVarImplementation(VD);
-
-    // If this is a willSet/didSet property, synthesize the getter and setter
-    // decl.
-    if (VD->hasObservers() &&
-        (!VD->getGetter()->getBody() || !VD->getSetter()->getBody()))
-      synthesizeObservingAccessors(VD, TC);
-
-    // If this is a get+mutableAddress property, synthesize the setter body.
-    if (VD->getStorageKind() == VarDecl::ComputedWithMutableAddress &&
-        !VD->getSetter()->getBody()) {
-      synthesizeSetterForMutableAddressedStorage(VD, TC);
-    }
-
-    // Typecheck any accessors that were previously synthesized
-    // (that were previously only validated at point of synthesis)
-    if (auto getter = VD->getGetter()) {
-      if (getter->hasBody()) {
-        TC.typeCheckDecl(getter);
-      }
-    }
-    if (auto setter = VD->getSetter()) {
-      if (setter->hasBody()) {
-        TC.typeCheckDecl(setter);
-      }
-    }
-
     TC.checkDeclAttributes(VD);
+
+    triggerAccessorSynthesis(TC, VD);
   }
 
 
@@ -3230,7 +3183,7 @@ public:
         auto *varDC = var->getDeclContext();
 
         // Non-member observing properties need an initializer.
-        if (var->getStorageKind() == VarDecl::StoredWithObservers &&
+        if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
             !isTypeContext && !var->isInvalid() && !PBD->isInvalid()) {
           TC.diagnose(var->getLoc(), diag::observingprop_requires_initializer);
           PBD->setInvalid();
@@ -3289,6 +3242,8 @@ public:
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+
+    triggerAccessorSynthesis(TC, SD);
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -4845,8 +4800,8 @@ public:
     // Returns true if we will already diagnose a bad override
     // on the property's accessor of the given kind.
     auto accessorOverrideAlreadyDiagnosed = [&](AccessorKind kind) {
-      FuncDecl *overrideAccessor = overrideASD->getAccessorFunction(kind);
-      FuncDecl *baseAccessor = baseASD->getAccessorFunction(kind);
+      FuncDecl *overrideAccessor = overrideASD->getAccessor(kind);
+      FuncDecl *baseAccessor = baseASD->getAccessor(kind);
       if (overrideAccessor && baseAccessor &&
           !TC.isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
         return true;
@@ -4907,7 +4862,8 @@ public:
       auto *overrideASD = cast<AbstractStorageDecl>(override);
       
       // Make sure that the overriding property doesn't have storage.
-      if (overrideASD->hasStorage() && !overrideASD->hasObservers()) {
+      if (overrideASD->hasStorage() &&
+          !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
         bool downgradeToWarning = false;
         if (!TC.Context.isSwiftVersionAtLeast(5) &&
             overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
@@ -4934,7 +4890,8 @@ public:
         baseIsSettable =
            baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
       }
-      if (overrideASD->hasObservers() && !baseIsSettable) {
+      if (overrideASD->getWriteImpl() == WriteImplKind::InheritedWithObservers
+          && !baseIsSettable) {
         TC.diagnose(overrideASD, diag::observing_readonly_property,
                     overrideASD->getBaseName().getIdentifier());
         TC.diagnose(baseASD, diag::property_override_here);
@@ -5062,13 +5019,13 @@ public:
       overridingASD->setOverriddenDecl(baseASD);
 
       // Make sure we get consistent overrides for the accessors as well.
-      assert(baseASD->hasAccessorFunctions());
+      assert(baseASD->getGetter());
 
       auto recordAccessorOverride = [&](AccessorKind kind) {
         // We need the same accessor on both.
-        auto baseAccessor = baseASD->getAccessorFunction(kind);
+        auto baseAccessor = baseASD->getAccessor(kind);
         if (!baseAccessor) return;
-        auto overridingAccessor = overridingASD->getAccessorFunction(kind);
+        auto overridingAccessor = overridingASD->getAccessor(kind);
         if (!overridingAccessor) return;
 
         // For setter accessors, we need the base's setter to be
@@ -6083,9 +6040,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Perform accessor-related validation.
     validateAbstractStorageDecl(*this, VD);
 
-    // Synthesize accessors as necessary.
-    maybeAddAccessorsToVariable(VD, *this);
-
     break;
   }
 
@@ -6188,6 +6142,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // to the value type.
       case AccessorKind::DidSet:
       case AccessorKind::WillSet:
+        // Make sure that observing accessors are marked final if in a class.
+        if (!accessor->isFinal() &&
+            accessor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+          makeFinal(Context, accessor);
+        }
+        LLVM_FALLTHROUGH;
+
       case AccessorKind::Set: {
         auto newValueParam = valueParams->get(0);
         newValueParam->setType(valueTy);
@@ -6723,12 +6684,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Perform accessor-related validation.
     validateAbstractStorageDecl(*this, SD);
-
-    // If this is a get+mutableAddress property, synthesize the setter body.
-    if (SD->getStorageKind() == SubscriptDecl::ComputedWithMutableAddress &&
-        !SD->getSetter()->getBody()) {
-      synthesizeSetterForMutableAddressedStorage(SD, *this);
-    }
 
     break;
   }
