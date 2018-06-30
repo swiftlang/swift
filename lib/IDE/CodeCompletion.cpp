@@ -1338,14 +1338,12 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-  bool typecheckContext(DeclContext *DC) {
+  void typeCheckContext(DeclContext *DC) {
     // Nothing to type check in module context.
     if (DC->isModuleScopeContext())
-      return true;
+      return;
 
-    // Type check the parent context.
-    if (!typecheckContext(DC->getParent()))
-      return false;
+    typeCheckContext(DC->getParent());
 
     // Type-check this context.
     switch (DC->getContextKind()) {
@@ -1353,31 +1351,38 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     case DeclContextKind::Initializer:
     case DeclContextKind::Module:
     case DeclContextKind::SerializedLocal:
+    case DeclContextKind::TopLevelCodeDecl:
       // Nothing to do for these.
-      return true;
+      break;
 
-    case DeclContextKind::AbstractFunctionDecl:
-      return typeCheckAbstractFunctionBodyUntil(
-                                  cast<AbstractFunctionDecl>(DC),
+    case DeclContextKind::AbstractFunctionDecl: {
+      auto *AFD = cast<AbstractFunctionDecl>(DC);
+
+      // FIXME: This shouldn't be necessary, but we crash otherwise.
+      if (auto *AD = dyn_cast<AccessorDecl>(AFD))
+        typeCheckCompletionDecl(AD->getStorage());
+
+      typeCheckAbstractFunctionBodyUntil(
+                                  AFD,
                                   P.Context.SourceMgr.getCodeCompletionLoc());
+      break;
+    }
 
     case DeclContextKind::ExtensionDecl:
-      return typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
+      typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
+      break;
 
     case DeclContextKind::GenericTypeDecl:
-      return typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
+      typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
+      break;
 
     case DeclContextKind::FileUnit:
       llvm_unreachable("module scope context handled above");
 
     case DeclContextKind::SubscriptDecl:
-      return typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
-
-    case DeclContextKind::TopLevelCodeDecl:
-      return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
+      typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
+      break;
     }
-
-    llvm_unreachable("Unhandled DeclContextKind in switch.");
   }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
@@ -5186,8 +5191,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       CurDeclContext = DC;
   }
 
-  if (!typecheckContext(CurDeclContext))
-    return;
+  // The only time we have to explicitly check a TopLevelCodeDecl
+  // is when we're directly inside of one. In this case,
+  // performTypeChecking() did not type check it for us.
+  auto *DC = CurDeclContext;
+  while (isa<AbstractClosureExpr>(DC))
+    DC = DC->getParent();
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
+    typeCheckTopLevelCodeDecl(TLCD);
+  else
+    typeCheckContext(CurDeclContext);
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;
