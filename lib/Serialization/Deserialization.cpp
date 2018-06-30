@@ -2301,7 +2301,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
          tl = TypeLoc::withoutLoc(getType(rawID));
       });
       nominal->setInherited(inheritedTypes);
-      nominal->setCheckedInheritanceClause();
   };
 
   while (true) {
@@ -2590,7 +2589,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     if (isImplicit)
       alias->setImplicit();
 
-    alias->setCheckedInheritanceClause();
     break;
   }
 
@@ -2661,8 +2659,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
     assocType->setAccess(std::max(parentAccess, AccessLevel::Internal));
     if (isImplicit)
       assocType->setImplicit();
-
-    assocType->setCheckedInheritanceClause();
 
     // Overridden associated types.
     SmallVector<AssociatedTypeDecl *, 2> overriddenAssocTypes;
@@ -3894,7 +3890,6 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       tl = TypeLoc::withoutLoc(getType(rawID));
     });
     extension->setInherited(inheritedTypes);
-    extension->setCheckedInheritanceClause();
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     skipRecord(DeclTypeCursor, decls_block::MEMBERS);

@@ -460,14 +460,7 @@ protected:
     HasStubImplementation : 1
   );
 
-  SWIFT_INLINE_BITFIELD(TypeDecl, ValueDecl, 1,
-    /// Whether we have already checked the inheritance clause.
-    ///
-    /// FIXME: Is this too fine-grained?
-    CheckedInheritanceClause : 1
-  );
-
-  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, TypeDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(AbstractTypeParamDecl, ValueDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, AbstractTypeParamDecl, 16+16,
     : NumPadBits,
@@ -476,7 +469,7 @@ protected:
     Index : 16
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, TypeDecl);
+  SWIFT_INLINE_BITFIELD_EMPTY(GenericTypeDecl, ValueDecl);
 
   SWIFT_INLINE_BITFIELD(TypeAliasDecl, GenericTypeDecl, 1+1,
     /// Whether the typealias forwards perfectly to its underlying type.
@@ -591,7 +584,7 @@ protected:
     Associativity : 2
   );
 
-  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, TypeDecl, 1+1,
+  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, ValueDecl, 1+1,
     ComputedOverridden : 1,
     HasOverridden : 1
   );
@@ -603,18 +596,13 @@ protected:
     NumPathElements : 8
   );
 
-  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 3+1+1,
+  SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 3+1,
     /// An encoding of the default and maximum access level for this extension.
     ///
     /// This is encoded as (1 << (maxAccess-1)) | (1 << (defaultAccess-1)),
     /// which works because the maximum is always greater than or equal to the
     /// default, and 'private' is never used. 0 represents an uncomputed value.
     DefaultAndMaxAccessLevel : 3,
-
-    /// Whether we have already checked the inheritance clause.
-    ///
-    /// FIXME: Is this too fine-grained?
-    CheckedInheritanceClause : 1,
 
     /// Whether there is are lazily-loaded conformances for this extension.
     HasLazyConformances : 1
@@ -1683,16 +1671,6 @@ public:
     return hasValidationStarted() && !isBeingValidated();
   }
 
-  /// Whether we already type-checked the inheritance clause.
-  bool checkedInheritanceClause() const {
-    return Bits.ExtensionDecl.CheckedInheritanceClause;
-  }
-
-  /// Note that we have already type-checked the inheritance clause.
-  void setCheckedInheritanceClause(bool checked = true) {
-    Bits.ExtensionDecl.CheckedInheritanceClause = checked;
-  }
-
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
   }
@@ -2488,10 +2466,7 @@ protected:
   TypeDecl(DeclKind K, llvm::PointerUnion<DeclContext *, ASTContext *> context,
            Identifier name, SourceLoc NameLoc,
            MutableArrayRef<TypeLoc> inherited) :
-    ValueDecl(K, context, name, NameLoc), Inherited(inherited)
-  {
-    Bits.TypeDecl.CheckedInheritanceClause = false;
-  }
+    ValueDecl(K, context, name, NameLoc), Inherited(inherited) {}
 
 public:
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
@@ -2514,16 +2489,6 @@ public:
 
   /// Retrieve one of the types listed in the "inherited" clause.
   Type getInheritedType(unsigned index) const;
-
-  /// Whether we already type-checked the inheritance clause.
-  bool checkedInheritanceClause() const {
-    return Bits.TypeDecl.CheckedInheritanceClause;
-  }
-
-  /// Note that we have already type-checked the inheritance clause.
-  void setCheckedInheritanceClause(bool checked = true) {
-    Bits.TypeDecl.CheckedInheritanceClause = checked;
-  }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 

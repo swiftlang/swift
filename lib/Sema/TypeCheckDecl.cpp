@@ -314,25 +314,15 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
   MutableArrayRef<TypeLoc> inheritedClause;
 
-  // If we already checked the inheritance clause, don't do so again.
   if (auto type = dyn_cast<TypeDecl>(decl)) {
-    if (type->checkedInheritanceClause())
-      return;
-
-    // This breaks infinite recursion, which will be diagnosed separately.
-    type->setCheckedInheritanceClause();
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
 
     validateExtension(ext);
-
-    if (ext->isInvalid() ||
-        ext->checkedInheritanceClause())
+    if (ext->isInvalid())
       return;
 
-    // This breaks infinite recursion, which will be diagnosed separately.
-    ext->setCheckedInheritanceClause();
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
@@ -630,17 +620,16 @@ static llvm::TinyPtrVector<ProtocolDecl *>
 getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl *proto,
                           ProtocolDecl **scratch) {
-  return tc.getDirectConformsTo(proto);
+  tc.resolveInheritedProtocols(proto);
+  return proto->getInheritedProtocols();
 }
 
 /// Retrieve the superclass of the given class.
 static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                        ClassDecl *classDecl,
                                                        ClassDecl **scratch) {
-  tc.checkInheritanceClause(classDecl);
-
   if (classDecl->hasSuperclass()) {
-    *scratch = classDecl->getSuperclass()->getClassOrBoundGenericClass();
+    *scratch = classDecl->getSuperclassDecl();
     return *scratch;
   }
   return { };
@@ -650,8 +639,6 @@ static ArrayRef<ClassDecl *> getInheritedForCycleCheck(TypeChecker &tc,
 static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
                                                       EnumDecl *enumDecl,
                                                       EnumDecl **scratch) {
-  tc.checkInheritanceClause(enumDecl);
-  
   if (enumDecl->hasRawType()) {
     *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
     return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
@@ -3319,6 +3306,8 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
     TC.validateDecl(AT);
 
+    TC.checkInheritanceClause(AT);
+
     auto *proto = AT->getProtocol();
     if (proto->isObjC()) {
       TC.diagnose(AT->getLoc(),
@@ -3397,6 +3386,8 @@ public:
 
     TC.checkDeclAttributes(ED);
 
+    TC.checkInheritanceClause(ED);
+
     AccessControlChecker::checkAccessControl(TC, ED);
     UsableFromInlineChecker::checkUsableFromInline(TC, ED);
 
@@ -3427,6 +3418,8 @@ public:
       visit(Member);
 
     TC.checkDeclAttributes(SD);
+
+    TC.checkInheritanceClause(SD);
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
@@ -3660,6 +3653,8 @@ public:
     CD->getAllConformances();
 
     TC.checkDeclAttributes(CD);
+
+    TC.checkInheritanceClause(CD);
 
     AccessControlChecker::checkAccessControl(TC, CD);
     UsableFromInlineChecker::checkUsableFromInline(TC, CD);
@@ -5791,7 +5786,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     SWIFT_DEFER { assocType->setIsBeingValidated(false); };
 
     checkDeclAttributesEarly(assocType);
-    checkInheritanceClause(assocType);
 
     // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
@@ -5844,8 +5838,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     nominal->setIsBeingValidated();
     validateGenericTypeSignature(nominal);
     nominal->setIsBeingValidated(false);
-
-    checkInheritanceClause(D);
 
     validateAttributes(*this, D);
 
@@ -5927,6 +5919,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
+    resolveTrailingWhereClause(proto);
 
     validateAttributes(*this, D);
 
@@ -6838,6 +6831,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
+    resolveTrailingWhereClause(proto);
 
     for (auto ATD : proto->getAssociatedTypeMembers()) {
       validateDeclForNameLookup(ATD);
@@ -7359,12 +7353,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   assert(extendedType->is<NominalType>());
   assert(!nominal->isGenericContext());
-}
-
-llvm::TinyPtrVector<ProtocolDecl *>
-TypeChecker::getDirectConformsTo(ProtocolDecl *proto) {
-  resolveInheritedProtocols(proto);
-  return proto->getInheritedProtocols();
 }
 
 /// Build a default initializer string for the given pattern.
