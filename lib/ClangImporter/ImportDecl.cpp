@@ -2635,7 +2635,6 @@ namespace {
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
         structDecl->computeType();
-        structDecl->setCheckedInheritanceClause();
         structDecl->setAddedImplicitInitializers();
 
         auto options = getDefaultMakeStructRawValuedOptions();
@@ -2777,7 +2776,6 @@ namespace {
         SmallVector<TypeLoc, 2> inheritedTypes;
         inheritedTypes.push_back(TypeLoc::withoutLoc(underlyingType));
         enumDecl->setInherited(C.AllocateCopy(inheritedTypes));
-        enumDecl->setCheckedInheritanceClause();
 
         if (errorWrapper) {
           addSynthesizedProtocolAttrs(Impl, enumDecl,
@@ -4383,7 +4381,6 @@ namespace {
                           inheritedTypes);
       result->setValidationStarted();
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
-      result->setCheckedInheritanceClause();
       result->setMemberLoader(&Impl, 0);
 
       return result;
@@ -4521,7 +4518,6 @@ namespace {
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
-      result->setCheckedInheritanceClause();
 
       // Compute the requirement signature.
       if (!result->isRequirementSignatureComputed())
@@ -4568,7 +4564,6 @@ namespace {
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
-        result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
         result->addImplicitDestructor();
@@ -4725,7 +4720,6 @@ namespace {
       importObjCProtocols(result, decl->getReferencedProtocols(),
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
-      result->setCheckedInheritanceClause();
 
       // Add inferred attributes.
 #define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)               \
@@ -5149,7 +5143,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
     SmallVector<TypeLoc, 4> inheritedTypes;
     inheritedTypes.push_back(TypeLoc::withoutLoc(superclass));
     theClass->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
-    theClass->setCheckedInheritanceClause();
   }
 
   addSynthesizedProtocolAttrs(Impl, theClass, {KnownProtocolKind::CFObject});
@@ -5310,7 +5303,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
-  structDecl->setCheckedInheritanceClause();
   structDecl->setAddedImplicitInitializers();
 
   // Import the type of the underlying storage
@@ -5589,7 +5581,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
   structDecl->computeType();
-  structDecl->setCheckedInheritanceClause();
   structDecl->setAddedImplicitInitializers();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
@@ -8230,7 +8221,6 @@ ClangImporter::Implementation::importDeclContextOf(
   auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
                                    getClangModuleForDecl(decl), nullptr);
   ext->setValidationStarted();
-  ext->setCheckedInheritanceClause();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getAsProtocolExtensionContext()) {

@@ -461,7 +461,6 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
     for (auto &inherited : param->getInherited())
       revertDependentTypeLoc(inherited);
   }

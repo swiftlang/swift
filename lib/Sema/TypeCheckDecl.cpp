@@ -312,25 +312,15 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
   MutableArrayRef<TypeLoc> inheritedClause;
 
-  // If we already checked the inheritance clause, don't do so again.
   if (auto type = dyn_cast<TypeDecl>(decl)) {
-    if (type->checkedInheritanceClause())
-      return;
-
-    // This breaks infinite recursion, which will be diagnosed separately.
-    type->setCheckedInheritanceClause();
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
 
     validateExtension(ext);
-
-    if (ext->isInvalid() ||
-        ext->checkedInheritanceClause())
+    if (ext->isInvalid())
       return;
 
-    // This breaks infinite recursion, which will be diagnosed separately.
-    ext->setCheckedInheritanceClause();
     inheritedClause = ext->getInherited();
 
     // Protocol extensions cannot have inheritance clauses.
