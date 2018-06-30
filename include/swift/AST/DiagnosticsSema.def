@@ -2795,11 +2795,18 @@ NOTE(ambiguous_because_of_trailing_closure,none,
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,none,
       "partial application of %select{"
-        "function with 'inout' parameters|"
         "'mutating' method|"
         "'super.init' initializer chain|"
         "'self.init' initializer delegation"
       "}0 is not allowed",
+      (unsigned))
+WARNING(partial_application_of_function_invalid_swift4,none,
+      "partial application of %select{"
+        "'mutating' method|"
+        "'super.init' initializer chain|"
+        "'self.init' initializer delegation"
+      "}0 is not allowed; calling the function has undefined behavior and will "
+      "be an error in future Swift versions",
       (unsigned))
 
 ERROR(self_assignment_var,none,

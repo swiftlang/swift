@@ -55,7 +55,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t VERSION_MINOR = 424; // Last change: isObjC bits
+const uint16_t VERSION_MINOR = 425; // Last change: access impls
 
 using DeclIDField = BCFixed<31>;
 
@@ -112,13 +112,38 @@ using CharOffsetField = BitOffsetField;
 using FileSizeField = BCVBR<16>;
 using FileModTimeField = BCVBR<16>;
 
-enum class StorageKind : uint8_t {
-  Stored, StoredWithTrivialAccessors, StoredWithObservers,
-  InheritedWithObservers,
-  Computed, ComputedWithMutableAddress,
-  Addressed, AddressedWithTrivialAccessors, AddressedWithObservers,
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ReadImplKind : uint8_t {
+  Stored = 0,
+  Get,
+  Inherited,
+  Address
 };
-using StorageKindField = BCFixed<4>;
+using ReadImplKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class WriteImplKind : uint8_t {
+  Immutable = 0,
+  Stored,
+  StoredWithObservers,
+  InheritedWithObservers,
+  Set,
+  MutableAddress,
+};
+using WriteImplKindField = BCFixed<3>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// VERSION_MAJOR.
+enum class ReadWriteImplKind : uint8_t {
+  Immutable = 0,
+  Stored,
+  MaterializeForSet,
+  MutableAddress,
+  MaterializeToTemporary,
+};
+using ReadWriteImplKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.
@@ -960,7 +985,9 @@ namespace decls_block {
     BCFixed<1>,   // HasNonPatternBindingInit?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    StorageKindField,   // StorageKind
+    ReadImplKindField,   // read implementation
+    WriteImplKindField,   // write implementation
+    ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
     DeclIDField,  // overridden decl
@@ -1097,7 +1124,9 @@ namespace decls_block {
     BCFixed<1>,  // objc?
     BCFixed<1>,   // is getter mutating?
     BCFixed<1>,   // is setter mutating?
-    StorageKindField,   // StorageKind
+    ReadImplKindField,   // read implementation
+    WriteImplKindField,   // write implementation
+    ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type

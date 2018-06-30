@@ -216,19 +216,7 @@ void verifyKeyPathComponent(SILModule &M,
     require(fieldTy == componentTy,
             "property decl should be a member of the base with the same type "
             "as the component");
-    switch (property->getStorageKind()) {
-    case AbstractStorageDecl::Stored:
-    case AbstractStorageDecl::StoredWithObservers:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
-      break;
-    case AbstractStorageDecl::Addressed:
-    case AbstractStorageDecl::AddressedWithObservers:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    case AbstractStorageDecl::Computed:
-    case AbstractStorageDecl::ComputedWithMutableAddress:
-    case AbstractStorageDecl::InheritedWithObservers:
-      require(false, "property must be stored");
-    }
+    require(property->hasStorage(), "property must be stored");
     auto propertyTy = loweredBaseTy.getFieldType(property, M);
     require(propertyTy.getObjectType()
               == loweredComponentTy.getObjectType(),

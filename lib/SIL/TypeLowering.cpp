@@ -89,60 +89,35 @@ static bool hasSingletonMetatype(CanType instanceType) {
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
   auto decl = capture.getDecl();
   if (auto *var = dyn_cast<VarDecl>(decl)) {
-    switch (var->getStorageKind()) {
-    case VarDecl::StoredWithTrivialAccessors:
-      llvm_unreachable("stored local variable with trivial accessors?");
+    assert(var->hasStorage() &&
+           "should not have attempted to directly capture this variable");
 
-    case VarDecl::InheritedWithObservers:
-      llvm_unreachable("inherited local variable?");
+    // If this is a non-address-only stored 'let' constant, we can capture it
+    // by value.  If it is address-only, then we can't load it, so capture it
+    // by its address (like a var) instead.
+    if (var->isImmutable() &&
+        (!SILModuleConventions(M).useLoweredAddresses() ||
+         !getTypeLowering(var->getType()).isAddressOnly()))
+      return CaptureKind::Constant;
 
-    case VarDecl::Computed:
-      llvm_unreachable("computed captured property should have been lowered "
-                       "away");
-
-    case VarDecl::StoredWithObservers:
-    case VarDecl::Addressed:
-    case VarDecl::AddressedWithTrivialAccessors:
-    case VarDecl::AddressedWithObservers:
-    case VarDecl::ComputedWithMutableAddress:
-      // Computed captures should have been lowered away.
-      assert(capture.isDirect()
-             && "computed captured property should have been lowered away");
-
-      // If captured directly, the variable is captured by box or pointer.
-      assert(var->hasStorage());
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
-
-    case VarDecl::Stored:
-      // If this is a non-address-only stored 'let' constant, we can capture it
-      // by value.  If it is address-only, then we can't load it, so capture it
-      // by its address (like a var) instead.
-      if (var->isImmutable() &&
-          (!SILModuleConventions(M).useLoweredAddresses() ||
-           !getTypeLowering(var->getType()).isAddressOnly()))
-        return CaptureKind::Constant;
-
-      // In-out parameters are captured by address.
-      if (var->isInOut()) {
-        return CaptureKind::StorageAddress;
-      }
-
-      // Reference storage types can appear in a capture list, which means
-      // we might allocate boxes to store the captures. However, those boxes
-      // have the same lifetime as the closure itself, so we must capture
-      // the box itself and not the payload, even if the closure is noescape,
-      // otherwise they will be destroyed when the closure is formed.
-      if (var->getType()->is<ReferenceStorageType>()) {
-        return CaptureKind::Box;
-      }
-
-      // If we're capturing into a non-escaping closure, we can generally just
-      // capture the address of the value as no-escape.
-      return capture.isNoEscape() ?
-        CaptureKind::StorageAddress : CaptureKind::Box;
+    // In-out parameters are captured by address.
+    if (var->isInOut()) {
+      return CaptureKind::StorageAddress;
     }
-    llvm_unreachable("bad storage kind");
+
+    // Reference storage types can appear in a capture list, which means
+    // we might allocate boxes to store the captures. However, those boxes
+    // have the same lifetime as the closure itself, so we must capture
+    // the box itself and not the payload, even if the closure is noescape,
+    // otherwise they will be destroyed when the closure is formed.
+    if (var->getType()->is<ReferenceStorageType>()) {
+      return CaptureKind::Box;
+    }
+
+    // If we're capturing into a non-escaping closure, we can generally just
+    // capture the address of the value as no-escape.
+    return capture.isNoEscape() ?
+      CaptureKind::StorageAddress : CaptureKind::Box;
   }
   
   // "Captured" local types require no context.
@@ -2080,57 +2055,76 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       // If the capture is of a computed property, grab the transitive captures
       // of its accessors.
       if (auto capturedVar = dyn_cast<VarDecl>(capture.getDecl())) {
-        switch (capturedVar->getStorageKind()) {
-        case VarDecl::StoredWithTrivialAccessors:
-          llvm_unreachable("stored local variable with trivial accessors?");
+        if (!capture.isDirect()) {
+          auto impl = capturedVar->getImplInfo();
 
-        case VarDecl::InheritedWithObservers:
-          llvm_unreachable("inherited local variable?");
-
-        case VarDecl::StoredWithObservers:
-        case VarDecl::Addressed:
-        case VarDecl::AddressedWithTrivialAccessors:
-        case VarDecl::AddressedWithObservers:
-        case VarDecl::ComputedWithMutableAddress:
-          // Directly capture storage if we're supposed to.
-          if (capture.isDirect())
-            goto capture_value;
-
-          // Otherwise, transitively capture the accessors.
-          LLVM_FALLTHROUGH;
-
-        case VarDecl::Computed: {
-          collectFunctionCaptures(capturedVar->getGetter());
-          if (auto setter = capturedVar->getSetter())
-            collectFunctionCaptures(setter);
-          continue;
-        }
-
-        case VarDecl::Stored: {
-          // We can always capture the storage in these cases.
-          Type captureType = capturedVar->getType();
-          if (auto *metatypeType = captureType->getAs<MetatypeType>())
-            captureType = metatypeType->getInstanceType();
-
-          if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
-            captureType = selfType->getSelfType();
-
-            // We're capturing a 'self' value with dynamic 'Self' type;
-            // handle it specially.
-            if (!selfCapture &&
-                captureType->getClassOrBoundGenericClass()) {
-              selfCapture = capture;
-              continue;
-            }
+          switch (impl.getReadImpl()) {
+          case ReadImplKind::Stored:
+            // Will capture storage later.
+            break;
+          case ReadImplKind::Address:
+            collectFunctionCaptures(capturedVar->getAddressor());
+            break;
+          case ReadImplKind::Get:
+            collectFunctionCaptures(capturedVar->getGetter());
+            break;
+          case ReadImplKind::Inherited:
+            llvm_unreachable("inherited local variable?");
           }
 
-          // Otherwise just fall through.
-          goto capture_value;
+          switch (impl.getWriteImpl()) {
+          case WriteImplKind::Immutable:
+          case WriteImplKind::Stored:
+            break;
+          case WriteImplKind::StoredWithObservers:
+          case WriteImplKind::Set:
+            collectFunctionCaptures(capturedVar->getSetter());
+            break;
+          case WriteImplKind::MutableAddress:
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            break;
+          case WriteImplKind::InheritedWithObservers:
+            llvm_unreachable("inherited local variable");
+          }
+
+          switch (impl.getReadWriteImpl()) {
+          case ReadWriteImplKind::Immutable:
+          case ReadWriteImplKind::Stored:
+            break;
+          case ReadWriteImplKind::MaterializeToTemporary:
+            // We've already processed the read and write operations.
+            break;
+          case ReadWriteImplKind::MutableAddress:
+            collectFunctionCaptures(capturedVar->getMutableAddressor());
+            break;
+          case ReadWriteImplKind::MaterializeForSet:
+            llvm_unreachable("local variable with materializeForSet?");
+          }
         }
+
+        if (!capturedVar->hasStorage())
+          continue;
+
+        // We can always capture the storage in these cases.
+        Type captureType = capturedVar->getType();
+        if (auto *metatypeType = captureType->getAs<MetatypeType>())
+          captureType = metatypeType->getInstanceType();
+
+        if (auto *selfType = captureType->getAs<DynamicSelfType>()) {
+          captureType = selfType->getSelfType();
+
+          // We're capturing a 'self' value with dynamic 'Self' type;
+          // handle it specially.
+          if (!selfCapture &&
+              captureType->getClassOrBoundGenericClass()) {
+            selfCapture = capture;
+            continue;
+          }
         }
+
+        // Fall through to capture the storage.
       }
       
-    capture_value:
       // Collect non-function captures.
       captures.insert(capture);
     }

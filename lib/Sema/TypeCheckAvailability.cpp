@@ -179,7 +179,7 @@ private:
     // when we process the accessor, we can use this TRC as the
     // parent.
     if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasAccessorFunctions()) {
+      if (StorageDecl->hasAnyAccessors()) {
         StorageContexts[StorageDecl] = NewTRC;
       }
     }
@@ -228,7 +228,7 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
-      if (storageDecl->hasAccessorFunctions() && BracesEnd.isValid()) {
+      if (storageDecl->hasAnyAccessors() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
                            BracesEnd);
       }
@@ -2433,11 +2433,14 @@ private:
     if (!D)
       return;
 
-    if (!D->hasAccessorFunctions()) {
+    if (!D->hasAnyAccessors()) {
       return;
     }
     
-    // Check availability of accessor functions
+    // Check availability of accessor functions.
+    // TODO: if we're talking about an inlineable storage declaration,
+    // this probably needs to be refined to not assume that the accesses are
+    // specifically using the getter/setter.
     switch (AccessContext) {
     case MemberAccessContext::Getter:
       diagAccessorAvailability(D->getGetter(), ReferenceRange, ReferenceDC,

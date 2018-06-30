@@ -871,8 +871,11 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
       auto isNullOrImplicit = [](const Decl *D) -> bool {
         return !D || D->isImplicit();
       };
+
+      bool usedPseudoAccessors = false;
       if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
           isNullOrImplicit(StoreD->getSetter())) {
+        usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.
         // We create accessor entities so we can implement the functionality
@@ -885,33 +888,19 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
         if (!reportPseudoSetterDecl(VarD))
           return false;
-      } else {
-        if (auto FD = StoreD->getGetter())
-          SourceEntityWalker::walk(cast<Decl>(FD));
+      } 
+
+      for (auto accessor : StoreD->getAllAccessors()) {
+        // Don't include the implicit getter and setter if we added pseudo
+        // accessors above.
+        if (usedPseudoAccessors &&
+            (accessor->getAccessorKind() == AccessorKind::Get ||
+             accessor->getAccessorKind() == AccessorKind::Set))
+          continue;
+
+        SourceEntityWalker::walk(cast<Decl>(accessor));
         if (Cancelled)
           return false;
-        if (auto FD = StoreD->getSetter())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-      }
-      if (StoreD->hasObservers()) {
-        if (auto FD = StoreD->getWillSetFunc())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-        if (auto FD = StoreD->getDidSetFunc())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-      }
-      if (StoreD->hasAddressors()) {
-        if (auto FD = StoreD->getAddressor())
-          SourceEntityWalker::walk(cast<Decl>(FD));
-        if (Cancelled)
-          return false;
-        if (auto FD = StoreD->getMutableAddressor())
-          SourceEntityWalker::walk(cast<Decl>(FD));
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))

@@ -171,22 +171,7 @@ static bool shouldSkipBraceStmtElement(ASTNode element) {
 
 /// Determine whether the given abstract storage declaration has accessors.
 static bool hasAccessors(AbstractStorageDecl *asd) {
-  switch (asd->getStorageKind()) {
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::Computed:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::StoredWithObservers:
-    return asd->getBracesRange().isValid();
-
-  case AbstractStorageDecl::Stored:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-    return false;
-  }
-
-  llvm_unreachable("Unhandled ContinuationKind in switch.");
+  return asd->getBracesRange().isValid();
 }
 
 void ASTScope::expand() const {
@@ -561,39 +546,12 @@ void ASTScope::expand() const {
 
   case ASTScopeKind::Accessors: {
     // Add children for all of the explicitly-written accessors.
-    SmallVector<ASTScope *, 4> accessors;
-    auto addAccessor = [&](FuncDecl *accessor) {
-      if (!accessor) return;
-      if (accessor->isImplicit()) return;
-      if (accessor->getStartLoc().isInvalid()) return;
-
+    for (auto accessor : abstractStorageDecl->getAllAccessors()) {
+      if (accessor->isImplicit() || accessor->getStartLoc().isInvalid())
+        continue;
       if (auto accessorChild = createIfNeeded(this, accessor))
-        accessors.push_back(accessorChild);
-    };
-
-    addAccessor(abstractStorageDecl->getGetter());
-    addAccessor(abstractStorageDecl->getSetter());
-    addAccessor(abstractStorageDecl->getMaterializeForSetFunc());
-    if (abstractStorageDecl->hasAddressors()) {
-      addAccessor(abstractStorageDecl->getAddressor());
-      addAccessor(abstractStorageDecl->getMutableAddressor());
+        addChild(accessorChild);
     }
-    if (abstractStorageDecl->hasObservers()) {
-      addAccessor(abstractStorageDecl->getDidSetFunc());
-      addAccessor(abstractStorageDecl->getWillSetFunc());
-    }
-
-    // Sort the accessors, because they can come in any order.
-    std::sort(accessors.begin(), accessors.end(),
-      [&](ASTScope *s1, ASTScope *s2) {
-        return ctx.SourceMgr.isBeforeInBuffer(s1->getSourceRange().Start,
-                                              s2->getSourceRange().Start);
-    });
-
-    // Add the accessors.
-    for (auto accessor : accessors)
-      addChild(accessor);
-
     break;
   }
 

@@ -4540,7 +4540,7 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(storageKind, LBLoc, Accessors, RBLoc);
 }
 
-AbstractStorageDecl::StorageKindTy
+StorageImplInfo
 Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                                   bool invalid, ParseDeclOptions flags,
                                   SourceLoc staticLoc,
@@ -4631,6 +4631,18 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
+  // Disallow observers with addressors.
+  if (Address || MutableAddress) {
+    if (WillSet) {
+      P.diagnose(WillSet->getLoc(), diag::observingproperty_with_address, 0);
+      ignoreInvalidAccessor(WillSet);
+    }
+    if (DidSet) {
+      P.diagnose(DidSet->getLoc(), diag::observingproperty_with_address, 1);
+      ignoreInvalidAccessor(DidSet);
+    }
+  }
+
   // If this is a willSet/didSet observing property, record this and we're done.
   if (WillSet || DidSet) {
     if (Get) {
@@ -4642,23 +4654,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(Set->getLoc(), diag::observingproperty_with_getset,
                  bool(DidSet), /*setter*/1);
       ignoreInvalidAccessor(Set);
-    }
-
-    AbstractStorageDecl::StorageKindTy storageKind;
-    if (Address) {
-      if (!MutableAddress) {
-        P.diagnose(WillSet ? WillSet->getLoc() : DidSet->getLoc(),
-                   diag::observingproperty_without_mutableaddress,
-                   bool(DidSet));
-        createImplicitAccessor(AccessorKind::MutableAddress,
-                               AddressorKind::Unsafe, nullptr);
-      }
-
-      storageKind = AbstractStorageDecl::AddressedWithObservers;
-    } else if (attrs.hasAttribute<OverrideAttr>()) {
-      storageKind = AbstractStorageDecl::InheritedWithObservers;
-    } else {
-      storageKind = AbstractStorageDecl::StoredWithObservers;
     }
 
     // Observing properties will have getters and setters synthesized by sema.
@@ -4675,13 +4670,27 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     createImplicitAccessor(AccessorKind::Set,
                            AddressorKind::NotAddressor, argList);
 
-    return storageKind;
+    if (attrs.hasAttribute<OverrideAttr>()) {
+      return StorageImplInfo(ReadImplKind::Inherited,
+                             WriteImplKind::InheritedWithObservers,
+                             ReadWriteImplKind::MaterializeToTemporary);
+    } else {
+      return StorageImplInfo(ReadImplKind::Stored,
+                             WriteImplKind::StoredWithObservers,
+                             ReadWriteImplKind::MaterializeToTemporary);
+    }
   }
 
   // If we have addressors, at this point mark it as addressed.
   if (Address) {
     assert(!Get && !Set);
-    return AbstractStorageDecl::Addressed;
+    if (MutableAddress) {
+      return StorageImplInfo(ReadImplKind::Address,
+                             WriteImplKind::MutableAddress,
+                             ReadWriteImplKind::MutableAddress);
+    } else {
+      return StorageImplInfo(ReadImplKind::Address);
+    }
   }
 
   // If this is a get+mutableAddress property, synthesize an implicit
@@ -4695,7 +4704,9 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     createImplicitAccessor(AccessorKind::Set,
                            AddressorKind::NotAddressor, argList);
 
-    return AbstractStorageDecl::ComputedWithMutableAddress;
+    return StorageImplInfo(ReadImplKind::Get,
+                           WriteImplKind::MutableAddress,
+                           ReadWriteImplKind::MutableAddress);
   }
 
   // Otherwise, this must be a get/set property.  The set is optional,
@@ -4718,17 +4729,19 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
+  assert(!Set || Get);
+
   if (Set || Get) {
     if (attrs.hasAttribute<SILStoredAttr>())
       // Turn this into a stored property with trivial accessors.
-      return AbstractStorageDecl::StoredWithTrivialAccessors;
+      return StorageImplInfo::getSimpleStored(Set != nullptr);
     else
       // Turn this into a computed variable.
-      return AbstractStorageDecl::Computed;
+      return StorageImplInfo::getComputed(Set != nullptr);
   } else {
     // Otherwise this decl is invalid and the accessors have been rejected above.
     // Make sure to at least record the braces range in the AST.
-    return AbstractStorageDecl::Stored;
+    return StorageImplInfo::getSimpleStored(/*mutable*/ true);
   }
 }
 
@@ -4924,6 +4937,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       // If we set up an initialization context for a property or module-level
       // global, record it.
       PBDEntries.back().setInitContext(initContext);
+
+      // If the attributes include @lazy, flag that on each initializer.
+      if (Attributes.hasAttribute<LazyAttr>()) {
+        PBDEntries.back().setInitializerLazy();
+      }
 
       // If we are doing second pass of code completion, we don't want to
       // suddenly cut off parsing and throw away the declaration.

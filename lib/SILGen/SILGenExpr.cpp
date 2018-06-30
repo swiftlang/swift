@@ -708,22 +708,29 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
     return ManagedValue();
   }
 
-  switch (var->getAccessStrategy(semantics, accessKind)) {
+  auto strategy = var->getAccessStrategy(semantics, accessKind, FunctionDC);
+
+  switch (strategy.getKind()) {
   case AccessStrategy::Storage:
     // The only kind of stored variable that should make it to here is
     // a global variable.  Just invoke its accessor function to get its
     // address.
     return emitGlobalVariableRef(loc, var);
 
-  case AccessStrategy::Addressor: {
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    auto accessor = strategy.getAccessor();
+    if (accessor != AccessorKind::Address &&
+        accessor != AccessorKind::MutableAddress)
+      return ManagedValue();
+
     LValue lvalue =
       emitLValueForAddressedNonMemberVarDecl(loc, var, formalRValueType,
                                              accessKind, semantics);
     return emitAddressOfLValue(loc, std::move(lvalue), accessKind);
   }
 
-  case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor:
+  case AccessStrategy::MaterializeToTemporary:
     return ManagedValue();
     
   case AccessStrategy::BehaviorStorage:
@@ -1047,7 +1054,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
                       ? Result : Result.copyUnmanaged(*this, loc));
     }
 
-    assert(var->hasAccessorFunctions() && "Unknown rvalue case");
+    assert(var->getGetter() && "Unknown rvalue case");
 
     SILDeclRef getter = SGM.getGetterDeclRef(var);
 
@@ -1074,7 +1081,8 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
       selfSource = ArgumentSource(loc, std::move(metatypeRV));
     }
 
-    bool isDirectAccessorUse = (semantics == AccessSemantics::DirectToAccessor);
+    bool isDirectAccessorUse =
+      (semantics == AccessSemantics::DirectToImplementation);
     return emitGetAccessor(loc, getter,
                            SGM.getNonMemberVarDeclSubstitutions(var),
                            std::move(selfSource),
@@ -1109,19 +1117,27 @@ getFormalStorageAbstractionPattern(SILGenFunction &SGF, AbstractStorageDecl *fie
 static SILDeclRef getRValueAccessorDeclRef(SILGenFunction &SGF,
                                            AbstractStorageDecl *storage,
                                            AccessStrategy strategy) {
-  switch (strategy) {
+  switch (strategy.getKind()) {
   case AccessStrategy::BehaviorStorage:
     llvm_unreachable("shouldn't load an rvalue via behavior storage!");
   
   case AccessStrategy::Storage:
     llvm_unreachable("should already have been filtered out!");
 
-  case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor:
-    return SGF.SGM.getGetterDeclRef(storage);
+  case AccessStrategy::MaterializeToTemporary:
+    llvm_unreachable("never used for read accesses");    
 
-  case AccessStrategy::Addressor:
-    return SGF.SGM.getAddressorDeclRef(storage, AccessKind::Read);
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    auto accessor = strategy.getAccessor();
+    assert(accessor == AccessorKind::Get || accessor == AccessorKind::Address);
+    if (accessor == AccessorKind::Get) {
+      return SGF.SGM.getGetterDeclRef(storage);
+    } else {
+      return SGF.SGM.getAddressorDeclRef(storage, AccessKind::Read);  
+    }
+  }
+
   }
   llvm_unreachable("should already have been filtered out!");
 }
@@ -1136,26 +1152,18 @@ emitRValueWithAccessor(SILGenFunction &SGF, SILLocation loc,
                        AbstractionPattern origFormalType,
                        CanType substFormalType,
                        SGFContext C) {
-  bool isDirectUse = (strategy == AccessStrategy::DirectToAccessor);
-
-  switch (strategy) {
-  case AccessStrategy::BehaviorStorage:
-    llvm_unreachable("shouldn't load an rvalue via behavior storage!");
-  
-  case AccessStrategy::Storage:
-    llvm_unreachable("should already have been filtered out!");
+  assert(strategy.getKind() == AccessStrategy::DirectToAccessor ||
+         strategy.getKind() == AccessStrategy::DispatchToAccessor);
+  bool isDirectUse = (strategy.getKind() == AccessStrategy::DirectToAccessor);
 
   // The easy path here is if we don't need to use an addressor.
-  case AccessStrategy::DirectToAccessor:
-  case AccessStrategy::DispatchToAccessor: {
+  if (strategy.getAccessor() == AccessorKind::Get) {
     return SGF.emitGetAccessor(loc, accessor, substitutions,
                                std::move(baseRV), isSuper, isDirectUse,
                                std::move(subscriptRV), C);
   }
 
-  case AccessStrategy::Addressor:
-    break;
-  }
+  assert(strategy.getAccessor() == AccessorKind::Address);
 
   auto &storageTL = SGF.getTypeLowering(origFormalType, substFormalType);
   SILType storageType = storageTL.getLoweredType().getAddressType();
@@ -1208,10 +1216,10 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
   AccessStrategy strategy =
-    storage->getAccessStrategy(semantics, AccessKind::Read);
+    storage->getAccessStrategy(semantics, AccessKind::Read, FunctionDC);
 
   // If we should call an accessor of some kind, do so.
-  if (strategy != AccessStrategy::Storage) {
+  if (strategy.getKind() != AccessStrategy::Storage) {
     auto accessor = getRValueAccessorDeclRef(*this, storage, strategy);
     ArgumentSource baseRV = prepareAccessorBaseArg(loc, base,
                                                    baseFormalType,
@@ -2471,8 +2479,9 @@ public:
 
     // Check that we have a stored access strategy. If we don't bail.
     AccessStrategy strategy =
-      Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read);
-    if (strategy != AccessStrategy::Storage)
+      Field->getAccessStrategy(Expr->getAccessSemantics(), AccessKind::Read,
+                               SGF.FunctionDC);
+    if (strategy.getKind() != AccessStrategy::Storage)
       return None;
 
     if (isa<StructDecl>(Base))
@@ -3102,7 +3111,6 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          SILLocation loc,
                          AbstractStorageDecl *property,
                          SubstitutionMap subs,
-                         AccessStrategy strategy,
                          GenericEnvironment *genericEnv,
                          ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
@@ -3171,7 +3179,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     thunk->setGenericEnvironment(genericEnv);
   }
   
-  SILGenFunction subSGF(SGM, *thunk);
+  SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
   auto entry = thunk->begin();
   auto resultArgTy = result.getSILStorageType();
   auto baseArgTy = params[0].getSILStorageType();
@@ -3216,11 +3224,10 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   return thunk;
 }
 
-SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
+static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           SILLocation loc,
                           AbstractStorageDecl *property,
                           SubstitutionMap subs,
-                          AccessStrategy strategy,
                           GenericEnvironment *genericEnv,
                           ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
@@ -3297,7 +3304,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     thunk->setGenericEnvironment(genericEnv);
   }
   
-  SILGenFunction subSGF(SGM, *thunk);
+  SILGenFunction subSGF(SGM, *thunk, SGM.SwiftModule);
   auto entry = thunk->begin();
   auto valueArgTy = params[0].getSILStorageType();
   auto baseArgTy = params[1].getSILStorageType();
@@ -3356,16 +3363,19 @@ SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     }
   }
 
+  auto semantics = AccessSemantics::Ordinary;
+  auto strategy = property->getAccessStrategy(semantics, AccessKind::Write);
+
   LValueOptions lvOptions;
   if (auto var = dyn_cast<VarDecl>(property)) {
     lv.addMemberVarComponent(subSGF, loc, var, subs, lvOptions,
                              /*super*/ false, AccessKind::Write,
-                             AccessSemantics::Ordinary, strategy, propertyType);
+                             semantics, strategy, propertyType);
   } else {
     auto sub = cast<SubscriptDecl>(property);
     lv.addMemberSubscriptComponent(subSGF, loc, sub, subs, lvOptions,
                                    /*super*/ false, AccessKind::Write,
-                                   AccessSemantics::Ordinary, strategy, propertyType,
+                                   semantics, strategy, propertyType,
                                    std::move(indexValue));
   }
 
@@ -3453,7 +3463,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       return;
     }
     
-    SILGenFunction subSGF(SGM, *equals);
+    SILGenFunction subSGF(SGM, *equals, SGM.SwiftModule);
     equals->setGenericEnvironment(genericEnv);
     auto entry = equals->begin();
     auto lhsPtr = entry->createFunctionArgument(params[0].getSILStorageType());
@@ -3617,7 +3627,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       return;
     }
     
-    SILGenFunction subSGF(SGM, *hash);
+    SILGenFunction subSGF(SGM, *hash, SGM.SwiftModule);
     hash->setGenericEnvironment(genericEnv);
     auto entry = hash->begin();
     auto indexPtr = entry->createFunctionArgument(params[0].getSILStorageType());
@@ -3709,11 +3719,19 @@ static KeyPathPatternComponent::ComputedPropertyId
 getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
                                          AbstractStorageDecl *storage,
                                          AccessStrategy strategy) {
-  switch (strategy) {
+  switch (strategy.getKind()) {
   case AccessStrategy::Storage:
     // Identify reabstracted stored properties by the property itself.
     return cast<VarDecl>(storage);
-  case AccessStrategy::Addressor:
+  case AccessStrategy::MaterializeToTemporary:
+    // Use the read strategy.  But try to avoid turning e.g. an
+    // observed property into a stored property.
+    strategy = strategy.getReadStrategy();
+    if (strategy.getKind() != AccessStrategy::Storage ||
+        !storage->getGetter()) {
+      return getIdForKeyPathComponentComputedProperty(SGM, storage, strategy);
+    }
+    LLVM_FALLTHROUGH;
   case AccessStrategy::DirectToAccessor: {
     // Identify the property using its (unthunked) getter. For a
     // computed property, this should be stable ABI; for a resilient public
@@ -3799,8 +3817,9 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 CanType baseTy,
                                 bool forPropertyDescriptor) {
   auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
-                                          AccessKind::ReadWrite,
-                                          M.getSwiftModule());
+                                             storage->supportsMutation()
+                                               ? AccessKind::ReadWrite
+                                               : AccessKind::Read);
 
   if (auto var = dyn_cast<VarDecl>(storage)) {
     CanType componentTy;
@@ -3818,12 +3837,35 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
   
     if (Types.canStorageUseStoredKeyPathComponent(var)) {
       return KeyPathPatternComponent::forStoredProperty(var, componentTy);
-    } else {
+    }
+
+    switch (strategy.getKind()) {
+    case AccessStrategy::BehaviorStorage:
+      llvm_unreachable("key path for behavior storage?");
+    case AccessStrategy::Storage: {
+      // If the stored value would need to be reabstracted in fully opaque
+      // context, then we have to treat the component as computed.
+      auto componentObjTy = componentTy->getWithoutSpecifierType();
+      if (genericEnv)
+        componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+      auto storageTy = Types.getSubstitutedStorageType(var, componentObjTy);
+      auto opaqueTy = Types
+        .getLoweredType(AbstractionPattern::getOpaque(), componentObjTy);
+      
+      if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
+        return KeyPathPatternComponent::forStoredProperty(var, componentTy);
+      }
+      LLVM_FALLTHROUGH;
+    }
+    case AccessStrategy::MaterializeToTemporary:
+    case AccessStrategy::DirectToAccessor:
+    case AccessStrategy::DispatchToAccessor: {
+      // We need thunks to bring the getter and setter to the right signature
+      // expected by the key path runtime.
       auto id = getIdForKeyPathComponentComputedProperty(*this, var,
                                                          strategy);
       auto getter = getOrCreateKeyPathGetter(*this, loc,
                var, subs,
-               strategy,
                needsGenericContext ? genericEnv : nullptr,
                {},
                baseTy, componentTy);
@@ -3831,7 +3873,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       if (var->isSettable(var->getDeclContext())) {
         auto setter = getOrCreateKeyPathSetter(*this, loc,
                var, subs,
-               strategy,
                needsGenericContext ? genericEnv : nullptr,
                {},
                baseTy, componentTy);
@@ -3841,6 +3882,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
         return KeyPathPatternComponent::forComputedGettableProperty(id,
             getter, {}, nullptr, nullptr, componentTy);
       }
+    }
     }
   }
   
@@ -3875,7 +3917,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
     auto getter = getOrCreateKeyPathGetter(*this, loc,
              decl, subs,
-             strategy,
              needsGenericContext ? genericEnv : nullptr,
              indexTypes,
              baseTy, componentTy);
@@ -3884,7 +3925,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     if (decl->isSettable()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
-             strategy,
              needsGenericContext ? genericEnv : nullptr,
              indexTypes,
              baseTy, componentTy);
