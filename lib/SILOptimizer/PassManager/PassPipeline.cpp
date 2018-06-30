@@ -479,6 +479,7 @@ static void addLateLoopOptPassPipeline(SILPassPipelinePlan &P) {
 static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
   // Optimize access markers for improved IRGen after all other optimizations.
   P.addAccessEnforcementOpts();
+  P.addAccessEnforcementWMO();
 
   // Only has an effect if the -assume-single-thread option is specified.
   P.addAssumeSingleThreaded();

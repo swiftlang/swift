@@ -285,7 +285,7 @@ public:
   }
   bool hasConflictFreeAccess() const {
     NoNestedConflictIterator iterator(*this);
-    return iterator.next() == nullptr;
+    return iterator.next() != nullptr;
   }
 
   bool hasInScopeAccess() const {
@@ -623,6 +623,9 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     SILFunction *F = getFunction();
     if (F->empty())
       return;
+
+    DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
+                       << F->getName() << "\n");
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
