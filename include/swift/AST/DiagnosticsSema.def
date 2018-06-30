@@ -2155,8 +2155,6 @@ ERROR(superclass_not_open,none,
 NOTE(superclass_here,none,"superclass is declared here", ())
 ERROR(superclass_of_open_not_open,none,
   "superclass %0 of open class must be open", (Type))
-ERROR(circular_class_inheritance,none,
-      "%0 inherits from itself", (Identifier))
 ERROR(inheritance_from_final_class,none,
       "inheritance from a final class %0", (Identifier))
 ERROR(inheritance_from_unspecialized_objc_generic_class,none,
@@ -2199,8 +2197,6 @@ ERROR(enum_stored_property,none,
 // Enum raw types
 ERROR(multiple_enum_raw_types,none,
   "multiple enum raw types %0 and %1", (Type, Type))
-ERROR(circular_enum_inheritance,none,
-      "%0 has a raw type that depends on itself", (Identifier))
 ERROR(raw_type_not_first,none,
   "raw type %0 must appear first in the enum inheritance clause", (Type))
 ERROR(raw_type_not_literal_convertible,none,
@@ -4060,18 +4056,6 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
-
-//------------------------------------------------------------------------------
-// MARK: Circular reference diagnostics
-//------------------------------------------------------------------------------
-ERROR(circular_reference, none,
-      "circular reference", ())
-
-ERROR(redundant_type_alias_define, none,
-      "redundant type alias declaration", ())
-
-NOTE(circular_reference_through, none,
-     "through reference here", ())
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics

@@ -71,20 +71,6 @@ public:
   /// Resolve the "is Objective-C" bit for the given declaration.
   virtual void resolveIsObjC(ValueDecl *VD) = 0;
 
-  /// Retrieve the superclass of the given class.
-  virtual Type getSuperclass(const ClassDecl *classDecl) = 0;
-
-  /// Retrieve the superclass of the given protocol.
-  virtual Type getSuperclass(const ProtocolDecl *protocolDecl) = 0;
-
-  /// Resolve the raw type of the given enum.
-  virtual Type getRawType(EnumDecl *enumDecl) = 0;
-
-  /// Get a specific inherited type from the given declaration.
-  virtual Type getInheritedType(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) = 0;
-
   /// Resolve the trailing where clause of the given protocol in-place.
   virtual void resolveTrailingWhereClause(ProtocolDecl *proto) = 0;
 
