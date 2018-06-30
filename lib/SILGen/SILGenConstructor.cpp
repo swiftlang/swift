@@ -940,7 +940,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
       if (pbd->isStatic()) continue;
 
       for (auto entry : pbd->getPatternList()) {
-        auto init = entry.getNonLazyInit();
+        auto init = entry.getInit();
         if (!init) continue;
 
         // Cleanup after this initialization.

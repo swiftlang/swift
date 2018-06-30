@@ -65,11 +65,6 @@ public:
     return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
                                                 std::forward<Args>(AA)...);
   }
-
-  ExprRetTy visitLazyInitializerExpr(LazyInitializerExpr *E, Args...AA) {
-    return static_cast<ImplClass*>(this)->visit(E->getSubExpr(),
-                                                std::forward<Args>(AA)...);
-  }
 };
 
 template <typename ImplClass,

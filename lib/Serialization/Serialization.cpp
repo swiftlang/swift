@@ -481,63 +481,32 @@ static const Decl *getDeclForContext(const DeclContext *DC) {
 
 namespace {
   struct Accessors {
-    uint8_t ReadImpl, WriteImpl, ReadWriteImpl;
+    StorageKind Kind;
     SmallVector<AccessorDecl *, 8> Decls;
   };
 } // end anonymous namespace
 
-static uint8_t getRawReadImplKind(swift::ReadImplKind kind) {
+static StorageKind getRawStorageKind(AbstractStorageDecl::StorageKindTy kind) {
   switch (kind) {
-#define CASE(KIND)                                     \
-  case swift::ReadImplKind::KIND:                      \
-    return uint8_t(serialization::ReadImplKind::KIND);
-  CASE(Stored)
-  CASE(Get)
-  CASE(Inherited)
-  CASE(Address)
+#define CASE(KIND) case AbstractStorageDecl::KIND: return StorageKind::KIND
+  CASE(Stored);
+  CASE(StoredWithTrivialAccessors);
+  CASE(StoredWithObservers);
+  CASE(InheritedWithObservers);
+  CASE(Computed);
+  CASE(ComputedWithMutableAddress);
+  CASE(Addressed);
+  CASE(AddressedWithTrivialAccessors);
+  CASE(AddressedWithObservers);
 #undef CASE
   }
-  llvm_unreachable("bad kind");
-}
-
-static unsigned getRawWriteImplKind(swift::WriteImplKind kind) {
-  switch (kind) {
-#define CASE(KIND)                                      \
-  case swift::WriteImplKind::KIND:                      \
-    return uint8_t(serialization::WriteImplKind::KIND);
-  CASE(Immutable)
-  CASE(Stored)
-  CASE(Set)
-  CASE(StoredWithObservers)
-  CASE(InheritedWithObservers)
-  CASE(MutableAddress)
-#undef CASE
-  }
-  llvm_unreachable("bad kind");
-}
-
-static unsigned getRawReadWriteImplKind(swift::ReadWriteImplKind kind) {
-  switch (kind) {
-#define CASE(KIND)                                          \
-  case swift::ReadWriteImplKind::KIND:                      \
-    return uint8_t(serialization::ReadWriteImplKind::KIND);
-  CASE(Immutable)
-  CASE(Stored)
-  CASE(MaterializeForSet)
-  CASE(MutableAddress)
-  CASE(MaterializeToTemporary)
-#undef CASE
-  }
-  llvm_unreachable("bad kind");
+  llvm_unreachable("bad storage kind");
 }
 
 static Accessors getAccessors(const AbstractStorageDecl *storage) {
   Accessors accessors;
-  auto impl = storage->getImplInfo();
-  accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
-  accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
-  accessors.ReadWriteImpl = getRawReadWriteImplKind(impl.getReadWriteImpl());
-  auto decls = storage->getAllAccessors();
+  accessors.Kind = getRawStorageKind(storage->getStorageKind());
+  auto decls = storage->getAllAccessorFunctions();
   accessors.Decls.append(decls.begin(), decls.end());
   return accessors;
 }
@@ -3160,9 +3129,7 @@ void Serializer::writeDecl(const Decl *D) {
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
-                          accessors.ReadImpl,
-                          accessors.WriteImpl,
-                          accessors.ReadWriteImpl,
+                          (unsigned) accessors.Kind,
                           accessors.Decls.size(),
                           addTypeRef(ty),
                           addDeclRef(var->getOverriddenDecl()),
@@ -3387,9 +3354,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 subscript->isObjC(),
                                 subscript->isGetterMutating(),
                                 subscript->isSetterMutating(),
-                                accessors.ReadImpl,
-                                accessors.WriteImpl,
-                                accessors.ReadWriteImpl,
+                                (unsigned) accessors.Kind,
                                 accessors.Decls.size(),
                                 addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),

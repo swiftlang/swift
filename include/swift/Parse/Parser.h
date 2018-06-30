@@ -889,7 +889,7 @@ public:
                 TypeLoc elementTy, ParameterList *indices,
                 SmallVectorImpl<Decl *> &decls);
 
-    StorageImplInfo
+    AbstractStorageDecl::StorageKindTy
     classify(Parser &P, AbstractStorageDecl *storage, bool invalid,
              ParseDeclOptions flags, SourceLoc staticLoc,
              const DeclAttributes &attrs,
