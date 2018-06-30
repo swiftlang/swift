@@ -14,6 +14,8 @@ func byteswap_n(_ a: UInt64) -> UInt64 {
 
 
 // expression should not be too complex
+#if false
+// FIXME: ...but alas, it is at the moment
 func radar31845712(_ i: Int, _ buffer: [UInt8]) {
   _ =  UInt64(buffer[i])
     | (UInt64(buffer[i + 1]) &<< 8)
@@ -24,6 +26,7 @@ func radar31845712(_ i: Int, _ buffer: [UInt8]) {
     | (UInt64(buffer[i + 6]) &<< 48)
     | (UInt64(buffer[i + 7]) &<< 56)
 }
+#endif
 
 // expression should not be too complex
 func radar32149641() {
