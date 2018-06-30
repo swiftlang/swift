@@ -542,8 +542,8 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
   };
 
   // @NSManaged properties must be written as stored.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
+  switch (VD->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
     // @NSManaged properties end up being computed; complain if there is
     // an initializer.
     if (VD->getParentInitializer()) {
@@ -553,14 +553,21 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
       PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
     }
     // Otherwise, ok.
-  } else if (impl.getReadImpl() == ReadImplKind::Address ||
-             impl.getWriteImpl() == WriteImplKind::MutableAddress) {
-    return diagnoseNotStored(/*addressed*/ 2);    
-  } else if (impl.getWriteImpl() == WriteImplKind::StoredWithObservers ||
-             impl.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
-    return diagnoseNotStored(/*observing*/ 1);    
-  } else {
+    break;
+
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    llvm_unreachable("Already created accessors?");
+
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
     return diagnoseNotStored(/*computed*/ 0);
+  case AbstractStorageDecl::StoredWithObservers:
+  case AbstractStorageDecl::InheritedWithObservers:
+    return diagnoseNotStored(/*observing*/ 1);
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    return diagnoseNotStored(/*addressed*/ 2);
   }
 
   // @NSManaged properties cannot be @NSCopying
@@ -623,13 +630,24 @@ void AttributeEarlyChecker::visitLazyAttr(LazyAttr *attr) {
 
 
   // TODO: Lazy properties can't yet be observed.
-  auto impl = VD->getImplInfo();
-  if (impl.isSimpleStored()) {
-    // ok
-  } else if (VD->hasStorage()) {
+  switch (VD->getStorageKind()) {
+  case AbstractStorageDecl::Stored:
+  case AbstractStorageDecl::StoredWithTrivialAccessors:
+    break;
+
+  case AbstractStorageDecl::StoredWithObservers:
     diagnoseAndRemoveAttr(attr, diag::lazy_not_observable);
-  } else {
+    break;
+
+  case AbstractStorageDecl::InheritedWithObservers:
+  case AbstractStorageDecl::ComputedWithMutableAddress:
+  case AbstractStorageDecl::Computed:
+  case AbstractStorageDecl::Addressed:
+  case AbstractStorageDecl::AddressedWithTrivialAccessors:
+  case AbstractStorageDecl::AddressedWithObservers:
+    assert(!VD->hasStorage() && "Non-stored AbstractStorageDecl has storage?");
     diagnoseAndRemoveAttr(attr, diag::lazy_not_on_computed);
+    break;
   }
 }
 
@@ -1266,13 +1284,6 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
     TC.diagnose(attr->getLocation(), diag::nscopying_only_stored_property);
     attr->setInvalid();
     return;
-  }
-
-  if (VD->hasInterfaceType()) {
-    if (TC.checkConformanceToNSCopying(VD)) {
-      attr->setInvalid();
-      return;
-    }
   }
 
   assert(VD->getOverriddenDecl() == nullptr &&

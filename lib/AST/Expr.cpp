@@ -379,7 +379,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(KeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
-    NON_LVALUE_EXPR(LazyInitializer)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -414,7 +413,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjectLiteral);
   NO_REFERENCE(MagicIdentifierLiteral);
   NO_REFERENCE(DiscardAssignment);
-  NO_REFERENCE(LazyInitializer);
 
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
@@ -686,7 +684,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   switch (getKind()) {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
-  case ExprKind::LazyInitializer:
     return false;
 
   case ExprKind::NilLiteral:

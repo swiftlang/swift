@@ -167,9 +167,6 @@ public:
   /// The SILModuleConventions for this SIL module.
   SILModuleConventions silConv;
 
-  /// The DeclContext corresponding to the function currently being emitted.
-  DeclContext * const FunctionDC;
-
   /// The name of the function currently being emitted, as presented to user
   /// code by #function.
   DeclName MagicFunctionName;
@@ -383,7 +380,7 @@ public:
   /// Get the PGO node's parent.
   Optional<ASTNode> getPGOParent(ASTNode Node) const;
 
-  SILGenFunction(SILGenModule &SGM, SILFunction &F, DeclContext *DC);
+  SILGenFunction(SILGenModule &SGM, SILFunction &F);
   ~SILGenFunction();
   
   /// Return a stable reference to the current cleanup.

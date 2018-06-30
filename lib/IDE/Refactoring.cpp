@@ -1612,7 +1612,7 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto accessors = ASD->getAllAccessors();
+      auto accessors = ASD->getAllAccessorFunctions();
       Found.insert(accessors.begin(), accessors.end());
     }
     return true;

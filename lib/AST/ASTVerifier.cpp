@@ -1624,7 +1624,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || VD->getAllAccessors().empty()) {
+          if (!VD || !VD->hasAccessorFunctions()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             abort();
@@ -2151,13 +2151,6 @@ public:
       verifyCheckedBase(VD);
     }
 
-    bool shouldWalkIntoLazyInitializers() override {
-      // We don't want to walk into lazy initializers because they should
-      // have been reparented to their synthesized getter, which will
-      // invalidate various invariants.
-      return false;
-    }
-
     void verifyChecked(PatternBindingDecl *binding) {
       // Look at all of the VarDecls being bound.
       for (auto entry : binding->getPatternList())
@@ -2201,18 +2194,20 @@ public:
           abort();
         }
       }
-      if (auto addressor = ASD->getAddressor()) {
-        if (addressor->isMutating() != ASD->isGetterMutating()) {
-          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                 " with whether immutable addressor is mutating";
-          abort();
+      if (ASD->hasAddressors()) {
+        if (auto addressor = ASD->getAddressor()) {
+          if (addressor->isMutating() != ASD->isGetterMutating()) {
+            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                   " with whether immutable addressor is mutating";
+            abort();
+          }
         }
-      }
-      if (auto addressor = ASD->getMutableAddressor()) {
-        if (addressor->isMutating() != ASD->isSetterMutating()) {
-          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                 " with whether mutable addressor is mutating";
-          abort();
+        if (auto addressor = ASD->getMutableAddressor()) {
+          if (addressor->isMutating() != ASD->isSetterMutating()) {
+            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                   " with whether mutable addressor is mutating";
+            abort();
+          }
         }
       }
 
@@ -2963,7 +2958,8 @@ public:
         }
       }
 
-      auto storedAccessor = storageDecl->getAccessor(FD->getAccessorKind());
+      auto storedAccessor =
+        storageDecl->getAccessorFunction(FD->getAccessorKind());
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();

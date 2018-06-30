@@ -43,7 +43,6 @@ class TopLevelContext;
 class TypeChecker;
 class TypoCorrectionResults;
 class ExprPattern;
-class SynthesizedFunction;
 
 namespace constraints {
   enum class ConstraintKind : char;
@@ -744,9 +743,6 @@ public:
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
   llvm::SetVector<ValueDecl *> DeclsToFinalize;
-
-  /// The list of functions that need to have their bodies synthesized.
-  llvm::MapVector<FuncDecl*, SynthesizedFunction> FunctionsToSynthesize;
 
   /// The list of protocols that need their requirement signatures computed,
   /// because they were first validated by validateDeclForNameLookup(),
@@ -1580,8 +1576,6 @@ public:
   void synthesizeWitnessAccessorsForStorage(AbstractStorageDecl *requirement,
                                             AbstractStorageDecl *storage);
 
-  void synthesizeFunctionBody(SynthesizedFunction fn);
-
   /// Provide storage and accessor implementations for the given property,
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
@@ -2070,11 +2064,6 @@ public:
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
                                   IterableDeclContext *idc);
-
-  /// Check that the type of the given property conforms to NSCopying.
-  ///
-  /// Return true if there was an error.
-  bool checkConformanceToNSCopying(VarDecl *var);
 
   /// Find the @objc requirement that are witnessed by the given
   /// declaration.

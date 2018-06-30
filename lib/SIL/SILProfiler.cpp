@@ -140,8 +140,8 @@ static void walkPatternForProfiling(PatternBindingDecl *PBD,
                                     ASTWalker &Walker) {
   if (PBD && !PBD->isStatic())
     for (auto E : PBD->getPatternList())
-      if (auto init = E.getNonLazyInit())
-        init->walk(Walker);
+      if (E.getInit())
+        E.getInit()->walk(Walker);
 }
 
 /// Special logic for handling closure visitation.
