@@ -442,16 +442,23 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     /// Union the `IndexSet` with `other`.
     public func union(_ other: IndexSet) -> IndexSet {
-        // This algorithm is naïve but it works. We could avoid calling insert in some cases.
-        
-        var result = IndexSet()
-        for r in self.rangeView {
-            result.insert(integersIn: r)
+        var result: IndexSet
+        var dense: IndexSet
+
+        // Prepare to make a copy of the more sparse IndexSet to prefer copy over repeated inserts
+        if self.rangeView.count > other.rangeView.count {
+            result = self
+            dense = other
+        } else {
+            result = other
+            dense = self
         }
-        
-        for r in other.rangeView {
-            result.insert(integersIn: r)
+
+        // Insert each range from the less sparse IndexSet
+        dense.rangeView.forEach {
+            result.insert(integersIn: $0)
         }
+
         return result
     }
     
