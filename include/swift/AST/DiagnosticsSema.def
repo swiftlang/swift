@@ -2557,6 +2557,8 @@ ERROR(tf_graph_attr_function_tensorflow_value_only,none,
       "@TensorFlowGraph can only be applied to functions whose parameters and "
       "return values are TensorFlow values or aggregates of TensorFlow "
       "values", ())
+ERROR(tf_graph_attr_no_generic_functions,none,
+      "@TensorFlowGraph cannot be applied to generic functions", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
