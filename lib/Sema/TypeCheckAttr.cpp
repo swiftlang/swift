@@ -2653,6 +2653,11 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_top_level_only);
     return;
   }
+  // Generic functions are not supported.
+  if (FD->isGeneric()) {
+    diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_no_generic_functions);
+    return;
+  }
   // Only functions taking and returning TensorFlow values are permitted.
   if (!tf::isTensorFlowValueOrAggregate(
         FD->getParameterList(0)->getType(FD->getASTContext())) ||
