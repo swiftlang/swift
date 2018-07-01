@@ -2502,7 +2502,7 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     /// When we've type checked a #tfop expression, we do some adjustment to the
-    /// argument types.  Specifically, if an argument is a type that conforms to
+    /// argument types.  Specifically, if an argument type conforms to
     /// TensorProtocol (like Tensor or TensorElementLiteral), we use the
     /// TensorHandle that they contain instead.
     Expr *visitTFOp(ObjectLiteralExpr *expr) {

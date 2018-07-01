@@ -223,7 +223,7 @@ func twoHandles() -> (TensorHandle<Int32>, ResourceHandle) {
 
 public func testMultiResultUninlinable() {
   let (x1, _) = twoHandles()  // expected-warning {{value implicitly copied to the accelerator}}
-  let _ : TensorHandle<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
+  let _: TensorHandle<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
 }
 
 // Test support for copying multiple result outputs.
