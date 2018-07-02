@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -1239,14 +1240,32 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
- 
 
+  // Extract the reason why this escape-use instruction exists and present
+  // diagnostics. While an escape-use instruction generally corresponds to a
+  // capture by a closure, there are the following special cases to consider:
+  //
+  // (a) A MarkFunctionEscapeInst with an operand say %var. This is introduced
+  // by the SILGen phase when %var is the address of a global variable that
+  // escapes because it is used by a closure or a defer statement or a function
+  // definition appearing at the top-level. The specific reason why %var escapes
+  // is recorded in MarkFunctionEscapeInst by making its SIL Location refer to
+  // the AST of the construct that uses the global variable (namely, a closure
+  // or a defer statement or a function definition). So, if %var is
+  // uninitialized at MarkFunctionEscapeInst, extract and report the reason
+  // why the variable escapes in the error message.
+  //
+  // (b) An UncheckedTakeEnumDataAddrInst takes the address of the data of
+  // an optional and is introduced as an intermediate step in optional chaining.
   Diag<StringRef, bool> DiagMessage;
   if (isa<MarkFunctionEscapeInst>(Inst)) {
-    if (Inst->getLoc().isASTNode<AbstractClosureExpr>())
+    if (Inst->getLoc().isASTNode<AbstractClosureExpr>()) {
       DiagMessage = diag::variable_closure_use_uninit;
-    else
+    } else if (Inst->getLoc().isASTNode<DeferStmt>()) {
+      DiagMessage = diag::variable_defer_use_uninit;
+    } else {
       DiagMessage = diag::variable_function_use_uninit;
+    }
   } else if (isa<UncheckedTakeEnumDataAddrInst>(Inst)) {
     DiagMessage = diag::variable_used_before_initialized;
   } else {
