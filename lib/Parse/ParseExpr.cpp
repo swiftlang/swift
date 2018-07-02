@@ -464,7 +464,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
 }
 
 static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
-  if (isa<ParenExpr>(argument) || isa<TupleExpr>(argument))
+  if (isa<ParenExpr>(argument))
     return argument;
 
   auto *arg = new (context)
