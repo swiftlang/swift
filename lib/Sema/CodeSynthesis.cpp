@@ -1068,11 +1068,8 @@ static void synthesizeObservedSetterBody(TypeChecker &TC, AccessorDecl *Set,
                                  Ctx.getIdentifier("tmp"), Type(), Set);
     OldValue->setImplicit();
     auto *tmpPattern = new (Ctx) NamedPattern(OldValue, /*implicit*/ true);
-    auto tmpPBD = PatternBindingDecl::create(Ctx, SourceLoc(),
-                                             StaticSpellingKind::None,
-                                             SourceLoc(),
-                                             tmpPattern, OldValueExpr, Set);
-    tmpPBD->setImplicit();
+    auto *tmpPBD = PatternBindingDecl::createImplicit(
+        Ctx, StaticSpellingKind::None, tmpPattern, OldValueExpr, Set);
     SetterBody.push_back(tmpPBD);
     SetterBody.push_back(OldValue);
   }
@@ -1199,10 +1196,8 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
   auto *Tmp1Init =
     createPropertyLoadOrCallSuperclassGetter(Get, Storage,
                                              TargetImpl::Storage, TC);
-  auto *Tmp1PBD = PatternBindingDecl::create(Ctx, /*StaticLoc*/SourceLoc(),
-                                             StaticSpellingKind::None,
-                                             /*VarLoc*/SourceLoc(),
-                                             Tmp1PBDPattern, Tmp1Init, Get);
+  auto *Tmp1PBD = PatternBindingDecl::createImplicit(
+      Ctx, StaticSpellingKind::None, Tmp1PBDPattern, Tmp1Init, Get);
   Body.push_back(Tmp1PBD);
   Body.push_back(Tmp1VD);
 
@@ -1264,10 +1259,9 @@ static void synthesizeLazyGetterBody(TypeChecker &TC, AccessorDecl *Get,
                                           TypeLoc::withoutLoc(VD->getType()),
                                           /*implicit*/true);
 
-  auto *Tmp2PBD = PatternBindingDecl::create(Ctx, /*StaticLoc*/SourceLoc(),
-                                             StaticSpellingKind::None,
-                                             InitValue->getStartLoc(),
-                                             Tmp2PBDPattern, InitValue, Get);
+  auto *Tmp2PBD = PatternBindingDecl::createImplicit(
+      Ctx, StaticSpellingKind::None, Tmp2PBDPattern, InitValue, Get,
+      /*VarLoc*/ InitValue->getStartLoc());
   Body.push_back(Tmp2PBD);
   Body.push_back(Tmp2VD);
 
@@ -1414,12 +1408,9 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   PBDPattern = new (Context) TypedPattern(PBDPattern,
                                   TypeLoc::withoutLoc(SubstStorageContextTy),
                                   /*implicit*/true);
-  auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
-                             VD->getParentPatternBinding()->getStaticSpelling(),
-                             /*varloc*/VD->getLoc(),
-                             PBDPattern, /*init*/InitStorageExpr,
-                             VD->getDeclContext());
-  PBD->setImplicit();
+  auto *PBD = PatternBindingDecl::createImplicit(
+      Context, VD->getParentPatternBinding()->getStaticSpelling(), PBDPattern,
+      InitStorageExpr, VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
   PBD->setInitializerChecked(0);
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
   
@@ -1608,13 +1599,11 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        Context.getIdentifier("tempSelf"),
                                        selfTy, fromAccessor);
       var->setInterfaceType(selfIfaceTy);
+      var->setImplicit();
 
-      auto varPat = new (Context) NamedPattern(var);
-      auto pbd = PatternBindingDecl::create(Context, SourceLoc(),
-                                            StaticSpellingKind::None,
-                                            SourceLoc(),
-                                            varPat, selfExpr,
-                                            fromAccessor);
+      auto varPat = new (Context) NamedPattern(var, /*implicit*/ true);
+      auto *pbd = PatternBindingDecl::createImplicit(
+          Context, StaticSpellingKind::None, varPat, selfExpr, fromAccessor);
       bodyStmts.push_back(var);
       bodyStmts.push_back(pbd);
       selfExpr = new (Context) DeclRefExpr(var, DeclNameLoc(),
@@ -1727,12 +1716,9 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   PBDPattern = new (Context) TypedPattern(PBDPattern,
                                           TypeLoc::withoutLoc(StorageTy),
                                           /*implicit*/true);
-  auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
-                                         StaticSpellingKind::None,
-                                         /*varloc*/VD->getLoc(),
-                                         PBDPattern, /*init*/nullptr,
-                                         VD->getDeclContext());
-  PBD->setImplicit();
+  auto *PBD = PatternBindingDecl::createImplicit(
+      Context, StaticSpellingKind::None, PBDPattern, /*init*/ nullptr,
+      VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
 
   // Now that we've got the storage squared away, enqueue the getter and

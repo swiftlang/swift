@@ -1907,6 +1907,12 @@ public:
                                     Pattern *Pat, Expr *E,
                                     DeclContext *Parent);
 
+  static PatternBindingDecl *createImplicit(ASTContext &Ctx,
+                                            StaticSpellingKind StaticSpelling,
+                                            Pattern *Pat, Expr *E,
+                                            DeclContext *Parent,
+                                            SourceLoc VarLoc = SourceLoc());
+
   static PatternBindingDecl *createDeserialized(
                                ASTContext &Ctx, SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
