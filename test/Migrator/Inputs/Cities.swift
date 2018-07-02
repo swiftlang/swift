@@ -84,7 +84,8 @@ public struct AwesomeCityAttribute: RawRepresentable {
 
 public class Wrapper {
   public struct Attribute: RawRepresentable {
-    public init?(rawValue: String) { self.rawValue = rawValue }
+    public static let KnownAttr = Wrapper.Attribute(rawValue: "")
+    public init(rawValue: String) { self.rawValue = rawValue }
     public var rawValue: String
     public typealias RawValue = String
   }
