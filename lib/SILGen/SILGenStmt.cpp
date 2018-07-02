@@ -467,14 +467,21 @@ namespace {
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   // Emit the closure for the defer, along with its binding.
-  SGF.visitFuncDecl(S->getTempDecl());
+  // If the defer is at the top-level code, insert 'mark_escape_inst'
+  // to the top-level code to check initialization of any captured globals.
+  FuncDecl *deferDecl = S->getTempDecl();
+  auto declCtxKind = deferDecl->getDeclContext()->getContextKind();
+  auto &sgm = SGF.SGM;
+  if (declCtxKind == DeclContextKind::TopLevelCodeDecl && sgm.TopLevelSGF &&
+      sgm.TopLevelSGF->B.hasValidInsertionPoint()) {
+    sgm.emitMarkFunctionEscapeForTopLevelCodeGlobals(
+        S, deferDecl->getCaptureInfo());
+  }
+  SGF.visitFuncDecl(deferDecl);
 
   // Register a cleanup to invoke the closure on any exit paths.
   SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
 }
-
-
-
 
 void StmtEmitter::visitIfStmt(IfStmt *S) {
   Scope condBufferScope(SGF.Cleanups, S);

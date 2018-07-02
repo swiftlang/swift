@@ -956,7 +956,8 @@ void AccessControlChecker::check(Decl *D) {
           return false;
         Type ty = inherited.getType();
         if (ty->is<ProtocolCompositionType>())
-          ty = ty->getExistentialLayout().superclass;
+          if (auto superclass = ty->getExistentialLayout().superclass)
+            ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
       // Sanity check: we couldn't find the superclass for whatever reason
@@ -1475,7 +1476,8 @@ void UsableFromInlineChecker::check(Decl *D) {
           return false;
         Type ty = inherited.getType();
         if (ty->is<ProtocolCompositionType>())
-          ty = ty->getExistentialLayout().superclass;
+          if (auto superclass = ty->getExistentialLayout().superclass)
+            ty = superclass;
         return ty->getAnyNominal() == superclassDecl;
       });
       // Sanity check: we couldn't find the superclass for whatever reason
