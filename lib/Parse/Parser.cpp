@@ -373,7 +373,7 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
   void relexComment(CharSourceRange CommentRange,
-                    llvm::SmallVectorImpl<Token> &Scracth) {
+                    llvm::SmallVectorImpl<Token> &Scratch) {
     Lexer L(Ctx.LangOpts, Ctx.SourceMgr, BufferID, nullptr, /*InSILMode=*/false,
             CommentRetentionMode::ReturnAsTokens,
             TriviaRetentionMode::WithoutTrivia,
@@ -384,8 +384,8 @@ class TokenRecorder: public ConsumeTokenReceiver {
       L.lex(Result);
       if (Result.is(tok::eof))
         break;
-      assert(Result.is(tok::comment));
-      Scracth.push_back(Result);
+      if(Result.is(tok::comment)) // interacts badly with custom delimiters
+      Scratch.push_back(Result);
     }
   }
 
