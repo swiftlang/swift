@@ -3136,26 +3136,9 @@ public:
       return true;
     }
 
-    if (!getASTContext().isSwiftVersion3()) {
-      if (CountScopes < TypeCounter)
-        return false;
-
-      // If we haven't explored a relatively large number of possibilities
-      // yet, continue.
-      if (CountScopes <= 16 * 1024)
-        return false;
-
-      // Clearly exponential
-      if (TypeCounter < 32 && CountScopes > (1U << TypeCounter))
-        return true;
-
-      // Bail out once we've looked at a really large number of
-      // choices.
-      if (CountScopes > TC.Context.LangOpts.SolverBindingThreshold)
-        return true;
-    }
-
-    return false;
+    // Bail out once we've looked at a really large number of
+    // choices.
+    return CountScopes > TC.Context.LangOpts.SolverBindingThreshold;
   }
   
   LLVM_ATTRIBUTE_DEPRECATED(
