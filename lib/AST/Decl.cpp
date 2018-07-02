@@ -2013,14 +2013,10 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find @objc members.
-  if (!isObjC())
-    return false;
-
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
   auto nominalDC =
-    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
@@ -2031,10 +2027,14 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
     return false;
 
   // Dynamic lookup can find functions, variables, and subscripts.
-  if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
-    return true;
+  if (!isa<FuncDecl>(this) && !isa<VarDecl>(this) && !isa<SubscriptDecl>(this))
+    return false;
 
-  return false;
+  // Dynamic lookup can only find @objc members.
+  if (!isObjC())
+    return false;
+
+  return true;
 }
 
 ArrayRef<ValueDecl *>
