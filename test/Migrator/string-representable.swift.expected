@@ -53,6 +53,7 @@ func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
   _ = "somevalue"
   _ = "somevalue"
   _ = b
+  _ = NewAttributeWrapper.NewKnownAttr
 }
 
 
