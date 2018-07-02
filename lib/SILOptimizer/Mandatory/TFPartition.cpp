@@ -3243,7 +3243,8 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
     // Ignore uses outside the tensor program region.
     if (DI.dominates(tensorEndPoint, user)) continue;
 
-    if(isa<DebugValueInst>(user)) continue;
+    if (isa<DebugValueInst>(user))
+      continue;
 
     if (isa<StrongRetainInst>(user)) {
       ++retainReleaseBalance;

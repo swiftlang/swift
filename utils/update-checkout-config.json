@@ -305,7 +305,7 @@
                 "swift-xcode-playground-support": "swift-DEVELOPMENT-SNAPSHOT-2018-06-19-a",
                 "ninja": "253e94c1fa511704baeb61cf69995bbf09ba435e",
                 "tensorflow": "9752b117ff63f204c4975cad52b5aab5c1f5e9a9",
-                "tensorflow-swift-bindings": "ce0a9e5561c0c6ce3af927bdfed51181da13aef1"
+                "tensorflow-swift-bindings": "489fcb7c4ca0ee11f3453ee7b0749a4f0742e780"
             }
         }
     }
