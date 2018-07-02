@@ -141,7 +141,7 @@ public extension Tensor {
                                           tensor,
                                           __shapes: [shape],
                                           __device: "/device:CPU:0")
-    return Tensor<Scalar>(handle: ret)
+    return Tensor(handle: ret)
   }
 
   /// Mark memory transfer to accelerator.
