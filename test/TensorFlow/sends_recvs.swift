@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify | %FileCheck %s
 
+// In this file, send means accelerator->host, and recv means the opposite.
+
 import TensorFlow
 
 public func test1Send() {

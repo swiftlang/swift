@@ -127,7 +127,7 @@ func test1RecvIntScalar() {
 SendsRecvsTests.testAllBackends("test1RecvIntScalar", test1RecvIntScalar)
 
 @inline(never)
-func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
+func atariSim<T>(_ a: Tensor<T>) -> Tensor<T> {
   return a
 }
 
@@ -136,8 +136,7 @@ func test1RecvFloatTensor() {
   // One send.
   printT(a.toHost())
   // One recv.
-  var b = atariSimFloat(a).toAccelerator()
-  let b_cpu = atariSimFloat(a).toAccelerator()
+  let b_cpu = atariSim(a).toAccelerator()
   var b_tpu = _scalarTensorWithShapeOnCPU(b_cpu)
   b_tpu += a
   printT("final b = \(b_tpu.toHost())")
@@ -145,17 +144,12 @@ func test1RecvFloatTensor() {
 }
 SendsRecvsTests.testAllBackends("test1RecvFloatTensor", test1RecvFloatTensor)
 
-@inline(never)
-func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
-  return a
-}
-
 func test1RecvIntTensor() {
   let a = Tensor<Int64>(1)
   // One send.
   printT(a.toHost())
   // One recv.
-  let b_cpu = atariSimInt(a).toAccelerator()
+  let b_cpu = atariSim(a).toAccelerator()
   var b_tpu = _scalarTensorWithShapeOnCPU(b_cpu)
   b_tpu += a
   printT("final b = \(b_tpu.toHost())")
