@@ -260,4 +260,12 @@
     "RightComment": "String",
     "ModuleName": "Cities"
   },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities7WrapperC9AttributeV9KnownAttrAEvpZ",
+    "OldPrintedName": "KnownAttr",
+    "OldTypeName": "Wrapper.Attribute",
+    "NewPrintedName": "NewKnownAttr",
+    "NewTypeName": "NewAttributeWrapper"
+  },
 ]
