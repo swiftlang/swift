@@ -510,14 +510,15 @@ class ${Self.full_name} : ${Super.full_name} {}
 
 AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarchy") {
   typealias T = Int
+% bunch = 2
   let xs = [
 % for (i, (Self, _)) in enumerate(types):
 %   ConcreteSelf = Self
 %   if ConcreteSelf.is_generic:
 %     ConcreteSelf = ConcreteSelf.specialize_with({'T':'Int'})
 %   end
-    ${Self.full_name}(${len(types) + i}),
-%   for j in range(0, len(types)):
+    ${Self.full_name}(${bunch + i}),
+%   for j in range(0, bunch):
     ${Self.full_name}(${j}),
 %   end
 % end
@@ -526,7 +527,7 @@ AnyHashableTests.test("AnyHashable containing classes from the ${prefix} hierarc
     if lhs == rhs {
       return true
     }
-    let p = ${len(types) + 1}
+    let p = ${bunch + 1}
     if lhs % p == 0 || rhs % p == 0 {
       return false
     }
