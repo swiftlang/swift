@@ -6303,6 +6303,11 @@ void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
                                        ConstraintLocatorBuilder locator) {
   // Update the type of the array literal.
   cs.setType(expr, toType);
+  // FIXME: finish{Array,Dictionary}Expr invoke cacheExprTypes after forming
+  // the semantic expression for the dictionary literal, which will undo the
+  // type we set here if this dictionary literal is nested unless we update
+  // the expr type as well.
+  expr->setType(toType);
 
   // Convert the elements.
   ConstraintLocatorBuilder innerLocator =
@@ -6327,6 +6332,11 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
                                             ConstraintLocatorBuilder locator) {
   // Update the type of the dictionary literal.
   cs.setType(expr, toType);
+  // FIXME: finish{Array,Dictionary}Expr invoke cacheExprTypes after forming
+  // the semantic expression for the dictionary literal, which will undo the
+  // type we set here if this dictionary literal is nested unless we update
+  // the expr type as well.
+  expr->setType(toType);
 
   ConstraintLocatorBuilder keyLocator =
     locator.withPathElement(
@@ -6355,6 +6365,11 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
       }
 
       cs.setType(tuple, tupleType);
+      // FIXME: finish{Array,Dictionary}Expr invoke cacheExprTypes after forming
+      // the semantic expression for the dictionary literal, which will undo the
+      // type we set here if this dictionary literal is nested unless we update
+      // the expr type as well.
+      tuple->setType(tupleType);
     }
   }
 
@@ -6364,7 +6379,7 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
 bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
                                             bool bridged,
                                             ConstraintLocatorBuilder locator) {
-  // Recurse into parenthesized expressions.
+  // Recur into parenthesized expressions.
   if (auto paren = dyn_cast<ParenExpr>(expr)) {
     // If we can't peephole the subexpression, we're done.
     if (!peepholeCollectionUpcast(paren->getSubExpr(), toType, bridged,
@@ -6372,8 +6387,14 @@ bool ExprRewriter::peepholeCollectionUpcast(Expr *expr, Type toType,
       return false;
 
     // Update the type of this expression.
-    cs.setType(paren, ParenType::get(cs.getASTContext(),
-                                     cs.getType(paren->getSubExpr())));
+    auto parenTy = ParenType::get(cs.getASTContext(),
+                                  cs.getType(paren->getSubExpr()));
+    cs.setType(paren, parenTy);
+    // FIXME: finish{Array,Dictionary}Expr invoke cacheExprTypes after forming
+    // the semantic expression for the dictionary literal, which will undo the
+    // type we set here if this dictionary literal is nested unless we update
+    // the expr type as well.
+    paren->setType(parenTy);
     return true;
   }
 
