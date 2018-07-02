@@ -1052,8 +1052,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return false;
-    if (handleRevertRawRepresentable(E))
-      return false;
+    if (handleRevertRawRepresentable(E)) {
+      // The name may also change, so we should keep visiting.
+      return true;
+    }
     if (handleQualifiedReplacement(E))
       return false;
     if (handleAssignDestMigration(E))
