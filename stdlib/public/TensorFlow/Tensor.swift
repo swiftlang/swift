@@ -137,10 +137,11 @@ public extension Tensor {
     let tensor = toAccelerator()
     // If the tensor is to be sent from host to TPU, the shape is specified on
     // TF CPU first, before TF CPU sends the tensor to TPU.
-    return #tfop("Identity",
-                 tensor,
-                 __shapes: [shape],
-                 __device: "/device:CPU:0")
+    let ret: TensorHandle<Scalar> = #tfop("Identity",
+                                          tensor,
+                                          __shapes: [shape],
+                                          __device: "/device:CPU:0")
+    return Tensor(handle: ret)
   }
 
   /// Mark memory transfer to accelerator.
@@ -158,8 +159,8 @@ public extension Tensor {
     // If the `self` tensor resides on TPU, the shape is specified on that
     // device first, before outfeeding the tensor to CPU, a required step for
     // sending the tensor to the host.
-    let tensor: Tensor<Scalar> = #tfop("Identity", self, __shapes: [shape])
-    return tensor.toHost()
+    let tensor: TensorHandle<Scalar> = #tfop("Identity", self, __shapes: [shape])
+    return Tensor(handle: tensor).toHost()
   }
 
   /// Mark memory transfer to host.
@@ -425,7 +426,8 @@ extension TensorElementLiteral : ExpressibleByArrayLiteral {
   public typealias ArrayLiteralElement = TensorElementLiteral<Scalar>
   @inlinable @inline(__always)
   public init(arrayLiteral elements: TensorElementLiteral<Scalar>...) {
-    tensor = #tfop("Pack", elements)
+    let handle: TensorHandle<Scalar> = #tfop("Pack", elements)
+    tensor = Tensor(handle: handle)
   }
 }
 

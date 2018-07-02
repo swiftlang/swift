@@ -154,7 +154,8 @@ public extension Tensor {
   @inlinable @inline(__always)
   func genericAttr<T : AccelerableByTensorFlow>(axis: T) -> Tensor {
     // expected-error @+1 {{op named 'ExampleOp' is not registered in TensorFlow}}
-    return #tfop("ExampleOp", handle, axis: axis, axisType: T.self)
+    let ret: TensorHandle<Scalar> = #tfop("ExampleOp", handle, axis: axis, axisType: T.self)
+    return Tensor<Scalar>(handle: ret)
   }
 }
 
@@ -222,7 +223,7 @@ func twoHandles() -> (TensorHandle<Int32>, ResourceHandle) {
 
 public func testMultiResultUninlinable() {
   let (x1, _) = twoHandles()  // expected-warning {{value implicitly copied to the accelerator}}
-  let _ : Tensor<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
+  let _: TensorHandle<Float> = #tfop("Identity", x1)  // expected-note {{value used here}}
 }
 
 // Test support for copying multiple result outputs.
@@ -234,12 +235,57 @@ public func testMultiOutputsFnResults() -> (Tensor<Float>,  Tensor<Float>) {
   return (x.toHost(),y.toHost())
 }
 
+// expected-warning @+2{{implicitly copied to the accelerator}}
+// expected-warning @+1{{implicitly copied to the accelerator}}
+public func testMultiResultOp_tfop(x: Tensor<Float>, y: Tensor<Float>) {
+  let (loss, backprop) : (TensorHandle<Float>, TensorHandle<Float>) =
+    #tfop("SoftmaxCrossEntropyWithLogits", x, y)
+  // expected-note @-1{{value used here}}
+  // expected-note @-2{{value used here}}
+  _hostOp(loss)
+  _hostOp(backprop)
+}
+
+// expected-warning @+2{{implicitly copied to the accelerator}}
+// expected-warning @+1{{implicitly copied to the accelerator}}
+public func testMultiResultOp_rawop(x: Tensor<Float>, y: Tensor<Float>) {
+  // expected-note @+2{{value used here}}
+  // expected-note @+1{{value used here}}
+  let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: y)
+  _hostOp(results.loss)
+  _hostOp(results.backprop)
+}
+
+// TODO: The sends/recvs diagnostics are not very good. Fix them.
+public func testMultiResultOp_send_recv() {
+  var x = Tensor<Float>([[1.0]])  // expected-warning {{implicitly copied to the host}}
+  // Accelerator -> Host
+  _hostOp(x)
+  x += [[2.0]]
+  // expected-warning @+2{{implicitly copied to the host}}
+  // expected-warning @+1{{implicitly copied to the host}}
+  let results = TensorFlow.Raw.softmaxCrossEntropyWithLogits(features: x, labels: x)
+  // Accelerator -> Host
+  _hostOp(results.loss)
+  // expected-note @+2{{value used here}}
+  // expected-warning @+1{{implicitly copied to the accelerator}}
+  let adjustedLoss = results.loss.scalar! + 3.0
+  // Host -> Accelerator
+  let y = Tensor<Float>(adjustedLoss)
+  _hostOp(y)
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testMultiResultOp_send_recv{{.*}}
+// CHECK:  builtin "__tfop_tfc.SendToHost
+// CHECK:  builtin "__tfop_tfc.SendToHost
+// CHECK:  builtin "__tfop_tfc.RecvFromHost
+
 var globalThing: Int32!
 
 public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
   _ = x.toAccelerator() + 1
-  //	%21 = argument of bb2 : $Int32                    // user: %22
-  // [Send]	  %22 = struct_extract %21 : $Int32, #Int32._value // user: %23
+  //  %21 = argument of bb2 : $Int32                    // user: %22
+  // [Send]   %22 = struct_extract %21 : $Int32, #Int32._value // user: %23
   // expected-warning @+1 {{value implicitly copied to the accelerator}}
   return Tensor<Int32>(globalThing)
 }

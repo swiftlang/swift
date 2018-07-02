@@ -337,9 +337,9 @@ public func testCast(x: Tensor<Float>) -> Tensor<Int32> {
 public func testInputListArguments(a: TensorHandle<Float>, b: Tensor<Float>) -> Tensor<Float> {
   // Pack takes an input list, not multiple inputs.  Here we're checking that
   // we can pass in an array of Tensor's and an array of TensorHandle's.
-  let x: Tensor<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
-  let y: Tensor<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
-  return (x+y).toHost()
+  let x: TensorHandle<Float> = #tfop("Pack", [a, a, a])  // expected-note {{value used here}}
+  let y: TensorHandle<Float> = #tfop("Pack", [b, b, b])  // expected-note {{value used here}}
+  return (Tensor(handle: x)+Tensor(handle: y)).toHost()
 }
 
 /*

@@ -322,7 +322,8 @@ public func test1RecvTensorCPU() {
 
 public func test1RecvTensorTPU() {
   TensorFlow.enableTPU()
-  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: TensorShape())
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
@@ -334,7 +335,8 @@ public func test1RecvTensorTPU() {
 public func test1RecvTensorTPU_ToHostNoShape_Error() {
   TensorFlow.enableTPU()
   // expected-error @+1 {{TPU outfeed dequeue supports dequeuing a single tensor -- did you specify shape?}}
-  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost()
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
@@ -345,7 +347,8 @@ public func test1RecvTensorTPU_ToHostNoShape_Error() {
 
 public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
   TensorFlow.enableTPU()
-  let a_tpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "TPU_SYSTEM")
+  let a_tpu = Tensor<Float>(handle: a_tpu_h)
   // Tensor transfer for the param of atariSim(): TPU->CPU, and then CPU->host.
   let a_host = a_tpu.toHost(shape: TensorShape())
   // For the result of atariSim(): host -> CPU, and then CPU->TPU.
@@ -358,7 +361,8 @@ public func test1RecvTensorTPU_ToAcceleratorNoShape_Error() {
 // Specifying shapes for CPU<->GPU sends/recvs should not hurt.
 public func test1RecvTensorGPU_WithShapes() {
   TensorFlow.enableGPU()
-  let a_gpu : Tensor<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
+  let a_gpu_h: TensorHandle<Float> = #tfop("Const", dtype: Float.self, value$tensor: 1.0, __device: "/device:CPU:0")
+  let a_gpu = Tensor<Float>(handle: a_gpu_h)
   // One send.
   // Tensor transfer for the param of atariSim(): GPU->CPU, and then CPU->host.
   let a_host = a_gpu.toHost(shape: TensorShape())
