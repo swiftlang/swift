@@ -2543,6 +2543,12 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
     if (nodeParent->getKind() == SDKNodeKind::DeclType &&
         diffParent->getKind() == SDKNodeKind::Root)
       TypeMemberDiffs.insert({diffNode, node});
+
+    // Move from a member variable to global variable.
+    if (nodeParent->getKind() == SDKNodeKind::Root &&
+        diffParent->getKind() == SDKNodeKind::DeclType)
+      TypeMemberDiffs.insert({diffNode, node});
+
     // Move from a member variable to another member variable
     if (nodeParent->getKind() == SDKNodeKind::DeclType &&
         diffParent->getKind() == SDKNodeKind::DeclType &&
@@ -3757,7 +3763,8 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
     // index, old printed name)
     TypeMemberDiffItem item = {
         right->getAs<SDKNodeDecl>()->getUsr(),
-        rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
+        rightParent->getKind() == SDKNodeKind::Root ?
+          StringRef() : rightParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
         right->getPrintedName(), findSelfIndex(right), None,
         leftParent->getKind() == SDKNodeKind::Root ?
           StringRef() : leftParent->getAs<SDKNodeDecl>()->getFullyQualifiedName(),
