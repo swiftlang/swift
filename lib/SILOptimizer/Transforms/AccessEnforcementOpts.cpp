@@ -624,8 +624,8 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
     if (F->empty())
       return;
 
-    DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
-                       << F->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Running local AccessEnforcementOpts on "
+                            << F->getName() << "\n");
 
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(F);
     AccessedStorageAnalysis *ASA = getAnalysis<AccessedStorageAnalysis>();
