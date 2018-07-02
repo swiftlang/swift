@@ -6650,7 +6650,7 @@ std::pair<DefaultArgumentKind, Type>
 getDefaultArgumentInfo(ValueDecl *source, unsigned Index);
 
 /// Display ValueDecl subclasses.
-void simple_display(llvm::raw_ostream &out, const ValueDecl *&decl);
+void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
 
 } // end namespace swift
 

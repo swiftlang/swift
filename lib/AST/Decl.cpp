@@ -5801,7 +5801,7 @@ NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
 }
 bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }
 
-void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *&decl) {
+void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
 }
