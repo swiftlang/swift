@@ -1,7 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 5
 
-class A { }
-protocol P { }
+public class A { }
+public protocol P { }
+public protocol P1 { }
 
 // Duplicate inheritance
 class B : A, A { } // expected-error{{duplicate inheritance from 'A'}}{{12-15=}}
@@ -17,6 +18,17 @@ class C : B, A { } // expected-error{{multiple inheritance from classes 'B' and 
 
 // Superclass in the wrong position
 class D : P, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{12-15=}}{{11-11=A, }}
+
+// SR-8160
+class D1 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{15-18=}}{{12-12=A, }}
+
+class D2 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}
+
+@usableFromInline
+class D3 : Any, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{15-18=}}{{12-12=A, }}
+
+@usableFromInline
+class D4 : P & P1, A { } // expected-error{{superclass 'A' must appear first in the inheritance clause}}{{18-21=}}{{12-12=A, }}
 
 // Struct inheriting a class
 struct S : A { } // expected-error{{non-class type 'S' cannot inherit from class 'A'}}
