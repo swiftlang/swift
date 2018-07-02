@@ -54,17 +54,16 @@ public func enableTPU(serverAddress: String? = nil, infeed: Bool = true) {
 // with enableTPU() above.
 @_transparent
 public func enableGPU() {
-  _RuntimeConfig.executionMode = .gpu
   #tfop("tfc.configureGPU") as Void
 }
 
 @_frozen
 public enum _ExecutionMode : Equatable {
-  /// Classical TF interpreter backend, on CPU.
-  case cpu
-  /// Classical TF interpreter backend, on GPU.
-  case gpu
-  /// TPU backend.
+  /// CPU or GPU execution.
+  case auto
+  /// TPU execution.
+  // TODO: assess if we can pass this bit of info from compiler settings (when
+  // enableTPU() is called), and avoid having this additional runtime bit.
   case tpu
   /// XLA jit-compilation backend (will use GPU when available, and otherwise
   /// CPU).
@@ -91,21 +90,14 @@ public enum _RuntimeConfig {
   /// - Note: Set to true only for debugging purposes.
   static public var usesSynchronousExecution = false
 
-  /// Setting the value to gpu requires that the Swift compiler and model code
-  /// be built with `--config=cuda`. If there are multiple GPUs, an arbitrary
-  /// one is chosen.
-  static public var executionMode: _ExecutionMode = .cpu {
-    willSet {
-      debugLog("About to set executionMode to \(newValue)")
-      guard newValue == .gpu else { return }
-      guard _ExecutionContext.global.gpuDeviceName != nil else {
-        fatalError("""
-          GPU must be available when _RuntimeConfig.executionMode is set to \
-          .gpu -- did you compile with --config=cuda and have a qualified GPU?
-          """)
-      }
-    }
-  }
+  /// For CPU and GPU execution without XLA, use the auto mode. For XLA and/or
+  /// TPU execution, set the enum value accordingly.
+  static public var executionMode: _ExecutionMode = .auto
+
+  /// When true, let TensorFlow GPU memory allocation start small and grow as needed.
+  /// Otherwise, The entire GPU memory region is pre-allocated.
+  // TODO: assess whether we should default to true.
+  static public var gpuMemoryAllowGrowth = false
 
   /// Specifies whether the TensorFlow computation runs in a local (in-process)
   /// session, or a remote session with the specified server address (must start
@@ -206,12 +198,19 @@ public final class _ExecutionContext {
   public static let global: _ExecutionContext = _ExecutionContext()
 
   public let cpuDeviceName: String
-
+ 
   /// Only set when there is a usable GPU.
   public let gpuDeviceName: String?
 
+  /// The buffer storing a serialized TensorFlow config proto.
+  public let tensorFlowConfig: UnsafeMutableRawPointer
+
+  /// The length of the above buffer.
+  /// The corresponding C type is size_t.
+  public let tensorFlowConfigSize: Int
+
   /// The TFE_Context object.
-  private var cContext: CTFEContext
+  private let cContext: CTFEContext
 
   // NOTE: the following properties are intentionally not implemented as an enum
   // due to high churn, *please do not refactor for Swiftiness*.
@@ -242,6 +241,30 @@ public final class _ExecutionContext {
     guard let opts = TFE_NewContextOptions() else {
       fatalError("ContextOptions object can never be nil.")
     }
+
+    // Create TF config object.
+    let maxBufferSize = 2 << 10  // Can make it configurable if needed
+    self.tensorFlowConfig = UnsafeMutableRawPointer.allocate(
+      byteCount: maxBufferSize,
+      alignment: 1)
+    if _RuntimeConfig.executionMode == .xla {
+      debugLog("Enable XLA execution.")
+    }
+    if _RuntimeConfig.gpuMemoryAllowGrowth {
+      debugLog("Allowing growth for GPU memory allocator.")
+    }
+    self.tensorFlowConfigSize = TF_CreateConfig(
+      _RuntimeConfig.executionMode == .xla ? 1 : 0,
+      _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
+      self.tensorFlowConfig,
+      maxBufferSize,
+      status
+    )
+    checkOk(status)
+    TFE_ContextOptionsSetConfig(
+      opts, self.tensorFlowConfig, self.tensorFlowConfigSize, status)
+    checkOk(status)
+
     let ctx = TFE_NewContext(opts, status)
     checkOk(status)
     self.cContext = ctx!
@@ -355,11 +378,12 @@ fileprivate extension _ExecutionContext {
 
       // Prepare session options for initializing a session.
       let sessionOptions = TF_NewSessionOptions()
-      // If needed, enable XLA compilation in session options.
-      if _RuntimeConfig.executionMode == .xla {
-        debugLog("Enable XLA execution.")
-        TF_EnableXLACompilation(sessionOptions, 1)
-      }
+      TF_SetConfig(sessionOptions,
+                   self.tensorFlowConfig,
+                   self.tensorFlowConfigSize,
+                   status)
+      checkOk(status)
+
       // If needed, enable remote execution in session options.
       if case .remote(let grpcAddress) = _RuntimeConfig.session {
         debugLog("Set TensorFlow server to \(grpcAddress).")
@@ -623,8 +647,9 @@ public final class _TensorComputation {
     let inputTensorHandles = UnsafeBufferPointer(start: tensorArgumentAddress,
                                                  count: tensorArgumentCount)
 
-    // Get global execution context, which caches all our tensor programs.
-    let context = _ExecutionContext.global
+    // Initialize global execution context if that's not yet done. It caches all
+    // our tensor programs.
+    let _ = _ExecutionContext.global
 
     if _RuntimeConfig.printsDebugLog {
       let buffer = UnsafeBufferPointer(
@@ -644,15 +669,6 @@ public final class _TensorComputation {
     self.stateTF = TFState(programByteAddress,
                            programByteCount: programByteCount)
     debugLog("Done initializing TF-specific state.")
-
-    if _RuntimeConfig.executionMode == .gpu {
-      guard context.gpuDeviceName != nil else {
-        fatalError("""
-          The availability of a GPU device should have been confirmed \
-          at this point.
-          """)
-      }
-    }
 
     debugLog("Populating the op's input list.")
     for (i, inputTensorHandle) in inputTensorHandles.enumerated() {
