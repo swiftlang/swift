@@ -89,13 +89,14 @@ extension RandomNumberGenerator {
   /// Returns a random value that is less than the given upper bound.
   ///
   /// - Parameter upperBound: The upper bound for the randomly generated value.
+  ///   Must be non-zero.
   /// - Returns: A random value of `T` in the range `0..<upperBound`. Every
   ///   value in the range `0..<upperBound` is equally likely to be returned.
   @inlinable
   public mutating func next<T: FixedWidthInteger & UnsignedInteger>(
     upperBound: T
   ) -> T {
-    guard upperBound != 0 else { return 0 }
+    _precondition(upperBound != 0, "upperBound cannot be zero.")
     let tmp = (T.max % upperBound) + 1
     let range = tmp == upperBound ? 0 : tmp
     var random: T = 0
