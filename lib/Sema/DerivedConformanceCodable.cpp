@@ -583,11 +583,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // binding.
   auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                 /*implicit=*/true);
-  auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                 StaticSpellingKind::None,
-                                                 SourceLoc(),
-                                                 containerPattern, callExpr,
-                                                 funcDC);
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
   statements.push_back(bindingDecl);
   statements.push_back(containerDecl);
 
@@ -851,11 +848,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // binding.
     auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                   /*implicit=*/true);
-    auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                   StaticSpellingKind::None,
-                                                   SourceLoc(),
-                                                   containerPattern, tryExpr,
-                                                   funcDC);
+    auto *bindingDecl = PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
     statements.push_back(bindingDecl);
     statements.push_back(containerDecl);
 
