@@ -221,10 +221,17 @@ namespace {
       }
       static Space forConstructor(Type T, Identifier H, bool downgrade,
                                   ArrayRef<Space> SP) {
+        if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
+          // A constructor with an unconstructible parameter can never actually
+          // be used.
+          return Space();
+        }
         return Space(T, H, downgrade, SP);
       }
       static Space forConstructor(Type T, Identifier H, bool downgrade,
                                   std::forward_list<Space> SP) {
+        // No need to filter SP here; this is only used to copy other
+        // Constructor spaces.
         return Space(T, H, downgrade, SP);
       }
       static Space forBool(bool C) {
@@ -493,9 +500,11 @@ namespace {
         }
       }
 
+      /// Convenience declaration to make the intersection operation look more
+      /// symmetric.
       static Space intersect(const Space &a, const Space &b, TypeChecker &TC,
                              const DeclContext *DC) {
-        return a.intersect(b, TC, DC).simplify(TC, DC);
+        return a.intersect(b, TC, DC);
       }
 
       // Returns the intersection of this space with another.  The intersection
@@ -736,13 +745,12 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> newSubSpaces;
           for (auto subSpace : this->getSpaces()) {
-            auto diff = subSpace.minus(other, TC, DC, minusCount);
-            if (!diff)
+            auto nextSpace = subSpace.minus(other, TC, DC, minusCount);
+            if (!nextSpace)
               return None;
-            auto nextSpace = diff->simplify(TC, DC);
-            if (nextSpace.isEmpty())
+            if (nextSpace.getValue().isEmpty())
               return Space();
-            newSubSpaces.push_back(nextSpace);
+            newSubSpaces.push_back(nextSpace.getValue());
           }
           return Space::forConstructor(this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
@@ -944,59 +952,6 @@ namespace {
               buffer << "(not_required)";
           }
           break;
-        }
-      }
-
-      // For optimization, attempt to simplify a space by removing any empty
-      // cases and unpacking empty or singular disjunctions where possible.
-      Space simplify(TypeChecker &TC, const DeclContext *DC) const {
-        switch (getKind()) {
-        case SpaceKind::Constructor: {
-          // If a constructor has no spaces it is an enum without a payload and
-          // cannot be optimized further.
-          if (getSpaces().empty()) {
-            return *this;
-          }
-
-          // Simplify each component subspace.  If, after simplification, any
-          // subspace contains an empty, then the whole space is empty.
-          SmallVector<Space, 4> simplifiedSpaces;
-          for (const auto &space : Spaces) {
-            auto simplified = space.simplify(TC, DC);
-            if (simplified.isEmpty())
-              return Space();
-
-            simplifiedSpaces.push_back(simplified);
-          }
-
-          return Space::forConstructor(getType(), Head, canDowngradeToWarning(),
-                                       simplifiedSpaces);
-        }
-        case SpaceKind::Type: {
-          // If the decomposition of a space is empty, the space is empty.
-          if (canDecompose(this->getType(), DC)) {
-            SmallVector<Space, 4> ss;
-            decompose(TC, DC, this->getType(), ss);
-            if (ss.empty()) {
-              return Space();
-            }
-            return *this;
-          } else {
-            return *this;
-          }
-        }
-        case SpaceKind::Disjunct: {
-          // Simplify each disjunct.
-          SmallVector<Space, 4> simplifiedSpaces;
-          std::transform(Spaces.begin(), Spaces.end(),
-                         std::back_inserter(simplifiedSpaces),
-                         [&](const Space &el){
-            return el.simplify(TC, DC);
-          });
-          return Space::forDisjunct(simplifiedSpaces);
-        }
-        default:
-          return *this;
         }
       }
 
@@ -1268,7 +1223,7 @@ namespace {
         return;
       }
       
-      auto uncovered = diff->simplify(TC, DC);
+      auto uncovered = diff.getValue();
       if (unknownCase && uncovered.isEmpty()) {
         TC.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
           .highlight(unknownCase->getSourceRange());
@@ -1279,7 +1234,6 @@ namespace {
       // that are implicitly frozen.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
                                    TC, DC, /*&minusCount*/ nullptr);
-      uncovered = uncovered.simplify(TC, DC);
 
       if (uncovered.isEmpty())
         return;
