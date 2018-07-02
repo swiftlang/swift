@@ -2421,10 +2421,6 @@ ${operatorComment(x.operator, False)}
 ${assignmentOperatorComment(x.operator, False)}
   static func ${x.operator}=(_ lhs: inout Self, _ rhs: Self)
 % end
-
-  static func _random<R: RandomNumberGenerator>(
-    using generator: inout R
-  ) -> Self
 }
 
 extension FixedWidthInteger {
@@ -2962,6 +2958,7 @@ ${assignmentOperatorComment('&' + x.operator, True)}
 }
 
 extension FixedWidthInteger {
+  @inlinable
   public static func _random<R: RandomNumberGenerator>(
     using generator: inout R
   ) -> Self {
@@ -3971,17 +3968,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
-
-extension ${Self} {
-  @inlinable
-  public static func _random<R: RandomNumberGenerator>(
-    using generator: inout R
-  ) -> ${Self} {
-    var result: ${Self} = 0
-    withUnsafeMutableBytes(of: &result) { generator._fill(bytes: $0) }
-    return result
-  }
-}
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 
