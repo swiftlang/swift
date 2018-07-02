@@ -953,8 +953,8 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   // Walk predecessors until we find marked blocks or other blocks we are
   // control-dependent on.
   //
-  // We only scan the region post dominated by BB.  In other words, elements in
-  // worklist must be post-minated by BB.
+  // We only scan the region post-dominated by BB.  In other words, elements in
+  // worklist must be post-dominated by BB.
   //
   // Note that though this is bounded, that it isn't a very efficient algorithm
   // since each block marking can walk the entire function's CFG, but it is good
@@ -2451,8 +2451,9 @@ static SILValue wrapInStruct(SILValue v, NominalTypeDecl *decl, SILBuilder &B,
 }
 
 /// `decl` is an stdlib numeric type represented by a struct wrapping an LLVM
-/// builtin type, such as $Bool, $Float and $Int64.
-static SILType getStdlibNumericTypeFromDecl(NominalTypeDecl *decl) {
+/// builtin type, such as $Bool, $Float and $Int64. An example returned type is
+/// $Builtin.Int1, in the case of $Bool as the input.
+static SILType extractBuiltinTypeFromStdlibNumericType(NominalTypeDecl *decl) {
   auto type = getSingleElementDeclFieldType(decl);
   return SILType::getPrimitiveObjectType(type);
 }
@@ -2463,7 +2464,7 @@ static SILValue createSomeIntegerValue(intmax_t value, SILBuilder &B,
                                        SILLocation loc,
                                        NominalTypeDecl *integerDecl,
                                        IntegerLiteralInst **ILI = nullptr) {
-  auto intFieldSILType = getStdlibNumericTypeFromDecl(integerDecl);
+  auto intFieldSILType = extractBuiltinTypeFromStdlibNumericType(integerDecl);
 
   auto literal = B.createIntegerLiteral(loc, intFieldSILType, value);
 
@@ -2770,7 +2771,7 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
 void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   auto &ctx = FP.hostFn.getASTContext();
   auto intDecl = ctx.getInt64Decl();
-  auto intFieldSILType = getStdlibNumericTypeFromDecl(intDecl);
+  auto intFieldSILType = extractBuiltinTypeFromStdlibNumericType(intDecl);
 
   auto hostLoc = getUserSourceLocation(inst);
   auto *createScalarTensorFn =
@@ -2780,13 +2781,11 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   assert(createScalarTensorFn &&
          "At this point of compilation, scalar value must be send'able "
          "from Swift to TensorFlow.");
-  (void)createScalarTensorFn;
 
   SILFunction *sendFn =
       lookupSendReceiveFunction("sendToAccelerator", intFieldSILType, hostLoc);
   assert(sendFn && "At this point of compilation, the value must be send'able "
                    "from Swift to TensorFlow.");
-  (void)sendFn;
 
   // Create the host->accelerator sends in the host code.
   for (unsigned i = 0, e = inst->getNumCases(); i != e; ++i) {
@@ -2847,7 +2846,8 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
     // Omit the metatype attr T for simplicity, and TF graphDef compiler can
     // infer the type.
     std::string equalOpName = "__tfop_Equal,$in,$in";
-    auto boolFieldSILType = getStdlibNumericTypeFromDecl(ctx.getBoolDecl());
+    auto boolFieldSILType =
+        extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
     auto tensorHandleI1Ty =
         convertElementTypeToTensorValueType(boolFieldSILType);
     SmallVector<SILValue, 4> operands = {acceleratorCaseId, zeroConstTensor};
