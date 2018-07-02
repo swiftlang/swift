@@ -1720,15 +1720,15 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
-  if (auto fd = dyn_cast<FuncDecl>(this))
-    return fd->getOverriddenDecl();
-  if (auto sdd = dyn_cast<AbstractStorageDecl>(this))
-    return sdd->getOverriddenDecl();
-  if (auto cd = dyn_cast<ConstructorDecl>(this))
-    return cd->getOverriddenDecl();
-  if (auto at = dyn_cast<AssociatedTypeDecl>(this))
-    return at->getOverriddenDecl();
-  return nullptr;
+  auto overridden = getOverriddenDecls();
+  if (overridden.empty()) return nullptr;
+
+  // FIXME: Arbitrarily pick the first overridden declaration.
+  return overridden.front();
+}
+
+bool ValueDecl::overriddenDeclsComputed() const {
+  return LazySemanticInfo.hasOverriddenComputed;
 }
 
 bool swift::conflicting(const OverloadSignature& sig1,
@@ -2779,9 +2779,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {
-
-  Bits.AssociatedTypeDecl.ComputedOverridden = false;
-  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
@@ -2793,8 +2790,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
-  Bits.AssociatedTypeDecl.ComputedOverridden = false;
-  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2842,11 +2837,6 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   }
 
   return bestAnchor;
-}
-
-AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
-  auto overridden = getOverriddenDecls();
-  return overridden.empty() ? nullptr : overridden.front();
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -4961,15 +4951,6 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName) const {
 
 bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
-}
-
-AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this))
-    return func->getOverriddenDecl();
-  if (auto ctor = dyn_cast<ConstructorDecl>(this))
-    return ctor->getOverriddenDecl();
-  
-  return nullptr;
 }
 
 static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {

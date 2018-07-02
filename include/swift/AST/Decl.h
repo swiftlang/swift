@@ -31,6 +31,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Witness.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/OptionalEnum.h"
@@ -319,10 +320,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+1,
-    /// Whether we are overridden later
-    Overridden : 1,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1,
     /// Whether the getter is mutating.
     IsGetterMutating : 1,
 
@@ -580,11 +578,6 @@ protected:
 
     /// The group's associativity.  A value of the Associativity enum.
     Associativity : 2
-  );
-
-  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, ValueDecl, 1+1,
-    ComputedOverridden : 1,
-    HasOverridden : 1
   );
 
   SWIFT_INLINE_BITFIELD(ImportDecl, Decl, 3+8,
@@ -2181,6 +2174,13 @@ class ValueDecl : public Decl {
 
     /// Whether this declaration is exposed to Objective-C.
     unsigned isObjC : 1;
+
+    /// Whether the "overridden" declarations have been computed already.
+    unsigned hasOverriddenComputed : 1;
+
+    /// Whether there are any "overridden" declarations. The actual overridden
+    /// declarations are kept in a side table in the ASTContext.
+    unsigned hasOverridden : 1;
   } LazySemanticInfo;
 
 protected:
@@ -2193,6 +2193,8 @@ protected:
     Bits.ValueDecl.IsUserAccessible = true;
     LazySemanticInfo.isObjCComputed = false;
     LazySemanticInfo.isObjC = false;
+    LazySemanticInfo.hasOverriddenComputed = false;
+    LazySemanticInfo.hasOverridden = false;
   }
 
   // MemberLookupTable borrows a bit from this type
@@ -2415,6 +2417,23 @@ public:
 
   /// Retrieve the declaration that this declaration overrides, if any.
   ValueDecl *getOverriddenDecl() const;
+
+  /// Retrieve the declarations that this declaration overrides, if any.
+  ArrayRef<ValueDecl *> getOverriddenDecls() const;
+
+  /// Set the declaration that this declaration overrides.
+  void setOverriddenDecl(ValueDecl *overridden) {
+    (void)setOverriddenDecls(overridden);
+  }
+
+  /// Set the declarations that this declaration overrides.
+  ///
+  /// \returns the ASTContext-allocated version of the array of overridden
+  /// declarations.
+  ArrayRef<ValueDecl *> setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
+
+  /// Whether the overridden declarations have already been computed.
+  bool overriddenDeclsComputed() const;
 
   /// Compute the untyped overload signature for this declaration.
   OverloadSignature getOverloadSignature() const;
@@ -2809,22 +2828,18 @@ public:
   AssociatedTypeDecl *getAssociatedTypeAnchor() const;
 
   /// Retrieve the (first) overridden associated type declaration, if any.
-  AssociatedTypeDecl *getOverriddenDecl() const;
+  AssociatedTypeDecl *getOverriddenDecl() const {
+    return cast_or_null<AssociatedTypeDecl>(
+                                   AbstractTypeParamDecl::getOverriddenDecl());
+  }
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  ArrayRef<AssociatedTypeDecl *> getOverriddenDecls() const;
-
-  /// Whether the overridden declarations have already been computed.
-  bool overriddenDeclsComputed() const {
-    return Bits.AssociatedTypeDecl.ComputedOverridden;
+  CastArrayRefView<ValueDecl *, AssociatedTypeDecl>
+  getOverriddenDecls() const {
+    return CastArrayRefView<ValueDecl *, AssociatedTypeDecl>(
+        AbstractTypeParamDecl::getOverriddenDecls());
   }
-
-  /// Record the set of overridden declarations.
-  ///
-  /// \returns the array recorded in the AST.
-  ArrayRef<AssociatedTypeDecl *> setOverriddenDecls(
-                                   ArrayRef<AssociatedTypeDecl *> overridden);
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
@@ -4022,8 +4037,6 @@ class AbstractStorageDecl : public ValueDecl {
 public:
   static const size_t MaxNumAccessors = 255;
 private:
-  AbstractStorageDecl *OverriddenDecl;
-
   /// A record of the accessors for the declaration.
   class alignas(1 << 3) AccessorRecord final :
       private llvm::TrailingObjects<AccessorRecord, AccessorDecl*> {
@@ -4094,12 +4107,11 @@ private:
 protected:
   AbstractStorageDecl(DeclKind Kind, DeclContext *DC, DeclName Name,
                       SourceLoc NameLoc, bool supportsMutation)
-    : ValueDecl(Kind, DC, Name, NameLoc), OverriddenDecl(nullptr) {
+    : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
     Bits.AbstractStorageDecl.IsGetterMutating = false;
     Bits.AbstractStorageDecl.IsSetterMutating = true;
-    Bits.AbstractStorageDecl.Overridden = false;
   }
 
   void setSupportsMutationIfStillStored(bool supportsMutation) {
@@ -4294,27 +4306,8 @@ public:
   getObjCSetterSelector(Identifier preferredName = Identifier()) const;
 
   AbstractStorageDecl *getOverriddenDecl() const {
-    return OverriddenDecl;
+    return cast_or_null<AbstractStorageDecl>(ValueDecl::getOverriddenDecl());
   }
-  void setOverriddenDecl(AbstractStorageDecl *over) {
-    // FIXME: Hack due to broken class circularity checking.
-    if (over == this) return;
-    OverriddenDecl = over;
-    over->setIsOverridden();
-  }
-
-  /// The declaration has been overridden in the module
-  ///
-  /// Resolved during type checking
-  void setIsOverridden() {
-    Bits.AbstractStorageDecl.Overridden = true;
-  }
-
-  /// Whether the declaration is later overridden in the module
-  ///
-  /// Overrides are resolved during type checking; only query this field after
-  /// the whole module has been checked
-  bool isOverridden() const { return Bits.AbstractStorageDecl.Overridden; }
 
   /// Returns the location of 'override' keyword, if any.
   SourceLoc getOverrideLoc() const;
@@ -5173,7 +5166,9 @@ public:
   ParamDecl *getImplicitSelfDecl();
 
   /// Retrieve the declaration that this method overrides, if any.
-  AbstractFunctionDecl *getOverriddenDecl() const;
+  AbstractFunctionDecl *getOverriddenDecl() const {
+    return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
+  }
 
   /// Returns true if a function declaration overrides a given
   /// method from its direct or indirect superclass.
@@ -5261,9 +5256,8 @@ class FuncDecl : public AbstractFunctionDecl {
 
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
-  llvm::PointerUnion<FuncDecl *, BehaviorRecord *>
-    OverriddenOrBehaviorParamDecl;
-  OperatorDecl *Operator;
+  BehaviorRecord *BehaviorParamDecl = nullptr;
+  OperatorDecl *Operator = nullptr;
 
 protected:
   ParameterList **getParameterListBuffer(); // defined inline below
@@ -5282,9 +5276,7 @@ protected:
                            Name, NameLoc,
                            Throws, ThrowsLoc,
                            NumParameterLists, GenericParams),
-      StaticLoc(StaticLoc), FuncLoc(FuncLoc),
-      OverriddenOrBehaviorParamDecl(),
-      Operator(nullptr) {
+      StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
     Bits.FuncDecl.IsStatic =
@@ -5442,34 +5434,17 @@ public:
   
   /// Get the supertype method this method overrides, if any.
   FuncDecl *getOverriddenDecl() const {
-    return OverriddenOrBehaviorParamDecl.dyn_cast<FuncDecl *>();
+    return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
-  void setOverriddenDecl(FuncDecl *over) {
-    // FIXME: Hack due to broken class circularity checking.
-    if (over == this) return;
 
-    // A function cannot be an override if it is also a derived global decl
-    // (since derived decls are at global scope).
-    assert((!OverriddenOrBehaviorParamDecl
-            || OverriddenOrBehaviorParamDecl.get<FuncDecl*>() == over)
-         && "function can only be one of override, derived, or behavior param");
-    OverriddenOrBehaviorParamDecl = over;
-    over->setIsOverridden();
-  }
-  
   /// Get the property behavior this function serves as a parameter for, if
   /// any.
   BehaviorRecord *getParamBehavior() const {
-    return OverriddenOrBehaviorParamDecl
-      .dyn_cast<BehaviorRecord *>();
+    return BehaviorParamDecl;
   }
   
   void setParamBehavior(BehaviorRecord *behavior) {
-    // Behavior param blocks cannot be overrides or derived.
-    assert((!OverriddenOrBehaviorParamDecl
-            || OverriddenOrBehaviorParamDecl.is<BehaviorRecord *>())
-         && "function can only be one of override, derived, or behavior param");
-    OverriddenOrBehaviorParamDecl = behavior;
+    BehaviorParamDecl = behavior;
   }
   
   OperatorDecl *getOperatorDecl() const {
@@ -5863,10 +5838,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// The constructor this overrides, which only makes sense when
-  /// both the overriding and the overridden constructors are abstract.
-  ConstructorDecl *OverriddenDecl = nullptr;
-
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc, 
                   OptionalTypeKind Failability, SourceLoc FailabilityLoc,
@@ -6019,13 +5990,9 @@ public:
     Bits.ConstructorDecl.HasStubImplementation = stub;
   }
 
-  ConstructorDecl *getOverriddenDecl() const { return OverriddenDecl; }
-  void setOverriddenDecl(ConstructorDecl *over) {
-    // FIXME: Hack due to broken class circularity checking.
-    if (over == this) return;
-
-    OverriddenDecl = over;
-    over->setIsOverridden();
+  ConstructorDecl *getOverriddenDecl() const {
+    return cast_or_null<ConstructorDecl>(
+        AbstractFunctionDecl::getOverriddenDecl());
   }
 
   /// Determine whether this initializer falls into the special case for
