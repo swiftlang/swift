@@ -3894,9 +3894,9 @@ protected:
 /// differentiated function that computes the gradient (or vector-Jacobian
 /// products) with respect to specified parameters.
 /// Examples:
-///   #gradient(of: baz)
-///   #gradient(of: bar, withRespectTo: .0, .1)
-///   #gradient(of: foo(_:_:), withRespectTo: .0)
+///   #gradient(baz)
+///   #gradient(bar, wrt: .0, .1)
+///   #gradient(foo(_:_:), wrt: .0)
 ///
 class GradientExpr : public ReverseAutoDiffExpr {
 public:
@@ -3921,9 +3921,9 @@ private:
 /// the gradient (or vector-Jacobian products) with respect to specified
 /// parameters.
 /// Examples:
-///   #valueAndGradient(of: baz)
-///   #valueAndGradient(of: bar, withRespectTo: .0, .1)
-///   #valueAndGradient(of: foo(_:_:), withRespectTo: .0)
+///   #valueAndGradient(baz)
+///   #valueAndGradient(bar, wrt: .0, .1)
+///   #valueAndGradient(foo(_:_:), wrt: .0)
 ///
 class ValueAndGradientExpr : public ReverseAutoDiffExpr {
 public:

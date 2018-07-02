@@ -3686,15 +3686,18 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     return makeParserCodeCompletionResult<Expr>();
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
-  // If found comma, parse 'withRespectTo:'.
+  // If found comma, parse 'wrt:'.
   SmallVector<AutoDiffParameter, 8> params;
   if (consumeIf(tok::comma)) {
-    // Parse 'wrt' ':'.
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
-      diagnose(Tok, diag::gradient_expr_use_wrt_not_withrespectto);
+      SourceRange withRespectToRange(Tok.getLoc(), Tok.getRange().getEnd());
+      diagnose(Tok, diag::gradient_expr_use_wrt_not_withrespectto)
+          .highlight(withRespectToRange)
+          .fixItReplace(withRespectToRange, "wrt:");
       return errorAndSkipToEnd();
     }
+    // Parse 'wrt' ':'.
     if (parseSpecificIdentifier("wrt",
                                 diag::expr_expected_label,
                                 exprName, "wrt:") ||
