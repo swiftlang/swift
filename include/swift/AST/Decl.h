@@ -307,7 +307,7 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ValueDecl, Decl, 1+1+1,
     AlreadyInLookupTable : 1,
 
     /// Whether we have already checked whether this declaration is a 
@@ -316,13 +316,7 @@ protected:
 
     /// Whether the decl can be accessed by swift users; for instance,
     /// a.storage for lazy var a is a decl that cannot be accessed.
-    IsUserAccessible : 1,
-
-    /// Whether the "IsObjC" bit has been computed yet.
-    IsObjCComputed : 1,
-
-    /// Whether this declaration is exposed to Objective-C.
-    IsObjC : 1
+    IsUserAccessible : 1
   );
 
   SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+1,
@@ -2181,6 +2175,14 @@ class ValueDecl : public Decl {
   llvm::PointerIntPair<Type, 3, OptionalEnum<AccessLevel>> TypeAndAccess;
   unsigned LocalDiscriminator = 0;
 
+  struct {
+    /// Whether the "IsObjC" bit has been computed yet.
+    unsigned isObjCComputed : 1;
+
+    /// Whether this declaration is exposed to Objective-C.
+    unsigned isObjC : 1;
+  } LazySemanticInfo;
+
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2189,8 +2191,8 @@ protected:
     Bits.ValueDecl.AlreadyInLookupTable = false;
     Bits.ValueDecl.CheckedRedeclaration = false;
     Bits.ValueDecl.IsUserAccessible = true;
-    Bits.ValueDecl.IsObjCComputed = false;
-    Bits.ValueDecl.IsObjC = false;
+    LazySemanticInfo.isObjCComputed = false;
+    LazySemanticInfo.isObjC = false;
   }
 
   // MemberLookupTable borrows a bit from this type

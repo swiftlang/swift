@@ -1989,8 +1989,8 @@ CanType ValueDecl::getOverloadSignatureType() const {
 }
 
 bool ValueDecl::isObjC() const {
-  if (Bits.ValueDecl.IsObjCComputed)
-    return Bits.ValueDecl.IsObjC;
+  if (LazySemanticInfo.isObjCComputed)
+    return LazySemanticInfo.isObjC;
 
   // Fallback: look for an @objc attribute.
   // FIXME: This should become an error, eventually.
@@ -1998,15 +1998,15 @@ bool ValueDecl::isObjC() const {
 }
 
 void ValueDecl::setIsObjC(bool value) {
-  assert(!Bits.ValueDecl.IsObjCComputed || Bits.ValueDecl.IsObjC == value);
+  assert(!LazySemanticInfo.isObjCComputed || LazySemanticInfo.isObjC == value);
 
-  if (Bits.ValueDecl.IsObjCComputed) {
-    assert(Bits.ValueDecl.IsObjC == value);
+  if (LazySemanticInfo.isObjCComputed) {
+    assert(LazySemanticInfo.isObjC == value);
     return;
   }
 
-  Bits.ValueDecl.IsObjCComputed = true;
-  Bits.ValueDecl.IsObjC = value;
+  LazySemanticInfo.isObjCComputed = true;
+  LazySemanticInfo.isObjC = value;
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
