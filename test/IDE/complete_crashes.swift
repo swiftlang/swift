@@ -296,3 +296,10 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
 // RDAR_28188259-DAG: Pattern/CurrModule:                 ({#_#})[#Void#]; name=(_)
 // RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
 // RDAR_28188259: End completions
+
+// rdar://problem/41224316
+// RUN: %target-swift-ide-test -code-completion -code-completion-token=RDAR_41224316 -source-filename=%s | %FileCheck %s -check-prefix=RDAR_41224316
+func test_41224316(str: String?) {
+  _ = str == nil #^RDAR_41224316^#
+}
+// RDAR_41224316: Begin completions
