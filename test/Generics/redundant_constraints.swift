@@ -75,7 +75,7 @@ protocol P4 {
   // expected-warning@-11 {{redundant conformance constraint 'Self.X3': 'Any'}} {{37-47=}}
   // expected-note@-12 {{all types implicitly conform to 'Any'}}
 
-  associatedtype X1 : Any, Any
+  associatedtype X1 : Any, Any // expected-error {{duplicate inheritance from 'Any'}} {{26-31=}}
   associatedtype X2 where X2 : Any, X2 : Any
   associatedtype X3 where X3 : Any, X3 : Any, X3 : P1
 }
@@ -91,6 +91,7 @@ protocol P7 : Any, Any {}
 // expected-note@-2 {{all types implicitly conform to 'Any'}}
 // expected-warning@-3 {{redundant conformance constraint 'Self': 'Any'}}
 // expected-note@-4 {{all types implicitly conform to 'Any'}}
+// expected-error@-5 {{duplicate inheritance from 'Any'}} {{18-23=}}
 
 func f1<T : Any>(_ x: T) {} // expected-warning {{redundant conformance constraint 'T': 'Any'}}
 // expected-note@-1 {{all types implicitly conform to 'Any'}}

@@ -409,25 +409,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     auto isConstraint =
         isa<AbstractTypeParamDecl>(decl) || isa<ProtocolDecl>(decl);
 
-    // Check for a stated conformance to Any, which is redundant.
-    // Ignore cases of ': Any' *constraints* that are parsed as inheritance
-    // clauses, such as with protocol and placeholder decls e.g <T : Any>, as
-    // these are handled by the generic signature builder along with redundant
-    // constraints that appear in 'where' clauses.
-    if (inheritedCanTy == Context.TheAnyType) {
-      if (!isConstraint) {
-        auto diagLoc = inherited.getSourceRange().Start;
-        auto diag = diagnose(diagLoc, diag::redundant_conformance_warning,
-                             declInterfaceTy, inheritedTy);
-        diag.highlight(inherited.getSourceRange());
-        tryAddRemovalFixIt(diag, i);
-        diag.flush();
-
-        diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
-      }
-      continue;
-    }
-
     // Check whether we inherited from the same type twice.
     auto knownType = inheritedTypes.find(inheritedCanTy);
     if (knownType != inheritedTypes.end()) {
@@ -457,6 +438,25 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       continue;
     }
     inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
+
+    // Check for a stated conformance to Any, which is redundant.
+    // Ignore cases of ': Any' *constraints* that are parsed as inheritance
+    // clauses, such as with protocol and placeholder decls e.g <T : Any>, as
+    // these are handled by the generic signature builder along with redundant
+    // constraints that appear in 'where' clauses.
+    if (inheritedCanTy == Context.TheAnyType) {
+      if (!isConstraint) {
+        auto diagLoc = inherited.getSourceRange().Start;
+        auto diag = diagnose(diagLoc, diag::redundant_conformance_warning,
+                             declInterfaceTy, inheritedTy);
+        diag.highlight(inherited.getSourceRange());
+        tryAddRemovalFixIt(diag, i);
+        diag.flush();
+
+        diagnose(diagLoc, diag::all_types_implicitly_conform_to, inheritedTy);
+      }
+      continue;
+    }
 
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();

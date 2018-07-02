@@ -43,12 +43,12 @@ class C7 : Any, AnyObject {}
 // FIX-ME: Implement redundant Any fix-its for requirements parsed as inheritance clauses.
 struct S12<T : Any> {}
 protocol P2 : Any {}
-protocol P3 : Any, Any {}
+protocol P3 : Any {}
 protocol P4 : class, Any, AnyObject {} // Parse will re-arrange 'class' to be first.
 protocol P5 : Any, AnyObject {}
 protocol P6 : AnyObject, Any {}
 
 protocol P7 {
   associatedtype X1 : Any
-  associatedtype X2 : Any, Any
+  associatedtype X2 : Any
 }
