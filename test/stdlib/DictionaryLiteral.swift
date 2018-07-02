@@ -51,3 +51,7 @@ expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLet)
 
 var hetero: DictionaryLiteral = ["a": 1 as NSNumber, "b": "Foo" as NSString]
 expectType(DictionaryLiteral<String, NSObject>.self, &hetero)
+
+let aliased: KeyValuePairs<String,String> = strings
+expectType(DictionaryLiteral<String, String>.self, &strings)
+
