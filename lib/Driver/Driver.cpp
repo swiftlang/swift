@@ -2400,8 +2400,13 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                                       Output.get());
   }
 
-  if (isa<CompileJobAction>(JA))
+  if (isa<MergeModuleJobAction>(JA) ||
+      (isa<CompileJobAction>(JA) &&
+       OI.CompilerMode == OutputInfo::Mode::SingleCompile)) {
+    // An emit-tbd argument gets passed down to a job that sees the whole
+    // module, either the -merge-modules job or a -wmo compiler invocation.
     chooseTBDPath(C, OI, OutputMap, workingDirectory, Buf, Output.get());
+  }
 
   if (isa<CompileJobAction>(JA))
     chooseDependenciesOutputPaths(C, OI, OutputMap, workingDirectory, Buf,
