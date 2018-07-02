@@ -12,12 +12,12 @@ func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: foo(_:_:)) // okay
+@differentiable(reverse, wrt: (self, .0, .1), adjoint: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, withRespectTo: (self, .0, .1), primal: bar, adjoint: foo(_:_:)) // okay
+@differentiable(reverse, wrt: (self, .0, .1), primal: bar, adjoint: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
@@ -39,7 +39,7 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, withRespectTo: (1), adjoint: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
+@differentiable(reverse, wrt: (1), adjoint: foo(_:_:)) // expected-error {{expected a parameter, which can be the index of a function parameter with a leading dot (e.g. '.0'), or 'self'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }

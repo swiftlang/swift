@@ -523,7 +523,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto params = attr->getParameters();
     // Print differentiation parameters, if any.
     if (!params.empty()) {
-      Printer << '(';
+      Printer << "wrt: (";
       interleave(params, [&](const AutoDiffParameter &param) {
         switch (param.getKind()) {
         case AutoDiffParameter::Kind::Index:

@@ -557,8 +557,8 @@ func bar(_ x: Float, _: Float) -> Float { return 1 }
 @differentiable(reverse, adjoint: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
-@differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: foo(_:_:))
+@differentiable(reverse, wrt: (self, .0, .1), adjoint: foo(_:_:))
 func bar(_ x: Float, _: Float) -> Float { return 1 }
 
-@differentiable(reverse, withRespectTo: (self, .0, .1), primal: bar, adjoint: foo(_:_:) where T : FloatingPoint)
+@differentiable(reverse, wrt: (self, .0, .1), primal: bar, adjoint: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
