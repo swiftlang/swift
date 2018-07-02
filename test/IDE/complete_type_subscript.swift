@@ -1,3 +1,7 @@
+protocol It {
+  associatedtype Assoc
+}
+
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PARAM_0 | %FileCheck %s -check-prefix=TOP_LEVEL_0
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_0 | %FileCheck %s -check-prefix=TOP_LEVEL_0
 
@@ -87,3 +91,34 @@ struct G5 {
 }
 // GEN_PARAM_5: Keyword/None:                       Type[#T.Type#];
 // GEN_PARAM_5: Keyword/CurrNominal:                self[#T#];
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_PARAM_6 | %FileCheck %s -check-prefix=GEN_PARAM_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_RETURN_6 | %FileCheck %s -check-prefix=GEN_PARAM_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_EXT_PARAM_6 | %FileCheck %s -check-prefix=GEN_PARAM_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GEN_EXT_RETURN_6 | %FileCheck %s -check-prefix=GEN_PARAM_6
+struct G6<T: It> {
+  subscript(a x: T.#^GEN_PARAM_6^#) -> Int { return 0 }
+  subscript(a x: Int) -> T.#^GEN_RETURN_6^# { return 0 }
+}
+extension G6 {
+  subscript(b x: T.#^GEN_EXT_PARAM_6^#) -> Int { return 0 }
+  subscript(b x: Int) -> T.#^GEN_EXT_RETURN_6^# { return 0 }
+}
+// GEN_PARAM_6-DAG: Decl[AssociatedType]/Super:         Assoc;
+// GEN_PARAM_6-DAG: Keyword/None:                       Type[#T.Type#];
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_PARAM_1 | %FileCheck %s -check-prefix=GENPROTO_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_RETURN_1 | %FileCheck %s -check-prefix=GENPROTO_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_EXT_PARAM_1 | %FileCheck %s -check-prefix=GENPROTO_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_EXT_RETURN_1 | %FileCheck %s -check-prefix=GENPROTO_1
+protocol GP1 {
+  associatedtype I: It
+  subscript(a x: I.#^GENPROTO_PARAM_1^#) -> Int
+  subscript(ax: Int) -> I.#^GENPROTO_RETURN_1^#
+}
+extension GP1 {
+  subscript(b x: I.#^GENPROTO_EXT_PARAM_1^#) -> Int { return 1 }
+  subscript(b x: Int) -> I.#^GENPROTO_EXT_RETURN_1^# { return 1 }
+}
+// GENPROTO_1-DAG: Decl[AssociatedType]/Super:         Assoc;
+// GENPROTO_1-DAG: Keyword/None:                       Type[#Self.I.Type#];
