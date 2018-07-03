@@ -463,6 +463,17 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   return sub;
 }
 
+static Expr *formUnaryArgument(ASTContext &context, Expr *argument) {
+  if (isa<ParenExpr>(argument))
+    return argument;
+
+  auto *arg = new (context)
+      ParenExpr(argument->getStartLoc(), argument, argument->getEndLoc(),
+                /*hasTrailingClosure*/ false);
+  arg->setImplicit();
+  return arg;
+}
+
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):
@@ -538,8 +549,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
     }
   }
 
-  return makeParserResult(
-      new (Context) PrefixUnaryExpr(Operator, SubExpr.get()));
+  return makeParserResult(new (Context) PrefixUnaryExpr(
+      Operator, formUnaryArgument(Context, SubExpr.get())));
 }
 
 /// expr-keypath-swift:
@@ -1330,8 +1341,9 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         break;
 
       Expr *oper = parseExprOperator();
-      Result =
-          makeParserResult(new (Context) PostfixUnaryExpr(oper, Result.get()));
+
+      Result = makeParserResult(new (Context) PostfixUnaryExpr(
+          oper, formUnaryArgument(Context, Result.get())));
       SyntaxContext->createNodeInPlace(SyntaxKind::PostfixUnaryExpr);
       continue;
     }

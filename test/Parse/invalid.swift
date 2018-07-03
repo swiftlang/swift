@@ -140,7 +140,7 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
 }
 
 let x: () = ()
-!() // expected-error {{missing argument for parameter #1 in call}}
+!() // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
