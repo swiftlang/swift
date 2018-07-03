@@ -1837,7 +1837,8 @@ bool TypeChecker::getDefaultGenericArgumentsString(
 
 /// Diagnose an argument labeling issue, returning true if we successfully
 /// diagnosed the issue.
-bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
+                                       const Expr *expr,
                                        ArrayRef<Identifier> newNames,
                                        bool isSubscript,
                                        InFlightDiagnostic *existingDiag) {
@@ -1848,6 +1849,7 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     return *diagOpt;
   };
 
+  auto &diags = ctx.Diags;
   auto tuple = dyn_cast<TupleExpr>(expr);
   if (!tuple) {
     llvm::SmallString<16> str;
@@ -1868,9 +1870,10 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
             str = ".";
             str += field.getName().str();
             if (!existingDiag) {
-              diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
-                                          diag::extra_named_single_element_tuple,
-                                          field.getName().str()));
+              diagOpt.emplace(
+                          diags.diagnose(expr->getStartLoc(),
+                                         diag::extra_named_single_element_tuple,
+                                         field.getName().str()));
             }
             getDiag().fixItInsertAfter(expr->getEndLoc(), str);
             return true;
@@ -1894,9 +1897,10 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
     str += newNames[0].str();
     str += ": ";
     if (!existingDiag) {
-      diagOpt.emplace(TC.diagnose(expr->getStartLoc(),
-                                  diag::missing_argument_labels,
-                                  false, str.str().drop_back(), isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getStartLoc(),
+                                     diag::missing_argument_labels,
+                                     false, str.str().drop_back(),
+                                     isSubscript));
     }
     getDiag().fixItInsert(expr->getStartLoc(), str);
     return true;
@@ -1962,17 +1966,21 @@ bool swift::diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
 
       StringRef haveStr = haveBuffer;
       StringRef expectedStr = expectedBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::wrong_argument_labels,
-                                  plural, haveStr, expectedStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::wrong_argument_labels,
+                                     plural, haveStr, expectedStr,
+                                     isSubscript));
     } else if (numMissing > 0) {
       StringRef missingStr = missingBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::missing_argument_labels,
-                                  plural, missingStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::missing_argument_labels,
+                                     plural, missingStr, isSubscript));
     } else {
       assert(numExtra > 0);
       StringRef extraStr = extraBuffer;
-      diagOpt.emplace(TC.diagnose(expr->getLoc(), diag::extra_argument_labels,
-                                  plural, extraStr, isSubscript));
+      diagOpt.emplace(diags.diagnose(expr->getLoc(),
+                                     diag::extra_argument_labels,
+                                     plural, extraStr, isSubscript));
     }
   }
 

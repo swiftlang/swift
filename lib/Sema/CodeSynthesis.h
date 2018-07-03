@@ -98,6 +98,8 @@ void makeDynamic(ASTContext &ctx, ValueDecl *D);
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = None);
+
+// Implemented in TypeCheckerOverride.cpp
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
 
 // These are implemented in CodeSynthesis.cpp.

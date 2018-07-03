@@ -39,6 +39,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckCircularity.cpp
   TypeCheckConstraints.cpp
   TypeCheckDecl.cpp
+  TypeCheckDeclOverride.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp

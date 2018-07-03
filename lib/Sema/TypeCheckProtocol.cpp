@@ -19,6 +19,7 @@
 #include "DerivedConformances.h"
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -2847,7 +2848,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     case CheckKind::Unavailable: {
       auto *attr = requirement->getAttrs().getUnavailable(TC.Context);
-      TC.diagnoseUnavailableOverride(witness, requirement, attr);
+      diagnoseUnavailableOverride(witness, requirement, attr);
       break;
     }
 

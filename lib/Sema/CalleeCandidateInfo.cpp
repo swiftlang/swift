@@ -17,6 +17,7 @@
 #include "ConstraintSystem.h"
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
@@ -1057,8 +1058,8 @@ bool CalleeCandidateInfo::diagnoseSimpleErrors(const Expr *E) {
   if (closeness == CC_Unavailable) {
     auto decl = candidates[0].getDecl();
     assert(decl && "Only decl-based candidates may be marked unavailable");
-    return CS.TC.diagnoseExplicitUnavailability(decl, loc, CS.DC,
-                                                dyn_cast<CallExpr>(E));
+    return diagnoseExplicitUnavailability(decl, loc, CS.DC,
+                                          dyn_cast<CallExpr>(E));
   }
   
   // Handle symbols that are matches, but are not accessible from the current
