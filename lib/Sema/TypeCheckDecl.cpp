@@ -3797,19 +3797,6 @@ public:
 };
 } // end anonymous namespace
 
-bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
-                                                ValueDecl *base) {
-  // API availability ranges are contravariant: make sure the version range
-  // of an overridden declaration is fully contained in the range of the
-  // overriding declaration.
-  AvailabilityContext overrideInfo =
-      AvailabilityInference::availableRange(override, Context);
-  AvailabilityContext baseInfo =
-      AvailabilityInference::availableRange(base, Context);
-
-  return baseInfo.isContainedIn(overrideInfo);
-}
-
 bool TypeChecker::isAvailabilitySafeForConformance(
     ProtocolDecl *proto, ValueDecl *requirement, ValueDecl *witness,
     DeclContext *dc, AvailabilityContext &requirementInfo) {

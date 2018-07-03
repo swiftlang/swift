@@ -2216,25 +2216,6 @@ public:
                                    Identifier name, SourceLoc nameLoc,
                                    LookupTypeResult &lookup);
 
-  void diagnoseUnavailableOverride(ValueDecl *override,
-                                   const ValueDecl *base,
-                                   const AvailableAttr *attr);
-
-  /// Emit a diagnostic for references to declarations that have been
-  /// marked as unavailable, either through "unavailable" or "obsoleted:".
-  bool diagnoseExplicitUnavailability(const ValueDecl *D,
-                                      SourceRange R,
-                                      const DeclContext *DC,
-                                      const ApplyExpr *call);
-
-  /// Emit a diagnostic for references to declarations that have been
-  /// marked as unavailable, either through "unavailable" or "obsoleted:".
-  bool diagnoseExplicitUnavailability(
-      const ValueDecl *D,
-      SourceRange R,
-      const DeclContext *DC,
-      llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
-
   /// @}
 
   /// \name Overload resolution
@@ -2346,10 +2327,6 @@ public:
   /// Routines that perform API availability checking and type checking of
   /// potentially unavailable API elements
   /// @{
-
-  /// \brief Returns true if the availability of the overriding declaration
-  /// makes it a safe override, given the availability of the base declaration.
-  bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);
 
   /// \brief Returns true if the availability of the witness
   /// is sufficient to safely conform to the requirement in the context

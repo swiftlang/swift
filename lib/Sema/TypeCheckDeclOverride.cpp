@@ -16,7 +16,9 @@
 #include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ParameterList.h"
 using namespace swift;
@@ -173,11 +175,13 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
 }
 
 static bool
-diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
+diagnoseMismatchedOptionals(const ValueDecl *member,
                             const ParameterList *params, TypeLoc resultTL,
                             const ValueDecl *parentMember,
                             const ParameterList *parentParams, Type owningTy,
                             bool treatIUOResultAsError) {
+  auto &diags = member->getASTContext().Diags;
+
   bool emittedError = false;
   Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
       parentMember, member, parentMember->getInterfaceType());
@@ -210,11 +214,11 @@ diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
           return;
 
       emittedError = true;
-      auto diag = TC.diagnose(decl->getStartLoc(),
-                              diag::override_optional_mismatch,
-                              member->getDescriptiveKind(),
-                              isa<SubscriptDecl>(member),
-                              parentParamTy, paramTy);
+      auto diag = diags.diagnose(decl->getStartLoc(),
+                                 diag::override_optional_mismatch,
+                                 member->getDescriptiveKind(),
+                                 isa<SubscriptDecl>(member),
+                                 parentParamTy, paramTy);
       if (TL.getTypeRepr()->isSimple()) {
         diag.fixItInsertAfter(TL.getSourceRange().End, "?");
       } else {
@@ -231,20 +235,20 @@ diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
     if (TL.getType()->hasParenSugar())
       return;
 
-    TC.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
-                member->getDescriptiveKind(), parentParamTy, paramTy)
+    diags.diagnose(decl->getStartLoc(), diag::override_unnecessary_IUO,
+                   member->getDescriptiveKind(), parentParamTy, paramTy)
       .highlight(TL.getSourceRange());
 
     auto sugaredForm =
       dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TL.getTypeRepr());
     if (sugaredForm) {
-      TC.diagnose(sugaredForm->getExclamationLoc(),
-                  diag::override_unnecessary_IUO_remove)
+      diags.diagnose(sugaredForm->getExclamationLoc(),
+                     diag::override_unnecessary_IUO_remove)
         .fixItRemove(sugaredForm->getExclamationLoc());
     }
 
-    TC.diagnose(TL.getSourceRange().Start,
-                diag::override_unnecessary_IUO_silence)
+    diags.diagnose(TL.getSourceRange().Start,
+                   diag::override_unnecessary_IUO_silence)
       .fixItInsert(TL.getSourceRange().Start, "(")
       .fixItInsertAfter(TL.getSourceRange().End, ")");
   };
@@ -276,11 +280,11 @@ diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
       if (parentResultTy->getOptionalObjectType())
         return;
       emittedError = true;
-      auto diag = TC.diagnose(resultTL.getSourceRange().Start,
-                              diag::override_optional_result_mismatch,
-                              member->getDescriptiveKind(),
-                              isa<SubscriptDecl>(member),
-                              parentResultTy, resultTy);
+      auto diag = diags.diagnose(resultTL.getSourceRange().Start,
+                                 diag::override_optional_result_mismatch,
+                                 member->getDescriptiveKind(),
+                                 isa<SubscriptDecl>(member),
+                                 parentResultTy, resultTy);
       if (auto optForm = dyn_cast<OptionalTypeRepr>(TR)) {
         diag.fixItRemove(optForm->getQuestionLoc());
       } else if (auto iuoForm =
@@ -297,20 +301,20 @@ diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
     if (resultTy->hasParenSugar())
       return;
 
-    TC.diagnose(resultTL.getSourceRange().Start,
-                diag::override_unnecessary_result_IUO,
-                member->getDescriptiveKind(), parentResultTy, resultTy)
+    diags.diagnose(resultTL.getSourceRange().Start,
+                   diag::override_unnecessary_result_IUO,
+                   member->getDescriptiveKind(), parentResultTy, resultTy)
       .highlight(resultTL.getSourceRange());
 
     auto sugaredForm = dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(TR);
     if (sugaredForm) {
-      TC.diagnose(sugaredForm->getExclamationLoc(),
-                  diag::override_unnecessary_IUO_use_strict)
+      diags.diagnose(sugaredForm->getExclamationLoc(),
+                     diag::override_unnecessary_IUO_use_strict)
         .fixItReplace(sugaredForm->getExclamationLoc(), "?");
     }
 
-    TC.diagnose(resultTL.getSourceRange().Start,
-                diag::override_unnecessary_IUO_silence)
+    diags.diagnose(resultTL.getSourceRange().Start,
+                   diag::override_unnecessary_IUO_silence)
       .fixItInsert(resultTL.getSourceRange().Start, "(")
       .fixItInsertAfter(resultTL.getSourceRange().End, ")");
   };
@@ -321,20 +325,21 @@ diagnoseMismatchedOptionals(TypeChecker &TC, const ValueDecl *member,
 
 /// Make sure that there is an invalid 'override' attribute on the
 /// given declaration.
-static void makeInvalidOverrideAttr(TypeChecker &TC, ValueDecl *decl) {
+static void makeInvalidOverrideAttr(ValueDecl *decl) {
   if (auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>()) {
     overrideAttr->setInvalid();
   } else {
-    auto attr = new (TC.Context) OverrideAttr(true);
+    auto attr = new (decl->getASTContext()) OverrideAttr(true);
     decl->getAttrs().add(attr);
     attr->setInvalid();
   }
 
+  // FIXME: What about the other accessors?
   if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     if (auto getter = storage->getGetter())
-      makeInvalidOverrideAttr(TC, getter);
+      makeInvalidOverrideAttr(getter);
     if (auto setter = storage->getSetter())
-      makeInvalidOverrideAttr(TC, setter);
+      makeInvalidOverrideAttr(setter);
   }
 }
 
@@ -350,9 +355,10 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
 /// attached. Otherwise, no note will be emitted.
 ///
 /// \returns true iff a diagnostic was emitted.
-static bool noteFixableMismatchedTypes(TypeChecker &TC, ValueDecl *decl,
-                                       const ValueDecl *base) {
-  DiagnosticTransaction tentativeDiags(TC.Diags);
+static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  DiagnosticTransaction tentativeDiags(diags);
 
   {
     Type baseTy = base->getInterfaceType();
@@ -365,22 +371,23 @@ static bool noteFixableMismatchedTypes(TypeChecker &TC, ValueDecl *decl,
       // input arguments.
       auto *fnType = baseTy->getAs<AnyFunctionType>();
       baseTy = fnType->getResult();
-      Type argTy = FunctionType::composeInput(TC.Context,
+      Type argTy = FunctionType::composeInput(ctx,
                                               baseTy->getAs<AnyFunctionType>()
                                                     ->getParams(),
                                               false);
       auto diagKind = diag::override_type_mismatch_with_fixits_init;
       unsigned numArgs = baseInit->getParameters()->size();
-      activeDiag.emplace(TC.diagnose(decl, diagKind,
-                                     /*plural*/std::min(numArgs, 2U),
-                                     argTy));
+      activeDiag.emplace(diags.diagnose(decl, diagKind,
+                                        /*plural*/std::min(numArgs, 2U),
+                                        argTy));
     } else {
       if (isa<AbstractFunctionDecl>(base))
         baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
 
-      activeDiag.emplace(TC.diagnose(decl,
-                                     diag::override_type_mismatch_with_fixits,
-                                     base->getDescriptiveKind(), baseTy));
+      activeDiag.emplace(
+        diags.diagnose(decl,
+                       diag::override_type_mismatch_with_fixits,
+                       base->getDescriptiveKind(), baseTy));
     }
 
     if (fixItOverrideDeclarationTypes(*activeDiag, decl, base))
@@ -415,30 +422,31 @@ namespace {
   };
 }
 
-static void diagnoseGeneralOverrideFailure(TypeChecker &TC,
-                                           ValueDecl *decl,
+static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
                                            ArrayRef<OverrideMatch> matches,
                                            OverrideCheckingAttempt attempt) {
+  auto &diags = decl->getASTContext().Diags;
+
   switch (attempt) {
   case OverrideCheckingAttempt::PerfectMatch:
-    TC.diagnose(decl, diag::override_multiple_decls_base,
-                decl->getFullName());
+    diags.diagnose(decl, diag::override_multiple_decls_base,
+                   decl->getFullName());
     break;
   case OverrideCheckingAttempt::BaseName:
-    TC.diagnose(decl, diag::override_multiple_decls_arg_mismatch,
-                decl->getFullName());
+    diags.diagnose(decl, diag::override_multiple_decls_arg_mismatch,
+                   decl->getFullName());
     break;
   case OverrideCheckingAttempt::MismatchedOptional:
   case OverrideCheckingAttempt::MismatchedTypes:
   case OverrideCheckingAttempt::BaseNameWithMismatchedOptional:
     if (isa<ConstructorDecl>(decl))
-      TC.diagnose(decl, diag::initializer_does_not_override);
+      diags.diagnose(decl, diag::initializer_does_not_override);
     else if (isa<SubscriptDecl>(decl))
-      TC.diagnose(decl, diag::subscript_does_not_override);
+      diags.diagnose(decl, diag::subscript_does_not_override);
     else if (isa<VarDecl>(decl))
-      TC.diagnose(decl, diag::property_does_not_override);
+      diags.diagnose(decl, diag::property_does_not_override);
     else
-      TC.diagnose(decl, diag::method_does_not_override);
+      diags.diagnose(decl, diag::method_does_not_override);
     break;
   case OverrideCheckingAttempt::Final:
     llvm_unreachable("should have exited already");
@@ -447,13 +455,13 @@ static void diagnoseGeneralOverrideFailure(TypeChecker &TC,
   for (auto match : matches) {
     auto matchDecl = match.Decl;
     if (attempt == OverrideCheckingAttempt::PerfectMatch) {
-      TC.diagnose(matchDecl, diag::overridden_here);
+      diags.diagnose(matchDecl, diag::overridden_here);
       continue;
     }
 
-    auto diag = TC.diagnose(matchDecl, diag::overridden_near_match_here,
-                            matchDecl->getDescriptiveKind(),
-                            matchDecl->getFullName());
+    auto diag = diags.diagnose(matchDecl, diag::overridden_near_match_here,
+                               matchDecl->getDescriptiveKind(),
+                               matchDecl->getFullName());
     if (attempt == OverrideCheckingAttempt::BaseName) {
       fixDeclarationName(diag, cast<AbstractFunctionDecl>(decl),
                          matchDecl->getFullName());
@@ -725,7 +733,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
                     parentDeclTy);
 
         // Put an invalid 'override' attribute here.
-        makeInvalidOverrideAttr(TC, decl);
+        makeInvalidOverrideAttr(decl);
 
         return true;
       }
@@ -747,7 +755,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
 
   // If we override more than one declaration, complain.
   if (matches.size() > 1) {
-    diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
+    diagnoseGeneralOverrideFailure(decl, matches, attempt);
     return true;
   }
 
@@ -894,7 +902,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
       if (ctor)
         diagKind = diag::initializer_does_not_override;
       TC.diagnose(decl, diagKind);
-      noteFixableMismatchedTypes(TC, decl, matchDecl);
+      noteFixableMismatchedTypes(decl, matchDecl);
       TC.diagnose(matchDecl, diag::overridden_near_match_here,
                   matchDecl->getDescriptiveKind(),
                   matchDecl->getFullName());
@@ -907,7 +915,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
       if (auto *methodAsFunc = dyn_cast<FuncDecl>(method))
         resultTL = methodAsFunc->getBodyResultTypeLoc();
       emittedMatchError |= diagnoseMismatchedOptionals(
-          TC, method, method->getParameterList(1), resultTL, matchDecl,
+          method, method->getParameterList(1), resultTL, matchDecl,
           cast<AbstractFunctionDecl>(matchDecl)->getParameterList(1),
           owningTy, mayHaveMismatchedOptionals);
     }
@@ -925,7 +933,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
 
     if (attempt == OverrideCheckingAttempt::MismatchedTypes) {
       TC.diagnose(decl, diag::subscript_does_not_override);
-      noteFixableMismatchedTypes(TC, decl, matchDecl);
+      noteFixableMismatchedTypes(decl, matchDecl);
       TC.diagnose(matchDecl, diag::overridden_near_match_here,
                   matchDecl->getDescriptiveKind(),
                   matchDecl->getFullName());
@@ -933,7 +941,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
 
     } else if (mayHaveMismatchedOptionals) {
       emittedMatchError |= diagnoseMismatchedOptionals(
-          TC, subscript, subscript->getIndices(),
+          subscript, subscript->getIndices(),
           subscript->getElementTypeLoc(), matchDecl,
           cast<SubscriptDecl>(matchDecl)->getIndices(), owningTy,
           mayHaveMismatchedOptionals);
@@ -947,7 +955,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
                              TypeMatchFlags::AllowOverride)) {
       TC.diagnose(property, diag::override_property_type_mismatch,
                   property->getName(), propertyTy, parentPropertyTy);
-      noteFixableMismatchedTypes(TC, decl, matchDecl);
+      noteFixableMismatchedTypes(decl, matchDecl);
       TC.diagnose(matchDecl, diag::property_override_here);
       return true;
     }
@@ -973,7 +981,7 @@ bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
   // Catch-all to make sure we don't silently accept something we shouldn't.
   if (attempt != OverrideCheckingAttempt::PerfectMatch &&
       !emittedMatchError) {
-    diagnoseGeneralOverrideFailure(TC, decl, matches, attempt);
+    diagnoseGeneralOverrideFailure(decl, matches, attempt);
   }
 
   return recordOverride(TC, decl, matchDecl);
@@ -989,14 +997,13 @@ namespace  {
   /// it, this isn't sufficient.
   class AttributeOverrideChecker
           : public AttributeVisitor<AttributeOverrideChecker> {
-    TypeChecker &TC;
     ValueDecl *Base;
     ValueDecl *Override;
+    DiagnosticEngine &Diags;
 
   public:
-    AttributeOverrideChecker(TypeChecker &tc, ValueDecl *base,
-                             ValueDecl *override)
-      : TC(tc), Base(base), Override(override) { }
+    AttributeOverrideChecker(ValueDecl *base, ValueDecl *override)
+      : Base(base), Override(override), Diags(base->getASTContext().Diags) { }
 
     /// Deleting this ensures that all attributes are covered by the visitor
     /// below.
@@ -1087,9 +1094,9 @@ namespace  {
       // unless the override is completely non-throwing.
       if (!Override->getAttrs().hasAttribute<RethrowsAttr>() &&
           cast<AbstractFunctionDecl>(Override)->hasThrows()) {
-        TC.diagnose(Override, diag::override_rethrows_with_non_rethrows,
-                    isa<ConstructorDecl>(Override));
-        TC.diagnose(Base, diag::overridden_here);
+        Diags.diagnose(Override, diag::override_rethrows_with_non_rethrows,
+                       isa<ConstructorDecl>(Override));
+        Diags.diagnose(Base, diag::overridden_here);
       }
     }
 
@@ -1110,15 +1117,15 @@ namespace  {
       case DescriptiveDeclKind::StaticLet:
       case DescriptiveDeclKind::StaticVar:
       case DescriptiveDeclKind::StaticMethod:
-        TC.diagnose(Override, diag::override_static, baseKind);
+        Diags.diagnose(Override, diag::override_static, baseKind);
         break;
       default:
-        TC.diagnose(Override, diag::override_final,
-                    Override->getDescriptiveKind(), baseKind);
+        Diags.diagnose(Override, diag::override_final,
+                       Override->getDescriptiveKind(), baseKind);
         break;
       }
 
-      TC.diagnose(Base, diag::overridden_here);
+      Diags.diagnose(Base, diag::overridden_here);
     }
 
     void visitDynamicAttr(DynamicAttr *attr) {
@@ -1126,7 +1133,7 @@ namespace  {
       if (Override->isFinal())
         return;
 
-      makeDynamic(TC.Context, Override);
+      makeDynamic(Override->getASTContext(), Override);
     }
 
     void visitObjCAttr(ObjCAttr *attr) {
@@ -1141,7 +1148,7 @@ namespace  {
       if (!attr->isSwift3Inferred()) return;
 
       // If we aren't warning about Swift 3 @objc inference, we're done.
-      if (TC.Context.LangOpts.WarnSwift3ObjCInference ==
+      if (Override->getASTContext().LangOpts.WarnSwift3ObjCInference ==
             Swift3ObjCInferenceWarnings::None)
         return;
 
@@ -1154,13 +1161,13 @@ namespace  {
       if (!isa<ExtensionDecl>(Base->getDeclContext())) return;
 
       // Complain.
-      TC.diagnose(Override, diag::override_swift3_objc_inference,
-                  Override->getDescriptiveKind(),
-                  Override->getFullName(),
-                  Base->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext()
-                    ->getName());
-      TC.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
+      Diags.diagnose(Override, diag::override_swift3_objc_inference,
+                     Override->getDescriptiveKind(),
+                     Override->getFullName(),
+                     Base->getDeclContext()
+                       ->getAsNominalTypeOrNominalTypeExtensionContext()
+                       ->getName());
+      Diags.diagnose(Base, diag::make_decl_objc, Base->getDescriptiveKind())
         .fixItInsert(Base->getAttributeInsertionLoc(false),
                      "@objc ");
     }
@@ -1176,12 +1183,28 @@ bool swift::overrideRequiresKeyword(ValueDecl *overridden) {
   return true;
 }
 
+/// \brief Returns true if the availability of the overriding declaration
+/// makes it a safe override, given the availability of the base declaration.
+static bool isAvailabilitySafeForOverride(ValueDecl *override,
+                                          ValueDecl *base) {
+  ASTContext &ctx = override->getASTContext();
+
+  // API availability ranges are contravariant: make sure the version range
+  // of an overridden declaration is fully contained in the range of the
+  // overriding declaration.
+  AvailabilityContext overrideInfo =
+    AvailabilityInference::availableRange(override, ctx);
+  AvailabilityContext baseInfo =
+    AvailabilityInference::availableRange(base, ctx);
+
+  return baseInfo.isContainedIn(overrideInfo);
+}
+
 /// Returns true if a diagnostic about an accessor being less available
 /// than the accessor it overrides would be redundant because we will
 /// already emit another diagnostic.
 static bool
-isRedundantAccessorOverrideAvailabilityDiagnostic(TypeChecker &TC,
-                                                  ValueDecl *override,
+isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
                                                   ValueDecl *base) {
 
   auto *overrideFn = dyn_cast<AccessorDecl>(override);
@@ -1196,7 +1219,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(TypeChecker &TC,
 
   // If we have already emitted a diagnostic about an unsafe override
   // for the property, don't complain about the accessor.
-  if (!TC.isAvailabilitySafeForOverride(overrideASD, baseASD)) {
+  if (!isAvailabilitySafeForOverride(overrideASD, baseASD)) {
     return true;
   }
 
@@ -1206,7 +1229,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(TypeChecker &TC,
     FuncDecl *overrideAccessor = overrideASD->getAccessor(kind);
     FuncDecl *baseAccessor = baseASD->getAccessor(kind);
     if (overrideAccessor && baseAccessor &&
-        !TC.isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
+        !isAvailabilitySafeForOverride(overrideAccessor, baseAccessor)) {
       return true;
     }
     return false;
@@ -1228,34 +1251,37 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(TypeChecker &TC,
 
 /// Diagnose an override for potential availability. Returns true if
 /// a diagnostic was emitted and false otherwise.
-static bool diagnoseOverrideForAvailability(TypeChecker &TC,
-                                            ValueDecl *override,
+static bool diagnoseOverrideForAvailability(ValueDecl *override,
                                             ValueDecl *base) {
-  if (TC.isAvailabilitySafeForOverride(override, base))
+  if (isAvailabilitySafeForOverride(override, base))
     return false;
 
   // Suppress diagnostics about availability overrides for accessors
   // if they would be redundant with other diagnostics.
-  if (isRedundantAccessorOverrideAvailabilityDiagnostic(TC, override, base))
+  if (isRedundantAccessorOverrideAvailabilityDiagnostic(override, base))
     return false;
 
+  auto &diags = override->getASTContext().Diags;
   if (auto *accessor = dyn_cast<AccessorDecl>(override)) {
-    TC.diagnose(override, diag::override_accessor_less_available,
-                accessor->getDescriptiveKind(),
-                accessor->getStorage()->getBaseName());
-    TC.diagnose(base, diag::overridden_here);
+    diags.diagnose(override, diag::override_accessor_less_available,
+                   accessor->getDescriptiveKind(),
+                   accessor->getStorage()->getBaseName());
+    diags.diagnose(base, diag::overridden_here);
     return true;
   }
 
-  TC.diagnose(override, diag::override_less_available,
-              override->getBaseName());
-  TC.diagnose(base, diag::overridden_here);
+  diags.diagnose(override, diag::override_less_available,
+                 override->getBaseName());
+  diags.diagnose(base, diag::overridden_here);
 
   return true;
 }
 
 static bool recordOverride(TypeChecker &TC, ValueDecl *override,
                            ValueDecl *base, bool isKnownObjC) {
+  ASTContext &ctx = override->getASTContext();
+  auto &diags = ctx.Diags;
+
   // Check property and subscript overriding.
   if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {
     auto *overrideASD = cast<AbstractStorageDecl>(override);
@@ -1264,7 +1290,7 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     if (overrideASD->hasStorage() &&
         !(overrideASD->getWillSetFunc() || overrideASD->getDidSetFunc())) {
       bool downgradeToWarning = false;
-      if (!TC.Context.isSwiftVersionAtLeast(5) &&
+      if (!ctx.isSwiftVersionAtLeast(5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
         // Swift 4.0 had a bug where lazy properties were considered
         // computed by the time of this check. Downgrade this diagnostic to
@@ -1274,9 +1300,9 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
       auto diagID = downgradeToWarning ?
           diag::override_with_stored_property_warn :
           diag::override_with_stored_property;
-      TC.diagnose(overrideASD, diagID,
-                  overrideASD->getBaseName().getIdentifier());
-      TC.diagnose(baseASD, diag::property_override_here);
+      diags.diagnose(overrideASD, diagID,
+                     overrideASD->getBaseName().getIdentifier());
+      diags.diagnose(baseASD, diag::property_override_here);
       if (!downgradeToWarning)
         return true;
     }
@@ -1285,15 +1311,15 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     // read-only.  Observing properties look at change, read-only properties
     // have nothing to observe!
     bool baseIsSettable = baseASD->isSettable(baseASD->getDeclContext());
-    if (baseIsSettable && TC.Context.LangOpts.EnableAccessControl) {
+    if (baseIsSettable && ctx.LangOpts.EnableAccessControl) {
       baseIsSettable =
          baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
     }
     if (overrideASD->getWriteImpl() == WriteImplKind::InheritedWithObservers
         && !baseIsSettable) {
-      TC.diagnose(overrideASD, diag::observing_readonly_property,
-                  overrideASD->getBaseName().getIdentifier());
-      TC.diagnose(baseASD, diag::property_override_here);
+      diags.diagnose(overrideASD, diag::observing_readonly_property,
+                     overrideASD->getBaseName().getIdentifier());
+      diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
 
@@ -1301,9 +1327,9 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     // one.  The only reasonable semantics for this would be to inherit the
     // setter but override the getter, and that would be surprising at best.
     if (baseIsSettable && !override->isSettable(override->getDeclContext())) {
-      TC.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
-                  overrideASD->getBaseName().getIdentifier());
-      TC.diagnose(baseASD, diag::property_override_here);
+      diags.diagnose(overrideASD, diag::override_mutable_with_readonly_property,
+                     overrideASD->getBaseName().getIdentifier());
+      diags.diagnose(baseASD, diag::property_override_here);
       return true;
     }
 
@@ -1313,9 +1339,9 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     // property.
     if (auto VD = dyn_cast<VarDecl>(baseASD)) {
       if (VD->isLet()) {
-        TC.diagnose(overrideASD, diag::override_let_property,
+        diags.diagnose(overrideASD, diag::override_let_property,
                     VD->getName());
-        TC.diagnose(baseASD, diag::property_override_here);
+        diags.diagnose(baseASD, diag::property_override_here);
         return true;
       }
     }
@@ -1327,15 +1353,15 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
        override->getDeclContext()->isExtensionContext()) &&
       !base->isObjC() && !isKnownObjC) {
     bool baseCanBeObjC = TC.canBeRepresentedInObjC(base);
-    TC.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                !base->getDeclContext()->isExtensionContext());
+    diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
+                   !base->getDeclContext()->isExtensionContext());
     if (baseCanBeObjC) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
-      TC.diagnose(base, diag::overridden_here_can_be_objc)
+      diags.diagnose(base, diag::overridden_here_can_be_objc)
         .fixItInsert(insertionLoc, "@objc ");
     } else {
-      TC.diagnose(base, diag::overridden_here);
+      diags.diagnose(base, diag::overridden_here);
     }
 
     return true;
@@ -1349,13 +1375,12 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     // location for the 'var' token.  Instead of emitting a bogus fixit, only
     // emit the fixit for 'func's.
     if (!isa<VarDecl>(override))
-      TC.diagnose(override, diag::missing_override)
+      diags.diagnose(override, diag::missing_override)
           .fixItInsert(override->getStartLoc(), "override ");
     else
-      TC.diagnose(override, diag::missing_override);
-    TC.diagnose(base, diag::overridden_here);
-    override->getAttrs().add(
-        new (TC.Context) OverrideAttr(SourceLoc()));
+      diags.diagnose(override, diag::missing_override);
+    diags.diagnose(base, diag::overridden_here);
+    override->getAttrs().add(new (ctx) OverrideAttr(SourceLoc()));
   }
 
   // If the overridden method is declared in a Swift Class Declaration,
@@ -1369,10 +1394,10 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
         !base->isDynamic() && !isKnownObjC &&
         override->getDeclContext()->isExtensionContext()) {
       // For compatibility, only generate a warning in Swift 3
-      TC.diagnose(override, (TC.Context.isSwiftVersion3()
+      diags.diagnose(override, (ctx.isSwiftVersion3()
         ? diag::override_class_declaration_in_extension_warning
         : diag::override_class_declaration_in_extension));
-      TC.diagnose(base, diag::overridden_here);
+      diags.diagnose(base, diag::overridden_here);
     }
   }
   // If the overriding declaration is 'throws' but the base is not,
@@ -1380,31 +1405,31 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
   if (auto overrideFn = dyn_cast<AbstractFunctionDecl>(override)) {
     if (overrideFn->hasThrows() &&
         !cast<AbstractFunctionDecl>(base)->hasThrows()) {
-      TC.diagnose(override, diag::override_throws,
+      diags.diagnose(override, diag::override_throws,
                   isa<ConstructorDecl>(override));
-      TC.diagnose(base, diag::overridden_here);
+      diags.diagnose(base, diag::overridden_here);
     }
 
     if (!overrideFn->hasThrows() && base->isObjC() &&
         cast<AbstractFunctionDecl>(base)->hasThrows()) {
-      TC.diagnose(override, diag::override_throws_objc,
-                  isa<ConstructorDecl>(override));
-      TC.diagnose(base, diag::overridden_here);
+      diags.diagnose(override, diag::override_throws_objc,
+                     isa<ConstructorDecl>(override));
+      diags.diagnose(base, diag::overridden_here);
     }
   }
 
   // FIXME: Possibly should extend to more availability checking.
-  if (auto *attr = base->getAttrs().getUnavailable(TC.Context)) {
-    TC.diagnoseUnavailableOverride(override, base, attr);
+  if (auto *attr = base->getAttrs().getUnavailable(ctx)) {
+    diagnoseUnavailableOverride(override, base, attr);
   }
 
-  if (!TC.getLangOpts().DisableAvailabilityChecking) {
-    diagnoseOverrideForAvailability(TC, override, base);
+  if (!ctx.LangOpts.DisableAvailabilityChecking) {
+    diagnoseOverrideForAvailability(override, base);
   }
 
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
-  AttributeOverrideChecker attrChecker(TC, base, override);
+  AttributeOverrideChecker attrChecker(base, override);
   for (auto attr : base->getAttrs()) {
     attrChecker.visit(attr);
   }
@@ -1445,13 +1470,13 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
       if (!overridingAccessor->getAttrs().hasAttribute<OverrideAttr>()) {
         auto loc = overridingASD->getOverrideLoc();
         overridingAccessor->getAttrs().add(
-            new (TC.Context) OverrideAttr(loc));
+            new (ctx) OverrideAttr(loc));
       }
 
-      recordOverride(TC, overridingAccessor, baseAccessor,
-                     baseASD->isObjC());
+      recordOverride(TC, overridingAccessor, baseAccessor, baseASD->isObjC());
     };
 
+    // FIXME: Another list of accessors, yay!
     recordAccessorOverride(AccessorKind::Get);
     recordAccessorOverride(AccessorKind::Set);
     recordAccessorOverride(AccessorKind::MaterializeForSet);

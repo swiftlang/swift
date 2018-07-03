@@ -1528,8 +1528,7 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
   return someEnclosingDeclMatches(ReferenceRange, ReferenceDC, IsDeprecated);
 }
 
-static void fixItAvailableAttrRename(TypeChecker &TC,
-                                     InFlightDiagnostic &diag,
+static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
                                      SourceRange referenceRange,
                                      const ValueDecl *renamedDecl,
                                      const AvailableAttr *attr,
@@ -1551,7 +1550,8 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
   if (parsed.isOperator() != originallyWasKnownOperatorExpr)
     return;
 
-  SourceManager &sourceMgr = TC.Context.SourceMgr;
+  auto &ctx = renamedDecl->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
 
   if (parsed.isInstanceMember()) {
     // Replace the base of the call with the "self argument".
@@ -1756,8 +1756,8 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
   SmallVector<Identifier, 4> argumentLabelIDs;
   std::transform(parsed.ArgumentLabels.begin(), parsed.ArgumentLabels.end(),
                  std::back_inserter(argumentLabelIDs),
-                 [&TC](StringRef labelStr) -> Identifier {
-    return labelStr.empty() ? Identifier() : TC.Context.getIdentifier(labelStr);
+                 [&ctx](StringRef labelStr) -> Identifier {
+    return labelStr.empty() ? Identifier() : ctx.getIdentifier(labelStr);
   });
 
   if (auto args = dyn_cast<TupleShuffleExpr>(argExpr)) {
@@ -1855,7 +1855,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     llvm_unreachable("Unexpected arg expression");
   }
 
-  diagnoseArgumentLabelError(TC, argExpr, argumentLabelIDs, false, &diag);
+  diagnoseArgumentLabelError(ctx, argExpr, argumentLabelIDs, false, &diag);
 }
 
 // Must be kept in sync with diag::availability_decl_unavailable_rename and
@@ -1999,28 +1999,31 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     auto renameDiag = diagnose(ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
-    fixItAvailableAttrRename(*this, renameDiag, ReferenceRange, DeprecatedDecl,
+    fixItAvailableAttrRename(renameDiag, ReferenceRange, DeprecatedDecl,
                              Attr, Call);
   }
 }
 
 
-void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
-                                              const ValueDecl *base,
-                                              const AvailableAttr *attr) {
+void swift::diagnoseUnavailableOverride(ValueDecl *override,
+                                        const ValueDecl *base,
+                                        const AvailableAttr *attr) {
+  ASTContext &ctx = override->getASTContext();
+  auto &diags = ctx.Diags;
   if (attr->Rename.empty()) {
     if (attr->Message.empty())
-      diagnose(override, diag::override_unavailable, override->getBaseName());
+      diags.diagnose(override, diag::override_unavailable,
+                     override->getBaseName());
     else
-      diagnose(override, diag::override_unavailable_msg,
-               override->getBaseName(), attr->Message);
+      diags.diagnose(override, diag::override_unavailable_msg,
+                     override->getBaseName(), attr->Message);
 
     DeclName name;
     unsigned rawAccessorKind;
     std::tie(rawAccessorKind, name) =
         getAccessorKindAndNameForDiagnostics(base);
-    diagnose(base, diag::availability_marked_unavailable,
-             rawAccessorKind, name);
+    diags.diagnose(base, diag::availability_marked_unavailable,
+                   rawAccessorKind, name);
     return;
   }
 
@@ -2044,7 +2047,7 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
       return;
     }
 
-    DeclName newName = parsedName.formDeclName(Context);
+    DeclName newName = parsedName.formDeclName(ctx);
     size_t numArgs = override->getFullName().getArgumentNames().size();
     if (!newName || newName.getArgumentNames().size() != numArgs)
       return;
@@ -2055,13 +2058,13 @@ void TypeChecker::diagnoseUnavailableOverride(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-bool TypeChecker::diagnoseExplicitUnavailability(const ValueDecl *D,
+bool swift::diagnoseExplicitUnavailability(const ValueDecl *D,
                                                  SourceRange R,
                                                  const DeclContext *DC,
                                                  const ApplyExpr *call) {
   return diagnoseExplicitUnavailability(D, R, DC,
                                         [=](InFlightDiagnostic &diag) {
-    fixItAvailableAttrRename(*this, diag, R, D, AvailableAttr::isUnavailable(D),
+    fixItAvailableAttrRename(diag, R, D, AvailableAttr::isUnavailable(D),
                              call);
   });
 }
@@ -2127,7 +2130,7 @@ bool isSubscriptReturningString(const ValueDecl *D, ASTContext &Context) {
   return resultTy->getDecl() == stringDecl;
 }
 
-bool TypeChecker::diagnoseExplicitUnavailability(
+bool swift::diagnoseExplicitUnavailability(
     const ValueDecl *D,
     SourceRange R,
     const DeclContext *DC,
@@ -2159,6 +2162,8 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   unsigned RawAccessorKind;
   std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
 
+  ASTContext &ctx = D->getASTContext();
+  auto &diags = ctx.Diags;
   switch (Attr->getPlatformAgnosticAvailability()) {
   case PlatformAgnosticAvailabilityKind::Deprecated:
     break;
@@ -2173,25 +2178,28 @@ bool TypeChecker::diagnoseExplicitUnavailability(
     if (!Attr->Rename.empty()) {
       SmallString<32> newNameBuf;
       Optional<ReplacementDeclKind> replaceKind =
-          describeRename(Context, Attr, D, newNameBuf);
+          describeRename(ctx, Attr, D, newNameBuf);
       unsigned rawReplaceKind = static_cast<unsigned>(
           replaceKind.getValueOr(ReplacementDeclKind::None));
       StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
 
       if (Attr->Message.empty()) {
-        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename,
-                             RawAccessorKind, Name, replaceKind.hasValue(),
-                             rawReplaceKind, newName);
+        auto diag = diags.diagnose(Loc,
+                                   diag::availability_decl_unavailable_rename,
+                                   RawAccessorKind, Name,
+                                   replaceKind.hasValue(),
+                                   rawReplaceKind, newName);
         attachRenameFixIts(diag);
       } else {
         EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-        auto diag = diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
-                             RawAccessorKind, Name, replaceKind.hasValue(),
-                             rawReplaceKind, newName, EncodedMessage.Message);
+        auto diag =
+          diags.diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
+                         RawAccessorKind, Name, replaceKind.hasValue(),
+                         rawReplaceKind, newName, EncodedMessage.Message);
         attachRenameFixIts(diag);
       }
-    } else if (isSubscriptReturningString(D, Context)) {
-      diagnose(Loc, diag::availabilty_string_subscript_migration)
+    } else if (isSubscriptReturningString(D, ctx)) {
+      diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
         .highlight(R)
         .fixItInsert(R.Start, "String(")
         .fixItInsertAfter(R.End, ")");
@@ -2199,22 +2207,23 @@ bool TypeChecker::diagnoseExplicitUnavailability(
       // Skip the note emitted below.
       return true;
     } else if (Attr->Message.empty()) {
-      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift
-                            : diag::availability_decl_unavailable,
-               RawAccessorKind, Name)
+      diags.diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift
+                                 : diag::availability_decl_unavailable,
+                     RawAccessorKind, Name)
         .highlight(R);
     } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      diagnose(Loc, inSwift ? diag::availability_decl_unavailable_in_swift_msg
-                            : diag::availability_decl_unavailable_msg,
-               RawAccessorKind, Name, EncodedMessage.Message)
+      diags.diagnose(Loc,
+                     inSwift ? diag::availability_decl_unavailable_in_swift_msg
+                             : diag::availability_decl_unavailable_msg,
+                     RawAccessorKind, Name, EncodedMessage.Message)
         .highlight(R);
     }
     break;
   }
   }
 
-  switch (Attr->getVersionAvailability(Context)) {
+  switch (Attr->getVersionAvailability(ctx)) {
   case AvailableVersionComparison::Available:
   case AvailableVersionComparison::PotentiallyUnavailable:
     llvm_unreachable("These aren't considered unavailable");
@@ -2222,22 +2231,23 @@ bool TypeChecker::diagnoseExplicitUnavailability(
   case AvailableVersionComparison::Unavailable:
     if (Attr->isLanguageVersionSpecific()
         && Attr->Introduced.hasValue())
-      diagnose(D, diag::availability_introduced_in_swift,
-               RawAccessorKind, Name, *Attr->Introduced)
+      diags.diagnose(D, diag::availability_introduced_in_swift,
+                     RawAccessorKind, Name, *Attr->Introduced)
         .highlight(Attr->getRange());
     else
-      diagnose(D, diag::availability_marked_unavailable, RawAccessorKind, Name)
+      diags.diagnose(D, diag::availability_marked_unavailable, RawAccessorKind,
+                     Name)
         .highlight(Attr->getRange());
     break;
 
   case AvailableVersionComparison::Obsoleted:
     // FIXME: Use of the platformString here is non-awesome for application
     // extensions.
-    diagnose(D, diag::availability_obsoleted,
-             RawAccessorKind, Name,
-             (Attr->isLanguageVersionSpecific() ?
-              "Swift" : Attr->prettyPlatformString()),
-             *Attr->Obsoleted)
+    diags.diagnose(D, diag::availability_obsoleted,
+                   RawAccessorKind, Name,
+                   (Attr->isLanguageVersionSpecific() ?
+                    "Swift" : Attr->prettyPlatformString()),
+                   *Attr->Obsoleted)
       .highlight(Attr->getRange());
     break;
   }
@@ -2475,8 +2485,8 @@ private:
     if (AvailableAttr::isUnavailable(D->getStorage()))
       return;
 
-    if (TC.diagnoseExplicitUnavailability(D, ReferenceRange, ReferenceDC,
-                                          /*call*/nullptr)) {
+    if (diagnoseExplicitUnavailability(D, ReferenceRange, ReferenceDC,
+                                       /*call*/nullptr)) {
       return;
     }
 
@@ -2518,7 +2528,7 @@ bool AvailabilityWalker::diagAvailability(const ValueDecl *D, SourceRange R,
                                       TreatUsableFromInlineAsPublic))
         return true;
 
-  if (TC.diagnoseExplicitUnavailability(D, R, DC, call))
+  if (diagnoseExplicitUnavailability(D, R, DC, call))
     return true;
 
   // Diagnose for deprecation
