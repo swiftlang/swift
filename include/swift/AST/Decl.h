@@ -4134,6 +4134,9 @@ public:
   /// is a member.  Currently only variables can be static.
   inline bool isStatic() const; // defined in this header
 
+  /// \brief Return the interface type of the stored value.
+  Type getValueInterfaceType() const;
+
   /// \brief Determine how this storage is implemented.
   StorageImplInfo getImplInfo() const {
     if (auto ptr = Accessors.getPointer())

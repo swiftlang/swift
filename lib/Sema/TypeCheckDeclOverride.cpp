@@ -70,9 +70,7 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
 
   auto abstractStorage = dyn_cast<AbstractStorageDecl>(member);
   assert((method || abstractStorage) && "Not a method or abstractStorage?");
-  SubscriptDecl *subscript = nullptr;
-  if (abstractStorage)
-    subscript = dyn_cast<SubscriptDecl>(abstractStorage);
+  SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
   auto memberType = member->getInterfaceType();
   if (derivedDecl) {

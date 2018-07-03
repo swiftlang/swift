@@ -625,11 +625,9 @@ public:
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
       assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-      ty = SD->getElementInterfaceType();
     } else {
-      auto *VD = cast<VarDecl>(decl);
-      ty = VD->getInterfaceType()->getReferenceStorageReferent();
+      ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType()
+                                          ->getReferenceStorageReferent();
     }
 #endif
 
