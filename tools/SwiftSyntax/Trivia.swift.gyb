@@ -221,14 +221,19 @@ extension TriviaPiece {
 }
 
 extension Trivia: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int) -> Trivia {
-    let pieces = [TriviaPiece].read(from: reader, numFields: numFields)
+  static func read(from reader: ByteTreeObjectReader, numFields: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> Trivia {
+    let pieces = [TriviaPiece].read(from: reader, numFields: numFields,
+                                    userInfo: userInfo)
     return Trivia(pieces: pieces)
   }
 }
 
 extension TriviaPiece: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int) -> TriviaPiece {
+  static func read(from reader: ByteTreeObjectReader, numFields: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> TriviaPiece {
     let kind = reader.readField(UInt8.self, index: 0)
     switch kind {
 % for trivia in TRIVIAS:
