@@ -4575,9 +4575,10 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
         if (!isRawRepresentableMismatch(argType, paramType, kind, CS))
           continue;
 
-        auto *expr = argExpr;
+        const Expr *expr = argExpr;
         if (tupleArgs)
           expr = tupleArgs->getElement(i);
+        expr = expr->getValueProvidingExpr();
 
         auto diag =
             CS.TC.diagnose(expr->getLoc(), diag::cannot_convert_argument_value,

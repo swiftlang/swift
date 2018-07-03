@@ -120,7 +120,7 @@ rdar32431165_1(.baz)
 // expected-error@-1 {{reference to member 'baz' cannot be resolved without a contextual type}}
 
 rdar32431165_1("")
-// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{15-15=E_32431165(rawValue: }} {{19-19=)}}
+// expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{16-16=E_32431165(rawValue: }} {{18-18=)}}
 rdar32431165_1(42, "")
 // expected-error@-1 {{cannot convert value of type 'String' to expected argument type 'E_32431165'}} {{20-20=E_32431165(rawValue: }} {{22-22=)}}
 
@@ -129,7 +129,7 @@ func rdar32431165_2(_: Int) {}
 func rdar32431165_2(_: Int, _: String) {}
 
 rdar32431165_2(E_32431165.bar)
-// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{15-15=}} {{31-31=.rawValue}}
+// expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{16-16=}} {{30-30=.rawValue}}
 rdar32431165_2(42, E_32431165.bar)
 // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{20-20=}} {{34-34=.rawValue}}
 
