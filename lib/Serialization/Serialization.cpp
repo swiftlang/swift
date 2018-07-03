@@ -618,17 +618,13 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   return id;
 }
 
-DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
-                              bool allowTypeAliasXRef) {
+DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
   if (!D)
     return 0;
 
-  DeclIDAndForce &id = DeclAndTypeIDs[D];
-  if (id.first != 0) {
-    if (forceSerialization && !id.second)
-      id.second = true;
-    return id.first;
-  }
+  DeclID &id = DeclAndTypeIDs[D];
+  if (id != 0)
+    return id;
 
   assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
           isa<PrecedenceGroupDecl>(D)) &&
@@ -642,9 +638,9 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization,
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the NameAliasType)");
 
-  id = { ++LastDeclID, forceSerialization };
+  id = ++LastDeclID;
   DeclsAndTypesToWrite.push(D);
-  return id.first;
+  return id;
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
@@ -657,12 +653,12 @@ serialization::TypeID Serializer::addTypeRef(Type ty) {
 #endif
 
   auto &id = DeclAndTypeIDs[ty];
-  if (id.first != 0)
-    return id.first;
+  if (id != 0)
+    return id;
 
-  id = { ++LastTypeID, true };
+  id = ++LastTypeID;
   DeclsAndTypesToWrite.push(ty);
-  return id.first;
+  return id;
 }
 
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
@@ -1577,8 +1573,7 @@ void Serializer::writeNormalConformance(
                                       Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
     data.push_back(addTypeRef(type));
-    data.push_back(addDeclRef(typeDecl, /*forceSerialization*/false,
-                              /*allowTypeAliasXRef*/true));
+    data.push_back(addDeclRef(typeDecl, /*allowTypeAliasXRef*/true));
     ++numTypeWitnesses;
     return false;
   });
@@ -2171,18 +2166,6 @@ DEF_VERIFY_ATTR(Destructor)
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
 
-static bool isForced(const Decl *D,
-                     const llvm::DenseMap<Serializer::DeclTypeUnion,
-                                          Serializer::DeclIDAndForce> &table) {
-  if (table.lookup(D).second)
-    return true;
-  for (const DeclContext *DC = D->getDeclContext(); !DC->isModuleScopeContext();
-       DC = DC->getParent())
-    if (table.lookup(getDeclForContext(DC)).second)
-      return true;
-  return false;
-}
-
 static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
   if (X.hasValue())
     return X.getValue();
@@ -2379,7 +2362,7 @@ bool Serializer::isDeclXRef(const Decl *D) const {
     assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
     return false;
   }
-  return !isForced(D, DeclAndTypeIDs);
+  return true;
 }
 
 void Serializer::writeDeclContext(const DeclContext *DC) {
@@ -2639,7 +2622,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   PrettyStackTraceDecl trace("serializing", D);
 
-  auto id = DeclAndTypeIDs[D].first;
+  auto id = DeclAndTypeIDs[D];
   assert(id != 0 && "decl or type not referenced properly");
   (void)id;
 
@@ -3607,7 +3590,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
 
-  auto id = DeclAndTypeIDs[ty].first;
+  auto id = DeclAndTypeIDs[ty];
   assert(id != 0 && "type not referenced properly");
   (void)id;
 
@@ -3635,7 +3618,6 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[BuiltinAliasTypeLayout::Code];
     BuiltinAliasTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addDeclRef(typeAlias,
-                                                  /*forceSerialization*/false,
                                                   /*allowTypeAliasXRef*/true),
                                        TypeID());
     break;
@@ -3647,9 +3629,7 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[NameAliasTypeLayout::Code];
     NameAliasTypeLayout::emitRecord(
                            Out, ScratchRecord, abbrCode,
-                           addDeclRef(typeAlias,
-                                      /*forceSerialization*/false,
-                                      /*allowTypeAliasXRef*/true),
+                           addDeclRef(typeAlias, /*allowTypeAliasXRef*/true),
                            addTypeRef(alias->getParent()),
                            addTypeRef(alias->getSinglyDesugaredType()),
                            addSubstitutionMapRef(alias->getSubstitutionMap()));
@@ -3968,7 +3948,6 @@ void Serializer::writeType(Type ty) {
     unsigned abbrCode = DeclTypeAbbrCodes[UnboundGenericTypeLayout::Code];
     UnboundGenericTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addDeclRef(generic->getDecl(),
-                                                    /*forceSerialization*/false,
                                                     /*allowTypeAliasXRef*/true),
                                          addTypeRef(generic->getParent()));
     break;
