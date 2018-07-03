@@ -1184,3 +1184,23 @@ func testUnavailableCases(_ x: UnavailableCase, _ y: UnavailableCaseOSSpecific, 
   case .notYetIntroduced: break
   } // no-error
 }
+
+// The following test used to behave differently when the uninhabited enum was
+// defined in the same module as the function (as opposed to using Swift.Never).
+enum NoError {}
+extension Result where T == NoError {
+  func testUninhabited() {
+    switch self {
+    case .Error(_):
+      break
+    // No .Ok case possible because of the 'NoError'.
+    }
+
+    switch self {
+    case .Error(_):
+      break
+    case .Ok(_):
+      break // But it's okay to write one.
+    }
+  }
+}
