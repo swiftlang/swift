@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -swift-version 3 -parse-stdlib -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=GenericSpecializer -emit-ir -O %s | %FileCheck %s
 // RUN: %target-swift-frontend -swift-version 4 -parse-stdlib -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=GenericSpecializer -emit-ir -O %s | %FileCheck %s
 //
 // Check that the -O pipeline always preserves the runtime calls for Builtin access markers and that the KeyPath implementation is fully inlined.

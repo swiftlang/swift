@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3
 // RUN: %target-typecheck-verify-swift -swift-version 4
 // RUN: not %target-swift-frontend -tyepcheck -swift-version 5
 

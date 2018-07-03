@@ -1,4 +1,3 @@
-// RUN: %target-typecheck-verify-swift -swift-version 3 -enable-resilience
 // RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
 
 func foo(a: Int?, b: Int?) -> Int {
