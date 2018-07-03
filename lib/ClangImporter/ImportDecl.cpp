@@ -3622,6 +3622,8 @@ namespace {
           "Functions that may return more than one time (annotated with the "
           "'returns_twice' attribute) are unavailable in Swift");
       }
+
+      recordObjCOverride(result);
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
@@ -6388,6 +6390,9 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
 void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Figure out the class in which this method occurs.
+  if (!decl->getDeclContext()->isTypeContext())
+    return;
+
   auto classTy = decl->getDeclContext()->getDeclaredInterfaceType()
       ->getAs<ClassType>();
   if (!classTy)
@@ -6403,13 +6408,15 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
                              Impl.getTypeResolver(), results);
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
-        member->isInstanceMember() != decl->isInstanceMember())
+        member->isInstanceMember() != decl->isInstanceMember() ||
+        member->isObjC() != decl->isObjC())
       continue;
     // Set function override.
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       auto foundFunc = cast<FuncDecl>(member);
       // Require a selector match.
-      if (func->getObjCSelector() != foundFunc->getObjCSelector())
+      if (foundFunc->isObjC() &&
+          func->getObjCSelector() != foundFunc->getObjCSelector())
         continue;
       func->setOverriddenDecl(foundFunc);
       return;
@@ -6418,7 +6425,8 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     auto ctor = cast<ConstructorDecl>(decl);
     auto memberCtor = cast<ConstructorDecl>(member);
     // Require a selector match.
-    if (ctor->getObjCSelector() != memberCtor->getObjCSelector())
+    if (ctor->isObjC() &&
+        ctor->getObjCSelector() != memberCtor->getObjCSelector())
       continue;
     ctor->setOverriddenDecl(memberCtor);
     // Propagate 'required' to subclass initializers.

@@ -266,9 +266,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// The existential signature <T : P> for each P.
   llvm::DenseMap<CanType, CanGenericSignature> ExistentialSignatures;
 
-  /// Overridden associated type declarations.
-  llvm::DenseMap<const AssociatedTypeDecl *, ArrayRef<AssociatedTypeDecl *>>
-    AssociatedTypeOverrides;
+  /// Overridden declarations.
+  llvm::DenseMap<const ValueDecl *, ArrayRef<ValueDecl *>> Overrides;
 
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
@@ -1591,127 +1590,52 @@ GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
   return env;
 }
 
-/// Minimize the set of overridden associated types, eliminating any
-/// associated types that are overridden by other associated types.
-static void minimizeOverriddenAssociatedTypes(
-                           SmallVectorImpl<AssociatedTypeDecl *> &assocTypes) {
-  // Mark associated types that are "worse" than some other associated type,
-  // because they come from an inherited protocol.
-  bool anyWorse = false;
-  std::vector<bool> worseThanAny(assocTypes.size(), false);
-  for (unsigned i : indices(assocTypes)) {
-    auto proto1 = assocTypes[i]->getProtocol();
-    for (unsigned j : range(i + 1, assocTypes.size())) {
-      auto proto2 = assocTypes[j]->getProtocol();
-      if (proto1->inheritsFrom(proto2)) {
-        anyWorse = true;
-        worseThanAny[j] = true;
-      } else if (proto2->inheritsFrom(proto1)) {
-        anyWorse = true;
-        worseThanAny[i] = true;
-        break;
-      }
-    }
-  }
+ArrayRef<ValueDecl *> ValueDecl::getOverriddenDecls() const {
+  // Check whether the overrides have already been computed.
+  if (LazySemanticInfo.hasOverriddenComputed) {
+    // If there are no overridden declarations (the common case), return.
+    if (!LazySemanticInfo.hasOverridden) return { };
 
-  // If we didn't find any associated types that were "worse", we're done.
-  if (!anyWorse) return;
-
-  // Copy in the associated types that aren't worse than any other associated
-  // type.
-  unsigned nextIndex = 0;
-  for (unsigned i : indices(assocTypes)) {
-    if (worseThanAny[i]) continue;
-    assocTypes[nextIndex++] = assocTypes[i];
-  }
-
-  assocTypes.erase(assocTypes.begin() + nextIndex, assocTypes.end());
-}
-
-/// Sort associated types just based on the protocol.
-static int compareSimilarAssociatedTypes(AssociatedTypeDecl *const *lhs,
-                                         AssociatedTypeDecl *const *rhs) {
-  auto lhsProto = (*lhs)->getProtocol();
-  auto rhsProto = (*rhs)->getProtocol();
-  return TypeDecl::compare(lhsProto, rhsProto);
-}
-
-ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::getOverriddenDecls() const {
-  // If we already computed the set of overridden associated types, return it.
-  if (Bits.AssociatedTypeDecl.ComputedOverridden) {
-    // We didn't override any associated types, so return the empty set.
-    if (!Bits.AssociatedTypeDecl.HasOverridden)
-      return { };
-
-    // Look up the overrides.
-    auto known = getASTContext().getImpl().AssociatedTypeOverrides.find(this);
-    assert(known != getASTContext().getImpl().AssociatedTypeOverrides.end());
+    // Look up the overridden declarations in the ASTContext.
+    auto known = getASTContext().getImpl().Overrides.find(this);
+    assert(known != getASTContext().getImpl().Overrides.end());
     return known->second;
   }
 
-  // While we are computing overridden declarations, pretend there are none.
-  auto mutableThis = const_cast<AssociatedTypeDecl *>(this);
-  mutableThis->Bits.AssociatedTypeDecl.ComputedOverridden = true;
-  mutableThis->Bits.AssociatedTypeDecl.HasOverridden = false;
+  ASTContext &ctx = getASTContext();
+  if (auto resolver = ctx.getLazyResolver()) {
+    resolver->resolveOverriddenDecl(const_cast<ValueDecl *>(this));
+    assert(LazySemanticInfo.hasOverriddenComputed);
+    return getOverriddenDecls();
+  }
 
-  // Find associated types with the given name in all of the inherited
-  // protocols.
-  SmallVector<AssociatedTypeDecl *, 4> inheritedAssociatedTypes;
-  auto proto = getProtocol();
-  proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
-    if (proto == inheritedProto) return TypeWalker::Action::Continue;
-
-    // Objective-C protocols
-    if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
-
-    // Look for associated types with the same name.
-    bool foundAny = false;
-    for (auto member : inheritedProto->lookupDirect(
-                                              getFullName(),
-                                              /*ignoreNewExtensions=*/true)) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        inheritedAssociatedTypes.push_back(assocType);
-        foundAny = true;
-      }
-    }
-
-    return foundAny ? TypeWalker::Action::SkipChildren
-                    : TypeWalker::Action::Continue;
-  });
-
-  // Minimize the set of inherited associated types, eliminating any that
-  // themselves are overridden.
-  minimizeOverriddenAssociatedTypes(inheritedAssociatedTypes);
-
-  // Sort the set of inherited associated types.
-  llvm::array_pod_sort(inheritedAssociatedTypes.begin(),
-                       inheritedAssociatedTypes.end(),
-                       compareSimilarAssociatedTypes);
-
-  mutableThis->Bits.AssociatedTypeDecl.ComputedOverridden = false;
-  return mutableThis->setOverriddenDecls(inheritedAssociatedTypes);
+  // FIXME: Shouldn't need this fallback.
+  return { };
 }
 
-ArrayRef<AssociatedTypeDecl *> AssociatedTypeDecl::setOverriddenDecls(
-                                  ArrayRef<AssociatedTypeDecl *> overridden) {
-  assert(!Bits.AssociatedTypeDecl.ComputedOverridden &&
-         "Overridden decls already computed");
-  Bits.AssociatedTypeDecl.ComputedOverridden = true;
+ArrayRef<ValueDecl *> ValueDecl::setOverriddenDecls(
+                                            ArrayRef<ValueDecl *> overridden) {
+  LazySemanticInfo.hasOverriddenComputed = true;
 
   // If the set of overridden declarations is empty, note that.
   if (overridden.empty()) {
-    Bits.AssociatedTypeDecl.HasOverridden = false;
+    LazySemanticInfo.hasOverridden = false;
     return { };
+  }
+
+  // Sanity-check the declarations we were given.
+  for (auto decl : overridden) {
+    assert(decl->getKind() == this->getKind() &&
+           "Overridden decl kind mismatch");
+    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
+      func->setIsOverridden();
   }
 
   // Record the overrides in the context.
   auto &ctx = getASTContext();
-  Bits.AssociatedTypeDecl.HasOverridden = true;
+  LazySemanticInfo.hasOverridden = true;
   auto overriddenCopy = ctx.AllocateCopy(overridden);
-  auto inserted =
-    ctx.getImpl().AssociatedTypeOverrides.insert({this, overriddenCopy}).second;
-  (void)inserted;
-  assert(inserted && "Already recorded associated type overrides");
+  (void)ctx.getImpl().Overrides.insert({this, overriddenCopy});
   return overriddenCopy;
 }
 

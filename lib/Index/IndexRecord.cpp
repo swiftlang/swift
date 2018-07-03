@@ -410,7 +410,6 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
     for (auto *FU : mod->getFiles()) {
       switch (FU->getKind()) {
       case FileUnitKind::Source:
-      case FileUnitKind::Derived:
       case FileUnitKind::Builtin:
         break;
       case FileUnitKind::SerializedAST:

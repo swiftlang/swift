@@ -573,7 +573,6 @@ bool IndexSwiftASTWalker::visitImports(
       switch (File->getKind()) {
       case FileUnitKind::Source:
       case FileUnitKind::Builtin:
-      case FileUnitKind::Derived:
         break;
       case FileUnitKind::SerializedAST:
         assert(!IsClangModuleOpt.hasValue() &&
@@ -1281,9 +1280,6 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
           switch (FU->getKind()) {
           case FileUnitKind::Builtin:
             Info += "builtin";
-            break;
-          case FileUnitKind::Derived:
-            Info += "derived";
             break;
           case FileUnitKind::Source:
             Info += "source, file=\"";
