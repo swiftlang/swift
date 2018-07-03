@@ -700,7 +700,10 @@ namespace {
     uint16_t getKindSpecificFlags() {
       TypeContextDescriptorFlags flags;
 
-      flags.setIsReflectable(true); // struct always reflectable
+      // Structs are reflectable unless we emit them with opaque reflection
+      // metadata.
+      flags.setIsReflectable(
+                            !IGM.shouldEmitOpaqueTypeMetadataRecord(getType()));
 
       getClangImportedFlags(flags);
       return flags.getOpaqueValue();
