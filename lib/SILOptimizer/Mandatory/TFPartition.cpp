@@ -2626,6 +2626,17 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   B.createBuiltin(loc, name, voidTy, subMap, operands);
 }
 
+template<typename T>
+static T* castWithDebugInfo(SILInstruction *inst) {
+#ifndef NDEBUG
+  if (!isa<T>(inst)) {
+    inst->dump();
+    llvm_unreachable("Unexpected instruction type!");
+  }
+#endif // NDEBUG
+  return cast<T>(inst);
+}
+
 // Create a call to runtime API @_swift_tfc_SendTensorHandle() for the host
 // program to receive a tensor from a TF-managed Fifo queue.
 //
@@ -2665,7 +2676,8 @@ static SILValue createHostSend(SILBuilder &B, SILLocation loc, SILValue value,
       //   %34 = struct_extract %33 : $Float, #Float._value
       //
       // In this case we set `value` to the Float operand like %33 above.
-      auto *SEI = cast<StructExtractInst>(value->getDefiningInstruction());
+      auto *SEI =
+          castWithDebugInfo<StructExtractInst>(value->getDefiningInstruction());
       assert(SEI->getFieldNo() == 0);
       value = SEI->getOperand();
       scalarValueTy = value->getType().getASTType();
@@ -3138,10 +3150,13 @@ bool PartitionCloner::finalizeOriginal() {
       // we can use to verify that here.
     } else if (auto *ai = dyn_cast<ApplyInst>(inst)) {
       // Sanity check: Verify that `inst` takes all tensor operands at +0.
-      auto *fri = cast<FunctionRefInst>(ai->getOperand(0));
+      assert(ai->getNumOperands() > 0);
+      auto firstOper = ai->getOperand(0);
+      auto *fri = castWithDebugInfo<FunctionRefInst>(
+          firstOper->getDefiningInstruction());
       const auto &conventions = fri->getConventions();
       const auto &operands = inst->getAllOperands();
-      assert (operands.size() == conventions.getNumParameters() + 1);
+      assert(operands.size() == conventions.getNumParameters() + 1);
       for (unsigned i = 1, e = operands.size(); i != e; ++i) {
         auto op = operands[i].get();
         if (!isTensorFlowValue(op->getType()))
@@ -3422,7 +3437,8 @@ void TFFunctionPartition::balanceRetainReleaseCount(SILValue oldResult,
 
     // Recall that tensor ops take tensor arguments as +0 values, so no adjust
     // is needed.
-    if(tensorOpsSet.count(user)) continue;
+    if (tensorOpsSet.count(user))
+      continue;
 
     if (isa<StrongRetainInst>(user)) {
       ++retainReleaseBalance;

@@ -27,10 +27,6 @@ public func test3Adds(x: Tensor<Int32>, y: Tensor<Int32>, z: Tensor<Int32>) {
 // We're passing 3 TensorHandle's into the StartTensorComputation call.
 // CHECK: alloc_stack $(OpaquePointer, OpaquePointer, OpaquePointer)
 // CHECK: function_ref @_swift_tfc_StartTensorComputation
-
-// No retain/releases needed to rebalance these tensors after host code rewrite.
-// CHECK-NOT: retain
-// CHECK-NOT: release
 //
 // CHECK: function_ref @_swift_tfc_FinishTensorComputation
 //
@@ -102,7 +98,6 @@ public func testBalancedRetainReleases() {
 //
 // Currently we generate a retain for the use of __tf_receive below
 // CHECK: strong_retain [[H]] : $TensorHandle<Float>
-// CHECK-NOT: release
 //
 // __tf_receive is called here
 // CHECK: [[RECV:%.*]] = function_ref @__tf_receive

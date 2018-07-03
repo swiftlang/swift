@@ -3086,8 +3086,9 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
       // parameters as @guaranteed instead of @owned.
       // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
       // expression without having to do a strong_retain (or copy_value) first.
-      args.push_back(visit(elt, SGFContext(SGFContext::AllowImmediatePlusZero))
-                         .forwardAsSingleValue(SGF, elt));
+      args.push_back(
+          SGF.emitRValueAsSingleValue(elt, SGFContext::AllowGuaranteedPlusZero)
+              .getValue());
     }
   }
   auto &resultTL = SGF.getTypeLowering(E->getType());

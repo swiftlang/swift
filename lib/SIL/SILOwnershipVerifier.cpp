@@ -1349,11 +1349,8 @@ OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitBuiltinInst(BuiltinInst *BI) {
   // SWIFT_ENABLE_TENSORFLOW
   if (BI->getName().str().startswith("__tfop")) {
-    // TF op builtins consume non-trivial values.
-    if (isAddressOrTrivialType())
-      return { true, UseLifetimeConstraint::MustBeLive };
-
-    return { true, UseLifetimeConstraint::MustBeInvalidated };
+    // TF op builtins take operands at +0.
+    return {true, UseLifetimeConstraint::MustBeLive};
   }
 
   return OwnershipCompatibilityBuiltinUseChecker(*this).check(BI);
