@@ -1644,8 +1644,10 @@ void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
   if (isa<TypeDecl>(VD))
     return;
 
-  // FIXME: We should check for the 'override' or 'required' keywords
-  // here, to short-circuit checking in the common case.
+  // Only initializers and declarations marked with the 'override' declaration
+  // modifier can override declarations.
+  if (!isa<ConstructorDecl>(VD) && !VD->getAttrs().hasAttribute<OverrideAttr>())
+    return;
 
   // FIXME: We should perform more minimal validation.
   validateDeclForNameLookup(VD);
