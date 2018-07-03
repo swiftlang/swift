@@ -785,7 +785,17 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
                                             parenTy->getParameterFlags()));
     return result;
   }
-    
+
+  // If `Void` has been explicitly specified, resulting decomposition
+  // should be empty, just like empty tuple would be.
+  case TypeKind::NameAlias: {
+    auto &ctx = type->getASTContext();
+    auto *typealias = cast<NameAliasType>(type.getPointer());
+    if (typealias->getDecl() == ctx.getVoidDecl())
+      return result;
+    break;
+  }
+
   default:
     // Default behavior below; inject the argument as the sole parameter.
     break;
