@@ -784,15 +784,13 @@ static ManagedValue emitSelfForMemberInit(SILGenFunction &SGF, SILLocation loc,
                                           VarDecl *selfDecl) {
   CanType selfFormalType = selfDecl->getType()->getCanonicalType();
   if (selfFormalType->hasReferenceSemantics())
-    return SGF.emitRValueForDecl(loc, selfDecl, selfDecl->getType(),
+    return SGF.emitRValueForDecl(loc, selfDecl, selfFormalType,
                                  AccessSemantics::DirectToStorage,
                                  SGFContext::AllowImmediatePlusZero)
       .getAsSingleValue(SGF, loc);
   else
-    return SGF.emitLValueForDecl(loc, selfDecl,
-                                 selfDecl->getType()->getCanonicalType(),
-                                 AccessKind::Write,
-                                 AccessSemantics::DirectToStorage);
+    return SGF.emitAddressOfLocalVarDecl(loc, selfDecl, selfFormalType,
+                                         AccessKind::Write);
 }
 
 static LValue emitLValueForMemberInit(SILGenFunction &SGF, SILLocation loc,
