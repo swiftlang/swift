@@ -490,8 +490,8 @@ bool ProvidesEmitter::extendedTypeIsPrivate(TypeLoc inheritedType) {
   }
 
   auto layout = type->getExistentialLayout();
-  assert(!layout.superclass && "Should not have a subclass existential "
-                               "in the inheritance clause of an extension");
+  assert(!layout.explicitSuperclass && "Should not have a subclass existential "
+                                       "in the inheritance clause of an extension");
   for (auto protoTy : layout.getProtocols()) {
     if (!declIsPrivate(protoTy->getDecl()))
       return false;

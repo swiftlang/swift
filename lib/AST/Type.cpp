@@ -257,7 +257,7 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   auto members = type->getMembers();
   if (!members.empty() &&
       isa<ClassDecl>(members[0]->getAnyNominal())) {
-    superclass = members[0];
+    explicitSuperclass = members[0];
     members = members.slice(1);
   }
 
@@ -284,7 +284,7 @@ ExistentialLayout CanType::getExistentialLayout() {
 }
 
 bool ExistentialLayout::requiresClass() const {
-  if (hasExplicitAnyObject || superclass)
+  if (hasExplicitAnyObject || explicitSuperclass)
     return true;
 
   for (auto proto : getProtocols()) {
@@ -295,8 +295,20 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
+Type ExistentialLayout::getSuperclass() const {
+  if (explicitSuperclass)
+    return explicitSuperclass;
+
+  for (auto proto : getProtocols()) {
+    if (auto superclass = proto->getSuperclass())
+      return superclass;
+  }
+
+  return Type();
+}
+
 bool ExistentialLayout::isAnyObject() const {
-  return (hasExplicitAnyObject && !superclass && getProtocols().empty());
+  return (hasExplicitAnyObject && !explicitSuperclass && getProtocols().empty());
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -624,7 +636,7 @@ bool TypeBase::isAnyObject() {
 bool ExistentialLayout::isErrorExistential() const {
   auto protocols = getProtocols();
   return (!hasExplicitAnyObject &&
-          !superclass &&
+          !explicitSuperclass &&
           protocols.size() == 1 &&
           protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
@@ -1453,8 +1465,11 @@ Type TypeBase::getSuperclass() {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
+    if (auto protocolTy = getAs<ProtocolType>())
+      return protocolTy->getDecl()->getSuperclass();
+
     if (auto compositionTy = getAs<ProtocolCompositionType>())
-      return compositionTy->getExistentialLayout().superclass;
+      return compositionTy->getExistentialLayout().getSuperclass();
 
     // No other types have superclasses.
     return Type();
@@ -1858,8 +1873,8 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   if (type->isExistentialType()) {
     auto layout = type->getExistentialLayout();
     if (layout.isObjC() &&
-        (!layout.superclass ||
-         getObjCObjectRepresentable(layout.superclass, dc) ==
+        (!layout.explicitSuperclass ||
+         getObjCObjectRepresentable(layout.explicitSuperclass, dc) ==
            ForeignRepresentableKind::Object))
       return ForeignRepresentableKind::Object;
   }
@@ -3196,7 +3211,7 @@ static Type getConcreteTypeForSuperclassTraversing(Type t) {
     } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {
       return dynamicSelfTy->getSelfType();
     } else if (auto compositionTy = t->getAs<ProtocolCompositionType>()) {
-      return compositionTy->getExistentialLayout().superclass;
+      return compositionTy->getExistentialLayout().explicitSuperclass;
     }
   }
   return t;
@@ -4096,8 +4111,8 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
   case TypeKind::ProtocolComposition: {
     auto layout = getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (layout.superclass)
-      return layout.superclass->usesNativeReferenceCounting(resilience);
+    if (auto superclass = layout.getSuperclass())
+      return superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
   }
 

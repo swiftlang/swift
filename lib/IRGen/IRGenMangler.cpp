@@ -141,19 +141,17 @@ mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
       if (i == 0)
         appendOperator("_");
     }
-    if (layout.superclass) {
-      auto superclassTy = layout.superclass;
-
+    if (auto superclass = layout.explicitSuperclass) {
       // We share type infos for different instantiations of a generic type
       // when the archetypes have the same exemplars.  We cannot mangle
       // archetypes, and the mangling does not have to be unique, so we just
       // mangle the unbound generic form of the type.
-      if (superclassTy->hasArchetype()) {
-        superclassTy = superclassTy->getClassOrBoundGenericClass()
+      if (superclass->hasArchetype()) {
+        superclass = superclass->getClassOrBoundGenericClass()
           ->getDeclaredType();
       }
 
-      appendType(CanType(superclassTy));
+      appendType(CanType(superclass));
       appendOperator("Xc");
     } else if (layout.getLayoutConstraint()) {
       appendOperator("Xl");

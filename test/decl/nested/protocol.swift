@@ -66,12 +66,10 @@ enum OuterEnum {
 
 class OuterClass {
   protocol InnerProtocol : OuterClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OuterClass'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
 
 class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
-  // expected-error@-1{{non-class type 'InnerProtocol' cannot inherit from class 'OtherGenericClass<T>'}}
-  // expected-error@-2{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }

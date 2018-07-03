@@ -246,7 +246,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
         }
         if (inheritedType->isExistentialType()) {
           auto layout = inheritedType->getExistentialLayout();
-          if (layout.superclass) {
+          if (layout.explicitSuperclass) {
             superclassLoc = inherited.getSourceRange().Start;
             return superclassLoc;
           }

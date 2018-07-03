@@ -39,7 +39,7 @@ func test1() {
 }
 
 protocol Bogus : Int {}
-// expected-error@-1{{inheritance from non-protocol type 'Int'}}
+// expected-error@-1{{inheritance from non-protocol, non-class type 'Int'}}
 // expected-error@-2{{type 'Self' constrained to non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
@@ -98,15 +98,13 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{protocol 'CircleMiddle' refines itself}}
 protocol CircleStart : CircleEnd { func circle_start() }
 // expected-note@-1{{protocol 'CircleStart' declared here}}
-// expected-error@-2{{protocol 'CircleStart' refines itself}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
-// expected-error@-1{{protocol 'CircleEnd' refines itself}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 2{{protocol 'CircleTrivial' refines itself}}
+protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
 
 struct Circle {
   func circle_start() {}

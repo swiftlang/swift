@@ -2993,8 +2993,8 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
 
     if (ty->isExistentialType()) {
       auto layout = ty->getExistentialLayout();
-      if (layout.superclass)
-        if (checkSuperclass(tyR->getStartLoc(), layout.superclass))
+      if (auto superclass = layout.explicitSuperclass)
+        if (checkSuperclass(tyR->getStartLoc(), superclass))
           continue;
       if (!layout.getProtocols().empty())
         HasProtocol = true;
@@ -3919,11 +3919,12 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     auto layout = T->getExistentialLayout();
 
     // See if the superclass is not @objc.
-    if (layout.superclass &&
-        !layout.superclass->getClassOrBoundGenericClass()->isObjC()) {
-      diagnose(TypeRange.Start, diag::not_objc_class_constraint,
-               layout.superclass);
-      return;
+    if (auto superclass = layout.explicitSuperclass) {
+      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+        diagnose(TypeRange.Start, diag::not_objc_class_constraint,
+                 superclass);
+        return;
+      }
     }
 
     // Find a protocol that is not @objc.

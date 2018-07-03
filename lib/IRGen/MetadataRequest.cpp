@@ -1155,9 +1155,9 @@ namespace {
                                !layout.requiresClass());
       llvm::Value *superclassConstraint =
         llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-      if (layout.superclass) {
+      if (auto superclass = layout.explicitSuperclass) {
         superclassConstraint = IGF.emitAbstractTypeMetadataRef(
-          CanType(layout.superclass));
+          CanType(superclass));
       }
 
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),

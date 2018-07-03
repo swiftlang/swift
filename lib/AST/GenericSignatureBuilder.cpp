@@ -4788,9 +4788,9 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
         anyErrors = true;
     }
 
-    if (layout.superclass) {
+    if (auto superclass = layout.explicitSuperclass) {
       if (isErrorResult(addSuperclassRequirementDirect(resolvedSubject,
-                                                       layout.superclass,
+                                                       superclass,
                                                        source)))
         anyErrors = true;
     }

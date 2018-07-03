@@ -104,7 +104,7 @@ Type SuperclassTypeRequest::evaluate(Evaluator &evaluator,
     // If we found an existential with a superclass bound, return it.
     if (inheritedType->isExistentialType()) {
       if (auto superclassType =
-            inheritedType->getExistentialLayout().superclass) {
+            inheritedType->getExistentialLayout().explicitSuperclass) {
         if (superclassType->getClassOrBoundGenericClass()) {
           if (superclassType->hasArchetype())
             return superclassType->mapTypeOutOfContext();
