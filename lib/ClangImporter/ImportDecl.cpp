@@ -6393,11 +6393,10 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return;
 
-  auto classTy = decl->getDeclContext()->getDeclaredInterfaceType()
-      ->getAs<ClassType>();
-  if (!classTy)
+  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl)
     return;
-  auto superTy = classTy->getSuperclass();
+  auto superTy = classDecl->getSuperclass();
   if (!superTy)
     return;
   // Dig out the Objective-C superclass.
