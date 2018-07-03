@@ -3542,10 +3542,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (toType->isAnyObject())
     return CheckedCastKind::BridgingCoercion;
   
-  // Do this check later in Swift 3 mode so that we check for NSNumber and
-  // NSValue casts (and container casts thereof) first.
-  if (!Context.LangOpts.isSwiftVersion3()
-      && isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
+  if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO){
     return CheckedCastKind::BridgingCoercion;
   }
 
@@ -3722,7 +3719,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return CheckedCastKind::ValueCast;
     }
 
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
@@ -3748,9 +3744,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
 
-      case CheckedCastKind::Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
-
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3766,7 +3759,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (auto toKeyValue = cs.isDictionaryType(toType)) {
     if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
       bool hasCoercion = false;
-      enum { NoBridging, BridgingCoercion, Swift3BridgingDowncast }
+      enum { NoBridging, BridgingCoercion }
         hasBridgingConversion = NoBridging;
       bool hasCast = false;
       switch (typeCheckCheckedCast(fromKeyValue->first, toKeyValue->first,
@@ -3779,10 +3772,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         hasBridgingConversion = std::max(hasBridgingConversion,
                                          BridgingCoercion);
-        break;
-      case CheckedCastKind::Swift3BridgingDowncast:
-        hasBridgingConversion = std::max(hasBridgingConversion,
-                                         Swift3BridgingDowncast);
         break;
 
       case CheckedCastKind::ArrayDowncast:
@@ -3807,10 +3796,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasBridgingConversion = std::max(hasBridgingConversion,
                                          BridgingCoercion);
         break;
-      case CheckedCastKind::Swift3BridgingDowncast:
-        hasBridgingConversion = std::max(hasBridgingConversion,
-                                         Swift3BridgingDowncast);
-        break;
 
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
@@ -3829,8 +3814,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         break;
       case BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
-      case Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
       }
       assert(hasCoercion && "Not a coercion?");
       return CheckedCastKind::Coercion;
@@ -3848,9 +3831,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
       
-      case CheckedCastKind::Swift3BridgingDowncast:
-        return CheckedCastKind::Swift3BridgingDowncast;
-
       case CheckedCastKind::ArrayDowncast:
       case CheckedCastKind::DictionaryDowncast:
       case CheckedCastKind::SetDowncast:
@@ -3863,19 +3843,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  // We accepted `NSNumber`-to-`*Int*` and `NSValue`-to-struct as bridging
-  // conversions in Swift 3. For compatibility, we need to distinguish these
-  // cases so we can accept them as coercions (with a warning).
-  if (Context.LangOpts.isSwiftVersion3() && extraFromOptionals == 0) {
-    // Do the check for a bridging conversion now that we deferred above.
-    if (isObjCBridgedTo(fromType, toType, dc, &unwrappedIUO) && !unwrappedIUO) {
-      if (Context.isObjCClassWithMultipleSwiftBridgedTypes(fromType)) {
-        return CheckedCastKind::Swift3BridgingDowncast;
-      }
-      return CheckedCastKind::BridgingCoercion;
-    }
-  }
-  
   // If we can bridge through an Objective-C class, do so.
   if (Type bridgedToClass = getDynamicBridgedThroughObjCClass(dc, fromType,
                                                               toType)) {
@@ -3884,7 +3851,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
@@ -3904,7 +3870,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                  nullptr, SourceRange())) {
     case CheckedCastKind::ArrayDowncast:
     case CheckedCastKind::BridgingCoercion:
-    case CheckedCastKind::Swift3BridgingDowncast:
     case CheckedCastKind::Coercion:
     case CheckedCastKind::DictionaryDowncast:
     case CheckedCastKind::SetDowncast:
