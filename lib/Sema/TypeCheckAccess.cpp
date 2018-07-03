@@ -167,7 +167,7 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   if (!ED->getExtendedType().isNull() &&
       !ED->getExtendedType()->hasError()) {
     if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-      validateDeclForNameLookup(nominal);
+      validateAccessControl(nominal);
       if (ED->hasDefaultAccessLevel())
         return;
       maxAccess = std::max(nominal->getFormalAccess(),
