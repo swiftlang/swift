@@ -219,17 +219,6 @@ static bool canInheritClass(Decl *decl) {
   return false;
 }
 
-// Add implicit conformances to the given declaration.
-static void addImplicitConformances(
-              TypeChecker &tc, Decl *decl,
-              llvm::SmallSetVector<ProtocolDecl *, 4> &allProtocols) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    SmallVector<ProtocolDecl *, 2> protocols;
-    nominal->getImplicitProtocols(protocols);
-    allProtocols.insert(protocols.begin(), protocols.end());
-  }
-}
-
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
@@ -388,9 +377,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
-  addImplicitConformances(*this, decl, allProtocols);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -467,10 +454,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
            !layout.explicitSuperclass)) {
-        for (auto proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
-          allProtocols.insert(protoDecl);
-        }
         continue;
       }
 
@@ -478,11 +461,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // do not contain an explicit AnyObject member.
       if (isa<ClassDecl>(decl) &&
           !layout.hasExplicitAnyObject) {
-        for (auto proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
-          allProtocols.insert(protoDecl);
-        }
-
         // Superclass inheritance is handled below.
         inheritedTy = layout.explicitSuperclass;
         if (!inheritedTy)
@@ -529,10 +507,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Record the raw type.
       superclassTy = inheritedTy;
       superclassRange = inherited.getSourceRange();
-      
-      // Add the RawRepresentable conformance implied by the raw type.
-      allProtocols.insert(getProtocol(decl->getLoc(),
-                                      KnownProtocolKind::RawRepresentable));
       continue;
     }
 
@@ -593,26 +567,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
              inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
     inherited.setInvalidType(Context);
-  }
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    // Check for circular inheritance.
-    // FIXME: The diagnostics here should be improved.
-    bool diagnosedCircularity = false;
-    for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
-      if (allProtocols[i] == proto || allProtocols[i]->inheritsFrom(proto)) {
-        if (!diagnosedCircularity) {
-          diagnose(proto, diag::circular_protocol_def, proto->getName());
-          diagnosedCircularity = true;
-        }
-
-        allProtocols.remove(allProtocols[i]);
-        --n;
-        continue;
-      }
-
-      ++i;
-    }
   }
 }
 
