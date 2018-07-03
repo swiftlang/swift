@@ -449,10 +449,10 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 
 protocol ProtoConstraintsSelfToClass where Self : Base<Int> {}
 
-protocol ProtoRefinesClass : Base<Int> {} // FIXME expected-error {{}}
+protocol ProtoRefinesClass : Base<Int> {}
 protocol ProtoRefinesClassAndProtocolAlias : BaseIntAndP2 {}
 protocol ProtoRefinesClassAndProtocolDirect : Base<Int> & P2 {}
-protocol ProtoRefinesClassAndProtocolExpanded : Base<Int>, P2 {} // FIXME expected-error {{}}
+protocol ProtoRefinesClassAndProtocolExpanded : Base<Int>, P2 {}
 
 class ClassConformsToClassProtocolBad1 : ProtoConstraintsSelfToClass {}
 // expected-error@-1 {{'ProtoConstraintsSelfToClass' requires that 'ClassConformsToClassProtocolBad1' inherit from 'Base<Int>'}}

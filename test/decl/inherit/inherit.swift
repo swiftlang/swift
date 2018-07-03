@@ -34,7 +34,7 @@ class D4 : P & P1, A { } // expected-error{{superclass 'A' must appear first in 
 struct S : A { } // expected-error{{non-class type 'S' cannot inherit from class 'A'}}
 
 // Protocol inheriting a class
-protocol Q : A { } // expected-error{{non-class type 'Q' cannot inherit from class 'A'}}
+protocol Q : A { }
 
 // Extension inheriting a class
 extension C : A { } // expected-error{{extension of type 'C' cannot inherit from class 'A'}}
@@ -44,14 +44,12 @@ struct S2 : struct { } // expected-error{{expected type}}
 
 // Protocol composition in inheritance clauses
 struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to protocol 'P'}}
-                         // expected-error @-1 {{'Q' requires that 'S3' inherit from 'A'}}
-                         // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S3]}}
-                         // expected-note @-3 {{'S3' declares conformance to protocol 'P' here}}
+                         // expected-error @-1 {{non-class type 'S3' cannot conform to class protocol 'Q'}}
+                         // expected-note @-2 {{'S3' declares conformance to protocol 'P' here}}
 struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
 struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
-                                // expected-error @-1 {{'Q' requires that 'S7' inherit from 'A'}}
-                                // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
+                                // expected-error @-1 {{non-class type 'S7' cannot conform to class protocol 'Q'}}
 
 class GenericBase<T> {}
 

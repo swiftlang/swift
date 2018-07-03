@@ -202,23 +202,6 @@ public:
   
 } // namespace llvm
 
-/// Determine whether the given declaration can inherit a class.
-static bool canInheritClass(Decl *decl) {
-  // Classes can inherit from a class.
-  if (isa<ClassDecl>(decl))
-    return true;
-
-  // Generic type parameters can inherit a class.
-  if (isa<GenericTypeParamDecl>(decl))
-    return true;
-
-  // Associated types can inherit a class.
-  if (isa<AssociatedTypeDecl>(decl))
-    return true;
-
-  return false;
-}
-
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
@@ -527,7 +510,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       // If the declaration we're looking at doesn't allow a superclass,
       // complain.
-      if (!canInheritClass(decl)) {
+      if (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl)) {
         diagnose(decl->getLoc(),
                  isa<ExtensionDecl>(decl)
                    ? diag::extension_class_inheritance
@@ -542,7 +525,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       }
 
       // If this is not the first entry in the inheritance clause, complain.
-      if (i > 0) {
+      if (isa<ClassDecl>(decl) && i > 0) {
         auto removeRange = getRemovalRange(i);
         diagnose(inherited.getSourceRange().Start,
                  diag::superclass_not_first, inheritedTy)
@@ -561,9 +544,9 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     // We can't inherit from a non-class, non-protocol type.
     diagnose(decl->getLoc(),
-             canInheritClass(decl)
-               ? diag::inheritance_from_non_protocol_or_class
-               : diag::inheritance_from_non_protocol,
+             (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
+               ? diag::inheritance_from_non_protocol
+               : diag::inheritance_from_non_protocol_or_class,
              inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
     inherited.setInvalidType(Context);
