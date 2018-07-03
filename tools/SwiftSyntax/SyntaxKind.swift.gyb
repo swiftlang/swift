@@ -85,10 +85,12 @@ internal func makeSyntax(root: SyntaxData?, data: SyntaxData) -> Syntax {
 
 
 extension SyntaxKind: ByteTreeScalarDecodable {
-  static func read(from pointer: UnsafeRawPointer, size: Int) -> SyntaxKind {
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> SyntaxKind {
     // Explicitly spell out all SyntaxKinds to keep the serialized value stable
     // even if its members get reordered or members get removed
-    let rawValue = UInt16.read(from: pointer, size: size)
+    let rawValue = UInt16.read(from: pointer, size: size, userInfo: userInfo)
     switch rawValue {
     case 0: 
       return .token
