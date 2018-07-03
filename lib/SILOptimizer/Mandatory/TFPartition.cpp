@@ -2784,6 +2784,28 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   return fn;
 }
 
+/// A wrapper over SwitchEnumInst, which treats its optional default case just
+/// like the other cases.
+class SwitchEnumCaseIterator {
+public:
+    SwitchEnumCaseIterator(SwitchEnumInst *inst) : inst(inst) {}
+
+    unsigned getNumCases() const {
+      return inst->hasDefault() ? inst->getNumCases() + 1 : inst->getNumCases();
+    }
+
+    SILBasicBlock *getCaseBB(unsigned i) const {
+      assert(i < getNumCases());
+      if (i < inst->getNumCases()) return inst->getCase(i).second;
+
+      assert(inst->hasDefault());
+      return inst->getDefaultBB();
+    }
+
+private:
+  SwitchEnumInst *const inst;
+};
+
 /// The partitioned code is illustrated by the snippet below:
 ///
 /// Host side:
@@ -2829,8 +2851,10 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
                    "from Swift to TensorFlow.");
 
   // Create the host->accelerator sends in the host code.
-  for (unsigned i = 0, e = inst->getNumCases(); i != e; ++i) {
-    SILBasicBlock *caseBB = inst->getCase(i).second;
+  // If the optional default case exists, we handle it like any other case.
+  SwitchEnumCaseIterator caseIt(inst);
+  for (unsigned i = 0, e = caseIt.getNumCases(); i != e; ++i) {
+    auto *caseBB = caseIt.getCaseBB(i);
     SILBuilder BH(caseBB); // Builder for host.
 
     // The send is at the beginning of each caseBB.
@@ -2856,7 +2880,7 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   // cond_br %cond, bb1, bb2
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
-  auto acceleratorCaseId =
+  auto receivedCaseId =
       (FP.configuration.primaryDeviceType == DeviceType::TPU)
           ? createAcceleratorReceive(BA, loc, remapType(intFieldSILType),
                                      /*isScalar*/ true, nextSendID,
@@ -2865,58 +2889,72 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
                 BA, loc, remapType(intFieldSILType),
                 /*isScalar*/ true, nextSendID, FP.configuration);
 
-  assert(inst->getNumCases() == 2 &&
-         "switch enums with 1 or >2 cases will be supported later.");
-  // Create a scalar const tensor 0, to compare with case id.
-  BuiltinInst *zeroConstTensor = nullptr;
-  {
-    auto *caseZero = BA.createIntegerLiteral(loc, intFieldSILType, 0);
-    SmallVector<SILValue, 4> operands;
-    std::string constOpName = "__tfop_Const";
-    createConstTensorAttrsOnAccel(caseZero, loc, ctx, BA, constOpName,
-                                  operands);
-    FP.configuration.handleDevicePlacement(
-        "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-        operands, constOpName);
-    auto subMap = getSingleSubstitutionMapForElementType(
-        intFieldSILType.getASTType(), ctx);
-    auto tensorHandleInt64Ty =
-        convertElementTypeToTensorValueType(intFieldSILType);
-    zeroConstTensor = BA.createBuiltin(loc, ctx.getIdentifier(constOpName),
-                                       tensorHandleInt64Ty, subMap, operands);
-  }
+  // Let K be the total # cases (including the optional default case). Create a
+  // chain of K-1 BB's with cond_br, to dispatch to the K cases.
+  for (unsigned i = 0, e = caseIt.getNumCases() - 1; i != e; ++i) {
+    // Create a scalar const tensor i, to compare with case id.
+    BuiltinInst *constTensorWithCaseId = nullptr;
+    {
+      auto *caseIdIntInst = BA.createIntegerLiteral(loc, intFieldSILType, i);
+      SmallVector<SILValue, 4> operands;
+      std::string constOpName = "__tfop_Const";
+      createConstTensorAttrsOnAccel(caseIdIntInst, loc, ctx, BA, constOpName,
+                                    operands);
+      FP.configuration.handleDevicePlacement(
+          "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
+          operands, constOpName);
+      auto subMap = getSingleSubstitutionMapForElementType(
+          intFieldSILType.getASTType(), ctx);
+      auto tensorHandleInt64Ty =
+          convertElementTypeToTensorValueType(intFieldSILType);
+      constTensorWithCaseId =
+          BA.createBuiltin(loc, ctx.getIdentifier(constOpName),
+                           tensorHandleInt64Ty, subMap, operands);
+    }
 
-  // Cast to a TensorHandle<Builtin.Int1> value
-  BuiltinInst *condBrOperand = nullptr;
-  {
-    // Omit the metatype attr T for simplicity, and TF graphDef compiler can
-    // infer the type.
-    std::string equalOpName = "__tfop_Equal,$in,$in";
-    auto boolFieldSILType =
-        extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
-    auto tensorHandleI1Ty =
-        convertElementTypeToTensorValueType(boolFieldSILType);
-    SmallVector<SILValue, 4> operands = {acceleratorCaseId, zeroConstTensor};
-    FP.configuration.handleDevicePlacement(
-        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-        operands, equalOpName);
-    auto subMap = getSingleSubstitutionMapForElementType(
-        boolFieldSILType.getASTType(), ctx);
-    auto *equalComparisonInst =
-        BA.createBuiltin(loc, ctx.getIdentifier(equalOpName), tensorHandleI1Ty,
-                         subMap, operands);
-    condBrOperand =
-        BA.createBuiltin(loc, ctx.getIdentifier("tf_tensor_to_i1"),
-                         boolFieldSILType, {}, {equalComparisonInst});
-  }
+    // Cast to a TensorHandle<Builtin.Int1> value
+    BuiltinInst *condBrOperand = nullptr;
+    {
+      // Omit the metatype attr T for simplicity, and TF graphDef compiler can
+      // infer the type.
+      std::string equalOpName = "__tfop_Equal,$in,$in";
+      auto boolFieldSILType =
+          extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
+      auto tensorHandleI1Ty =
+          convertElementTypeToTensorValueType(boolFieldSILType);
+      SmallVector<SILValue, 4> operands = {receivedCaseId,
+                                           constTensorWithCaseId};
+      FP.configuration.handleDevicePlacement(
+          "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
+          operands, equalOpName);
+      auto subMap = getSingleSubstitutionMapForElementType(
+          boolFieldSILType.getASTType(), ctx);
+      auto *equalComparisonInst =
+          BA.createBuiltin(loc, ctx.getIdentifier(equalOpName),
+                           tensorHandleI1Ty, subMap, operands);
+      condBrOperand =
+          BA.createBuiltin(loc, ctx.getIdentifier("tf_tensor_to_i1"),
+                           boolFieldSILType, {}, {equalComparisonInst});
+    }
 
-  // The args for the true and false BBs are always sent from host to
-  // accelerator, so no BB args for them here.
-  BA.createCondBranch(
-      loc, condBrOperand, getOpBasicBlock(inst->getCase(0).second),
-      /*TrueArgs*/ OperandValueArrayRef(),
-      getOpBasicBlock(inst->getCase(1).second),
-      /*FalseArgs*/ OperandValueArrayRef(), ProfileCounter(), ProfileCounter());
+    // For case `i`, the true branch dispatches to the corresponding enum
+    // caseBB. For the false branch:
+    // - When `i` is not `e` - 1 (recall `e` points to the last case), we create
+    // a new BB for it, which evaluates the next cond_br on case `i` + 1
+    // - Otherwise, the false branch dispatches to the last enum caseBB.
+    auto *falseBB = i < e - 1 ? BA.getFunction().createBasicBlock()
+                              : getOpBasicBlock(caseIt.getCaseBB(e));
+    //
+    // The args for the true and false BBs are always sent from host to
+    // accelerator, so no BB args for them here.
+    BA.createCondBranch(loc, condBrOperand,
+                        getOpBasicBlock(caseIt.getCaseBB(i)),
+                        /*TrueArgs*/ OperandValueArrayRef(), falseBB,
+                        /*FalseArgs*/ OperandValueArrayRef(), ProfileCounter(),
+                        ProfileCounter());
+    if (i < e - 1)
+      BA.setInsertionPoint(falseBB);
+  }
 
   ++nextSendID;
 }
