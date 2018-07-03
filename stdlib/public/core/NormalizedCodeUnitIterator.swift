@@ -63,11 +63,7 @@ struct _NormalizedCodeUnitIterator: IteratorProtocol {
     where Source.Element == UInt16, Source.SubSequence == Source
   {
     var remaining: Int {
-      @_specialize(where Source == _UnmanagedString<UInt16>)
-      @_specialize(where Source == _UnmanagedOpaqueString)
-      get {
-        return collection.distance(from: index, to: collection.endIndex)
-      }
+      return collection.distance(from: index, to: collection.endIndex)
     }
     var collection: Source
     var index: Source.Index
