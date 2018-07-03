@@ -14,6 +14,14 @@ import Foundation
 
 // MARK: - ByteTree decoder protocols
 
+struct ByteTreeUserInfoKey: Hashable {
+  let rawValue: String
+
+  init(rawValue: String) {
+    self.rawValue = rawValue
+  }
+}
+
 /// A type that can be deserialized from ByteTree into a scalar value that
 /// doesn't have any child nodes
 protocol ByteTreeScalarDecodable {
@@ -23,7 +31,8 @@ protocol ByteTreeScalarDecodable {
   ///   - pointer: The pointer pointing to the start of the serialized data
   ///   - size: The length of the serialized data in bytes
   /// - Returns: The deserialized value
-  static func read(from pointer: UnsafeRawPointer, size: Int) -> Self
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]) -> Self
 }
 
 /// A type that can be deserialized from ByteTree into an object with child
@@ -39,7 +48,8 @@ protocol ByteTreeObjectDecodable {
   ///   - numFields: The number of fields that are present in the serialized
   ///                object
   /// - Returns: The deserialized object
-  static func read(from reader: ByteTreeObjectReader, numFields: Int) -> Self
+  static func read(from reader: ByteTreeObjectReader, numFields: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]) -> Self
 }
 
 // MARK: - Reader objects
@@ -119,14 +129,30 @@ class ByteTreeObjectReader {
 
 /// Reader for reading the ByteTree format into Swift objects
 class ByteTreeReader {
+  enum DeserializationError: Error, CustomStringConvertible {
+    case versionValidationFailed(ByteTreeReader.ProtocolVersion)
+
+    public var description: String {
+      switch self {
+      case .versionValidationFailed(let version):
+        return "The serialized ByteTree version \(version) cannot be parsed " +
+               "by this version of swiftSyntax"
+      }
+    }
+  }
+
   /// The type as which the protocol version is encoded in ByteTree
   typealias ProtocolVersion = UInt32
 
   /// A pointer pointing to the next byte of serialized data to be read
   private var pointer: UnsafeRawPointer
 
-  private init(pointer: UnsafeRawPointer) {
+  private var userInfo: [ByteTreeUserInfoKey: Any]
+
+  private init(pointer: UnsafeRawPointer,
+               userInfo: [ByteTreeUserInfoKey: Any]) {
     self.pointer = pointer
+    self.userInfo = userInfo
   }
 
   // MARK: Public entrance function
@@ -137,21 +163,44 @@ class ByteTreeReader {
   /// - Parameters:
   ///   - rootObjectType: The type of the root object in the deserialized tree
   ///   - pointer: The memory location at which the serialized data resides
-  ///   - protocolVerisonValidation: A callback to determine if the data can be
+  ///   - protocolVersionValidation: A callback to determine if the data can be
   ///       read, based on the format's protocol version. If the callback
-  ///       returns `false`, `nil` will be returned and reading aborded.
+  ///       returns `false` an error will be thrown
   /// - Returns: The deserialized tree or `nil` if protocol version validation
   ///            failed
   static func read<T: ByteTreeObjectDecodable>(
     _ rootObjectType: T.Type, from pointer: UnsafeRawPointer,
-    protocolVerisonValidation: (ProtocolVersion) -> Bool
-  ) -> T? {
-    let reader = ByteTreeReader(pointer: pointer)
-    if !reader.readAndValidateProtocolVersion(protocolVerisonValidation) {
-      return nil
-    }
+    userInfo: [ByteTreeUserInfoKey: Any],
+    protocolVersionValidation: (ProtocolVersion) -> Bool
+  ) throws -> T {
+    let reader = ByteTreeReader(pointer: pointer, userInfo: userInfo)
+    try reader.readAndValidateProtocolVersion(protocolVersionValidation)
     return reader.read(rootObjectType)
   }
+
+  /// Deserialize an object tree from the ByteTree data at the given memory
+  /// location.
+  ///
+  /// - Parameters:
+  ///   - rootObjectType: The type of the root object in the deserialized tree
+  ///   - data: The data to deserialize
+  ///   - protocolVersionValidation: A callback to determine if the data can be
+  ///       read, based on the format's protocol version. If the callback
+  ///       returns `false` an error will be thrown
+  /// - Returns: The deserialized tree
+  static func read<T: ByteTreeObjectDecodable>(
+    _ rootObjectType: T.Type, from data: Data,
+    userInfo: [ByteTreeUserInfoKey: Any],
+    protocolVersionValidation versionValidate: (ProtocolVersion) -> Bool
+  ) throws -> T {
+    return try data.withUnsafeBytes { (pointer: UnsafePointer<UInt8>) in
+      let rawPointer = UnsafeRawPointer(pointer)
+      return try ByteTreeReader.read(rootObjectType, from: rawPointer,
+                                     userInfo: userInfo,
+                                     protocolVersionValidation: versionValidate)
+    }
+  }
+
 
   // MARK: Internal read functions
 
@@ -181,12 +230,13 @@ class ByteTreeReader {
   ///             protocol version can be read
   private func readAndValidateProtocolVersion(
     _ validationCallback: (ProtocolVersion) -> Bool
-  ) -> Bool {
+  ) throws {
     let protocolVersion = ProtocolVersion(littleEndian: 
       readRaw(ProtocolVersion.self))
     let result = validationCallback(protocolVersion)
-    pointer = pointer.advanced(by: MemoryLayout<ProtocolVersion>.size)
-    return result
+    if !result {
+      throw DeserializationError.versionValidationFailed(protocolVersion)
+    }
   }
 
   /// Read the next field in the tree as an object of the specified type.
@@ -199,7 +249,7 @@ class ByteTreeReader {
     let numFields = readFieldLength()
     let objectReader = ByteTreeObjectReader(reader: self,
                                             numFields: numFields)
-    return T.read(from: objectReader, numFields: numFields)
+    return T.read(from: objectReader, numFields: numFields, userInfo: userInfo)
   }
 
   /// Read the next field in the tree as a scalar of the specified type.
@@ -213,7 +263,7 @@ class ByteTreeReader {
     defer {
       pointer = pointer.advanced(by: fieldSize)
     }
-    return T.read(from: pointer, size: fieldSize)
+    return T.read(from: pointer, size: fieldSize, userInfo: userInfo)
   }
 
   /// Discard the next scalar field, advancing the pointer to the next field
@@ -230,7 +280,9 @@ class ByteTreeReader {
 // Implemenation for reading an integer from memory to be shared between
 // multiple types
 extension ByteTreeScalarDecodable where Self : FixedWidthInteger {
-  static func read(from pointer: UnsafeRawPointer, size: Int) -> Self {
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> Self {
     assert(size == MemoryLayout<Self>.size)
     return pointer.bindMemory(to: Self.self, capacity: 1).pointee
   }
@@ -241,7 +293,8 @@ extension UInt16: ByteTreeScalarDecodable {}
 extension UInt32: ByteTreeScalarDecodable {}
 
 extension String: ByteTreeScalarDecodable {
-  static func read(from pointer: UnsafeRawPointer, size: Int) -> String {
+  static func read(from pointer: UnsafeRawPointer, size: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]) -> String {
     let data = Data(bytes: pointer, count: size)
     return String(data: data, encoding: .utf8)!
   }
@@ -250,12 +303,14 @@ extension String: ByteTreeScalarDecodable {
 extension Optional: ByteTreeObjectDecodable
   where
   Wrapped: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int) ->
-    Optional<Wrapped> {
+  static func read(from reader: ByteTreeObjectReader, numFields: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> Optional<Wrapped> {
     if numFields == 0 {
       return nil
     } else {
-      return Wrapped.read(from: reader, numFields: numFields)
+      return Wrapped.read(from: reader, numFields: numFields,
+                          userInfo: userInfo)
     }
   }
 }
@@ -263,8 +318,9 @@ extension Optional: ByteTreeObjectDecodable
 extension Array: ByteTreeObjectDecodable
   where
   Element: ByteTreeObjectDecodable {
-  static func read(from reader: ByteTreeObjectReader, numFields: Int) ->
-    Array<Element> {
+  static func read(from reader: ByteTreeObjectReader, numFields: Int,
+                   userInfo: [ByteTreeUserInfoKey: Any]
+  ) -> Array<Element> {
     return (0..<numFields).map {
       return reader.readField(Element.self, index: $0)
     }
