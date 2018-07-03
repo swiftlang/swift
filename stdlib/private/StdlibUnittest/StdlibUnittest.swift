@@ -1268,9 +1268,6 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
-        if crashOutput.isEmpty && expectedSubstring.isEmpty {
-          found = true
-        }
         for s in crashOutput {
           if findSubstring(s, expectedSubstring) != nil {
             found = true
