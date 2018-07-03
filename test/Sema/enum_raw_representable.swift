@@ -145,6 +145,29 @@ func rdar32432253(_ condition: Bool = false) {
   // expected-error@-1 {{cannot convert value of type 'E_32431165' to expected argument type 'String'}} {{11-11=}} {{17-17=.rawValue}}
 }
 
+func sr8150_helper1(_: Int) {}
+func sr8150_helper1(_: Double) {}
+
+func sr8150_helper2(_: Double) {}
+func sr8150_helper2(_: Int) {}
+
+func sr8150_helper3(_: Foo) {}
+func sr8150_helper3(_: Bar) {}
+
+func sr8150_helper4(_: Bar) {}
+func sr8150_helper4(_: Foo) {}
+
+func sr8150(bar: Bar) {
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper2(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+  sr8150_helper3(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+  sr8150_helper4(0.0)
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
+}
+
 
 struct NotEquatable { }
 
