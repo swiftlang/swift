@@ -13,7 +13,7 @@
 #include <Foundation/Foundation.h>
 #include "swift/Runtime/Config.h"
 
-SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY
 extern "C" void
 NSArray_getObjects(NSArray SWIFT_NS_RELEASES_ARGUMENT *_Nonnull nsArray,
                    id *objects, NSUInteger rangeLocation,
@@ -22,7 +22,7 @@ NSArray_getObjects(NSArray SWIFT_NS_RELEASES_ARGUMENT *_Nonnull nsArray,
   SWIFT_CC_PLUSONE_GUARD([nsArray release]);
 }
 
-SWIFT_CC(swift) LLVM_LIBRARY_VISIBILITY
+SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY
 extern "C" void
 NSDictionary_getObjects(NSDictionary *_Nonnull nsDictionary,
                         id *objects, id *keys) {

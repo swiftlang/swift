@@ -17,8 +17,34 @@
 #ifndef SWIFT_RUNTIME_CONFIG_H
 #define SWIFT_RUNTIME_CONFIG_H
 
-// Bring in visibility attribute macros for library visibility.
-#include "llvm/Support/Compiler.h"
+/// \macro SWIFT_RUNTIME_GNUC_PREREQ
+/// Extend the default __GNUC_PREREQ even if glibc's features.h isn't
+/// available.
+#ifndef SWIFT_RUNTIME_GNUC_PREREQ
+# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
+     ((maj) << 20) + ((min) << 10) + (patch))
+# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
+# else
+#  define SWIFT_RUNTIME_GNUC_PREREQ(maj, min, patch) 0
+# endif
+#endif
+
+/// SWIFT_RUNTIME_LIBRARY_VISIBILITY - If a class marked with this attribute is
+/// linked into a shared library, then the class should be private to the
+/// library and not accessible from outside it.  Can also be used to mark
+/// variables and functions, making them private to any shared library they are
+/// linked into.
+/// On PE/COFF targets, library visibility is the default, so this isn't needed.
+#if (__has_attribute(visibility) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)) &&    \
+    !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#else
+#define SWIFT_RUNTIME_LIBRARY_VISIBILITY
+#endif
 
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
