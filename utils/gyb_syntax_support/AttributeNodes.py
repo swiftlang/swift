@@ -162,16 +162,15 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiable-attr-parameters ->
-    #     'withRespectTo' ':' '(' differentiable-attr-parameter-list ')'
+    #     'wrt' ':' '(' differentiable-attr-parameter-list ')'
     Node('DifferentiableAttributeDiffParams', kind='Syntax',
          description='The parameters to differentiate with respect to.',
          traits=['WithTrailingComma'],
          children=[
-             Child('WithRespectToKeyword', kind='IdentifierToken',
-                   text_choices=['withRespectTo'],
-                   description='The "withRespectTo" label.'),
+             Child('WrtLabel', kind='IdentifierToken',
+                   text_choices=['wrt'], description='The "wrt" label.'),
              Child('Colon', kind='ColonToken', description='''
-                   The colon separating "withRespectTo" and the parameter list.
+                   The colon separating "wrt" and the parameter list.
                    '''),
              Child('LeftParen', kind='LeftParenToken'),
              Child('DiffParams', kind='DifferentiableAttributeDiffParamList',

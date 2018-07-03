@@ -30,9 +30,9 @@ struct S<T> {
     return self
   }
 
-  // CHECK-DAG: @differentiable(reverse, (self), primal: primal, adjoint: adjoint_checkpointed)
+  // CHECK-DAG: @differentiable(reverse, wrt: (self), primal: primal, adjoint: adjoint_checkpointed)
   // CHECK-DAG: func original(x: Float) -> Float
-  @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed)
+  @differentiable(reverse, wrt: (self), primal: primal, adjoint: adjoint_checkpointed)
   func original(x: Float) -> Float {
     return x
   }

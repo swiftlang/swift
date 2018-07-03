@@ -3691,10 +3691,10 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   if (consumeIf(tok::comma)) {
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
-      SourceRange withRespectToRange(Tok.getLoc());
-      diagnose(Tok, diag::gradient_expr_use_wrt_not_withrespectto)
+      SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
+      diagnose(Tok, diag::autodiff_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
-        .fixItReplace(withRespectToRange, "wrt");
+        .fixItReplace(withRespectToRange, "wrt:");
       return errorAndSkipToEnd();
     }
     // Parse 'wrt' ':'.

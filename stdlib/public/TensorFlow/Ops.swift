@@ -441,7 +441,7 @@ public extension Tensor {
   /// order.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, withRespectTo: (self),
+    reverse, wrt: (self),
     adjoint: _adjointTransposed(_:originalValue:seed:)
   )
   func transposed(
@@ -1212,7 +1212,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   // `ExpressibleByFloatLiteral`.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, withRespectTo: (self, .1, .2),
+    reverse, wrt: (self, .1, .2),
     adjoint: _adjointBatchNormalized
   )
   func batchNormalized(
@@ -1268,7 +1268,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   /// - Precondition: `filter` must have rank 4.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, withRespectTo: (self, .0),
+    reverse, wrt: (self, .0),
     adjoint: _adjointConvolved2D(filter:strides:padding:originalValue:seed:)
   )
   func convolved2D(
@@ -1293,7 +1293,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - padding: The padding for the operation.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, withRespectTo: (self),
+    reverse, wrt: (self),
     adjoint: _adjointMaxPooled(kernelSize:strides:padding:originalValue:seed:)
   )
   func maxPooled(
@@ -1318,7 +1318,7 @@ public extension Tensor where Scalar : BinaryFloatingPoint {
   ///   - padding: The padding for the operation.
   @inlinable @inline(__always)
   @differentiable(
-    reverse, withRespectTo: (self),
+    reverse, wrt: (self),
     adjoint: _adjointAveragePooled(kernelSize:strides:padding:originalValue:seed:)
   )
   func averagePooled(

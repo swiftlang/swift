@@ -52,7 +52,7 @@ struct A {
       }
 
       @differentiable(
-        reverse, withRespectTo: (self, .0),
+        reverse, wrt: (self, .0),
         adjoint: dSubtract(a:primal:seed:)
       )
       func subtract(a: C) -> C {
@@ -101,10 +101,7 @@ extension Pair {
     return (seed, seed)
   }
 
-  @differentiable(
-    reverse, withRespectTo: (self, .0),
-    adjoint: dSubtract(_:primal:seed:)
-  )
+  @differentiable(reverse, wrt: (self, .0), adjoint: dSubtract(_:primal:seed:))
   func subtract(_ a: Pair) -> Pair {
     return Pair(x: x-a.x, y: y-a.y)
   }
@@ -156,10 +153,7 @@ struct Vector<T> {
     return a
   }
 
-  @differentiable(
-    reverse, withRespectTo: (self, .0),
-    adjoint: dDivide(_:primal:seed:)
-  )
+  @differentiable(reverse, wrt: (self, .0), adjoint: dDivide(_:primal:seed:))
   func divide<A : FloatingPoint>(_ a: Vector<A>) -> Vector<A> {
     return a
   }

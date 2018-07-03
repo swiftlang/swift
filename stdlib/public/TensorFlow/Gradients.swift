@@ -279,7 +279,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the input.
   @inlinable
   @differentiable(
-    reverse, withRespectTo: (.1, .2),
+    reverse, wrt: (.1, .2),
     adjoint: _adjointTFConv2DBackpropInput(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropInput(
@@ -300,7 +300,7 @@ extension Tensor where Scalar : BinaryFloatingPoint {
   /// TensorFlow builtin conv2d gradient helper for the filter.
   @inlinable
   @differentiable(
-    reverse, withRespectTo: (.0, .2),
+    reverse, wrt: (.0, .2),
     adjoint: _adjointTFConv2DBackpropFilter(_:_:_:_:_:_:_:)
   )
   func _TFConv2DBackpropFilter(
