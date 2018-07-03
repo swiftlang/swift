@@ -1534,6 +1534,47 @@ static int compareSimilarAssociatedTypes(ValueDecl *const *lhs,
   return TypeDecl::compare(lhsProto, rhsProto);
 }
 
+/// Compute the set of associated types that are overridden by the given
+/// associated type.
+static SmallVector<ValueDecl *, 4>
+computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
+  // Find associated types with the given name in all of the inherited
+  // protocols.
+  SmallVector<ValueDecl *, 4> overriddenAssocTypes;
+  auto proto = assocType->getProtocol();
+  proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
+    if (proto == inheritedProto) return TypeWalker::Action::Continue;
+
+    // Objective-C protocols
+    if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
+
+    // Look for associated types with the same name.
+    bool foundAny = false;
+    for (auto member : inheritedProto->lookupDirect(
+                                              assocType->getFullName(),
+                                              /*ignoreNewExtensions=*/true)) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        overriddenAssocTypes.push_back(assocType);
+        foundAny = true;
+      }
+    }
+
+    return foundAny ? TypeWalker::Action::SkipChildren
+                    : TypeWalker::Action::Continue;
+  });
+
+  // Minimize the set of inherited associated types, eliminating any that
+  // themselves are overridden.
+  minimizeOverriddenAssociatedTypes(overriddenAssocTypes);
+
+  // Sort the set of inherited associated types.
+  llvm::array_pod_sort(overriddenAssocTypes.begin(),
+                       overriddenAssocTypes.end(),
+                       compareSimilarAssociatedTypes);
+
+  return overriddenAssocTypes;
+}
+
 void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
   // If this function or something it calls didn't set any overridden
   // declarations, it means that there are no overridden declarations. Set
@@ -1553,41 +1594,8 @@ void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
     // FIXME: The request-evaluator will eventually handle this for us.
     (void)assocType->setOverriddenDecls({ });
 
-    // Find associated types with the given name in all of the inherited
-    // protocols.
-    SmallVector<ValueDecl *, 4> inheritedAssociatedTypes;
-    auto proto = assocType->getProtocol();
-    proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
-      if (proto == inheritedProto) return TypeWalker::Action::Continue;
-
-      // Objective-C protocols
-      if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
-
-      // Look for associated types with the same name.
-      bool foundAny = false;
-      for (auto member : inheritedProto->lookupDirect(
-                                                      assocType->getFullName(),
-                                                      /*ignoreNewExtensions=*/true)) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-          inheritedAssociatedTypes.push_back(assocType);
-          foundAny = true;
-        }
-      }
-
-      return foundAny ? TypeWalker::Action::SkipChildren
-      : TypeWalker::Action::Continue;
-    });
-
-    // Minimize the set of inherited associated types, eliminating any that
-    // themselves are overridden.
-    minimizeOverriddenAssociatedTypes(inheritedAssociatedTypes);
-
-    // Sort the set of inherited associated types.
-    llvm::array_pod_sort(inheritedAssociatedTypes.begin(),
-                         inheritedAssociatedTypes.end(),
-                         compareSimilarAssociatedTypes);
-
-    (void)assocType->setOverriddenDecls(inheritedAssociatedTypes);
+    auto overriddenAssocTypes = computeOverriddenAssociatedTypes(assocType);
+    (void)assocType->setOverriddenDecls(overriddenAssocTypes);
     return;
   }
 
