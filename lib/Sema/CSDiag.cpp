@@ -18,6 +18,7 @@
 #include "CSDiag.h"
 #include "CalleeCandidateInfo.h"
 #include "MiscDiagnostics.h"
+#include "TypeCheckAvailability.h"
 #include "TypoCorrection.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -4404,7 +4405,7 @@ public:
     assert(!newNames.empty() && "No arguments were re-labeled");
 
     // Let's diagnose labeling problem but only related to corrected ones.
-    if (diagnoseArgumentLabelError(TC, ArgExpr, newNames, IsSubscript))
+    if (diagnoseArgumentLabelError(TC.Context, ArgExpr, newNames, IsSubscript))
       Diagnosed = true;
 
     return true;
@@ -6351,7 +6352,7 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
     // type-checking sub-expression as unavaible
     // declaration, let's try to diagnose that here.
     if (AvailableAttr::isUnavailable(decl))
-      return CS.TC.diagnoseExplicitUnavailability(
+      return diagnoseExplicitUnavailability(
           decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
   }
 
@@ -7908,8 +7909,8 @@ bool FailureDiagnosis::diagnoseMemberFailures(
   if (allUnavailable) {
     auto firstDecl = viableCandidatesToReport[0].getDecl();
     // FIXME: We need the enclosing CallExpr to rewrite the argument labels.
-    if (CS.TC.diagnoseExplicitUnavailability(firstDecl, BaseLoc, CS.DC,
-                                             /*call*/ nullptr))
+    if (diagnoseExplicitUnavailability(firstDecl, BaseLoc, CS.DC,
+                                       /*call*/ nullptr))
       return true;
   }
 

@@ -61,7 +61,8 @@ void fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
 /// error diagnostic.
 ///
 /// \returns true if the issue was diagnosed
-bool diagnoseArgumentLabelError(TypeChecker &TC, const Expr *expr,
+bool diagnoseArgumentLabelError(ASTContext &ctx,
+                                const Expr *expr,
                                 ArrayRef<Identifier> newNames,
                                 bool isSubscript,
                                 InFlightDiagnostic *existingDiag = nullptr);
