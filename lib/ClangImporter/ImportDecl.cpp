@@ -6379,11 +6379,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
 void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   // Figure out the class in which this method occurs.
-  auto classTy = decl->getDeclContext()->getDeclaredInterfaceType()
-      ->getAs<ClassType>();
-  if (!classTy)
+  auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl)
     return;
-  auto superTy = classTy->getSuperclass();
+  auto superTy = classDecl->getSuperclass();
   if (!superTy)
     return;
   // Dig out the Objective-C superclass.
