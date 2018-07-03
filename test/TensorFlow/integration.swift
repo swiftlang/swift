@@ -228,6 +228,65 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: cond_br [[BOOLVAL]],
 
+public func test_multiple_ifs(status: Bool // expected-warning {{'status' implicitly copied to the accelerator}}
+) {
+  var a = Tensor<Int32>(0);
+  let b = a;
+  if (status) { // expected-note {{value used here}}
+    a += b;
+  }
+  a += b;
+  if (status) {
+    a += b;
+  }
+  a -= b;
+  print (a)
+}
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_multiple_ifs{{.*}}
+// CHECK: sil private @{{.*}}test_multiple_ifs{{.*}}
+// CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>):
+// CHECK:      integer_literal $Builtin.Int32, 0
+// CHECK-NEXT: integer_literal $Builtin.Int32, 3
+// CHECK:      [[INIT:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
+// CHECK-NEXT: [[A:%.*]] = unchecked_ref_cast [[INIT]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32>
+// CHECK:      builtin "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>)
+// CHECK-NEXT: cond_br {{.*}}, bb2, bb1
+
+// CHECK: bb1:
+// CHECK:   br bb3([[A]] : $TensorHandle<Int32>)
+
+// CHECK: bb2:
+// CHECK:      [[B:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[A]] : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, {{.*}} : $@thick Int32.Type, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Int32>
+// CHECK-NEXT: br bb3([[B]] : $TensorHandle<Int32>)
+
+// CHECK: bb3([[C:%.*]] : $TensorHandle<Int32>):
+// CHECK:   [[D:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[C]] : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, {{.*}} : $@thick Int32.Type, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Int32>
+// CHECK:      builtin "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>)
+// CHECK-NEXT: cond_br {{.*}}, bb5, bb4
+
+// CHECK: bb4:
+// CHECK:   br bb6([[D]] : $TensorHandle<Int32>)
+
+// CHECK: bb5:
+// CHECK:   [[E:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"([[D]] : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, {{.*}} : $@thick Int32.Type, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Int32>
+// CHECK:   br bb6([[E]] : $TensorHandle<Int32>)
+
+// CHECK: bb6([[F:%.*]] : $TensorHandle<Int32>):
+// CHECK:   [[G:%.*]] = builtin "__tfop_Sub,$in,$in,T,__device"([[F]] : $TensorHandle<Int32>, [[A]] : $TensorHandle<Int32>, {{.*}} : $@thick Int32.Type, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Int32>
+// CHECK-NEXT:   return [[G]] : $TensorHandle<Int32>
+// CHECK: }
+
+// ----
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
+// CHECK:      [sequence
+// CHECK-NEXT:   {condition Header: bb0
+// CHECK-NEXT:     block bb2
+// CHECK-NEXT:     block bb1}
+// CHECK-NEXT:   {condition Header: bb3
+// CHECK-NEXT:     block bb5
+// CHECK-NEXT:     block bb4}
+// CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {
