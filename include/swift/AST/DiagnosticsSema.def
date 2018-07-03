@@ -1976,15 +1976,6 @@ NOTE(overridden_here,none,
 NOTE(overridden_here_can_be_objc,none,
      "add '@objc' to make this declaration overridable", ())
 
-ERROR(override_objc_type_mismatch_method,none,
-      "overriding method with selector %0 has incompatible type %1",
-      (ObjCSelector, Type))
-ERROR(override_objc_type_mismatch_subscript,none,
-      "overriding %select{|indexed |keyed }0subscript with incompatible type "
-      "%1",
-      (unsigned, Type))
-NOTE(overridden_here_with_type,none,
-     "overridden declaration here has type %0", (Type))
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())
 

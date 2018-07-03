@@ -342,26 +342,6 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
   return emittedError;
 }
 
-/// Make sure that there is an invalid 'override' attribute on the
-/// given declaration.
-static void makeInvalidOverrideAttr(ValueDecl *decl) {
-  if (auto overrideAttr = decl->getAttrs().getAttribute<OverrideAttr>()) {
-    overrideAttr->setInvalid();
-  } else {
-    auto attr = new (decl->getASTContext()) OverrideAttr(true);
-    decl->getAttrs().add(attr);
-    attr->setInvalid();
-  }
-
-  // FIXME: What about the other accessors?
-  if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    if (auto getter = storage->getGetter())
-      makeInvalidOverrideAttr(getter);
-    if (auto setter = storage->getSetter())
-      makeInvalidOverrideAttr(setter);
-  }
-}
-
 /// Record that the \c overriding declarations overrides the
 /// \c overridden declaration.
 ///
@@ -657,9 +637,6 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     members = tc.lookupMember(dc, superclass, membersName, lookupOptions);
   }
 
-  auto method = dyn_cast<AbstractFunctionDecl>(decl);
-  SubscriptDecl *subscript = dyn_cast<SubscriptDecl>(decl);
-
   // Check each member we found.
   SmallVector<OverrideMatch, 2> matches;
   for (auto memberResult : members) {
@@ -673,27 +650,6 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
     assert(parentMethod || parentStorage);
-
-    // If both are Objective-C, then match based on selectors or
-    // subscript kind and check the types separately.
-    // FIXME: This is wrong. We should be matching based on type information,
-    // then checking Objective-C selectors much later.
-    bool objCMatch = false;
-    if (parentDecl->isObjC() && decl->isObjC()) {
-      if (method) {
-        if (method->getObjCSelector() == parentMethod->getObjCSelector())
-          objCMatch = true;
-      } else if (auto *parentSubscript =
-                 dyn_cast<SubscriptDecl>(parentStorage)) {
-        // If the subscript kinds don't match, it's not an override.
-        if (subscript->getObjCSubscriptKind()
-            == parentSubscript->getObjCSubscriptKind())
-          objCMatch = true;
-      }
-
-      // Properties don't need anything here since they are always
-      // checked by name.
-    }
 
     // Check whether the types are identical.
     auto parentDeclTy = getMemberTypeForComparison(ctx, parentDecl, decl);
@@ -736,33 +692,12 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
 
       if (declFnTy->matchesFunctionType(parentDeclFnTy, matchMode,
                                         paramsAndResultMatch)) {
-        matches.push_back({parentDecl, objCMatch, parentDeclTy});
+        matches.push_back({parentDecl, false, parentDeclTy});
         continue;
       }
     } else if (getDeclComparisonType()->matches(parentDeclTy, matchMode)) {
-      matches.push_back({parentDecl, objCMatch, parentDeclTy});
+      matches.push_back({parentDecl, false, parentDeclTy});
       continue;
-    }
-
-    // Not a match. If we had an Objective-C match, this is a serious
-    // problem.
-    if (objCMatch) {
-      if (method) {
-        ctx.Diags.diagnose(decl, diag::override_objc_type_mismatch_method,
-                           method->getObjCSelector(), declTy);
-      } else {
-        ctx.Diags.diagnose(decl, diag::override_objc_type_mismatch_subscript,
-                           static_cast<unsigned>(
-                                          subscript->getObjCSubscriptKind()),
-                           getDeclComparisonType());
-      }
-      ctx.Diags.diagnose(parentDecl, diag::overridden_here_with_type,
-                         parentDeclTy);
-
-      // Put an invalid 'override' attribute here.
-      makeInvalidOverrideAttr(decl);
-
-      return { };
     }
   }
 
