@@ -756,18 +756,6 @@ public:
   /// The list of types whose circularity checks were delayed.
   SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
-  using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
-
-  /// Caches the outermost scope where a particular declaration can be used,
-  /// relative to a particular file.
-  ///
-  /// The file is used to handle things like \c \@testable. A null-but-present
-  /// value means the type is public.
-  llvm::DenseMap<const SourceFile *,
-                 std::pair<TypeAccessScopeCacheMap,
-                           TypeAccessScopeCacheMap>>
-    TypeAccessScopeCache;
-
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
     specializedOverloadComparisonCache;

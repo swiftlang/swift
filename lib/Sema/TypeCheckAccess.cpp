@@ -30,20 +30,15 @@ namespace {
 class AccessScopeChecker {
   const SourceFile *File;
   bool TreatUsableFromInlineAsPublic;
-  TypeChecker::TypeAccessScopeCacheMap &Cache;
 
 protected:
   ASTContext &Context;
   Optional<AccessScope> Scope = AccessScope::getPublic();
 
   AccessScopeChecker(const DeclContext *useDC,
-                     bool treatUsableFromInlineAsPublic,
-                     decltype(TypeChecker::TypeAccessScopeCache) &caches)
+                     bool treatUsableFromInlineAsPublic)
       : File(useDC->getParentSourceFile()),
         TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
-        Cache(TreatUsableFromInlineAsPublic
-              ? caches[File].first
-              : caches[File].second),
         Context(File->getASTContext()) {}
 
   bool visitDecl(ValueDecl *VD) {
@@ -57,17 +52,7 @@ protected:
         return true;
     }
 
-    auto cached = Cache.find(VD);
-    if (cached != Cache.end()) {
-      Scope = Scope->intersectWith(cached->second);
-      return Scope.hasValue();
-    }
-
     auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
-    auto result = Cache.insert(std::make_pair(VD, AS));
-    assert(result.second);
-    (void) result;
-
     Scope = Scope->intersectWith(AS);
     return Scope.hasValue();
   }
@@ -75,9 +60,8 @@ protected:
 
 class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
   TypeReprAccessScopeChecker(const DeclContext *useDC,
-                             bool treatUsableFromInlineAsPublic,
-                             decltype(TypeChecker::TypeAccessScopeCache) &caches)
-    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic, caches) {
+                             bool treatUsableFromInlineAsPublic)
+    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic) {
   }
 
   bool walkToTypeReprPre(TypeRepr *TR) override {
@@ -92,10 +76,9 @@ class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
 
 public:
   static Optional<AccessScope>
-  getAccessScope(TypeChecker &TC, TypeRepr *TR, const DeclContext *useDC,
+  getAccessScope(TypeRepr *TR, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false) {
-    TypeReprAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
-                                       TC.TypeAccessScopeCache);
+    TypeReprAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
     TR->walk(checker);
     return checker.Scope;
   }
@@ -106,9 +89,8 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
   TypeAccessScopeChecker(const DeclContext *useDC,
                          bool treatUsableFromInlineAsPublic,
-                         decltype(TypeChecker::TypeAccessScopeCache) &caches,
                          bool canonicalizeParentTypes)
-    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic, caches),
+    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic),
       CanonicalizeParentTypes(canonicalizeParentTypes) {}
 
   Action walkToTypePre(Type T) override {
@@ -157,11 +139,10 @@ class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
 
 public:
   static Optional<AccessScope>
-  getAccessScope(TypeChecker &TC, Type T, const DeclContext *useDC,
+  getAccessScope(Type T, const DeclContext *useDC,
                  bool treatUsableFromInlineAsPublic = false,
                  bool canonicalizeParentTypes = false) {
     TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
-                                   TC.TypeAccessScopeCache,
                                    canonicalizeParentTypes);
     T.walk(checker);
     return checker.Scope;
@@ -194,11 +175,11 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [this, ED](const TypeLoc &TL) -> AccessLevel {
+    auto getTypeAccess = [ED](const TypeLoc &TL) -> AccessLevel {
       if (!TL.getType())
         return AccessLevel::Public;
       auto accessScope =
-          TypeReprAccessScopeChecker::getAccessScope(*this, TL.getTypeRepr(),
+          TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
                                                      ED->getDeclContext());
       // This is an error case and will be diagnosed elsewhere.
       if (!accessScope.hasValue())
@@ -442,10 +423,10 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
   // type.
   auto typeAccessScope =
     (TL.getTypeRepr()
-     ? TypeReprAccessScopeChecker::getAccessScope(TC, TL.getTypeRepr(),
+     ? TypeReprAccessScopeChecker::getAccessScope(TL.getTypeRepr(),
                                                   useDC,
                                                   checkUsableFromInline)
-     : TypeAccessScopeChecker::getAccessScope(TC, TL.getType(),
+     : TypeAccessScopeChecker::getAccessScope(TL.getType(),
                                               useDC,
                                               checkUsableFromInline));
 
@@ -479,7 +460,7 @@ void AccessControlCheckerBase::checkTypeAccessImpl(
     if (TC.getLangOpts().isSwiftVersion3()) {
       auto typeOnlyAccessScope =
         TypeAccessScopeChecker::getAccessScope(
-            TC, TL.getType(), useDC,
+            TL.getType(), useDC,
             /*treatUsableFromInlineAsPublic*/false,
             /*canonicalizeParents*/true);
       if (typeOnlyAccessScope.hasValue()) {
