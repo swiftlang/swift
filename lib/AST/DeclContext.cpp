@@ -558,9 +558,6 @@ unsigned DeclContext::printContext(raw_ostream &OS, unsigned indent) const {
     case FileUnitKind::Builtin:
       OS << " Builtin";
       break;
-    case FileUnitKind::Derived:
-      OS << " derived";
-      break;
     case FileUnitKind::Source:
       OS << " file=\"" << cast<SourceFile>(this)->getFilename() << "\"";
       break;

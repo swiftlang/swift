@@ -1720,15 +1720,15 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
-  if (auto fd = dyn_cast<FuncDecl>(this))
-    return fd->getOverriddenDecl();
-  if (auto sdd = dyn_cast<AbstractStorageDecl>(this))
-    return sdd->getOverriddenDecl();
-  if (auto cd = dyn_cast<ConstructorDecl>(this))
-    return cd->getOverriddenDecl();
-  if (auto at = dyn_cast<AssociatedTypeDecl>(this))
-    return at->getOverriddenDecl();
-  return nullptr;
+  auto overridden = getOverriddenDecls();
+  if (overridden.empty()) return nullptr;
+
+  // FIXME: Arbitrarily pick the first overridden declaration.
+  return overridden.front();
+}
+
+bool ValueDecl::overriddenDeclsComputed() const {
+  return LazySemanticInfo.hasOverriddenComputed;
 }
 
 bool swift::conflicting(const OverloadSignature& sig1,
@@ -1989,8 +1989,8 @@ CanType ValueDecl::getOverloadSignatureType() const {
 }
 
 bool ValueDecl::isObjC() const {
-  if (Bits.ValueDecl.IsObjCComputed)
-    return Bits.ValueDecl.IsObjC;
+  if (LazySemanticInfo.isObjCComputed)
+    return LazySemanticInfo.isObjC;
 
   // Fallback: look for an @objc attribute.
   // FIXME: This should become an error, eventually.
@@ -1998,29 +1998,25 @@ bool ValueDecl::isObjC() const {
 }
 
 void ValueDecl::setIsObjC(bool value) {
-  assert(!Bits.ValueDecl.IsObjCComputed || Bits.ValueDecl.IsObjC == value);
+  assert(!LazySemanticInfo.isObjCComputed || LazySemanticInfo.isObjC == value);
 
-  if (Bits.ValueDecl.IsObjCComputed) {
-    assert(Bits.ValueDecl.IsObjC == value);
+  if (LazySemanticInfo.isObjCComputed) {
+    assert(LazySemanticInfo.isObjC == value);
     return;
   }
 
-  Bits.ValueDecl.IsObjCComputed = true;
-  Bits.ValueDecl.IsObjC = value;
+  LazySemanticInfo.isObjCComputed = true;
+  LazySemanticInfo.isObjC = value;
 }
 
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
 
-  // Dynamic lookup can only find @objc members.
-  if (!isObjC())
-    return false;
-
   // Dynamic lookup can only find class and protocol members, or extensions of
   // classes.
   auto nominalDC =
-    getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!nominalDC ||
       (!isa<ClassDecl>(nominalDC) && !isa<ProtocolDecl>(nominalDC)))
     return false;
@@ -2031,10 +2027,14 @@ bool ValueDecl::canBeAccessedByDynamicLookup() const {
     return false;
 
   // Dynamic lookup can find functions, variables, and subscripts.
-  if (isa<FuncDecl>(this) || isa<VarDecl>(this) || isa<SubscriptDecl>(this))
-    return true;
+  if (!isa<FuncDecl>(this) && !isa<VarDecl>(this) && !isa<SubscriptDecl>(this))
+    return false;
 
-  return false;
+  // Dynamic lookup can only find @objc members.
+  if (!isObjC())
+    return false;
+
+  return true;
 }
 
 ArrayRef<ValueDecl *>
@@ -2779,9 +2779,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
       TrailingWhere(trailingWhere) {
-
-  Bits.AssociatedTypeDecl.ComputedOverridden = false;
-  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
@@ -2793,8 +2790,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
       Resolver(definitionResolver), ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
-  Bits.AssociatedTypeDecl.ComputedOverridden = false;
-  Bits.AssociatedTypeDecl.HasOverridden = false;
 }
 
 void AssociatedTypeDecl::computeType() {
@@ -2842,11 +2837,6 @@ AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
   }
 
   return bestAnchor;
-}
-
-AssociatedTypeDecl *AssociatedTypeDecl::getOverriddenDecl() const {
-  auto overridden = getOverriddenDecls();
-  return overridden.empty() ? nullptr : overridden.front();
 }
 
 EnumDecl::EnumDecl(SourceLoc EnumLoc,
@@ -4963,15 +4953,6 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
-AbstractFunctionDecl *AbstractFunctionDecl::getOverriddenDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this))
-    return func->getOverriddenDecl();
-  if (auto ctor = dyn_cast<ConstructorDecl>(this))
-    return ctor->getOverriddenDecl();
-  
-  return nullptr;
-}
-
 static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
@@ -5801,7 +5782,7 @@ NominalTypeDecl *TypeOrExtensionDecl::getBaseNominal() const {
 }
 bool TypeOrExtensionDecl::isNull() const { return Decl.isNull(); }
 
-void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *&decl) {
+void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
 }

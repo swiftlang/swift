@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_ARRAYREFVIEW_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/Casting.h"
 
 namespace swift {
 
@@ -151,6 +152,20 @@ public:
     return !(lhs == rhs);
   }
 };
+
+/// Helper for \c CastArrayRefView that casts the original type to the
+/// projected type.
+template<typename Projected, typename Orig>
+inline Projected *arrayRefViewCastHelper(const Orig &value) {
+  using llvm::cast_or_null;
+  return cast_or_null<Projected>(value);
+}
+
+/// An ArrayRefView that performs a cast_or_null on each element in the
+/// underlying ArrayRef.
+template<typename Orig, typename Projected>
+using CastArrayRefView =
+  ArrayRefView<Orig, Projected *, arrayRefViewCastHelper<Projected, Orig>>;
 
 } // end namespace swift
 

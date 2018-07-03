@@ -2698,7 +2698,7 @@ ModuleFile::getDeclCheckedImpl(DeclID DID, Optional<DeclContext *> ForcedContext
       assocType->setImplicit();
 
     // Overridden associated types.
-    SmallVector<AssociatedTypeDecl *, 2> overriddenAssocTypes;
+    SmallVector<ValueDecl *, 2> overriddenAssocTypes;
     for (auto overriddenID : rawOverriddenIDs) {
       if (auto overriddenAssocType =
               dyn_cast_or_null<AssociatedTypeDecl>(getDecl(overriddenID))) {

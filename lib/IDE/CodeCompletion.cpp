@@ -3227,7 +3227,6 @@ public:
       for (auto fileUnit : import.second->getFiles()) {
         switch (fileUnit->getKind()) {
         case FileUnitKind::Builtin:
-        case FileUnitKind::Derived:
         case FileUnitKind::ClangModule:
           continue;
         case FileUnitKind::Source:

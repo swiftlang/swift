@@ -2647,13 +2647,116 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   if (isInvalid) PGD->setInvalid();
 }
 
+/// Minimize the set of overridden associated types, eliminating any
+/// associated types that are overridden by other associated types.
+static void minimizeOverriddenAssociatedTypes(
+                           SmallVectorImpl<ValueDecl *> &assocTypes) {
+  // Mark associated types that are "worse" than some other associated type,
+  // because they come from an inherited protocol.
+  bool anyWorse = false;
+  std::vector<bool> worseThanAny(assocTypes.size(), false);
+  for (unsigned i : indices(assocTypes)) {
+    auto assoc1 = cast<AssociatedTypeDecl>(assocTypes[i]);
+    auto proto1 = assoc1->getProtocol();
+    for (unsigned j : range(i + 1, assocTypes.size())) {
+      auto assoc2 = cast<AssociatedTypeDecl>(assocTypes[j]);
+      auto proto2 = assoc2->getProtocol();
+      if (proto1->inheritsFrom(proto2)) {
+        anyWorse = true;
+        worseThanAny[j] = true;
+      } else if (proto2->inheritsFrom(proto1)) {
+        anyWorse = true;
+        worseThanAny[i] = true;
+        break;
+      }
+    }
+  }
+
+  // If we didn't find any associated types that were "worse", we're done.
+  if (!anyWorse) return;
+
+  // Copy in the associated types that aren't worse than any other associated
+  // type.
+  unsigned nextIndex = 0;
+  for (unsigned i : indices(assocTypes)) {
+    if (worseThanAny[i]) continue;
+    assocTypes[nextIndex++] = assocTypes[i];
+  }
+
+  assocTypes.erase(assocTypes.begin() + nextIndex, assocTypes.end());
+}
+
+/// Sort associated types just based on the protocol.
+static int compareSimilarAssociatedTypes(ValueDecl *const *lhs,
+                                         ValueDecl *const *rhs) {
+  auto lhsProto = cast<AssociatedTypeDecl>(*lhs)->getProtocol();
+  auto rhsProto = cast<AssociatedTypeDecl>(*rhs)->getProtocol();
+  return TypeDecl::compare(lhsProto, rhsProto);
+}
+
 void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
+  // If this function or something it calls didn't set any overridden
+  // declarations, it means that there are no overridden declarations. Set
+  // the empty list.
+  // Note: the request-evaluator would do this for free, but this function
+  // is still fundamentally stateful.
+  SWIFT_DEFER {
+    if (!VD->overriddenDeclsComputed())
+      (void)VD->setOverriddenDecls({ });
+  };
+
+  // For an associated type, compute the (minimized) set of overridden
+  // declarations.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(VD)) {
+    // Assume there are no overridden declarations for the purposes of this
+    // computation.
+    // FIXME: The request-evaluator will eventually handle this for us.
+    (void)assocType->setOverriddenDecls({ });
+
+    // Find associated types with the given name in all of the inherited
+    // protocols.
+    SmallVector<ValueDecl *, 4> inheritedAssociatedTypes;
+    auto proto = assocType->getProtocol();
+    proto->walkInheritedProtocols([&](ProtocolDecl *inheritedProto) {
+      if (proto == inheritedProto) return TypeWalker::Action::Continue;
+
+      // Objective-C protocols
+      if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
+
+      // Look for associated types with the same name.
+      bool foundAny = false;
+      for (auto member : inheritedProto->lookupDirect(
+                                                assocType->getFullName(),
+                                                /*ignoreNewExtensions=*/true)) {
+        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+          inheritedAssociatedTypes.push_back(assocType);
+          foundAny = true;
+        }
+      }
+
+      return foundAny ? TypeWalker::Action::SkipChildren
+                      : TypeWalker::Action::Continue;
+    });
+
+    // Minimize the set of inherited associated types, eliminating any that
+    // themselves are overridden.
+    minimizeOverriddenAssociatedTypes(inheritedAssociatedTypes);
+
+    // Sort the set of inherited associated types.
+    llvm::array_pod_sort(inheritedAssociatedTypes.begin(),
+                         inheritedAssociatedTypes.end(),
+                         compareSimilarAssociatedTypes);
+
+    (void)assocType->setOverriddenDecls(inheritedAssociatedTypes);
+    return;
+  }
+
   // Only members of classes can override other declarations.
   if (!VD->getDeclContext()->getAsClassOrClassExtensionContext())
     return;
 
   // Types that aren't associated types cannot be overridden.
-  if (isa<TypeDecl>(VD) && !isa<AssociatedTypeDecl>(VD))
+  if (isa<TypeDecl>(VD))
     return;
 
   // FIXME: We should check for the 'override' or 'required' keywords
@@ -3271,6 +3374,9 @@ public:
 
     AccessControlChecker::checkAccessControl(TC, AT);
     UsableFromInlineChecker::checkUsableFromInline(TC, AT);
+
+    // Trigger the checking for overridden declarations.
+    (void)AT->getOverriddenDecls();
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {

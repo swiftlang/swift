@@ -1735,8 +1735,8 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
   if (VD->getDeclContext()->getAsClassOrClassExtensionContext())
     makeFinal(Context, Storage);
   Storage->setImplicit();
-  Storage->setAccess(AccessLevel::Private);
-  Storage->setSetterAccess(AccessLevel::Private);
+  Storage->overwriteAccess(AccessLevel::Private);
+  Storage->overwriteSetterAccess(AccessLevel::Private);
 }
 
 /// Consider add a materializeForSet accessor to the given storage
