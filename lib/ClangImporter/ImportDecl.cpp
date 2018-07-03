@@ -1965,7 +1965,7 @@ shouldSuppressGenericParamsImport(const LangOptions &langOpts,
     return module->getTopLevelModuleName() == "Foundation";
   };
 
-  if (langOpts.isSwiftVersion3() || isFromFoundationModule(decl)) {
+  if (isFromFoundationModule(decl)) {
     // In Swift 3 we used a hardcoded list of declarations, and made all of
     // their subclasses drop their generic parameters when imported.
     while (decl) {
@@ -7552,41 +7552,6 @@ void ClangImporter::Implementation::importAttributes(
                                           PlatformAgnostic, /*Implicit=*/false);
 
       MappedDecl->getAttrs().add(AvAttr);
-
-      // For enum cases introduced in the 2017 SDKs, add
-      // @_downgrade_exhaustivity_check in Swift 3.
-      if (C.LangOpts.isSwiftVersion3() && isa<EnumElementDecl>(MappedDecl)) {
-        bool downgradeExhaustivity = false;
-        switch (*platformK) {
-        case PlatformKind::OSX:
-        case PlatformKind::OSXApplicationExtension:
-          downgradeExhaustivity = (introduced.getMajor() == 10 &&
-                                   introduced.getMinor() &&
-                                   *introduced.getMinor() == 13);
-          break;
-
-        case PlatformKind::iOS:
-        case PlatformKind::iOSApplicationExtension:
-        case PlatformKind::tvOS:
-        case PlatformKind::tvOSApplicationExtension:
-          downgradeExhaustivity = (introduced.getMajor() == 11);
-          break;
-
-        case PlatformKind::watchOS:
-        case PlatformKind::watchOSApplicationExtension:
-          downgradeExhaustivity = (introduced.getMajor() == 4);
-          break;
-
-        case PlatformKind::none:
-          break;
-        }
-
-        if (downgradeExhaustivity) {
-          auto attr =
-            new (C) DowngradeExhaustivityCheckAttr(/*isImplicit=*/true);
-          MappedDecl->getAttrs().add(attr);
-        }
-      }
     }
   }
 
@@ -7717,8 +7682,7 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
       }
     }
     if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-      if (!SwiftContext.LangOpts.isSwiftVersion3() &&
-          method->isDesignatedInitializerForTheInterface()) {
+      if (method->isDesignatedInitializerForTheInterface()) {
         const clang::ObjCInterfaceDecl *theClass = method->getClassInterface();
         assert(theClass && "cannot be a protocol method here");
         // Only allow this to affect declarations in the same top-level module
