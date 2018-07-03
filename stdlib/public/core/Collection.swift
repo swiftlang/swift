@@ -658,22 +658,24 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `-distance` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
-  func index(_ i: Index, offsetBy n: Int) -> Index
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
+  func index(_ i: Index, offsetBy distance: Int) -> Index
 
   /// Returns an index that is the specified distance from the given index,
   /// unless that distance is beyond a given limiting index.
@@ -697,26 +699,28 @@ public protocol Collection: Sequence where SubSequence: Collection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index?
 
   /// Returns the distance between two indices.
@@ -859,24 +863,26 @@ extension Collection {
   ///     print(s[i])
   ///     // Prints "t"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `-distance` calls to
+  ///   `index(before:)`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return self._advanceForward(i, by: n)
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    return self._advanceForward(i, by: distance)
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -901,75 +907,80 @@ extension Collection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    return self._advanceForward(i, by: n, limitedBy: limit)
+    return self._advanceForward(i, by: distance, limitedBy: limit)
   }
 
   /// Offsets the given index by the specified distance.
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
-  public func formIndex(_ i: inout Index, offsetBy n: Int) {
-    i = index(i, offsetBy: n)
+  public func formIndex(_ i: inout Index, offsetBy distance: Int) {
+    i = index(i, offsetBy: distance)
   }
 
   /// Offsets the given index by the specified distance, or so that it equals
   /// the given limiting index.
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the collection.
-  ///   - n: The distance to offset `i`. `n` must not be negative unless the
-  ///     collection conforms to the `BidirectionalCollection` protocol.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     a limit that is less than `i` has no effect. Likewise, if `n < 0`, a
-  ///     limit that is greater than `i` has no effect.
-  /// - Returns: `true` if `i` has been offset by exactly `n` steps without
-  ///   going beyond `limit`; otherwise, `false`. When the return value is
-  ///   `false`, the value of `i` is equal to `limit`.
+  ///   - distance: The distance to offset `i`. `distance` must not be negative
+  ///     unless the collection conforms to the `BidirectionalCollection`
+  ///     protocol.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: `true` if `i` has been offset by exactly `distance` steps
+  ///   without going beyond `limit`; otherwise, `false`. When the return
+  ///   value is `false`, the value of `i` is equal to `limit`.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
-  ///   value of `n`.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the absolute
+  ///   value of `distance`.
   @inlinable
   public func formIndex(
-    _ i: inout Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: inout Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Bool {
-    if let advancedIndex = index(i, offsetBy: n, limitedBy: limit) {
+    if let advancedIndex = index(i, offsetBy: distance, limitedBy: limit) {
       i = advancedIndex
       return true
     }
@@ -1772,8 +1783,8 @@ extension Collection where SubSequence == Self {
   ///   elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
-  ///   the collection.
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the specified
+  ///   number of elements.
   @inlinable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }

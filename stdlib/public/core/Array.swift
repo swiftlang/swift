@@ -429,24 +429,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  /// - Returns: An index offset by `n` from the index `i`. If `n` is positive,
-  ///   this is the same value as the result of `n` calls to `index(after:)`.
-  ///   If `n` is negative, this is the same value as the result of `-n` calls
-  ///   to `index(before:)`.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `-distance` calls to
+  ///   `index(before:)`.
   @inlinable
-  public func index(_ i: Int, offsetBy n: Int) -> Int {
+  public func index(_ i: Int, offsetBy distance: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
     // capable of creating partial specializations yet.
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
-    return i + n
+    return i + distance
   }
 
   /// Returns an index that is the specified distance from the given index,
@@ -475,22 +476,25 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `n` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
-  ///   - n: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `n > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `n < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
-  /// - Returns: An index offset by `n` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` has no effect if it is less than `i`.
+  ///     Likewise, if `distance < 0`, `limit` has no effect if it is greater
+  ///     than `i`.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public func index(
-    _ i: Int, offsetBy n: Int, limitedBy limit: Int
+    _ i: Int, offsetBy distance: Int, limitedBy limit: Int
   ) -> Int? {
     // NOTE: this is a manual specialization of index movement for a Strideable
     // index that is required for Array performance.  The optimizer is not
@@ -498,10 +502,10 @@ extension Array: RandomAccessCollection, MutableCollection {
     // NOTE: Range checks are not performed here, because it is done later by
     // the subscript function.
     let l = limit - i
-    if n > 0 ? l >= 0 && l < n : l <= 0 && n < l {
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
-    return i + n
+    return i + distance
   }
 
   /// Returns the distance between two indices.
@@ -546,10 +550,9 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   greater than or equal to `startIndex` and less than `endIndex`.
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
-  ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.
-  ///   If the array uses a bridged `NSArray` instance as its storage, the
-  ///   efficiency is unspecified.
+  ///   unless the array's storage is shared with another array or uses a
+  ///   bridged `NSArray` instance as its storage, in which case writing is
+  ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
     get {

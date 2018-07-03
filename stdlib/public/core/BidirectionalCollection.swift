@@ -140,17 +140,17 @@ extension BidirectionalCollection {
   }
 
   @inlinable // protocol-only
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
-    return _index(i, offsetBy: n)
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
+    return _index(i, offsetBy: distance)
   }
 
   @inlinable // protocol-only
-  internal func _index(_ i: Index, offsetBy n: Int) -> Index {
-    if n >= 0 {
-      return _advanceForward(i, by: n)
+  internal func _index(_ i: Index, offsetBy distance: Int) -> Index {
+    if distance >= 0 {
+      return _advanceForward(i, by: distance)
     }
     var i = i
-    for _ in stride(from: 0, to: n, by: -1) {
+    for _ in stride(from: 0, to: distance, by: -1) {
       formIndex(before: &i)
     }
     return i
@@ -158,20 +158,20 @@ extension BidirectionalCollection {
 
   @inlinable // protocol-only
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    return _index(i, offsetBy: n, limitedBy: limit)
+    return _index(i, offsetBy: distance, limitedBy: limit)
   }
 
   @inlinable // protocol-only
   internal func _index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
-    if n >= 0 {
-      return _advanceForward(i, by: n, limitedBy: limit)
+    if distance >= 0 {
+      return _advanceForward(i, by: distance, limitedBy: limit)
     }
     var i = i
-    for _ in stride(from: 0, to: n, by: -1) {
+    for _ in stride(from: 0, to: distance, by: -1) {
       if i == limit {
         return nil
       }

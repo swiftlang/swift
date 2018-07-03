@@ -57,9 +57,9 @@
 /// add an empty initializer and the `replaceSubrange(_:with:)` method to your
 /// custom type. `RangeReplaceableCollection` provides default implementations
 /// of all its other methods using this initializer and method. For example,
-/// the `removeSubrange(_:)` method is implemented by calling 
-/// `replaceSubrange(_:with:)` with an empty collection for the `newElements` 
-/// parameter. You can override any of the protocol's required methods to 
+/// the `removeSubrange(_:)` method is implemented by calling
+/// `replaceSubrange(_:with:)` with an empty collection for the `newElements`
+/// parameter. You can override any of the protocol's required methods to
 /// provide your own custom implementation.
 public protocol RangeReplaceableCollection : Collection
   where SubSequence : RangeReplaceableCollection {
@@ -525,9 +525,9 @@ extension RangeReplaceableCollection {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter position: The position of the element to remove. `position` must be
-  ///   a valid index of the collection that is not equal to the collection's
-  ///   end index.
+  /// - Parameter position: The position of the element to remove. `position`
+  ///   must be a valid index of the collection that is not equal to the
+  ///   collection's end index.
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
@@ -684,7 +684,9 @@ extension RangeReplaceableCollection where SubSequence == Self {
   ///   `n` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1) if the collection conforms to
+  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the specified
+  ///   number of elements.
   @inlinable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
@@ -997,8 +999,8 @@ extension RangeReplaceableCollection {
   /// Appends the elements of a sequence to a range-replaceable collection.
   ///
   /// Use this operator to append the elements of a sequence to the end of
-  /// range-replaceable collection with same `Element` type. This example appends
-  /// the elements of a `Range<Int>` instance to an array of integers.
+  /// range-replaceable collection with same `Element` type. This example
+  /// appends the elements of a `Range<Int>` instance to an array of integers.
   ///
   ///     var numbers = [1, 2, 3, 4, 5]
   ///     numbers += 10...15
@@ -1009,7 +1011,8 @@ extension RangeReplaceableCollection {
   ///   - lhs: The array to append to.
   ///   - rhs: A collection or finite sequence.
   ///
-  /// - Complexity: O(*m*), where *m* is the length of the right-hand-side argument.
+  /// - Complexity: O(*m*), where *m* is the length of the right-hand-side
+  ///   argument.
   @inlinable
   public static func += <
     Other : Sequence
