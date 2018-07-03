@@ -214,6 +214,8 @@ namespace {
           Spaces({}) {}
 
       static Space forType(Type T, Identifier NameForPrinting) {
+        if (T->isStructurallyUninhabited())
+          return Space();
         return Space(T, NameForPrinting);
       }
       static Space forUnknown(bool allowedButNotRequired) {
