@@ -128,9 +128,10 @@ struct OuterGenericStruct<A> {
 func genericFunction<T>(t: T) {
   class First : Second<T>.UnknownType { }
   // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
+  // expected-error@-2 {{'UnknownType' is not a member type of 'Second<T>'}}
   class Second<T> : Second { }
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
-  // expected-error@-2 2 {{'Second' inherits from itself}}
+  // expected-error@-2 {{'Second' inherits from itself}}
 }
 
 // Spurious "Self or associated type requirements" diagnostic.
