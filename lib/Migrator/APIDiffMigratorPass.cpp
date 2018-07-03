@@ -1028,6 +1028,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
 
     // Change attribute(rawValue: "value") to "value"
+    // Change attribute("value") to "value"
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Found = false;
       if (auto *CRC = dyn_cast<ConstructorRefCallExpr>(CE->getFn())) {
@@ -1040,10 +1041,14 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         return false;
       std::vector<CallArgInfo> AllArgs =
         getCallArgInfo(SM, CE->getArg(), LabelRangeEndAt::LabelNameOnly);
-      if (AllArgs.size() == 1 && AllArgs.front().LabelRange.str() == "rawValue") {
-        Editor.replace(CE->getSourceRange(), Lexer::getCharSourceRangeFromSourceRange(SM,
-          AllArgs.front().ArgExp->getSourceRange()).str());
-        return true;
+      if (AllArgs.size() == 1) {
+        auto Label = AllArgs.front().LabelRange.str();
+        if (Label == "rawValue" || Label.empty()) {
+          Editor.replace(CE->getSourceRange(),
+                         Lexer::getCharSourceRangeFromSourceRange(SM,
+                           AllArgs.front().ArgExp->getSourceRange()).str());
+          return true;
+        }
       }
     }
     return false;
