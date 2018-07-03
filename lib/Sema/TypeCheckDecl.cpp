@@ -376,20 +376,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->hasError())
       continue;
 
-    // Retrieve the interface type for this inherited type.
-    //
-    // If we have a generic parameter, mapTypeOutOfContext() might not
-    // work yet, if we're calling this while building the generic
-    // signature. However, we're also not storing inheritedTy back
-    // anywhere, so it's OK to leave it as an archetype.
-    //
-    // FIXME: Ideally, we wouldn't have code paths that take a mix
-    // of archetypes and interface types. Other than generic parameters,
-    // the only time we get an interface type here is with invalid
-    // circular cases. That should be diagnosed elsewhere.
-    if (inheritedTy->hasArchetype() && !isa<GenericTypeParamDecl>(decl))
-      inheritedTy = inheritedTy->mapTypeOutOfContext();
-
     // Check whether we inherited from the same type twice.
     CanType inheritedCanTy = inheritedTy->getCanonicalType();
     auto knownType = inheritedTypes.find(inheritedCanTy);

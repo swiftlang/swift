@@ -1,16 +1,16 @@
-// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-ide-test -print-ast-typechecked -source-filename=%s -print-implicit-attrs -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 @objc class Super {
-  func baseFoo() {}
+  @objc dynamic func baseFoo() {}
 }
 
 // CHECK: extension Super {
 extension Super {
   // CHECK:  @objc dynamic func foo
-  func foo() { }
+  @objc func foo() { }
 
   // CHECK: @objc dynamic var prop: Super
-  var prop: Super {
+  @objc var prop: Super {
     // CHECK: @objc dynamic get
     get { return Super() }
     // CHECK: @objc dynamic set
@@ -18,7 +18,7 @@ extension Super {
   }
 
   // CHECK: @objc dynamic subscript(sup: Super) -> Super
-  subscript(sup: Super) -> Super {
+  @objc subscript(sup: Super) -> Super {
     // CHECK: @objc dynamic get
     get { return sup }
     // CHECK: @objc dynamic set
@@ -60,10 +60,10 @@ extension Sub {
 
 extension FinalTests {
   // CHECK: @objc final func foo
-  final func foo() { }
+  @objc final func foo() { }
 
   // CHECK: @objc final var prop: Super
-  final var prop: Super {
+  @objc final var prop: Super {
     // CHECK: @objc final get
     get { return Super() }
     // CHECK: @objc final set
@@ -71,7 +71,7 @@ extension FinalTests {
   }
 
   // CHECK: @objc final subscript(sup: Super) -> Super
-  final subscript(sup: Super) -> Super {
+  @objc final subscript(sup: Super) -> Super {
     // CHECK: @objc final get
     get { return sup }
     // CHECK: @objc final set
@@ -79,9 +79,9 @@ extension FinalTests {
   }
 
   // CHECK: @objc static var x
-  static var x: Int = 0
+  @objc static var x: Int = 0
 
   // CHECK: @objc static func bar
-  static func bar() { }
+  @objc static func bar() { }
 }
 
