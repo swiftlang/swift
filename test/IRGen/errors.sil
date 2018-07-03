@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu
 // REQUIRES: executable_test
+// UNSUPPORTED: CPU=powerpc64le
 
 sil_stage canonical
 
