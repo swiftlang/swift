@@ -83,13 +83,9 @@ public:
     }
   };
 
-  // FIXME: This should be a PointerIntPair, but there's a bug in
-  // PointerIntPair when the number of free bits is greater than 32.
-  using DeclIDAndForce = std::pair<DeclID, bool>;
-
 private:
   /// A map from Types and Decls to their serialized IDs.
-  llvm::DenseMap<DeclTypeUnion, DeclIDAndForce> DeclAndTypeIDs;
+  llvm::DenseMap<DeclTypeUnion, DeclID> DeclAndTypeIDs;
 
   /// A map from Identifiers to their serialized IDs.
   llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
@@ -462,8 +458,7 @@ public:
   /// The Decl will be scheduled for serialization if necessary.
   ///
   /// \returns The ID for the given Decl in this module.
-  DeclID addDeclRef(const Decl *D, bool forceSerialization = false,
-                    bool allowTypeAliasXRef = false);
+  DeclID addDeclRef(const Decl *D, bool allowTypeAliasXRef = false);
 
   /// Records the use of the given DeclContext.
   ///
