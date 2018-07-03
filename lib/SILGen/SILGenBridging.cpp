@@ -67,8 +67,8 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
 
     // They're also convertible to Error if they have a class bound that
     // conforms to Error.
-    if (auto cls = layout.superclass) {
-      type = cls->getCanonicalType();
+    if (auto superclass = layout.getSuperclass()) {
+      type = superclass->getCanonicalType();
 
     // Otherwise, they are not convertible to Error.
     } else {

@@ -204,34 +204,6 @@ public:
   
 } // namespace llvm
 
-/// Determine whether the given declaration can inherit a class.
-static bool canInheritClass(Decl *decl) {
-  // Classes can inherit from a class.
-  if (isa<ClassDecl>(decl))
-    return true;
-
-  // Generic type parameters can inherit a class.
-  if (isa<GenericTypeParamDecl>(decl))
-    return true;
-
-  // Associated types can inherit a class.
-  if (isa<AssociatedTypeDecl>(decl))
-    return true;
-
-  return false;
-}
-
-// Add implicit conformances to the given declaration.
-static void addImplicitConformances(
-              TypeChecker &tc, Decl *decl,
-              llvm::SmallSetVector<ProtocolDecl *, 4> &allProtocols) {
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    SmallVector<ProtocolDecl *, 2> protocols;
-    nominal->getImplicitProtocols(protocols);
-    allProtocols.insert(protocols.begin(), protocols.end());
-  }
-}
-
 /// Check that the declaration attributes are ok.
 static void validateAttributes(TypeChecker &TC, Decl *D);
 
@@ -390,9 +362,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   // Check all of the types listed in the inheritance clause.
   Type superclassTy;
   SourceRange superclassRange;
-  llvm::SmallSetVector<ProtocolDecl *, 4> allProtocols;
   llvm::SmallDenseMap<CanType, std::pair<unsigned, SourceRange>> inheritedTypes;
-  addImplicitConformances(*this, decl, allProtocols);
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
@@ -462,14 +432,13 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Protocols, generic parameters and associated types can inherit
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
+      //
+      // Classes can only inherit from subclass existentials that do not
+      // have a superclass term.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
-           !layout.superclass)) {
-        for (auto proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
-          allProtocols.insert(protoDecl);
-        }
+           !layout.explicitSuperclass)) {
         continue;
       }
 
@@ -477,13 +446,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // do not contain an explicit AnyObject member.
       if (isa<ClassDecl>(decl) &&
           !layout.hasExplicitAnyObject) {
-        for (auto proto : layout.getProtocols()) {
-          auto *protoDecl = proto->getDecl();
-          allProtocols.insert(protoDecl);
-        }
-
         // Superclass inheritance is handled below.
-        inheritedTy = layout.superclass;
+        inheritedTy = layout.explicitSuperclass;
         if (!inheritedTy)
           continue;
       }
@@ -528,10 +492,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // Record the raw type.
       superclassTy = inheritedTy;
       superclassRange = inherited.getSourceRange();
-      
-      // Add the RawRepresentable conformance implied by the raw type.
-      allProtocols.insert(getProtocol(decl->getLoc(),
-                                      KnownProtocolKind::RawRepresentable));
       continue;
     }
 
@@ -552,7 +512,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
       // If the declaration we're looking at doesn't allow a superclass,
       // complain.
-      if (!canInheritClass(decl)) {
+      if (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl)) {
         diagnose(decl->getLoc(),
                  isa<ExtensionDecl>(decl)
                    ? diag::extension_class_inheritance
@@ -567,7 +527,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       }
 
       // If this is not the first entry in the inheritance clause, complain.
-      if (i > 0) {
+      if (isa<ClassDecl>(decl) && i > 0) {
         auto removeRange = getRemovalRange(i);
         diagnose(inherited.getSourceRange().Start,
                  diag::superclass_not_first, inheritedTy)
@@ -586,32 +546,12 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
 
     // We can't inherit from a non-class, non-protocol type.
     diagnose(decl->getLoc(),
-             canInheritClass(decl)
-               ? diag::inheritance_from_non_protocol_or_class
-               : diag::inheritance_from_non_protocol,
+             (isa<StructDecl>(decl) || isa<ExtensionDecl>(decl))
+               ? diag::inheritance_from_non_protocol
+               : diag::inheritance_from_non_protocol_or_class,
              inheritedTy);
     // FIXME: Note pointing to the declaration 'inheritedTy' references?
     inherited.setInvalidType(Context);
-  }
-
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    // Check for circular inheritance.
-    // FIXME: The diagnostics here should be improved.
-    bool diagnosedCircularity = false;
-    for (unsigned i = 0, n = allProtocols.size(); i != n; /*in loop*/) {
-      if (allProtocols[i] == proto || allProtocols[i]->inheritsFrom(proto)) {
-        if (!diagnosedCircularity) {
-          diagnose(proto, diag::circular_protocol_def, proto->getName());
-          diagnosedCircularity = true;
-        }
-
-        allProtocols.remove(allProtocols[i]);
-        --n;
-        continue;
-      }
-
-      ++i;
-    }
   }
 }
 
@@ -620,8 +560,21 @@ static llvm::TinyPtrVector<ProtocolDecl *>
 getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl *proto,
                           ProtocolDecl **scratch) {
-  tc.resolveInheritedProtocols(proto);
-  return proto->getInheritedProtocols();
+  TinyPtrVector<ProtocolDecl *> result;
+
+  for (unsigned index : indices(proto->getInherited())) {
+    if (auto type = proto->getInheritedType(index)) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        for (auto protoTy : layout.getProtocols()) {
+          auto *protoDecl = protoTy->getDecl();
+          result.push_back(protoDecl);
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /// Retrieve the superclass of the given class.
@@ -3504,14 +3457,6 @@ public:
       checkCircularity(TC, PD, diag::circular_protocol_def,
                        DescriptiveDeclKind::Protocol, path);
 
-      // Make sure the parent protocols have been fully validated.
-      for (auto inherited : PD->getLocalProtocols()) {
-        TC.validateDecl(inherited);
-        for (auto *member : inherited->getMembers())
-          if (auto *requirement = dyn_cast<ValueDecl>(member))
-            TC.validateDecl(requirement);
-      }
-
       if (auto *SF = PD->getParentSourceFile()) {
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate =
@@ -3562,6 +3507,9 @@ public:
       canRequirementSig->print(llvm::errs());
       llvm::errs() << "\n";
     }
+
+    // Explicitly calculate this bit.
+    (void) PD->existentialTypeSupported(&TC);
   }
 
   void visitVarDecl(VarDecl *VD) {

@@ -3148,8 +3148,8 @@ public:
               "init_existential of class existential with non-class type");
     }
 
-    if (layout.superclass) {
-      require(layout.superclass->isExactSuperclassOf(concreteType),
+    if (auto superclass = layout.getSuperclass()) {
+      require(superclass->isExactSuperclassOf(concreteType),
               "init_existential of subclass existential with wrong type");
     }
 

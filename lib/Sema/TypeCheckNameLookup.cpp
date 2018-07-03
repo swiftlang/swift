@@ -220,8 +220,8 @@ namespace {
       // pull out the superclass instead, and use that below.
       if (foundInType->isExistentialType()) {
         auto layout = foundInType->getExistentialLayout();
-        if (layout.superclass) {
-          conformingType = layout.superclass;
+        if (auto superclass = layout.getSuperclass()) {
+          conformingType = superclass;
         } else {
           // Non-subclass existential: don't need to look for further
           // conformance or witness.

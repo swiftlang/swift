@@ -3394,6 +3394,10 @@ bool ProtocolDecl::requiresClassSlow() {
         return true;
       }
     }
+    if (type->getClassOrBoundGenericClass()) {
+      Bits.ProtocolDecl.RequiresClass = true;
+      return true;
+    }
   }
 
   return Bits.ProtocolDecl.RequiresClass;

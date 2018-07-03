@@ -1387,16 +1387,24 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  if (layout.superclass) {
+  if (layout.explicitSuperclass) {
     auto subKind = std::min(ConstraintKind::Subtype, kind);
-    auto result = matchTypes(type1, layout.superclass, subKind, subflags,
-                             locator);
+    auto result = matchTypes(type1, layout.explicitSuperclass, subKind,
+                             subflags, locator);
     if (result.isFailure())
       return result;
   }
 
   for (auto *proto : layout.getProtocols()) {
     auto *protoDecl = proto->getDecl();
+
+    if (auto superclass = protoDecl->getSuperclass()) {
+      auto subKind = std::min(ConstraintKind::Subtype, kind);
+      auto result = matchTypes(type1, superclass, subKind,
+                               subflags, locator);
+      if (result.isFailure())
+        return result;
+    }
 
     switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
