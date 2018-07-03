@@ -621,8 +621,21 @@ static llvm::TinyPtrVector<ProtocolDecl *>
 getInheritedForCycleCheck(TypeChecker &tc,
                           ProtocolDecl *proto,
                           ProtocolDecl **scratch) {
-  tc.resolveInheritedProtocols(proto);
-  return proto->getInheritedProtocols();
+  TinyPtrVector<ProtocolDecl *> result;
+
+  for (unsigned index : indices(proto->getInherited())) {
+    if (auto type = proto->getInheritedType(index)) {
+      if (type->isExistentialType()) {
+        auto layout = type->getExistentialLayout();
+        for (auto protoTy : layout.getProtocols()) {
+          auto *protoDecl = protoTy->getDecl();
+          result.push_back(protoDecl);
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /// Retrieve the superclass of the given class.
