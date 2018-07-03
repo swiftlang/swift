@@ -21,7 +21,8 @@
 namespace swift {
 namespace byteTree {
 void ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>>::write(
-    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout) {
+    ByteTreeWriter &Writer, const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+    UserInfoMap &UserInfo) {
   for (unsigned I = 0, E = Layout.size(); I < E; ++I) {
     if (Layout[I]) {
       Writer.write(*Layout[I], /*Index=*/I);

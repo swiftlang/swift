@@ -21,6 +21,7 @@
 
 #include "llvm/Support/BinaryStreamError.h"
 #include "llvm/Support/BinaryStreamWriter.h"
+#include <map>
 
 namespace {
 // Only used by compiler if both template types are the same
@@ -32,6 +33,8 @@ namespace swift {
 namespace byteTree {
 class ByteTreeWriter;
 
+using UserInfoMap = std::map<void *, void *>;
+
 /// Add a template specialization of \c ObjectTraits for any that type
 /// serializes as an object consisting of multiple fields.
 template <class T>
@@ -39,12 +42,17 @@ struct ObjectTraits {
   // Must provide:
 
   /// Return the number of fields that will be written in \c write when
-  /// \p Object gets serialized.
-  // static unsigned numFields(const T &Object);
+  /// \p Object gets serialized. \p UserInfo can contain arbitrary values that
+  /// can modify the serialization behaviour and gets passed down from the
+  /// serialization invocation.
+  // static unsigned numFields(const T &Object, UserInfoMap &UserInfo);
 
   /// Serialize \p Object by calling \c Writer.write for all the fields of
-  /// \p Object.
-  // static void write(BinaryTreeWriter &Writer, const T &Object);
+  /// \p Object. \p UserInfo can contain arbitrary values that can modify the
+  /// serialization behaviour and gets passed down from the serialization
+  /// invocation.
+  // static void write(ByteTreeWriter &Writer, const T &Object,
+  //                   UserInfoMap &UserInfo);
 };
 
 /// Add a template specialization of \c ScalarTraits for any that type
@@ -79,8 +87,9 @@ struct WrapperTypeTraits {
 // Test if ObjectTraits<T> is defined on type T.
 template <class T>
 struct has_ObjectTraits {
-  using Signature_numFields = unsigned (*)(const T &);
-  using Signature_write = void (*)(ByteTreeWriter &Writer, const T &Object);
+  using Signature_numFields = unsigned (*)(const T &, UserInfoMap &UserInfo);
+  using Signature_write = void (*)(ByteTreeWriter &Writer, const T &Object,
+                                   UserInfoMap &UserInfo);
 
   template <typename U>
   static char test(SameType<Signature_numFields, &U::numFields> *,
@@ -144,10 +153,12 @@ private:
   /// expected number of fields.
   unsigned CurrentFieldIndex = 0;
 
+  UserInfoMap &UserInfo;
+
   /// The \c ByteTreeWriter can only be constructed internally. Use
   /// \c ByteTreeWriter.write to serialize a new object.
-  ByteTreeWriter(llvm::BinaryStreamWriter &StreamWriter)
-      : StreamWriter(StreamWriter) {}
+  ByteTreeWriter(llvm::BinaryStreamWriter &StreamWriter, UserInfoMap &UserInfo)
+      : StreamWriter(StreamWriter), UserInfo(UserInfo) {}
 
   /// Set the expected number of fields the object written by this writer is
   /// expected to have.
@@ -188,8 +199,8 @@ public:
   template <typename T>
   typename std::enable_if<has_ObjectTraits<T>::value, void>::type
   static write(uint32_t ProtocolVersion, llvm::BinaryStreamWriter &StreamWriter,
-              const T &Object) {
-    ByteTreeWriter Writer(StreamWriter);
+               const T &Object, UserInfoMap &UserInfo) {
+    ByteTreeWriter Writer(StreamWriter, UserInfo);
 
     auto Error = Writer.StreamWriter.writeInteger(ProtocolVersion);
     (void)Error;
@@ -206,10 +217,10 @@ public:
   write(const T &Object, unsigned Index) {
     validateAndIncreaseFieldIndex(Index);
 
-    auto ObjectWriter = ByteTreeWriter(StreamWriter);
-    ObjectWriter.setNumFields(ObjectTraits<T>::numFields(Object));
+    auto ObjectWriter = ByteTreeWriter(StreamWriter, UserInfo);
+    ObjectWriter.setNumFields(ObjectTraits<T>::numFields(Object, UserInfo));
 
-    ObjectTraits<T>::write(ObjectWriter, Object);
+    ObjectTraits<T>::write(ObjectWriter, Object, UserInfo);
   }
 
   template <typename T>

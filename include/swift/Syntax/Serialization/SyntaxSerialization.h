@@ -203,6 +203,11 @@ struct NullableTraits<RC<syntax::RawSyntax>> {
 
 namespace byteTree {
 
+/// The key for a ByteTree serializion user info of type
+/// `std::unordered_set<unsigned> *`. Specifies the IDs of syntax nodes that
+/// shall be omitted when the syntax tree gets serialized.
+static void *UserInfoKeyReusedNodeIds = &UserInfoKeyReusedNodeIds;
+
 template <>
 struct WrapperTypeTraits<tok> {
   static uint8_t numericValue(const tok &Value);
@@ -229,12 +234,14 @@ template <>
 
 template <>
 struct ObjectTraits<ArrayRef<syntax::TriviaPiece>> {
-  static unsigned numFields(const ArrayRef<syntax::TriviaPiece> &Trivia) {
+  static unsigned numFields(const ArrayRef<syntax::TriviaPiece> &Trivia,
+                            UserInfoMap &UserInfo) {
     return Trivia.size();
   }
 
   static void write(ByteTreeWriter &Writer,
-                    const ArrayRef<syntax::TriviaPiece> &Trivia) {
+                    const ArrayRef<syntax::TriviaPiece> &Trivia,
+                    UserInfoMap &UserInfo) {
     for (unsigned I = 0, E = Trivia.size(); I < E; ++I) {
       Writer.write(Trivia[I], /*Index=*/I);
     }
@@ -243,20 +250,26 @@ struct ObjectTraits<ArrayRef<syntax::TriviaPiece>> {
 
 template <>
 struct ObjectTraits<ArrayRef<RC<syntax::RawSyntax>>> {
-  static unsigned numFields(const ArrayRef<RC<syntax::RawSyntax>> &Layout) {
+  static unsigned numFields(const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+                            UserInfoMap &UserInfo) {
     return Layout.size();
   }
 
   static void write(ByteTreeWriter &Writer,
-                    const ArrayRef<RC<syntax::RawSyntax>> &Layout);
+                    const ArrayRef<RC<syntax::RawSyntax>> &Layout,
+                    UserInfoMap &UserInfo);
 };
 
 template <>
 struct ObjectTraits<std::pair<tok, StringRef>> {
-  static unsigned numFields(const std::pair<tok, StringRef> &Pair) { return 2; }
+  static unsigned numFields(const std::pair<tok, StringRef> &Pair,
+                            UserInfoMap &UserInfo) {
+    return 2;
+  }
 
   static void write(ByteTreeWriter &Writer,
-                    const std::pair<tok, StringRef> &Pair) {
+                    const std::pair<tok, StringRef> &Pair,
+                    UserInfoMap &UserInfo) {
     Writer.write(Pair.first, /*Index=*/0);
     Writer.write(Pair.second, /*Index=*/1);
   }
@@ -264,42 +277,63 @@ struct ObjectTraits<std::pair<tok, StringRef>> {
 
 template <>
 struct ObjectTraits<syntax::RawSyntax> {
-  enum NodeKind { Token = 0, Layout = 1 };
+  enum NodeKind { Token = 0, Layout = 1, Omitted = 2 };
 
-  static unsigned numFields(const syntax::RawSyntax &Syntax) {
-    switch (nodeKind(Syntax)) {
-    case Token:
-      return 6;
-    case Layout:
-      return 5;
+  static bool shouldOmitNode(const syntax::RawSyntax &Syntax,
+                             UserInfoMap &UserInfo) {
+    if (auto ReusedNodeIds = static_cast<std::unordered_set<unsigned> *>(
+            UserInfo[UserInfoKeyReusedNodeIds])) {
+      return ReusedNodeIds->count(Syntax.getId()) > 0;
+    } else {
+      return false;
     }
   }
 
-  static NodeKind nodeKind(const syntax::RawSyntax &Syntax) {
-    if (Syntax.isToken()) {
+  static NodeKind nodeKind(const syntax::RawSyntax &Syntax,
+                           UserInfoMap &UserInfo) {
+    if (shouldOmitNode(Syntax, UserInfo)) {
+      return Omitted;
+    } else if (Syntax.isToken()) {
       return Token;
     } else {
       return Layout;
     }
   }
 
-  static void write(ByteTreeWriter &Writer, const syntax::RawSyntax &Syntax) {
-    auto Kind = nodeKind(Syntax);
+  static unsigned numFields(const syntax::RawSyntax &Syntax,
+                            UserInfoMap &UserInfo) {
+    switch (nodeKind(Syntax, UserInfo)) {
+    case Token:
+      return 6;
+    case Layout:
+      return 5;
+    case Omitted:
+      return 2;
+    }
+  }
+
+  static void write(ByteTreeWriter &Writer, const syntax::RawSyntax &Syntax,
+                    UserInfoMap &UserInfo) {
+    auto Kind = nodeKind(Syntax, UserInfo);
 
     Writer.write(static_cast<uint8_t>(Kind), /*Index=*/0);
-    Writer.write(Syntax.getPresence(), /*Index=*/1);
-    Writer.write(static_cast<uint32_t>(Syntax.getId()), /*Index=*/2);
+    Writer.write(static_cast<uint32_t>(Syntax.getId()), /*Index=*/1);
 
     switch (Kind) {
     case Token:
+      Writer.write(Syntax.getPresence(), /*Index=*/2);
       Writer.write(std::make_pair(Syntax.getTokenKind(), Syntax.getTokenText()),
                    /*Index=*/3);
       Writer.write(Syntax.getLeadingTrivia(), /*Index=*/4);
       Writer.write(Syntax.getTrailingTrivia(), /*Index=*/5);
       break;
     case Layout:
+      Writer.write(Syntax.getPresence(), /*Index=*/2);
       Writer.write(Syntax.getKind(), /*Index=*/3);
       Writer.write(Syntax.getLayout(), /*Index=*/4);
+      break;
+    case Omitted:
+      // Nothing more to write
       break;
     }
   }
