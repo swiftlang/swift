@@ -30,6 +30,7 @@ struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
 struct StringSymbolicValue;
 struct AggregateSymbolicValue;
+struct EnumSymbolicValue;
 
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
@@ -107,6 +108,10 @@ class SymbolicValue {
     /// cheat and represent single-element structs as the value of their
     /// element (since they are so common).
     RK_Aggregate,
+
+    /// This value is an enum with no payload.
+    // TODO: support enum with a payload.
+    RK_Enum,
   };
 
   RepresentationKind representationKind : 8;
@@ -145,6 +150,10 @@ class SymbolicValue {
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
     /// information about the array elements, count, and element type.
     AggregateSymbolicValue *aggregate;
+
+    /// When this SymbolicValue is of "Enum" kind, this pointer stores
+    /// information about the enum case type.
+    EnumSymbolicValue *enumVal;
   } value;
 
   union {
@@ -181,6 +190,9 @@ public:
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
+
+    /// This is an enum.
+    Enum,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -284,6 +296,11 @@ public:
                                     llvm::BumpPtrAllocator &allocator);
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
+
+  static SymbolicValue getEnum(EnumElementDecl *decl,
+                               llvm::BumpPtrAllocator &allocator);
+
+  EnumElementDecl *getEnumValue() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some

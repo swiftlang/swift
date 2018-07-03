@@ -417,6 +417,13 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return calculatedValues[apply];
   }
 
+  if (auto *enumVal = dyn_cast<EnumInst>(value)) {
+    // TODO: support enums with payloads.
+    if (!enumVal->hasOperand())
+      return SymbolicValue::getEnum(enumVal->getElement(),
+                                    evaluator.getAllocator());
+  }
+
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
   // Otherwise, we don't know how to handle this.
@@ -1460,6 +1467,14 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
         return SymbolicValue::getUnknown(cbr, UnknownReason::Loop);
 
       nextInst = destBB->begin();
+      continue;
+    }
+
+    if (auto *SEAI = dyn_cast<SwitchEnumAddrInst>(inst)) {
+      auto value = state.computeLoadResult(SEAI->getOperand());
+      assert(value.getKind() == SymbolicValue::Enum);
+      auto *caseBB = SEAI->getCaseDestination(value.getEnumValue());
+      nextInst = caseBB->begin();
       continue;
     }
 
