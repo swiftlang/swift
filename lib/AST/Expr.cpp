@@ -1544,6 +1544,7 @@ TupleExpr *TupleExpr::create(ASTContext &ctx,
   assert((Implicit || ElementNames.size() == ElementNameLocs.size() ||
           (!hasNonEmptyIdentifier(ElementNames) && ElementNameLocs.empty())) &&
          "trying to create non-implicit tuple-expr without name locations");
+  (void)hasNonEmptyIdentifier;
 
   size_t size =
       totalSizeToAlloc<Expr *, Identifier, SourceLoc>(SubExprs.size(),

@@ -874,6 +874,7 @@ namespace {
 
       auto *dc = fn.getDecl()->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
+      (void)dc;
 
       if (fn.getDecl()->getDeclContext() == getType()) {
         if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {

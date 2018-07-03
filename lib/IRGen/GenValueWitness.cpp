@@ -1400,4 +1400,5 @@ void TypeInfo::collectMetadataForOutlining(OutliningMetadataCollector &c,
                                            SILType T) const {
   auto canType = T.getASTType();
   assert(!canType->is<ArchetypeType>() && "Did not expect an ArchetypeType");
+  (void)canType;
 }

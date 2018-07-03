@@ -129,6 +129,7 @@ static bool isGuaranteedForwardingInst(SILInstruction *I) {
   return isGuaranteedForwardingValueKind(SILNodeKind(I->getKind()));
 }
 
+LLVM_ATTRIBUTE_UNUSED
 static bool isOwnershipForwardingInst(SILInstruction *I) {
   return isOwnershipForwardingValueKind(SILNodeKind(I->getKind()));
 }
@@ -154,7 +155,9 @@ class OwnershipCompatibilityUseChecker
                                    OwnershipUseCheckerResult> {
 public:
 private:
+  LLVM_ATTRIBUTE_UNUSED
   SILModule &Mod;
+
   const Operand &Op;
   SILValue BaseValue;
   ErrorBehaviorKind ErrorBehavior;

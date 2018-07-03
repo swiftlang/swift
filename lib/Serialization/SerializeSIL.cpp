@@ -2433,6 +2433,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // FIXME: Resilience: could write out vtable for fragile classes.
   const DeclContext *assocDC = SILMod->getAssociatedContext();
   assert(assocDC && "cannot serialize SIL without an associated DeclContext");
+  (void)assocDC;
   for (const SILVTable &vt : SILMod->getVTables()) {
     if ((ShouldSerializeAll || vt.isSerialized()) &&
         SILMod->shouldSerializeEntitiesAssociatedWithDeclContext(vt.getClass()))

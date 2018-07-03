@@ -7900,6 +7900,7 @@ recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
 
   const ProtocolDecl *proto = conformance->getProtocol();
   assert(origBase->isEqual(proto->getSelfInterfaceType()));
+  (void)proto;
   return conformance->getTypeWitness(depMemTy->getAssocType(),
                                      /*resolver=*/nullptr);
 }

@@ -4984,6 +4984,8 @@ void SILWitnessTable::verify(const SILModule &M) const {
                "Witnesses must either have a concrete Self, or an "
                "an abstract Self that is constrained to their "
                "protocol.");
+        (void)protocol;
+        (void)witnessSelfProtocol;
       }
     }
 }

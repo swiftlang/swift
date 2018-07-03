@@ -654,6 +654,7 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
     assert(((relatedEntityKind[0] >= 'a' && relatedEntityKind[0] <= 'j') ||
             (relatedEntityKind[0] >= 'A' && relatedEntityKind[0] <= 'J')) &&
            "Only [a-jA-J] are reserved for related entity kinds");
+    (void)relatedEntityKind;
     return appendOperatorParam("L", synthesizedTypeAttr->getManglingName());
   }
 

@@ -219,6 +219,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
              SILFunctionTypeRepresentation::Thick &&
          !fnType->isNoEscape() && resultFnType->isNoEscape() &&
          "Expect a escaping to noescape conversion");
+  (void)fnType;
+  (void)resultFnType;
   SILValue fnValue = fn.getValue();
   SILValue result = createConvertEscapeToNoEscape(
       loc, fnValue, resultTy, isEscapedByUser, false);
