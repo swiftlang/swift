@@ -77,7 +77,8 @@ public enum FontWeight: Int {
 }
 
 public struct AwesomeCityAttribute: RawRepresentable {
-  public init?(rawValue: String) { self.rawValue = rawValue }
+  public init(rawValue: String) { self.rawValue = rawValue }
+  public init(_ rawValue: String) { self.rawValue = rawValue }
   public var rawValue: String
   public typealias RawValue = String
 }
@@ -86,6 +87,7 @@ public class Wrapper {
   public struct Attribute: RawRepresentable {
     public static let KnownAttr = Wrapper.Attribute(rawValue: "")
     public init(rawValue: String) { self.rawValue = rawValue }
+    public init(_ rawValue: String) { self.rawValue = rawValue }
     public var rawValue: String
     public typealias RawValue = String
   }

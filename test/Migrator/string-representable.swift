@@ -49,11 +49,15 @@ class C: BarForwardDeclaredClass {}
 func revert(_ a: AwesomeCityAttribute, b: Wrapper.Attribute) {
   _ = AwesomeCityAttribute(rawValue: "somevalue")
   _ = AwesomeCityAttribute.init(rawValue: "somevalue")
+  _ = AwesomeCityAttribute("somevalue")
+  _ = AwesomeCityAttribute.init("somevalue")
   _ = a.rawValue
   _ = Wrapper.Attribute(rawValue: "somevalue")
   _ = Wrapper.Attribute.init(rawValue: "somevalue")
   _ = b.rawValue
   _ = Wrapper.Attribute.KnownAttr.rawValue
+  _ = Wrapper.Attribute("somevalue")
+  _ = Wrapper.Attribute.init("somevalue")
 }
 
 
