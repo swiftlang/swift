@@ -162,7 +162,7 @@ ATTRIBUTE_NODES = [
          ]),
 
     # differentiable-attr-parameters ->
-    #     'wrt' ':' '(' differentiable-attr-parameter-list ')'
+    #     'wrt' ':' '(' differentiation-parameter-list ')'
     Node('DifferentiableAttributeDiffParams', kind='Syntax',
          description='The parameters to differentiate with respect to.',
          traits=['WithTrailingComma'],
@@ -173,20 +173,20 @@ ATTRIBUTE_NODES = [
                    The colon separating "wrt" and the parameter list.
                    '''),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
+             Child('DiffParams', kind='DifferentiationParameterList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiable-attr-parameter-list ->
-    #     differentiable-attr-parameter differentiable-attr-parameter-list?
-    Node('DifferentiableAttributeDiffParamList', kind='SyntaxCollection',
-         element='DifferentiableAttributeDiffParam'),
+    # differentiation-parameter-list ->
+    #     differentiation-parameter differentiation-parameter-list?
+    Node('DifferentiationParameterList', kind='SyntaxCollection',
+         element='DifferentiationParameter'),
 
-    # differentiable-attr-parameter ->
-    #     'self' | differentiable-attr-index-parameter
-    Node('DifferentiableAttributeDiffParam', kind='Syntax',
+    # differentiation-parameter ->
+    #     'self' | differentiation-index-parameter
+    Node('DifferentiationParameter', kind='Syntax',
          description='''
          A differentiation parameter: either the "self" identifier or a period
          followed by an unsigned integer (e.g. `.0`).
@@ -196,13 +196,13 @@ ATTRIBUTE_NODES = [
              Child('DiffParam', kind='Syntax',
                    node_choices=[
                        Child('Self', kind='SelfToken'),
-                       Child('Index', kind='DifferentiableAttributeIndexParam'),
+                       Child('Index', kind='DifferentiationIndexParameter'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiable-attr-index-parameter -> '.' integer-literal
-    Node('DifferentiableAttributeIndexParam', kind='Syntax',
+    # differentiation-index-parameter -> '.' integer-literal
+    Node('DifferentiationIndexParameter', kind='Syntax',
          description='''
          A differentiation index parameter: a period followed by an unsigned \
          integer (e.g. `.0`)
@@ -212,7 +212,7 @@ ATTRIBUTE_NODES = [
              Child('IntegerLiteral', kind='IntegerLiteralToken'),
          ]),
 
-    # differentiable-attr-func-specifier ->
+    # differentiation-func-specifier ->
     #     ('primal' | 'adjoint') ':' decl-name
     # decl-name -> (identifier | operator) decl-name-arguments?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',

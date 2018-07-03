@@ -876,12 +876,12 @@ bool Parser::parseDifferentiableAttributeArguments(
     // occurred.
     auto parseParam = [&]() -> bool {
       SyntaxParsingContext DiffParamContext(
-          SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParam);
+          SyntaxContext, SyntaxKind::DifferentiationParameter);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix: {
         SyntaxParsingContext IndexParamContext(
-            SyntaxContext, SyntaxKind::DifferentiableAttributeIndexParam);
+            SyntaxContext, SyntaxKind::DifferentiationIndexParameter);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,
@@ -915,7 +915,7 @@ bool Parser::parseDifferentiableAttributeArguments(
         return errorAndSkipToEnd(2);
 
     SyntaxContext->collectNodesInPlace(
-        SyntaxKind::DifferentiableAttributeDiffParamList);
+        SyntaxKind::DifferentiationParameterList);
     // Parse closing ')' of the parameter list and a comma.
     consumeToken(tok::r_paren);
     parseToken(tok::comma, diag::attr_expected_comma, AttrName,

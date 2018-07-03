@@ -569,4 +569,62 @@ EXPR_NODES = [
              Child('Arguments', kind='FunctionCallArgumentList'),
              Child('RightParen', kind='RightParenToken'),
          ]),
+
+    # SWIFT_ENABLE_TENSORFLOW
+    # Expression generalizing #gradient and #valueAndGradient.
+    # e.g. #gradient(foo(_:_:), wrt: .0, .1)
+    Node('GradientExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'PoundGradientToken',
+                       'PoundValueAndGradientToken',
+                   ]),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('OriginalFunction', kind='Expr'),
+             Child('Commna', kind='CommaToken', is_optional=True),
+             Child('WithRespectToLabel', kind='IdentifierToken', is_optional=True,
+                   text_choices=['wrt']),
+             Child('Colon', kind='ColonToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParameterList',
+                   is_optional=True),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # SWIFT_ENABLE_TENSORFLOW
+    # e.g. #adjoint(foo(_:_:))
+    Node('AdjointExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundAdjoint', kind='PoundAdjointToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('BaseType', kind='Syntax', is_optional=True, description='''
+                   The optional base type of the referenced function.
+                   ''',
+                   node_choices=[
+                       Child('SimpleType', kind='SimpleTypeIdentifier'),
+                       Child('MemberType', kind='MemberTypeIdentifier'),
+                   ]),
+             Child('Dot', kind='PeriodToken', is_optional=True,
+                   description='The period after the optional base type.'),
+             Child('DeclBaseName', kind='Syntax', description='''
+                   The base name of the referenced function.
+                   ''',
+                   node_choices=[
+                       Child('Identifier', kind='IdentifierToken'),
+                       Child('UnspacedBinaryOperator',
+                             kind='UnspacedBinaryOperatorToken'),
+                       Child('SpacedBinaryOperator',
+                             kind='SpacedBinaryOperatorToken'),
+                       Child('PrefixOperator', kind='PrefixOperatorToken'),
+                       Child('PostfixOperator', kind='PostfixOperatorToken'),
+                   ]),
+             Child('DeclNameArguments', kind='DeclNameArguments',
+                   is_optional=True, description='''
+                   The argument labels of the referenced function, optionally \
+                   specified.
+                   '''),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
 ]
