@@ -127,7 +127,6 @@ extension TokenKind: ByteTreeObjectDecodable {
       let text = reader.readField(String.self, index: 1)
       return .${token.swift_kind()}(text)
 %   end
-
 % end
     default:
       fatalError("Unknown TokenKind \(kind)")
