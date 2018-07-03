@@ -73,4 +73,39 @@ ControlFlowTests.testAllBackends("weighPetWithDefault") {
   weighPetWithDefault(.fish, 4.0)
 }
 
+
+public enum EnumWithPayload {
+  case a(String)
+  case b(Float)
+  case c(Tensor<Float>, Tensor<Float>)
+  indirect case d(EnumWithPayload)
+}
+
+public func testEnumWithPayload(_ x: EnumWithPayload) -> Tensor<Float> {
+  var val = Tensor<Float>(2.0)
+  switch x {
+  case .a(let x):
+    val += 1.0
+    print(x)
+  case .b(let x):
+    print(x)
+    val += Tensor<Float>(x)
+  case .c(let x, let y):
+    val *= x + y
+    print(x, y)
+  case .d(let f):
+    val += 10.0
+    print(f)
+  }
+  val += 0.0
+  return val
+}
+ControlFlowTests.testAllBackends("testEnumWithPayload") {
+  expectNearlyEqualWithScalarTensor(3.0, testEnumWithPayload(.a("Hello")))
+  expectNearlyEqualWithScalarTensor(5.0, testEnumWithPayload(.b(3.0)))
+  expectNearlyEqualWithScalarTensor(6.0, testEnumWithPayload(
+                                           .c(Tensor<Float>(1.0), Tensor<Float>(2.0))))
+  expectNearlyEqualWithScalarTensor(12.0, testEnumWithPayload(.d(.b(3.0))))
+}
+
 runAllTests()
