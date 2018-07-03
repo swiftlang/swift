@@ -203,11 +203,7 @@ public final class _ExecutionContext {
   public let gpuDeviceName: String?
 
   /// The buffer storing a serialized TensorFlow config proto.
-  public let tensorFlowConfig: UnsafeMutableRawPointer
-
-  /// The length of the above buffer.
-  /// The corresponding C type is size_t.
-  public let tensorFlowConfigSize: Int
+  public let tensorFlowConfig: UnsafeMutablePointer<TF_Buffer>
 
   /// The TFE_Context object.
   private let cContext: CTFEContext
@@ -243,26 +239,19 @@ public final class _ExecutionContext {
     }
 
     // Create TF config object.
-    let maxBufferSize = 2 << 10  // Can make it configurable if needed
-    self.tensorFlowConfig = UnsafeMutableRawPointer.allocate(
-      byteCount: maxBufferSize,
-      alignment: 1)
     if _RuntimeConfig.executionMode == .xla {
       debugLog("Enable XLA execution.")
     }
     if _RuntimeConfig.gpuMemoryAllowGrowth {
       debugLog("Allowing growth for GPU memory allocator.")
     }
-    self.tensorFlowConfigSize = TF_CreateConfig(
+    self.tensorFlowConfig = TF_CreateConfig(
       _RuntimeConfig.executionMode == .xla ? 1 : 0,
-      _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0,
-      self.tensorFlowConfig,
-      maxBufferSize,
-      status
-    )
-    checkOk(status)
-    TFE_ContextOptionsSetConfig(
-      opts, self.tensorFlowConfig, self.tensorFlowConfigSize, status)
+      _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0)
+    TFE_ContextOptionsSetConfig(opts,
+                                self.tensorFlowConfig.pointee.data,
+                                self.tensorFlowConfig.pointee.length,
+                                status)
     checkOk(status)
 
     let ctx = TFE_NewContext(opts, status)
@@ -316,6 +305,7 @@ public final class _ExecutionContext {
     }
     TFE_DeleteContext(cContext, status)
     checkOk(status)
+    TF_DeleteBuffer(tensorFlowConfig)
     TF_DeleteStatus(status)
     pthread_mutex_destroy(&mutex)
   }
@@ -379,8 +369,8 @@ fileprivate extension _ExecutionContext {
       // Prepare session options for initializing a session.
       let sessionOptions = TF_NewSessionOptions()
       TF_SetConfig(sessionOptions,
-                   self.tensorFlowConfig,
-                   self.tensorFlowConfigSize,
+                   self.tensorFlowConfig.pointee.data,
+                   self.tensorFlowConfig.pointee.length,
                    status)
       checkOk(status)
 
