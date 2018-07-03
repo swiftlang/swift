@@ -2582,6 +2582,20 @@ bool isAcceptableDynamicMemberLookupSubscript(SubscriptDecl *decl,
 /// \endcode
 bool isPassThroughTypealias(TypeAliasDecl *typealias);
 
+/// Determine whether overriding the given declaration requires a keyword.
+bool overrideRequiresKeyword(ValueDecl *overridden);
+
+/// Compute the type of a member that will be used for comparison when
+/// performing override checking.
+Type getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
+                                ValueDecl *derivedDecl = nullptr,
+                                bool stripLabels = true);
+
+/// Determine whether the given declaration is an override by comparing type
+/// information.
+bool isOverrideBasedOnType(ValueDecl *decl, Type declTy,
+                           ValueDecl *parentDecl, Type parentDeclTy);
+
 } // end namespace swift
 
 #endif
