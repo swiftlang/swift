@@ -304,8 +304,8 @@ static void diagnoseBinOpSplit(UnresolvedDeclRefExpr *UDRE,
 /// needs whitespace.  If so, emit specific diagnostics for it and return true,
 /// otherwise return false.
 static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
-                                    DeclContext *DC,
-                                    TypeChecker &TC) {
+                                          DeclContext *DC,
+                                          TypeChecker &TC) {
   Identifier name = UDRE->getName().getBaseIdentifier();
   StringRef nameStr = name.str();
   if (!name.isOperator() || nameStr.size() < 2)
@@ -403,6 +403,32 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
   }
 }
 
+
+static bool diagnoseRangeOperatorMisspell(UnresolvedDeclRefExpr *UDRE,
+                                          TypeChecker &TC) {
+  auto name = UDRE->getName().getBaseIdentifier();
+  if (!name.isOperator())
+    return false;
+
+  auto corrected = StringRef();
+  if (name.str() == ".." || name.str() == "...." ||
+      name.str() == ".…" || name.str() == "…" || name.str() == "….")
+    corrected = "...";
+  else if (name.str() == "...<" || name.str() == "....<" ||
+           name.str() == "…<")
+    corrected = "..<";
+
+  if (!corrected.empty()) {
+    TC.diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
+                name, true, corrected)
+      .highlight(UDRE->getSourceRange())
+      .fixItReplace(UDRE->getSourceRange(), corrected);
+
+    return true;
+  }
+  return false;
+}
+
 static bool findNonMembers(TypeChecker &TC,
                            ArrayRef<LookupResultEntry> lookupResults,
                            DeclRefKind refKind, bool breakOnMember,
@@ -455,7 +481,7 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 }
 
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
-/// returning the resultant expression.  Context is the DeclContext used
+/// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
 Expr *TypeChecker::
 resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
@@ -473,10 +499,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
   if (!Lookup) {
-    // If we failed lookup of an operator, check to see it to see if it is
-    // because two operators are juxtaposed e.g. (x*-4) that needs whitespace.
-    // If so, emit specific diagnostics for it.
-    if (diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
+    // If we failed lookup of an operator, check to see if this is a range
+    // operator misspelling. Otherwise try to diagnose a juxtaposition
+    // e.g. (x*-4) that needs whitespace.
+    if (diagnoseRangeOperatorMisspell(UDRE, *this) ||
+        diagnoseOperatorJuxtaposition(UDRE, DC, *this)) {
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
@@ -520,9 +547,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                                         strlen(buffer)))
            != ~0U) {
       int length = (buffer - simpleName.get()) - offset;
-      char expectedCodepoint;
-      if ((expectedCodepoint =
-           confusable::tryConvertConfusableCharacterToASCII(codepoint))) {
+      if (auto expectedCodepoint =
+          confusable::tryConvertConfusableCharacterToASCII(codepoint)) {
         isConfused = true;
         expectedIdentifier += expectedCodepoint;
       } else {
@@ -544,7 +570,8 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
 
       if (auto typo = corrections.claimUniqueCorrection()) {
         auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
-                             Name, Name.isOperator(), typo->CorrectedName);
+                             Name, Name.isOperator(),
+                             typo->CorrectedName.getBaseIdentifier().str());
         diag.highlight(UDRE->getSourceRange());
         typo->addFixits(diag);
       } else {
