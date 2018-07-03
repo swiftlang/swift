@@ -5,13 +5,12 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -typecheck -verify -swift-version 3
+// RUN: %target-swift-frontend %s -typecheck -verify
 
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 // rdar://18175202
 
-func d<b: Sequence, e where Optional<e> == b.Iterator.Element>(c : b) -> e? {
-  // expected-warning@-1 {{'where' clause next to generic parameters}}
+func d<b: Sequence, e>(c : b) -> e? where Optional<e> == b.Iterator.Element {
   for mx : e? in c { // expected-warning {{immutable value 'mx' was never used}}
   }
 }
