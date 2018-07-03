@@ -156,7 +156,8 @@ void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   if (ED->hasDefaultAccessLevel())
     return;
 
-  validateExtension(ED);
+  LazyResolver *Resolver = ED->getASTContext().getLazyResolver();
+  Resolver->resolveExtension(ED);
 
   if (ED->hasDefaultAccessLevel())
     return;
