@@ -6393,9 +6393,6 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
   };
 
   // Figure out the class in which this method occurs.
-  if (!decl->getDeclContext()->isTypeContext())
-    return;
-
   auto classDecl = decl->getDeclContext()->getAsClassOrClassExtensionContext();
   if (!classDecl)
     return;
