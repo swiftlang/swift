@@ -79,6 +79,7 @@ void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 /// emit a warning that the bound instance will be immediately deallocated.
 void diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
                                           const Pattern *pattern,
+                                          SourceLoc equalLoc,
                                           const Expr *initializer);
 
 /// Attempt to fix the type of \p decl so that it's a valid override for

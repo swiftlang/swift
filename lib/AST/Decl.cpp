@@ -999,17 +999,15 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
 
 PatternBindingDecl *
 PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
-                           StaticSpellingKind StaticSpelling,
-                           SourceLoc VarLoc,
-                           Pattern *Pat, Expr *E,
+                           StaticSpellingKind StaticSpelling, SourceLoc VarLoc,
+                           Pattern *Pat, SourceLoc EqualLoc, Expr *E,
                            DeclContext *Parent) {
   DeclContext *BindingInitContext = nullptr;
   if (!Parent->isLocalContext())
     BindingInitContext = new (Ctx) PatternBindingInitializer(Parent);
 
-  auto Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc,
-                       PatternBindingEntry(Pat, E, BindingInitContext),
-                       Parent);
+  auto PBE = PatternBindingEntry(Pat, EqualLoc, E, BindingInitContext);
+  auto *Result = create(Ctx, StaticLoc, StaticSpelling, VarLoc, PBE, Parent);
 
   if (BindingInitContext)
     cast<PatternBindingInitializer>(BindingInitContext)->setBinding(Result, 0);
@@ -1021,7 +1019,7 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, E, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
   Result->setImplicit();
   return Result;
 }
@@ -1069,7 +1067,8 @@ PatternBindingDecl *PatternBindingDecl::createDeserialized(
   auto PBD = ::new (D) PatternBindingDecl(StaticLoc, StaticSpelling, VarLoc,
                                           NumPatternEntries, Parent);
   for (auto &entry : PBD->getMutablePatternList()) {
-    entry = PatternBindingEntry(nullptr, nullptr, nullptr);
+    entry = PatternBindingEntry(/*Pattern*/ nullptr, /*EqualLoc*/ SourceLoc(),
+                                /*Init*/ nullptr, /*InitContext*/ nullptr);
   }
   return PBD;
 }

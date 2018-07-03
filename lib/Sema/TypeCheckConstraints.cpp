@@ -2449,11 +2449,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                             nullptr, TypeLoc())) {
       return true;
     }
-
-    // If we're performing an binding to a weak or unowned variable from a
-    // constructor call, emit a warning that the instance will be immediately
-    // deallocated.
-    diagnoseUnownedImmediateDeallocation(*this, pattern, initializer);
   }
 
   if (!resultTy && !initializer->getType())
@@ -2483,7 +2478,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                           unsigned patternNumber,
                                           bool skipApplyingSolution) {
-
+  const auto &pbe = PBD->getPatternList()[patternNumber];
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2496,8 +2491,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
   if (!DC->isLocalContext()) {
-    initContext = cast_or_null<PatternBindingInitializer>(
-                    PBD->getPatternList()[patternNumber].getInitContext());
+    initContext = cast_or_null<PatternBindingInitializer>(pbe.getInitContext());
     if (initContext)
       DC = initContext;
   }
@@ -2506,15 +2500,21 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
-  // If we entered an initializer context, contextualize any
-  // auto-closures we might have created.
-  if (initContext && !hadError) {
-    // Check safety of error-handling in the declaration, too.
-    checkInitializerErrorHandling(initContext, init);
-    (void)contextualizeInitializer(initContext, init);
-  }
+  if (!hadError) {
+    // If we're performing an binding to a weak or unowned variable from a
+    // constructor call, emit a warning that the instance will be immediately
+    // deallocated.
+    diagnoseUnownedImmediateDeallocation(*this, pattern, pbe.getEqualLoc(),
+                                         init);
 
-  if (hadError) {
+    // If we entered an initializer context, contextualize any
+    // auto-closures we might have created.
+    if (initContext) {
+      // Check safety of error-handling in the declaration, too.
+      checkInitializerErrorHandling(initContext, init);
+      (void)contextualizeInitializer(initContext, init);
+    }
+  } else {
     PBD->setInvalid();
   }
 

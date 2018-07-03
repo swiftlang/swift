@@ -1791,6 +1791,9 @@ public:
 class PatternBindingEntry {
   Pattern *ThePattern;
 
+  /// The location of the equal '=' token.
+  SourceLoc EqualLoc;
+
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
@@ -1808,8 +1811,10 @@ class PatternBindingEntry {
   friend class PatternBindingInitializer;
 
 public:
-  PatternBindingEntry(Pattern *P, Expr *E, DeclContext *InitContext)
-    : ThePattern(P), InitAndFlags(E, {}), InitContext(InitContext) {}
+  PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
+                      DeclContext *InitContext)
+      : ThePattern(P), EqualLoc(EqualLoc), InitAndFlags(E, {}),
+        InitContext(InitContext) {}
 
   Pattern *getPattern() const { return ThePattern; }
   void setPattern(Pattern *P) { ThePattern = P; }
@@ -1822,6 +1827,12 @@ public:
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
+
+  /// Retrieve the location of the equal '=' token.
+  SourceLoc getEqualLoc() const { return EqualLoc; }
+
+  /// Set the location of the equal '=' token.
+  void setEqualLoc(SourceLoc equalLoc) { EqualLoc = equalLoc; }
 
   /// Retrieve the initializer as it was written in the source.
   Expr *getInitAsWritten() const { return InitAndFlags.getPointer(); }
@@ -1890,8 +1901,8 @@ public:
 
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
-                                    SourceLoc VarLoc,
-                                    Pattern *Pat, Expr *E,
+                                    SourceLoc VarLoc, Pattern *Pat,
+                                    SourceLoc EqualLoc, Expr *E,
                                     DeclContext *Parent);
 
   static PatternBindingDecl *createImplicit(ASTContext &Ctx,
