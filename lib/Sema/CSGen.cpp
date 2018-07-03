@@ -1173,7 +1173,7 @@ namespace {
 
     Type visitLiteralExpr(LiteralExpr *expr) {
       // If the expression has already been assigned a type; just use that type.
-      if (expr->getType())
+      if (expr->getType() && !expr->getType()->is<UnresolvedType>())
         return expr->getType();
 
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
