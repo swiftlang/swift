@@ -249,8 +249,8 @@ public final class _ExecutionContext {
       _RuntimeConfig.executionMode == .xla ? 1 : 0,
       _RuntimeConfig.gpuMemoryAllowGrowth ? 1 : 0)
     TFE_ContextOptionsSetConfig(opts,
-                                self.tensorFlowConfig.pointee.data,
-                                self.tensorFlowConfig.pointee.length,
+                                tensorFlowConfig.pointee.data,
+                                tensorFlowConfig.pointee.length,
                                 status)
     checkOk(status)
 
@@ -369,8 +369,8 @@ fileprivate extension _ExecutionContext {
       // Prepare session options for initializing a session.
       let sessionOptions = TF_NewSessionOptions()
       TF_SetConfig(sessionOptions,
-                   self.tensorFlowConfig.pointee.data,
-                   self.tensorFlowConfig.pointee.length,
+                   tensorFlowConfig.pointee.data,
+                   tensorFlowConfig.pointee.length,
                    status)
       checkOk(status)
 
@@ -639,7 +639,7 @@ public final class _TensorComputation {
 
     // Initialize global execution context if that's not yet done. It caches all
     // our tensor programs.
-    let _ = _ExecutionContext.global
+    _ = _ExecutionContext.global
 
     if _RuntimeConfig.printsDebugLog {
       let buffer = UnsafeBufferPointer(
