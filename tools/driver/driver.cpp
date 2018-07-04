@@ -198,8 +198,7 @@ int main(int argc_, const char **argv_) {
   int ExpandedArgc = ExpandedArgs.size();
   const char **ExpandedArgv = ExpandedArgs.data();
   PROGRAM_START(ExpandedArgc, ExpandedArgv);
-  SmallVector<const char *, 256> argv(&ExpandedArgv[0],
-                                      &ExpandedArgv[ExpandedArgc]);
+  ArrayRef<const char *> argv(ExpandedArgv, ExpandedArgc);
 
   // Check if this invocation should execute a subcommand.
   StringRef ExecName = llvm::sys::path::stem(argv[0]);
