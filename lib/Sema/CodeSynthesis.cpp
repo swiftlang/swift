@@ -2411,6 +2411,10 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
         ctor, {classDecl, superclassCtor}, ctx);
   }
 
+  // Wire up the overrides.
+  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
+  ctor->setOverriddenDecl(superclassCtor);
+
   if (superclassCtor->isObjC()) {
     // Inherit the @objc name from the superclass initializer, if it
     // has one.
@@ -2429,10 +2433,6 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));
   if (superclassCtor->isDynamic())
     ctor->getAttrs().add(new (ctx) DynamicAttr(/*IsImplicit*/true));
-
-  // Wire up the overrides.
-  ctor->getAttrs().add(new (ctx) OverrideAttr(/*IsImplicit=*/true));
-  ctor->setOverriddenDecl(superclassCtor);
 }
 
 ConstructorDecl *

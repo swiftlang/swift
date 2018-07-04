@@ -74,6 +74,12 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   if (abstractStorage)
     subscript = dyn_cast<SubscriptDecl>(abstractStorage);
 
+  if (!member->hasInterfaceType()) {
+    auto lazyResolver = ctx.getLazyResolver();
+    assert(lazyResolver && "Need to resolve interface type");
+    lazyResolver->resolveDeclSignature(member);
+  }
+
   auto memberType = member->getInterfaceType();
   if (derivedDecl) {
     auto *dc = derivedDecl->getDeclContext();
@@ -958,8 +964,21 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 ///
 /// \returns true if an error occurred.
 bool swift::checkOverrides(TypeChecker &TC, ValueDecl *decl) {
-  if (decl->getOverriddenDecl())
-    return false;
+  // If we already computed overridden declarations and either succeeded
+  // or invalidated the attribute, there's nothing more to do.
+  if (decl->overriddenDeclsComputed()) {
+    // If we computed an overridden declaration successfully, we're done.
+    if (decl->getOverriddenDecl())
+      return false;
+
+    // If we set the override attribute to "invalid", we already diagnosed
+    // something here.
+    if (decl->getAttrs().hasAttribute<OverrideAttr>(/*AllowInvalid=*/true) &&
+        !decl->getAttrs().hasAttribute<OverrideAttr>())
+      return true;
+
+    // Otherwise, we have more checking to do.
+  }
 
   // Set up matching, but bail out if there's nothing to match.
   OverrideMatcher matcher(TC, decl);
@@ -1649,6 +1668,41 @@ void TypeChecker::resolveOverriddenDecl(ValueDecl *VD) {
   if (!isa<ConstructorDecl>(VD) && !VD->getAttrs().hasAttribute<OverrideAttr>())
     return;
 
-  // FIXME: We should perform more minimal validation.
-  validateDeclForNameLookup(VD);
+  // Invalidate an existing "override" attribute or add a new invalid "override"
+  // attribute, which will suppress additional checking.
+  auto invalidateOverrideAttribute = [VD]() {
+    auto overrideAttr = VD->getAttrs().getAttribute<OverrideAttr>(true);
+    if (!overrideAttr) {
+      overrideAttr = new (VD->getASTContext()) OverrideAttr(true);
+      VD->getAttrs().add(overrideAttr);
+    }
+
+    overrideAttr->setInvalid();
+  };
+
+  // Try to match potential overridden declarations.
+  OverrideMatcher matcher(*this, VD);
+  if (!matcher) {
+    return;
+  }
+
+  auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
+  if (matches.empty()) {
+    return;
+  }
+
+  // If we have more than one potential match, diagnose the ambiguity and
+  // fail.
+  if (matches.size() > 1) {
+    diagnoseGeneralOverrideFailure(VD, matches,
+                                   OverrideCheckingAttempt::PerfectMatch);
+    invalidateOverrideAttribute();
+    return;
+  }
+
+  // Check the correctness of the override.
+  // FIXME: This also records the override.
+  if (matcher.checkOverride(matches.front().Decl,
+                            OverrideCheckingAttempt::PerfectMatch))
+    invalidateOverrideAttribute();
 }
