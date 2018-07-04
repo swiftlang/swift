@@ -3836,6 +3836,9 @@ ParserResult<Expr> Parser::parseExprAdjoint() {
 /// expr-pound-assert:
 ///   '#assert' '(' expr ',' string_literal ')'
 ParserResult<Expr> Parser::parseExprPoundAssert() {
+  SyntaxParsingContext AssertContext(SyntaxContext,
+      SyntaxKind::PoundAssertExpr);
+
   SourceLoc startLoc = consumeToken(tok::pound_assert);
   SourceLoc endLoc;
 
