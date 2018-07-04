@@ -16,6 +16,7 @@
 
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
+#include "swift/AST/AccessScopeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Pattern.h"
@@ -24,133 +25,6 @@
 using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckAccess"
-
-namespace {
-
-class AccessScopeChecker {
-  const SourceFile *File;
-  bool TreatUsableFromInlineAsPublic;
-
-protected:
-  ASTContext &Context;
-  Optional<AccessScope> Scope = AccessScope::getPublic();
-
-  AccessScopeChecker(const DeclContext *useDC,
-                     bool treatUsableFromInlineAsPublic)
-      : File(useDC->getParentSourceFile()),
-        TreatUsableFromInlineAsPublic(treatUsableFromInlineAsPublic),
-        Context(File->getASTContext()) {}
-
-  bool visitDecl(ValueDecl *VD) {
-    if (!VD || isa<GenericTypeParamDecl>(VD))
-      return true;
-
-    // FIXME: Figure out why AssociatedTypeDecls don't always have an access
-    // level here.
-    if (!VD->hasAccess()) {
-      if (isa<AssociatedTypeDecl>(VD))
-        return true;
-    }
-
-    auto AS = VD->getFormalAccessScope(File, TreatUsableFromInlineAsPublic);
-    Scope = Scope->intersectWith(AS);
-    return Scope.hasValue();
-  }
-};
-
-class TypeReprAccessScopeChecker : private ASTWalker, AccessScopeChecker {
-  TypeReprAccessScopeChecker(const DeclContext *useDC,
-                             bool treatUsableFromInlineAsPublic)
-    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic) {
-  }
-
-  bool walkToTypeReprPre(TypeRepr *TR) override {
-    if (auto CITR = dyn_cast<ComponentIdentTypeRepr>(TR))
-      return visitDecl(CITR->getBoundDecl());
-    return true;
-  }
-
-  bool walkToTypeReprPost(TypeRepr *TR) override {
-    return Scope.hasValue();
-  }
-
-public:
-  static Optional<AccessScope>
-  getAccessScope(TypeRepr *TR, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false) {
-    TypeReprAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic);
-    TR->walk(checker);
-    return checker.Scope;
-  }
-};
-
-class TypeAccessScopeChecker : private TypeWalker, AccessScopeChecker {
-  bool CanonicalizeParentTypes;
-
-  TypeAccessScopeChecker(const DeclContext *useDC,
-                         bool treatUsableFromInlineAsPublic,
-                         bool canonicalizeParentTypes)
-    : AccessScopeChecker(useDC, treatUsableFromInlineAsPublic),
-      CanonicalizeParentTypes(canonicalizeParentTypes) {}
-
-  Action walkToTypePre(Type T) override {
-    ValueDecl *VD;
-    if (auto *BNAD = dyn_cast<NameAliasType>(T.getPointer())) {
-      if (CanonicalizeParentTypes &&
-          BNAD->getDecl()->getUnderlyingTypeLoc().getType()->hasTypeParameter())
-        VD = nullptr;
-      else
-        VD = BNAD->getDecl();
-    }
-    else if (auto *NTD = T->getAnyNominal())
-      VD = NTD;
-    else
-      VD = nullptr;
-
-    if (!visitDecl(VD))
-      return Action::Stop;
-
-    if (!CanonicalizeParentTypes) {
-      return Action::Continue;
-    }
-    
-    Type nominalParentTy;
-    if (auto nominalTy = dyn_cast<NominalType>(T.getPointer())) {
-      nominalParentTy = nominalTy->getParent();
-    } else if (auto genericTy = dyn_cast<BoundGenericType>(T.getPointer())) {
-      nominalParentTy = genericTy->getParent();
-      for (auto genericArg : genericTy->getGenericArgs())
-        genericArg.walk(*this);
-    } else if (auto NameAliasTy =
-                 dyn_cast<NameAliasType>(T.getPointer())) {
-      // The parent type would have been lost previously, so look right through
-      // this type.
-      if (NameAliasTy->getDecl()->getUnderlyingTypeLoc().getType()
-            ->hasTypeParameter())
-        Type(NameAliasTy->getSinglyDesugaredType()).walk(*this);
-    } else {
-      return Action::Continue;
-    }
-
-    if (nominalParentTy)
-      nominalParentTy->getCanonicalType().walk(*this);
-    return Action::SkipChildren;
-  }
-
-public:
-  static Optional<AccessScope>
-  getAccessScope(Type T, const DeclContext *useDC,
-                 bool treatUsableFromInlineAsPublic = false,
-                 bool canonicalizeParentTypes = false) {
-    TypeAccessScopeChecker checker(useDC, treatUsableFromInlineAsPublic,
-                                   canonicalizeParentTypes);
-    T.walk(checker);
-    return checker.Scope;
-  }
-};
-
-} // end anonymous namespace
-
 
 void TypeChecker::computeDefaultAccessLevel(ExtensionDecl *ED) {
   if (ED->hasDefaultAccessLevel())
