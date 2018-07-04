@@ -516,6 +516,7 @@ void SILPassManager::execute() {
     SILTransform *Tr = Transformations[Idx];
     assert((isa<SILFunctionTransform>(Tr) || isa<SILModuleTransform>(Tr)) &&
            "Unexpected pass kind!");
+    (void)Tr;
 
     unsigned FirstFuncTrans = Idx;
     while (Idx < NumTransforms && isa<SILFunctionTransform>(Transformations[Idx]))

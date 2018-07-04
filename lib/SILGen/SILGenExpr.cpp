@@ -4584,6 +4584,7 @@ namespace {
     void visitTupleExpr(TupleExpr *E) {
       auto *TTy = E->getType()->castTo<TupleType>();
       assert(TTy->hasLValueType() || TTy->isVoid());
+      (void)TTy;
       for (auto &elt : E->getElements()) {
         visit(elt);
       }

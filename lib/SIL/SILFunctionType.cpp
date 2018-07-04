@@ -2122,6 +2122,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
 
   auto inserted = ConstantTypes.insert({constant, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 
@@ -2289,6 +2290,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
   
   auto inserted = ConstantOverrideTypes.insert({{derived, base}, result});
   assert(inserted.second);
+  (void)inserted;
   return *result;
 }
 

@@ -3857,6 +3857,7 @@ CallEmission::applyEnumElementConstructor(SGFContext C) {
   }
 
   assert(substFnType->getNumResults() == 1);
+  (void)substFnType;
   ManagedValue resultMV = SGF.emitInjectEnum(
       uncurriedLoc, std::move(payload), SGF.getLoweredType(formalResultType),
       element, uncurriedContext);
@@ -5198,6 +5199,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
       auto subscriptsTupleType = cast<TupleType>(subscripts.getType());
       assert(accessType.getParams().size()
               == 1 + subscriptsTupleType->getNumElements());
+      (void)subscriptsTupleType;
       SmallVector<RValue, 8> eltRVs;
       std::move(subscripts).extractElements(eltRVs);
       for (auto &elt : eltRVs)

@@ -2614,6 +2614,7 @@ MetadataResponse MetadataPath::followComponent(IRGenFunction &IGF,
           return /*finished?*/ false;
         });
     assert(found && "too many conditional conformances");
+    (void)found;
 
     sourceKey.Kind =
         LocalTypeDataKind::forAbstractProtocolWitnessTable(conformingProto);

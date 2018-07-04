@@ -1497,6 +1497,7 @@ recur:
       } else {
         auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
         assert(parenTy && "Associated value type is neither paren nor tuple?");
+        (void)parenTy;
         
         auto *subPattern = new (Context) AnyPattern(SourceLoc());
         elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),

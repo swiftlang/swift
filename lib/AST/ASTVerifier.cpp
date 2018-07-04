@@ -934,6 +934,7 @@ public:
     void verifyChecked(DeferStmt *S) {
       auto FT = S->getTempDecl()->getInterfaceType()->castTo<AnyFunctionType>();
       assert(FT->isNoEscape() && "Defer statements must not escape");
+      (void)FT;
       verifyCheckedBase(S);
     }
 

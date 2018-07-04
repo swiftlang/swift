@@ -71,9 +71,8 @@ Type InheritedTypeRequest::evaluate(
     resolver = &archetypeResolver;
   }
 
-  // FIXME: Hack for calls through here when we have no type checker.
   auto lazyResolver = dc->getASTContext().getLazyResolver();
-  if (!lazyResolver) return ErrorType::get(dc->getASTContext());
+  assert(lazyResolver && "Cannot resolve inherited type at this point");
 
   TypeChecker &tc = *static_cast<TypeChecker *>(lazyResolver);
   TypeLoc &typeLoc = getTypeLoc(decl, index);

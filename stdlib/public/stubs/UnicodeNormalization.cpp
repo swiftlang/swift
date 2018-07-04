@@ -78,31 +78,6 @@ UBool u_isdefined(UChar32);
 #include <mutex>
 #include <assert.h>
 
-static const UCollator *MakeRootCollator() {
-  UErrorCode ErrorCode = U_ZERO_ERROR;
-  UCollator *root = ucol_open("", &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_open: Failure setting up default collation.");
-  }
-  ucol_setAttribute(root, UCOL_NORMALIZATION_MODE, UCOL_ON, &ErrorCode);
-  ucol_setAttribute(root, UCOL_STRENGTH, UCOL_TERTIARY, &ErrorCode);
-  ucol_setAttribute(root, UCOL_NUMERIC_COLLATION, UCOL_OFF, &ErrorCode);
-  ucol_setAttribute(root, UCOL_CASE_LEVEL, UCOL_OFF, &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_setAttribute: Failure setting up default collation.");
-  }
-  return root;
-}
-
-// According to this thread in the ICU mailing list, it should be safe
-// to assume the UCollator object is thread safe so long as you're only
-// passing it to functions that take a const pointer to it. So, we make it
-// const here to make sure we don't misuse it.
-// http://sourceforge.net/p/icu/mailman/message/27427062/
-static const UCollator *GetRootCollator() {
-  return SWIFT_LAZY_CONSTANT(MakeRootCollator());
-}
-
 /// Convert the unicode string to uppercase. This function will return the
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of

@@ -105,6 +105,7 @@ public:
             == parent->getParent()->mapTypeIntoContext(
                    SGF.getSILType(parameterInfo))
         && "argument does not have same type as specified by parameter info");
+    (void)parameterInfo;
 
     ManagedValue mv = SGF.B.createInputFunctionArgument(
         argType, loc.getAsASTNode<ValueDecl>());

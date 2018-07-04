@@ -86,6 +86,7 @@ bool doesASTRequireProfiling(SILModule &M, ASTNode N) {
 } // namespace swift
 
 /// Check that the input AST has at least been type-checked.
+LLVM_ATTRIBUTE_UNUSED
 static bool hasASTBeenTypeChecked(ASTNode N) {
   DeclContext *DC = N.getAsDeclContext();
   assert(DC && "Invalid AST node for profiling");

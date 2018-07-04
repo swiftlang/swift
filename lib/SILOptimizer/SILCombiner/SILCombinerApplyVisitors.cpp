@@ -393,6 +393,7 @@ SILInstruction *PartialApplyCombiner::combine() {
             ConvertCalleeTy->getExtInfo().withNoEscape(false));
       assert(Use->get()->getType().castTo<SILFunctionType>() ==
              EscapingCalleeTy);
+      (void)EscapingCalleeTy;
       Uses.append(CFI->getUses().begin(), CFI->getUses().end());
       continue;
     }

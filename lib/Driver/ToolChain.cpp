@@ -297,6 +297,7 @@ sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
     auto R =
         jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
     assert(R.second);
+    (void)R;
   }
   for (const InputPair &P : C.getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());

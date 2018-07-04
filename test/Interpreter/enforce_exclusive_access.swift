@@ -3,6 +3,7 @@
 //
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
+// REQUIRES: rdar41660554
 
 // Tests for traps at run time when enforcing exclusive access.
 

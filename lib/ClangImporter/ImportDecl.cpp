@@ -6389,6 +6389,12 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 }
 
 void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
+  // Make sure that we always set the overriden declarations.
+  SWIFT_DEFER {
+    if (!decl->overriddenDeclsComputed())
+      (void)decl->setOverriddenDecls({ });
+  };
+
   // Figure out the class in which this method occurs.
   if (!decl->getDeclContext()->isTypeContext())
     return;
@@ -6418,6 +6424,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
           func->getObjCSelector() != foundFunc->getObjCSelector())
         continue;
       func->setOverriddenDecl(foundFunc);
+      func->getAttrs().add(new (func->getASTContext()) OverrideAttr(true));
       return;
     }
     // Set constructor override.
@@ -6428,6 +6435,8 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
         ctor->getObjCSelector() != memberCtor->getObjCSelector())
       continue;
     ctor->setOverriddenDecl(memberCtor);
+    ctor->getAttrs().add(new (ctor->getASTContext()) OverrideAttr(true));
+
     // Propagate 'required' to subclass initializers.
     if (memberCtor->isRequired() &&
         !ctor->getAttrs().hasAttribute<RequiredAttr>()) {
@@ -7894,6 +7903,7 @@ recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
 
   const ProtocolDecl *proto = conformance->getProtocol();
   assert(origBase->isEqual(proto->getSelfInterfaceType()));
+  (void)proto;
   return conformance->getTypeWitness(depMemTy->getAssocType(),
                                      /*resolver=*/nullptr);
 }

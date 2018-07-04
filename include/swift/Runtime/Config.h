@@ -46,6 +46,51 @@
 #define SWIFT_RUNTIME_LIBRARY_VISIBILITY
 #endif
 
+/// Attributes.
+/// SWIFT_RUNTIME_ATTRIBUTE_NOINLINE - On compilers where we have a directive to do so,
+/// mark a method "not for inlining".
+#if __has_attribute(noinline) || SWIFT_RUNTIME_GNUC_PREREQ(3, 4, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE __declspec(noinline)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+#endif
+
+/// SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE - On compilers where we have a directive to do
+/// so, mark a method "always inline" because it is performance sensitive. GCC
+/// 3.4 supported this but is buggy in various cases and produces unimplemented
+/// errors, just use it in GCC 4.0 and later.
+#if __has_attribute(always_inline) || SWIFT_RUNTIME_GNUC_PREREQ(4, 0, 0)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE __forceinline
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
+#endif
+
+#ifdef __GNUC__
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __declspec(noreturn)
+#else
+#define SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+#endif
+
+/// SWIFT_RUNTIME_BUILTIN_TRAP - On compilers which support it, expands to an expression
+/// which causes the program to exit abnormally.
+#if __has_builtin(__builtin_trap) || SWIFT_RUNTIME_GNUC_PREREQ(4, 3, 0)
+# define SWIFT_RUNTIME_BUILTIN_TRAP __builtin_trap()
+#elif defined(_MSC_VER)
+// The __debugbreak intrinsic is supported by MSVC, does not require forward
+// declarations involving platform-specific typedefs (unlike RaiseException),
+// results in a call to vectored exception handlers, and encodes to a short
+// instruction that still causes the trapping behavior we want.
+# define SWIFT_RUNTIME_BUILTIN_TRAP __debugbreak()
+#else
+# define SWIFT_RUNTIME_BUILTIN_TRAP *(volatile int*)0x11 = 0
+#endif
+
 /// Does the current Swift platform support "unbridged" interoperation
 /// with Objective-C?  If so, the implementations of various types must
 /// implicitly handle Objective-C pointers.

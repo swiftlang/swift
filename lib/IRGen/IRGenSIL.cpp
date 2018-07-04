@@ -3956,6 +3956,7 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
 
   auto fnType = operandType.getAs<SILFunctionType>();
   assert(fnType->getExtInfo().hasContext() && "Must have a closure operand");
+  (void)fnType;
 
   // This code relies on that an optional<()->()>'s tag fits in the function
   // pointer.
@@ -3963,6 +3964,7 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
   assert(TI.mayHaveExtraInhabitants(IGM) &&
          "Must have extra inhabitants to be able to handle the optional "
          "closure case");
+  (void)TI;
 
   Explosion closure = getLoweredExplosion(i->getOperand());
   auto func = closure.claimNext();
