@@ -2,9 +2,9 @@
 // RUN: if [ %target-runtime == "objc" ]; \
 // RUN: then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
+// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
 // RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String -swift-version 3; \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
 // RUN: fi
 
 // RUN: %target-run %t/String
@@ -227,9 +227,9 @@ StringTests.test("ForeignIndexes/Valid") {
     expectEqual("\u{1f601}", acceptor[donor.startIndex])
     expectEqual("\u{fffd}", acceptor[donor.index(after: donor.startIndex)])
     expectEqualUnicodeScalars([ 0xfffd, 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)])
+      String(acceptor[donor.index(_nth: 1)..<donor.index(_nth: 5)]))
     expectEqualUnicodeScalars([ 0x1f602, 0xfffd ],
-      acceptor[donor.index(_nth: 2)..<donor.index(_nth: 5)])
+      String(acceptor[donor.index(_nth: 2)..<donor.index(_nth: 5)]))
   }
 }
 
@@ -484,7 +484,7 @@ StringTests.test("substringDoesNotCopy/Swift3")
       }
       var s0 = String(repeating: "x", count: size)
       let originalIdentity = s0.bufferID
-      s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+      s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
       expectEqual(originalIdentity, s0.bufferID)
     }
   }
@@ -565,7 +565,7 @@ StringTests.test("appendToSubstring") {
           continue
         }
         var s0 = String(repeating: "x", count: initialSize)
-        s0 = s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)]
+        s0 = String(s0[s0.index(_nth: sliceStart)..<s0.index(_nth: sliceEnd)])
         s0 += "x"
         expectEqual(
           String(
@@ -603,7 +603,7 @@ StringTests.test("appendToSubstringBug")
     
     // This sorta checks for the original bug
     expectEqual(
-      cap, s0[s0.index(_nth: 1)..<s0.endIndex].unusedCapacity)
+      cap, String(s0[s0.index(_nth: 1)..<s0.endIndex]).unusedCapacity)
     
     return (s0, cap)
   }
@@ -611,7 +611,7 @@ StringTests.test("appendToSubstringBug")
   do {
     var (s, _) = { ()->(String, Int) in
       let (s0, unused) = stringWithUnusedCapacity()
-      return (s0[s0.index(_nth: 5)..<s0.endIndex], unused)
+      return (String(s0[s0.index(_nth: 5)..<s0.endIndex]), unused)
     }()
     let originalID = s.bufferID
     // Appending to a String always results in storage that 
@@ -1325,7 +1325,7 @@ StringTests.test("indexConversion")
   ) {
     result, flags, stop
   in
-    let r = result!.rangeAt(1)
+    let r = result!.range(at: 1)
     let start = String.UTF16Index(encodedOffset: r.location)
     let end = String.UTF16Index(encodedOffset: r.location + r.length)
     matches.append(String(s.utf16[start..<end])!)
