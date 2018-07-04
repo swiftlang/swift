@@ -3081,7 +3081,14 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
     // Emit the tensor arguments as well as the attribute values.
     for (auto &elt : tuple->getElements().drop_front()) {
-      args.push_back(visit(elt).forwardAsSingleValue(SGF, elt));
+      // Arguments of this builtin will be taken at +0 instead of +1, for
+      // consistency with the default calling convention of taking function
+      // parameters as @guaranteed instead of @owned.
+      // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
+      // expression without having to do a strong_retain (or copy_value) first.
+      args.push_back(
+          SGF.emitRValueAsSingleValue(elt, SGFContext::AllowGuaranteedPlusZero)
+              .getValue());
     }
   }
   auto &resultTL = SGF.getTypeLowering(E->getType());
