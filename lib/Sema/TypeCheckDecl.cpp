@@ -6383,6 +6383,9 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   //
   // Returns whether the target conforms to the protocol.
   auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+    if (!protocol)
+      return false;
+
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
                         targetType, protocol, target,
@@ -6420,12 +6423,11 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     }
   } else {
     auto argumentNames = member.getArgumentNames();
-    if (argumentNames.size() != 1)
+    if (member.isCompoundName() && argumentNames.size() != 1)
       return;
 
-    auto argumentName = argumentNames.front();
     if (baseName == DeclBaseName::createConstructor() &&
-        argumentName == Context.Id_from) {
+        (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
       // init(from:) may be synthesized as part of derived conformance to the
       // Decodable protocol.
       // If the target should conform to the Decodable protocol, check the
@@ -6434,7 +6436,8 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       (void)evaluateTargetConformanceTo(decodableProto);
     } else if (!baseName.isSpecial() &&
                baseName.getIdentifier() == Context.Id_encode &&
-               argumentName == Context.Id_to) {
+               (member.isSimpleName() ||
+                argumentNames.front() == Context.Id_to)) {
       // encode(to:) may be synthesized as part of derived conformance to the
       // Encodable protocol.
       // If the target should conform to the Encodable protocol, check the
