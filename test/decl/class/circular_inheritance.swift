@@ -49,8 +49,15 @@ class Outer3
 // CHECK: ===CYCLE DETECTED===
 // CHECK-NEXT: `--{{.*}}SuperclassTypeRequest({{.*Left}}
 // CHECK-NEXT:      `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Left@
+// CHECK-NEXT:          `--{{.*}}AccessLevelRequest
+// CHECK-NEXT:          `--{{.*}}AccessLevelRequest
+// CHECK-NEXT:          `--{{.*}}AccessLevelRequest
 // CHECK-NEXT:          `--{{.*}}SuperclassTypeRequest
 // CHECK-NEXT:              `--{{.*}}InheritedTypeRequest(circular_inheritance.(file).Right@
+// CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
+// CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
+// CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
+// CHECK-NEXT:                  `--{{.*}}AccessLevelRequest{{.*}}
 // CHECK-NEXT:                  `--{{.*}}SuperclassTypeRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
