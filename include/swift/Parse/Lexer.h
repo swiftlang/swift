@@ -355,13 +355,13 @@ public:
     enum : char { Literal, Expr } Kind;
     // Loc+Length for the segment inside the string literal, without quotes.
     SourceLoc Loc;
-    unsigned Length, IndentToStrip;
-    bool IsFirstSegment, IsLastSegment, RawString;
+    unsigned Length, IndentToStrip, DelimiterLength;
+    bool IsFirstSegment, IsLastSegment;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
                                     bool IsFirstSegment, bool IsLastSegment,
                                     unsigned IndentToStrip,
-                                    bool RawString) {
+                                    unsigned DelimiterLength) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
@@ -369,7 +369,7 @@ public:
       Result.IsFirstSegment = IsFirstSegment;
       Result.IsLastSegment = IsLastSegment;
       Result.IndentToStrip = IndentToStrip;
-      Result.RawString = RawString;
+      Result.DelimiterLength = DelimiterLength;
       return Result;
     }
     
@@ -381,7 +381,7 @@ public:
       Result.IsFirstSegment = false;
       Result.IsLastSegment = false;
       Result.IndentToStrip = 0;
-      Result.RawString = false;
+      Result.DelimiterLength = 0;
       return Result;
     }
 
@@ -399,13 +399,13 @@ public:
                                            bool IsFirstSegment = false,
                                            bool IsLastSegment = false,
                                            unsigned IndentToStrip = 0,
-                                           bool RawString = false);
+                                           unsigned DelimiterLength = 0);
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
         StringRef(getBufferPtrForSourceLoc(Segment.Loc), Segment.Length),
         Buffer, Segment.IsFirstSegment, Segment.IsLastSegment,
-        Segment.IndentToStrip, Segment.RawString);
+        Segment.IndentToStrip, Segment.DelimiterLength);
   }
 
   /// \brief Given a string literal token, separate it into string/expr segments
@@ -470,7 +470,7 @@ private:
   }
 
   void formToken(tok Kind, const char *TokStart, bool MultilineString = false,
-                 bool RawString = false, size_t DelimiterLength = 0);
+                 unsigned DelimiterLength = 0);
   void formEscapedIdentifierToken(const char *TokStart);
 
   /// Advance to the end of the line.
@@ -496,8 +496,8 @@ private:
 
   unsigned lexCharacter(const char *&CurPtr,
                         char StopQuote, bool EmitDiagnostics,
-                        bool Multiline = false, bool RawString = false);
-  void lexStringLiteral(bool RawString = false, std::string Delimiter = "");
+                        bool Multiline = false, unsigned DelimiterLength = 0);
+  void lexStringLiteral(unsigned DelimiterLength = 0);
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
