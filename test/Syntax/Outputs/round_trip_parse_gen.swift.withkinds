@@ -570,4 +570,7 @@ func bar<GenericParameterClause><<GenericParameter>T : <SimpleTypeIdentifier>Num
 #adjoint(+)</AdjointExpr><AdjointExpr>
 #adjoint(foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument><DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments>)</AdjointExpr><AdjointExpr>
 #adjoint(<MemberTypeIdentifier><SimpleTypeIdentifier>A</SimpleTypeIdentifier>.B</MemberTypeIdentifier>.foo<DeclNameArguments>(<DeclNameArgument>_:</DeclNameArgument>)</DeclNameArguments>)</AdjointExpr><AdjointExpr>
-#adjoint(<SimpleTypeIdentifier>Tensor<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier>.+)</AdjointExpr>
+#adjoint(<SimpleTypeIdentifier>Tensor<GenericArgumentClause><<GenericArgument><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></GenericArgument>></GenericArgumentClause></SimpleTypeIdentifier>.+)</AdjointExpr><PoundAssertExpr>
+
+#assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertExpr><PoundAssertExpr>
+#assert(<SequenceExpr><IntegerLiteralExpr>1 </IntegerLiteralExpr><BinaryOperatorExpr>== </BinaryOperatorExpr><IntegerLiteralExpr>2</IntegerLiteralExpr></SequenceExpr>, <StringLiteralExpr>"Error message"</StringLiteralExpr>)</PoundAssertExpr>

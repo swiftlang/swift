@@ -571,3 +571,6 @@ func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 #adjoint(foo(_:_:))
 #adjoint(A.B.foo(_:))
 #adjoint(Tensor<Float>.+)
+
+#assert(true)
+#assert(1 == 2, "Error message")

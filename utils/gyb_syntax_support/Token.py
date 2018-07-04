@@ -129,6 +129,8 @@ SYNTAX_TOKENS = [
           text='#valueAndGradient', is_keyword=True),
     Token('PoundAdjoint', 'pound_adjoint', text='#adjoint',
           is_keyword=True),
+    Token('PoundAssert', 'pound_assert', text='#assert',
+          is_keyword=True),
     Token('Arrow', 'arrow', text='->'),
     Token('AtSign', 'at_sign', text='@'),
     Token('Colon', 'colon', text=':'),
