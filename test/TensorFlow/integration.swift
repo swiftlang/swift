@@ -135,7 +135,7 @@ public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
   // expected-warning @+1 {{implicitly copied to the accelerator}}
-  if i == 0 {  // expected-error {{Length for attr 'Tout' of 0 must be at least minimum 1}}
+  if i == 0 {
     return
   }
 
