@@ -912,6 +912,44 @@ class TestJSONEncoder : TestJSONEncoderSuper {
     let _ = try! decoder.decode(EitherDecodable<TopLevelWrapper<Data>, TopLevelWrapper<Int>>.self, from: json)
   }
 
+  // MARK: - Decode Optional<T> values with SingleValueDecodingContainer
+  // SR-7404
+  func testSingleValueDecodingContainerForOptionalType() {
+    struct Value<T: Decodable>: Decodable {
+      var value: T
+      init(default def: T) {
+        value = def
+      }
+      init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        value = try container.decode(T.self)
+      }
+    }
+    struct Wrapper_URL: Decodable {
+      var url = Value<URL>(default: URL(string: "http://swift.org")!)
+    }
+    struct Wrapper_Optional_URL: Decodable {
+      var url = Value<URL?>(default: nil)
+    }
+
+    let decoder = JSONDecoder()
+    var json = "{\"url\":\"http:\\/\\/swift.org\"}".data(using: .utf8)!
+    let wrapper1 = try! decoder.decode(Wrapper_URL.self, from: json)
+    expectEqual(wrapper1.url.value.absoluteString, "http://swift.org", "Decoded value not identical to expected one.")
+
+    var wrapper2 = try! decoder.decode(Wrapper_Optional_URL.self, from: json)
+    expectEqual(wrapper2.url.value!.absoluteString, "http://swift.org", "Decoded value not identical to expected one.")
+
+    json = "{\"url\": null}".data(using: .utf8)!
+    do {
+      _ = try decoder.decode(Wrapper_URL.self, from: json)
+      expectUnreachable("Decoder should throw.")
+    } catch {}
+
+    wrapper2 = try! decoder.decode(Wrapper_Optional_URL.self, from: json)
+    expectEqual(wrapper2.url.value, nil, "Decoded value not identical to expected one.")
+  }
+
   // MARK: - Helper Functions
   private var _jsonEmptyDictionary: Data {
     return "{}".data(using: .utf8)!
@@ -1572,5 +1610,6 @@ JSONEncoderTests.test("testEncoderStateThrowOnEncodeCustomData") { TestJSONEncod
 JSONEncoderTests.test("testDecoderStateThrowOnDecode") { TestJSONEncoder().testDecoderStateThrowOnDecode() }
 JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomDate") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomDate() }
 JSONEncoderTests.test("testDecoderStateThrowOnDecodeCustomData") { TestJSONEncoder().testDecoderStateThrowOnDecodeCustomData() }
+JSONEncoderTests.test("testSingleValueDecodingContainerForOptionalType") { TestJSONEncoder().testSingleValueDecodingContainerForOptionalType() }
 runAllTests()
 #endif

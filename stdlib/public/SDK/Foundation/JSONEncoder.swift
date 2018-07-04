@@ -2005,7 +2005,9 @@ extension _JSONDecoder : SingleValueDecodingContainer {
     }
 
     public func decode<T : Decodable>(_ type: T.Type) throws -> T {
-        try expectNonNull(type)
+        if !_isOptional(type) {
+            try expectNonNull(T.self)
+        }
         return try self.unbox(self.storage.topContainer, as: type)!
     }
 }
