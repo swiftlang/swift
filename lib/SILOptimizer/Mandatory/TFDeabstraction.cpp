@@ -1509,6 +1509,7 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
   case SymbolicValue::Function:
+  case SymbolicValue::Enum:
     // TODO: Unsupported right now.
     return nullptr;
 

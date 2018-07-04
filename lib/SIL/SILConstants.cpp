@@ -83,6 +83,11 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os.indent(indent) << "]\n";
     return;
   }
+  case RK_Enum: {
+    auto *decl = getEnumValue();
+    decl->print(os);
+    return;
+  }
   }
 }
 
@@ -99,6 +104,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Metatype:     return Metatype;
   case RK_Function:     return Function;
   case RK_Aggregate:    return Aggregate;
+  case RK_Enum:         return Enum;
   case RK_Integer:      return Integer;
   case RK_Float:        return Float;
   case RK_String:       return String;
@@ -138,6 +144,8 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
       results.push_back(elt.cloneInto(allocator));
     return getAggregate(results, allocator);
   }
+  case SymbolicValue::Enum:
+    return SymbolicValue::getEnum(getEnumValue(), allocator);
   }
 }
 
@@ -419,6 +427,61 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Enums
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// This is the representation of a constant enum value. It maintains
+/// an optional SymbolicValue as a trailing object.
+struct alignas(SymbolicValue) EnumSymbolicValue final
+    : private llvm::TrailingObjects<EnumSymbolicValue, SymbolicValue> {
+  friend class llvm::TrailingObjects<EnumSymbolicValue, SymbolicValue>;
+
+  /// This is the number of elements in the aggregate.
+  EnumElementDecl *decl;
+
+  static EnumSymbolicValue *create(EnumElementDecl *decl,
+                                   llvm::BumpPtrAllocator &allocator) {
+    // TODO: support an optional SymbolicValue-typed payload.
+    auto byteSize = EnumSymbolicValue::totalSizeToAlloc<SymbolicValue>(0);
+    auto rawMem = allocator.Allocate(byteSize, alignof(EnumSymbolicValue));
+
+    //  Placement initialize the EnumSymbolicValue.
+    auto esv = ::new (rawMem) EnumSymbolicValue(decl);
+    return esv;
+  }
+
+  EnumElementDecl *getEnumDecl() const { return decl; }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const { return 0; }
+
+private:
+  EnumSymbolicValue() = delete;
+  EnumSymbolicValue(const EnumSymbolicValue &) = delete;
+  EnumSymbolicValue(EnumElementDecl *decl) : decl(decl) {}
+};
+
+/// This returns a constant Symbolic value for the enum case in `decl`.
+SymbolicValue SymbolicValue::getEnum(EnumElementDecl *decl,
+                                     llvm::BumpPtrAllocator &allocator) {
+  auto enumVal = EnumSymbolicValue::create(decl, allocator);
+  assert(enumVal && "enum value must be present");
+  SymbolicValue result;
+  result.representationKind = RK_Enum;
+  result.value.enumVal = enumVal;
+  return result;
+}
+
+EnumElementDecl *SymbolicValue::getEnumValue() const {
+  assert(representationKind == RK_Enum);
+  return value.enumVal->getEnumDecl();
+}
+
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
 
@@ -494,5 +557,3 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
            diag::tf_op_misuse_note, error)
     .highlight(loc.getSourceRange());
 }
-
-
