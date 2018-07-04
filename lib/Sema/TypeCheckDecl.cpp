@@ -1454,12 +1454,17 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     (D->getOverriddenDecl() &&
      D->getOverriddenDecl()->hasClangNode());
 
+  bool overridesDyanmic =
+    (D->getOverriddenDecl() &&
+     D->getOverriddenDecl()->isDynamic());
+
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
 
   bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
 
   // We only infer 'dynamic' in these three cases.
-  if (!isExtension && !isNSManaged && !overridesImportedMethod)
+  if (!isExtension && !isNSManaged && !overridesImportedMethod &&
+      !overridesDyanmic)
     return;
 
   // The presence of 'final' blocks the inference of 'dynamic'.

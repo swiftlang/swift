@@ -1189,6 +1189,10 @@ namespace  {
       if (Override->isFinal())
         return;
 
+      // Must be @objc to be 'dynamic'.
+      if (!Override->isObjC())
+        return;
+
       makeDynamic(Override->getASTContext(), Override);
     }
 
@@ -1483,13 +1487,6 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     diagnoseOverrideForAvailability(override, base);
   }
 
-  /// Check attributes associated with the base; some may need to merged with
-  /// or checked against attributes in the overriding declaration.
-  AttributeOverrideChecker attrChecker(base, override);
-  for (auto attr : base->getAttrs()) {
-    attrChecker.visit(attr);
-  }
-
   if (auto overridingFunc = dyn_cast<FuncDecl>(override)) {
     overridingFunc->setOverriddenDecl(cast<FuncDecl>(base));
   } else if (auto overridingCtor = dyn_cast<ConstructorDecl>(override)) {
@@ -1497,8 +1494,20 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
   } else if (auto overridingASD = dyn_cast<AbstractStorageDecl>(override)) {
     auto *baseASD = cast<AbstractStorageDecl>(base);
     overridingASD->setOverriddenDecl(baseASD);
+  } else {
+    llvm_unreachable("Unexpected decl");
+  }
 
+  /// Check attributes associated with the base; some may need to merged with
+  /// or checked against attributes in the overriding declaration.
+  AttributeOverrideChecker attrChecker(base, override);
+  for (auto attr : base->getAttrs()) {
+    attrChecker.visit(attr);
+  }
+
+  if (auto overridingASD = dyn_cast<AbstractStorageDecl>(override)) {
     // Make sure we get consistent overrides for the accessors as well.
+    auto *baseASD = cast<AbstractStorageDecl>(base);
     assert(baseASD->getGetter());
 
     auto recordAccessorOverride = [&](AccessorKind kind) {
@@ -1536,8 +1545,6 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
     recordAccessorOverride(AccessorKind::Get);
     recordAccessorOverride(AccessorKind::Set);
     recordAccessorOverride(AccessorKind::MaterializeForSet);
-  } else {
-    llvm_unreachable("Unexpected decl");
   }
 
   return false;
