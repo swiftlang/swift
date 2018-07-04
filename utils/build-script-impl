@@ -2774,9 +2774,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         >&2 echo "error: LLDB gtests failed"
                         exit 1
                     fi
-                else
-                    with_pushd ${lldb_build_dir} \
-                        ${NINJA_BIN} check-lldb-lit
                 fi
 
                 swift_build_dir=$(build_directory ${host} swift)
