@@ -1,19 +1,9 @@
-// RUN: %target-swift-frontend -typecheck %s -swift-version 3
-// RUN: %target-swift-frontend -typecheck -update-code -primary-file %s -emit-migrated-file-path %t.result -disable-migrator-fixits -swift-version 3
-// RUN: diff -u %s.expected %t.result
-// RUN: %target-swift-frontend -typecheck %s.expected -swift-version 4
+// RUN: %target-typecheck-verify-swift
 
 func test1(_: ()) {}
 test1(())
-test1()
 func test2() {}
 test2()
-
-enum Result<T> {
-	case success(T)
-}
-func test3(_: Result<()>) {}
-test3(.success())
 
 func test4(_: (Int, Int) -> ()) {}
 test4({ (x,y) in })
@@ -44,10 +34,7 @@ func toString(indexes: Int?...) -> String {
     if index != nil {}
     return ""
   })
-  let _ = indexes.reduce(0) { print($0); return $0.0 + ($0.1 ?? 0)}
-  let _ = indexes.reduce(0) { (true ? $0 : (1, 2)).0 + ($0.1 ?? 0) }
   let _ = [(1, 2)].contains { $0 != $1 }
-  _ = ["Hello", "Foo"].sorted { print($0); return $0.0.count > ($0).1.count }
   _ = ["Hello" : 2].map { ($0, ($1)) }
 }
 
@@ -59,7 +46,3 @@ extension Dictionary {
 
 let dictionary: [String: String] = [:]
 _ = dictionary.first { (column, value) in true }!.value
-
-func doit(_ x: Int) -> Bool { return x > 0 }
-let _: ((String, Int)) -> [String:Bool] = { [$0: doit($1)] }
-func returnClosure() -> ((Int, Int)) -> Bool { return {$1 > $0} }
