@@ -949,6 +949,7 @@ void LargeValueVisitor::visitDeallocInst(DeallocStackInst *instr) {
     assert(pass.allocToApplyRetMap.find(opAsInstr) !=
                pass.allocToApplyRetMap.end() &&
            "Unexpected dealloc instr!");
+    (void)opAsInstr;
   }
 }
 
@@ -1377,6 +1378,7 @@ void LoadableStorageAllocation::convertApplyResults() {
                  "Expected SILFunctionType or Optional for the result type");
           assert(optionalType.is<SILFunctionType>() &&
                  "Expected a SILFunctionType inside the optional Type");
+          (void)optionalType;
         }
         continue;
       }
@@ -2018,6 +2020,8 @@ static void rewriteFunction(StructLoweringState &pass,
     assert(srcType && "Expected an address-type source");
     assert(tgtType.isAddress() && "Expected an address-type target");
     assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
 
     SILBuilderWithScope copyBuilder(instr);
     createOutlinedCopyCall(copyBuilder, src, tgt, pass);
@@ -2406,6 +2410,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     assert(oldYields.size() == newYields.size() &&
            oldYields.size() == oldYieldedValues.size() &&
            newYields.size() == newYieldedValues.size());
+    (void)newYields;
     for (auto i : indices(oldYields)) {
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];

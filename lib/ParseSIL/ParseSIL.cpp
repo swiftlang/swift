@@ -847,6 +847,7 @@ void SILParser::convertRequirements(SILFunction *F,
 
   auto *GenericEnv = F->getGenericEnvironment();
   assert(GenericEnv);
+  (void)GenericEnv;
 
   IdentTypeReprLookup PerformLookup(P);
   // Use parser lexical scopes to resolve references

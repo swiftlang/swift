@@ -878,7 +878,7 @@ namespace {
       auto *dc = fn.getDecl()->getDeclContext();
       assert(!isa<ExtensionDecl>(dc));
 
-      if (fn.getDecl()->getDeclContext() == getType()) {
+      if (dc == getType()) {
         if (auto entry = VTable->getEntry(IGM.getSILModule(), fn)) {
           assert(entry->TheKind == SILVTable::Entry::Kind::Normal);
           auto *implFn = IGM.getAddrOfSILFunction(entry->Implementation,

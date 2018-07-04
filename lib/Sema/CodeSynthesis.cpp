@@ -808,6 +808,7 @@ static void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
                                              IsImplicit));
 }
 
+LLVM_ATTRIBUTE_UNUSED
 static bool isSynthesizedComputedProperty(AbstractStorageDecl *storage) {
   return (storage->getAttrs().hasAttribute<LazyAttr>() ||
           storage->getAttrs().hasAttribute<NSManagedAttr>());

@@ -3390,6 +3390,7 @@ WitnessTableCacheEntry::allocate(GenericWitnessTable *genericTable,
   size_t numRequirements =
     protocol->NumRequirements + WitnessTableFirstRequirementOffset;
   assert(numPatternWitnesses <= numRequirements);
+  (void)numRequirements;
 
   // Number of bytes for any private storage used by the conformance itself.
   size_t privateSizeInWords = genericTable->WitnessTablePrivateSizeInWords;

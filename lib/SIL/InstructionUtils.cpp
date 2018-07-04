@@ -355,6 +355,7 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
 static SILValue findClosureStoredIntoBlock(SILValue V) {
   auto FnType = V->getType().castTo<SILFunctionType>();
   assert(FnType->getRepresentation() == SILFunctionTypeRepresentation::Block);
+  (void)FnType;
 
   // Given a no escape block argument to a function,
   // pattern match to find the noescape closure that invoking the block

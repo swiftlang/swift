@@ -498,6 +498,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // Fix up the string parameters to have the right type.
     SILType nameArgTy = fnConv.getSILArgumentType(3);
     assert(nameArgTy == fnConv.getSILArgumentType(2));
+    (void)nameArgTy;
     auto managedName = ManagedValue::forUnmanaged(optName);
     SILValue nilValue;
     assert(optName->getType() == nameArgTy);
