@@ -2185,7 +2185,9 @@ extension BinaryFloatingPoint {
           sign: source.sign,
           exponentBitPattern: Self.nan.exponentBitPattern,
           significandBitPattern: payload | Self.nan.significandBitPattern)
-      return payload_ == payload ? (value, true) : (value, false)
+      // We define exactness by equality after roundtripping; since NaN is never
+      // equal to itself, it can never be converted exactly.
+      return (value, false)
     }
 
     let exponent = source.exponent
@@ -2299,8 +2301,7 @@ extension BinaryFloatingPoint {
   /// exactly.
   ///
   /// If the given floating-point value cannot be represented exactly, the
-  /// result is `nil`. A value that is NaN ("not a number") cannot be
-  /// represented exactly if its payload cannot be encoded exactly.
+  /// result is `nil`.
   ///
   /// - Parameter value: A floating-point value to be converted.
   @inlinable // FIXME(sil-serialize-all)
