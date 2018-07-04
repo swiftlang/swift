@@ -1999,8 +1999,11 @@ internal class _RawNativeDictionaryStorage
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
+  @objc(getObjects:andKeys:count:)
+  internal func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
     // Do nothing, we're empty
   }
 #endif
@@ -2168,9 +2171,11 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 
   // We also override the following methods for efficiency.
   @inlinable // FIXME(sil-serialize-all)
-  @objc
-  override func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
+  @objc(getObjects:andKeys:count:)
+  override func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
     // The user is expected to provide a storage of the correct size
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
@@ -2178,11 +2183,13 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
         for (offset: i, element: (key: key, value: val)) in full.enumerated() {
           unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
         for (offset: i, element: (key: key, value: _)) in full.enumerated() {
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          guard i < count else { break }
         }
       }
     } else {
@@ -2190,6 +2197,7 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
         // keys null, objects nonnull
         for (offset: i, element: (key: _, value: val)) in full.enumerated() {
           unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+          guard i < count else { break }
         }
       } else {
         // do nothing, both are null
@@ -2862,12 +2870,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @objc
+  @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
   ) {
-    bridgedAllKeysAndValues(objects, keys)
+    bridgedAllKeysAndValues(objects, keys, count)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2957,7 +2966,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @nonobjc
   internal func bridgedAllKeysAndValues(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    _ keys: UnsafeMutablePointer<AnyObject>?
+    _ keys: UnsafeMutablePointer<AnyObject>?,
+    _ count: Int
   ) {
     bridgeEverything()
     // The user is expected to provide a storage of the correct size
@@ -2972,6 +2982,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
@@ -2980,6 +2991,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       }
@@ -2990,6 +3002,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {

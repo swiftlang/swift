@@ -103,8 +103,12 @@ public protocol _NSDictionaryCore :
   @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?)
+  @objc(getObjects:andKeys:count:)
+  func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
+  )
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumerating(
