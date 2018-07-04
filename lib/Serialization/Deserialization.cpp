@@ -5305,8 +5305,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       continue;
     }
 
-    // Generic signature and environment.
-    GenericSignature *syntheticSig = nullptr;
+    // Generic environment.
     GenericEnvironment *syntheticEnv = nullptr;
     
     auto trySetOpaqueWitness = [&]{
@@ -5315,7 +5314,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       
       // We shouldn't yet need to worry about generic requirements, since
       // an imported ObjC method should never be generic.
-      assert(syntheticSig == nullptr && syntheticEnv == nullptr &&
+      assert(syntheticEnv == nullptr &&
              "opaque witness shouldn't be generic yet. when this is "
              "possible, it should use forwarding substitutions");
       conformance->setWitness(req, Witness::forOpaque(req));
