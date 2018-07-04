@@ -622,6 +622,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // We use a reference here on purpose so our transformations can know if we
   // are going to make a thunk and thus should just optimize.
   bool &Changed = TransformDescriptor.Changed;
+  bool hasOnlyDirectCallers = TransformDescriptor.hasOnlyDirectCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
   // If we are asked to assume a caller for testing purposes, set the flag.
@@ -642,7 +643,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // Run DeadArgument elimination transformation. We only specialize
   // if this function has a caller inside the current module or we have
   // already created a thunk.
-  if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectCallers) && DeadArgumentAnalyzeParameters()) {
     Changed = true;
     DEBUG(llvm::dbgs() << "  remove dead arguments\n");
     DeadArgumentTransformFunction();
@@ -660,7 +661,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // In order to not miss any opportunity, we send the optimized function
   // to the passmanager to optimize any opportunities exposed by argument
   // explosion.
-  if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectCallers) && ArgumentExplosionAnalyzeParameters()) {
     Changed = true;
   }
 
@@ -810,7 +811,8 @@ public:
 
     // Owned to guaranteed optimization.
     FunctionSignatureTransform FST(F, RCIA, EA, Mangler, AIM,
-                                   ArgumentDescList, ResultDescList);
+                                   ArgumentDescList, ResultDescList,
+                                   FuncInfo.hasAllCallers());
 
     bool Changed = false;
     if (OptForPartialApply) {

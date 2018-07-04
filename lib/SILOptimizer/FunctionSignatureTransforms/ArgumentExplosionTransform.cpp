@@ -38,11 +38,11 @@ static bool
 shouldExplodeTrivial(FunctionSignatureTransformDescriptor &transformDesc,
                      ArgumentDescriptor &argDesc, SILType ty,
                      unsigned maxExplosionSize) {
-  // Just blow up parameters if we will reduce the size of arguments.
-  //
-  // FIXME: In the future we should attempt to only do this if we can generate a
-  // thunk. This was tried with the current heuristic and it resulted in a 1%
-  // increase in code-size in the standard library.
+  // Only blow up trivial parameters if we will not form a thunk...
+  if (!transformDesc.hasOnlyDirectCallers)
+    return false;
+
+  // ... and reduce the size of the argument by a reasonable amount.
   unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
   return explosionSize <= maxExplosionSize;
 }
@@ -114,11 +114,9 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
   auto *arg = argDesc.Arg;
   auto &module = arg->getModule();
   auto ty = arg->getType().getObjectType();
-#if false
   if (!shouldExpand(module, ty)) {
     return false;
   }
-#endif
 
   // If we have a singular argument, be more aggressive about our max explosion
   // size. If we were unable to expand the value we know that it will be

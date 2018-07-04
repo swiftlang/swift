@@ -200,6 +200,10 @@ struct FunctionSignatureTransformDescriptor {
   /// Are we going to make a change to this function?
   bool Changed;
 
+  /// Does this function only have direct callers. In such a case we know that
+  /// all thunks we create will be eliminated so we can be more aggressive.
+  bool hasOnlyDirectCallers;
+
   /// Return a function name based on the current state of ArgumentDescList and
   /// ResultDescList.
   ///
@@ -295,8 +299,10 @@ public:
       Mangle::FunctionSignatureSpecializationMangler &Mangler,
       llvm::SmallDenseMap<int, int> &AIM,
       llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
-      llvm::SmallVector<ResultDescriptor, 4> &RDL)
-      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL, false},
+      llvm::SmallVector<ResultDescriptor, 4> &RDL,
+      bool hasOnlyDirectCallers)
+      : TransformDescriptor{F, nullptr, AIM, false, ADL, RDL, false,
+                            hasOnlyDirectCallers},
         RCIA(RCIA), EA(EA) {}
 
   /// Return the optimized function.
