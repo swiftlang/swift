@@ -328,7 +328,7 @@ protected:
     StorageKind : 4
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+4+1+1+1+1,
     /// \brief Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1,
@@ -347,7 +347,11 @@ protected:
 
     /// \brief Whether this is a property used in expressions in the debugger.
     /// It is up to the debugger to instruct SIL how to access this variable.
-    IsDebuggerVar : 1
+    IsDebuggerVar : 1,
+
+    /// \brief Whether this is a property defined in the debugger's REPL.
+    /// FIXME: Remove this once LLDB has proper support for resilience.
+    IsREPLVar : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -4576,6 +4580,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
+    Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     setType(Ty);
   }
@@ -4761,6 +4766,13 @@ public:
   bool isDebuggerVar() const { return Bits.VarDecl.IsDebuggerVar; }
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
+  }
+  
+  /// Is this a special debugger REPL variable?
+  /// FIXME: Remove this once LLDB has proper support for resilience.
+  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
+  void setREPLVar(bool IsREPLVar) {
+    Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
   /// Return the Objective-C runtime name for this property.
