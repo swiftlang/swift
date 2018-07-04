@@ -2763,6 +2763,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
     case CheckKind::Access:
     case CheckKind::AccessOfSetter: {
+      // Swift 4.2 relaxed some rules for protocol witness matching.
+      //
+      // This meant that it was possible for an optional protocol requirement
+      // to have a witness where previously in Swift 4.1 it did not.
+      //
+      // Since witnesses must be as visible as the protocol, this caused a
+      // source compatibility break if the witness was not sufficiently
+      // visible.
+      //
+      // Work around this by discarding the witness if its not sufficiently
+      // visible.
+      if (!TC.Context.isSwiftVersionAtLeast(5))
+        if (requirement->getAttrs().hasAttribute<OptionalAttr>())
+          return ResolveWitnessResult::Missing;
+
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(requirement, false,
