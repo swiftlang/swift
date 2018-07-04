@@ -720,6 +720,12 @@ public struct DictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
   internal let _elements: [(Key, Value)]
 }
 
+// NOTE: This will become the new name in Swift 5.0. This typealias is being
+// introduced in 4.2 in order to allow code to be migrated to the new name
+// using the old compiler, enabling warning-free compilation with both  the
+// old and new compiler. This is a swift-4.2-branch only change.
+public typealias KeyValuePairs<Key,Value> = DictionaryLiteral<Key,Value>
+
 /// `Collection` conformance that allows `DictionaryLiteral` to
 /// interoperate with the rest of the standard library.
 extension DictionaryLiteral : RandomAccessCollection {
