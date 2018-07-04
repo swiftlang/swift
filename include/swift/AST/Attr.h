@@ -1385,7 +1385,7 @@ public:
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
   const ATTR *getAttribute(bool AllowInvalid = false) const {
-    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>();
+    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>(AllowInvalid);
   }
 
   template <typename ATTR>

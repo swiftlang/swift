@@ -84,13 +84,8 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
   if (decls.size() < 2)
     return false;
 
-  auto lazyResolver = decls.front()->getASTContext().getLazyResolver();
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
   for (auto decl : decls) {
-    // Compute enough information to make the overridden-declaration available.
-    if (lazyResolver)
-      lazyResolver->resolveOverriddenDecl(decl);
-
     while (auto overrides = decl->getOverriddenDecl()) {
       overridden.insert(overrides);
 
@@ -105,10 +100,6 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
         ///        cause instead (incomplete circularity detection).
         assert(decl != overrides && "Circular class inheritance?");
         decl = overrides;
-
-        if (lazyResolver)
-          lazyResolver->resolveOverriddenDecl(decl);
-
         continue;
       }
 
@@ -1913,9 +1904,6 @@ bool DeclContext::lookupQualified(Type type,
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
-      if (typeResolver)
-        typeResolver->resolveOverriddenDecl(decl);
-
       if (decl->getOverriddenDecl())
         continue;
 
