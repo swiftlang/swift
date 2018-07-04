@@ -1510,6 +1510,7 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   case SymbolicValue::Aggregate:
   case SymbolicValue::Function:
   case SymbolicValue::Enum:
+  case SymbolicValue::EnumWithPayload:
     // TODO: Unsupported right now.
     return nullptr;
 

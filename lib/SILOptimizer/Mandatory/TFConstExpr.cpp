@@ -219,6 +219,11 @@ namespace {
     /// object it is addressing and any indices into that object.
     llvm::DenseMap<SILValue, AddressValue> addressValues;
 
+    void setAddress(SILValue addr, AddressValue addrVal) {
+      assert(addr->getType().isAddress() && "values are tracked separately");
+      addressValues.insert({addr, addrVal});
+    }
+
   public:
     ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
                            SubstitutionMap substitutionMap,
@@ -233,14 +238,15 @@ namespace {
       calculatedValues.insert({ value, symVal });
     }
 
-    void setAddress(SILValue addr, AddressValue addrVal) {
-      assert(addr->getType().isAddress() && "values are tracked separately");
-      addressValues.insert({ addr, addrVal });
-    }
-
+    /// Invariant: Before the call, `addressValues` must not contain `addr` as a
+    /// key, unless `initialValue` is an unknown value, representing a failure in
+    /// compiler-time evaluation.
     AddressValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
+      if (!initialValue.isUnknown()) {
+        assert(!addressValues.count(addr));
+      }
       unsigned objectID = memoryObjects.size();
-      auto objectType = simplifyType(addr->getType().getSwiftRValueType());
+      auto objectType = simplifyType(addr->getType().getASTType());
       memoryObjects.push_back({initialValue, objectType});
 
       auto result = AddressValue::get(objectID);
@@ -418,10 +424,13 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   }
 
   if (auto *enumVal = dyn_cast<EnumInst>(value)) {
-    // TODO: support enums with payloads.
     if (!enumVal->hasOperand())
-      return SymbolicValue::getEnum(enumVal->getElement(),
-                                    evaluator.getAllocator());
+      return SymbolicValue::getEnum(enumVal->getElement());
+
+    auto payload = computeConstantValue(enumVal->getOperand());
+    if (payload.isConstant())
+      return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
+                                               evaluator.getAllocator());
   }
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
@@ -1189,8 +1198,10 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   return None;
 }
 
-
+/// Invariant: Before the call, `addressValues` must not contain `addr` as a
+/// key. After the call, it must do.
 AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
+  assert(!addressValues.count(addr));
   // If this is a struct or tuple element addressor, compute a more derived
   // address.
   if (isa<StructElementAddrInst>(addr) || isa<TupleElementAddrInst>(addr)) {
@@ -1213,6 +1224,14 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
   // These instructions are markers that return their first operand.
   if (auto *bai = dyn_cast<BeginAccessInst>(addr))
     return getAddressValue(bai->getOperand());
+
+  // This one returns the address of its enum payload.
+  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(addr)) {
+    auto enumAddr = dai->getOperand();
+    auto enumVal = computeLoadResult(enumAddr);
+    if (enumVal.isConstant())
+      return createMemoryObject(addr, enumVal.getEnumPayload());
+  }
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
 
@@ -1296,6 +1315,19 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       return stored;
 
     return computeFSStore(stored, inst->getOperand(1));
+  }
+
+  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
+    auto enumVal = computeLoadResult(dai->getOperand());
+    if (!enumVal.isConstant())
+      return enumVal;
+    assert(enumVal.getKind() == SymbolicValue::EnumWithPayload);
+
+    assert(dai->getType().isAddress());
+    auto payload = computeLoadResult(dai);
+    assert(payload.isConstant());
+    (void)payload;
+    return None;
   }
 
   // Copy addr is a load + store combination.
@@ -1470,14 +1502,34 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       continue;
     }
 
-    if (auto *SEAI = dyn_cast<SwitchEnumAddrInst>(inst)) {
-      auto value = state.computeLoadResult(SEAI->getOperand());
-      assert(value.getKind() == SymbolicValue::Enum);
-      auto *caseBB = SEAI->getCaseDestination(value.getEnumValue());
+    if (isa<SwitchEnumAddrInst>(inst) || isa<SwitchEnumInst>(inst)) {
+      SymbolicValue value;
+      SwitchEnumInstBase *switchInst = dyn_cast<SwitchEnumInst>(inst);
+      if (switchInst) {
+        value = state.getConstantValue(switchInst->getOperand());
+      } else {
+        switchInst = cast<SwitchEnumAddrInst>(inst);
+        value = state.computeLoadResult(switchInst->getOperand());
+      }
+      if (!value.isConstant())
+        return value;
+      assert(value.getKind() == SymbolicValue::Enum ||
+             value.getKind() == SymbolicValue::EnumWithPayload);
+      // Set up basic block arguments.
+      auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
+      if (caseBB->getNumArguments() > 0) {
+        assert(value.getKind() == SymbolicValue::EnumWithPayload);
+        // When there are multiple payload components, they form a single
+        // tuple-typed argument.
+        assert(caseBB->getNumArguments() == 1);
+        auto argument = value.getEnumPayload();
+        assert(argument.isConstant());
+        state.setValue(caseBB->getArgument(0), argument);
+      }
       nextInst = caseBB->begin();
       continue;
     }
-
+    
     DEBUG(llvm::dbgs() << "ConstExpr: Unknown Terminator: " << *inst << "\n");
 
     // TODO: Enum switches when we support enums?

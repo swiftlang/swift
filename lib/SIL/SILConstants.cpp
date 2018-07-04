@@ -85,7 +85,16 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   }
   case RK_Enum: {
     auto *decl = getEnumValue();
+    os << "enum: ";
     decl->print(os);
+    return;
+  }
+  case RK_EnumWithPayload: {
+    auto *decl = getEnumValue();
+    os << "enum: ";
+    decl->print(os);
+    os <<", payload: ";
+    getEnumPayload().print(os, indent);
     return;
   }
   }
@@ -105,6 +114,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_Function:     return Function;
   case RK_Aggregate:    return Aggregate;
   case RK_Enum:         return Enum;
+  case RK_EnumWithPayload:
+    return EnumWithPayload;
   case RK_Integer:      return Integer;
   case RK_Float:        return Float;
   case RK_String:       return String;
@@ -145,7 +156,10 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
     return getAggregate(results, allocator);
   }
   case SymbolicValue::Enum:
-    return SymbolicValue::getEnum(getEnumValue(), allocator);
+    return SymbolicValue::getEnum(getEnumValue());
+  case SymbolicValue::EnumWithPayload:
+    return SymbolicValue::getEnumWithPayload(getEnumValue(), getEnumPayload(),
+                                             allocator);
   }
 }
 
@@ -432,51 +446,70 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 
 namespace swift {
 
-/// This is the representation of a constant enum value. It maintains
-/// an optional SymbolicValue as a trailing object.
-struct alignas(SymbolicValue) EnumSymbolicValue final
-    : private llvm::TrailingObjects<EnumSymbolicValue, SymbolicValue> {
-  friend class llvm::TrailingObjects<EnumSymbolicValue, SymbolicValue>;
-
-  /// This is the number of elements in the aggregate.
+/// This is the representation of a constant enum value with payload.
+struct alignas(SymbolicValue) EnumWithPayloadSymbolicValue final {
+  /// The enum case.
   EnumElementDecl *decl;
 
-  static EnumSymbolicValue *create(EnumElementDecl *decl,
-                                   llvm::BumpPtrAllocator &allocator) {
-    // TODO: support an optional SymbolicValue-typed payload.
-    auto byteSize = EnumSymbolicValue::totalSizeToAlloc<SymbolicValue>(0);
-    auto rawMem = allocator.Allocate(byteSize, alignof(EnumSymbolicValue));
+  SymbolicValue payload;
 
-    //  Placement initialize the EnumSymbolicValue.
-    auto esv = ::new (rawMem) EnumSymbolicValue(decl);
-    return esv;
+  /// `payload` must be a constant.
+  static EnumWithPayloadSymbolicValue *
+  create(EnumElementDecl *decl, SymbolicValue payload,
+         llvm::BumpPtrAllocator &allocator) {
+    assert(decl);
+    auto rawMem = allocator.Allocate(sizeof(EnumWithPayloadSymbolicValue),
+                                     alignof(EnumWithPayloadSymbolicValue));
+    //  Placement initialize the EnumWithPayloadSymbolicValue.
+    return ::new (rawMem) EnumWithPayloadSymbolicValue(decl, payload);
   }
 
   EnumElementDecl *getEnumDecl() const { return decl; }
 
-  // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<SymbolicValue>) const { return 0; }
+  SymbolicValue getPayload() const { return payload; }
 
 private:
-  EnumSymbolicValue() = delete;
-  EnumSymbolicValue(const EnumSymbolicValue &) = delete;
-  EnumSymbolicValue(EnumElementDecl *decl) : decl(decl) {}
+  EnumWithPayloadSymbolicValue() = delete;
+  EnumWithPayloadSymbolicValue(const EnumWithPayloadSymbolicValue &) = delete;
+  EnumWithPayloadSymbolicValue(EnumElementDecl *decl, SymbolicValue payload)
+      : decl(decl), payload(payload) {
+    assert(payload.isConstant());
+  }
 };
 
 /// This returns a constant Symbolic value for the enum case in `decl`.
-SymbolicValue SymbolicValue::getEnum(EnumElementDecl *decl,
-                                     llvm::BumpPtrAllocator &allocator) {
-  auto enumVal = EnumSymbolicValue::create(decl, allocator);
-  assert(enumVal && "enum value must be present");
+SymbolicValue SymbolicValue::getEnum(EnumElementDecl *decl) {
+  assert(decl);
   SymbolicValue result;
   result.representationKind = RK_Enum;
-  result.value.enumVal = enumVal;
+  result.value.enumVal = decl;
+  return result;
+}
+
+/// This returns a constant Symbolic value for the enum case in `decl` with a
+/// payload.
+SymbolicValue
+SymbolicValue::getEnumWithPayload(EnumElementDecl *decl, SymbolicValue payload,
+                                  llvm::BumpPtrAllocator &allocator) {
+  auto enumVal = EnumWithPayloadSymbolicValue::create(decl, payload, allocator);
+  assert(enumVal);
+  SymbolicValue result;
+  result.representationKind = RK_EnumWithPayload;
+  result.value.enumValWithPayload = enumVal;
   return result;
 }
 
 EnumElementDecl *SymbolicValue::getEnumValue() const {
-  assert(representationKind == RK_Enum);
-  return value.enumVal->getEnumDecl();
+  if (representationKind == RK_Enum)
+    return value.enumVal;
+
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->getEnumDecl();
+}
+
+SymbolicValue SymbolicValue::getEnumPayload() const {
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->getPayload();
 }
 
 } // end namespace swift

@@ -1579,6 +1579,7 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       case SymbolicValue::Unknown:
       case SymbolicValue::UninitMemory:
       case SymbolicValue::Enum:
+      case SymbolicValue::EnumWithPayload:
         assert(0 && "These attribute kinds cannot happen here");
       case SymbolicValue::Integer: {
         auto value = attrValue.getIntegerValue();
