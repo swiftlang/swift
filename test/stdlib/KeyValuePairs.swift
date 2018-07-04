@@ -1,4 +1,4 @@
-//===--- DictionaryLiteral.swift ------------------------------------------===//
+//===--- KeyValuePairs.swift ------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,14 +21,14 @@ import StdlibUnittest
 // Check that the generic parameters are called 'Key' and 'Value'.
 protocol TestProtocol1 {}
 
-extension DictionaryLiteral where Key : TestProtocol1, Value : TestProtocol1 {
+extension KeyValuePairs where Key : TestProtocol1, Value : TestProtocol1 {
   var _keyAndValueAreTestProtocol1: Bool {
     fatalError("not implemented")
   }
 }
 
 func checkAssociatedTypes() {
-  typealias Subject = DictionaryLiteral<MinimalHashableValue, OpaqueValue<Int>>
+  typealias Subject = KeyValuePairs<MinimalHashableValue, OpaqueValue<Int>>
   expectRandomAccessCollectionAssociatedTypes(
     collectionType: Subject.self,
     iteratorType: IndexingIterator<Subject>.self,
@@ -37,17 +37,17 @@ func checkAssociatedTypes() {
     indicesType: CountableRange<Int>.self)
 }
 
-var strings: DictionaryLiteral = ["a": "1", "b": "Foo"]
-expectType(DictionaryLiteral<String, String>.self, &strings)
+var strings: KeyValuePairs = ["a": "1", "b": "Foo"]
+expectType(KeyValuePairs<String, String>.self, &strings)
 
-var stringNSStringLiteral: DictionaryLiteral = [
+var stringNSStringLiteral: KeyValuePairs = [
   "a": "1", "b": "Foo" as NSString]
-expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLiteral)
+expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLiteral)
 
 let aString = "1"
 let anNSString = "Foo" as NSString
-var stringNSStringLet: DictionaryLiteral = [ "a": aString as NSString, "b": anNSString]
-expectType(DictionaryLiteral<String, NSString>.self, &stringNSStringLet)
+var stringNSStringLet: KeyValuePairs = [ "a": aString as NSString, "b": anNSString]
+expectType(KeyValuePairs<String, NSString>.self, &stringNSStringLet)
 
-var hetero: DictionaryLiteral = ["a": 1 as NSNumber, "b": "Foo" as NSString]
-expectType(DictionaryLiteral<String, NSObject>.self, &hetero)
+var hetero: KeyValuePairs = ["a": 1 as NSNumber, "b": "Foo" as NSString]
+expectType(KeyValuePairs<String, NSObject>.self, &hetero)
