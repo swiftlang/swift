@@ -67,6 +67,12 @@ Swift 5.0
 Swift 4.2
 ---------
 
+* [SE-0214][]:
+
+  Renamed the `DictionaryLiteral` type to `KeyValuePairs`.
+  A typealias preserves the old name for compatibility.
+
+
 * [SE-0194][]
 
   The new CaseIterable protocol describes types which have a static
@@ -7147,6 +7153,7 @@ Swift 1.0
 [SE-0210]: <https://github.com/apple/swift-evolution/blob/master/proposals/0210-key-path-offset.md>
 [SE-0211]: <https://github.com/apple/swift-evolution/blob/master/proposals/0211-unicode-scalar-properties.md>
 [SE-0212]: <https://github.com/apple/swift-evolution/blob/master/proposals/0212-compiler-version-directive.md>
+[SE-0214]: <https://github.com/apple/swift-evolution/blob/master/proposals/0214-DictionaryLiteral.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
 [SR-419]: <https://bugs.swift.org/browse/SR-419>
