@@ -344,10 +344,11 @@ namespace swift {
     Implementation &Impl;
   };
 
-  /// Register the type checker's request functions with the evaluator.
+  /// Register request functions with the evaluator.
   ///
   /// Clients that form an ASTContext and will perform any semantic
-  /// queries should call this function after forming the ASTContext.
+  /// queries should call these functions after forming the ASTContext.
+  void registerAccessRequestFunctions(Evaluator &evaluator);
   void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
 
 } // end namespace swift

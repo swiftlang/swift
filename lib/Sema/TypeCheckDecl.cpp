@@ -3664,8 +3664,6 @@ public:
 
     validateAttributes(TC, ED);
 
-    TC.computeDefaultAccessLevel(ED);
-
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
@@ -5532,74 +5530,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
 }
 
 void TypeChecker::validateAccessControl(ValueDecl *D) {
-  if (D->hasAccess())
-    return;
-
-  // FIXME: Encapsulate the following in computeAccessLevel() ?
-
-  switch (D->getKind()) {
-  case DeclKind::Import:
-  case DeclKind::Extension:
-  case DeclKind::PatternBinding:
-  case DeclKind::EnumCase:
-  case DeclKind::TopLevelCode:
-  case DeclKind::InfixOperator:
-  case DeclKind::PrefixOperator:
-  case DeclKind::PostfixOperator:
-  case DeclKind::PrecedenceGroup:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
-  case DeclKind::MissingMember:
-    llvm_unreachable("not a value decl");
-
-  case DeclKind::Module:
-    break;
-
-  case DeclKind::TypeAlias:
-    computeAccessLevel(D);
-    break;
-
-  case DeclKind::GenericTypeParam:
-    // Ultimately handled in generic signature validation.
-    return;
-
-  case DeclKind::AssociatedType: {
-      auto assocType = cast<AssociatedTypeDecl>(D);
-      auto prot = assocType->getProtocol();
-      validateAccessControl(prot);
-      assocType->setAccess(std::max(prot->getFormalAccess(),
-                                    AccessLevel::Internal));
-      break;
-    }
-
-  case DeclKind::Enum:
-  case DeclKind::Struct:
-  case DeclKind::Class:
-  case DeclKind::Protocol:
-  case DeclKind::Var:
-  case DeclKind::Param:
-  case DeclKind::Func:
-  case DeclKind::Accessor:
-  case DeclKind::Subscript:
-  case DeclKind::Constructor:
-    computeAccessLevel(D);
-    break;
-
-  case DeclKind::Destructor:
-  case DeclKind::EnumElement: {
-    if (D->isInvalid()) {
-      D->setAccess(AccessLevel::Private);
-    } else {
-      auto container = cast<NominalTypeDecl>(D->getDeclContext());
-      validateAccessControl(container);
-      D->setAccess(std::max(container->getFormalAccess(),
-                            AccessLevel::Internal));
-    }
-    break;
-  }
-  }
-
-  assert(D->hasAccess());
+  (void) D->getFormalAccess();
 }
 
 bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {
