@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-module -o %t -I %S/../Inputs/ObjCBridging %S/../Inputs/ObjCBridging/Appliances.swift
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridging -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle -emit-silgen %s -enable-sil-ownership | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridging -I %S/../Inputs/ObjCBridging -Xllvm -sil-full-demangle %s -enable-sil-ownership | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
 
 // REQUIRES: objc_interop
 
@@ -245,7 +245,7 @@ var NSS: NSString
 
 // -- NSString methods don't convert 'self'
 extension NSString {
-  var nsstrFakeProp: NSString {
+  @objc var nsstrFakeProp: NSString {
     get { return NSS }
     set {}
   }
@@ -258,13 +258,13 @@ extension NSString {
   // CHECK-NOT: $SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: }
 
-  func nsstrResult() -> NSString { return NSS }
+  @objc func nsstrResult() -> NSString { return NSS }
   // CHECK-LABEL: sil hidden [thunk] @$SSo8NSStringC13objc_bridgingE11nsstrResultAByFTo
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: $SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: }
 
-  func nsstrArg(_ s: NSString) { }
+  @objc func nsstrArg(_ s: NSString) { }
   // CHECK-LABEL: sil hidden [thunk] @$SSo8NSStringC13objc_bridgingE8nsstrArgyyABFTo
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: $SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
@@ -274,7 +274,7 @@ extension NSString {
 
 class Bas : NSObject {
   // -- Bridging thunks for String properties convert between NSString
-  var strRealProp: String = "Hello"
+  @objc var strRealProp: String = "Hello"
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC11strRealPropSSvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSString {
   // CHECK: bb0([[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]] : $Bas
@@ -322,7 +322,7 @@ class Bas : NSObject {
   // CHECK:   assign {{.*}} to [[WRITE]]
   // CHECK: }
 
-  var strFakeProp: String {
+  @objc var strFakeProp: String {
     get { return "" }
     set {}
   }
@@ -357,8 +357,8 @@ class Bas : NSObject {
   // CHECK: } // end sil function '$S13objc_bridging3BasC11strFakePropSSvsTo'
 
   // -- Bridging thunks for explicitly NSString properties don't convert
-  var nsstrRealProp: NSString
-  var nsstrFakeProp: NSString {
+  @objc var nsstrRealProp: NSString
+  @objc var nsstrFakeProp: NSString {
     get { return NSS }
     set {}
   }
@@ -373,7 +373,7 @@ class Bas : NSObject {
   // CHECK: }
 
   // -- Bridging thunks for String methods convert between NSString
-  func strResult() -> String { return "" }
+  @objc func strResult() -> String { return "" }
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC9strResultSSyFTo
   // CHECK: bb0([[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[THIS_COPY:%.*]] = copy_value [[THIS]]
@@ -389,7 +389,7 @@ class Bas : NSObject {
   // CHECK:   destroy_value [[STR]]
   // CHECK:   return [[NSSTR]]
   // CHECK: }
-  func strArg(_ s: String) { }
+  @objc func strArg(_ s: String) { }
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC6strArgyySSFTo
   // CHECK: bb0([[NSSTR:%.*]] : @unowned $NSString, [[THIS:%.*]] : @unowned $Bas):
   // CHECK:   [[NSSTR_COPY:%.*]] = copy_value [[NSSTR]]
@@ -406,18 +406,18 @@ class Bas : NSObject {
   // CHECK: } // end sil function '$S13objc_bridging3BasC6strArgyySSFTo'
 
   // -- Bridging thunks for explicitly NSString properties don't convert
-  func nsstrResult() -> NSString { return NSS }
+  @objc func nsstrResult() -> NSString { return NSS }
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC11nsstrResultSo8NSStringCyFTo
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: $SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: }
-  func nsstrArg(_ s: NSString) { }
+  @objc func nsstrArg(_ s: NSString) { }
   // CHECK-LABEL: sil hidden @$S13objc_bridging3BasC8nsstrArgyySo8NSStringCF
   // CHECK-NOT: swift_StringToNSString
   // CHECK-NOT: $SSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
   // CHECK: }
 
-  init(str: NSString) {
+  @objc init(str: NSString) {
     nsstrRealProp = str
     super.init()
   }
@@ -437,7 +437,7 @@ class Bas : NSObject {
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]] from [[SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
-  func arrayArg(_ array: [AnyObject]) { }
+  @objc func arrayArg(_ array: [AnyObject]) { }
   
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC11arrayResultSayyXlGyFTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Bas):
@@ -453,11 +453,11 @@ class Bas : NSObject {
   // CHECK:   end_borrow [[BORROWED_ARRAY]] from [[ARRAY]]
   // CHECK:   destroy_value [[ARRAY]]
   // CHECK:   return [[NSARRAY]]
-  func arrayResult() -> [AnyObject] { return [] }
+  @objc func arrayResult() -> [AnyObject] { return [] }
 
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC9arrayPropSaySSGvgTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK-LABEL: sil hidden [thunk] @$S13objc_bridging3BasC9arrayPropSaySSGvsTo : $@convention(objc_method) (NSArray, Bas) -> ()
-  var arrayProp: [String] = []
+  @objc var arrayProp: [String] = []
 }
 
 // CHECK-LABEL: sil hidden @$S13objc_bridging16applyStringBlock_1xS3SXB_SStF

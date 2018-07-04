@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -210,9 +210,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
-  Opts.IterativeTypeChecker |= Args.hasArg(OPT_iterative_type_checker);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
+
+  if (Args.hasArg(OPT_verify_syntax_tree)) {
+    Opts.BuildSyntaxTree = true;
+    Opts.VerifySyntaxTree = true;
+  }
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -249,6 +253,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefix = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_debug_cycles)) {
+    Opts.EvaluatorCycleDiagnostics = CycleDiagnosticKind::DebugDiagnose;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
@@ -270,6 +278,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
     Opts.SolverShrinkUnsolvedThreshold = threshold;
   }
+
+  if (const Arg *A = Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -312,7 +323,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableNonFrozenEnumExhaustivityDiagnostics =
     Args.hasFlag(OPT_enable_nonfrozen_enum_exhaustivity_diagnostics,
                  OPT_disable_nonfrozen_enum_exhaustivity_diagnostics,
-                 Opts.EnableNonFrozenEnumExhaustivityDiagnostics);
+                 Opts.isSwiftVersionAtLeast(5));
 
   if (Arg *A = Args.getLastArg(OPT_Rpass_EQ))
     Opts.OptimizationRemarkPassedPattern =
@@ -576,16 +587,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     }
   }
   
-  if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
-                                     OPT_sil_link_all)) {
-    if (A->getOption().matches(OPT_disable_sil_linking))
-      Opts.LinkMode = SILOptions::LinkNone;
-    else if (A->getOption().matches(OPT_sil_link_all))
-      Opts.LinkMode = SILOptions::LinkAll;
-    else
-      llvm_unreachable("Unknown SIL linking option!");
-  }
-
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
@@ -716,10 +717,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   return false;
 }
 
-void CompilerInvocation::buildDWARFDebugFlags(std::string &Output,
-                                              const ArrayRef<const char*> &Args,
-                                              StringRef SDKPath,
-                                              StringRef ResourceDir) {
+void CompilerInvocation::buildDebugFlags(std::string &Output,
+                                         const ArrayRef<const char*> &Args,
+                                         StringRef SDKPath,
+                                         StringRef ResourceDir) {
   // This isn't guaranteed to be the same temp directory as what the driver
   // uses, but it's highly likely.
   llvm::SmallString<128> TDir;
@@ -761,30 +762,61 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
   } else if (const Arg *A = Args.getLastArg(OPT_g_Group)) {
     if (A->getOption().matches(OPT_g))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::Normal;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
     else if (A->getOption().matches(options::OPT_gline_tables_only))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::LineTables;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::LineTables;
     else if (A->getOption().matches(options::OPT_gdwarf_types))
-      Opts.DebugInfoKind = IRGenDebugInfoKind::DwarfTypes;
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::DwarfTypes;
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
 
-    if (Opts.DebugInfoKind > IRGenDebugInfoKind::LineTables) {
-      ArgStringList RenderedArgs;
-      for (auto A : Args)
-        A->render(Args, RenderedArgs);
-      CompilerInvocation::buildDWARFDebugFlags(Opts.DWARFDebugFlags,
-                                               RenderedArgs, SDKPath,
-                                               ResourceDir);
+    if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::LineTables) {
+      if (Args.hasArg(options::OPT_debug_info_store_invocation)) {
+        ArgStringList RenderedArgs;
+        for (auto A : Args)
+          A->render(Args, RenderedArgs);
+        CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
+                                            RenderedArgs, SDKPath,
+                                            ResourceDir);
+      }
       // TODO: Should we support -fdebug-compilation-dir?
       llvm::SmallString<256> cwd;
       llvm::sys::fs::current_path(cwd);
       Opts.DebugCompilationDir = cwd.str();
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
+    if (A->containsValue("dwarf"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+    else if (A->containsValue("codeview"))
+      Opts.DebugInfoFormat = IRGenDebugInfoFormat::CodeView;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+  } else if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::None) {
+    // If -g was specified but not -debug-info-format, DWARF is assumed.
+    Opts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  }
+  if (Args.hasArg(options::OPT_debug_info_format) &&
+      !Args.hasArg(options::OPT_g_Group)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_option_missing_required_argument,
+                   debugFormatArg->getAsString(Args), "-g");
+  }
+  if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView &&
+      (Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables ||
+       Opts.DebugInfoLevel == IRGenDebugInfoLevel::DwarfTypes)) {
+    const Arg *debugFormatArg = Args.getLastArg(options::OPT_debug_info_format);
+    Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+                   debugFormatArg->getAsString(Args),
+                   Opts.DebugInfoLevel == IRGenDebugInfoLevel::LineTables
+                     ? "-gline-tables-only"
+                     : "-gdwarf_types");
   }
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
@@ -814,7 +846,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.DisableLLVMOptzns |= Args.hasArg(OPT_disable_llvm_optzns);
-  Opts.DisableLLVMARCOpts |= Args.hasArg(OPT_disable_llvm_arc_opts);
+  Opts.DisableSwiftSpecificLLVMOptzns |=
+      Args.hasArg(OPT_disable_swift_specific_llvm_optzns);
   Opts.DisableLLVMSLPVectorizer |= Args.hasArg(OPT_disable_llvm_slp_vectorizer);
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
@@ -909,17 +942,30 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
+  if (Args.hasArg(OPT_enable_class_resilience)) {
+    Opts.EnableClassResilience = true;
+  }
+
+  if (Args.hasArg(OPT_enable_resilience_bypass)) {
+    Opts.EnableResilienceBypass = true;
+  }
+
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
     Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
 
   return false;
 }
 
-bool ParseMigratorArgs(MigratorOptions &Opts,
-                       const FrontendOptions &FrontendOpts,
-                       const llvm::Triple &Triple,
-                       StringRef ResourcePath, const ArgList &Args,
-                       DiagnosticEngine &Diags) {
+static std::string getScriptFileName(StringRef name, bool isSwiftVersion3) {
+  StringRef langVer = isSwiftVersion3 ? "3" : "4";
+  return (Twine(name) + langVer + ".json").str();
+}
+
+static bool ParseMigratorArgs(MigratorOptions &Opts,
+                              LangOptions &LangOpts,
+                              const FrontendOptions &FrontendOpts,
+                              StringRef ResourcePath, const ArgList &Args,
+                              DiagnosticEngine &Diags) {
   using namespace options;
 
   Opts.KeepObjcVisibility |= Args.hasArg(OPT_migrate_keep_objc_visibility);
@@ -944,23 +990,38 @@ bool ParseMigratorArgs(MigratorOptions &Opts,
   if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
     Opts.APIDigesterDataStorePaths.push_back(DataPath->getValue());
   } else {
+    auto &Triple = LangOpts.Target;
+    bool isSwiftVersion3 = LangOpts.isSwiftVersion3();
+
+    llvm::SmallString<128> basePath;
+    if (auto DataDir = Args.getLastArg(OPT_api_diff_data_dir)) {
+      basePath = DataDir->getValue();
+    } else {
+      basePath = ResourcePath;
+      llvm::sys::path::append(basePath, "migrator");
+    }
+
     bool Supported = true;
-    llvm::SmallString<128> dataPath(ResourcePath);
-    llvm::sys::path::append(dataPath, "migrator");
+    llvm::SmallString<128> dataPath(basePath);
+
     if (Triple.isMacOSX())
-      llvm::sys::path::append(dataPath, "macos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("macos", isSwiftVersion3));
     else if (Triple.isiOS())
-      llvm::sys::path::append(dataPath, "ios.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("ios", isSwiftVersion3));
     else if (Triple.isTvOS())
-      llvm::sys::path::append(dataPath, "tvos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("tvos", isSwiftVersion3));
     else if (Triple.isWatchOS())
-      llvm::sys::path::append(dataPath, "watchos.json");
+      llvm::sys::path::append(dataPath,
+                              getScriptFileName("watchos", isSwiftVersion3));
     else
       Supported = false;
     if (Supported) {
-      llvm::SmallString<128> authoredDataPath(ResourcePath);
-      llvm::sys::path::append(authoredDataPath, "migrator");
-      llvm::sys::path::append(authoredDataPath, "overlay.json");
+      llvm::SmallString<128> authoredDataPath(basePath);
+      llvm::sys::path::append(authoredDataPath,
+                              getScriptFileName("overlay", isSwiftVersion3));
       // Add authored list first to take higher priority.
       Opts.APIDigesterDataStorePaths.push_back(authoredDataPath.str());
       Opts.APIDigesterDataStorePaths.push_back(dataPath.str());
@@ -980,6 +1041,9 @@ bool ParseMigratorArgs(MigratorOptions &Opts,
     // supplementary output for the whole compilation instead of one per input,
     // so it's probably not worth it.
     FrontendOpts.InputsAndOutputs.assertMustNotBeMoreThanOnePrimaryInput();
+
+    // Always disable typo-correction in the migrator.
+    LangOpts.TypoCorrectionLimit = 0;
   }
 
   return false;
@@ -1050,7 +1114,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseMigratorArgs(MigratorOpts, FrontendOpts, LangOpts.Target,
+  if (ParseMigratorArgs(MigratorOpts, LangOpts, FrontendOpts,
                         SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }

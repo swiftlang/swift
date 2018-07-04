@@ -4,7 +4,7 @@ import Builtin
 
 protocol P {}
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dont_crash(
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dont_crash(
 // CHECK:  [[TYPE_ADDR:%.*]] = getelementptr inbounds %T27fixed_size_buffer_peepholes1PP, %T27fixed_size_buffer_peepholes1PP* %0, i32 0, i32 1
 // CHECK:  [[TYPE:%.*]] = load %swift.type*, %swift.type** [[TYPE_ADDR]]
 // CHECK:  call {{.*}} @__swift_project_boxed_opaque_existential_1

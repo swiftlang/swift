@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
 
 sil_stage canonical
 
@@ -31,8 +31,8 @@ sil @_TFC14devirt_access21YcfMS0_FT_S0_ : $@convention(method) (@owned Y) -> @ow
 sil @_TFC14devirt_access21YCfMS0_FT_S0_ : $@convention(thin) (@thick Y.Type) -> @owned Y
 
 //CHECK-LABEL: sil @Case
-//CHECK-NOT: function_ref @_TFC14devirt_access21X4pingfS0_FT_Si
-//CHECK: class_method
+//CHECK: function_ref @_TFC14devirt_access21X4pingfS0_FT_Si : $@convention(method) (@guaranteed X)
+//CHECK-NOT: class_method
 //CHECK: apply
 //CHECK: return
 sil @Case : $@convention(thin) (@owned Y) -> Int {

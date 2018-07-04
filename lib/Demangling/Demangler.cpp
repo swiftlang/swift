@@ -130,8 +130,10 @@ swift::Demangle::makeSymbolicMangledNameStringRef(const char *base) {
   auto end = base;
   while (*end != '\0') {
     // Skip over symbolic references.
-    if (*end == '\1')
-      end += 4;
+    if (*end >= '\x01' && *end <= '\x17')
+      end += sizeof(uint32_t);
+    if (*end >= '\x18' && *end <= '\x1F')
+      end += sizeof(void*);
     ++end;
   }
   return StringRef(base, end - base);
@@ -262,8 +264,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
   return isStructNode(Dem.demangleType(mangledName));
 }
 
-namespace swift {
-namespace Demangle {
+using namespace swift;
+using namespace Demangle;
 
 //////////////////////////////////
 // Node member functions        //
@@ -923,6 +925,7 @@ NodePointer Demangler::popTypeAndGetAnyGeneric() {
 
 NodePointer Demangler::demangleBuiltinType() {
   NodePointer Ty = nullptr;
+  const int maxTypeSize = 4096; // a very conservative upper bound
   switch (nextChar()) {
     case 'b':
       Ty = createNode(Node::Kind::BuiltinTypeName,
@@ -934,7 +937,7 @@ NodePointer Demangler::demangleBuiltinType() {
       break;
     case 'f': {
       int size = demangleIndex() - 1;
-      if (size <= 0)
+      if (size <= 0 || size > maxTypeSize)
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_FLOAT, *this);
@@ -944,7 +947,7 @@ NodePointer Demangler::demangleBuiltinType() {
     }
     case 'i': {
       int size = demangleIndex() - 1;
-      if (size <= 0)
+      if (size <= 0 || size > maxTypeSize)
         return nullptr;
       CharVector name;
       name.append(BUILTIN_TYPE_NAME_INT, *this);
@@ -954,7 +957,7 @@ NodePointer Demangler::demangleBuiltinType() {
     }
     case 'v': {
       int elts = demangleIndex() - 1;
-      if (elts <= 0)
+      if (elts <= 0 || elts > maxTypeSize)
         return nullptr;
       NodePointer EltType = popTypeAndGetChild();
       if (!EltType || EltType->getKind() != Node::Kind::BuiltinTypeName ||
@@ -1192,6 +1195,17 @@ NodePointer Demangler::popTypeList() {
 }
 
 NodePointer Demangler::popProtocol() {
+  if (NodePointer Type = popNode(Node::Kind::Type)) {
+    if (Type->getNumChildren() < 1)
+      return nullptr;
+
+    NodePointer Proto = Type->getChild(0);
+    if (Proto->getKind() != Node::Kind::Protocol)
+      return nullptr;
+
+    return Type;
+  }
+
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
   NodePointer Proto = createWithChildren(Node::Kind::Protocol, Ctx, Name);
@@ -1318,8 +1332,14 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
     case Node::Kind::Enum:
       kind = Node::Kind::BoundGenericEnum;
       break;
+    case Node::Kind::Protocol:
+      kind = Node::Kind::BoundGenericProtocol;
+      break;
     case Node::Kind::OtherNominalType:
       kind = Node::Kind::BoundGenericOtherNominalType;
+      break;
+    case Node::Kind::TypeAlias:
+      kind = Node::Kind::BoundGenericTypeAlias;
       break;
     default:
       return nullptr;
@@ -1543,13 +1563,6 @@ NodePointer Demangler::demangleArchetype() {
       addSubstitution(AssocTy);
       return AssocTy;
     }
-    case 'q': {
-      NodePointer Idx = demangleIndexAsNode();
-      NodePointer Ctx = popContext();
-      NodePointer DeclCtx = createWithChild(Node::Kind::DeclContext, Ctx);
-      return createType(createWithChildren(Node::Kind::QualifiedArchetype,
-                                           Idx, DeclCtx));
-    }
     case 'y': {
       NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
       addSubstitution(T);
@@ -1756,6 +1769,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       if (node) {
         if (node->getKind() == Node::Kind::DependentGenericSignature) {
           auto decl = popNode();
+          if (!decl)
+            return nullptr;
           result = createWithChildren(nodeKind, decl, /*sig*/ node);
         } else {
           result = createWithChild(nodeKind, /*decl*/ node);
@@ -1974,10 +1989,31 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
           return nullptr;
       }
     }
+    case 'e': {
+      unsigned Value =
+          unsigned(FunctionSigSpecializationParamKind::ExistentialToGeneric);
+      if (nextIf('D'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::Dead);
+      if (nextIf('G'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
+      if (nextIf('O'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+      if (nextIf('X'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     Value));
+    }
     case 'd': {
       unsigned Value = unsigned(FunctionSigSpecializationParamKind::Dead);
       if (nextIf('G'))
         Value |= unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
+      if (nextIf('O'))
+        Value |=
+            unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
       if (nextIf('X'))
         Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
       return addChild(Param, createNode(
@@ -1990,6 +2026,16 @@ NodePointer Demangler::demangleFuncSpecParam(Node::IndexType ParamIdx) {
         Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
       return addChild(Param, createNode(
                   Node::Kind::FunctionSignatureSpecializationParamKind, Value));
+    }
+    case 'o': {
+      unsigned Value =
+          unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
+      if (nextIf('X'))
+        Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     Value));
     }
     case 'x':
       return addChild(Param, createNode(
@@ -2677,6 +2723,3 @@ NodePointer Demangler::demangleObjCTypeName() {
 
   return Global;
 }
-
-} // namespace Demangle
-} // namespace swift

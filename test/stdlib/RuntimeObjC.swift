@@ -292,13 +292,13 @@ Runtime.test("forceBridgeFromObjectiveC") {
 
 
 Runtime.test("isBridgedToObjectiveC") {
-  expectTrue(_isBridgedToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType))
+  expectTrue(_isBridgedToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 Runtime.test("isBridgedVerbatimToObjectiveC") {
-  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType))
-  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType))
+  expectFalse(_isBridgedVerbatimToObjectiveC(BridgedValueType.self))
+  expectTrue(_isBridgedVerbatimToObjectiveC(BridgedVerbatimRefType.self))
 }
 
 //===----------------------------------------------------------------------===//
@@ -700,7 +700,7 @@ Reflection.test("TupleMirror/NoLeak") {
   }
 }
 
-class TestArtificialSubclass: NSObject {
+@objc @objcMembers class TestArtificialSubclass: NSObject {
   dynamic var foo = "foo"
 }
 
@@ -759,6 +759,30 @@ ObjCConformsToProtocolTestSuite.test("cast/instance") {
 ObjCConformsToProtocolTestSuite.test("cast/metatype") {
   expectTrue(SomeClass.self is SomeObjCProto.Type)
   expectTrue(SomeSubclass.self is SomeObjCProto.Type)
+}
+
+// SR-7357
+
+extension Optional where Wrapped == NSData {
+    private class Inner {
+    }
+
+    var asInner: Inner {
+        return Inner()
+    }
+}
+
+var RuntimeClassNamesTestSuite = TestSuite("runtime class names")
+
+RuntimeClassNamesTestSuite.test("private class nested in same-type-constrained extension") {
+  let base: NSData? = nil
+  let util = base.asInner
+
+  let clas = unsafeBitCast(type(of: util), to: NSObject.self)
+  // Name should look like _TtC1aP.*Inner
+  let desc = clas.description
+  expectEqual(desc.prefix(7), "_TtC1aP")
+  expectEqual(desc.suffix(5), "Inner")
 }
 
 runAllTests()

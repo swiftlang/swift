@@ -30,12 +30,8 @@ class TypeRepr;
 /// A TypeLoc is stored in AST nodes which use an explicitly written type.
 struct TypeLoc {
 private:
-  /// \brief The resolved type and a bit indicating if it was validated, which
-  /// means it went through possible generic substitutions.
-  llvm::PointerIntPair<Type, 1, bool> TAndValidBit;
+  Type Ty;
   TypeRepr *TyR = nullptr;
-
-  TypeLoc(Type T, TypeRepr *TyR) : TAndValidBit(T, false), TyR(TyR) {}
 
 public:
   TypeLoc() {}
@@ -44,12 +40,14 @@ public:
     setType(Ty);
   }
 
-  bool wasValidated() const { return TAndValidBit.getInt(); }
+  bool wasValidated() const { return !Ty.isNull(); }
   bool isError() const;
 
   // FIXME: We generally shouldn't need to build TypeLocs without a location.
   static TypeLoc withoutLoc(Type T) {
-    return TypeLoc(T, nullptr);
+    TypeLoc result;
+    result.Ty = T;
+    return result;
   }
 
   /// Get the representative location of this type, for diagnostic
@@ -60,14 +58,12 @@ public:
 
   bool hasLocation() const { return TyR != nullptr; }
   TypeRepr *getTypeRepr() const { return TyR; }
-  Type getType() const { return TAndValidBit.getPointer(); }
+  Type getType() const { return Ty; }
 
   bool isNull() const { return getType().isNull() && TyR == nullptr; }
 
   void setInvalidType(ASTContext &C);
-  void setType(Type Ty, bool validated = false) {
-    TAndValidBit.setPointerAndInt(Ty, validated);
-  }
+  void setType(Type Ty);
 
   TypeLoc clone(ASTContext &ctx) const;
 };

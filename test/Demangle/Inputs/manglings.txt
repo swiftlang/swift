@@ -23,7 +23,6 @@ _TtSV ---> Swift.UnsafeRawPointer
 _TtSv ---> Swift.UnsafeMutableRawPointer
 _TtGSaSS_ ---> [Swift.String]
 _TtGSqSS_ ---> Swift.String?
-_TtGSQSS_ ---> Swift.String!
 _TtGVs10DictionarySSSi_ ---> [Swift.String : Swift.Int]
 _TtVs7CString ---> Swift.CString
 _TtCSo8NSObject ---> __C.NSObject
@@ -245,7 +244,6 @@ _TFVV15nested_generics5Lunch6DinnerCfT11firstCoursex12secondCourseGSqqd___9lefto
 _TFVFC15nested_generics7HotDogs11applyRelishFT_T_L_6RelishCfT8materialx_GS1_x_ ---> init(material: A) -> Relish #1 in nested_generics.HotDogs.applyRelish() -> ()<A> in Relish #1 in nested_generics.HotDogs.applyRelish() -> ()
 _TFVFE15nested_genericsSS3fooFT_T_L_6CheeseCfT8materialx_GS0_x_ ---> init(material: A) -> Cheese #1 in (extension in nested_generics):Swift.String.foo() -> ()<A> in Cheese #1 in (extension in nested_generics):Swift.String.foo() -> ()
 _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue ---> _TTWOE5imojiCSo5Imoji14ImojiMatchRankS_9RankValueS_FS2_g9rankValueqq_Ss16RawRepresentable8RawValue
-_TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__ ---> _TtFzas4VoidGC16FusionXBaseUtils6FutureQq_ZFVS_7Futures6futureurFFzT_GS0_x_GS0_x__
 _T0s17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD05Indexs01_A9IndexablePQzAM15shiftingToStart_tFAJs01_J4BasePQzAQcfU_ ---> closure #1 (A.Index) -> A.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.SubSequence: Swift.MutableCollection, A.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Index) -> A.Index
 _$Ss17MutableCollectionP1asAARzs012RandomAccessB0RzsAA11SubSequences013BidirectionalB0PRpzsAdHRQlE06rotatecD015shiftingToStart5Indexs01_A9IndexablePQzAN_tFAKs01_M4BasePQzAQcfU_ ---> closure #1 (A.Index) -> A.Index in (extension in a):Swift.MutableCollection<A where A: Swift.MutableCollection, A: Swift.RandomAccessCollection, A.SubSequence: Swift.MutableCollection, A.SubSequence: Swift.RandomAccessCollection>.rotateRandomAccess(shiftingToStart: A.Index) -> A.Index
 _T03foo4_123ABTf3psbpsb_n ---> function signature specialization <Arg[0] = [Constant Propagated String : u8'123'], Arg[1] = [Constant Propagated String : u8'123']> of foo
@@ -287,10 +285,6 @@ _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.In
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
 _T0So11UITextFieldC4textSSSgvgToTepb_ ---> outlined bridged method (pb) of @objc __C.UITextField.text.getter : Swift.String?
 _T0So11UITextFieldC4textSSSgvgToTeab_ ---> outlined bridged method (ab) of @objc __C.UITextField.text.getter : Swift.String?
-_T0So5GizmoC11doSomethingSQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __C.Gizmo.doSomething([Swift.String]!) -> Any!
-_T0So5GizmoC12modifyStringSQySSGAD_Si10withNumberSQyypG0D6FoobartFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __C.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
-_$SSo5GizmoC11doSomethingySQyypGSQySaySSGGFToTembnn_ ---> outlined bridged method (mbnn) of @objc __C.Gizmo.doSomething([Swift.String]!) -> Any!
-_$SSo5GizmoC12modifyString_10withNumber0D6FoobarSQySSGAF_SiSQyypGtFToTembnnnb_ ---> outlined bridged method (mbnnnb) of @objc __C.Gizmo.modifyString(_: Swift.String!, withNumber: Swift.Int, withFoobar: Any!) -> Swift.String!
 _T04test1SVyxGAA1RA2A1ZRzAA1Y2ZZRpzl1A_AhaGPWT ---> {C} associated type witness table accessor for A.ZZ : test.Y in <A where A: test.Z, A.ZZ: test.Y> test.S<A> : test.R in test
 _T0s24_UnicodeScalarExceptions33_0E4228093681F6920F0AB2E48B4F1C69LLVACycfC ---> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69).init() -> Swift.(_UnicodeScalarExceptions in _0E4228093681F6920F0AB2E48B4F1C69)
 _T0D ---> _T0D
@@ -310,3 +304,17 @@ $SSC9SomeErrorLeVD ---> __C_Synthesized.related decl 'e' for SomeError
 $S20mangling_retroactive5test0yyAA1ZVy12RetroactiveB1XVSiAE1YVAG0D1A1PAAg_AiJ1QAAg1_GF -> mangling_retroactive.test0(mangling_retroactive.Z<RetroactiveB.X, Swift.Int, RetroactiveB.Y>) -> ()
 _T0LiteralAByxGxd_tcfC ---> _T0LiteralAByxGxd_tcfC
 _T0XZ ---> _T0XZ
+_TTSf0os___TFVs17_LegacyStringCore15_invariantCheckfT_T_ ---> function signature specialization <Arg[0] = Guaranteed To Owned and Exploded> of Swift._LegacyStringCore._invariantCheck() -> ()
+_TTSf2o___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2do___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf2dos___TTSf2s_d___TFVs17_LegacyStringCoreCfVs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead and Guaranteed To Owned and Exploded> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of Swift._LegacyStringCore.init(Swift._StringBuffer) -> Swift._LegacyStringCore
+_TTSf ---> _TTSf
+_$S3BBBBf0602365061_ ---> _$S3BBBBf0602365061_
+_$S3BBBBi0602365061_ ---> _$S3BBBBi0602365061_
+_$S3BBBBv0602365061_ ---> _$S3BBBBv0602365061_
+_T0lxxxmmmTk ---> _T0lxxxmmmTk
+$S4blah8PatatinoaySiGD ---> blah.Patatino<Swift.Int>
+$SSiSHsWP ---> protocol witness table for Swift.Int : Swift.Hashable in Swift
+$S7TestMod5OuterV3Fooayx_SiGD ---> TestMod.Outer<A>.Foo<Swift.Int>
+$Ss17_VariantSetBufferO05CocoaC0ayx_GD ---> Swift._VariantSetBuffer<A>.CocoaBuffer
+$S2t21QP22ProtocolTypeAliasThingayAA4BlahV5SomeQa_GSgD ---> t2.Blah.SomeQ as t2.Q.ProtocolTypeAliasThing?

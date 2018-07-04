@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library -emit-silgen  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name closures -enable-sil-ownership -parse-stdlib -parse-as-library  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 import Swift
 
@@ -380,13 +380,11 @@ func closeOverLetLValue() {
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[ARG]]
 // CHECK:   store [[COPY_ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
+// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = load_borrow [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[INT_IN_CLASS_ADDR]] : $*Int
 // CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[ACCESS]] : $*Int
-// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[LOADED_CLASS]]
-// CHECK:   destroy_value [[LOADED_CLASS]]
+// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[TMP_CLASS_ADDR]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
 // CHECK:   return [[INT_IN_CLASS]]
@@ -397,10 +395,8 @@ func closeOverLetLValue() {
 // GUARANTEED:   [[TMP:%.*]] = alloc_stack $ClassWithIntProperty
 // GUARANTEED:   [[COPY:%.*]] = copy_value %0 : $ClassWithIntProperty
 // GUARANTEED:   store [[COPY]] to [init] [[TMP]] : $*ClassWithIntProperty
-// GUARANTEED:   [[LOADED_COPY:%.*]] = load [copy] [[TMP]]
-// GUARANTEED:   [[BORROWED:%.*]] = begin_borrow [[LOADED_COPY]]
-// GUARANTEED:   end_borrow [[BORROWED]] from [[LOADED_COPY]]
-// GUARANTEED:   destroy_value [[LOADED_COPY]]
+// GUARANTEED:   [[BORROWED:%.*]] = load_borrow [[TMP]]
+// GUARANTEED:   end_borrow [[BORROWED]] from [[TMP]]
 // GUARANTEED:   destroy_addr [[TMP]]
 // GUARANTEED: } // end sil function '$S8closures18closeOverLetLValueyyFSiyXEfU_'
 
@@ -614,9 +610,9 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$S8closures8SuperSubC1fyyFyycfU_yyKXKfu_]] : $@convention(thin) (@guaranteed SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]]
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]]
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{.*}}([[CVT]])
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_PA]]
     // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
@@ -646,9 +642,9 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$S8closures8SuperSubC1g.*]] : $@convention(thin) (@guaranteed SuperSub) -> @error Error
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> @error Error to $@noescape @callee_guaranteed () -> @error Error
     // CHECK:   [[REABSTRACT_PA:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[CVT]]) : $@convention(thin) (@noescape @callee_guaranteed () -> @error Error) -> (@out (), @error Error)
-    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [[REABSTRACT_PA]]
+    // CHECK:   [[REABSTRACT_CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[REABSTRACT_PA]]
     // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$Ss2qqoiyxxSg_xyKXKtKlF : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
     // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[REABSTRACT_CVT]]) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @noescape @callee_guaranteed () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error), normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
@@ -694,7 +690,7 @@ class SuperSub : SuperBase {
 // CHECK:         destroy_value [[SELF]]
 // -- closure takes unowned ownership
 // CHECK:         [[OUTER_CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[UNOWNED_SELF2_COPY]])
-// CHECK:         [[OUTER_CONVERT:%.*]] = convert_escape_to_noescape [[OUTER_CLOSURE]]
+// CHECK:         [[OUTER_CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[OUTER_CLOSURE]]
 // -- call consumes closure
 // -- strong +1, unowned +1
 // CHECK:         [[INNER_CLOSURE:%.*]] = apply [[OUTER_CONVERT]]
@@ -765,7 +761,7 @@ class GenericDerived<Ocean> : ConcreteBase {
 // Don't crash on this
 func r25993258_helper(_ fn: (inout Int, Int) -> ()) {}
 func r25993258() {
-  r25993258_helper { _ in () }
+  r25993258_helper { _, _ in () }
 }
 
 // rdar://29810997

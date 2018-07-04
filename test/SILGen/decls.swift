@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @$S5decls11void_returnyyF
 // CHECK: = tuple

@@ -68,7 +68,8 @@ open class PropertyListEncoder {
       do {
           return try PropertyListSerialization.data(fromPropertyList: topLevel, format: self.outputFormat, options: 0)
       } catch {
-          throw EncodingError.invalidValue(value, EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
+          throw EncodingError.invalidValue(value, 
+                                           EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value as a property list", underlyingError: error))
       }
     }
 

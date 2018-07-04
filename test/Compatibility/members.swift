@@ -7,5 +7,4 @@ struct X {
 
 func g0(_: (inout X) -> (Float) -> ()) {}
 
-// This becomes an error in Swift 4 mode -- probably a bug
-g0(X.f1)
+g0(X.f1) // expected-warning{{partial application of 'mutating' method}}

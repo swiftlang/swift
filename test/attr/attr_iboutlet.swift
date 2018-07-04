@@ -3,8 +3,9 @@
 // REQUIRES: objc_interop
 import Foundation
 
+// expected-error@+1 {{@IBOutlet property cannot have non-object type 'Int'}}
 @IBOutlet // expected-error {{only instance properties can be declared @IBOutlet}} {{1-11=}}
-var iboutlet_global: Int
+var iboutlet_global: Int?
 
 @IBOutlet // expected-error {{@IBOutlet may only be used on 'var' declarations}} {{1-11=}}
 class IBOutletClassTy {}
@@ -20,7 +21,7 @@ class IBOutletWrapperTy {
   var value : IBOutletWrapperTy! = IBOutletWrapperTy() // no-warning
 
   @IBOutlet
-  class var staticValue: IBOutletWrapperTy = 52  // expected-error {{cannot convert value of type 'Int' to specified type 'IBOutletWrapperTy'}}
+  class var staticValue: IBOutletWrapperTy? = 52  // expected-error {{cannot convert value of type 'Int' to specified type 'IBOutletWrapperTy?'}}
   // expected-error@-2 {{only instance properties can be declared @IBOutlet}} {{3-12=}}
   // expected-error@-2 {{class stored properties not supported}}
 
@@ -50,13 +51,12 @@ protocol CP2 : class { }
 
 class NonObjC {}
 
-// Check where @IBOutlet can occur
+// Ensure that only ObjC types work
 @objc class X {
   // Class type
   @IBOutlet var outlet2: X?
   @IBOutlet var outlet3: X!
 
-  @IBOutlet var outlet1a: NonObjC // expected-error{{@IBOutlet property cannot have non-'@objc' class type 'NonObjC'}} {{3-13=}}
   @IBOutlet var outlet2a: NonObjC? // expected-error{{@IBOutlet property cannot have non-'@objc' class type 'NonObjC'}} {{3-13=}}
   @IBOutlet var outlet3a: NonObjC! // expected-error{{@IBOutlet property cannot have non-'@objc' class type 'NonObjC'}} {{3-13=}}
 
@@ -69,8 +69,6 @@ class NonObjC {}
   @IBOutlet var outlet6a: Any!
 
   // Protocol types
-  @IBOutlet var outlet7: P1 // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type 'P1'}} {{3-13=}}
-  @IBOutlet var outlet8: CP1 // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type 'CP1'}} {{3-13=}}
   @IBOutlet var outlet10: P1? // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type}} {{3-13=}}
   @IBOutlet var outlet11: CP1? // expected-error{{@IBOutlet property cannot have non-'@objc' protocol type}} {{3-13=}}
   @IBOutlet var outlet12: OP1?
@@ -79,19 +77,14 @@ class NonObjC {}
   @IBOutlet var outlet15: OP1!
 
   // Class metatype
-  @IBOutlet var outlet15b: X.Type // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet16: X.Type? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet17: X.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
 
   // AnyClass
-  @IBOutlet var outlet18: AnyClass // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet19: AnyClass? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet20: AnyClass! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
 
-  // Protocol types
-  @IBOutlet var outlet21: P1.Type // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  @IBOutlet var outlet22: CP1.Type // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  @IBOutlet var outlet23: OP1.Type // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
+  // Protocol metatype types
   @IBOutlet var outlet24: P1.Type? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet25: CP1.Type? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet26: OP1.Type? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
@@ -99,19 +92,15 @@ class NonObjC {}
   @IBOutlet var outlet28: CP1.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet29: OP1.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   
-  // weak/unowned
-  @IBOutlet weak var outlet30: X?
-  @IBOutlet weak var outlet31: X!
-
   // String
   @IBOutlet var outlet33: String?
   @IBOutlet var outlet34: String!
 
   // Other bad cases
-  @IBOutlet var outlet35: S // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  @IBOutlet var outlet36: E // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  @IBOutlet var outlet37: (X, X)  // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  @IBOutlet var outlet38: Int  // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
+  @IBOutlet var outlet35: S? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
+  @IBOutlet var outlet36: E? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
+  @IBOutlet var outlet37: (X, X)? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
+  @IBOutlet var outlet38: Int? // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
 
   @IBOutlet var collection1b: [AnyObject]?
   @IBOutlet var collection1c: [AnyObject]!
@@ -122,17 +111,32 @@ class NonObjC {}
   @IBOutlet var collection3b: [OP1]?
   @IBOutlet var collection3c: [OP1]!
 
-  @IBOutlet var collection4a: [CP1] // expected-error{{@IBOutlet property cannot be an array of non-'@objc' protocol type}} {{3-13=}}
   @IBOutlet var collection4b: ([CP1])? // expected-error{{@IBOutlet property cannot be an array of non-'@objc' protocol type}} {{3-13=}}
   @IBOutlet var collection4c: ([CP1])! // expected-error{{@IBOutlet property cannot be an array of non-'@objc' protocol type}} {{3-13=}}
 
   @IBOutlet var collection5b: ([String])?
   @IBOutlet var collection5c: ([String])!
 
-  @IBOutlet var collection6a: [NonObjC] // expected-error{{@IBOutlet property cannot be an array of non-'@objc' class type}} {{3-13=}}
   @IBOutlet var collection6b: ([NonObjC])? // expected-error{{@IBOutlet property cannot be an array of non-'@objc' class type}} {{3-13=}}
   @IBOutlet var collection6c: ([NonObjC])! // expected-error{{@IBOutlet property cannot be an array of non-'@objc' class type}} {{3-13=}}
 
+  init() { }
+}
+
+// Check that the type is optional
+@objc class OX {
+  // expected-error@+3 {{@IBOutlet property has non-optional type 'OX'}}
+  // expected-note @+2 {{add '?' to form the optional type 'OX?'}}
+  // expected-note @+1 {{add '!' to form an implicitly unwrapped optional}}
+  @IBOutlet var ox: OX
+  init() { }
+}
+
+// Check reference storage types
+@objc class RSX {
+  @IBOutlet weak var rsx1: RSX?
+  @IBOutlet unowned var rsx2: RSX? // expected-error {{'unowned' variable cannot have optional type}}
+  @IBOutlet unowned(unsafe) var rsx3: RSX? // expected-error {{'unowned(unsafe)' variable cannot have optional type}}
   init() { }
 }
 
@@ -156,52 +160,4 @@ class NonObjC {}
   func testStrong() {
     if outlet4 != nil {}
   }
-}
-
-
-
-@objc class C {
-}
-
-@objc protocol Proto {
-}
-
-class SwiftGizmo {
-  @IBOutlet var a : C!
-  @IBOutlet var b1 : [C]
-  @IBOutlet var b2 : [C]!
-  @IBOutlet var c : String!
-  @IBOutlet var d : [String]!
-  @IBOutlet var e : Proto!
-
-  @IBOutlet var f : C?
-  @IBOutlet var g : C!
-
-  @IBOutlet weak var h : C?
-  @IBOutlet weak var i : C!
-  @IBOutlet unowned var j : C // expected-error{{@IBOutlet property has non-optional type 'C'}}
-  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{30-30=?}}
-  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{30-30=!}}
-  @IBOutlet unowned(unsafe) var k : C // expected-error{{@IBOutlet property has non-optional type 'C'}}
-  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{38-38=?}}
-  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{38-38=!}}
-
-  @IBOutlet var bad1 : Int  // expected-error {{@IBOutlet property cannot have non-object type 'Int'}} {{3-13=}}
-
-  @IBOutlet var dup: C! // expected-note{{'dup' previously declared here}}
-  @IBOutlet var dup: C! // expected-error{{invalid redeclaration of 'dup'}}
-
-  init() {}
-}
-
-class MissingOptional {
-  @IBOutlet var a: C // expected-error{{@IBOutlet property has non-optional type 'C'}}
-  // expected-note @-1{{add '?' to form the optional type 'C?'}}{{21-21=?}}
-  // expected-note @-2{{add '!' to form an implicitly unwrapped optional}}{{21-21=!}}
-
-  @IBOutlet weak var b: C // expected-error{{@IBOutlet property has non-optional type 'C'}}
-  // expected-note @-1{{add '!' to form an implicitly unwrapped optional}} {{26-26=!}}
-  // expected-note @-2{{add '?' to form the optional type 'C?'}} {{26-26=?}}
-
-  init() {}
 }

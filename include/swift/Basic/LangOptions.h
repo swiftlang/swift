@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
+#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
@@ -157,9 +158,6 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable the iterative type checker.
-    bool IterativeTypeChecker = false;
-
     /// \brief Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
@@ -171,6 +169,10 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
+    /// \brief How to diagnose cycles encountered
+    CycleDiagnosticKind EvaluatorCycleDiagnostics =
+        CycleDiagnosticKind::NoDiagnose;
+
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
@@ -180,6 +182,9 @@ namespace swift {
     /// \brief The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
+
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
 
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
@@ -258,7 +263,9 @@ namespace swift {
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
-    /// Whether to parse syntax tree.
+    /// Whether to parse syntax tree. If the syntax tree is built, the generated
+    /// AST may not be correct when syntax nodes are reused as part of
+    /// incrementals parsing.
     bool BuildSyntaxTree = false;
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
@@ -340,8 +347,8 @@ namespace swift {
     /// This is usually the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
     /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major);
+    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
+      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
 
     /// Returns true if the given platform condition argument represents

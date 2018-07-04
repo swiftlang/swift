@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // Test function requirements within protocols, as well as conformance to
 // said protocols.
@@ -196,16 +196,26 @@ struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}
 }
 
 protocol P6Ownership {
-  func foo(_ x: __shared Int) // expected-note{{protocol requires function 'foo' with type '(__shared Int) -> ()'}}
-  func foo2(_ x: Int) // expected-note{{protocol requires function 'foo2' with type '(Int) -> ()'}}
-  func bar(x: Int)
-  func bar2(x: __owned Int)
+  func thunk__shared(_ x: __shared Int)
+  func mismatch__shared(_ x: Int)
+  func mismatch__owned(x: Int)
+  func thunk__owned__owned(x: __owned Int)
+
+  __consuming func inherits__consuming(x: Int)
+  func mismatch__consuming(x: Int)
+  __consuming func mismatch__consuming_mutating(x: Int) // expected-note {{protocol requires function 'mismatch__consuming_mutating(x:)' with type '(Int) -> ()'}}
+  mutating func mismatch__mutating_consuming(x: Int)
 }
 struct X6Ownership : P6Ownership { // expected-error{{type 'X6Ownership' does not conform to protocol 'P6Ownership'}}
-  func foo(_ x: Int) { } // expected-note{{candidate has non-matching type '(Int) -> ()'}}
-  func foo2(_ x: __shared Int) { } // expected-note{{candidate has non-matching type '(__shared Int) -> ()'}}
-  func bar(x: __owned Int) { } // no diagnostic
-  func bar2(x: Int) { } // no diagnostic
+  func thunk__shared(_ x: Int) { } // OK
+  func mismatch__shared(_ x: __shared Int) { } // OK
+  func mismatch__owned(x: __owned Int) { } // OK
+  func thunk__owned__owned(x: Int) { } // OK
+
+  func inherits__consuming(x: Int) { } // OK
+  __consuming func mismatch__consuming(x: Int) { } // OK
+  mutating func mismatch__consuming_mutating(x: Int) { } // expected-note {{candidate is marked 'mutating' but protocol does not allow it}}
+  __consuming func mismatch__mutating_consuming(x: Int) { } // OK - '__consuming' acts as a counterpart to 'nonmutating'
 }
 
 protocol P7 {

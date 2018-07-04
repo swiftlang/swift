@@ -1,7 +1,7 @@
 
 // RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -enable-sil-ownership -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -450,7 +450,7 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
+// CHECK-LABEL: sil hidden @$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF : $@convention(thin) (@guaranteed Dictionary<Int, Array<Int>>) -> () {
 // CHECK: bb0(%0 : @guaranteed $Dictionary<Int, Array<Int>>):
 // CHECK:   alloc_box ${ var Dictionary<Int, Array<Int>> }, var, name "dict"
 // CHECK:   [[PROJ:%.*]] = project_box
@@ -503,7 +503,7 @@ func accessOptionalArray(_ dict : [Int : [Int]] = [:]) {
 // CHECK:   store %{{.*}} to [trivial]
 // ----- call Dictionary.subscript.setter
 // CHECK: apply %{{.*}}<Int, [Int]>([[ARRAYCOPY]], %{{.*}}, [[BOXACCESS]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_0, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyys10DictionaryVySiSaySiGGF'
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify0A13OptionalArrayyySDySiSaySiGGF'
 
 // --- Optional map.
 enum OptionalWithMap<Wrapped> {
@@ -575,8 +575,8 @@ func testAddressor(p: UnsafePointer<Int>) -> Int {
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK-NOT: begin_access
-// CHECK:   load [trivial] [[ADR]] : $*Int
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify13testAddressor1pSiSPySiG_tF'
 
@@ -610,8 +610,9 @@ var globalString2 = globalString1
 // CHECK: apply
 // CHECK: [[PTR:%.*]] = pointer_to_address
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[PTR]] : $*String
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[ACCESS]] to [initialization] [[GA]] : $*String
+// CHECK: [[INIT:%.*]] = begin_access [modify] [unsafe] [[GA]] : $*String
+// CHECK: copy_addr [[ACCESS]] to [initialization] [[INIT]] : $*String
+// CHECK: end_access [[INIT]] : $*String
 // CHECK: end_access [[ACCESS]] : $*String
 // CHECK-NOT: end_access
 // CHECK-LABEL: } // end sil function 'globalinit_33_180BF7B9126DB0C8C6C26F15ACD01908_func1'
@@ -848,7 +849,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
     return (self as CanCast as? CanCastStruct<T>)?.base
   }
 }
-// CHECK-LABEL: sil hidden @$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
+// CHECK-LABEL: sil hidden @$S20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF : $@convention(method) <Base where Base : Hashable><T where T : Hashable> (@in_guaranteed CanCastStruct<Base>) -> @out Optional<T> {
 // CHECK: bb0(%0 : @trivial $*Optional<T>, %1 : @trivial $*CanCastStruct<Base>):
 // CHECK: [[OUT_ENUM:%.*3]] = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK: [[TEMP_SUB:%.*]] = alloc_stack $Optional<CanCastStruct<T>>
@@ -869,7 +870,7 @@ internal struct CanCastStruct<Base : Hashable> : CanCast {
 // CHECK: end_access [[ACCESS]] : $*CanCastStruct<T>
 // CHECK-NOT: begin_access
 // CHECK: inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt.1
-// CHECK-LABEL: } // end sil function '$S20access_marker_verify13CanCastStructV5unboxqd__Sgys8HashableRd__lF'
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify13CanCastStructV5unboxqd__SgySHRd__lF'
 
 // --- open existential
 protocol Q : PBar {}
@@ -968,13 +969,13 @@ struct StructWithLayout {
 // CHECK: mark_uninitialized [rootself] %{{.*}} : ${ var StructWithLayout }
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var StructWithLayout }, 0
 // CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
-// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
-// call default argument
-// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
+// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
 // call StaticString.init
 // CHECK: apply
 // call UInt.init(_builtinIntegerLiteral:)
 // CHECK: apply
+// call default argument
+// CHECK: apply %{{.*}}() : $@convention(thin) () -> StaticString
 // call _sanityCheck(_:_:file:line:)
 // CHECK: apply %{{.*}}([[CLOSURE]], {{.*}})
 // CHECK: load [trivial] [[PROJ]] : $*StructWithLayout
@@ -991,6 +992,52 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK-NOT: begin_access
-// CHECK: assign %0 to [[ADR]] : $*Int
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: assign %0 to [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$S20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
+
+// Verification should ignore the address operand of init_existential_addr.
+class testInitExistentialGlobal {
+  static var testProperty: P = StructP()
+}
+// CHECK-LABEL: sil private @globalinit{{.*}} : $@convention(c) () -> () {
+// CHECK:   alloc_global @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ
+// CHECK:   [[GADR:%.*]] = global_addr @$S20access_marker_verify25testInitExistentialGlobalC0D8PropertyAA1P_pvpZ : $*P
+// CHECK:   [[EADR:%.*]] = init_existential_addr [[GADR]] : $*P, $StructP
+// CHECK:   %{{.*}} = apply %{{.*}}({{.*}}) : $@convention(method) (@thin StructP.Type) -> StructP
+// CHECK:   store %{{.*}} to [trivial] [[EADR]] : $*StructP
+// CHECK-LABEL: } // end sil function 'globalinit
+
+public enum SomeError: Swift.Error {
+    case error
+}
+
+// Verification should ignore addresses produced by project_existential_box.
+public func testInitBox() throws {
+    throw SomeError.error
+}
+// CHECK-LABEL: sil @$S20access_marker_verify11testInitBoxyyKF : $@convention(thin) () -> @error Error {
+// CHECK: [[BOXALLOC:%.*]] = alloc_existential_box $Error, $SomeError
+// CHECK: [[PROJ:%.*]] = project_existential_box $SomeError in [[BOXALLOC]] : $Error
+// CHECK: store %{{.*}} to [trivial] [[PROJ]] : $*SomeError
+// CHECK: throw [[BOXALLOC]] : $Error
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify11testInitBoxyyKF'
+
+public final class HasStaticProp {
+  public static let empty: HasStaticProp = HasStaticProp()
+}
+
+// A global addressor produces an unenforced RawPointer. This looke
+// like an Unidentified access with no access marker. Ensure that
+// verification doesn't assert.
+public func getStaticProp() -> HasStaticProp {
+  return .empty
+}
+
+// CHECK-LABEL: sil @$S20access_marker_verify13getStaticPropAA03HaseF0CyF : $@convention(thin) () -> @owned HasStaticProp {
+// function_ref HasStaticProp.empty.unsafeMutableAddressor
+// CHECK: [[F:%.*]] = function_ref @$S20access_marker_verify13HasStaticPropC5emptyACvau : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[RP:%.*]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
+// CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
+// CHECK: load [copy] [[ADR]] : $*HasStaticProp
+// CHECK-LABEL: } // end sil function '$S20access_marker_verify13getStaticPropAA03HaseF0CyF'

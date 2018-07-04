@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s %S/Inputs/objc_enum_multi_file_helper.swift -emit-ir | %FileCheck %s
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module %S/Inputs/objc_enum_multi_file_helper.swift -o %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name main -primary-file %s -I %t -DIMPORT -emit-ir | %FileCheck %s
 
 #if IMPORT
@@ -34,7 +34,7 @@ func useFoo(_ x: Foo) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3FooON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]
@@ -68,7 +68,7 @@ func useBar(_ x: Bar) -> Int32 {
   }
 
   // CHECK: <label>:[[DEFAULT]]
-  // CHECK-NEXT: call void @llvm.trap()
+  // CHECK: call swiftcc void @"$Ss32_diagnoseUnexpectedEnumCaseValue{{.+}}"(%swift.type* @"$S{{.+}}3BarON", %swift.opaque* noalias nocapture %{{.+}}, %swift.type* @"$Ss5Int32VN")
   // CHECK-NEXT: unreachable
 
   // CHECK: <label>:[[FINAL]]

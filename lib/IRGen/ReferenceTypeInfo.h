@@ -35,7 +35,7 @@ protected:
   ReferenceTypeInfo(llvm::Type *type, Size size, SpareBitVector spareBits,
                     Alignment align, IsPOD_t pod = IsNotPOD)
     : LoadableTypeInfo(type, size, spareBits, align, pod,
-                       IsFixedSize, STIK_Reference)
+                       IsFixedSize, SpecialTypeInfoKind::Reference)
   {}
 
 public:
@@ -102,7 +102,7 @@ public:
 
   static bool classof(const ReferenceTypeInfo *type) { return true; }
   static bool classof(const TypeInfo *type) {
-    return type->getSpecialTypeInfoKind() == STIK_Reference;
+    return type->getSpecialTypeInfoKind() == SpecialTypeInfoKind::Reference;
   }
 };
 

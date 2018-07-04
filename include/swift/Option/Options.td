@@ -102,9 +102,17 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   HelpText<"Show every step in the lifecycle of driver jobs">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
+def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
+  InternalDebugOpt, HelpText<"Pass input or output file names as filelists if there are more than <n>">,
+  MetaVarName<"<n>">;
+def driver_filelist_threshold_EQ : Joined<["-"], "driver-filelist-threshold=">,
+  Alias<driver_filelist_threshold>;
 def driver_batch_seed : Separate<["-"], "driver-batch-seed">,
   InternalDebugOpt,
   HelpText<"Use the given seed value to randomize batch-mode partitions">;
+def driver_batch_count : Separate<["-"], "driver-batch-count">,
+  InternalDebugOpt,
+  HelpText<"Use the given number of batch-mode partitions, rather than default parallelism level">;
 def driver_force_one_batch_repartition : Flag<["-"], "driver-force-one-batch-repartition">,
   InternalDebugOpt,
   HelpText<"Force one batch repartitioning for testing">;
@@ -350,6 +358,11 @@ def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
   Alias<warn_swift3_objc_inference_complete>,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, HelpHidden]>;
 
+def emit_public_type_metadata_accessors :
+  Flag<["-"], "emit-public-type-metadata-accessors">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit all type metadata accessors as public (deprecated: now does nothing)">;
+
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
   HelpText<"Report performed transformations by optimization passes whose "
@@ -458,10 +471,18 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+def debug_info_format : Joined<["-"], "debug-info-format=">,
+  Flags<[FrontendOption]>,
+  HelpText<"Specify the debug info format type to either 'dwarf' or 'codeview'">;
+
 // Verify debug info
 def verify_debug_info : Flag<["-"], "verify-debug-info">,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Verify the binary representation of debug output.">;
+
+def debug_info_store_invocation : Flag<["-"], "debug-info-store-invocation">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit the compiler invocation in the debug info.">;
 
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
@@ -533,6 +554,13 @@ def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_dir: Separate<["-"], "api-diff-data-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+         ArgumentIsPath]>,
+  HelpText<"Load platform and version specific API migration data files from <path>. "
+      "Ignored if -api-diff-data-file is specified.">,
   MetaVarName<"<path>">;
 
 def dump_usr: Flag<["-"], "dump-usr">,
@@ -744,6 +772,10 @@ def index_file_path : Separate<["-"], "index-file-path">,
 def index_store_path : Separate<["-"], "index-store-path">,
   Flags<[FrontendOption, ArgumentIsPath]>, MetaVarName<"<path>">,
   HelpText<"Store indexing data to <path>">;
+
+def index_ignore_system_modules : Flag<["-"], "index-ignore-system-modules">,
+  Flags<[NoInteractiveOption]>,
+  HelpText<"Avoid indexing system modules">;
 
 def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
   Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,

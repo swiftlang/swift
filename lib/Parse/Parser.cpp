@@ -18,6 +18,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -500,6 +501,10 @@ Parser::~Parser() {
   delete SyntaxContext;
 }
 
+bool Parser::allowTopLevelCode() const {
+  return SF.isScriptMode();
+}
+
 const Token &Parser::peekToken() {
   return L->peekNextToken();
 }
@@ -559,7 +564,6 @@ void Parser::markSplitToken(tok Kind, StringRef Txt) {
   SplitTokens.back().setToken(Kind, Txt);
   Trivia EmptyTrivia;
   SyntaxContext->addToken(SplitTokens.back(), LeadingTrivia, EmptyTrivia);
-  LeadingTrivia.empty();
   TokReceiver->receive(SplitTokens.back());
 }
 
@@ -703,6 +707,23 @@ void Parser::skipUntilConditionalBlockClose() {
                    tok::eof)) {
     skipSingle();
   }
+}
+
+bool Parser::loadCurrentSyntaxNodeFromCache() {
+  // Don't do a cache lookup when not building a syntax tree since otherwise
+  // the corresponding AST nodes do not get created
+  if (!SF.shouldBuildSyntaxTree()) {
+    return false;
+  }
+  unsigned LexerOffset =
+      SourceMgr.getLocOffsetInBuffer(Tok.getLoc(), L->getBufferID());
+  unsigned LeadingTriviaOffset = LexerOffset - LeadingTrivia.getTextLength();
+  if (auto TextLength = SyntaxContext->loadFromCache(LeadingTriviaOffset)) {
+    L->resetToOffset(LeadingTriviaOffset + TextLength);
+    L->lex(Tok, LeadingTrivia, TrailingTrivia);
+    return true;
+  }
+  return false;
 }
 
 bool Parser::parseEndIfDirective(SourceLoc &Loc) {
@@ -880,7 +901,7 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                   bool AllowSepAfterLast, Diag<> ErrorDiag, SyntaxKind Kind,
-                  std::function<ParserStatus()> callback) {
+                  llvm::function_ref<ParserStatus()> callback) {
   llvm::Optional<SyntaxParsingContext> ListContext;
   ListContext.emplace(SyntaxContext, Kind);
   if (Kind == SyntaxKind::Unknown)
@@ -966,16 +987,15 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
 void Parser::diagnoseRedefinition(ValueDecl *Prev, ValueDecl *New) {
   assert(New != Prev && "Cannot conflict with self");
-  diagnose(New->getLoc(), diag::decl_redefinition, New->isDefinition());
-  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->isDefinition(),
-           Prev->getBaseName());
+  diagnose(New->getLoc(), diag::decl_redefinition);
+  diagnose(Prev->getLoc(), diag::previous_decldef, Prev->getBaseName());
 }
 
 struct ParserUnit::Implementation {
   LangOptions LangOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticEngine Diags;
-  ASTContext Ctx;
+  ASTContext &Ctx;
   SourceFile *SF;
   std::unique_ptr<Parser> TheParser;
 
@@ -983,7 +1003,7 @@ struct ParserUnit::Implementation {
                  const LangOptions &Opts, StringRef ModuleName)
     : LangOpts(Opts),
       Diags(SM),
-      Ctx(LangOpts, SearchPathOpts, SM, Diags),
+      Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SM, Diags)),
       SF(new (Ctx) SourceFile(
             *ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx),
             SourceFileKind::Main, BufferID,

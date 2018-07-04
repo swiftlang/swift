@@ -167,7 +167,7 @@ SILAnalysis *createClosureScopeAnalysis(SILModule *M) {
 }
 
 void TopDownClosureFunctionOrder::visitFunctions(
-    std::function<void(SILFunction *)> visitor) {
+    llvm::function_ref<void(SILFunction *)> visitor) {
   auto markVisited = [&](SILFunction *F) {
     bool visitOnce = visited.insert(F).second;
     assert(visitOnce);

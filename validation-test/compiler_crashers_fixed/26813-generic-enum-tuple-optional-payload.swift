@@ -6,7 +6,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: %target-swift-frontend %s -typecheck
+// RUN: %target-swift-frontend %s -typecheck -swift-version 3
 
 // Issue found by https://github.com/austinzheng (Austin Zheng)
 

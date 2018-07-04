@@ -296,23 +296,6 @@ DeclContext *DeclContext::getParentForLookup() const {
   return getParent();
 }
 
-DeclContext *DeclContext::getCommonParentContext(DeclContext *A,
-                                                 DeclContext *B) {
-  if (A == B)
-    return A;
-
-  if (A->isChildContextOf(B))
-    return B;
-
-  // Peel away layers of A until we reach a common parent
-  for (DeclContext *CurDC = A; CurDC; CurDC = CurDC->getParent()) {
-    if (B->isChildContextOf(CurDC))
-      return CurDC;
-  }
-
-  return nullptr;
-}
-
 ModuleDecl *DeclContext::getParentModule() const {
   const DeclContext *DC = this;
   while (!DC->isModuleContext())
@@ -364,8 +347,10 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     // if the type is formally fixed layout.
     if (isa<PatternBindingInitializer>(dc)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(dc->getParent())) {
-        if (!NTD->getFormalAccessScope(/*useDC=*/nullptr,
-                                       /*respectVersionedAttr=*/true).isPublic())
+        auto nominalAccess =
+          NTD->getFormalAccessScope(/*useDC=*/nullptr,
+                                    /*treatUsableFromInlineAsPublic=*/true);
+        if (!nominalAccess.isPublic())
           return ResilienceExpansion::Maximal;
 
         if (NTD->isFormallyResilient())
@@ -386,10 +371,13 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
       if (!AFD->hasAccess())
         break;
 
+      auto funcAccess =
+        AFD->getFormalAccessScope(/*useDC=*/nullptr,
+                                  /*treatUsableFromInlineAsPublic=*/true);
+
       // If the function is not externally visible, we will not be serializing
       // its body.
-      if (!AFD->getFormalAccessScope(/*useDC=*/nullptr,
-                                     /*respectVersionedAttr=*/true).isPublic())
+      if (!funcAccess.isPublic())
         break;
 
       // Bodies of public transparent and always-inline functions are
@@ -816,6 +804,9 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
 /// declaration or extension, the supplied context is returned.
 static const DeclContext *
 getPrivateDeclContext(const DeclContext *DC, const SourceFile *useSF) {
+  if (DC->getASTContext().isSwiftVersion3())
+    return DC;
+
   auto NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
   if (!NTD)
     return DC;

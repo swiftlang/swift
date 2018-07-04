@@ -195,3 +195,7 @@ public func ${op} <${comparableTypeParams}>(lhs: ${tupleT}, rhs: ${tupleT}) -> B
 }
 %   end
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

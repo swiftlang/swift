@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
 
@@ -331,10 +332,14 @@ namespace {
                                WitnessSizedTypeInfo<NonFixedTupleTypeInfo>>
   {
   public:
-    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *T,
+    NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          FieldsAreABIAccessible_t fieldsABIAccessible,
+                          llvm::Type *T,
                           Alignment minAlign, IsPOD_t isPOD,
-                          IsBitwiseTakable_t isBT)
-      : TupleTypeInfoBase(fields, T, minAlign, isPOD, isBT) {}
+                          IsBitwiseTakable_t isBT,
+                          IsABIAccessible_t tupleAccessible)
+      : TupleTypeInfoBase(fields, fieldsABIAccessible,
+                          T, minAlign, isPOD, isBT, tupleAccessible) {}
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
@@ -374,11 +379,16 @@ namespace {
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
+                                     FieldsAreABIAccessible_t fieldsAccessible,
                                           StructLayout &&layout) {
-      return NonFixedTupleTypeInfo::create(fields, layout.getType(),
+      auto tupleAccessible = IsABIAccessible_t(
+        IGM.getSILModule().isTypeABIAccessible(TheTuple));
+      return NonFixedTupleTypeInfo::create(fields, fieldsAccessible,
+                                           layout.getType(),
                                            layout.getAlignment(),
                                            layout.isPOD(),
-                                           layout.isBitwiseTakable());
+                                           layout.isBitwiseTakable(),
+                                           tupleAccessible);
     }
 
     TupleFieldInfo getFieldInfo(unsigned index,

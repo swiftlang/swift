@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -enable-sil-ownership -I %S/../IDE/Inputs/custom-modules %s -enable-objc-interop -I %S/Inputs/usr/include | %FileCheck %s
 
 import ImportAsMember
 
@@ -10,8 +8,8 @@ func makeMetatype() -> Struct1.Type { return Struct1.self }
 public func importAsUnaryInit() {
   // CHECK: function_ref @CCPowerSupplyCreateDangerous : $@convention(c) () -> @owned CCPowerSupply
   var a = CCPowerSupply(dangerous: ())
-  let f: () -> CCPowerSupply = CCPowerSupply.init(dangerous:)
-  a = f()
+  let f: (()) -> CCPowerSupply = CCPowerSupply.init(dangerous:)
+  a = f(())
 }
 
 // CHECK-LABEL: sil @$S10cf_members3foo{{[_0-9a-zA-Z]*}}F

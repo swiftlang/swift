@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 protocol EmptyProtocol { }
 
 protocol DefinitionsInProtocols {
@@ -98,15 +98,15 @@ struct DoesNotConform : Up {
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
-// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
-// expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{protocol 'CircleMiddle' refines itself}}
+protocol CircleStart : CircleEnd { func circle_start() }
 // expected-note@-1{{protocol 'CircleStart' declared here}}
+// expected-error@-2{{protocol 'CircleStart' refines itself}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
+// expected-error@-1{{protocol 'CircleEnd' refines itself}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error 2{{protocol 'CircleTrivial' refines itself}}
 
 struct Circle {
   func circle_start() {}
@@ -266,7 +266,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence' requires the types 'Sequence' and 'Sequence.Iterator' be equivalent to use 'makeIterator'}}
+  var x = e.makeIterator() // expected-error{{value of type 'Sequence' has no member 'makeIterator'}}
   x.next()
   x.nonexistent()
 }
@@ -465,6 +465,7 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
+    // expected-warning@+1 {{'weak' should not be applied to a property declaration in a protocol and will be disallowed in future versions}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 

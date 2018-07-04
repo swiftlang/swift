@@ -75,7 +75,7 @@ presentBase(Derived(x: "two"))
 presentBase(Base(x: "two"))
 presentBase(Base(x: 2))
 
-// CHECK-LABEL: define{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @initialize_metadata_SuperDerived(i8*)
 // CHECK:         [[T0:%.*]] = call swiftcc %swift.metadata_response @"$S3foo7DerivedCMa"([[INT]] 1)
 // CHECK:         [[TMP:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1

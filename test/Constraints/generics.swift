@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 infix operator +++
 
@@ -559,5 +559,36 @@ do {
 }
 
 func rdar35890334(_ arr: inout [Int]) {
-  _ = arr.popFirst() // expected-error {{'[Int]' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent to use 'popFirst'}}
+  _ = arr.popFirst() // expected-error {{value of type '[Int]' has no member 'popFirst'}}
+}
+
+// rdar://problem/39616039
+
+func rdar39616039() {
+  func foo<V>(default: V, _ values: [String: V]) -> V {
+    return values["foo"] ?? `default`
+  }
+
+  var a = foo(default: 42, ["foo": 0])
+  a += 1 // ok
+
+  var b = foo(default: 42.0, ["foo": 0])
+  b += 1 // ok
+
+  var c = foo(default: 42.0, ["foo": Float(0)])
+  c += 1 // ok
+}
+
+// https://bugs.swift.org/browse/SR-8075
+
+func sr8075() {
+  struct UIFont {
+    init(ofSize: Float) {}
+  }
+
+  func switchOnCategory<T>(_ categoryToValue: [Int: T]) -> T {
+    fatalError()
+  }
+
+  let _: UIFont = .init(ofSize: switchOnCategory([0: 15.5, 1: 20.5]))
 }

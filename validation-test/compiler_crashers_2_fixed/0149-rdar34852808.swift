@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s
+// RUN: %target-typecheck-verify-swift
 
 func foo(optional: Int?) {
   _ = { [value = optional ?? 0]

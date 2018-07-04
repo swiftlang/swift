@@ -168,19 +168,19 @@ extension ClosedRange.Index : Comparable {
 
 extension ClosedRange.Index: Hashable
 where Bound: Strideable, Bound.Stride: SignedInteger, Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .inRange(let value):
-      hasher.append(0 as Int8)
-      hasher.append(value)
+      hasher.combine(0 as Int8)
+      hasher.combine(value)
     case .pastEnd:
-      hasher.append(1 as Int8)
+      hasher.combine(1 as Int8)
     }
   }
 }
@@ -308,6 +308,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element <= upperBound
               ? .inRange(element) : nil
   }
+
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
 }
 
 extension Comparable {  
@@ -389,15 +395,10 @@ extension ClosedRange: Equatable {
 }
 
 extension ClosedRange: Hashable where Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 
@@ -411,7 +412,6 @@ extension ClosedRange : CustomStringConvertible {
 
 extension ClosedRange : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "ClosedRange(\(String(reflecting: lowerBound))"
     + "...\(String(reflecting: upperBound)))"
@@ -419,7 +419,6 @@ extension ClosedRange : CustomDebugStringConvertible {
 }
 
 extension ClosedRange : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -460,16 +459,7 @@ extension ClosedRange {
   }
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
-  /// Now that Range is conditionally a collection when Bound: Strideable,
-  /// CountableRange is no longer needed. This is a deprecated initializer
-  /// for any remaining uses of Range(countableRange).
-  @available(*,deprecated: 4.2, 
-    message: "CountableRange is now Range. No need to convert any more.")
-  public init(_ other: ClosedRange<Bound>) {
-    self = other
-  }  
-  
+extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {  
   /// Creates an instance equivalent to the given `Range`.
   ///
   /// - Parameter other: A `Range` to convert to a `ClosedRange` instance.
@@ -496,8 +486,7 @@ extension ClosedRange {
   }
 }
 
-@available(*, deprecated, renamed: "ClosedRange.Index")
-public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable, T.Stride: SignedInteger
-@available(*, deprecated, renamed: "ClosedRange")
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger

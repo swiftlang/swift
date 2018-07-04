@@ -1,7 +1,6 @@
-
-// RUN: %target-swift-frontend -module-name dynamic_self -emit-silgen -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -module-name dynamic_self -emit-sil -O %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -module-name dynamic_self -emit-ir %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-emit-silgen -module-name dynamic_self -enable-sil-ownership %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name dynamic_self -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-ir -module-name dynamic_self %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
   func f() -> Self
@@ -111,7 +110,7 @@ func testAnyObjectDispatch(o: AnyObject) {
 
 // <rdar://problem/16270889> Dispatch through ObjC metatypes.
 class ObjCInit {
-  dynamic required init() { }
+  @objc dynamic required init() { }
 }
 
 // CHECK-LABEL: sil hidden @$S12dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()

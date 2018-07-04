@@ -26,12 +26,16 @@ function usage() {
   echo "-t --test"
   echo "Run tests."
   echo ""
+  echo "--distcc"
+  echo "Build with distcc to speed up the toolchain build"
+  echo ""
 }
 
+RESULT_DIR=$PWD
 cd "$(dirname $0)/.." || exit
-SRC_DIR=$PWD
 
 # Set defaults
+DISTCC_FLAG=
 DRY_RUN=
 BUNDLE_PREFIX=
 case $(uname -s) in
@@ -60,6 +64,9 @@ while [ $# -ne 0 ]; do
       else
         SWIFT_PACKAGE=buildbot_osx_package
       fi
+  ;;
+    --distcc)
+      DISTCC_FLAG="--distcc"
   ;;
   -h|--help)
     usage
@@ -98,14 +105,15 @@ DISPLAY_NAME_SHORT="Local Swift Development Snapshot"
 DISPLAY_NAME="${DISPLAY_NAME_SHORT} ${YEAR}-${MONTH}-${DAY}"
 TOOLCHAIN_NAME="${TOOLCHAIN_VERSION}"
 
-SWIFT_INSTALLABLE_PACKAGE="${SRC_DIR}/${ARCHIVE}"
-SWIFT_INSTALL_DIR="${SRC_DIR}/swift-nightly-install"
-SWIFT_INSTALL_SYMROOT="${SRC_DIR}/swift-nightly-symroot"
+SWIFT_INSTALLABLE_PACKAGE="${RESULT_DIR}/${ARCHIVE}"
+SWIFT_INSTALL_DIR="${RESULT_DIR}/swift-nightly-install"
+SWIFT_INSTALL_SYMROOT="${RESULT_DIR}/swift-nightly-symroot"
 SWIFT_TOOLCHAIN_DIR="/Library/Developer/Toolchains/${TOOLCHAIN_NAME}.xctoolchain"
-SYMBOLS_PACKAGE="${SRC_DIR}/${SYM_ARCHIVE}"
+SYMBOLS_PACKAGE="${RESULT_DIR}/${SYM_ARCHIVE}"
 DRY_RUN="${DRY_RUN}"
+DISTCC_FLAG="${DISTCC_FLAG}"
 
-./utils/build-script ${DRY_RUN} --preset="${SWIFT_PACKAGE}" \
+./utils/build-script ${DRY_RUN} ${DISTCC_FLAG} --preset="${SWIFT_PACKAGE}" \
         install_destdir="${SWIFT_INSTALL_DIR}" \
         installable_package="${SWIFT_INSTALLABLE_PACKAGE}" \
         install_toolchain_dir="${SWIFT_TOOLCHAIN_DIR}" \

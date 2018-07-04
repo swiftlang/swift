@@ -15,7 +15,7 @@ bb1:
   %0 = integer_literal $Builtin.Int8, 7
   br bb2
 }
-// CHECK:   define{{( protected)?}} swiftcc i8 @test0()
+// CHECK:   define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @test0()
 // CHECK:     br
 // CHECK-NOT: }
 // CHECK:     ret i8 7

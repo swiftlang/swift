@@ -54,9 +54,20 @@ enum class MetadataKind : uint32_t {
 #define ABSTRACTMETADATAKIND(name, start, end)                                 \
   name##_Start = start, name##_End = end,
 #include "MetadataKind.def"
+  
+  /// The largest possible non-isa-pointer metadata kind value.
+  ///
+  /// This is included in the enumeration to prevent against attempts to
+  /// exhaustively match metadata kinds. Future Swift runtimes or compilers
+  /// may introduce new metadata kinds, so for forward compatibility, the
+  /// runtime must tolerate metadata with unknown kinds.
+  /// This specific value is not mapped to a valid metadata kind at this time,
+  /// however.
+  LastEnumerated = 2047,
 };
 
-const unsigned LastEnumeratedMetadataKind = 2047;
+const unsigned LastEnumeratedMetadataKind =
+  (unsigned)MetadataKind::LastEnumerated;
 
 /// Try to translate the 'isa' value of a type/heap metadata into a value
 /// of the MetadataKind enum.
@@ -127,6 +138,8 @@ public:
   }
 
   /// True if the type requires out-of-line allocation of its storage.
+  /// This can be the case because the value requires more storage or if it is
+  /// not bitwise takable.
   bool isInlineStorage() const { return !(Data & IsNonInline); }
   constexpr TargetValueWitnessFlags withInlineStorage(bool isInline) const {
     return TargetValueWitnessFlags((Data & ~IsNonInline) |
@@ -929,12 +942,17 @@ public:
 enum class ExclusivityFlags : uintptr_t {
   Read             = 0x0,
   Modify           = 0x1,
-  // Leave space for other actions.
-  // Don't rely on ActionMask in stable ABI.
+  // ActionMask can grow without breaking the ABI because the runtime controls
+  // how these flags are encoded in the "value buffer". However, any additional
+  // actions must be compatible with the original behavior for the old, smaller
+  // ActionMask (older runtimes will continue to treat them as either a simple
+  // Read or Modify).
   ActionMask       = 0x1,
 
   // Downgrade exclusivity failures to a warning.
-  WarningOnly      = 0x10
+  WarningOnly      = 0x10,
+  // The runtime should track this access to check against subsequent accesses.
+  Tracking         = 0x20
 };
 static inline ExclusivityFlags operator|(ExclusivityFlags lhs,
                                          ExclusivityFlags rhs) {
@@ -950,6 +968,9 @@ static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
 }
 static inline bool isWarningOnly(ExclusivityFlags flags) {
   return uintptr_t(flags) & uintptr_t(ExclusivityFlags::WarningOnly);
+}
+static inline bool isTracking(ExclusivityFlags flags) {
+  return uintptr_t(flags) & uintptr_t(ExclusivityFlags::Tracking);
 }
 
 /// Flags for struct layout.
@@ -1168,6 +1189,12 @@ class TypeContextDescriptorFlags : public FlagSet<uint16_t> {
     ///
     /// Meaningful for all type-descriptor kinds.
     IsReflectable = 2,
+    
+    /// Set if the type is a Clang-importer-synthesized related entity. After
+    /// the null terminator for the type name is another null-terminated string
+    /// containing the tag that discriminates the entity from other synthesized
+    /// declarations associated with the same declaration.
+    IsSynthesizedRelatedEntity = 3,
 
     /// Set if the context descriptor is includes metadata for dynamically
     /// constructing a class's vtables at metadata instantiation time.
@@ -1199,6 +1226,10 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTag, isCTag, setIsCTag)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsCTypedef, isCTypedef, setIsCTypedef)
   FLAGSET_DEFINE_FLAG_ACCESSORS(IsReflectable, isReflectable, setIsReflectable)
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsSynthesizedRelatedEntity,
+                                isSynthesizedRelatedEntity,
+                                setIsSynthesizedRelatedEntity)
 
   FLAGSET_DEFINE_FLAG_ACCESSORS(Class_HasVTable,
                                 class_hasVTable,

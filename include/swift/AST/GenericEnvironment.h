@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_GENERIC_ENVIRONMENT_H
 #define SWIFT_AST_GENERIC_ENVIRONMENT_H
 
-#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericParamKey.h"
@@ -170,7 +169,7 @@ public:
   /// generic parameter types by their sugared form.
   Type getSugaredType(Type type) const;
 
-  SubstitutionList getForwardingSubstitutions() const;
+  SubstitutionMap getForwardingSubstitutionMap() const;
 
   void dump(raw_ostream &os) const;
 

@@ -18,10 +18,54 @@
 #ifndef SWIFT_SIL_SILVTABLEVISITOR_H
 #define SWIFT_SIL_SILVTABLEVISITOR_H
 
+#include <string>
+
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/ASTMangler.h"
 
 namespace swift {
+
+// Utility class for deterministically ordering vtable entries for
+// synthesized methods.
+struct SortedFuncList {
+  using Entry = std::pair<std::string, AbstractFunctionDecl *>;
+  SmallVector<Entry, 2> elts;
+  bool sorted = false;
+
+  void add(AbstractFunctionDecl *afd) {
+    Mangle::ASTMangler mangler;
+    std::string mangledName;
+    if (auto *cd = dyn_cast<ConstructorDecl>(afd))
+      mangledName = mangler.mangleConstructorEntity(cd, 0, 0);
+    else
+      mangledName = mangler.mangleEntity(afd, 0);
+
+    elts.push_back(std::make_pair(mangledName, afd));
+  }
+
+  bool empty() { return elts.empty(); }
+
+  void sort() {
+    assert(!sorted);
+    sorted = true;
+    std::sort(elts.begin(),
+              elts.end(),
+              [](const Entry &lhs, const Entry &rhs) -> bool {
+                return lhs.first < rhs.first;
+              });
+  }
+
+  decltype(elts)::const_iterator begin() const {
+    assert(sorted);
+    return elts.begin();
+  }
+
+  decltype(elts)::const_iterator end() const {
+    assert(sorted);
+    return elts.end();
+  }
+};
 
 /// A CRTP class for visiting virtually-dispatched methods of a class.
 ///
@@ -76,19 +120,47 @@ template <class T> class SILVTableVisitor {
     }
   }
 
+  void maybeAddMember(Decl *member) {
+    if (auto *fd = dyn_cast<FuncDecl>(member))
+      maybeAddMethod(fd);
+    else if (auto *cd = dyn_cast<ConstructorDecl>(member))
+      maybeAddConstructor(cd);
+    else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
+      asDerived().addPlaceholder(placeholder);
+  }
+
 protected:
   void addVTableEntries(ClassDecl *theClass) {
     // Imported classes do not have a vtable.
     if (!theClass->hasKnownSwiftImplementation())
       return;
 
+    // Note that while vtable order is not ABI, we still want it to be
+    // consistent between translation units.
+    //
+    // So, sort synthesized members by their mangled name, since they
+    // are added lazily during type checking, with the remaining ones
+    // forced at the end.
+    SortedFuncList synthesizedMembers;
+
     for (auto member : theClass->getMembers()) {
-      if (auto *fd = dyn_cast<FuncDecl>(member))
-        maybeAddMethod(fd);
-      else if (auto *cd = dyn_cast<ConstructorDecl>(member))
-        maybeAddConstructor(cd);
-      else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
-        asDerived().addPlaceholder(placeholder);
+      if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
+        if (afd->isSynthesized()) {
+          synthesizedMembers.add(afd);
+          continue;
+        }
+      }
+
+      maybeAddMember(member);
+    }
+
+    if (synthesizedMembers.empty())
+      return;
+
+    synthesizedMembers.sort();
+
+    for (const auto &pair : synthesizedMembers) {
+      maybeAddMember(pair.second);
     }
   }
 };

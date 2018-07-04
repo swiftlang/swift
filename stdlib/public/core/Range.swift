@@ -186,7 +186,6 @@ where Bound: Strideable, Bound.Stride : SignedInteger {
   public typealias Iterator = IndexingIterator<Range<Bound>>
 }
 
-// FIXME: should just be RandomAccessCollection
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
 where Bound : Strideable, Bound.Stride : SignedInteger
 {
@@ -255,6 +254,12 @@ where Bound : Strideable, Bound.Stride : SignedInteger
     return lowerBound <= element && element < upperBound ? element : nil
   }
 
+  @inlinable
+  public func _customLastIndexOfEquatableElement(_ element: Bound) -> Index?? {
+    // The first and last elements are the same because each element is unique.
+    return _customIndexOfEquatableElement(element)
+  }
+
   /// Accesses the element at specified position.
   ///
   /// You can subscript a collection with any valid index other than the
@@ -273,16 +278,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 }
 
-extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
-  /// Now that Range is conditionally a collection when Bound: Strideable,
-  /// CountableRange is no longer needed. This is a deprecated initializer
-  /// for any remaining uses of Range(countableRange).
-  @available(*,deprecated: 4.2, 
-    message: "CountableRange is now Range. No need to convert any more.")
-  public init(_ other: Range<Bound>) {
-    self = other
-  }  
-  
+extension Range where Bound: Strideable, Bound.Stride : SignedInteger {  
   /// Creates an instance equivalent to the given `ClosedRange`.
   ///
   /// - Parameter other: A closed range to convert to a `Range` instance.
@@ -358,7 +354,6 @@ extension Range : CustomStringConvertible {
 
 extension Range : CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
     + "..<\(String(reflecting: upperBound)))"
@@ -366,7 +361,6 @@ extension Range : CustomDebugStringConvertible {
 }
 
 extension Range : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -399,15 +393,15 @@ extension Range: Equatable {
 }
 
 extension Range: Hashable where Bound: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(lowerBound)
-    hasher.append(upperBound)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(lowerBound)
+    hasher.combine(upperBound)
   }
 }
 
@@ -606,18 +600,29 @@ extension PartialRangeFrom: Sequence
 {
   public typealias Element = Bound
 
+  /// The iterator for a `PartialRangeFrom` instance.
   @_fixed_layout
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _current: Bound
     @inlinable
     public init(_current: Bound) { self._current = _current }
+
+    /// Advances to the next element and returns it, or `nil` if no next
+    /// element exists.
+    ///
+    /// Once `nil` has been returned, all subsequent calls return `nil`.
+    ///
+    /// - Returns: The next element in the underlying sequence, if a next
+    ///   element exists; otherwise, `nil`.
     @inlinable
     public mutating func next() -> Bound? {
       defer { _current = _current.advanced(by: 1) }
       return _current
     }
   }
+
+  /// Returns an iterator for this sequence.
   @inlinable
   public func makeIterator() -> Iterator { 
     return Iterator(_current: lowerBound) 
@@ -739,30 +744,33 @@ extension Comparable {
 /// unbounded range is essentially a conversion of a collection instance into
 /// its slice type.
 ///
-/// For example, the following code declares `levenshteinDistance(_:_:)`, a
-/// function that calculates the number of changes required to convert one
-/// string into another. `levenshteinDistance(_:_:)` uses `Substring`, a
-/// string's slice type, for its parameters.
+/// For example, the following code declares `countLetterChanges(_:_:)`, a
+/// function that finds the number of changes required to change one
+/// word or phrase into another. The function uses a recursive approach to
+/// perform the same comparisons on smaller and smaller pieces of the original
+/// strings. In order to use recursion without making copies of the strings at
+/// each step, `countLetterChanges(_:_:)` uses `Substring`, a string's slice
+/// type, for its parameters.
 ///
-///     func levenshteinDistance(_ s1: Substring, _ s2: Substring) -> Int {
+///     func countLetterChanges(_ s1: Substring, _ s2: Substring) -> Int {
 ///         if s1.isEmpty { return s2.count }
 ///         if s2.isEmpty { return s1.count }
 ///
 ///         let cost = s1.first == s2.first ? 0 : 1
 ///
 ///         return min(
-///             levenshteinDistance(s1.dropFirst(), s2) + 1,
-///             levenshteinDistance(s1, s2.dropFirst()) + 1,
-///             levenshteinDistance(s1.dropFirst(), s2.dropFirst()) + cost)
+///             countLetterChanges(s1.dropFirst(), s2) + 1,
+///             countLetterChanges(s1, s2.dropFirst()) + 1,
+///             countLetterChanges(s1.dropFirst(), s2.dropFirst()) + cost)
 ///     }
 ///
-/// To call `levenshteinDistance(_:_:)` with two strings, use an unbounded
-/// range in each string's subscript to convert it to a `Substring`.
+/// To call `countLetterChanges(_:_:)` with two strings, use an unbounded
+/// range in each string's subscript.
 ///
 ///     let word1 = "grizzly"
 ///     let word2 = "grisly"
-///     let distance = levenshteinDistance(word1[...], word2[...])
-///     // distance == 2
+///     let changes = countLetterChanges(word1[...], word2[...])
+///     // changes == 2
 @_frozen // FIXME(sil-serialize-all)
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
@@ -800,7 +808,7 @@ extension Collection {
   /// of the strings in the slice, and then uses that index in the original
   /// array.
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     print(streets[index!])
   ///     // "Evarts"
   ///
@@ -832,6 +840,7 @@ extension Collection {
     return self[startIndex...]
   }
 }
+
 extension MutableCollection {
   @inlinable
   public subscript<R: RangeExpression>(r: R) -> SubSequence
@@ -890,6 +899,12 @@ extension Range {
   }
 }
 
-@available(*, deprecated, renamed: "Range")
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
 public typealias CountableRange<Bound: Strideable> = Range<Bound>
+  where Bound.Stride : SignedInteger
+
+// Note: this is not for compatibility only, it is considered a useful
+// shorthand. TODO: Add documentation
+public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
   where Bound.Stride : SignedInteger

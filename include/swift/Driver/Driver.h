@@ -43,6 +43,9 @@ namespace opt {
 }
 
 namespace swift {
+  namespace sys {
+    class TaskQueue;
+  }
   class DiagnosticEngine;
 namespace driver {
   class Action;
@@ -64,7 +67,17 @@ public:
     /// A compilation using a single frontend invocation without -primary-file.
     SingleCompile,
 
-    /// A single process that batches together multiple StandardCompile jobs.
+    /// A single process that batches together multiple StandardCompile Jobs.
+    ///
+    /// Note: this is a transient value to use _only_ for the individual
+    /// BatchJobs that are the temporary containers for multiple StandardCompile
+    /// Jobs built by ToolChain::constructBatchJob.
+    ///
+    /// In particular, the driver treats a batch-mode-enabled Compilation as
+    /// having OutputInfo::CompilerMode == StandardCompile, with the
+    /// Compilation::BatchModeEnabled flag set to true, _not_ as a
+    /// BatchModeCompile Compilation. The top-level OutputInfo::CompilerMode for
+    /// a Compilation should never be BatchModeCompile.
     BatchModeCompile,
 
     /// Invoke the REPL
@@ -89,7 +102,10 @@ public:
 
   /// Whether or not the output should contain debug info.
   // FIXME: Eventually this should be replaced by dSYM generation.
-  IRGenDebugInfoKind DebugInfoKind = IRGenDebugInfoKind::None;
+  IRGenDebugInfoLevel DebugInfoLevel = IRGenDebugInfoLevel::None;
+
+  /// What kind of debug info to generate.
+  IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
@@ -163,12 +179,6 @@ private:
   /// Indicates whether the driver should check that the input files exist.
   bool CheckInputFilesExist = true;
 
-  /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  unsigned DriverBatchSeed = 0;
-
-  /// Forces a repartition for testing.
-  bool DriverForceOneBatchRepartition = false;
-
 public:
   Driver(StringRef DriverExecutable, StringRef Name,
          ArrayRef<const char *> Args, DiagnosticEngine &Diags);
@@ -202,6 +212,13 @@ public:
   /// because ToolChain has virtual methods.
   std::unique_ptr<ToolChain>
   buildToolChain(const llvm::opt::InputArgList &ArgList);
+
+  /// Compute the task queue for this compilation and command line argument
+  /// vector.
+  ///
+  /// \return A TaskQueue, or nullptr if an invalid number of parallel jobs is
+  /// specified.  This condition is signalled by a diagnostic.
+  std::unique_ptr<sys::TaskQueue> buildTaskQueue(const Compilation &C);
 
   /// Construct a compilation object for a given ToolChain and command line
   /// argument vector.
@@ -389,8 +406,11 @@ private:
   /// there is an actual conflict.
   /// \param Args The input arguments.
   /// \param Inputs The inputs to the driver.
+  /// \param BatchModeOut An out-parameter flag that indicates whether to
+  /// batch the jobs of the resulting \c Mode::StandardCompile compilation.
   OutputInfo::Mode computeCompilerMode(const llvm::opt::DerivedArgList &Args,
-                                       const InputFileList &Inputs) const;
+                                       const InputFileList &Inputs,
+                                       bool &BatchModeOut) const;
 };
 
 } // end namespace driver

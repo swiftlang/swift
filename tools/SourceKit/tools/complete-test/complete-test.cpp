@@ -64,7 +64,6 @@ static sourcekitd_uid_t KeyRequest;
 static sourcekitd_uid_t KeyCompilerArgs;
 static sourcekitd_uid_t KeyOffset;
 static sourcekitd_uid_t KeyLength;
-static sourcekitd_uid_t KeyActionable;
 static sourcekitd_uid_t KeySourceFile;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyName;
@@ -286,7 +285,6 @@ static int skt_main(int argc, const char **argv) {
   KeyCompilerArgs = sourcekitd_uid_get_from_cstr("key.compilerargs");
   KeyOffset = sourcekitd_uid_get_from_cstr("key.offset");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
-  KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
   KeyKind = sourcekitd_uid_get_from_cstr("key.kind");
   KeyCodeCompleteOptions =
       sourcekitd_uid_get_from_cstr("key.codecomplete.options");

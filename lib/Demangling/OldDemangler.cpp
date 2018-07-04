@@ -100,13 +100,21 @@ public:
 
   /// Return the next character without claiming it.  Asserts that
   /// there is at least one remaining character.
-  char peek() { return Text.front(); }
+  char peek() {
+    if (isEmpty()) {
+      // Return an otherwise unused character to prevent crashes for malformed
+      // symbols.
+      return '.';
+    }
+    return Text.front();
+  }
 
   /// Claim and return the next character.  Asserts that there is at
   /// least one remaining character.
   char next() {
     char c = peek();
-    advanceOffset(1);
+    if (!isEmpty())
+      advanceOffset(1);
     return c;
   }
 
@@ -639,6 +647,11 @@ private:
         if (Mangled.nextIf('g')) {
           Value |=
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
+        }
+
+        if (Mangled.nextIf('o')) {
+          Value |=
+              unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned);
         }
 
         if (Mangled.nextIf('s')) {
@@ -1691,20 +1704,6 @@ private:
     if (Mangled.nextIf('s')) {
       NodePointer stdlib = Factory.createNode(Node::Kind::Module, STDLIB_NAME);
       return makeAssociatedType(stdlib);
-    }
-    if (Mangled.nextIf('q')) {
-      NodePointer index = demangleIndexAsNode();
-      if (!index)
-        return nullptr;
-      NodePointer decl_ctx = Factory.createNode(Node::Kind::DeclContext);
-      NodePointer ctx = demangleContext();
-      if (!ctx)
-        return nullptr;
-      decl_ctx->addChild(ctx, Factory);
-      auto qual_atype = Factory.createNode(Node::Kind::QualifiedArchetype);
-      qual_atype->addChild(index, Factory);
-      qual_atype->addChild(decl_ctx, Factory);
-      return qual_atype;
     }
     return nullptr;
   }

@@ -93,14 +93,14 @@
 // CHECK-SAME:   i32 {{3|2}},
 // CHECK-SAME: }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$S13generic_types1ACMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)
 // CHECK-NEXT:   ret %swift.type* [[METADATA]]
 // CHECK: }
 
-// CHECK-LABEL: define{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} internal %swift.type* @"$S13generic_types1BCMi"(%swift.type_descriptor*, i8**, i8**) {{.*}} {
 // CHECK:   [[T0:%.*]] = bitcast i8** %1 to %swift.type**
 // CHECK:   %T = load %swift.type*, %swift.type** [[T0]],
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @swift_allocateGenericClassMetadata(%swift.type_descriptor* %0, i8** %1, i8** %2)

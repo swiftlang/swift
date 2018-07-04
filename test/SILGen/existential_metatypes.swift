@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-stdlib -enable-sil-ownership %s | %FileCheck %s
+
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {}
 
 struct Value {}
 

@@ -1,6 +1,6 @@
 // XFAIL: *
 
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-emit-silgen -enable-sil-opaque-values -emit-sorted-sil -Xllvm -sil-full-demangle %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 struct TrivialStruct {
   var x: Int
@@ -1160,7 +1160,7 @@ public func s020_______assignToVar() {
 
 // Tests LogicalPathComponent's writeback for opaque value types
 // ---
-// CHECK-LABEL: sil @$Ss10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @inout Dictionary<Key, Value>) -> () {
+// CHECK-LABEL: sil @$SSD20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF : $@convention(method) <Key, Value where Key : Hashable> (@in_guaranteed Value, @inout Dictionary<Key, Value>) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Value, [[ARG1:%.*]] : $*Dictionary<Key, Value>):
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG1]] : $*Dictionary<Key, Value>
 // CHECK:   [[OPTIONAL_ALLOC:%.*]] = alloc_stack $Optional<Value>
@@ -1169,11 +1169,11 @@ public func s020_______assignToVar() {
 // CHECK:   [[OPTIONAL_LOAD:%.*]] = load [take] [[OPTIONAL_ALLOC]] : $*Optional<Value>
 // CHECK:   apply {{.*}}<Key, Value>([[OPTIONAL_LOAD]], {{.*}}, [[WRITE]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '$Ss10DictionaryV20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF'
+// CHECK-LABEL: } // end sil function '$SSD20opaque_values_silgenE22inoutAccessOfSubscript3keyyq__tF'
 
 // Tests materializeForSet's createSetterCallback for opaque values
 // ---
-// CHECK-LABEL: sil shared [transparent] [serialized] @$Ss10DictionaryV20opaque_values_silgenEyq_Sgq_cimytfU_ : $@convention(method) <Key, Value where Key : Hashable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Key, Value>, @thick Dictionary<Key, Value>.Type) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] @$SSD20opaque_values_silgenEyq_Sgq_cimytfU_ : $@convention(method) <Key, Value where Key : Hashable> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Dictionary<Key, Value>, @thick Dictionary<Key, Value>.Type) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Builtin.RawPointer, [[ARG1:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG2:%.*]] : $*Dictionary<Key, Value>, [[ARG3:%.*]] : $@thick Dictionary<Key, Value>.Type):
 // CHECK:   [[PROJ_VAL1:%.*]] = project_value_buffer $Value in [[ARG1]] : $*Builtin.UnsafeValueBuffer
 // CHECK:   [[LOAD_VAL1:%.*]] = load [take] [[PROJ_VAL1]] : $*Value
@@ -1181,7 +1181,7 @@ public func s020_______assignToVar() {
 // CHECK:   [[LOAD_VAL0:%.*]] = load [take] [[ADDR_VAL0]] : $*Optional<Value>
 // CHECK:   apply {{.*}}<Key, Value>([[LOAD_VAL0]], [[LOAD_VAL1]], [[ARG2]]) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in Optional<τ_0_1>, @in τ_0_1, @inout Dictionary<τ_0_0, τ_0_1>) -> ()
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '$Ss10DictionaryV20opaque_values_silgenEyq_Sgq_cimytfU_'
+// CHECK-LABEL: } // end sil function '$SSD20opaque_values_silgenEyq_Sgq_cimytfU_'
 extension Dictionary {
   public subscript(key: Value) -> Value? {
     @inline(__always)

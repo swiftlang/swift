@@ -172,14 +172,6 @@ FUNCTION_VALUE_WITNESS(assignWithTake,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE, TYPE_TYPE))
 
-///   T *(*initializeBufferWithTakeOfBuffer)(B *dest, B *src, M *self);
-/// Given an invalid buffer, initialize it by taking the value out of
-/// the source buffer.
-FUNCTION_VALUE_WITNESS(initializeBufferWithTakeOfBuffer,
-                       InitializeBufferWithTakeOfBuffer,
-                       MUTABLE_VALUE_TYPE,
-                       (MUTABLE_BUFFER_TYPE, MUTABLE_BUFFER_TYPE, TYPE_TYPE))
-
 /// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
 /// Given an instance of valid single payload enum with a payload of this
 /// witness table's type (e.g Optional<ThisType>) , get the tag of the enum.
@@ -228,7 +220,7 @@ BEGIN_VALUE_WITNESS_RANGE(RequiredTypeLayoutWitness,
 /// The ValueWitnessIsNonPOD bit is set if the type is not POD.
 ///
 /// The ValueWitnessIsNonInline bit is set if the type cannot be
-/// represented in a fixed-size buffer.
+/// represented in a fixed-size buffer or if it is not bitwise takable.
 ///
 /// The Enum_HasExtraInhabitants bit is set if the type's binary
 /// representation has "extra inhabitants" that do not form valid values of

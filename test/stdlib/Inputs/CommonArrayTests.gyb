@@ -274,8 +274,7 @@ ${Suite}.test("${ArrayType}/_withUnsafeMutableBufferPointerIfSupported")
       // Read.
       var result = a._withUnsafeMutableBufferPointerIfSupported {
         (bufferPointer) -> OpaqueValue<[OpaqueValue<Int>]> in
-        let r = OpaqueValue(Array(bufferPointer))
-        return r
+        return OpaqueValue(Array(bufferPointer))
       }
       expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
       expectEqualSequence(test.sequence, result!.value.map { $0.value })

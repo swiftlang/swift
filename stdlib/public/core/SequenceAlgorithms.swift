@@ -488,6 +488,21 @@ extension Sequence {
     }
     return false
   }
+
+  /// Returns a Boolean value indicating whether every element of a sequence
+  /// satisfies a given predicate.
+  ///
+  /// - Parameter predicate: A closure that takes an element of the sequence
+  ///   as its argument and returns a Boolean value that indicates whether
+  ///   the passed element satisfies a condition.
+  /// - Returns: `true` if the sequence contains only elements that satisfy
+  ///   `predicate`; otherwise, `false`.
+  @inlinable
+  public func allSatisfy(
+    _ predicate: (Element) throws -> Bool
+  ) rethrows -> Bool {
+    return try !contains { try !predicate($0) }
+  }
 }
 
 extension Sequence where Element : Equatable {
@@ -675,10 +690,10 @@ extension Sequence {
   ///
   ///     let numbers = [1, 2, 3, 4]
   ///
-  ///     let mapped = numbers.map { Array(count: $0, repeatedValue: $0) }
+  ///     let mapped = numbers.map { Array(repeating: $0, count: $0) }
   ///     // [[1], [2, 2], [3, 3, 3], [4, 4, 4, 4]]
   ///
-  ///     let flatMapped = numbers.flatMap { Array(count: $0, repeatedValue: $0) }
+  ///     let flatMapped = numbers.flatMap { Array(repeating: $0, count: $0) }
   ///     // [1, 2, 2, 3, 3, 3, 4, 4, 4, 4]
   ///
   /// In fact, `s.flatMap(transform)`  is equivalent to
@@ -729,39 +744,6 @@ extension Sequence {
   ///   and *n* is the length of the result.
   @inlinable
   public func compactMap<ElementOfResult>(
-    _ transform: (Element) throws -> ElementOfResult?
-  ) rethrows -> [ElementOfResult] {
-    return try _compactMap(transform)
-  }
-
-  /// Returns an array containing the non-`nil` results of calling the given
-  /// transformation with each element of this sequence.
-  ///
-  /// Use this method to receive an array of nonoptional values when your
-  /// transformation produces an optional value.
-  ///
-  /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an optional `Int` value.
-  ///
-  ///     let possibleNumbers = ["1", "2", "three", "///4///", "5"]
-  ///
-  ///     let mapped: [Int?] = possibleNumbers.map { str in Int(str) }
-  ///     // [1, 2, nil, nil, 5]
-  ///
-  ///     let flatMapped: [Int] = possibleNumbers.flatMap { str in Int(str) }
-  ///     // [1, 2, 5]
-  ///
-  /// - Parameter transform: A closure that accepts an element of this
-  ///   sequence as its argument and returns an optional value.
-  /// - Returns: An array of the non-`nil` results of calling `transform`
-  ///   with each element of the sequence.
-  ///
-  /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
-  ///   and *n* is the length of the result.
-  @inline(__always)
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {
     return try _compactMap(transform)

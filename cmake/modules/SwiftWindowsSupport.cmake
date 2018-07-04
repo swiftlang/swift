@@ -71,7 +71,7 @@ function(swift_windows_generate_sdk_vfs_overlay flags)
                  @ONLY)
 
   set(${flags}
-      -ivfsoverlay;"${CMAKE_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
+      -Xclang;-ivfsoverlay;-Xclang;"${CMAKE_BINARY_DIR}/windows-sdk-vfs-overlay.yaml"
       PARENT_SCOPE)
 endfunction()
 

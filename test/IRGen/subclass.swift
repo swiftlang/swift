@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 // CHECK-DAG: %swift.refcounted = type {
 // CHECK-DAG: [[TYPE:%swift.type]] = type
@@ -35,7 +34,7 @@
 // CHECK:   i64 ([[B]]*)* @"$S8subclass1BC1fSiyF",
 // CHECK:   [[A]]* ([[TYPE]]*)* @"$S8subclass1AC1gACyFZ"
 // CHECK: }>
-// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$S8subclass1ACN" {{.*}}, i8* {{.*}} @"$S8subclass1BCN" {{.*}}], section "__DATA,__objc_classlist,regular,no_dead_strip", align 8
+// CHECK: @objc_classes = internal global [2 x i8*] [i8* {{.*}} @"$S8subclass1ACN" {{.*}}, i8* {{.*}} @"$S8subclass1BCN" {{.*}}]
 
 class A {
   var x = 0

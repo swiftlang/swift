@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -enable-expand-all -inline -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 
@@ -136,7 +136,7 @@ struct SingleFieldLvl3 {
 
 /// This checks the case where we have a single level hierarchy and the root is
 /// dead.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @single_level_dead_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
 // CHECK: [[FN:%[0-9]+]] = function_ref @$S29single_level_dead_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
@@ -182,7 +182,7 @@ bb0(%0 : $S1):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @single_level_live_root_callee : $@convention(thin) (S1) -> Builtin.Int32 {
 // CHECK: bb0([[INPUT:%[0-9]+]] : $S1):
 // CHECK: [[FN:%[0-9]+]] = function_ref @$S29single_level_live_root_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> Builtin.Int32
 // CHECK: [[ARG2:%.*]] = struct_extract [[INPUT]] : $S1, #S1.f2
@@ -234,7 +234,7 @@ bb0(%0 : $S1):
 // This test checks where we have a multiple level hierarchy, the root is dead,
 // but the root has all fields used. This means that we should extract
 // everything, but we should not "reform" the aggregate.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[INPUT:%.*]] : $S2):
 // CHECK: [[FN:%.*]] = function_ref @$S42multiple_level_all_root_fields_used_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[INPUT]] : $S2, #S2.f2
@@ -292,7 +292,7 @@ bb0(%0 : $S2):
 }
 
 /// This test checks a multiple level hierarchy where the root has no fields used.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @multiple_level_no_root_fields_have_direct_uses_callee : $@convention(thin) (S3) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S3):
 // CHECK: [[FN:%.*]] = function_ref @$S53multiple_level_no_root_fields_have_direct_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S3, #S3.f2
@@ -355,7 +355,7 @@ bb0(%0 : $S3):
 
 // This test checks a multiple level hierarchy where the root has its own use
 // and needs to be reformed via a struct.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @multiple_level_root_must_be_reformed_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 // CHECK: bb0([[IN:%.*]] : $S2):
 // CHECK: [[FN:%.*]] = function_ref @$S43multiple_level_root_must_be_reformed_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32, Builtin.Int64) -> (Builtin.Int16, Builtin.Int64)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S2, #S2.f2
@@ -439,7 +439,7 @@ bb0(%0 : $S2):
 }
 
 // This test checks if we can handle @owned structs correctly
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_struct_1_callee : $@convention(thin) (@owned S5, @owned S5) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32) {
 // CHECK: bb0([[IN1:%.*]] : $S5, [[IN2:%.*]] : $S5):
 // CHECK: [[FN:%.*]] = function_ref @$S21owned_struct_1_calleeTfq4dgX_n : $@convention(thin) (@guaranteed S4, Builtin.Int16, Builtin.Int32) -> (Builtin.Int16, Builtin.Int32, Builtin.Int16, Builtin.Int32)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S5, #S5.f2
@@ -505,7 +505,7 @@ bb0(%0 : $S5):
 }
 
 // This test checks if we can properly insert arguments in between dead arguments.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @owned_struct_2_callee : $@convention(thin) (Builtin.Int256, Builtin.Int256, @owned S5, Builtin.Int128, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128) {
 // CHECK: bb0([[IN1:%.*]] : $Builtin.Int256, [[IN2:%.*]] : $Builtin.Int256, [[IN3:%.*]] : $S5, [[IN4:%.*]] : $Builtin.Int128, [[IN5:%.*]] : $Builtin.Int128):
 // CHECK: [[FN:%.*]] = function_ref @$S21owned_struct_2_calleeTfq4ndgXdn_n : $@convention(thin) (Builtin.Int256, @guaranteed S4, Builtin.Int16, Builtin.Int32, Builtin.Int128) -> (Builtin.Int256, Builtin.Int16, Builtin.Int32, Builtin.Int128)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN3]] : $S5, #S5.f2
@@ -567,7 +567,7 @@ bb0(%0 : $Builtin.Int256, %1 : $S5, %2 : $Builtin.Int128):
 }
 
 /// This test makes sure that we ignore pointer arguments for now.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S1, [[IN3:%.*]] : $S1):
 // CHECK: [[FN:%.*]] = function_ref @$S18ignore_ptrs_calleeTfq4nxx_n : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S1, #S1.f1
@@ -677,7 +677,7 @@ bb0(%0 : $FakeStaticString, %1 : $FakeString, %2 : $FakeStaticString):
 // This test makes sure that we handle cases where the callee has field uses
 // that are processed in a different order than the fields are layed out in the
 // structure.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @check_out_of_order_uses_callee : $@convention(thin) (S1) -> () {
 // CHECK: bb0([[IN:%.*]] : $S1):
 // CHECK: [[FN:%.*]] = function_ref @$S30check_out_of_order_uses_calleeTfq4x_n : $@convention(thin) (Builtin.Int16, Builtin.Int32) -> ()
 // CHECK: [[EXT1:%.*]] = struct_extract [[IN]] : $S1, #S1.f2
@@ -735,7 +735,7 @@ bb0(%0 : $S1):
 }
 
 // Make sure that we do not SROA classes.
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @class_callee_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @$S14class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
@@ -774,7 +774,7 @@ bb0(%0 : $C1, %1 : $Builtin.Int32):
   return %1 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @class_caller_1 : $@convention(thin) (@owned C1, Builtin.Int32) -> Builtin.Int32 {
 // CHECK: bb0([[IN1:%.*]] : $C1, [[IN2:%.*]] : $Builtin.Int32):
 // CHECK: [[FN:%.*]] = function_ref @$S14class_callee_1Tfq4gn_n : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
 // CHECK: apply [[FN]]([[IN1]], [[IN2]]) : $@convention(thin) (@guaranteed C1, Builtin.Int32) -> Builtin.Int32
@@ -856,7 +856,7 @@ bb0(%0 : $ThirtySixFieldStruct):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [serialized] [thunk] [always_inline] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
+// CHECK-LABEL: sil [serialized] [signature_optimized_thunk] [always_inline] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 sil [serialized] @more_than_32_type_sized_callee : $@convention(thin) (ThirtySixFieldStruct) -> Builtin.Int32 {
 bb0(%0 : $ThirtySixFieldStruct):
   // make it a non-trivial function

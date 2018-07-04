@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name argument_shuffle_swift3 -emit-silgen -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name argument_shuffle_swift3 -enable-sil-ownership %s -swift-version 3 | %FileCheck %s
 
 func fn(_: Any) {}
 

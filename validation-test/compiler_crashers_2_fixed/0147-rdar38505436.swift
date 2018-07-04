@@ -1,4 +1,4 @@
-// RUN: not %target-typecheck-verify-swift %s
+// RUN: not %target-typecheck-verify-swift
 
 protocol P1 {
   class N1 {

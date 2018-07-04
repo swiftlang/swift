@@ -4,7 +4,7 @@ import Swift
 
 sil @error_user : $@convention(thin) (@owned Error) -> ()
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @retain_release_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @retain_release_boxed_existential(%swift.error*)
 sil @retain_release_boxed_existential : $@convention(thin) (@owned Error) -> () {
 entry(%e : $Error):
   // CHECK-objc: @swift_errorRetain
@@ -18,7 +18,7 @@ entry(%e : $Error):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Error)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.Error)
 sil @alloc_boxed_existential : $@convention(thin) <T: Error> (@in T) -> @owned Error {
 entry(%x : $*T):
   // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* %T, i8** %T.Error, %swift.opaque* null, i1 false)
@@ -37,7 +37,7 @@ struct SomeError: Error {
   let _code: Int
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential_concrete
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %swift.error* @alloc_boxed_existential_concrete
 sil @alloc_boxed_existential_concrete : $@convention(thin) (@owned SomeError) -> @owned Error {
 entry(%x : $SomeError):
   // CHECK: [[BOX_PAIR:%.*]] = call swiftcc { %swift.error*, %swift.opaque* } @swift_allocError(%swift.type* {{.*}} @"$S17boxed_existential9SomeErrorVMf", {{.*}}, i8** {{%.*|@"\$S17boxed_existential9SomeErrorVs0D0AAWP"}}, %swift.opaque* null, i1 false)
@@ -51,7 +51,7 @@ entry(%x : $SomeError):
   return %b : $Error
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.Error)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @dealloc_boxed_existential(%swift.error*, %swift.type* %T, i8** %T.Error)
 sil @dealloc_boxed_existential : $@convention(thin) <T: Error> (@owned Error) -> () {
 entry(%b : $Error):
   // CHECK: call void @swift_deallocError(%swift.error* %0, %swift.type* %T)
@@ -61,7 +61,7 @@ entry(%b : $Error):
 
 struct Str : Error { }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @alloc_dealloc_box_with_concrete_type
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @alloc_dealloc_box_with_concrete_type
 sil @alloc_dealloc_box_with_concrete_type : $@convention(thin) () -> () {
 bb0:
   // CHECK: call {{.*}} @swift_allocError
@@ -72,7 +72,7 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i[0-9]+}} @project_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i[0-9]+}} @project_boxed_existential(%swift.error*)
 sil @project_boxed_existential : $@convention(thin) (@owned Error) -> Int {
 entry(%b : $Error):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])

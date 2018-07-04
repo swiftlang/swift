@@ -1,13 +1,19 @@
-// RUN: %target-swift-frontend -emit-sil %s -import-objc-header %S/Inputs/enum-objc.h -verify
+// RUN: %target-swift-frontend -emit-sil %s -enable-objc-interop -import-objc-header %S/Inputs/enum-objc.h -verify -enable-nonfrozen-enum-exhaustivity-diagnostics
 
 // REQUIRES: objc_interop
 
-func test(_ value: SwiftEnum) {
-    switch value {
-    case .one: break
-    case .two: break
-    case .three: break
-    } // no error
+func test(_ value: SwiftEnum, _ exhaustiveValue: ExhaustiveEnum) {
+  switch value { // expected-warning {{switch must be exhaustive}} expected-note {{handle unknown values using "@unknown default"}}
+  case .one: break
+  case .two: break
+  case .three: break
+  }
+
+  switch exhaustiveValue { // ok
+  case .one: break
+  case .two: break
+  case .three: break
+  }
 }
 
 let _: Int = forwardBarePointer // expected-error {{cannot convert value of type '(OpaquePointer) -> Void' to specified type 'Int'}}

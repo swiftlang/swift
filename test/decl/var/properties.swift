@@ -114,6 +114,9 @@ var x15: Int {
   // applied to the getter.
   weak
   var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
+  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
+  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-3 {{'foo' declared here}}
   return 0
 }
 
@@ -281,7 +284,7 @@ var duplicateAccessors1: X {
     return _x
   }
   set { // expected-note {{previous definition of setter is here}}
-    _x = value
+    _x = newValue
   }
   get { // expected-error {{duplicate definition of getter}}
     return _x
@@ -324,10 +327,10 @@ var extraTokensInAccessorBlock4: X {
 var extraTokensInAccessorBlock5: X {
   set blah wibble // expected-error{{expected '{' to start setter definition}}
 }
-var extraTokensInAccessorBlock6: X {
+var extraTokensInAccessorBlock6: X { // expected-error{{non-member observing properties require an initializer}}
   willSet blah wibble // expected-error{{expected '{' to start willSet definition}}
 }
-var extraTokensInAccessorBlock7: X {
+var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing properties require an initializer}}
   didSet blah wibble // expected-error{{expected '{' to start didSet definition}}
 }
 
@@ -734,7 +737,7 @@ struct WillSetDidSetProperties {
       markUsed("woot")
     }
     set { // expected-error {{willSet variable must not also have a set specifier}}
-      return 4
+      return 4 // expected-error {{unexpected non-void return value in void function}}
     }
   }
 
@@ -872,10 +875,10 @@ protocol ProtocolWillSetDidSet2 {
   var a: Int { didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet3 {
-  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { willSet didSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
 }
 protocol ProtocolWillSetDidSet4 {
-  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error {{expected get or set in a protocol property}}
+  var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} expected-error 2 {{expected get or set in a protocol property}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}
@@ -1103,16 +1106,16 @@ class OwnershipImplicitSub : OwnershipBase {
 }
 
 class OwnershipBadSub : OwnershipBase {
-  override weak var strongVar: AnyObject? { // expected-error {{cannot override strong property with weak property}}
+  override weak var strongVar: AnyObject? { // expected-error {{cannot override 'strong' property with 'weak' property}}
     didSet {}
   }
-  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' may only be applied to class and class-bound protocol types, not 'AnyObject?'}}
+  override unowned var weakVar: AnyObject? { // expected-error {{'unowned' variable cannot have optional type}}
     didSet {}
   }
   override weak var unownedVar: AnyObject { // expected-error {{'weak' variable should have optional type 'AnyObject?'}}
     didSet {}
   }
-  override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override unowned(unsafe) property with unowned property}}
+  override unowned var unownedUnsafeVar: AnyObject { // expected-error {{cannot override 'unowned(unsafe)' property with 'unowned' property}}
     didSet {}
   }
 }
@@ -1234,4 +1237,15 @@ struct SR3893 {
   var plain: SR3893Box = SR3893Box(value: 0)
 }
 
+protocol WFI_P1 : class {}
+protocol WFI_P2 : class {}
 
+class WeakFixItTest {
+  init() {}
+
+  // expected-error @+1 {{'weak' variable should have optional type 'WeakFixItTest?'}} {{31-31=?}}
+  weak var foo : WeakFixItTest
+
+  // expected-error @+1 {{'weak' variable should have optional type '(WFI_P1 & WFI_P2)?'}} {{18-18=(}} {{33-33=)?}}
+  weak var bar : WFI_P1 & WFI_P2
+}

@@ -74,7 +74,6 @@ extension _UIntBuffer : Collection {
     internal var bitOffset: UInt8
     
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline
     internal init(bitOffset: UInt8) { self.bitOffset = bitOffset }
     
     @inlinable // FIXME(sil-serialize-all)
@@ -106,7 +105,6 @@ extension _UIntBuffer : Collection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal var _elementWidth : UInt8 {
     return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
@@ -148,19 +146,16 @@ extension _UIntBuffer : RandomAccessCollection {
 extension FixedWidthInteger {
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func _fullShiftLeft<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &<< ((n &+ 1) &>> 1)) &<< (n &>> 1)
   }
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func _fullShiftRight<N: FixedWidthInteger>(_ n: N) -> Self {
     return (self &>> ((n &+ 1) &>> 1)) &>> (n &>> 1)
   }
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static func _lowBits<N: FixedWidthInteger>(_ n: N) -> Self {
     return ~((~0 as Self)._fullShiftLeft(n))
   }
@@ -169,7 +164,6 @@ extension FixedWidthInteger {
 extension Range {
   @inline(__always)
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal func _contains_(_ other: Range) -> Bool {
     return other.clamped(to: self) == other
   }

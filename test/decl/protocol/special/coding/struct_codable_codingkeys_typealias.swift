@@ -25,3 +25,12 @@ let _ = SimpleStruct.encode(to:)
 // The synthesized CodingKeys type should not be accessible from outside the
 // struct.
 let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}
+
+// Structs with CodingKeys which are typealiases that don't point to a valid
+// nominal type should produce errors.
+struct StructWithUndeclaredCodingKeys : Codable { // expected-error {{type 'StructWithUndeclaredCodingKeys' does not conform to protocol 'Decodable'}}
+  // expected-error@-1 {{type 'StructWithUndeclaredCodingKeys' does not conform to protocol 'Encodable'}}
+  private typealias CodingKeys = NonExistentType // expected-error {{use of undeclared type 'NonExistentType'}}
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
+}

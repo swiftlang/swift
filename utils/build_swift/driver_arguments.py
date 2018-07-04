@@ -358,6 +358,9 @@ def create_argument_parser():
            help='enable Thread Sanitizer on the swift runtime')
     option('--enable-lsan', toggle_true,
            help='enable Leak Sanitizer for swift tools')
+    option('--enable-sanitize-coverage', toggle_true,
+           help='enable sanitizer coverage for swift tools. Necessary for '
+                'fuzzing swiftc')
 
     option('--compiler-vendor', store,
            choices=['none', 'apple'],
@@ -447,6 +450,9 @@ def create_argument_parser():
 
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
+
+    option('--enable-stdlibcore-exclusivity-checking', store_true,
+           help='Enable exclusivity checking in stdlibCore')
 
     option('--force-optimized-typechecker', store_true,
            help='Force the type checker to be built with '

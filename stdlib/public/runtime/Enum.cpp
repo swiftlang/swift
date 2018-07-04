@@ -89,12 +89,14 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
   
   size_t align = payloadLayout->flags.getAlignment();
+  bool isBT = payloadLayout->flags.isBitwiseTakable();
   TypeLayout layout;
   layout.size = size;
-  layout.flags = payloadLayout->flags
-    .withExtraInhabitants(unusedExtraInhabitants > 0)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
+  layout.flags =
+      payloadLayout->flags.withExtraInhabitants(unusedExtraInhabitants > 0)
+          .withEnumWitnesses(true)
+          .withInlineStorage(
+              ValueWitnessTable::isValueInline(isBT, size, align));
   auto rawStride = llvm::alignTo(size, align);
   layout.stride = rawStride == 0 ? 1 : rawStride;
   
@@ -200,14 +202,14 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   TypeLayout layout;
   layout.size = totalSize;
   layout.flags = ValueWitnessFlags()
-    .withAlignmentMask(alignMask)
-    .withPOD(isPOD)
-    .withBitwiseTakable(isBT)
-    // TODO: Extra inhabitants
-    .withExtraInhabitants(false)
-    .withEnumWitnesses(true)
-    .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
-    ;
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBT)
+                     // TODO: Extra inhabitants
+                     .withExtraInhabitants(false)
+                     .withEnumWitnesses(true)
+                     .withInlineStorage(ValueWitnessTable::isValueInline(
+                         isBT, totalSize, alignMask + 1));
   auto rawStride = (totalSize + alignMask) & ~alignMask;
   layout.stride = rawStride == 0 ? 1 : rawStride;
   

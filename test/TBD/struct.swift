@@ -1,4 +1,11 @@
-// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-resilience -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-resilience -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-resilience -enable-testing -O
 
 public struct PublicNothing {}
 
@@ -40,6 +47,25 @@ public struct PublicProperties {
     }
     private var privateVarGetSet: Int {
         get { return 0 }
+        set {}
+    }
+}
+
+public struct PublicSubscripts {
+    public subscript(publicGet _: Int) -> Int { return 0 }
+    internal subscript(internalGet _: Int) -> Int { return 0 }
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    public subscript(publicGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    internal subscript(internalGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
         set {}
     }
 }
@@ -135,6 +161,20 @@ internal struct InternalProperties {
     }
 }
 
+internal struct InternalSubscripts {
+    internal subscript(internalGet _: Int) -> Int { return 0 }
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    internal subscript(internalGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
+        set {}
+    }
+}
+
 internal struct InternalStatics {
     internal static func internalStaticFunc() {}
     private static func privateStaticFunc() {}
@@ -199,6 +239,15 @@ private struct PrivateProperties {
 
     private var privateVarGetSet: Int {
         get { return 0 }
+        set {}
+    }
+}
+
+private struct PrivateSubscripts {
+    private subscript(privateGet _: Int) -> Int { return 0 }
+
+    private subscript(privateGetSet _: Int) -> Int {
+        get {return 0 }
         set {}
     }
 }

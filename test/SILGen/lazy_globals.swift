@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 // CHECK: sil private @globalinit_[[T:.*]]_func0 : $@convention(c) () -> () {
 // CHECK:   alloc_global @$S12lazy_globals1xSiv

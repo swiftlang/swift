@@ -52,7 +52,6 @@ struct _StringObject {
 #endif
 
 #if arch(i386) || arch(arm)
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -62,7 +61,6 @@ struct _StringObject {
     _invariantCheck()
   }
 #else
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -80,7 +78,6 @@ extension _StringObject {
   public typealias _RawBitPattern = UInt
 #endif
 
-  @usableFromInline
   @inlinable
   internal
   var rawBits: _RawBitPattern {
@@ -95,7 +92,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   // TODO: private
@@ -111,7 +107,6 @@ extension _StringObject {
 #endif
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   // TODO: private
@@ -131,7 +126,6 @@ extension _StringObject {
   // we are giving up on compile-time constant folding of ARC of values. Thus,
   // this should only be called from the callee of a non-inlineable function
   // that has no knowledge of the value-ness of the object.
-  @usableFromInline
   @inlinable
   @inline(__always)
   // TODO: private
@@ -181,7 +175,6 @@ extension _StringObject {
 //
 extension _StringObject {
 #if arch(i386) || arch(arm)
-  @usableFromInline
   @inlinable
   internal
   static var _isCocoaBit: UInt {
@@ -191,7 +184,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   static var _isOpaqueBit: UInt {
@@ -201,7 +193,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   static var _twoByteBit: UInt {
@@ -211,7 +202,6 @@ extension _StringObject {
     }
   }
 #else // !(arch(i386) || arch(arm))
-  @usableFromInline
   @inlinable
   internal
   static var _isValueBit: UInt {
@@ -225,7 +215,6 @@ extension _StringObject {
 
   // After deciding isValue, which of the two variants (on both sides) are we.
   // That is, native vs objc or unsafe vs small.
-  @usableFromInline
   @inlinable
   internal
   static var _subVariantBit: UInt {
@@ -235,7 +224,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   static var _isOpaqueBit: UInt {
@@ -245,7 +233,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   static var _twoByteBit: UInt {
@@ -256,16 +243,13 @@ extension _StringObject {
   }
 
   // There are 4 sub-variants depending on the isValue and subVariant bits
-  @usableFromInline
   @inlinable
   internal
   static var _variantMask: UInt {
     @inline(__always)
-    get { return UInt(Builtin.stringObjectOr_Int64(
-      _isValueBit._value, _subVariantBit._value)) }
+    get { return _isValueBit | _subVariantBit }
   }
 
-  @usableFromInline
   @inlinable
   internal
   static var _payloadMask: UInt {
@@ -275,7 +259,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var _variantBits: UInt {
@@ -286,7 +269,6 @@ extension _StringObject {
   }
 #endif // arch(i386) || arch(arm)
 
-  @usableFromInline
   @inlinable
   internal
   var referenceBits: UInt {
@@ -304,7 +286,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var payloadBits: UInt {
@@ -344,7 +325,6 @@ internal var _emptyStringAddressBits: UInt {
 
 extension _StringObject {
 #if arch(i386) || arch(arm)
-  @usableFromInline
   @inlinable
   internal
   var isEmptySingleton: Bool {
@@ -357,7 +337,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -365,7 +344,6 @@ extension _StringObject {
     self.init(.unmanagedSingleByte, _emptyStringAddressBits)
   }
 #else
-  @usableFromInline
   @inlinable
   internal
   static var _emptyStringBitPattern: UInt {
@@ -373,7 +351,6 @@ extension _StringObject {
     get {  return _smallUTF8TopNibble }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isEmptySingleton: Bool {
@@ -381,7 +358,6 @@ extension _StringObject {
     get { return rawBits == _StringObject._emptyStringBitPattern }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -405,24 +381,23 @@ extension _StringObject {
 
 #if arch(i386) || arch(arm)
 #else
-  @usableFromInline @inlinable internal
+  @inlinable internal
   static var _topNibbleMask: UInt {
     @inline(__always)
     get { return 0xF000_0000_0000_0000 }
   }
-  @usableFromInline @inlinable internal
+  @inlinable internal
   static var _smallUTF8TopNibble: UInt {
     @inline(__always)
     get { return 0xE000_0000_0000_0000 }
   }
-  @usableFromInline @inlinable internal
+  @inlinable internal
   static var _smallUTF8CountMask: UInt {
     @inline(__always)
     get { return 0x0F00_0000_0000_0000 }
   }
 #endif
 
-  @usableFromInline
   @inlinable
   internal
   var _isSmallUTF8: Bool {
@@ -443,7 +418,6 @@ extension _StringObject {
   // keep the count. The StringObject represents the second word of a
   // SmallUTF8String.
   //
-  @usableFromInline
   @inlinable
   internal
   var asSmallUTF8SecondWord: UInt {
@@ -458,7 +432,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var smallUTF8Count: Int {
@@ -475,7 +448,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   init(_smallUTF8SecondWord bits: UInt) {
@@ -494,7 +466,6 @@ extension _StringObject {
 // TODO: private!
 //
 extension _StringObject {
-  @usableFromInline
   @inlinable
   internal // TODO: private!
   var asNativeObject: AnyObject {
@@ -520,7 +491,6 @@ extension _StringObject {
   }
 
 #if _runtime(_ObjC)
-  @usableFromInline
   @inlinable
   internal // TODO: private!
   var asCocoaObject: _CocoaString {
@@ -546,7 +516,6 @@ extension _StringObject {
   }
 #endif
 
-  @usableFromInline
   @inlinable
   internal // TODO: private!
   var asOpaqueObject: _OpaqueString {
@@ -558,7 +527,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var asUnmanagedRawStart: UnsafeRawPointer {
@@ -583,7 +551,6 @@ extension _StringObject {
   //
   // Determine which of the 4 major variants we are
   //
-  @usableFromInline
   @inlinable
   internal
   var isNative: Bool {
@@ -598,7 +565,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isCocoa: Bool {
@@ -626,7 +592,6 @@ extension _StringObject {
 #endif
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isValue: Bool {
@@ -644,7 +609,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isUnmanaged: Bool {
@@ -663,7 +627,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isSmall: Bool {
@@ -682,7 +645,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isSmallOrCocoa: Bool {
@@ -704,7 +666,6 @@ extension _StringObject {
   //
   // Frequently queried properties
   //
-  @usableFromInline
   @inlinable
   internal
   var isContiguous: Bool {
@@ -725,7 +686,6 @@ extension _StringObject {
     }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isOpaque: Bool {
@@ -733,7 +693,6 @@ extension _StringObject {
     get { return !isContiguous }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isContiguousCocoa: Bool {
@@ -741,7 +700,6 @@ extension _StringObject {
     get { return isContiguous && isCocoa }
   }
 
-  @usableFromInline
   @inlinable
   internal
   var isNoncontiguousCocoa: Bool {
@@ -750,7 +708,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isSingleByte: Bool {
     @inline(__always)
     get {
@@ -770,13 +727,11 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var byteWidth: Int {
     @inline(__always)
     get { return isSingleByte ? 1 : 2 }
   }
 
-  @usableFromInline
   @inlinable
   var bitWidth: Int {
     @inline(__always)
@@ -784,20 +739,17 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var isContiguousASCII: Bool {
     @inline(__always)
     get { return isContiguous && isSingleByte }
   }
 
   @inlinable
-  public // @testable
   var isContiguousUTF16: Bool {
     @inline(__always)
     get { return isContiguous && !isSingleByte }
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -813,7 +765,6 @@ extension _StringObject {
   }
 
   @inlinable
-  public // @testable
   var nativeRawStorage: _SwiftRawStringStorage {
     @inline(__always) get {
       _sanityCheck(isNative)
@@ -825,7 +776,6 @@ extension _StringObject {
 
 extension _StringObject {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
 #if INTERNAL_CHECKS_ENABLED
     _sanityCheck(MemoryLayout<_StringObject>.size == 8)
@@ -865,7 +815,6 @@ extension _StringObject {
 // Conveniently construct, tag, flag, etc. StringObjects
 //
 extension _StringObject {
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -911,7 +860,7 @@ extension _StringObject {
     self.init(.strong(Builtin.reinterpretCast(_payloadBits)), bits)
 #else
     _sanityCheck(_payloadBits & ~_StringObject._payloadMask == 0)
-    var rawBits = _payloadBits & _StringObject._payloadMask
+    var rawBits = _payloadBits
     if isValue {
       var rawBitsBuiltin = Builtin.stringObjectOr_Int64(
         rawBits._value, _StringObject._isValueBit._value)
@@ -944,7 +893,6 @@ extension _StringObject {
 #endif
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -963,7 +911,6 @@ extension _StringObject {
       isTwoByte: !isSingleByte)
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -976,7 +923,6 @@ extension _StringObject {
   }
 
 #if _runtime(_ObjC)
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -989,7 +935,6 @@ extension _StringObject {
       isSingleByte: isSingleByte)
   }
 #else
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -1002,7 +947,6 @@ extension _StringObject {
   }
 #endif
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal
@@ -1018,7 +962,6 @@ extension _StringObject {
     _sanityCheck(isSingleByte == (CodeUnit.bitWidth == 8))
   }
 
-  @usableFromInline
   @inlinable
   @inline(__always)
   internal

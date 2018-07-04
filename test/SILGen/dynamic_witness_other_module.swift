@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module %S/Inputs/dynamic_witness_other_module_other.swift -emit-module-path %t
 
-// RUN: %target-swift-frontend -emit-silgen %s -I %t | %FileCheck %s
-// RUN: %target-swift-frontend -emit-ir %s -I %t > /dev/null
+// RUN: %target-swift-emit-silgen %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %t > /dev/null
 
 // REQUIRES: objc_interop
 

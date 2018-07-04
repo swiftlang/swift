@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name accessors -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name accessors -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
 
 // Hold a reference to do to magically become non-POD.
 class Reference {}
@@ -58,9 +58,10 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on [[ARG]] : $A
+// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*OrdinarySub
 // CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$S9accessors11OrdinarySubVyS2icis
-// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ACCESS]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
@@ -68,12 +69,13 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
 // CHECK-NEXT: store_borrow [[ARG]] to [[TEMP2]] : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
-// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*OrdinarySub to $Builtin.RawPointer
+// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ACCESS]] : $*OrdinarySub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 
 // CHECK:    [[CONT]]:
+// CHECK-NEXT: end_access [[ACCESS]] : $*OrdinarySub
 // CHECK-NEXT: dealloc_stack [[BUFFER]]
 // CHECK-NEXT: dealloc_stack [[STORAGE]]
 // CHECK-NEXT: dealloc_stack [[TEMP]]
@@ -114,9 +116,10 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[ARG]] : $B
+// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*MutatingSub
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @$S9accessors11MutatingSubVyS2icig : $@convention(method) (Int, @inout MutatingSub) -> Int
-// CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
+// CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ACCESS]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
@@ -124,13 +127,14 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[ARG]] to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
-// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
+// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ACCESS]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 //
 // CHECK:    [[CONT]]:
 //   Formal access to LHS.
+// CHECK-NEXT: end_access [[ACCESS]] : $*MutatingSub
 // CHECK-NEXT: [[STORAGE2:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
 // CHECK-NEXT: [[BUFFER2:%.*]] = alloc_stack $MutatingSub
 // CHECK-NEXT: [[T0:%.*]] = address_to_pointer [[BUFFER2]]
@@ -140,9 +144,10 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on [[ARG]] : $B
+// CHECK-NEXT: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*MutatingSub
 // CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[SETTER:%.*]] = function_ref @$S9accessors11MutatingSubVyS2icis : $@convention(method) (Int, Int, @inout MutatingSub) -> ()
-// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ADDR]])
+// CHECK-NEXT: apply [[SETTER]]([[VALUE]], [[INDEX0]], [[ACCESS]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.none!enumelt: [[CONT:bb[0-9]+]]
 //
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
@@ -150,12 +155,13 @@ func test1(_ ref: B) {
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
 // CHECK-NEXT: store_borrow [[ARG]] to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
-// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
+// CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ACCESS]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]], [[TEMP2]], [[T0]])
 // CHECK-NEXT: dealloc_stack [[TEMP2]]
 // CHECK-NEXT: br [[CONT]]
 //
 // CHECK:    [[CONT]]:
+// CHECK-NEXT: end_access [[ACCESS]] : $*MutatingSub
 // CHECK-NEXT: dealloc_stack [[BUFFER2]]
 // CHECK-NEXT: dealloc_stack [[STORAGE2]]
 // CHECK-NEXT: dealloc_stack [[BUFFER]]

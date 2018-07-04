@@ -624,12 +624,12 @@ CollectionTypeTests.test("count/dispatch") {
 }
 
 //===----------------------------------------------------------------------===//
-// index(of:)
+// firstIndex(of:)
 //===----------------------------------------------------------------------===//
 
-CollectionTypeTests.test("index(of:)/WhereElementIsEquatable/dispatch") {
+CollectionTypeTests.test("firstIndex(of:)/WhereElementIsEquatable/dispatch") {
   let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
-  _ = tester.index(of: MinimalEquatableValue(1))
+  _ = tester.firstIndex(of: MinimalEquatableValue(1))
   expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
 }
 
@@ -640,14 +640,14 @@ func callGenericFind_<
   C : Collection
 >(_ collection: C, _ element: C.Iterator.Element) -> C.Index? 
 where C.Iterator.Element : Equatable {
-  return collection.index(of: element)
+  return collection.firstIndex(of: element)
 }
 
 func callStaticFind_(
   _ set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Set<MinimalHashableValue>.Index? {
-  return set.index(of: element)
+  return set.firstIndex(of: element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:
@@ -659,7 +659,7 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
     let s = Set<MinimalHashableValue>(
       test.sequence.map { MinimalHashableValue($0.value) })
     MinimalHashableValue.timesEqualEqualWasCalled = 0
-    MinimalHashableValue.timesHashValueWasCalled = 0
+    MinimalHashableValue.timesHashIntoWasCalled = 0
     expectEqual(
       test.expected
         .map { _ in MinimalHashableValue(test.element.value) },
@@ -671,11 +671,11 @@ CollectionTypeTests.test("Set<T>.find/CustomImplementation/${dispatch}") {
         0, MinimalHashableValue.timesEqualEqualWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectNotEqual(
-        0, MinimalHashableValue.timesHashValueWasCalled,
+        0, MinimalHashableValue.timesHashIntoWasCalled,
         stackTrace: SourceLocStack().with(test.loc))
     }
     if test.expected != nil {
@@ -702,7 +702,7 @@ extension Collection where
   func _test_indicesOf(_ element: Iterator.Element) -> [Index] {
     var result: [Index] = []
     var tail = self[startIndex..<endIndex]
-    while let foundIndex = tail.index(of: element) {
+    while let foundIndex = tail.firstIndex(of: element) {
       result.append(foundIndex)
       tail = tail[index(after: foundIndex)..<endIndex]
     }
@@ -710,7 +710,7 @@ extension Collection where
   }
 }
 
-CollectionTypeTests.test("index(of:)/ContinueSearch") {
+CollectionTypeTests.test("firstIndex(of:)/ContinueSearch") {
   do {
     let c = MinimalCollection(elements: [] as [MinimalEquatableValue])
     expectEqualSequence(

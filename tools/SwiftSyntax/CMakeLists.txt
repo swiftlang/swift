@@ -2,6 +2,7 @@ add_swift_library(swiftSwiftSyntax SHARED
   # This file should be listed the first.  Module name is inferred from the
   # filename.
   SwiftSyntax.swift
+  AbsolutePosition.swift
   AtomicCache.swift
   Diagnostic.swift
   DiagnosticConsumer.swift

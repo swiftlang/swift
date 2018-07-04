@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s
 
 // Capture list with weak capture vs noescape closure
 func transform<T>(fn: () -> T) -> T {

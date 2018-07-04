@@ -7,7 +7,7 @@ x + x; // expected-error {{expressions are not allowed at the top level}} expect
 // Make sure we don't crash on closures at the top level
 ({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{expression resolves to an unused function}}
 ({ 5 }()) // expected-error {{expressions are not allowed at the top level}}
-// expected-warning @-1 {{result of call is unused}}
+// expected-warning @-1 {{result of call to closure returning 'Int' is unused}}
 
 
 // expected-error @+3 {{expected 'in' after for-each pattern}}

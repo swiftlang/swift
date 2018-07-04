@@ -578,9 +578,9 @@ public:
       verifyChecked(type, visitedArchetypes);
     }
 
-    void verifyChecked(
-           Type type,
-           llvm::SmallPtrSet<ArchetypeType *, 4> &visitedArchetypes) {
+    void
+    verifyChecked(Type type,
+                  llvm::SmallPtrSetImpl<ArchetypeType *> &visitedArchetypes) {
       if (!type)
         return;
 
@@ -1576,7 +1576,7 @@ public:
                  "\nArgument type: ";
           E->getArg()->getType().print(Out);
           Out << "\nParameter type: ";
-          FT->getInput()->print(Out);
+          FT->printParams(Out);
           Out << "\n";
           E->dump(Out);
           abort();
@@ -1624,7 +1624,7 @@ public:
       if (auto *baseIOT = E->getBase()->getType()->getAs<InOutType>()) {
         if (!baseIOT->getObjectType()->is<ArchetypeType>()) {
           auto *VD = dyn_cast<VarDecl>(E->getMember().getDecl());
-          if (!VD || !VD->hasAccessorFunctions()) {
+          if (!VD || VD->getAllAccessors().empty()) {
             Out << "member_ref_expr on value of inout type\n";
             E->dump(Out);
             abort();
@@ -2114,11 +2114,26 @@ public:
     }
 
     void verifyChecked(ValueDecl *VD) {
-      if (!VD->hasAccess() && !VD->getDeclContext()->isLocalContext() &&
-          !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
-        dumpRef(VD);
-        Out << " does not have access";
-        abort();
+      if (VD->hasAccess()) {
+        if (VD->getFormalAccess() == AccessLevel::Open) {
+          if (!isa<ClassDecl>(VD) && !VD->isPotentiallyOverridable()) {
+            Out << "decl cannot be 'open'\n";
+            VD->dump(Out);
+            abort();
+          }
+          if (VD->isFinal()) {
+            Out << "decl cannot be both 'open' and 'final'\n";
+            VD->dump(Out);
+            abort();
+          }
+        }
+      } else {
+        if (!VD->getDeclContext()->isLocalContext() &&
+            !isa<GenericTypeParamDecl>(VD) && !isa<ParamDecl>(VD)) {
+          dumpRef(VD);
+          Out << " does not have access";
+          abort();
+        }
       }
 
       // Make sure that there are no archetypes in the interface type.
@@ -2134,6 +2149,13 @@ public:
       }
 
       verifyCheckedBase(VD);
+    }
+
+    bool shouldWalkIntoLazyInitializers() override {
+      // We don't want to walk into lazy initializers because they should
+      // have been reparented to their synthesized getter, which will
+      // invalidate various invariants.
+      return false;
     }
 
     void verifyChecked(PatternBindingDecl *binding) {
@@ -2179,20 +2201,18 @@ public:
           abort();
         }
       }
-      if (ASD->hasAddressors()) {
-        if (auto addressor = ASD->getAddressor()) {
-          if (addressor->isMutating() != ASD->isGetterMutating()) {
-            Out << "AbstractStorageDecl::isGetterMutating is out of sync"
-                   " with whether immutable addressor is mutating";
-            abort();
-          }
+      if (auto addressor = ASD->getAddressor()) {
+        if (addressor->isMutating() != ASD->isGetterMutating()) {
+          Out << "AbstractStorageDecl::isGetterMutating is out of sync"
+                 " with whether immutable addressor is mutating";
+          abort();
         }
-        if (auto addressor = ASD->getMutableAddressor()) {
-          if (addressor->isMutating() != ASD->isSetterMutating()) {
-            Out << "AbstractStorageDecl::isSetterMutating is out of sync"
-                   " with whether mutable addressor is mutating";
-            abort();
-          }
+      }
+      if (auto addressor = ASD->getMutableAddressor()) {
+        if (addressor->isMutating() != ASD->isSetterMutating()) {
+          Out << "AbstractStorageDecl::isSetterMutating is out of sync"
+                 " with whether mutable addressor is mutating";
+          abort();
         }
       }
 
@@ -2240,15 +2260,15 @@ public:
 
       // Variables must have materializable type, unless they are parameters,
       // in which case they must either have l-value type or be anonymous.
-      if (!var->getInterfaceType()->isMaterializable() || var->isInOut()) {
+      if (!var->getInterfaceType()->isMaterializable()) {
         if (!isa<ParamDecl>(var)) {
-          Out << "Non-parameter VarDecl has non-materializable type: ";
+          Out << "VarDecl has non-materializable type: ";
           var->getType().print(Out);
           Out << "\n";
           abort();
         }
 
-        if (!var->getInterfaceType()->is<InOutType>() && var->hasName()) {
+        if (!var->isInOut() && var->hasName()) {
           Out << "ParamDecl may only have non-materializable tuple type "
                  "when it is anonymous: ";
           var->getType().print(Out);
@@ -2325,8 +2345,7 @@ public:
 
       if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
         auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent()
-                         ->getWithoutSpecifierType();
+                         ->getReferenceStorageReferent();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2399,6 +2418,10 @@ public:
         Out << "\n";
         abort();
       }
+    }
+
+    void verifyChecked(SubstitutionMap substitutions){
+      // FIXME: Check replacement types without forcing anything.
     }
 
     /// Check the given explicit protocol conformance.
@@ -2507,13 +2530,15 @@ public:
           // Check the witness substitutions.
           const auto &witness = normal->getWitness(req, nullptr);
 
-          if (witness.requiresSubstitution()) {
-            GenericEnv.push_back({witness.getSyntheticEnvironment()});
-            for (const auto &sub : witness.getSubstitutions()) {
-              verifyChecked(sub.getReplacement());
-            }
+          if (auto *genericEnv = witness.getSyntheticEnvironment())
+            GenericEnv.push_back({genericEnv});
+
+          verifyChecked(witness.getRequirementToSyntheticSubs());
+          verifyChecked(witness.getSubstitutions());
+
+          if (auto *genericEnv = witness.getSyntheticEnvironment()) {
             assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
-                     == witness.getSyntheticEnvironment());
+                     == genericEnv);
             GenericEnv.pop_back();
           }
 
@@ -2885,13 +2910,13 @@ public:
           abort();
         }
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (!selfParam->getInterfaceType()->is<InOutType>()) {
+        if (!selfParam->isInOut()) {
           Out << "mutating function does not have inout 'self'\n";
           abort();
         }
       } else {
         const ParamDecl *selfParam = FD->getImplicitSelfDecl();
-        if (selfParam && selfParam->getInterfaceType()->is<InOutType>()) {
+        if (selfParam && selfParam->isInOut()) {
           Out << "non-mutating function has inout 'self'\n";
           abort();
         }
@@ -2904,7 +2929,7 @@ public:
           abort();
         }
 
-        auto resultTy = FD->getResultInterfaceType()->getWithoutSpecifierType();
+        auto resultTy = FD->getResultInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2938,27 +2963,26 @@ public:
         }
       }
 
-      auto storedAccessor =
-        storageDecl->getAccessorFunction(FD->getAccessorKind());
+      auto storedAccessor = storageDecl->getAccessor(FD->getAccessorKind());
       if (storedAccessor != FD) {
         Out << "storage declaration has different accessor for this kind\n";
         abort();
       }
 
       switch (FD->getAccessorKind()) {
-      case AccessorKind::IsGetter:
-      case AccessorKind::IsSetter:
-      case AccessorKind::IsWillSet:
-      case AccessorKind::IsDidSet:
-      case AccessorKind::IsMaterializeForSet:
+      case AccessorKind::Get:
+      case AccessorKind::Set:
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+      case AccessorKind::MaterializeForSet:
         if (FD->getAddressorKind() != AddressorKind::NotAddressor) {
           Out << "non-addressor accessor has an addressor kind\n";
           abort();
         }
         break;
 
-      case AccessorKind::IsAddressor:
-      case AccessorKind::IsMutableAddressor:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
         if (FD->getAddressorKind() == AddressorKind::NotAddressor) {
           Out << "addressor does not have an addressor kind\n";
           abort();
@@ -3394,9 +3418,8 @@ public:
 
     /// \brief Verify that the given source ranges is contained within the
     /// parent's source range.
-    void checkSourceRanges(SourceRange Current,
-                           ASTWalker::ParentTy Parent,
-                           std::function<void()> printEntity) {
+    void checkSourceRanges(SourceRange Current, ASTWalker::ParentTy Parent,
+                           llvm::function_ref<void()> printEntity) {
       SourceRange Enclosing;
       if (Parent.isNull())
           return;

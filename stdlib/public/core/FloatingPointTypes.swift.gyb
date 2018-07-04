@@ -83,15 +83,28 @@ extension ${Self} : CustomStringConvertible {
   /// A textual representation of the value.
   @inlinable // FIXME(sil-serialize-all)
   public var description: String {
-    return _float${bits}ToString(self, debug: false)
+    if isFinite {
+      return _float${bits}ToString(self, debug: false)
+    } else if isNaN {
+      return "nan"
+    } else if sign == .minus {
+      return "-inf"
+    } else {
+      return "inf"
+    }
   }
 }
 
 extension ${Self} : CustomDebugStringConvertible {
   /// A textual representation of the value, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
-    return _float${bits}ToString(self, debug: true)
+    if isFinite || isNaN {
+      return _float${bits}ToString(self, debug: true)
+    } else if sign == .minus {
+      return "-inf"
+    } else {
+      return "inf"
+    }
   }
 }
 
@@ -158,19 +171,16 @@ extension ${Self}: BinaryFloatingPoint {
 
   //  Implementation details.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _infinityExponent: UInt {
     @inline(__always) get { return 1 &<< UInt(exponentBitCount) - 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _exponentBias: UInt {
     @inline(__always) get { return _infinityExponent &>> 1 }
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _significandMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount) - 1
@@ -178,7 +188,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal static var _quietNaNMask: ${RawSignificand} {
     @inline(__always) get {
       return 1 &<< ${RawSignificand}(significandBitCount - 1)
@@ -311,31 +320,26 @@ extension ${Self}: BinaryFloatingPoint {
     internal var _storage: (UInt64, UInt16, /* pad */ UInt16, UInt16, UInt16)
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var explicitSignificand: UInt64 { return _storage.0 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var signAndExponent: UInt16 { return _storage.1 }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var sign: FloatingPointSign {
       return FloatingPointSign(rawValue: Int(signAndExponent &>> 15))!
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal var exponentBitPattern: UInt {
       return UInt(signAndExponent) & 0x7fff
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     @_transparent
     internal init(explicitSignificand: UInt64, signAndExponent: UInt16) {
       _storage = (explicitSignificand, signAndExponent, 0, 0, 0)
@@ -343,7 +347,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _representation: _Representation {
     return unsafeBitCast(self, to: _Representation.self)
   }
@@ -367,7 +370,6 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _explicitBitMask: UInt64 {
     @inline(__always) get { return 1 &<< 63 }
   }
@@ -1518,17 +1520,13 @@ extension ${Self} : _ExpressibleByBuiltinFloatLiteral {
 % end
 
 extension ${Self} : Hashable {
-  /// The number's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
     var v = self
     if isZero {
       // To satisfy the axiom that equality implies hash equality, we need to
@@ -1536,13 +1534,36 @@ extension ${Self} : Hashable {
       v = 0
     }
   %if bits == 80:
-    hasher.append(v._representation.signAndExponent)
-    hasher.append(v.significandBitPattern)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
   %else:
-    hasher.append(v.bitPattern)
+    hasher.combine(v.bitPattern)
   %end
   }
 
+  @inlinable
+  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
+    // To satisfy the axiom that equality implies hash equality, we need to
+    // finesse the hash value of -0.0 to match +0.0.
+    let v = isZero ? 0 : self
+  %if bits == 80:
+    var hasher = Hasher(_seed: seed)
+    hasher.combine(v._representation.signAndExponent)
+    hasher.combine(v.significandBitPattern)
+    return hasher._finalize()
+  %elif bits == 64:
+    return Hasher._hash(seed: seed, v.bitPattern)
+  %elif bits == 32:
+    return Hasher._hash(seed: seed, bytes: UInt64(v.bitPattern), count: 4)
+  %end
+  }
+}
+
+extension ${Self}: _HasCustomAnyHashableRepresentation {
+  // Not @inlinable
+  public func _toCustomAnyHashable() -> AnyHashable? {
+    return AnyHashable(_box: _${Self}AnyHashableBox(self))
+  }
 }
 
 extension ${Self} {
@@ -1796,42 +1817,89 @@ extension ${Self} : Strideable {
 }
 
 //===----------------------------------------------------------------------===//
-// Deprecated operators
+// AnyHashable
 //===----------------------------------------------------------------------===//
 
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public prefix func ++ (rhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public prefix func -- (rhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use += 1")
-@discardableResult
-public postfix func ++ (lhs: inout ${Self}) -> ${Self} {
-  fatalError("++ is not available")
-}
-@_transparent
-@available(*, unavailable, message: "use -= 1")
-@discardableResult
-public postfix func -- (lhs: inout ${Self}) -> ${Self} {
-  fatalError("-- is not available")
-}
+internal struct _${Self}AnyHashableBox: _AnyHashableBox {
+  internal typealias Base = ${Self}
+  internal let _value: Base
 
-extension ${Self} {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Please use the `abs(_:)` free function")
-  @_transparent
-  public static func abs(_ x: ${Self}) -> ${Self} {
-    return x.magnitude
+  internal init(_ value: Base) {
+    self._value = value
+  }
+
+  internal var _canonicalBox: _AnyHashableBox {
+    // Float and Double are bridged with NSNumber, so we have to follow
+    // NSNumber's rules for equality.  I.e., we need to make sure equal
+    // numerical values end up in identical boxes after canonicalization, so
+    // that _isEqual will consider them equal and they're hashed the same way.
+    //
+    // Note that these AnyHashable boxes don't currently feed discriminator bits
+    // to the hasher, so we allow repeatable collisions. E.g., -1 will always
+    // collide with UInt64.max.
+    if _value < 0 {
+      if let i = Int64(exactly: _value) {
+        return _IntegerAnyHashableBox(i)
+      }
+    } else {
+      if let i = UInt64(exactly: _value) {
+        return _IntegerAnyHashableBox(i)
+      }
+    }
+    if let d = Double(exactly: _value) {
+      return _DoubleAnyHashableBox(d)
+    }
+    // If a value can't be represented by a Double, keep it in its original
+    // representation so that it won't compare equal to approximations. (So that
+    // we don't round off Float80 values.)
+    return self
+  }
+
+  internal func _isEqual(to box: _AnyHashableBox) -> Bool? {
+    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
+    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    if let box = box as? _${Self}AnyHashableBox {
+      return _value == box._value
+    }
+    return nil
+  }
+
+  internal var _hashValue: Int {
+    return _rawHashValue(_seed: Hasher._seed)
+  }
+
+  internal func _hash(into hasher: inout Hasher) {
+    _sanityCheck(Int64(exactly: _value) == nil, "self isn't canonical")
+    _sanityCheck(UInt64(exactly: _value) == nil, "self isn't canonical")
+    hasher.combine(_value)
+  }
+
+  internal func _rawHashValue(_seed: (UInt64, UInt64)) -> Int {
+    var hasher = Hasher(_seed: _seed)
+    _hash(into: &hasher)
+    return hasher.finalize()
+  }
+
+  internal var _base: Any {
+    return _value
+  }
+
+  internal func _unbox<T: Hashable>() -> T? {
+    return _value as? T
+  }
+
+  internal func _downCastConditional<T>(
+    into result: UnsafeMutablePointer<T>
+  ) -> Bool {
+    guard let value = _value as? T else { return false }
+    result.initialize(to: value)
+    return true
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Deprecated operators
+//===----------------------------------------------------------------------===//
 
 % if bits == 80:
 #else
@@ -1865,3 +1933,7 @@ public func % <T : BinaryFloatingPoint>(lhs: T, rhs: T) -> T {
 public func %= <T : BinaryFloatingPoint> (lhs: inout T, rhs: T) {
   fatalError("%= is not available.")
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

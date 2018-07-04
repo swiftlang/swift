@@ -34,6 +34,17 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> Argv,
   // frontend command.
   Args.push_back("-force-single-frontend-invocation");
 
+  // Explictly disable batch mode to avoid a spurious warning when combining
+  // -enable-batch-mode with -force-single-frontend-invocation.  This is an
+  // implementation detail.
+  Args.push_back("-disable-batch-mode");
+
+  // Avoid using filelists
+  std::string neverThreshold =
+      std::to_string(Compilation::NEVER_USE_FILELIST);
+  Args.push_back("-driver-filelist-threshold");
+  Args.push_back(neverThreshold.c_str());
+
   // Force the driver into batch mode by specifying "swiftc" as the name.
   Driver TheDriver("swiftc", "swiftc", Args, Diags);
 

@@ -404,6 +404,9 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
   if (!S->hasResult())
     // Void return.
     SGF.Cleanups.emitBranchAndCleanups(SGF.ReturnDest, Loc);
+  else if (S->getResult()->getType()->isUninhabited())
+    // Never return.
+    SGF.emitIgnoredExpr(S->getResult());
   else
     SGF.emitReturnExpr(Loc, S->getResult());
 }
@@ -680,9 +683,6 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     llvm::SaveAndRestore<JumpDest> savedThrowDest(SGF.ThrowDest, throwDest);
 
     visit(S->getBody());
-    // We emit the counter for exiting the do-block here, as we may not have a
-    // valid insertion point when falling out.
-    SGF.emitProfilerIncrement(S);
   }
 
   // Emit the catch clauses, but only if the body of the function

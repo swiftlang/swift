@@ -108,10 +108,18 @@ func findFirstObjectFile(for dsohandle: UnsafeRawPointer = #dsohandle) -> URL? {
   return URL(fileURLWithPath: path)
 }
 
-enum InvocationError: Error {
+enum InvocationError: Error, CustomStringConvertible {
   case couldNotFindSwiftc
   case couldNotFindSDK
-  case abort(code: Int)
+
+  var description: String {
+    switch self {
+    case .couldNotFindSwiftc:
+      return "could not locate swift compiler binary"
+    case .couldNotFindSDK:
+      return "could not locate macOS SDK"
+    }
+  }
 }
 
 struct SwiftcRunner {

@@ -55,7 +55,7 @@ extension String {
   /// `String` type's `init(_:)` initializer.
   ///
   ///     let favemoji = "My favorite emoji is 🎉"
-  ///     if let i = favemoji.utf16.index(where: { $0 >= 128 }) {
+  ///     if let i = favemoji.utf16.firstIndex(where: { $0 >= 128 }) {
   ///         let asciiPrefix = String(favemoji.utf16[..<i])
   ///         print(asciiPrefix)
   ///     }
@@ -125,7 +125,6 @@ extension String {
     @_fixed_layout // FIXME(sil-serialize-all)
     public struct Indices {
       @inlinable // FIXME(sil-serialize-all)
-      @usableFromInline // FIXME(sil-serialize-all)
       internal init(
         _elements: String.UTF16View, _startIndex: Index, _endIndex: Index
       ) {
@@ -189,7 +188,6 @@ extension String {
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal func _internalIndex(at i: Int) -> Int {
       return _guts.startIndex + i
     }
@@ -256,25 +254,21 @@ extension String {
 #endif
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts) {
       self.init(_guts, offset: 0, length: _guts.count)
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_ _guts: _StringGuts, offset: Int, length: Int) {
       self._offset = offset
       self._length = length
       self._guts = _guts
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var description: String {
       return String(_guts._extractSlice(_encodedOffsetRange))
     }
 
-    @inlinable // FIXME(sil-serialize-all)
     public var debugDescription: String {
       return "StringUTF16(\(self.description.debugDescription))"
     }
@@ -300,45 +294,6 @@ extension String {
   }
 
   /// Creates a string corresponding to the given sequence of UTF-16 code units.
-  ///
-  /// If `utf16` contains unpaired UTF-16 surrogates, the result is `nil`.
-  ///
-  /// You can use this initializer to create a new string from a slice of
-  /// another string's `utf16` view.
-  ///
-  ///     let picnicGuest = "Deserving porcupine"
-  ///     if let i = picnicGuest.utf16.index(of: 32) {
-  ///         let adjective = String(picnicGuest.utf16[..<i])
-  ///         print(adjective)
-  ///     }
-  ///     // Prints "Optional(Deserving)"
-  ///
-  /// The `adjective` constant is created by calling this initializer with a
-  /// slice of the `picnicGuest.utf16` view.
-  ///
-  /// - Parameter utf16: A UTF-16 code sequence.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, deprecated: 3.2, obsoleted: 4.0)
-  public init?(_ utf16: UTF16View) {
-    // Attempt to recover the whole string, the better to implement the actual
-    // Swift 3.1 semantics, which are not as documented above!  Full Swift 3.1
-    // semantics may be impossible to preserve in the case of string literals,
-    // since we no longer have access to the length of the original string when
-    // there is no owner and elements are dropped from the end.
-    let wholeString = String(utf16._guts)
-    guard
-      let start = UTF16Index(_offset: utf16._offset)
-        .samePosition(in: wholeString),
-      let end = UTF16Index(_offset: utf16._offset + utf16._length)
-        .samePosition(in: wholeString)
-      else
-    {
-        return nil
-    }
-    self = wholeString[start..<end]
-  }
-
-  /// Creates a string corresponding to the given sequence of UTF-16 code units.
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4.0)
   public init(_ utf16: UTF16View) {
@@ -351,20 +306,16 @@ extension String {
 
 extension String.UTF16View : _SwiftStringView {
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _ephemeralContent : String { return _persistentContent }
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal var _persistentContent : String { return String(self._guts) }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _wholeString : String {
     return String(_guts)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   var _encodedOffsetRange : Range<Int> {
     return _offset..<_offset+_length
   }
@@ -387,7 +338,7 @@ extension String.UTF16View.Index {
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let stringIndex = cafe.index(of: "é")!
+  ///     let stringIndex = cafe.firstIndex(of: "é")!
   ///     let utf16Index = String.Index(stringIndex, within: cafe.utf16)!
   ///
   ///     print(cafe.utf16[...utf16Index])
@@ -401,7 +352,7 @@ extension String.UTF16View.Index {
   public init?(
     _ sourcePosition: String.Index, within target: String.UTF16View
   ) {
-    guard sourcePosition._transcodedOffset == 0 else { return nil }
+    guard sourcePosition.transcodedOffset == 0 else { return nil }
     self.init(encodedOffset: sourcePosition.encodedOffset)
   }
 
@@ -415,7 +366,7 @@ extension String.UTF16View.Index {
   /// position in the string's `unicodeScalars` view.
   ///
   ///     let cafe = "Café 🍵"
-  ///     let i = cafe.utf16.index(of: 32)!
+  ///     let i = cafe.utf16.firstIndex(of: 32)!
   ///     let j = i.samePosition(in: cafe.unicodeScalars)!
   ///     print(cafe.unicodeScalars[..<j])
   ///     // Prints "Café"
@@ -439,17 +390,8 @@ extension String.UTF16View.Index {
 // Reflection
 extension String.UTF16View : CustomReflectable {
   /// Returns a mirror that reflects the UTF-16 view of a string.
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
-  }
-}
-
-extension String.UTF16View : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "UTF16View.customPlaygroundQuickLook will be removed in a future Swift version")
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
   }
 }
 
@@ -459,7 +401,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   public typealias SubSequence = String.UTF16View.Indices
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(
     _elements: String.UTF16View,
     startIndex: Index,
@@ -546,39 +487,6 @@ extension String.UTF16View.Indices : BidirectionalCollection {
   }
 }
 
-// backward compatibility for index interchange.
-extension String.UTF16View {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(after i: Index?) -> Index {
-    return index(after: i!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public func index(
-    _ i: Index?, offsetBy n: Int) -> Index {
-    return index(i!, offsetBy: n)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional indices")
-  public func distance(from i: Index?, to j: Index?) -> Int {
-    return distance(from: i!, to: j!)
-  }
-  @inlinable // FIXME(sil-serialize-all)
-  @available(
-    swift, obsoleted: 4.0,
-    message: "Any String view index conversion can fail in Swift 4; please unwrap the optional index")
-  public subscript(i: Index?) -> Unicode.UTF16.CodeUnit {
-    return self[i!]
-  }
-}
-
 //===--- Slicing Support --------------------------------------------------===//
 /// In Swift 3.2, in the absence of type context,
 ///
@@ -592,22 +500,7 @@ extension String.UTF16View {
 
   @inlinable // FIXME(sil-serialize-all)
   @available(swift, introduced: 4)
-  public subscript(r: Range<Index>) -> String.UTF16View.SubSequence {
-    return String.UTF16View.SubSequence(self, _bounds: r)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: Range<Index>) -> String.UTF16View {
-    return String.UTF16View(
-      _guts,
-      offset: _internalIndex(at: bounds.lowerBound.encodedOffset),
-      length: bounds.upperBound.encodedOffset - bounds.lowerBound.encodedOffset)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public subscript(bounds: ClosedRange<Index>) -> String.UTF16View {
-    return self[bounds.relative(to: self)]
+  public subscript(bounds: Range<Index>) -> String.UTF16View.SubSequence {
+    return String.UTF16View.SubSequence(self, _bounds: bounds)
   }
 }

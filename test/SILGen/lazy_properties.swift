@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library -enable-sil-ownership -primary-file %s | %FileCheck %s
 
 // <rdar://problem/17405715> lazy property crashes silgen of implicit memberwise initializer
 

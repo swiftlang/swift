@@ -1,0 +1,6 @@
+framework module TestMyTime {
+  umbrella header "TestMyTime.h"
+
+  export *
+  module * { export * }
+}

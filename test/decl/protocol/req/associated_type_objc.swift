@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 @objc protocol P {
   associatedtype T

@@ -66,7 +66,7 @@ void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
     // effect of an intersection.
     auto Other = SuccRegionState.PtrToBottomUpState.find(RefCountedValue);
     if (Other == SuccRegionState.PtrToBottomUpState.end()) {
-      PtrToBottomUpState.blot(RefCountedValue);
+      PtrToBottomUpState.erase(RefCountedValue);
       continue;
     }
 
@@ -76,7 +76,7 @@ void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
     // This has the effect of an intersection since we already checked earlier
     // that RefCountedValue was not blotted.
     if (!OtherRefCountedValue) {
-      PtrToBottomUpState.blot(RefCountedValue);
+      PtrToBottomUpState.erase(RefCountedValue);
       continue;
     }
 
@@ -87,7 +87,7 @@ void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
     // of instructions which together semantically act as one ref count
     // increment. Merge the two states together.
     if (!RefCountState.merge(OtherRefCountState)) {
-      PtrToBottomUpState.blot(RefCountedValue);
+      PtrToBottomUpState.erase(RefCountedValue);
     }
   }
 }
@@ -123,7 +123,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
     // effect of an intersection.
     auto Other = PredRegionState.PtrToTopDownState.find(RefCountedValue);
     if (Other == PredRegionState.PtrToTopDownState.end()) {
-      PtrToTopDownState.blot(RefCountedValue);
+      PtrToTopDownState.erase(RefCountedValue);
       continue;
     }
 
@@ -132,7 +132,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
     // If the other ref count value was blotted, blot our value and continue.
     // This has the effect of an intersection.
     if (!OtherRefCountedValue) {
-      PtrToTopDownState.blot(RefCountedValue);
+      PtrToTopDownState.erase(RefCountedValue);
       continue;
     }
 
@@ -145,7 +145,7 @@ void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
     // ref counted value and continue.
     if (!RefCountState.merge(OtherRefCountState)) {
       DEBUG(llvm::dbgs() << "Failed to merge!\n");
-      PtrToTopDownState.blot(RefCountedValue);
+      PtrToTopDownState.erase(RefCountedValue);
       continue;
     }
   }

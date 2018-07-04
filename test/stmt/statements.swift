@@ -41,6 +41,11 @@ func funcdecl5(_ a: Int, y: Int) {
 
   1 = x        // expected-error {{cannot assign to a literal value}}
   (1) = x      // expected-error {{cannot assign to a literal value}}
+  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
+  1.0 = x               // expected-error {{cannot assign to a literal value}}
+  nil = 1               // expected-error {{cannot assign to a literal value}}
+
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
@@ -378,6 +383,13 @@ func test_guard(_ x : Int, y : Int??, cond : Bool) {
 
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
+
+  // SR-7567
+  guard let outer = y else {
+    guard true else {
+      print(outer) // expected-error {{variable declared in 'guard' condition is not usable in its body}}
+    }
+  }
 }
 
 func test_is_as_patterns() {

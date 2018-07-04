@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name protocols -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name protocols -enable-sil-ownership %s | %FileCheck %s
 
 //===----------------------------------------------------------------------===//
 // Calling Existential Subscripts
@@ -27,10 +27,10 @@ func use_subscript_rvalue_get(_ i : Int) -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*SubscriptableGet to $*[[OPENED:@opened(.*) SubscriptableGet]]
 // CHECK: [[ALLOCSTACK:%[0-9]+]] = alloc_stack $[[OPENED]]
 // CHECK: copy_addr [[PROJ]] to [initialization] [[ALLOCSTACK]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #SubscriptableGet.subscript!getter.1
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[METH]]<[[OPENED]]>(%0, [[ALLOCSTACK]])
 // CHECK-NEXT: destroy_addr [[ALLOCSTACK]]
-// CHECK-NEXT: end_access [[READ]] : $*SubscriptableGet
 // CHECK-NEXT: dealloc_stack [[ALLOCSTACK]] : $*[[OPENED]]
 // CHECK-NEXT: return [[RESULT]]
 
@@ -134,9 +134,9 @@ func use_property_rvalue_get() -> Int {
 // CHECK: [[PROJ:%[0-9]+]] = open_existential_addr immutable_access [[READ]] : $*PropertyWithGetter to $*[[OPENED:@opened(.*) PropertyWithGetter]]
 // CHECK: [[COPY:%.*]] = alloc_stack $[[OPENED]]
 // CHECK-NEXT: copy_addr [[PROJ]] to [initialization] [[COPY]] : $*[[OPENED]]
+// CHECK-NEXT: end_access [[READ]] : $*PropertyWithGetter
 // CHECK-NEXT: [[METH:%[0-9]+]] = witness_method $[[OPENED]], #PropertyWithGetter.a!getter.1
 // CHECK-NEXT: apply [[METH]]<[[OPENED]]>([[COPY]])
-// CHECK: end_access [[READ]] : $*PropertyWithGetter
 
 func use_property_lvalue_get() -> Int {
   return propertyGetSet.b
@@ -407,13 +407,14 @@ func modifyProperty<T : PropertyWithGetterSetter>(_ x: inout T) {
 // CHECK:      [[CALLBACK:%.*]] = tuple_extract [[RESULT]]
 // CHECK:      [[TEMPORARY_ADDR_TMP:%.*]] = pointer_to_address [[TEMPORARY]] : $Builtin.RawPointer to [strict] $*Int
 // CHECK:      [[TEMPORARY_ADDR:%.*]] = mark_dependence [[TEMPORARY_ADDR_TMP]] : $*Int on [[WRITE]] : $*T
+// CHECK:      [[TEMPORARY_ACCESS:%.*]] = begin_access [modify] [unsafe] [[TEMPORARY_ADDR]] : $*Int
 // CHECK:      [[MODIFY_FN:%.*]] = function_ref @$S9protocols6modifyyySizF
-// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ADDR]])
+// CHECK:      apply [[MODIFY_FN]]([[TEMPORARY_ACCESS]])
 // CHECK:      switch_enum [[CALLBACK]] : $Optional<Builtin.RawPointer>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
 // CHECK:    bb1([[CALLBACK_ADDR:%.*]] : @trivial $Builtin.RawPointer):
 // CHECK:      [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]]
 // CHECK:      [[METATYPE:%.*]] = metatype $@thick T.Type
-// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ADDR]] : $*Int to $Builtin.RawPointer
+// CHECK:      [[TEMPORARY:%.*]] = address_to_pointer [[TEMPORARY_ACCESS]] : $*Int to $Builtin.RawPointer
 // CHECK:      apply [[CALLBACK]]<T>
 
 public struct Val {
@@ -458,15 +459,3 @@ public func test(_ p: Proto) {
 // CHECK-LABEL: sil_witness_table hidden StructWithStoredClassProperty: PropertyWithGetter module protocols {
 // CHECK-NEXT:  method #PropertyWithGetter.a!getter.1: {{.*}} : @$S9protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSivgTW
 // CHECK-NEXT: }
-
-//
-// rdar://problem/37031037
-//
-
-protocol MethodWithDefaultArgGenerator {}
-extension MethodWithDefaultArgGenerator {
-  mutating func foo(_ x: Int = 0) {}
-}
-func invokeMethodWithDefaultArg(x: inout MethodWithDefaultArgGenerator) {
-  x.foo()
-}

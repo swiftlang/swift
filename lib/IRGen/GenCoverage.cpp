@@ -39,9 +39,9 @@ static std::string getCoverageSection(IRGenModule &IGM) {
 
 void IRGenModule::emitCoverageMapping() {
   std::vector<const SILCoverageMap *> Mappings;
-  for (const auto &M : getSILModule().getCoverageMapList())
-    if (M.hasSymtabEntry())
-      Mappings.push_back(&M);
+  for (const auto &M : getSILModule().getCoverageMaps())
+    if (M.second->hasSymtabEntry())
+      Mappings.push_back(M.second);
 
   // If there aren't any coverage maps, there's nothing to emit.
   if (Mappings.empty())

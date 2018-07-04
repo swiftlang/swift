@@ -46,19 +46,19 @@ extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *message) {
+static inline void CRSetCrashLogMessage(const char *message) {
   gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
 }
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static const char *CRGetCrashLogMessage() {
+static inline const char *CRGetCrashLogMessage() {
   return reinterpret_cast<const char *>(gCRAnnotations.message);
 }
 
 #else
 
 LLVM_ATTRIBUTE_ALWAYS_INLINE
-static void CRSetCrashLogMessage(const char *) {}
+static inline void CRSetCrashLogMessage(const char *) {}
 
 #endif
 
@@ -80,13 +80,6 @@ static inline void crash(const char *message) {
 
   LLVM_BUILTIN_TRAP;
   swift_runtime_unreachable("Expected compiler to crash.");
-}
-
-/// Report a corrupted type object.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static inline void _failCorruptType(const Metadata *type) {
-  swift::crash("Corrupt Swift type object");
 }
 
 // swift::fatalError() halts with a crash log message, 
@@ -167,7 +160,7 @@ struct RuntimeErrorDetails {
   uintptr_t framesToSkip;
 
   // Address of some associated object (if there's any).
-  void *memoryAddress;
+  const void *memoryAddress;
 
   // A structure describing an extra thread (and its stack) that is related.
   struct Thread {

@@ -43,10 +43,6 @@ extension CMTimeRange {
     return self.isValid && (self.duration == kCMTimeZero)
   }
 
-  public var end: CMTime {
-    return CMTimeRangeGetEnd(self)
-  }
-
   public func union(_ otherRange: CMTimeRange) -> CMTimeRange {
     return CMTimeRangeGetUnion(self, otherRange)
   }

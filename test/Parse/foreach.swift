@@ -8,7 +8,7 @@ struct IntRange<Int> : Sequence, IteratorProtocol {
   func makeIterator() -> IntRange<Int> { return self }
 }
 
-func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{did you mean 'r'?}}
+func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{'r' declared here}}
   var sum = 0
 
   // Simple foreach loop, using the variable in the body
@@ -16,7 +16,7 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{did you me
     sum = sum + i
   }
   // Check scoping of variable introduced with foreach loop
-  i = 0 // expected-error{{use of unresolved identifier 'i'}}
+  i = 0 // expected-error{{use of unresolved identifier 'i'; did you mean 'r'?}}
 
   // For-each loops with two variables and varying degrees of typedness
   for (i, j) in iir {

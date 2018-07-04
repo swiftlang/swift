@@ -40,3 +40,12 @@ extension HasDefaultImplementation {
   internal func foo() {}
 }
 internal class InternalBase {}
+
+open class ImplementsInternalProtocol {}
+
+protocol InternalProtocol {}
+extension InternalProtocol {
+  public var i: Int { return 1 }
+}
+
+extension ImplementsInternalProtocol : InternalProtocol {}

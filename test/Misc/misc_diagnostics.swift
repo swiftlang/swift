@@ -135,9 +135,9 @@ func test20770032() {
 
 
 
-func tuple_splat1(_ a : Int, _ b : Int) { // expected-note {{'tuple_splat1' declared here}}
+func tuple_splat1(_ a : Int, _ b : Int) { // expected-note 2 {{'tuple_splat1' declared here}}
   let x = (1,2)
-  tuple_splat1(x)          // expected-error {{passing 2 arguments to a callee as a single tuple value has been removed in Swift 3}}
+  tuple_splat1(x)          // expected-error {{missing argument for parameter #2 in call}}
   tuple_splat1(1, 2)       // Ok.
   tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
 }

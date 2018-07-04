@@ -47,7 +47,7 @@ private:
   void computePrintStatsOptions();
   void computeTBDOptions();
 
-  void setUnsignedIntegerArgument(options::ID optionID, unsigned max,
+  void setUnsignedIntegerArgument(options::ID optionID, unsigned radix,
                                   unsigned &valueToSet);
 
   bool setUpForSILOrLLVM();

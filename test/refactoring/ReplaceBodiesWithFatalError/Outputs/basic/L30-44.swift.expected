@@ -1,0 +1,71 @@
+var foo: Int = 0
+
+var bar: Int {
+    return 0
+}
+
+var qux: Int = 0 {
+    willSet { print("hi") }
+    didSet { print("bye") }
+}
+
+func generic<T>(_: T) -> Int {
+    return 0
+}
+
+class Foo {
+    var foo: Int
+
+    var bar: Int {
+        return 0
+    }
+
+    var baz: Int {
+        get { return 0 }
+        set { foo = newValue }
+    }
+
+    var qux: Int {
+        willSet { print("hi") }
+        didSet {
+fatalError()
+}
+    }
+
+    init() {
+fatalError()
+}
+
+    func nonGeneric() -> Int {
+fatalError()
+}
+
+    func generic<T>(_: T) -> Int {
+fatalError()
+}
+
+    deinit {
+        print("bye")
+    }
+}
+
+extension Foo {
+    func nonGeneric2() -> Int {
+        return 0
+    }
+
+    func generic2<T>(_: T) -> Int {
+        return 0
+    }
+}
+
+
+// FIXME: we should be able to run on the whole file.
+
+
+
+
+
+
+
+

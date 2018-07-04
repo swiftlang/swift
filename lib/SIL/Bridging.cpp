@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Module.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"

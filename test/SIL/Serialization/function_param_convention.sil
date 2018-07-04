@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-sil -sil-inline-threshold 0 %S/Inputs/function_param_convention_input.sil -o %t/FunctionInput.swiftmodule -emit-module -parse-as-library -parse-stdlib -module-name FunctionInput -O
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -I %t -linker %s -o - | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -I %t -performance-linker %s -o - | %FileCheck %s
 
 import Swift
 import FunctionInput

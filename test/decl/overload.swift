@@ -219,7 +219,9 @@ struct X6<T> {
 
 extension X6 {
   var k: Int { return 0 } // expected-note{{previously declared here}}
-  func k() // expected-error{{invalid redeclaration of 'k()'}}
+  func k()
+  // expected-error@-1{{invalid redeclaration of 'k()'}}
+  // expected-error@-2{{expected '{' in body of function declaration}}
 }
 
 // Subscripting
@@ -446,8 +448,8 @@ struct SR7249<T> {
 }
 
 extension SR7249 {
-  var x: Int { fatalError() } // expected-error{{invalid redeclaration of 'x'}}
-  var y: T { fatalError() } // expected-error{{invalid redeclaration of 'y'}}
+  var x: Int { fatalError() } // expected-warning{{redeclaration of 'x' is deprecated and will be an error in Swift 5}}
+  var y: T { fatalError() } // expected-warning{{redeclaration of 'y' is deprecated and will be an error in Swift 5}}
   var z: Int { fatalError() } // expected-error{{invalid redeclaration of 'z'}}
 }
 

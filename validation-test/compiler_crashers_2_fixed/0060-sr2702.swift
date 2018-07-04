@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir
-// RUN: %target-swift-frontend %s -emit-ir -O
+// RUN: %target-swift-frontend %s -emit-ir -swift-version 3
+// RUN: %target-swift-frontend %s -emit-ir -O -swift-version 3
 
 // REQUIRES: objc_interop
 

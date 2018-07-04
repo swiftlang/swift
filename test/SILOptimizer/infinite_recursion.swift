@@ -78,6 +78,8 @@ class S {
       b()
     } while (i > 5)
   }
+
+  var bar: String = "hi!"
 }
 
 class T: S {
@@ -88,6 +90,15 @@ class T: S {
       i += 1
       super.b()
     } while (i > 5)
+  }
+
+  override var bar: String {
+    get {
+      return super.bar
+    }
+    set { // expected-warning {{all paths through this function will call itself}}
+      self.bar = newValue
+    }
   }
 }
 

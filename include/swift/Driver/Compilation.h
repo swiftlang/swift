@@ -40,6 +40,9 @@ namespace opt {
 
 namespace swift {
   class DiagnosticEngine;
+  namespace sys {
+    class TaskQueue;
+  }
 
 namespace driver {
   class Driver;
@@ -72,6 +75,11 @@ enum class PreserveOnSignal : bool {
 
 class Compilation {
   friend class PerformJobsState;
+
+public:
+  /// The filelist threshold value to pass to ensure file lists are never used
+  static const size_t NEVER_USE_FILELIST = SIZE_MAX;
+
 private:
   /// The DiagnosticEngine to which this Compilation should emit diagnostics.
   DiagnosticEngine &Diags;
@@ -141,17 +149,6 @@ private:
   /// If unknown, this will be some time in the past.
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
 
-  /// The number of commands which this compilation should attempt to run in
-  /// parallel.
-  unsigned NumberOfParallelCommands;
-
-  /// Indicates whether this Compilation should use skip execution of
-  /// subtasks during performJobs() by using a dummy TaskQueue.
-  ///
-  /// \note For testing purposes only; similar user-facing features should be
-  /// implemented separately, as the dummy TaskQueue may provide faked output.
-  bool SkipTaskExecution;
-
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
   bool ContinueBuildingAfterErrors = false;
@@ -160,25 +157,36 @@ private:
   /// of date.
   bool EnableIncrementalBuild;
 
+  /// When true, emit duplicated compilation record file whose filename is
+  /// suffixed with '~moduleonly'.
+  ///
+  /// This compilation record is used by '-emit-module'-only incremental builds
+  /// so that module-only builds do not affect compilation record file for
+  /// normal builds, while module-only incremental builds are able to use
+  /// artifacts of normal builds if they are already up to date.
+  bool OutputCompilationRecordForModuleOnlyBuild = false;
+
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
   /// redundant work.
-  bool EnableBatchMode;
+  const bool EnableBatchMode;
 
   /// Provides a randomization seed to batch-mode partitioning, for debugging.
-  unsigned BatchSeed;
+  const unsigned BatchSeed;
+
+  /// Overrides parallelism level as count of batches, if in batch-mode.
+  const Optional<unsigned> BatchCount;
 
   /// In order to test repartitioning, set to true if
-  /// -driver-force-one-batch-repartition is present. This is cleared after the
-  /// forced repartition happens.
-  bool ForceOneBatchRepartition = false;
+  /// -driver-force-one-batch-repartition is present.
+  const bool ForceOneBatchRepartition = false;
 
   /// True if temporary files should not be deleted.
-  bool SaveTemps;
+  const bool SaveTemps;
 
   /// When true, dumps information on how long each compilation task took to
   /// execute.
-  bool ShowDriverTimeCompilation;
+  const bool ShowDriverTimeCompilation;
 
   /// When non-null, record various high-level counters to this.
   std::unique_ptr<UnifiedStatsReporter> Stats;
@@ -194,6 +202,10 @@ private:
   /// When true, some frontend job has requested permission to pass
   /// -emit-loaded-module-trace, so no other job needs to do it.
   bool PassedEmitLoadedModuleTraceToFrontendJob = false;
+
+  /// The limit for the number of files to pass on the command line. Beyond this
+  /// limit filelists will be used.
+  size_t FilelistThreshold;
 
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
@@ -211,13 +223,16 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
+              std::string CompilationRecordPath,
+              bool OutputCompilationRecordForModuleOnlyBuild,
               StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
-              unsigned NumberOfParallelCommands = 1,
+              llvm::sys::TimePoint<> LastBuildTime,
+              size_t FilelistThreshold,
               bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
+              Optional<unsigned> BatchCount = None,
               bool ForceOneBatchRepartition = false,
-              bool SkipTaskExecution = false,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr);
@@ -264,10 +279,6 @@ public:
     return DerivedOutputFileMap;
   }
 
-  unsigned getNumberOfParallelCommands() const {
-    return NumberOfParallelCommands;
-  }
-
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
@@ -296,13 +307,12 @@ public:
     ShowJobLifecycle = value;
   }
 
-  void setCompilationRecordPath(StringRef path) {
-    assert(CompilationRecordPath.empty() && "already set");
-    CompilationRecordPath = path;
+  size_t getFilelistThreshold() const {
+    return FilelistThreshold;
   }
 
-  void setLastBuildTime(llvm::sys::TimePoint<> time) {
-    LastBuildTime = time;
+  UnifiedStatsReporter *getStatsReporter() const {
+    return Stats.get();
   }
 
   /// Requests the path to a file containing all input source files. This can
@@ -315,9 +325,12 @@ public:
   const char *getAllSourcesPath() const;
 
   /// Asks the Compilation to perform the Jobs which it knows about.
+  ///
+  /// \param TQ The TaskQueue used to schedule jobs for execution.
+  ///
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
-  int performJobs();
+  int performJobs(std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// Returns whether the callee is permitted to pass -emit-loaded-module-trace
   /// to a frontend job.
@@ -340,10 +353,11 @@ private:
   ///
   /// \param[out] abnormalExit Set to true if any job exits abnormally (i.e.
   /// crashes).
+  /// \param TQ The task queue on which jobs will be scheduled.
   ///
   /// \returns exit code of the first failed Job, or 0 on success. If a Job
   /// crashes during execution, a negative value will be returned.
-  int performJobsImpl(bool &abnormalExit);
+  int performJobsImpl(bool &abnormalExit, std::unique_ptr<sys::TaskQueue> &&TQ);
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///

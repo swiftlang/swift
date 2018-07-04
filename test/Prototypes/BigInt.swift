@@ -712,7 +712,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       return 0
     }
 
-    let i = _data.index(where: { $0 != 0 })!
+    let i = _data.firstIndex(where: { $0 != 0 })!
     _sanityCheck(_data[i] != 0)
     return i * Word.bitWidth + _data[i].trailingZeroBitCount
   }

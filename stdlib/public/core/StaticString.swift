@@ -167,7 +167,6 @@ public struct StaticString
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(
     _start: Builtin.RawPointer,
@@ -185,7 +184,6 @@ public struct StaticString
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(
     unicodeScalar: Builtin.Int32
@@ -198,7 +196,7 @@ public struct StaticString
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
     self = StaticString(unicodeScalar: value)
@@ -209,14 +207,14 @@ public struct StaticString
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string with a Unicode scalar.
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(unicodeScalarLiteral value: StaticString) {
     self = value
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
@@ -236,14 +234,14 @@ public struct StaticString
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using an extended grapheme cluster.
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(extendedGraphemeClusterLiteral value: StaticString) {
     self = value
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(
     _builtinStringLiteral start: Builtin.RawPointer,
@@ -261,7 +259,7 @@ public struct StaticString
   /// Do not call this initializer directly. It may be used by the compiler
   /// when you initialize a static string using a string literal.
   @inlinable // FIXME(sil-serialize-all)
-  @effects(readonly)
+  @_effects(readonly)
   @_transparent
   public init(stringLiteral value: StaticString) {
     self = value
@@ -274,20 +272,18 @@ public struct StaticString
       if isASCII {
         return String._fromASCII(buffer)
       } else {
-        return String._fromWellFormedUTF8CodeUnitSequence(buffer)
+        return String._fromWellFormedUTF8(buffer)
       }
     }
   }
 
   /// A textual representation of the static string, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return self.description.debugDescription
   }
 }
 
 extension StaticString {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     return Mirror(reflecting: description)
   }

@@ -135,6 +135,9 @@ let tests = [
   ComparisonTest(.eq, "\u{0301}", "\u{0341}"),
   ComparisonTest(.lt, "\u{0301}", "\u{0954}"),
   ComparisonTest(.lt, "\u{0341}", "\u{0954}"),
+
+  // (U+212A KELVIN SIGN) normalizes to ASCII "K"
+  ComparisonTest(.eq, "K", "\u{212A}"),
 ]
 
 func checkStringComparison(

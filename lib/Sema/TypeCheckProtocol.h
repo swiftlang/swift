@@ -115,13 +115,12 @@ struct InferredAssociatedTypesByWitness {
 
 /// The set of witnesses that were considered when attempting to
 /// infer associated types.
-typedef SmallVector<InferredAssociatedTypesByWitness, 2>
-  InferredAssociatedTypesByWitnesses;
+using InferredAssociatedTypesByWitnesses =
+    SmallVector<InferredAssociatedTypesByWitness, 2>;
 
 /// A mapping from requirements to the set of matches with witnesses.
-typedef SmallVector<std::pair<ValueDecl *,
-                              InferredAssociatedTypesByWitnesses>, 4>
-  InferredAssociatedTypes;
+using InferredAssociatedTypes =
+    SmallVector<std::pair<ValueDecl *, InferredAssociatedTypesByWitnesses>, 4>;
 
 /// A potential solution to the set of inferred type witnesses.
 struct InferredTypeWitnessesSolution {
@@ -369,7 +368,7 @@ struct RequirementMatch {
 
   /// Substitutions mapping the type of the witness to the requirement
   /// environment.
-  SmallVector<Substitution, 2> WitnessSubstitutions;
+  SubstitutionMap WitnessSubstitutions;
 
   /// \brief Determine whether this match is viable.
   bool isViable() const {
@@ -816,8 +815,8 @@ private:
 public:
   /// Describes a mapping from associated type declarations to their
   /// type witnesses (as interface types).
-  typedef std::vector<std::pair<AssociatedTypeDecl *, Type>>
-    InferredTypeWitnesses;
+  using InferredTypeWitnesses =
+      std::vector<std::pair<AssociatedTypeDecl *, Type>>;
 
   /// Perform associated type inference.
   ///
@@ -831,14 +830,14 @@ public:
 RequirementMatch matchWitness(
              TypeChecker &tc,
              DeclContext *dc, ValueDecl *req, ValueDecl *witness,
-             const std::function<
+             llvm::function_ref<
                      std::tuple<Optional<RequirementMatch>, Type, Type>(void)>
-               &setup,
-             const std::function<Optional<RequirementMatch>(Type, Type)>
-               &matchTypes,
-             const std::function<
+               setup,
+             llvm::function_ref<Optional<RequirementMatch>(Type, Type)>
+               matchTypes,
+             llvm::function_ref<
                      RequirementMatch(bool, ArrayRef<OptionalAdjustment>)
-                   > &finalize);
+                   > finalize);
 
 RequirementMatch matchWitness(TypeChecker &tc,
                               ProtocolDecl *proto,

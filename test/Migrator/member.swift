@@ -6,5 +6,6 @@ import Bar
 
 func foo(_ b: BarForwardDeclaredClass, _ s: SomeItemSet) -> Int32 {
   let _ = s.theSimpleOldName
+  let _ = s.theSimpleOldNameNotToRename
   return barGlobalVariable
 }

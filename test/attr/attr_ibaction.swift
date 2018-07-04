@@ -5,6 +5,11 @@
 @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
 var iboutlet_global: Int
 
+var iboutlet_accessor: Int {
+  @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{3-13=}}
+  get { return 42 }
+}
+
 @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}
 class IBOutletClassTy {}
 @IBAction // expected-error {{@IBAction may only be used on 'func' declarations}} {{1-11=}}

@@ -642,7 +642,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
                                             OrigFTI->getGenericSignature());
         paramTy = boxTy->getFieldType(Orig->getModule(), 0);
       }
-      auto promotedParam = SILParameterInfo(paramTy.getSwiftRValueType(),
+      auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
       ClonedInterfaceArgTys.push_back(promotedParam);
     } else {
@@ -871,7 +871,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
   SILValue FunctionRef = Builder.createFunctionRef(PartialApply->getLoc(),
                                                    ClonedFn);
   return Builder.createPartialApply(
-      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutions(),
+      PartialApply->getLoc(), FunctionRef, PartialApply->getSubstitutionMap(),
       Args,
       PartialApply->getType().getAs<SILFunctionType>()->getCalleeConvention());
 }

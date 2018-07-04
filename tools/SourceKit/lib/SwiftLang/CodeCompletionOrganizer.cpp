@@ -1212,6 +1212,7 @@ void CompletionBuilder::getFilterName(CodeCompletionString *str,
       case ChunkKind::Whitespace:
       case ChunkKind::Ellipsis:
       case ChunkKind::Ampersand:
+      case ChunkKind::OptionalMethodCallTail:
         continue;
       case ChunkKind::CallParameterColon:
         // Since we don't add the type, also don't add the space after ':'.

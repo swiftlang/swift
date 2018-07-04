@@ -25,6 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/FormatVariadic.h"
 #include <fstream>
 #include <unistd.h>
 #include <sys/param.h>
@@ -100,10 +101,12 @@ static SourceKitRequest ActiveRequest = SourceKitRequest::None;
 static sourcekitd_uid_t SemaDiagnosticStage;
 
 static sourcekitd_uid_t NoteDocUpdate;
-
 static SourceKit::Semaphore semaSemaphore(0);
 static sourcekitd_response_t semaResponse;
 static const char *semaName;
+
+static sourcekitd_uid_t NoteTest;
+static SourceKit::Semaphore noteSyncSemaphore(0);
 
 namespace {
 struct AsyncResponseInfo {
@@ -138,6 +141,33 @@ struct NotificationBuffer {
 };
 static NotificationBuffer notificationBuffer;
 
+static void syncNotificationsWithService() {
+  // Send TestNotification request, then wait for the notification. This ensures
+  // that all notifications previously posted on the service side have been
+  // passed to our notification handler.
+  sourcekitd_object_t req = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(req, KeyRequest, RequestTestNotification);
+  auto resp = sourcekitd_send_request_sync(req);
+  if (sourcekitd_response_is_error(resp)) {
+    sourcekitd_response_description_dump(resp);
+    exit(1);
+  }
+  sourcekitd_response_dispose(resp);
+  sourcekitd_request_release(req);
+  if (noteSyncSemaphore.wait(60 * 1000)) {
+    llvm::report_fatal_error("Test notification not received");
+  }
+}
+
+static void printBufferedNotifications(bool syncWithService = true) {
+  if (syncWithService) {
+    syncNotificationsWithService();
+  }
+  notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
+    sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
+  });
+}
+
 static int skt_main(int argc, const char **argv);
 
 int main(int argc, const char **argv) {
@@ -164,6 +194,7 @@ static int skt_main(int argc, const char **argv) {
   SemaDiagnosticStage = sourcekitd_uid_get_from_cstr("source.diagnostic.stage.swift.sema");
 
   NoteDocUpdate = sourcekitd_uid_get_from_cstr("source.notification.editor.documentupdate");
+  NoteTest = sourcekitd_uid_get_from_cstr("source.notification.test");
 
 #define REQUEST(NAME, CONTENT) Request##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
 #define KIND(NAME, CONTENT) Kind##NAME = sourcekitd_uid_get_from_cstr(CONTENT);
@@ -171,12 +202,6 @@ static int skt_main(int argc, const char **argv) {
 
 #define REFACTORING(KIND, NAME, ID) Kind##Refactoring##KIND = sourcekitd_uid_get_from_cstr("source.refactoring.kind."#ID);
 #include "swift/IDE/RefactoringKinds.def"
-
-  auto printBufferedNotifications = []{
-    notificationBuffer.handleNotifications([](sourcekitd_response_t note) {
-      sourcekitd_response_description_dump_filedesc(note, STDOUT_FILENO);
-    });
-  };
 
   // A test invocation may initialize the options to be used for subsequent
   // invocations.
@@ -195,7 +220,6 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_shutdown();
       return ret;
     }
-    printBufferedNotifications();
     Args = Args.slice(i+1);
   }
 
@@ -274,7 +298,35 @@ static bool readPopularAPIList(StringRef filename,
   return false;
 }
 
-static int handleJsonRequestPath(StringRef QueryPath) {
+namespace {
+class PrintingTimer {
+  std::string desc;
+  llvm::sys::TimePoint<> start;
+  llvm::raw_ostream &OS;
+public:
+  PrintingTimer(std::string desc, llvm::raw_ostream &OS = llvm::errs())
+      : desc(std::move(desc)), start(std::chrono::system_clock::now()), OS(OS) {
+  }
+  ~PrintingTimer() {
+    std::chrono::duration<float, std::milli> delta(
+        std::chrono::system_clock::now() - start);
+    OS << desc << ": " << llvm::formatv("{0:ms+f3}", delta) << "\n";
+  }
+};
+}
+
+/// Wrapper for sourcekitd_send_request_sync that handles printing options.
+static sourcekitd_response_t sendRequestSync(sourcekitd_object_t req,
+                                             const TestOptions &opts) {
+  if (opts.PrintRequest)
+    sourcekitd_request_description_dump(req);
+  Optional<PrintingTimer> timer;
+  if (opts.timeRequest)
+    timer.emplace("request time");
+  return sourcekitd_send_request_sync(req);
+}
+
+static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
   auto Buffer = getBufferForFilename(QueryPath)->getBuffer();
   char *Err = nullptr;
   auto Req = sourcekitd_request_create_from_yaml(Buffer.data(), &Err);
@@ -284,12 +336,16 @@ static int handleJsonRequestPath(StringRef QueryPath) {
     free(Err);
     return 1;
   }
-  sourcekitd_request_description_dump(Req);
-  sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
   auto Error = sourcekitd_response_is_error(Resp);
-  sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  if (Opts.PrintResponse) {
+    sourcekitd_response_description_dump_filedesc(Resp, STDOUT_FILENO);
+  }
   return Error ? 1 : 0;
 }
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
                                 TestOptions &InitOpts) {
@@ -305,11 +361,25 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
   if (Opts.parseArgs(Args.slice(0, Optargc)))
     return 1;
 
-  if (!Opts.JsonRequestPath.empty())
-    return handleJsonRequestPath(Opts.JsonRequestPath);
-
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  assert(Opts.repeatRequest >= 1);
+  for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
+    if (int ret = handleTestInvocation(Opts, InitOpts)) {
+      printBufferedNotifications(/*syncWithService=*/true);
+      return ret;
+    }
+    // We will sync with the service before exiting; don't do so here.
+    printBufferedNotifications(/*syncWithService=*/false);
+  }
+  return 0;
+}
+
+static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+
+  if (!Opts.JsonRequestPath.empty())
+    return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 
   if (Opts.Request == SourceKitRequest::DemangleNames ||
       Opts.Request == SourceKitRequest::MangleSimpleClasses)
@@ -526,7 +596,7 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
         }
         StringRef AllArgs = Text.substr(ArgStart + 1, ArgEnd - ArgStart - 1);
         AllArgs.split(ArgPieces, ':');
-        if (!Args.empty()) {
+        if (!ArgPieces.empty()) {
           if (!ArgPieces.back().empty()) {
             llvm::errs() << "Swift name is malformed.\n";
             return 1;
@@ -804,11 +874,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     }
   }
 
-  if (Opts.PrintRequest)
-    sourcekitd_request_description_dump(Req);
 
   if (!Opts.isAsyncRequest) {
-    sourcekitd_response_t Resp = sourcekitd_send_request_sync(Req);
+    sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
     sourcekitd_request_release(Req);
     return handleResponse(Resp, Opts, SourceFile, std::move(SourceBuf),
                           &InitOpts)
@@ -822,6 +890,9 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     info.sourceBuffer = std::move(SourceBuf);
     unsigned respIndex = asyncResponses.size();
     asyncResponses.push_back(std::move(info));
+
+    if (Opts.PrintRequest)
+      sourcekitd_request_description_dump(Req);
 
     sourcekitd_send_request(Req, nullptr, ^(sourcekitd_response_t resp) {
       auto &info = asyncResponses[respIndex];
@@ -848,6 +919,8 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
   if (IsError) {
     sourcekitd_response_description_dump(Resp);
 
+  } else if (!Opts.PrintResponse) {
+    // Nothing.
   } else if (Opts.PrintResponseAsJSON) {
     sourcekitd_variant_t Info = sourcekitd_response_get_value(Resp);
     char *json = sourcekitd_variant_json_description_copy(Info);
@@ -988,7 +1061,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
         sourcekitd_request_dictionary_set_int64(EdReq, KeySyntacticOnly,
                                                 !Opts.UsedSema);
 
-        sourcekitd_response_t EdResp = sourcekitd_send_request_sync(EdReq);
+        sourcekitd_response_t EdResp = sendRequestSync(EdReq, Opts);
         sourcekitd_response_description_dump_filedesc(EdResp, STDOUT_FILENO);
         sourcekitd_response_dispose(EdResp);
         sourcekitd_request_release(EdReq);
@@ -1023,7 +1096,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
           sourcekitd_request_release(FO);
         }
 
-        sourcekitd_response_t FmtResp = sourcekitd_send_request_sync(Fmt);
+        sourcekitd_response_t FmtResp = sendRequestSync(Fmt, Opts);
         sourcekitd_response_description_dump_filedesc(FmtResp, STDOUT_FILENO);
         sourcekitd_response_dispose(FmtResp);
         sourcekitd_request_release(Fmt);
@@ -1121,6 +1194,8 @@ static void notification_receiver(sourcekitd_response_t resp) {
     semaResponse = sourcekitd_send_request_sync(edReq);
     sourcekitd_request_release(edReq);
     semaSemaphore.signal();
+  } else if (note == NoteTest) {
+    noteSyncSemaphore.signal();
   } else {
     notificationBuffer.add(resp);
   }
@@ -1663,10 +1738,13 @@ static void prepareDemangleRequest(sourcekitd_object_t Req,
     llvm::StringRef inputContents = input.get()->getBuffer();
 
     // This doesn't handle Unicode symbols, but maybe that's okay.
-    llvm::Regex maybeSymbol("(_T|" MANGLING_PREFIX_STR ")[_a-zA-Z0-9$]+");
+    // Also accept the future mangling prefix.
+    llvm::Regex maybeSymbol("(_T|_?\\$[Ss])[_a-zA-Z0-9$.]+");
     llvm::SmallVector<llvm::StringRef, 1> matches;
     while (maybeSymbol.match(inputContents, &matches)) {
       addName(matches.front());
+      auto offset = matches.front().data() - inputContents.data();
+      inputContents = inputContents.substr(offset + matches.front().size());
     }
 
   } else {

@@ -5,3 +5,6 @@
 
 @interface ObjC2: NSObject
 @end
+
+@protocol ObjCProtocol
+@end

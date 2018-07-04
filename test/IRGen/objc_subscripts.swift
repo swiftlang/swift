@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
-// REQUIRES: objc_interop
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_subscripts10SomeObject = 
 // CHECK:   private constant { i32, i32, [5 x { i8*, i8*, i8* }] } 
@@ -34,10 +33,10 @@
 // CHECK:       { i8*, i8*, i8* } 
 // CHECK:         { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @{{[0-9]+}}, i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @"$S15objc_subscripts10SomeObjectCACycfcTo" to i8*) }
 // CHECK:    ]
-// CHECK:  }, section "__DATA, __objc_const", align 8
+// CHECK:  }
 
 @objc class SomeObject {
-  subscript (i : Int) -> SomeObject {
+  @objc subscript (i : Int) -> SomeObject {
     // CHECK: define internal [[OPAQUE0:%.*]]* @"$S15objc_subscripts10SomeObjectCyACSicigTo"([[OPAQUE1]]*, i8*, i64) unnamed_addr
     get {
       // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @"$S15objc_subscripts10SomeObjectCyACSicig"
@@ -50,7 +49,7 @@
     }
   }
 
-  subscript (s : SomeObject) -> Int {
+  @objc subscript (s : SomeObject) -> Int {
   // CHECK-LABEL: define internal i64 @"$S15objc_subscripts10SomeObjectCySiACcigTo"
     get {
       // CHECK: call swiftcc i64 @"$S15objc_subscripts10SomeObjectCySiACcig"
@@ -62,5 +61,7 @@
       // CHECK: call swiftcc void @"$S15objc_subscripts10SomeObjectCySiACcis"
     }
   }
+
+  @objc init() {}
 }
 

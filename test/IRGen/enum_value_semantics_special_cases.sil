@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -134,7 +134,8 @@ enum MultipleEmptyRefcounted {
 // CHECK:   %2 = load i64, i64* %1, align 8
 // CHECK:   switch i64 %2, label %3 [
 // CHECK:     i64 0, label %5
-// CHECK:     i64 2, label %5
+// CHECK-native:   i64 1, label %5
+// CHECK-objc:     i64 2, label %5
 // CHECK:   ]
 // CHECK: ; <label>:3:                                      ; preds = %entry
 // CHECK:   %4 = bitcast %T34enum_value_semantics_special_cases23MultipleEmptyRefcountedO* %0 to %swift.refcounted**

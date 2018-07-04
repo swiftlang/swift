@@ -708,8 +708,7 @@
 // CHECK: CAPTURE DESCRIPTORS:
 // CHECK: ====================
 // CHECK: - Capture types:
-// CHECK: (sil_box
-// CHECK:   (generic_type_parameter depth=0 index=0))
+// CHECK: (builtin Builtin.NativeObject)
 // CHECK: - Metadata sources:
 // CHECK: (generic_type_parameter depth=0 index=0)
 // CHECK: (closure_binding index=0)

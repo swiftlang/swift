@@ -46,7 +46,7 @@ extension RangeReplaceableCollection {
 
 extension RangeReplaceableCollection where Self: MutableCollection {
   mutating func removeWhere_move(where match: (Element) throws -> Bool) rethrows  {
-    guard var i = try index(where: match) else { return }
+    guard var i = try firstIndex(where: match) else { return }
 
     var j = index(after: i)
     while j != endIndex {
@@ -62,7 +62,7 @@ extension RangeReplaceableCollection where Self: MutableCollection {
   }
 
   mutating func removeWhere_swap(where match: (Element) throws -> Bool) rethrows {
-    guard var i = try index(where: match) else { return }
+    guard var i = try firstIndex(where: match) else { return }
 
     var j = index(after: i)
     while j != endIndex {

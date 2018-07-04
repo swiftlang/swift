@@ -60,6 +60,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
+    Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
@@ -78,6 +82,8 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.WarnLongExpressionTypeChecking);
   setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ, 10,
                              Opts.SolverExpressionTimeThreshold);
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
+                             Opts.SwitchCheckingInvocationThreshold);
 
   Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
@@ -212,10 +218,10 @@ void ArgsToFrontendOptionsConverter::computeTBDOptions() {
 }
 
 void ArgsToFrontendOptionsConverter::setUnsignedIntegerArgument(
-    options::ID optionID, unsigned max, unsigned &valueToSet) {
+    options::ID optionID, unsigned radix, unsigned &valueToSet) {
   if (const Arg *A = Args.getLastArg(optionID)) {
     unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(max, attempt)) {
+    if (StringRef(A->getValue()).getAsInteger(radix, attempt)) {
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     } else {

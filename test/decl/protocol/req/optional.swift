@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 // -----------------------------------------------------------------------
 // Declaring optional requirements
@@ -113,9 +113,8 @@ extension C6 : P1 {
 }
 
 @objc class C8 : P2 { // expected-note{{class 'C8' declares conformance to protocol 'P2' here}}
-  func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
-  // expected-note@-1{{add '@nonobjc' to silence this error}}{{3-3=@nonobjc }}
-  // expected-note@-2{{rename method to match requirement 'method(y:)'}}{{8-18=method}}{{19-22=y}}{{none}}
+  @objc func objcMethod(int x: Int) { } // expected-error{{Objective-C method 'objcMethodWithInt:' provided by method 'objcMethod(int:)' conflicts with optional requirement method 'method(y:)' in protocol 'P2'}}
+  // expected-note@-1{{rename method to match requirement 'method(y:)'}}{{14-24=method}}{{25-28=y}}{{none}}
 }
 
 

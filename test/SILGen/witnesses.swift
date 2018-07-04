@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-frontend -module-name witnesses -Xllvm -sil-full-demangle -emit-silgen %s -disable-objc-attr-requires-foundation-module -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name witnesses -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-sil-ownership | %FileCheck %s
 
-infix operator <~> {}
+infix operator <~>
 
 func archetype_method<T: X>(x: T, y: T) -> T {
   var x = x
@@ -520,8 +520,8 @@ protocol EscapingReq {
 
 // CHECK-LABEL: sil private [transparent] [thunk] @$S9witnesses18EscapingCovarianceVAA0B3ReqA2aDP1fyyS2icFTW : $@convention(witness_method: EscapingReq) (@guaranteed @callee_guaranteed (Int) -> Int, @in_guaranteed EscapingCovariance) -> ()
 // CHECK-NOT: return
-// CHECK: [[COPIED:%.*]] = copy_value %0
-// CHECK: convert_escape_to_noescape [[COPIED]]
+// CHECK: convert_escape_to_noescape [not_guaranteed] %0
+// CHECK: return
 struct EscapingCovariance: EscapingReq {
   func f(_: (Int) -> Int) { }
 }

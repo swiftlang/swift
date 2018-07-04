@@ -29,7 +29,7 @@ extension TestStruct {
   func doTheThing() {} // expected-note {{'doTheThing()' was introduced in Swift 400}}
 }
 
-@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+@available(swift 400) // FIXME: This has no effect and should be complained about.
 extension TestStruct {
   func doAnotherThing() {}
 }
@@ -40,10 +40,10 @@ func testMemberAvailability() {
   TestStruct().doAnotherThing() // okay (for now)
 }
 
-@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+@available(swift 400) // FIXME: This has no effect and should be complained about.
 @available(macOS 10.11, *)
 extension TestStruct {}
 
 @available(macOS 10.11, *)
-@available(swift 400) // expected-warning {{'@available' without an OS is ignored on extensions; apply the attribute to each member instead}} {{1-23=}}
+@available(swift 400) // FIXME: This has no effect and should be complained about.
 extension TestStruct {}

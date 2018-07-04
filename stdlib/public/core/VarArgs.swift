@@ -32,6 +32,11 @@
 /// arguments. C functions that use the `...` syntax for variadic arguments
 /// are not imported, and therefore can't be called using `CVarArg` arguments.
 ///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
+///
 /// - Note: Declaring conformance to the `CVarArg` protocol for types defined
 ///   outside the standard library is not supported.
 public protocol CVarArg {
@@ -88,10 +93,14 @@ internal let _registerSaveWords = _countGPRegisters
 #endif
 
 #if arch(s390x)
+@usableFromInline
 internal typealias _VAUInt = CUnsignedLongLong
+@usableFromInline
 internal typealias _VAInt  = Int64
 #else
+@usableFromInline
 internal typealias _VAUInt = CUnsignedInt
+@usableFromInline
 internal typealias _VAInt  = Int32
 #endif
 
@@ -101,6 +110,11 @@ internal typealias _VAInt  = Int32
 /// The pointer passed as an argument to `body` is valid only during the
 /// execution of `withVaList(_:_:)`. Do not store or return the pointer for
 /// later use.
+///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
 ///
 /// - Parameters:
 ///   - args: An array of arguments to convert to a C `va_list` pointer.
@@ -122,7 +136,6 @@ public func withVaList<R>(_ args: [CVarArg],
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 internal func _withVaList<R>(
   _ builder: _VaListBuilder,
   _ body: (CVaListPointer) -> R
@@ -143,6 +156,11 @@ internal func _withVaList<R>(
 /// You should prefer `withVaList(_:_:)` instead of this function. In some
 /// uses, such as in a `class` initializer, you may find that the language
 /// rules do not allow you to use `withVaList(_:_:)` as intended.
+///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
 ///
 /// - Parameter args: An array of arguments to convert to a C `va_list`
 ///   pointer.
@@ -377,7 +395,6 @@ final internal class _VaListBuilder {
   @usableFromInline
   internal struct Header {
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init() {}
 
     @usableFromInline // FIXME(sil-serialize-all)
@@ -392,18 +409,15 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {
     // prepare the register save area
     storage = ContiguousArray(repeating: 0, count: _registerSaveWords)
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func append(_ arg: CVarArg) {
     var encoded = arg._cVarArgEncoding
 
@@ -445,7 +459,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func va_list() -> CVaListPointer {
     header.reg_save_area = storage._baseAddress
     header.overflow_arg_area
@@ -476,11 +489,9 @@ final internal class _VaListBuilder {
 final internal class _VaListBuilder {
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init() {}
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func append(_ arg: CVarArg) {
     // Write alignment padding if necessary.
     // This is needed on architectures where the ABI alignment of some
@@ -521,7 +532,6 @@ final internal class _VaListBuilder {
   // FIXME: this should be packaged into a better storage type
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func appendWords(_ words: [Int]) {
     let newCount = count + words.count
     if newCount > allocated {
@@ -548,7 +558,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func rawSizeAndAlignment(
     _ wordCount: Int
   ) -> (Builtin.Word, Builtin.Word) {
@@ -557,7 +566,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal func allocStorage(wordCount: Int) -> UnsafeMutablePointer<Int> {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
@@ -574,7 +582,6 @@ final internal class _VaListBuilder {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   deinit {
     if let allocatedStorage = storage {
       deallocStorage(wordCount: allocated, storage: allocatedStorage)

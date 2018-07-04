@@ -36,9 +36,7 @@ namespace swift {
   class DeclName;
 
   /// \brief Typecheck a declaration parsed during code completion.
-  ///
-  /// \returns true on success, false on error.
-  bool typeCheckCompletionDecl(Decl *D);
+  void typeCheckCompletionDecl(Decl *D);
 
   /// \brief Check if T1 is convertible to T2.
   ///
@@ -147,8 +145,8 @@ namespace swift {
     bool IsSynthesized;
   };
 
-  typedef llvm::function_ref<void(ArrayRef<ExtensionInfo>)>
-      ExtensionGroupOperation;
+  using ExtensionGroupOperation =
+      llvm::function_ref<void(ArrayRef<ExtensionInfo>)>;
 
   class SynthesizedExtensionAnalyzer {
     struct Implementation;

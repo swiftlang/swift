@@ -314,9 +314,6 @@ extension Unicode.UTF8 : UnicodeCodec {
   }
 }
 
-// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF8")
-public typealias UTF8 = Unicode.UTF8
-
 /// A codec for translating between Unicode scalar values and UTF-16 code
 /// units.
 extension Unicode.UTF16 : UnicodeCodec {
@@ -384,7 +381,6 @@ extension Unicode.UTF16 : UnicodeCodec {
   /// units it spanned in the input.  This function may consume more code
   /// units than required for this scalar.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal mutating func _decodeOne<I : IteratorProtocol>(
     _ input: inout I
   ) -> (UnicodeDecodingResult, Int) where I.Element == CodeUnit {
@@ -429,8 +425,6 @@ extension Unicode.UTF16 : UnicodeCodec {
     processCodeUnit(UInt16(truncatingIfNeeded: s))
   }
 }
-// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF16")
-public typealias UTF16 = Unicode.UTF16
 
 /// A codec for translating between Unicode scalar values and UTF-32 code
 /// units.
@@ -488,7 +482,6 @@ extension Unicode.UTF32 : UnicodeCodec {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static func _decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
@@ -525,8 +518,6 @@ extension Unicode.UTF32 : UnicodeCodec {
     processCodeUnit(UInt32(input))
   }
 }
-// @available(swift, obsoleted: 4.0, renamed: "Unicode.UTF32")
-public typealias UTF32 = Unicode.UTF32
 
 /// Translates the given input from one Unicode encoding to another by calling
 /// the given closure.
@@ -886,7 +877,6 @@ extension Unicode.Scalar {
   /// Create an instance with numeric value `value`, bypassing the regular
   /// precondition checks for code point validity.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   internal init(_unchecked value: UInt32) {
     _sanityCheck(value < 0xD800 || value > 0xDFFF,
       "high- and low-surrogate code points are not valid Unicode scalar values")

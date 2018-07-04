@@ -90,3 +90,13 @@ public var failNested2: (_ x: (main.ActuallyPrivate) -> Void) -> Void = { _ in }
 public func failTest(x: ActuallyPrivate) {} // expected-error {{cannot be declared public}}
 public func failTest2(x: main.ActuallyPrivate) {} // expected-error {{cannot be declared public}}
 
+// Property has an inferred type, public alias with
+// private generic parameter bound.
+public struct PublicGeneric<T> {}
+
+public typealias GenericAlias<T> = PublicGeneric<T>
+
+fileprivate func makeAValue() -> GenericAlias<ActuallyPrivate> { }
+
+public var cannotBePublic = makeAValue()
+// expected-error@-1 {{variable cannot be declared public because its type 'GenericAlias<ActuallyPrivate>' (aka 'PublicGeneric<ActuallyPrivate>') uses a private type}}

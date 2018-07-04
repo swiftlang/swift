@@ -2,11 +2,11 @@
 // RUN: cp -R %S/Inputs/mixed-target %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -import-objc-header %t/mixed-target/header.h -emit-module-path %t/MixedWithHeader.swiftmodule %S/Inputs/mixed-with-header.swift %S/../../Inputs/empty.swift -module-name MixedWithHeader -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -enable-objc-interop -import-objc-header %t/mixed-target/header.h -emit-module-path %t/MixedWithHeader.swiftmodule %S/Inputs/mixed-with-header.swift %S/../../Inputs/empty.swift -module-name MixedWithHeader -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/../Inputs/custom-modules -typecheck %s -verify
 
 // RUN: rm -rf %t/mixed-target/
@@ -26,15 +26,15 @@
 #endif
 
 #if canImport(CoreGraphics)
-  let square = CGRect(x: 100, y: 100, width: 100, height: 100) // expected-error {{use of unresolved identifier 'CGRect'}}
-  // expected-error@-1 {{'square' used within its own type}}
-  // expected-error@-2 {{could not infer type for 'square'}}
+  let square = CGRect(x: 100, y: 100, width: 100, height: 100)
+  // expected-error@-1 {{use of unresolved identifier 'CGRect'}}
+  // expected-note@-2 {{'square' declared here}}
+
   let (r, s) = square.divided(atDistance: 50, from: .minXEdge)
+  // expected-error@-1 {{ambiguous use of 'square'}}
 #endif
 
 #if canImport(MixedWithHeader)
 let object = NSObject() // expected-error {{use of unresolved identifier 'NSObject'}}
-  // expected-error@-1 {{'object' used within its own type}}
-  // expected-error@-2 {{could not infer type for 'object'}}
 let someAPI = Derived() // expected-error {{use of unresolved identifier 'Derived'}}
 #endif

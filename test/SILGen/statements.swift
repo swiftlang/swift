@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name statements -Xllvm -sil-full-demangle -parse-as-library -emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name statements -Xllvm -sil-full-demangle -parse-as-library -enable-sil-ownership -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }

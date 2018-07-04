@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name sil_locations -emit-silgen -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name sil_locations -Xllvm -sil-print-debuginfo -emit-verbose-sil -enable-sil-ownership %s | %FileCheck %s
 
 // FIXME: Not sure if this an ideal source info for the branch - 
 // it points to if, not the last instruction in the block.

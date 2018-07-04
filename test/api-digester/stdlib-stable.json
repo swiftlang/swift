@@ -74020,7 +74020,7 @@
         {
           "kind": "Function",
           "name": "index",
-          "printedName": "index(of:)",
+          "printedName": "firstIndex(of:)",
           "declKind": "Func",
           "usr": "s:FesRxs10CollectionWx8Iterator7Element_s9EquatablerS_5indexFT2ofWxS0_S1___GSqwx5Index_",
           "location": "",
@@ -78173,7 +78173,7 @@
         {
           "kind": "Function",
           "name": "index",
-          "printedName": "index(of:)",
+          "printedName": "firstIndex(of:)",
           "declKind": "Func",
           "usr": "s:FVs3Set5indexFT2ofx_GSqGVs8SetIndexx__",
           "location": "",

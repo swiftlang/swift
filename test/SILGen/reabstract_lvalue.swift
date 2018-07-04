@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name reabstract_lvalue -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name reabstract_lvalue -enable-sil-ownership %s | %FileCheck %s
 
 struct MyMetatypeIsThin {}
 

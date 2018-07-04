@@ -190,7 +190,6 @@ struct DiagnosticEntryInfo : DiagnosticEntryInfoBase {
 
 class EditorConsumer {
   virtual void anchor();
-
 public:
   virtual ~EditorConsumer() { }
 
@@ -518,7 +517,6 @@ public:
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) = 0;
 
   virtual void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
-                          bool EnableSyntaxMap,
                           EditorConsumer &Consumer,
                           ArrayRef<const char *> Args) = 0;
 

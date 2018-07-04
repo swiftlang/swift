@@ -12,11 +12,14 @@
 
 import SwiftShims
 
+@usableFromInline
 internal typealias _UnmanagedASCIIString = _UnmanagedString<UInt8>
-internal typealias _UnmanagedUTF16String = _UnmanagedString<UTF16.CodeUnit>
 
 @usableFromInline
+internal typealias _UnmanagedUTF16String = _UnmanagedString<UTF16.CodeUnit>
+
 @inlinable
+@inline(__always)
 internal
 func memcpy_zext<
   Target: FixedWidthInteger & UnsignedInteger,
@@ -25,13 +28,18 @@ func memcpy_zext<
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
   _sanityCheck(Source.bitWidth < Target.bitWidth)
-  for i in 0..<count {
+  _sanityCheck(count >= 0)
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
     dst[i] = Target(src[i])
+    i = i &+ 1
   }
 }
 
-@usableFromInline
 @inlinable
+@inline(__always)
 internal
 func memcpy_trunc<
   Target: FixedWidthInteger & UnsignedInteger,
@@ -40,8 +48,30 @@ func memcpy_trunc<
   dst: UnsafeMutablePointer<Target>, src: UnsafePointer<Source>, count: Int
 ) {
   _sanityCheck(Source.bitWidth > Target.bitWidth)
-  for i in 0..<count {
+  _sanityCheck(count >= 0)
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
     dst[i] = Target(truncatingIfNeeded: src[i])
+    i = i &+ 1
+  }
+}
+
+@inlinable
+@inline(__always)
+internal
+func memcpy_<
+  Source: FixedWidthInteger & UnsignedInteger
+>(
+  dst: UnsafeMutablePointer<Source>, src: UnsafePointer<Source>, count: Int
+) {
+  // Don't use the for-in-range syntax to avoid precondition checking in Range.
+  // This enables vectorization of the memcpy loop.
+  var i = 0
+  while i < count {
+    dst[i] = src[i]
+    i = i &+ 1
   }
 }
 
@@ -68,7 +98,6 @@ struct _UnmanagedString<CodeUnit>
   internal var count: Int
 
   @inlinable
-  @usableFromInline
   init(start: UnsafePointer<CodeUnit>, count: Int) {
     _sanityCheck(CodeUnit.self == UInt8.self || CodeUnit.self == UInt16.self)
     self.start = start
@@ -76,7 +105,6 @@ struct _UnmanagedString<CodeUnit>
   }
 
   @inlinable
-  @usableFromInline
   init(_ bufPtr: UnsafeBufferPointer<CodeUnit>) {
     self.init(
       start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
@@ -86,31 +114,26 @@ struct _UnmanagedString<CodeUnit>
 
 extension _UnmanagedString {
   @inlinable
-  @usableFromInline
   internal var end: UnsafePointer<CodeUnit> {
     return start + count
   }
 
   @inlinable
-  @usableFromInline
   internal var rawStart: UnsafeRawPointer {
     return UnsafeRawPointer(start)
   }
 
   @inlinable
-  @usableFromInline
   internal var rawEnd: UnsafeRawPointer {
     return UnsafeRawPointer(end)
   }
 
   @inlinable
-  @usableFromInline
   internal var buffer: UnsafeBufferPointer<CodeUnit> {
     return .init(start: start, count: count)
   }
 
   @inlinable
-  @usableFromInline
   internal var rawBuffer: UnsafeRawBufferPointer {
     return .init(start: rawStart, count: rawEnd - rawStart)
   }
@@ -122,23 +145,23 @@ extension _UnmanagedString : RandomAccessCollection {
   // requires that SubSequence share indices with the original collection.
   // Therefore, we use pointers as the index type; however, we also provide
   // integer subscripts as a convenience, in a separate extension below.
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias Index = UnsafePointer<CodeUnit>
   internal typealias IndexDistance = Int
   internal typealias Indices = Range<Index>
+
+  @usableFromInline // FIXME(sil-serialize-all)
   internal typealias SubSequence = _UnmanagedString
 
   @inlinable
-  @usableFromInline
   internal
   var startIndex: Index { return start }
 
   @inlinable
-  @usableFromInline
   internal
   var endIndex: Index { return end }
 
   @inlinable
-  @usableFromInline
   internal subscript(position: Index) -> UTF16.CodeUnit {
     @inline(__always)
     get {
@@ -148,7 +171,6 @@ extension _UnmanagedString : RandomAccessCollection {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     _sanityCheck(bounds.lowerBound >= start && bounds.upperBound <= end)
     return _UnmanagedString(start: bounds.lowerBound, count: bounds.count)
@@ -157,14 +179,12 @@ extension _UnmanagedString : RandomAccessCollection {
 
 extension _UnmanagedString : _StringVariant {
   @inlinable
-  @usableFromInline
   internal var isASCII: Bool {
     // NOTE: For now, single byte means ASCII. Might change in future
     return CodeUnit.bitWidth == 8
   }
 
   @inlinable
-  @usableFromInline
   internal subscript(offset: Int) -> UTF16.CodeUnit {
     @inline(__always)
     get {
@@ -174,7 +194,6 @@ extension _UnmanagedString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: Range<Int>) -> _UnmanagedString {
     _sanityCheck(offsetRange.lowerBound >= 0 && offsetRange.upperBound <= count)
     return _UnmanagedString(
@@ -183,7 +202,6 @@ extension _UnmanagedString : _StringVariant {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeFrom<Int>) -> SubSequence {
     _sanityCheck(offsetRange.lowerBound >= 0)
     return _UnmanagedString(
@@ -193,7 +211,6 @@ extension _UnmanagedString : _StringVariant {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeUpTo<Int>) -> SubSequence {
     _sanityCheck(offsetRange.upperBound <= count)
     return _UnmanagedString(
@@ -203,7 +220,6 @@ extension _UnmanagedString : _StringVariant {
   }
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal subscript(offsetRange: PartialRangeThrough<Int>) -> SubSequence {
     _sanityCheck(offsetRange.upperBound < count)
     return _UnmanagedString(
@@ -213,7 +229,7 @@ extension _UnmanagedString : _StringVariant {
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
+  @inline(__always)
   internal func _copy<TargetCodeUnit>(
     into target: UnsafeMutableBufferPointer<TargetCodeUnit>
   ) where TargetCodeUnit : FixedWidthInteger & UnsignedInteger {
@@ -251,14 +267,12 @@ extension _UnmanagedString : _StringVariant {
     var _offset: Int
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     init(_ base: _UnmanagedString) {
       self._base = base
       self._offset = 0
     }
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     mutating func next() -> Unicode.Scalar? {
       if _slowPath(_offset == _base.count) { return nil }
       let u0 = _base[_offset]
@@ -278,7 +292,6 @@ extension _UnmanagedString : _StringVariant {
     }
   }
 
-  @usableFromInline // FIXME(sil-serialize-all)
   @inlinable
   func makeUnicodeScalarIterator() -> UnicodeScalarIterator {
     return UnicodeScalarIterator(self)

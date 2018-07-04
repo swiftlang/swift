@@ -34,7 +34,7 @@ To follow along with this guide, you'll need:
    The stdlib is currently only buildable for Android from a Linux environment.
    Before attempting to build for Android, please make sure you are able to build
    for Linux by following the instructions in the Swift project README.
-2. The latest version of the Android NDK (r14 at the time of this writing),
+2. The latest version of the Android NDK (r16 at the time of this writing),
    available to download here:
    http://developer.android.com/ndk/downloads/index.html.
 3. An Android device with remote debugging enabled. We require remote
@@ -51,12 +51,6 @@ needed to `apt-get install libicu-dev icu-devtools`. Similarly, building
 the Swift stdlib for Android requires the libiconv and libicu libraries.
 However, you'll need versions of these libraries that work on Android devices.
 
-You may download prebuilt copies of these dependencies, built for Ubuntu 15.10
-and Android NDK r13. Click [here](https://github.com/SwiftAndroid/libiconv-libicu-android/releases/download/android-ndk-r13/libiconv-libicu-armeabi-v7a-ubuntu-15.10-ndk-r13.tar.gz)
-to download, then unzip the archive file.
-
-Alternatively, you may choose to build libiconv and libicu for Android yourself.
-If you are using Ubuntu 16.04, it is suggested that you build them yourself, as the prebuilt 15.10 copies have not been tested on 16.04.
 The steps are as follows:
 
 1. Ensure you have `curl`, `autoconf`, `automake`, `libtool`, and
@@ -67,144 +61,29 @@ The steps are as follows:
 3. From the command-line, run `which ndk-build`. Confirm that the path to
    the `ndk-build` executable in the Android NDK you downloaded is displayed.
    If not, you may need to add the Android NDK directory to your `PATH`.
-
-#### Adding `swift` suffix to icu libraries
-
-Android OS has its own icu libraries which are different from the ones we are generating and conflicts with ours. In order to resolve this conflict when linking Swift stdlib dependencies in Android devices, we need to change our icu libraries names by adding `swift` suffix at the end. To do that, enter the `libiconv-libicu-android` directory on the command line, then do the following steps:
-
-Create `armeabi-v7a` directory and generate `icu` directory by uncompressing `icu4c-55_1-src.tgz` file, as following:
- 
-```
-$ mkdir armeabi-v7a
-$ cd armeabi-v7a
-$ tar xvf ../icu4c-55_1-src.tgz
-```
-
-**Edit icu configure file**
-
-In order to prevent icu configuration from adding `swift` suffix to internal symbols as well, edit `icu/source/configure` file and change:
-
-```
-if test "$ICULIBSUFFIX" != ""
-then
-    U_HAVE_LIB_SUFFIX=1
-    ICULIBSUFFIXCNAME=`echo _$ICULIBSUFFIX | sed 's/^A-Za-z0-9_/_/g'`
-    UCONFIG_CPPFLAGS="${UCONFIG_CPPFLAGS} -DU_HAVE_LIB_SUFFIX=1 -DU_LIB_SUFFIX_C_NAME=${ICULIBSUFFIXCNAME} "
-else
-    U_HAVE_LIB_SUFFIX=0
-fi
-```
-
-To:
- 
-```
-#if test "$ICULIBSUFFIX" != ""
-#then
-#    U_HAVE_LIB_SUFFIX=1
-#    ICULIBSUFFIXCNAME=`echo _$ICULIBSUFFIX | sed 's/^A-Za-z0-9_/_/g'`
-#    UCONFIG_CPPFLAGS="${UCONFIG_CPPFLAGS} -DU_HAVE_LIB_SUFFIX=1 -DU_LIB_SUFFIX_C_NAME=${ICULIBSUFFIXCNAME} "
-#else
-    U_HAVE_LIB_SUFFIX=0
-#fi
-```
-
-**Edit build.sh file**
-
-Now go back to the `libiconv-libicu-android` root directory:
-
-```
-$ cd ..
-```
-
-In order to prevent `build.sh` from regenerating the icu directory and override the `configure` file we just edited, edit `build.sh` and change:
-
-```
-[ -e ../icu4c-55_1-src.tgz ] || exit 1
-tar xvf ../icu4c-55_1-src.tgz
-```
-
-To:
-
-```
-#[ -e ../icu4c-55_1-src.tgz ] || exit 1
-#tar xvf ../icu4c-55_1-src.tgz
-```
-
-In order to check the existence of `libicuucswift.so` file instead of `libicuuc.so`, change:
-
-```
-[ -e libicuuc.so ] || {
-```
-
-To:
-
-```
-[ -e libicuucswift.so ] || {
-```
-
-Then add the `swift` suffix to the call of `configure` file, by changing:
-
-```
-./configure \
---host=arm-linux-androideabi \
---prefix=`pwd`/../../ \
---with-cross-build=`pwd`/cross \
---enable-static --enable-shared \
-|| exit 1
-```
-To:
-
-```
-./configure \
---host=arm-linux-androideabi \
---prefix=`pwd`/../../ \
---with-library-suffix=swift \
---with-cross-build=`pwd`/cross \
---enable-static --enable-shared \
-|| exit 1
-```
-
-Now change the libraries file names on the last step of th build, by adding `swift` at the end of each one, by changing:
-
-```
-for f in libicudata libicutest libicui18n libicuio libicule libiculx libicutu libicuuc; do
-```
-
-To:
-
-```
-for f in libicudataswift libicutestswift libicui18nswift libicuioswift libiculeswift libiculxswift libicutuswift libicuucswift; do
-```
-
-
-**Run build.sh**
-
-Now we are finally ready to run the `build.sh` file
-
-```
-$ ./build.sh
-```
-
-Confirm that the build script created `armeabi-v7a/icu/source/i18n` and
-   `armeabi-v7a/icu/source/common` directories within your
-   `libiconv-libicu-android` directory.
+4. Change directories into `libiconv-libicu-android`: `cd libiconv-libicu-android`
+5. Run the Swift build script: `./build-swift.sh`
+6. Confirm that the various `libicuXYZswift.so` libraries are located in the
+   `armeabi-v7a` directory.
 
 ### 2. Building the Swift stdlib for Android
 
 Enter your Swift directory, then run the build script, passing paths to the
-Android NDK, as well as the directories that contain the `libicuuc.so` and
-`libicui18n.so` you downloaded or built in step one:
+Android NDK, as well as the directories that contain the `libicuucswift.so` and
+`libicui18nswift.so` you downloaded or built in step one:
 
 ```
+$ ARM_DIR=path/to/libicu-libiconv-android
+$ NDK_PATH=path/to/android-ndk16
 $ utils/build-script \
     -R \                                       # Build in ReleaseAssert mode.
     --android \                                # Build for Android.
-    --android-ndk /path/to/android-ndk-r14 \   # Path to an Android NDK.
+    --android-ndk $NDK_PATH \   # Path to an Android NDK.
     --android-api-level 21 \                   # The Android API level to target. Swift only supports 21 or greater.
-    --android-icu-uc /path/to/libicu-android/armeabi-v7a \
-    --android-icu-uc-include /path/to/libicu-android/armeabi-v7a/icu/source/common \
-    --android-icu-i18n /path/to/libicu-android/armeabi-v7a \
-    --android-icu-i18n-include /path/to/libicu-android/armeabi-v7a/icu/source/i18n
+    --android-icu-uc ${ARM_DIR}/libicuucswift.so \
+    --android-icu-uc-include ${ARM_DIR}/icu/source/common \
+    --android-icu-i18n ${ARM_DIR}/libicui18nswift.so \
+    --android-icu-i18n-include ${ARM_DIR}/icu/source/i18n
 ```
 
 ### 3. Compiling `hello.swift` to run on an Android device
@@ -220,7 +99,7 @@ gold linker in the Android NDK into your `PATH`:
 
 ```
 $ sudo ln -s \
-    /path/to/android-ndk-r14/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin/ld.gold \
+    /path/to/android-ndk-r16/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin/ld.gold \
     /usr/bin/armv7-none-linux-androideabi-ld.gold
 ```
 
@@ -228,13 +107,14 @@ Then use the built Swift compiler from the previous step to compile a Swift
 source file, targeting Android:
 
 ```
+$ NDK_PATH="path/to/android-ndk16"
 $ build/Ninja-ReleaseAssert/swift-linux-x86_64/bin/swiftc \                      # The Swift compiler built in the previous step.
                                                                                  # The location of the tools used to build Android binaries
-    -tools-directory /path/to/android-ndk-r14/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin
+    -tools-directory ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/arm-linux-androideabi/bin
     -target armv7-none-linux-androideabi \                                       # Targeting android-armv7.
-    -sdk /path/to/android-ndk-r14/platforms/android-21/arch-arm \                # Use the same NDK path and API version as you used to build the stdlib in the previous step.
-    -L /path/to/android-ndk-r14/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a \   # Link the Android NDK's libc++ and libgcc.
-    -L /path/to/android-ndk-r14/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x \
+    -sdk ${NDK_PATH}/platforms/android-21/arch-arm \                               # Use the same NDK path and API version as you used to build the stdlib in the previous step.
+    -L ${NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a \                  # Link the Android NDK's libc++ and libgcc.
+    -L ${NDK_PATH}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/lib/gcc/arm-linux-androideabi/4.9.x \
     hello.swift
 ```
 

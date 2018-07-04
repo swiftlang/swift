@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "TypoCorrection.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -147,20 +148,18 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    LookupResult corrections;
+    TypoCorrectionResults corrections(tc, ref->getIdentifier(),
+                                      DeclNameLoc(ref->getIdLoc()));
     tc.performTypoCorrection(DC, DeclRefKind::Ordinary,
                              MetatypeType::get(baseTy),
-                             ref->getIdentifier(), ref->getIdLoc(),
                              NameLookupFlags::ProtocolMembers,
                              corrections, &builder);
 
-    // Filter out non-types.
-    corrections.filter([](const LookupResultEntry &result) {
-      return isa<TypeDecl>(result.getValueDecl());
-    });
-
     // Check whether we have a single type result.
-    auto singleType = corrections.getSingleTypeResult();
+    auto singleType = cast_or_null<TypeDecl>(
+      corrections.getUniqueCandidateMatching([](ValueDecl *result) {
+        return isa<TypeDecl>(result);
+      }));
 
     // If we don't have a single result, complain and fail.
     if (!singleType) {
@@ -168,9 +167,7 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
       SourceLoc nameLoc = ref->getIdLoc();
       tc.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
         .highlight(baseRange);
-      for (const auto &suggestion : corrections)
-        tc.noteTypoCorrection(name, DeclNameLoc(nameLoc),
-                              suggestion.getValueDecl());
+      corrections.noteAllCandidates();
 
       return ErrorType::get(tc.Context);
     }
@@ -196,6 +193,16 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
   // base type into it.
   auto concrete = ref->getBoundDecl();
   tc.validateDeclForNameLookup(concrete);
+
+  if (auto typeAlias = dyn_cast<TypeAliasDecl>(concrete)) {
+    if (auto protocol = dyn_cast<ProtocolDecl>(typeAlias->getDeclContext())) {
+      // We need to make sure the generic environment of a surrounding protocol
+      // propagates to the typealias, since the former may not have existed when
+      // the typealiases type was first computed.
+      // FIXME: See the comment in the ProtocolDecl case of validateDecl().
+      tc.validateDecl(protocol);
+    }
+  }
   if (!concrete->hasInterfaceType())
     return ErrorType::get(tc.Context);
   if (baseTy->isTypeParameter()) {
@@ -299,6 +306,9 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
                                       GenericTypeResolver *resolver) {
   if (req.isInvalid())
     return true;
+
+  // Note that we are resolving within a requirement.
+  options |= TypeResolutionFlags::GenericRequirement;
 
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
@@ -444,14 +454,13 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
     return;
 
   // Make sure we validate the type again.
-  tl.setType(Type(), /*validated=*/false);
+  tl.setType(Type());
 }
 
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
   for (auto param : *genericParams) {
-    param->setCheckedInheritanceClause(false);
     for (auto &inherited : param->getInherited())
       revertDependentTypeLoc(inherited);
   }
@@ -661,7 +670,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
       return Action::Continue;
     }
 
-    SmallPtrSet<CanType, 4> &getReferencedGenericParams() {
+    SmallPtrSetImpl<CanType> &getReferencedGenericParams() {
       return ReferencedGenericParams;
     }
   };
@@ -670,7 +679,8 @@ static void checkReferencedGenericParams(GenericContext *dc,
   // return type.
   ReferencedGenericTypeWalker paramsAndResultWalker;
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  funcTy->getInput().walk(paramsAndResultWalker);
+  for (const auto &param : funcTy->getParams())
+    param.getType().walk(paramsAndResultWalker);
   funcTy->getResult().walk(paramsAndResultWalker);
 
   // Set of generic params referenced in parameter types,
@@ -1281,7 +1291,6 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
-    UnsatisfiedDependency *unsatisfiedDependency,
     ConformanceCheckOptions conformanceOptions,
     GenericRequirementsCheckListener *listener,
     SubstOptions options) {
@@ -1349,26 +1358,10 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         //        diagnose problems with conformances.
         auto result =
             conformsToProtocol(firstType, proto->getDecl(), dc,
-                               conformanceOptions, loc, unsatisfiedDependency);
+                               conformanceOptions, loc);
 
-        // Unsatisfied dependency case.
-        auto status = result.getStatus();
-        switch (status) {
-        case RequirementCheckResult::Failure:
-          // A failure at the top level is diagnosed elsewhere.
-          if (current.Parents.empty())
-            return status;
-
-          diagnostic = diag::type_does_not_conform_owner;
-          diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
-          requirementFailure = true;
-          break;
-        case RequirementCheckResult::UnsatisfiedDependency:
-        case RequirementCheckResult::SubstitutionFailure:
-          // pass it on up.
-          return status;
-        case RequirementCheckResult::Success: {
-          auto conformance = result.getConformance();
+        if (result) {
+          auto conformance = *result;
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,
@@ -1383,9 +1376,15 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
           }
           continue;
         }
-        }
+
+        // A failure at the top level is diagnosed elsewhere.
+        if (current.Parents.empty())
+          return RequirementCheckResult::Failure;
 
         // Failure needs to emit a diagnostic.
+        diagnostic = diag::type_does_not_conform_owner;
+        diagnosticNote = diag::type_does_not_inherit_or_conform_requirement;
+        requirementFailure = true;
         break;
       }
 

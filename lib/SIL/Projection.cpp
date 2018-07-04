@@ -91,7 +91,7 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::RefTailAddrInst: {
     auto *RTAI = cast<RefTailAddrInst>(I);
-    auto *Ty = RTAI->getTailType().getSwiftRValueType().getPointer();
+    auto *Ty = RTAI->getTailType().getASTType().getPointer();
     Value = ValueTy(ProjectionKind::TailElems, Ty);
     assert(getKind() == ProjectionKind::TailElems);
     break;
@@ -148,14 +148,14 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     break;
   }
   case SILInstructionKind::UpcastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::Upcast, Ty);
     assert(getKind() == ProjectionKind::Upcast);
     break;
   }
   case SILInstructionKind::UncheckedRefCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::RefCast, Ty);
     assert(getKind() == ProjectionKind::RefCast);
@@ -163,7 +163,7 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedAddrCastInst: {
-    auto *Ty = I->getType().getSwiftRValueType().getPointer();
+    auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
     Value = ValueTy(ProjectionKind::BitwiseCast, Ty);
     assert(getKind() == ProjectionKind::BitwiseCast);
@@ -508,7 +508,46 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   return P;
 }
 
-raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
+void Projection::print(raw_ostream &os, SILType baseType) const {
+  if (isNominalKind()) {
+    auto *Decl = getVarDecl(baseType);
+    os << "Field: ";
+    Decl->print(os);
+    return;
+  }
+
+  if (getKind() == ProjectionKind::Tuple) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::BitwiseCast) {
+    os << "BitwiseCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Index) {
+    os << "Index: " << getIndex();
+    return;
+  }
+  if (getKind() == ProjectionKind::Upcast) {
+    os << "UpCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::RefCast) {
+    os << "RefCast";
+    return;
+  }
+  if (getKind() == ProjectionKind::Box) {
+    os << " Box over";
+    return;
+  }
+  if (getKind() == ProjectionKind::TailElems) {
+    os << " TailElems";
+    return;
+  }
+  os << "<unexpected projection>";
+}
+
+raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) const {
   os << "Projection Path [";
   SILType IterType = getBaseType();
   for (const Projection &IterProj : Path) {
@@ -517,50 +556,14 @@ raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
 
     os << BaseType.getAddressType() << "\n  ";
 
-    if (IterProj.isNominalKind()) {
-      auto *Decl = IterProj.getVarDecl(BaseType);
-      os << "Field: ";
-      Decl->print(os);
-      os << " of: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::Tuple) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-
-    if (IterProj.getKind() == ProjectionKind::BitwiseCast) {
-      os << "BitwiseCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Index) {
-      os << "Index: " << IterProj.getIndex() << " into: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Upcast) {
-      os << "UpCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::RefCast) {
-      os << "RefCast to: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::Box) {
-      os << " Box over: ";
-      continue;
-    }
-    if (IterProj.getKind() == ProjectionKind::TailElems) {
-      os << " TailElems of: ";
-      continue;
-    }
-    os << "<unexpected projection> into: ";
+    IterProj.print(os, BaseType);
+    os << " in: ";
   }
   os << IterType.getAddressType() << "]\n";
   return os;
 }
 
-void ProjectionPath::dump(SILModule &M) {
+void ProjectionPath::dump(SILModule &M) const {
   print(llvm::dbgs(), M);
 }
 
@@ -840,6 +843,24 @@ createProjection(SILBuilder &B, SILLocation Loc, SILValue Arg) const {
   return Proj->createProjection(B, Loc, Arg);
 }
 
+// Projection tree only supports structs and tuples today.
+static bool isSupportedProjection(const Projection &p) {
+  switch (p.getKind()) {
+  case ProjectionKind::Struct:
+  case ProjectionKind::Tuple:
+    return true;
+  case ProjectionKind::Class:
+  case ProjectionKind::Enum:
+  case ProjectionKind::Box:
+  case ProjectionKind::Upcast:
+  case ProjectionKind::RefCast:
+  case ProjectionKind::BitwiseCast:
+  case ProjectionKind::TailElems:
+  case ProjectionKind::Index:
+    return false;
+  }
+}
+
 void
 ProjectionTreeNode::
 processUsersOfValue(ProjectionTree &Tree,
@@ -863,12 +884,11 @@ processUsersOfValue(ProjectionTree &Tree,
       continue;
     }
 
-    // Check whether the user is such a projection.
     auto P = Projection(projectionInst);
 
-    // If we fail to create a projection, add User as a user to this node and
-    // continue.
-    if (!P.isValid()) {
+    // If we fail to create a projection or this is a type of projection that we
+    // do not support, add User as a user to this node and continue.
+    if (!P.isValid() || !isSupportedProjection(P)) {
       DEBUG(llvm::dbgs() << "            Failed to create projection. Adding "
             "to non projection user!\n");
       addNonProjectionUser(Op);
@@ -895,7 +915,7 @@ processUsersOfValue(ProjectionTree &Tree,
       Worklist.push_back({V, ChildNode});
     } else {
       DEBUG(llvm::dbgs() << "            Did not find a child for projection!. "
-            "Adding to non projection user!\b");
+            "Adding to non projection user!\n");
 
       // The only projection which we do not currently handle are enums since we
       // may not know the correct case. This can be extended in the future.
@@ -1100,9 +1120,12 @@ public:
 //                               ProjectionTree
 //===----------------------------------------------------------------------===//
 
-ProjectionTree::
-ProjectionTree(SILModule &Mod, SILType BaseTy) : Mod(Mod) {
-  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy);
+ProjectionTree::ProjectionTree(
+    SILModule &Mod, SILType BaseTy,
+    llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
+    : Mod(Mod), Allocator(Allocator) {
+  DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
+                     << "\n");
 
   // Create the root node of the tree with our base type.
   createRoot(BaseTy);
@@ -1240,7 +1263,7 @@ computeUsesAndLiveness(SILValue Base) {
 #ifndef NDEBUG
   DEBUG(llvm::dbgs() << "Final Leafs: \n");
   llvm::SmallVector<SILType, 8> LeafTypes;
-  getLeafTypes(LeafTypes);
+  getLiveLeafTypes(LeafTypes);
   for (SILType Leafs : LeafTypes) {
     DEBUG(llvm::dbgs() << "    " << Leafs << "\n");
   }

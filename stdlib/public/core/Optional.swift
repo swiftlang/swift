@@ -72,7 +72,7 @@
 /// optional chaining to access the `hasSuffix(_:)` method on a `String?`
 /// instance.
 ///
-///     if let isPNG = imagePaths["star"]?.hasSuffix(".png") {
+///     if imagePaths["star"]?.hasSuffix(".png") == true {
 ///         print("The star image is in PNG format")
 ///     }
 ///     // Prints "The star image is in PNG format"
@@ -269,7 +269,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
 
 extension Optional : CustomDebugStringConvertible {
   /// A textual representation of this instance, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     switch self {
     case .some(let value):
@@ -284,7 +283,6 @@ extension Optional : CustomDebugStringConvertible {
 }
 
 extension Optional : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     switch self {
     case .some(let value):
@@ -410,25 +408,19 @@ extension Optional : Equatable where Wrapped : Equatable {
 }
 
 extension Optional: Hashable where Wrapped: Hashable {
-  /// The hash value for the optional instance.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// Two optionals that are equal will always have equal hash values.
-  ///
-  /// Hash values are not guaranteed to be equal across different executions of
-  /// your program. Do not save hash values to use during a future execution.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
-      hasher.append(0 as UInt8)
+      hasher.combine(0 as UInt8)
     case .some(let wrapped):
-      hasher.append(1 as UInt8)
-      hasher.append(wrapped)
+      hasher.combine(1 as UInt8)
+      hasher.combine(wrapped)
     }
   }
 }
@@ -724,7 +716,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get

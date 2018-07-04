@@ -440,7 +440,7 @@ private:
 inline SILValue getSILValueType(const Operand &op) {
   return op.get();
 }
-typedef ArrayRefView<Operand,SILValue,getSILValueType> OperandValueArrayRef;
+using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 
 /// An iterator over all uses of a ValueBase.
 class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
@@ -600,7 +600,7 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 namespace llvm {
   /// A SILValue casts like a ValueBase *.
   template<> struct simplify_type<const ::swift::SILValue> {
-    typedef ::swift::ValueBase *SimpleType;
+    using SimpleType = ::swift::ValueBase *;
     static SimpleType getSimplifiedValue(::swift::SILValue Val) {
       return Val;
     }

@@ -426,15 +426,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
 %  end # !mutable
 
 %  if mutable:
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "allocate(byteCount:alignment:)")
-  @inlinable
-  public static func allocate(
-    bytes size: Int, alignedTo alignment: Int
-  ) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer.allocate(byteCount: size, alignment: alignment)
-  }
-
   /// Allocates uninitialized memory with the specified size and alignment.
   ///
   /// You are in charge of managing the allocated memory. Be sure to deallocate
@@ -459,11 +450,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
         byteCount._builtinWordValue, alignment._builtinWordValue))
   }
 %  end # mutable
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
-  public func deallocate(bytes _: Int, alignedTo _: Int) { 
-    self.deallocate()
-  }
 
   /// Deallocates the previously allocated memory block referenced by this pointer.
   ///
@@ -537,17 +523,7 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
     return Unsafe${Mutable}Pointer<T>(_rawValue)
   }
 
-%  if mutable:
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "initializeMemory(as:repeating:count:)")
-  @discardableResult
-  public func initializeMemory<T>(
-    as type: T.Type, at offset: Int = 0, count: Int = 1, to repeatedValue: T
-  ) -> UnsafeMutablePointer<T> { 
-    return (self + offset * MemoryLayout<T>.stride).initializeMemory(
-      as: type, repeating: repeatedValue, count: count)
-  }
-  
+%  if mutable:  
   /// Initializes the memory referenced by this pointer with the given value,
   /// binds the memory to the value's type, and returns a typed pointer to the
   /// initialized memory.
@@ -662,62 +638,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
     // for i in 0..<count {
     //   (self.assumingMemoryBound(to: T.self) + i).initialize(to: source[i])
     // }
-    return UnsafeMutablePointer(_rawValue)
-  }
-
-  /// Initializes the memory referenced by this pointer with the values of the
-  /// given collection, binds the memory to the values' type, and returns a
-  /// typed pointer to the initialized memory.
-  ///
-  /// The memory referenced by this pointer must be uninitialized or
-  /// initialized to a trivial type, and must be properly aligned for
-  /// accessing `T`.
-  ///
-  /// The following example allocates enough raw memory to hold four instances
-  /// of `Int8`, and then uses the `initializeMemory(as:from:)` method to
-  /// initialize the allocated memory.
-  ///
-  ///     let count = 4
-  ///     let bytesPointer = UnsafeMutableRawPointer.allocate(
-  ///             bytes: count * MemoryLayout<Int8>.stride,
-  ///             alignedTo: MemoryLayout<Int8>.alignment)
-  ///     let values: [Int8] = [1, 2, 3, 4]
-  ///     let int8Pointer = bytesPointer.initializeMemory(
-  ///             as: Int8.self,
-  ///             from: values)
-  ///     // int8Pointer.pointee == 1
-  ///     // (int8Pointer + 3).pointee == 4
-  ///
-  ///     // After using 'int8Pointer':
-  ///     int8Pointer.deallocate(count)
-  ///
-  /// After calling this method on a raw pointer `p`, the region starting at
-  /// `p` and continuing up to `p + count * MemoryLayout<T>.stride` is bound
-  /// to type `T` and initialized. If `T` is a nontrivial type, you must
-  /// eventually deinitialize or move from the values in this region to avoid
-  /// leaks.
-  ///
-  /// - Parameters:
-  ///   - type: The type to bind this memory to.
-  ///   - source: A pointer to the values to copy. If `source` is an
-  ///     `UnsafeBufferPointer` or `UnsafeMutableBufferPointer` instance, the
-  ///     memory region referenced by `source` must not overlap the
-  ///     destination region.
-  /// - Returns: A typed pointer to the memory referenced by this raw pointer.
-  // This is fundamentally unsafe since collections can underreport their count.
-  @inlinable
-  @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
-  @discardableResult
-  public func initializeMemory<C : Collection>(
-    as type: C.Element.Type, from source: C
-  ) -> UnsafeMutablePointer<C.Element> {
-    // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
-    // Initialize and bind each element of the container.
-    var ptr = self
-    for element in source {
-      ptr.initializeMemory(as: C.Element.self, repeating: element, count: 1)
-      ptr += MemoryLayout<C.Element>.stride
-    }
     return UnsafeMutablePointer(_rawValue)
   }
 
@@ -864,11 +784,6 @@ public struct Unsafe${Mutable}RawPointer: _Pointer {
         /*volatile:*/ false._value)
     }
   }
-
-  @available(swift, deprecated: 4.1, obsoleted: 5.0.0, renamed: "copyMemory(from:byteCount:)")
-  public func copyBytes(from source: UnsafeRawPointer, count: Int) {
-    copyMemory(from: source, byteCount: count)
-  }
   
   /// Copies the specified number of bytes from the given raw pointer's memory
   /// into this pointer's memory.
@@ -965,50 +880,29 @@ extension ${Self}: Comparable {
 }
 
 extension ${Self}: Hashable {
-  /// The pointer's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
   @inlinable
-  public var hashValue: Int {
-    return Int(bitPattern: self)
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(bitPattern: self))
   }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 extension Unsafe${Mutable}RawPointer : CustomReflectable {
-  @inlinable // FIXME(sil-serialize-all)
   public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
-  }
-}
-
-extension Unsafe${Mutable}RawPointer : CustomPlaygroundQuickLookable {
-  @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
-  @available(*, deprecated, message: "Unsafe${Mutable}RawPointer.customPlaygroundQuickLook will be removed in a future Swift version")
-  internal var summary: String {
-    let selfType = "${Self}"
-    let ptrValue = UInt64(
-      bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return ptrValue == 0
-    ? "\(selfType)(nil)"
-    : "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(summary)
   }
 }
 
@@ -1076,3 +970,7 @@ extension UnsafeMutableRawPointer {
   @available(*, unavailable, renamed: "init(mutating:)")
   public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable(); return nil }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

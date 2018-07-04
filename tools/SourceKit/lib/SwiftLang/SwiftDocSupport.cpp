@@ -209,6 +209,7 @@ public:
     initDefaultMapToUse(D);
     // If D is declared in the extension, then the synthesized target is valid.
     TypeOrExtensionDecl SynthesizedTarget;
+    assert(D->getDeclContext()->isModuleScopeContext() == EntitiesStack.empty());
     if (D->getDeclContext() == SynthesizedExtensionInfo.first)
       SynthesizedTarget = SynthesizedExtensionInfo.second;
     EntitiesStack.emplace_back(D, SynthesizedTarget,

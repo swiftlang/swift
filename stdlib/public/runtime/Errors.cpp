@@ -171,7 +171,7 @@ void swift::dumpStackTraceEntry(unsigned index, void *framePC,
     fprintf(stderr, "%s`%s + %td", libraryName.data(), symbolName.c_str(),
             offset);
   } else {
-    constexpr const char *format = "%-4u %-34s 0x%0.16tx %s + %td\n";
+    constexpr const char *format = "%-4u %-34s 0x%0.16" PRIxPTR " %s + %td\n";
     fprintf(stderr, format, index, libraryName.data(), symbolAddr,
             symbolName.c_str(), offset);
   }

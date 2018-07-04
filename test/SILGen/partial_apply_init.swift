@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   init(x: Int) {}
@@ -42,7 +42,7 @@ func class_init_partial_apply(c: C.Type) {
 // CHECK:         class_method %0 : $@thick C.Type, #C.init!allocator.1
 
 // CHECK-LABEL: sil hidden @$S18partial_apply_init010archetype_c1_a1_B0{{[_0-9a-zA-Z]*}}F
-func archetype_init_partial_apply<T: C where T: P>(t: T.Type) {
+func archetype_init_partial_apply<T: C>(t: T.Type) where T: P {
   // Archetype initializations are always dynamic, whether applied to the type or a metatype.
   // CHECK: function_ref @$S18partial_apply_init1CC{{[_0-9a-zA-Z]*}}fC
   let requiredT: (Double) -> T = T.init

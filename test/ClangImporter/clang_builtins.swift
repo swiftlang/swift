@@ -5,8 +5,10 @@
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   import Darwin
-#else
+#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
   import Glibc
+#elseif os(Windows)
+  import MSVCRT
 #endif
 
 func test() {

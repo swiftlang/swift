@@ -66,6 +66,24 @@ enum class FixedPacking {
   Dynamic
 };
 
+enum class SpecialTypeInfoKind : uint8_t {
+  Unimplemented,
+
+  None,
+
+  /// Everything after this is statically fixed-size.
+  Fixed,
+  Weak,
+
+  /// Everything after this is loadable.
+  Loadable,
+  Reference,
+
+  Last_Kind = Reference
+};
+enum : unsigned { NumSpecialTypeInfoKindBits =
+  countBitsUsed(static_cast<unsigned>(SpecialTypeInfoKind::Last_Kind)) };
+
 /// Information about the IR representation and generation of the
 /// given type.
 class TypeInfo {
@@ -73,39 +91,96 @@ class TypeInfo {
   TypeInfo &operator=(const TypeInfo &) = delete;
 
   friend class TypeConverter;
-  mutable const TypeInfo *NextConverted;
 
 protected:
-  enum SpecialTypeInfoKind {
-    STIK_Unimplemented,
-    
-    STIK_None,
+  union {
+    uint64_t OpaqueBits;
 
-    /// Everything after this is statically fixed-size.
-    STIK_Fixed,
-    STIK_Weak,
+    SWIFT_INLINE_BITFIELD_BASE(TypeInfo,
+                               bitmax(NumSpecialTypeInfoKindBits,8)+6+1+1+3+1+1,
+      /// The kind of supplemental API this type has, if any.
+      Kind : bitmax(NumSpecialTypeInfoKindBits,8),
 
-    /// Everything after this is loadable.
-    STIK_Loadable,
-    STIK_Reference,
-  };
+      /// The storage alignment of this type in log2 bytes.
+      AlignmentShift : 6,
+
+      /// Whether this type is known to be POD.
+      POD : 1,
+
+      /// Whether this type is known to be bitwise-takable.
+      BitwiseTakable : 1,
+
+      /// An arbitrary discriminator for the subclass.  This is useful for e.g.
+      /// distinguishing between different TypeInfos that all implement the same
+      /// kind of type.
+      /// FIXME -- Create TypeInfoNodes.def and get rid of this field.
+      SubclassKind : 3,
+
+      /// Whether this type can be assumed to have a fixed size from all
+      /// resilience domains.
+      AlwaysFixedSize : 1,
+
+      /// Whether this type is ABI-accessible from this SILModule.
+      ABIAccessible : 1
+    );
+
+    /// FixedTypeInfo will use the remaining bits for the size.
+    ///
+    /// NOTE: Until one can define statically sized inline arrays in the
+    /// language, defining an extremely large object is quite impractical.
+    /// For now: "4 GiB should be more than good enough."
+    SWIFT_INLINE_BITFIELD_FULL(FixedTypeInfo, TypeInfo, 32,
+      : NumPadBits,
+
+      /// The storage size of this type in bytes.  This may be zero even
+      /// for well-formed and complete types, such as a trivial enum or
+      /// tuple.
+      Size : 32
+    );
+  } Bits;
+  enum { InvalidSubclassKind = 0x7 };
 
   TypeInfo(llvm::Type *Type, Alignment A, IsPOD_t pod,
            IsBitwiseTakable_t bitwiseTakable,
            IsFixedSize_t alwaysFixedSize,
-           SpecialTypeInfoKind stik)
-    : NextConverted(0), StorageType(Type), nativeReturnSchema(nullptr),
-      nativeParameterSchema(nullptr), StorageAlignment(A),
-      POD(pod), BitwiseTakable(bitwiseTakable),
-      AlwaysFixedSize(alwaysFixedSize), STIK(stik),
-      SubclassKind(InvalidSubclassKind) {
-    assert(STIK >= STIK_Fixed || !AlwaysFixedSize);
+           IsABIAccessible_t abiAccessible,
+           SpecialTypeInfoKind stik) : StorageType(Type) {
+    assert(stik >= SpecialTypeInfoKind::Fixed || !alwaysFixedSize);
+    assert(!A.isZero() && "Invalid alignment");
+    Bits.OpaqueBits = 0;
+    Bits.TypeInfo.Kind = unsigned(stik);
+    Bits.TypeInfo.AlignmentShift = llvm::Log2_32(A.getValue());
+    Bits.TypeInfo.POD = pod;
+    Bits.TypeInfo.BitwiseTakable = bitwiseTakable;
+    Bits.TypeInfo.SubclassKind = InvalidSubclassKind;
+    Bits.TypeInfo.AlwaysFixedSize = alwaysFixedSize;
+    Bits.TypeInfo.ABIAccessible = abiAccessible;
   }
 
   /// Change the minimum alignment of a stored value of this type.
   void setStorageAlignment(Alignment alignment) {
-    StorageAlignment = alignment;
+    auto Prev = Bits.TypeInfo.AlignmentShift;
+    auto Next = llvm::Log2_32(alignment.getValue());
+    assert(Next >= Prev && "Alignment can only increase");
+    (void)Prev;
+    Bits.TypeInfo.AlignmentShift = Next;
   }
+
+  void setSubclassKind(unsigned kind) {
+    assert(kind != InvalidSubclassKind);
+    Bits.TypeInfo.SubclassKind = kind;
+    assert(Bits.TypeInfo.SubclassKind == kind && "kind was truncated?");
+  }
+
+private:
+  mutable const TypeInfo *NextConverted = nullptr;
+
+  /// The LLVM representation of a stored value of this type.  For
+  /// non-fixed types, this is really useful only for forming pointers to it.
+  llvm::Type *StorageType;
+
+  mutable NativeConventionSchema *nativeReturnSchema = nullptr;
+  mutable NativeConventionSchema *nativeParameterSchema = nullptr;
 
 public:
   virtual ~TypeInfo();
@@ -116,59 +191,30 @@ public:
     return static_cast<const T &>(*this);
   }
 
-private:
-  /// The LLVM representation of a stored value of this type.  For
-  /// non-fixed types, this is really useful only for forming pointers to it.
-  llvm::Type *StorageType;
-
-  mutable NativeConventionSchema *nativeReturnSchema;
-  mutable NativeConventionSchema *nativeParameterSchema;
-
-  /// The storage alignment of this type in bytes.  This is never zero
-  /// for a completely-converted type.
-  Alignment StorageAlignment;
-
-  /// Whether this type is known to be POD.
-  unsigned POD : 1;
-  
-  /// Whether this type is known to be bitwise-takable.
-  unsigned BitwiseTakable : 1;
-
-  /// Whether this type can be assumed to have a fixed size from all
-  /// resilience domains.
-  unsigned AlwaysFixedSize : 1;
-
-  /// The kind of supplemental API this type has, if any.
-  unsigned STIK : 3;
-
-  /// An arbitrary discriminator for the subclass.  This is useful for
-  /// e.g. distinguishing between different TypeInfos that all
-  /// implement the same kind of type.
-  unsigned SubclassKind : 3;
-  enum { InvalidSubclassKind = 0x7 };
-
-protected:
-  void setSubclassKind(unsigned kind) {
-    assert(kind != InvalidSubclassKind);
-    SubclassKind = kind;
-    assert(SubclassKind == kind && "kind was truncated?");
-  }
-
-public:
-  /// Whether this type info has been completely converted.
-  bool isComplete() const { return !StorageAlignment.isZero(); }
-
   /// Whether this type is known to be empty.
   bool isKnownEmpty(ResilienceExpansion expansion) const;
 
+  /// Whether this type is known to be ABI-accessible, i.e. whether it's
+  /// actually possible to do ABI operations on it from this current SILModule.
+  /// See SILModule::isTypeABIAccessible.
+  ///
+  /// All fixed-size types are currently ABI-accessible, although this would
+  /// not be difficult to change (e.g. if we had an archetype size constraint
+  /// that didn't say anything about triviality).
+  IsABIAccessible_t isABIAccessible() const {
+    return IsABIAccessible_t(Bits.TypeInfo.ABIAccessible);
+  }
+
   /// Whether this type is known to be POD, i.e. to not require any
   /// particular action on copy or destroy.
-  IsPOD_t isPOD(ResilienceExpansion expansion) const { return IsPOD_t(POD); }
+  IsPOD_t isPOD(ResilienceExpansion expansion) const {
+    return IsPOD_t(Bits.TypeInfo.POD);
+  }
   
   /// Whether this type is known to be bitwise-takable, i.e. "initializeWithTake"
   /// is equivalent to a memcpy.
   IsBitwiseTakable_t isBitwiseTakable(ResilienceExpansion expansion) const {
-    return IsBitwiseTakable_t(BitwiseTakable);
+    return IsBitwiseTakable_t(Bits.TypeInfo.BitwiseTakable);
   }
   
   /// Returns the type of special interface followed by this TypeInfo.
@@ -178,7 +224,7 @@ public:
   /// properties on their parameter types, but then the program
   /// can rely on them.
   SpecialTypeInfoKind getSpecialTypeInfoKind() const {
-    return SpecialTypeInfoKind(STIK);
+    return SpecialTypeInfoKind(Bits.TypeInfo.Kind);
   }
 
   /// Returns whatever arbitrary data has been stash in the subclass
@@ -186,16 +232,16 @@ public:
   /// distinguishing between TypeInfos, which is useful when multiple
   /// TypeInfo subclasses are used to implement the same kind of type.
   unsigned getSubclassKind() const {
-    assert(SubclassKind != InvalidSubclassKind &&
+    assert(Bits.TypeInfo.SubclassKind != InvalidSubclassKind &&
            "subclass kind has not been initialized!");
-    return SubclassKind;
+    return Bits.TypeInfo.SubclassKind;
   }
 
   /// Whether this type is known to be fixed-size in the local
   /// resilience domain.  If true, this TypeInfo can be cast to
   /// FixedTypeInfo.
   IsFixedSize_t isFixedSize() const {
-    return IsFixedSize_t(STIK >= STIK_Fixed);
+    return IsFixedSize_t(getSpecialTypeInfoKind() >= SpecialTypeInfoKind::Fixed);
   }
 
   /// Whether this type is known to be fixed-size in the given
@@ -207,9 +253,9 @@ public:
     case ResilienceExpansion::Minimal:
       // We can't be universally fixed size if we're not locally
       // fixed size.
-      assert((isFixedSize() || AlwaysFixedSize == IsNotFixedSize) &&
+      assert((isFixedSize() || Bits.TypeInfo.AlwaysFixedSize == IsNotFixedSize) &&
              "IsFixedSize vs IsAlwaysFixedSize mismatch");
-      return IsFixedSize_t(AlwaysFixedSize);
+      return IsFixedSize_t(Bits.TypeInfo.AlwaysFixedSize);
     }
 
     llvm_unreachable("Not a valid ResilienceExpansion.");
@@ -219,13 +265,14 @@ public:
   /// resilience domain.  If true, this TypeInfo can be cast to
   /// LoadableTypeInfo.
   IsLoadable_t isLoadable() const {
-    return IsLoadable_t(STIK >= STIK_Loadable);
+    return IsLoadable_t(getSpecialTypeInfoKind() >= SpecialTypeInfoKind::Loadable);
   }
 
   llvm::Type *getStorageType() const { return StorageType; }
 
   Alignment getBestKnownAlignment() const {
-    return StorageAlignment;
+    auto Shift = Bits.TypeInfo.AlignmentShift;
+    return Alignment(1ull << Shift);
   }
 
   /// Given a generic pointer to this type, produce an Address for it.
@@ -323,23 +370,6 @@ public:
                                                    Address srcBuffer,
                                                    SILType T) const;
 
-  /// Perform a take-initialization from the given fixed-size buffer
-  /// into an uninitialized fixed-size buffer, allocating the buffer if
-  /// necessary and deallocating the destination buffer.  Returns the
-  /// address of the value inside the destination buffer.
-  ///
-  /// This is equivalent to:
-  ///   auto srcAddress = projectBuffer(IGF, srcBuffer, T);
-  ///   initializeBufferWithTake(IGF, destBuffer, srcAddress, T);
-  ///   deallocateBuffer(IGF, srcBuffer, T);
-  /// but may be able to re-use the buffer from the source buffer, and may
-  /// be more efficient for dynamic types, since it uses a single
-  /// value witness call.
-  virtual Address initializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
-                                                   Address destBuffer,
-                                                   Address srcBuffer,
-                                                   SILType T) const;
-
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address src, SILType T,
@@ -405,6 +435,9 @@ public:
                                          SILType T) const = 0;
   
   /// Compute the packing of values of this type into a fixed-size buffer.
+  /// A value might not be stored in the fixed-size buffer because it does not
+  /// fit or because it is not bit-wise takable. Non bit-wise takable values are
+  /// not stored inline by convention.
   FixedPacking getFixedPacking(IRGenModule &IGM) const;
   
   /// Index into an array of objects of this type.

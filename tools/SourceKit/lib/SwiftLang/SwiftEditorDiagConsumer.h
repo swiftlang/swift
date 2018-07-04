@@ -24,6 +24,7 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
   /// Maps from a BufferID to the diagnostics that were emitted inside that
   /// buffer.
   llvm::DenseMap<unsigned, DiagnosticsTy> BufferDiagnostics;
+  DiagnosticsTy InvalidLocDiagnostics;
 
   SmallVector<unsigned, 8> InputBufIDs;
   int LastDiagBufferID = -1;
@@ -40,7 +41,6 @@ class EditorDiagConsumer : public swift::DiagnosticConsumer {
     return BufferDiagnostics[LastDiagBufferID][LastDiagIndex];
   }
 
-  bool HadInvalidLocError = false;
   bool HadAnyError = false;
 
 public:
@@ -63,8 +63,6 @@ public:
   }
 
   void getAllDiagnostics(SmallVectorImpl<DiagnosticEntryInfo> &Result);
-
-  bool hadErrorWithInvalidLoc() const { return HadInvalidLocError; }
 
   bool hadAnyError() const { return HadAnyError; }
 

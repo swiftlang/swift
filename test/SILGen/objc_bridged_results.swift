@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridged_results -emit-silgen %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_bridged_results %s -Xllvm -sil-print-debuginfo -import-objc-header %S/Inputs/objc_bridged_results.h -enable-sil-ownership | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -74,31 +74,31 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
 } // CHECK: } // end sil function '$S20objc_bridged_results19testNullUnspecifiedySayypGSgSo4TestCF'
 
 
-// CHECK-LABEL: sil hidden @$S20objc_bridged_results21testNonnullDictionaryys0F0Vys11AnyHashableVypGSo4TestCF
+// CHECK-LABEL: sil hidden @$S20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF
 func testNonnullDictionary(_ obj: Test) -> [AnyHashable: Any] {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullDictionary!getter.1.foreign : (Test) -> () -> [AnyHashable : Any], $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSDictionary>
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$Ss10DictionaryV10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxq_GSo12NSDictionaryCSgFZ
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$SSD10FoundationE36_unconditionallyBridgeFromObjectiveCySDyxq_GSo12NSDictionaryCSgFZ
   // CHECK: [[DICT_META:%[0-9]+]] = metatype $@thin Dictionary<AnyHashable, Any>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable, Any>([[COCOA_VAL]], [[DICT_META]])
   // CHECK-NOT: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Dictionary<AnyHashable, Any>
   return obj.nonnullDictionary
-} // CHECK: } // end sil function '$S20objc_bridged_results21testNonnullDictionaryys0F0Vys11AnyHashableVypGSo4TestCF'
+} // CHECK: } // end sil function '$S20objc_bridged_results21testNonnullDictionaryySDys11AnyHashableVypGSo4TestCF'
 
-// CHECK-LABEL: sil hidden @$S20objc_bridged_results14testNonnullSetys0F0Vys11AnyHashableVGSo4TestCF
+// CHECK-LABEL: sil hidden @$S20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF
 func testNonnullSet(_ obj: Test) -> Set<AnyHashable> {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Test):
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[ARG]] : $Test, #Test.nonnullSet!getter.1.foreign : (Test) -> () -> Set<AnyHashable>, $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
   // CHECK: [[COCOA_VAL:%[0-9]+]] = apply [[METHOD]]([[ARG]]) : $@convention(objc_method) (Test) -> @autoreleased Optional<NSSet>
-  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$Ss3SetV10FoundationE36_unconditionallyBridgeFromObjectiveCyAByxGSo5NSSetCSgFZ
+  // CHECK: [[CONVERT:%[0-9]+]] = function_ref @$SSh10FoundationE36_unconditionallyBridgeFromObjectiveCyShyxGSo5NSSetCSgFZ
   // CHECK: [[SET_META:%[0-9]+]] = metatype $@thin Set<AnyHashable>.Type
   // CHECK: [[RESULT:%[0-9]+]] = apply [[CONVERT]]<AnyHashable>([[COCOA_VAL]], [[SET_META]])
   // CHECK-NOT: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Set<AnyHashable>
   return obj.nonnullSet
-} // CHECK: } // end sil function '$S20objc_bridged_results14testNonnullSetys0F0Vys11AnyHashableVGSo4TestCF'
+} // CHECK: } // end sil function '$S20objc_bridged_results14testNonnullSetyShys11AnyHashableVGSo4TestCF'
 
 // CHECK-LABEL: sil hidden @$S20objc_bridged_results17testNonnullStringySSSo4TestCF
 func testNonnullString(_ obj: Test) -> String {

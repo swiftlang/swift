@@ -1,5 +1,11 @@
 // RUN: %target-typecheck-verify-swift -enable-throw-without-try -debugger-support
 
+var invalidAccessor : Int {
+  // expected-error@+1 {{@LLDBDebuggerFunction may only be used on 'func' declarations}} {{3-24=}}
+  @LLDBDebuggerFunction
+  get { return 42 }
+}
+
 func foo() throws -> Int { return 0 }
 
 @LLDBDebuggerFunction

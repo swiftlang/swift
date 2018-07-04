@@ -456,8 +456,9 @@ IsSerialized_t SILDeclRef::isSerialized() const {
     // marked as @_fixed_layout.
     if (isStoredPropertyInitializer()) {
       auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
-      auto scope = nominal->getFormalAccessScope(/*useDC=*/nullptr,
-                                                 /*respectVersionedAttr=*/true);
+      auto scope =
+        nominal->getFormalAccessScope(/*useDC=*/nullptr,
+                                      /*treatUsableFromInlineAsPublic=*/true);
       if (!scope.isPublic())
         return IsNotSerialized;
       if (nominal->isFormallyResilient())
@@ -652,7 +653,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
   case SILDeclRef::Kind::GlobalAccessor:
     assert(!isCurried);
-    return mangler.mangleAccessorEntity(AccessorKind::IsMutableAddressor,
+    return mangler.mangleAccessorEntity(AccessorKind::MutableAddress,
                                         AddressorKind::Unsafe,
                                         cast<AbstractStorageDecl>(getDecl()),
                                         /*isStatic*/ false,
@@ -768,6 +769,14 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 
   // Methods from extensions don't go into vtables (yet).
   if (context->isExtensionContext())
+    return SubclassScope::NotApplicable;
+
+  // Various forms of thunks don't either.
+  if (isThunk() || isForeign)
+    return SubclassScope::NotApplicable;
+
+  // Default arg generators only need to be visible in Swift 3.
+  if (isDefaultArgGenerator() && !context->getASTContext().isSwiftVersion3())
     return SubclassScope::NotApplicable;
 
   auto *classType = context->getAsClassOrClassExtensionContext();

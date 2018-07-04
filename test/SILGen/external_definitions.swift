@@ -1,7 +1,4 @@
-
-// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen -enable-sil-ownership | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-emit-silgen -sdk %S/Inputs %s -enable-sil-ownership -enable-objc-interop | %FileCheck %s
 
 import ansible
 
@@ -32,7 +29,7 @@ hasNoPrototype()
 // CHECK-LABEL: sil shared [serializable] @$SSo7AnsibleC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@in Optional<Any>, @thick Ansible.Type) -> @owned Optional<Ansible>
 
 // -- Native Swift thunk for NSAnse
-// CHECK: sil shared [serialized] [thunk] @$SSo6NSAnseySo7AnsibleCSgADFTO : $@convention(thin) (@guaranteed Optional<Ansible>) -> @owned Optional<Ansible> {
+// CHECK: sil shared [serializable] [thunk] @$SSo6NSAnseySo7AnsibleCSgADFTO : $@convention(thin) (@guaranteed Optional<Ansible>) -> @owned Optional<Ansible> {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $Optional<Ansible>):
 // CHECK:   [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[FUNC:%.*]] = function_ref @NSAnse : $@convention(c) (Optional<Ansible>) -> @autoreleased Optional<Ansible>

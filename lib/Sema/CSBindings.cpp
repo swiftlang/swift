@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -66,6 +66,14 @@ ConstraintSystem::determineBestBindings() {
         continue;
 
       for (auto &binding : relatedBindings->getSecond().Bindings) {
+        // We need the binding kind for the potential binding to
+        // either be Exact or Supertypes in order for it to make sense
+        // to add Supertype bindings based on the relationship between
+        // our type variables.
+        if (binding.Kind != AllowedBindingKind::Exact &&
+            binding.Kind != AllowedBindingKind::Supertypes)
+          continue;
+
         auto type = binding.BindingType;
 
         if (ConstraintSystem::typeVarOccursInType(typeVar, type))
@@ -253,6 +261,17 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
   if (type->hasError())
     return None;
 
+  // Don't deduce autoclosure types or single-element, non-variadic
+  // tuples.
+  if (shouldBindToValueType(constraint)) {
+    if (auto funcTy = type->getAs<FunctionType>()) {
+      if (funcTy->isAutoClosure())
+        type = funcTy->getResult();
+    }
+
+    type = type->getWithoutImmediateLabel();
+  }
+
   // If the source of the binding is 'OptionalObject' constraint
   // and type variable is on the left-hand side, that means
   // that it _has_ to be of optional type, since the right-hand
@@ -304,17 +323,6 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
     result.InvolvesTypeVariables = true;
     return None;
-  }
-
-  // Don't deduce autoclosure types or single-element, non-variadic
-  // tuples.
-  if (shouldBindToValueType(constraint)) {
-    if (auto funcTy = type->getAs<FunctionType>()) {
-      if (funcTy->isAutoClosure())
-        type = funcTy->getResult();
-    }
-
-    type = type->getWithoutImmediateLabel();
   }
 
   // Make sure we aren't trying to equate type variables with different

@@ -74,11 +74,6 @@ public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
   @usableFromInline // FIXME(sil-serialize-all)
   internal let _sequence2: Sequence2
 
-  @available(*, deprecated, renamed: "Sequence1.Iterator")
-  public typealias Stream1 = Sequence1.Iterator
-  @available(*, deprecated, renamed: "Sequence2.Iterator")
-  public typealias Stream2 = Sequence2.Iterator
-
   /// Creates an instance that makes pairs of elements from `sequence1` and
   /// `sequence2`.
   @inlinable // FIXME(sil-serialize-all)
@@ -101,7 +96,6 @@ extension Zip2Sequence {
 
     /// Creates an instance around a pair of underlying iterators.
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(
     _ iterator1: Sequence1.Iterator, 
     _ iterator2: Sequence2.Iterator
@@ -152,6 +146,3 @@ extension Zip2Sequence: Sequence {
       _sequence2.makeIterator())
   }
 }
-
-// @available(*, deprecated, renamed: "Zip2Sequence.Iterator")
-public typealias Zip2Iterator<T, U> = Zip2Sequence<T, U>.Iterator where T: Sequence, U: Sequence

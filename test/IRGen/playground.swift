@@ -13,7 +13,7 @@ public func anchor() {}
 
 anchor()
 
-// CHECK-LABEL: define{{( protected)?}} i32 @main
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} i32 @main
 // CHECK:         call void @runtime_registration
 // CHECK:         call swiftcc void @"$S10playground6anchoryyF"
 // CHECK:         ret void

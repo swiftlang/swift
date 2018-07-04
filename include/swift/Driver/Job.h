@@ -26,6 +26,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/Chrono.h"
+#include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <memory>
@@ -237,6 +238,11 @@ public:
 
   using EnvironmentVector = std::vector<std::pair<const char *, const char *>>;
 
+  /// If positive, contains llvm::ProcessID for a real Job on the host OS. If
+  /// negative, contains a quasi-PID, which identifies a Job that's a member of
+  /// a BatchJob _without_ denoting an operating system process.
+  using PID = int64_t;
+
 private:
   /// The action which caused the creation of this Job, and the conditions
   /// under which it must be run.
@@ -265,6 +271,14 @@ private:
   /// Whether the job wants a list of input or output files created.
   std::vector<FilelistInfo> FilelistFileInfos;
 
+  /// Response file path
+  const char *ResponseFilePath;
+
+  /// This contains a single argument pointing to the response file path with
+  /// the '@' prefix.
+  /// The argument string must be kept alive as long as the Job is alive.
+  const char *ResponseFileArg;
+
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
@@ -275,12 +289,16 @@ public:
       const char *Executable,
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
-      std::vector<FilelistInfo> Infos = {})
+      std::vector<FilelistInfo> Infos = {},
+      const char *ResponseFilePath = nullptr,
+      const char *ResponseFileArg = nullptr)
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
-        FilelistFileInfos(std::move(Infos)) {}
+        FilelistFileInfos(std::move(Infos)),
+        ResponseFilePath(ResponseFilePath),
+        ResponseFileArg(ResponseFileArg) {}
 
   virtual ~Job();
 
@@ -290,7 +308,9 @@ public:
 
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
+  ArrayRef<const char *> getResponseFileArg() const { return ResponseFileArg; }
   ArrayRef<FilelistInfo> getFilelistInfos() const { return FilelistFileInfos; }
+  ArrayRef<const char *> getArgumentsForTaskExecution() const;
 
   ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
@@ -328,10 +348,23 @@ public:
   void printCommandLineAndEnvironment(raw_ostream &Stream,
                                       StringRef Terminator = "\n") const;
 
+  /// Call the provided Callback with any Jobs (and their possibly-quasi-PIDs)
+  /// contained within this Job; if this job is not a BatchJob, just pass \c
+  /// this and the provided \p OSPid back to the Callback.
+  virtual void forEachContainedJobAndPID(
+      llvm::sys::ProcessInfo::ProcessId OSPid,
+      llvm::function_ref<void(const Job *, Job::PID)> Callback) const {
+    Callback(this, static_cast<Job::PID>(OSPid));
+  }
+
   void dump() const LLVM_ATTRIBUTE_USED;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);
+
+  bool hasResponseFile() const { return ResponseFilePath != nullptr; }
+
+  bool writeArgsToResponseFile() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
@@ -345,17 +378,37 @@ public:
 /// See ToolChain::jobsAreBatchCombinable for details.
 
 class BatchJob : public Job {
-  SmallVector<const Job *, 4> CombinedJobs;
+
+  /// The set of constituents making up the batch.
+  const SmallVector<const Job *, 4> CombinedJobs;
+
+  /// A negative number to use as the base value for assigning quasi-PID to Jobs
+  /// in the \c CombinedJobs array. Quasi-PIDs count _down_ from this value.
+  const Job::PID QuasiPIDBase;
+
 public:
   BatchJob(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
            std::unique_ptr<CommandOutput> Output, const char *Executable,
            llvm::opt::ArgStringList Arguments,
            EnvironmentVector ExtraEnvironment,
            std::vector<FilelistInfo> Infos,
-           ArrayRef<const Job *> Combined);
+           ArrayRef<const Job *> Combined, Job::PID &NextQuasiPID);
 
   ArrayRef<const Job*> getCombinedJobs() const {
     return CombinedJobs;
+  }
+
+  /// Call the provided callback for each Job in the batch, passing the
+  /// corresponding quasi-PID with each Job.
+  void forEachContainedJobAndPID(
+      llvm::sys::ProcessInfo::ProcessId OSPid,
+      llvm::function_ref<void(const Job *, Job::PID)> Callback) const override {
+    Job::PID QPid = QuasiPIDBase;
+    assert(QPid < 0);
+    for (auto const *J : CombinedJobs) {
+      assert(QPid != std::numeric_limits<Job::PID>::min());
+      Callback(J, QPid--);
+    }
   }
 };
 

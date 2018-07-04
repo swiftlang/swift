@@ -20,11 +20,13 @@
 // --------------------------------------------------------------------
 // Now check that we do generate line+scope info with -g.
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -g -o - -disable-sil-linking \
-// RUN:   | %FileCheck %s --check-prefix=CHECK-NOSIL
 // --------------------------------------------------------------------
 // Currently -gdwarf-types should give the same results as -g.
 // RUN: %target-swift-frontend %s -emit-ir -gdwarf-types -o - | %FileCheck %s
+// --------------------------------------------------------------------
+// Verify that -g -debug-info-format=dwarf gives the same results as -g.
+// RUN: %target-swift-frontend %s -emit-ir -g -debug-info-format=dwarf -o - \
+// RUN:   | %FileCheck %s
 // --------------------------------------------------------------------
 //
 // CHECK: foo
@@ -49,10 +51,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        // CHECK-DAG: !DILexicalBlock({{.*}} line: [[@LINE-1]]
        // Transparent inlined multiply:
        // CHECK-DAG: smul{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+4]], column: 16,
-       // Runtime call to multiply function:
-       // CHECK-NOSIL: @"$Ss5Int64V1moiyA2B_ABtFZ{{.*}}, !dbg ![[MUL:[0-9]+]]
-       // CHECK-NOSIL: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
+       // CHECK-DAG: [[MUL]] = !DILocation(line: [[@LINE+1]], column: 16,
        return a*b
      } else {
        // CHECK-DAG: ![[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]], column: 13)
@@ -69,7 +68,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 
 // CHECK-DAG: ![[FILE_CWD:[0-9]+]] = !DIFile(filename: "{{.*}}DebugInfo/basic.swift", directory: "{{.*}}")
 // CHECK-DAG: ![[MAINFILE:[0-9]+]] = !DIFile(filename: "basic.swift", directory: "{{.*}}DebugInfo")
-// CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}} flags: "{{[^"]*}}-emit-ir
+// CHECK-DAG: !DICompileUnit(language: DW_LANG_Swift, file: ![[FILE_CWD]],{{.*}} producer: "{{.*}}Swift version{{.*}},{{.*}}
 // CHECK-DAG: !DISubprogram(name: "main", {{.*}}file: ![[MAINFILE]],
 
 // Function type for foo.

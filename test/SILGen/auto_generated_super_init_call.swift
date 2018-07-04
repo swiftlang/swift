@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-debuginfo -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-debuginfo -enable-sil-ownership %s | %FileCheck %s
 
 // Test that we emit a call to super.init at the end of the initializer, when none has been previously added.
 

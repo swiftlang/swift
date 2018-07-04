@@ -202,6 +202,56 @@ extension Syntax {
     where Target: TextOutputStream {
     data.raw.write(to: &target)
   }
+
+  /// The starting location, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterLeadingTrivia: Whether to skip leading trivia when getting
+  ///                         the node's location. Defaults to `true`.
+  public func startLocation(
+    in file: URL,
+    afterLeadingTrivia: Bool = true
+  ) -> SourceLocation {
+    let pos = afterLeadingTrivia ? 
+      data.position.copy() :
+      data.positionAfterSkippingLeadingTrivia.copy()
+    return SourceLocation(file: file.path, position: pos)
+  }
+
+
+  /// The ending location, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterTrailingTrivia: Whether to skip trailing trivia when getting
+  ///                          the node's location. Defaults to `false`.
+  public func endLocation(
+    in file: URL,
+    afterTrailingTrivia: Bool = false
+  ) -> SourceLocation {
+    let pos = data.position.copy()
+    raw.accumulateAbsolutePosition(pos)
+    if afterTrailingTrivia {
+      raw.accumulateTrailingTrivia(pos)
+    }
+    return SourceLocation(file: file.path, position: pos)
+  }
+
+  /// The source range, in the provided file, of this Syntax node.
+  /// - Parameters:
+  ///   - file: The file URL this node resides in.
+  ///   - afterLeadingTrivia: Whether to skip leading trivia when getting
+  ///                          the node's start location. Defaults to `true`.
+  ///   - afterTrailingTrivia: Whether to skip trailing trivia when getting
+  ///                          the node's end location. Defaults to `false`.
+  public func sourceRange(
+    in file: URL,
+    afterLeadingTrivia: Bool = true,
+    afterTrailingTrivia: Bool = false
+  ) -> SourceRange {
+    let start = startLocation(in: file, afterLeadingTrivia: afterLeadingTrivia)
+    let end = endLocation(in: file, afterTrailingTrivia: afterTrailingTrivia)
+    return SourceRange(start: start, end: end)
+  }
 }
 
 /// Determines if two nodes are equal to each other.

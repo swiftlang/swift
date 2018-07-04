@@ -169,6 +169,8 @@ private:
   bool diagnoseInfiniteRecursion(CanType parentType, ValueDecl *member,
                                  CanType memberType);
 
+  void diagnoseNonWellFoundedEnum(EnumDecl *E);
+
   void addPathElementsTo(Path &path, CanType type);
   void addPathElement(Path &path, ValueDecl *member, CanType memberType);
 
@@ -272,7 +274,11 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
 bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
                                    unsigned depth) {
   // Indirect enums are representational leaves.
-  if (E->isIndirect()) return false;
+  if (E->isIndirect()) {
+    // Diagnose whether the enum is non-well-founded before bailing
+    diagnoseNonWellFoundedEnum(E);
+    return false;
+  }
 
   startExpandingType(type);
 
@@ -298,6 +304,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (addMember(type, elt, eltType, depth))
       return true;
   }
+  diagnoseNonWellFoundedEnum(E);
 
   return false;
 }
@@ -600,4 +607,45 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
               pathString);
 
   return true;
+}
+
+/// Show a warning if all cases of the given enum are recursive,
+/// making it impossible to be instantiated. Such an enum is 'non-well-founded'.
+/// The outcome of this method is irrelevant.
+void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
+
+  auto containsType = [](TupleType *tuple, Type E) -> bool {
+    for (auto type: tuple->getElementTypes()) {
+      if (type->isEqual(E))
+        return true;
+    }
+    return false;
+  };
+  auto isNonWellFounded = [containsType, E]() -> bool {
+    auto elts = E->getAllElements();
+    if (elts.empty())
+      return false;
+
+    for (auto elt: elts) {
+      if (!elt->hasInterfaceType() ||
+          !(elt->isIndirect() || E->isIndirect()))
+        return false;
+
+      auto argTy = elt->getArgumentInterfaceType();
+      if (!argTy)
+        return false;
+
+      if (auto tuple = argTy->getAs<TupleType>()) {
+        if (!containsType(tuple, E->getSelfInterfaceType()))
+          return false;
+      } else if (auto paren = dyn_cast<ParenType>(argTy.getPointer())) {
+        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+          return false;
+      }
+    }
+    return true;
+  };
+
+  if (isNonWellFounded())
+    TC.diagnose(E, diag::enum_non_well_founded);
 }

@@ -309,7 +309,11 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel();
+  /// If \p emitForParallelEmission is true ensures that symbols that are
+  /// expressed as relative pointers are collocated in the same output module
+  /// with their base symbol. For example, witness methods need to be collocated
+  /// with the witness table in the same LLVM module.
+  void emitGlobalTopLevel(bool emitForParallelEmission = false);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -353,6 +357,8 @@ public:
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
 
+  void noteUseOfAnyParentTypeMetadata(NominalTypeDecl *type);
+
 private:
   void noteUseOfTypeGlobals(NominalTypeDecl *type,
                             bool isUseOfMetadata,
@@ -389,6 +395,8 @@ public:
 
   /// Return the effective triple used by clang.
   llvm::Triple getEffectiveClangTriple();
+
+  const llvm::DataLayout &getClangDataLayout();
 };
 
 class ConstantReference {
@@ -561,6 +569,8 @@ public:
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
   llvm::PointerType *WitnessTablePtrPtrTy;   /// i8***
+
+  llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
   /// elements.
@@ -760,6 +770,7 @@ private:
   void destroyMetadataLayoutMap();
 
   friend class GenericContextScope;
+  friend class CompletelyFragileScope;
   
 //--- Globals ---------------------------------------------------------------
 public:
@@ -965,13 +976,14 @@ public:
   /// reflection metadata.
   llvm::SetVector<const StructDecl *> ImportedStructs;
 
+  llvm::Constant *getTypeRef(CanType type);
   llvm::Constant *getAddrOfStringForTypeRef(StringRef mangling);
   llvm::Constant *getAddrOfStringForTypeRef(const SymbolicMangling &mangling);
   llvm::Constant *getAddrOfFieldName(StringRef Name);
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             SubstitutionList subs,
+                                             SubstitutionMap subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
@@ -1017,6 +1029,8 @@ public:
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
   llvm::AttributeList getAllocAttrs();
+
+  bool isStandardLibrary() const;
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1256,6 +1270,8 @@ public:
   void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   void emitSharedContextDescriptor(DeclContext *dc);
+
+  void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
 
 private:
   llvm::Constant *

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name optional -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name optional -enable-sil-ownership %s | %FileCheck %s
 
 func testCall(_ f: (() -> ())?) {
   f?()
@@ -96,7 +96,7 @@ func tuple_bind(_ x: (Int, String)?) -> String? {
 
 // rdar://21883752 - We were crashing on this function because the deallocation happened
 // out of scope.
-// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyys10DictionaryVySiSaySiGGFfA_
+// CHECK-LABEL: sil hidden @$S8optional16crash_on_deallocyySDySiSaySiGGFfA_
 func crash_on_dealloc(_ dict : [Int : [Int]] = [:]) {
   var dict = dict
   dict[1]?.append(2)

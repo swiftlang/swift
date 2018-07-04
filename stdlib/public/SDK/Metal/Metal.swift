@@ -64,6 +64,11 @@ extension MTLComputeCommandEncoder {
     public func setSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
         __setSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
     }
+    
+    @available(macOS 10.14, iOS 12.0, tvOS 12.0, *)
+    public func memoryBarrier(_ resources:[MTLResource]) {
+        __memoryBarrier(resources: resources, count: resources.count)
+    }
 }
 
 @available(macOS 10.11, iOS 8.0, tvOS 8.0, *)
@@ -190,6 +195,13 @@ extension MTLRenderCommandEncoder {
     @available(iOS 11.0, *)
     public func setTileSamplerStates(_ samplers: [MTLSamplerState?], lodMinClamps: [Float], lodMaxClamps: [Float], range: Range<Int>) {
         __setTileSamplerStates(samplers, lodMinClamps: lodMinClamps, lodMaxClamps: lodMaxClamps, with: NSRange(location: range.lowerBound, length: range.count))
+    }
+#endif
+    
+#if os(macOS)
+    @available(macOS 10.14, *)
+    public func memoryBarrier(_ resources: [MTLResource], after: MTLRenderStages, before: MTLRenderStages) {
+        __memoryBarrier(resources: resources, count: resources.count, after: after, before: before)
     }
 #endif
 }

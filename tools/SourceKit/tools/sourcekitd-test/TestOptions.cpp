@@ -276,6 +276,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintRawResponse = true;
       break;
 
+    case OPT_dont_print_response:
+      PrintResponse = false;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = llvm::None;
@@ -329,6 +333,20 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         return true;
       }
       CancelOnSubsequentRequest = Cancel;
+      break;
+
+    case OPT_time_request:
+      timeRequest = true;
+      break;
+
+    case OPT_repeat_request:
+      if (StringRef(InputArg->getValue()).getAsInteger(10, repeatRequest)) {
+        llvm::errs() << "error: expected integer for 'cancel-on-subsequent-request'\n";
+        return true;
+      } else if (repeatRequest < 1) {
+        llvm::errs() << "error: repeat-request must be >= 1\n";
+        return true;
+      }
       break;
 
     case OPT_UNKNOWN:

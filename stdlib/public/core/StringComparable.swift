@@ -20,7 +20,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isEqual(
     _ left: _StringGuts, to right: _StringGuts
   ) -> Bool {
@@ -28,11 +27,18 @@ extension _StringGuts {
     if left._bitwiseEqualTo(right) {
       return true
     }
+    if left._isSmall && right._isSmall {
+      // TODO: Ensure normality when adding UTF-8 support
+      _sanityCheck(left._isASCIIOrSmallASCII && right._isASCIIOrSmallASCII,
+        "Need to ensure normality")
+
+      // Equal small strings should be bitwise equal if ASCII
+      return false
+    }
     return compare(left, to: right) == 0
   }
 
   @inlinable
-  @usableFromInline
   internal static func isEqual(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
@@ -45,7 +51,6 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func isLess(
     _ left: _StringGuts, than right: _StringGuts
   ) -> Bool {
@@ -53,11 +58,14 @@ extension _StringGuts {
     if left._bitwiseEqualTo(right) {
       return false
     }
+    if left._isSmall && right._isSmall {
+      // Small strings compare lexicographically if ASCII
+      return left._smallUTF8String._compare(right._smallUTF8String) == .less
+    }
     return compare(left, to: right) == -1
   }
 
   @inlinable
-  @usableFromInline
   internal static func isLess(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     than right: _StringGuts, _ rightRange: Range<Int>
@@ -70,21 +78,20 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func compare(
     _ left: _StringGuts, _ leftRange: Range<Int>,
     to right: _StringGuts, _ rightRange: Range<Int>
   ) -> Int {
     defer { _fixLifetime(left) }
     defer { _fixLifetime(right) }
-    
+
     if left.isASCII && right.isASCII {
       let leftASCII = left._unmanagedASCIIView[leftRange]
       let rightASCII = right._unmanagedASCIIView[rightRange]
       let result = leftASCII.compareASCII(to: rightASCII)
       return result
     }
-    
+
     let leftBits = left.rawBits
     let rightBits = right.rawBits
 
@@ -92,20 +99,19 @@ extension _StringGuts {
   }
 
   @inlinable
-  @usableFromInline
   internal static func compare(
     _ left: _StringGuts, to right: _StringGuts
   ) -> Int {
     defer { _fixLifetime(left) }
     defer { _fixLifetime(right) }
-    
+
     if left.isASCII && right.isASCII {
       let leftASCII = left._unmanagedASCIIView
       let rightASCII = right._unmanagedASCIIView
       let result = leftASCII.compareASCII(to: rightASCII)
       return result
     }
-    
+
     let leftBits = left.rawBits
     let rightBits = right.rawBits
 

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name access_marker_gen -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -enable-sil-ownership %s | %FileCheck %s
 
 func modify<T>(_ x: inout T) {}
 
@@ -150,5 +150,6 @@ func testDispatchedClassInstanceProperty(d: D) {
 // CHECK:     bb0([[D:%.*]] : @guaranteed $D
 // CHECK:       [[METHOD:%.*]] = class_method [[D]] : $D, #D.x!materializeForSet.1
 // CHECK:       apply [[METHOD]]({{.*}}, [[D]])
+// CHECK:       begin_access [modify] [unsafe]
 // CHECK-NOT:   begin_access
 

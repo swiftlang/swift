@@ -62,8 +62,7 @@ public:
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
                                         GenericEnvironment *GE, VarDecl *Decl,
-                                        swift::Type Ty, const TypeInfo &Info,
-                                        bool Unwrap);
+                                        swift::Type Ty, const TypeInfo &Info);
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
@@ -84,10 +83,6 @@ public:
   DeclContext *getDeclContext() const { return DeclCtx; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
-  void unwrapLValueOrInOutType() {
-    Type = Type->getWithoutSpecifierType().getPointer();
-  }
-
   // Determine whether this type is an Archetype itself.
   bool isArchetype() const {
     return Type->getWithoutSpecifierType()->is<ArchetypeType>();
@@ -96,11 +91,9 @@ public:
   /// LValues, inout args, and Archetypes are implicitly indirect by
   /// virtue of their DWARF type.
   //
-  // FIXME: Should this check if the lowered SILType is address only
-  // instead? Otherwise optionals of archetypes etc will still have
-  // 'isImplicitlyIndirect()' return false.
+  // FIXME: There exists an inverse workaround in LLDB. Both should be removed.
   bool isImplicitlyIndirect() const {
-    return Type->hasLValueType() || isArchetype() || Type->is<InOutType>();
+    return isArchetype();
   }
 
   bool isNull() const { return Type == nullptr; }

@@ -46,6 +46,7 @@ namespace swift {
   class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
+  class Evaluator;
   class FileUnit;
   class GenericEnvironment;
   class GenericParamList;
@@ -189,7 +190,8 @@ namespace swift {
                            unsigned StartElem = 0,
                            unsigned WarnLongFunctionBodies = 0,
                            unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0);
+                           unsigned ExpressionTimeoutThreshold = 0,
+                           unsigned SwitchCheckingInvocationThreshold = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -341,6 +343,13 @@ namespace swift {
     struct Implementation;
     Implementation &Impl;
   };
+
+  /// Register the type checker's request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any semantic
+  /// queries should call this function after forming the ASTContext.
+  void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
+
 } // end namespace swift
 
 #endif // SWIFT_SUBSYSTEMS_H

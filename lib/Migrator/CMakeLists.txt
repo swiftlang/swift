@@ -1,9 +1,14 @@
 set(datafiles
-  macos.json
-  ios.json
-  tvos.json
-  watchos.json
-  overlay.json
+  macos3.json
+  macos4.json
+  ios3.json
+  ios4.json
+  tvos3.json
+  tvos4.json
+  watchos3.json
+  watchos4.json
+  overlay3.json
+  overlay4.json
 )
 set(SWIFTLIB_DIR
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")

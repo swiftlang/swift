@@ -158,10 +158,8 @@ func testInOut(_ arg: inout Int) {
 }
 
 // Don't infer inout types.
-var ir = &i // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-            // expected-error{{'&' can only appear immediately in a call argument list}}
-var ir2 = ((&i)) // expected-error{{variable has type 'inout Int' which includes nested inout parameters}} \
-                 // expected-error{{'&' can only appear immediately in a call argument list}}
+var ir = &i // expected-error {{use of extraneous '&'}}
+var ir2 = ((&i)) // expected-error {{use of extraneous '&'}}
 
 // <rdar://problem/17133089>
 func takeArrayRef(_ x: inout Array<String>) { }

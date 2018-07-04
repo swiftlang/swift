@@ -64,3 +64,11 @@ class Impl_2484 : SR_2484 {
     super.init() // expected-error {{'init' is inaccessible due to 'private' protection level}}
   }
 }
+
+class A_Priv<T> {
+  private init(_ foo: T) {}
+}
+
+class B_Override<U> : A_Priv<[U]> {
+  init(_ foo: [U]) { fatalError() } // Ok, because effectively overrides init from parent which is invisible
+}

@@ -43,6 +43,10 @@ enum class Status {
   /// The module file is an overlay for a Clang module, which can't be found.
   MissingShadowedModule,
 
+  /// The module file depends on a module that is still being loaded, i.e.
+  /// there is a circular dependency.
+  CircularDependency,
+
   /// The module file depends on a bridging header that can't be loaded.
   FailedToLoadBridgingHeader,
 

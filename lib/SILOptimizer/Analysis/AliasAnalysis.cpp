@@ -652,8 +652,8 @@ bool AliasAnalysis::canApplyDecrementRefCount(FullApplySite FAS, SILValue Ptr) {
   if (!EA->canEscapeTo(Ptr, FAS))
     return false;
 
-  SideEffectAnalysis::FunctionEffects ApplyEffects;
-  SEA->getEffects(ApplyEffects, FAS);
+  FunctionSideEffects ApplyEffects;
+  SEA->getCalleeEffects(ApplyEffects, FAS);
 
   auto &GlobalEffects = ApplyEffects.getGlobalEffects();
   if (ApplyEffects.mayReadRC() || GlobalEffects.mayRelease())

@@ -21,7 +21,7 @@ LiteralsTestSuite.test("file") {
 }
 
 LiteralsTestSuite.test("image") {
-  let image = #imageLiteral(resourceName: NSImageNameComputer)
+  let image = #imageLiteral(resourceName: NSImage.Name.computer.rawValue)
   expectTrue(image.isValid)
 }
 

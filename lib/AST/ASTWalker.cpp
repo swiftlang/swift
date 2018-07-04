@@ -158,7 +158,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         PBD->setPattern(idx, Pat, entry.getInitContext());
       else
         return true;
-      if (entry.getInit()) {
+      if (entry.getInit() &&
+          (!entry.isInitializerLazy() ||
+           Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
@@ -942,6 +944,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitLazyInitializerExpr(LazyInitializerExpr *E) {
+    // Initializer is totally opaque for most visitation purposes.
+    return E;
+  }
+
   Expr *visitObjCSelectorExpr(ObjCSelectorExpr *E) {
     Expr *sub = doIt(E->getSubExpr());
     if (!sub) return nullptr;
@@ -1705,7 +1712,7 @@ bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {
 
 bool Traversal::visitSILBoxTypeRepr(SILBoxTypeRepr *T) {
   for (auto &field : T->getFields()) {
-    if (doIt(field.FieldType))
+    if (doIt(field.getFieldType()))
       return true;
   }
   for (auto &arg : T->getGenericArguments()) {

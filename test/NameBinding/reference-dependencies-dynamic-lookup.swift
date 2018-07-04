@@ -14,7 +14,7 @@ import Foundation
 
 // CHECK-LABEL: provides-dynamic-lookup:
 
-@objc class Base : NSObject {
+@objc @objcMembers class Base : NSObject {
   // CHECK-DAG: - "foo"
   func foo() {}
 

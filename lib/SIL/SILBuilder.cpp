@@ -23,7 +23,8 @@ using namespace swift;
 
 SILBuilder::SILBuilder(SILGlobalVariable *GlobVar,
                        SmallVectorImpl<SILInstruction *> *InsertedInstrs)
-    : F(nullptr), Mod(GlobVar->getModule()), InsertedInstrs(InsertedInstrs) {
+    : TempContext(GlobVar->getModule(), InsertedInstrs), C(TempContext),
+      F(nullptr) {
   setInsertionPoint(&GlobVar->StaticInitializerBlock);
 }
 
@@ -41,7 +42,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   // Derive the tuple type from the elements.
   SmallVector<TupleTypeElt, 4> eltTypes;
   for (auto elt : elts)
-    eltTypes.push_back(elt->getType().getSwiftRValueType());
+    eltTypes.push_back(elt->getType().getASTType());
   auto tupleType = SILType::getPrimitiveObjectType(
       CanType(TupleType::get(eltTypes, getASTContext())));
 
@@ -50,7 +51,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
-                                        SubstitutionList subs,
+                                        SubstitutionMap subs,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -61,8 +62,9 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   auto params = FTI->getParameters();
   auto newParams = params.slice(0, params.size() - argCount);
 
-  auto extInfo = FTI->getExtInfo().withRepresentation(
-      SILFunctionType::Representation::Thick);
+  auto extInfo = FTI->getExtInfo()
+    .withRepresentation(SILFunctionType::Representation::Thick)
+    .withIsPseudogeneric(false);
 
   // If the original method has an @unowned_inner_pointer return, the partial
   // application thunk will lifetime-extend 'self' for us, converting the
@@ -100,7 +102,8 @@ SILBuilder::tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
     return nullptr;
 
   return insert(UncheckedRefCastInst::create(getSILDebugLocation(Loc), Op,
-                                   ResultTy, getFunction(), OpenedArchetypes));
+                                             ResultTy, getFunction(),
+                                             C.OpenedArchetypes));
 }
 
 ClassifyBridgeObjectInst *
@@ -120,15 +123,15 @@ SILBuilder::createUncheckedBitCast(SILLocation Loc, SILValue Op, SILType Ty) {
   assert(Ty.isLoadableOrOpaque(getModule()));
   if (Ty.isTrivial(getModule()))
     return insert(UncheckedTrivialBitCastInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getFunction(), OpenedArchetypes));
+        getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
 
   if (auto refCast = tryCreateUncheckedRefCast(Loc, Op, Ty))
     return refCast;
 
   // The destination type is nontrivial, and may be smaller than the source
   // type, so RC identity cannot be assumed.
-  return insert(UncheckedBitwiseCastInst::create(getSILDebugLocation(Loc), Op,
-                                         Ty, getFunction(), OpenedArchetypes));
+  return insert(UncheckedBitwiseCastInst::create(
+      getSILDebugLocation(Loc), Op, Ty, getFunction(), C.OpenedArchetypes));
 }
 
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
@@ -261,7 +264,8 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       isa<RetainValueInst>(Inst) || isa<UnownedRetainInst>(Inst) ||
       isa<UnownedReleaseInst>(Inst) || isa<StrongRetainUnownedInst>(Inst) ||
       isa<StoreWeakInst>(Inst) || isa<StrongRetainInst>(Inst) ||
-      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst))
+      isa<AllocStackInst>(Inst) || isa<DeallocStackInst>(Inst) ||
+      isa<CopyUnownedValueInst>(Inst))
     return false;
 
   // Assign and copyaddr of trivial types cannot drop refcounts, and 'inits'
@@ -420,7 +424,7 @@ SILValue SILBuilder::emitObjCToThickMetatype(SILLocation Loc, SILValue Op,
 void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
   // The list of archetypes from the previous instruction needs
   // to be replaced, because it may reference a removed instruction.
-  OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
+  C.OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
   if (I && I->getNumTypeDependentOperands() > 0)
     return;
 
@@ -447,18 +451,19 @@ void SILBuilder::addOpenedArchetypeOperands(SILInstruction *I) {
       I = SVI;
       continue;
     }
-    auto Def = OpenedArchetypes.getOpenedArchetypeDef(Archetype);
+    auto Def = C.OpenedArchetypes.getOpenedArchetypeDef(Archetype);
     // Return if it is a known open archetype.
     if (Def)
       return;
     // Otherwise register it and return.
-    if (OpenedArchetypesTracker)
-      OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, SVI);
+    if (C.OpenedArchetypesTracker)
+      C.OpenedArchetypesTracker->addOpenedArchetypeDef(Archetype, SVI);
     return;
   }
 
   if (I && I->getNumTypeDependentOperands() > 0) {
-    OpenedArchetypes.addOpenedArchetypeOperands(I->getTypeDependentOperands());
+    C.OpenedArchetypes.addOpenedArchetypeOperands(
+        I->getTypeDependentOperands());
   }
 }
 

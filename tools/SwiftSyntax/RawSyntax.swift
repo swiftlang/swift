@@ -251,12 +251,10 @@ extension RawSyntax {
     }
   }
 
-  var isSourceFile: Bool {
-    switch self {
-    case .node(let kind, _, _):
-      return kind == SyntaxKind.sourceFile
-    default:
-      return false
+  func accumulateTrailingTrivia(_ pos: AbsolutePosition) {
+    guard let trivia = trailingTrivia else { return }
+    for piece in trivia {
+      piece.accumulateAbsolutePosition(pos)
     }
   }
 }

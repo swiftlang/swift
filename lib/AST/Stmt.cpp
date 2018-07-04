@@ -368,10 +368,10 @@ SourceLoc CaseLabelItem::getEndLoc() const {
 }
 
 CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-                   bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
-                   Optional<bool> Implicit)
+                   bool HasBoundDecls, SourceLoc UnknownAttrLoc,
+                   SourceLoc ColonLoc, Stmt *Body, Optional<bool> Implicit)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(Implicit, CaseLoc)),
-      CaseLoc(CaseLoc), ColonLoc(ColonLoc),
+      UnknownAttrLoc(UnknownAttrLoc), CaseLoc(CaseLoc), ColonLoc(ColonLoc),
       BodyAndHasBoundDecls(Body, HasBoundDecls) {
   Bits.CaseStmt.NumPatterns = CaseLabelItems.size();
   assert(Bits.CaseStmt.NumPatterns > 0 &&
@@ -387,12 +387,13 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
 
 CaseStmt *CaseStmt::create(ASTContext &C, SourceLoc CaseLoc,
                            ArrayRef<CaseLabelItem> CaseLabelItems,
-                           bool HasBoundDecls, SourceLoc ColonLoc, Stmt *Body,
+                           bool HasBoundDecls, SourceLoc UnknownAttrLoc,
+                           SourceLoc ColonLoc, Stmt *Body,
                            Optional<bool> Implicit) {
   void *Mem = C.Allocate(totalSizeToAlloc<CaseLabelItem>(CaseLabelItems.size()),
                          alignof(CaseStmt));
-  return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls, ColonLoc,
-                              Body, Implicit);
+  return ::new (Mem) CaseStmt(CaseLoc, CaseLabelItems, HasBoundDecls,
+                              UnknownAttrLoc, ColonLoc, Body, Implicit);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,

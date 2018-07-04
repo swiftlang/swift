@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown
+// RUN: %target-swift-frontend -typecheck -verify -primary-file %t/main.swift %S/Inputs/enum_conformance_synthesis_other.swift -verify-ignore-unknown -swift-version 4
+
+var hasher = Hasher()
 
 enum Foo: CaseIterable {
   case A, B
@@ -8,6 +10,7 @@ enum Foo: CaseIterable {
 
 if Foo.A == .B { }
 var aHash: Int = Foo.A.hashValue
+Foo.A.hash(into: &hasher)
 _ = Foo.allCases
 
 Foo.A == Foo.B // expected-warning {{result of operator '==' is unused}}
@@ -24,6 +27,7 @@ enum Generic<T>: CaseIterable {
 
 if Generic<Foo>.A == .B { }
 var gaHash: Int = Generic<Foo>.A.hashValue
+Generic<Foo>.A.hash(into: &hasher)
 _ = Generic<Foo>.allCases
 
 func localEnum() -> Bool {
@@ -39,12 +43,13 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 4 {{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 5 {{non-matching type}}
   return true
 }
 
 if CustomHashable.A == .B { }
 var custHash: Int = CustomHashable.A.hashValue
+CustomHashable.A.hash(into: &hasher)
 
 // We still synthesize conforming overloads of '==' and 'hashValue' if
 // explicit definitions don't satisfy the protocol requirements. Probably
@@ -54,13 +59,14 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 4 {{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 5 {{non-matching type}}
   return ""
 }
 if InvalidCustomHashable.A == .B { }
 var s: String = InvalidCustomHashable.A == .B
 s = InvalidCustomHashable.A.hashValue
 var i: Int = InvalidCustomHashable.A.hashValue
+InvalidCustomHashable.A.hash(into: &hasher)
 
 // Check use of an enum's synthesized members before the enum is actually declared.
 struct UseEnumBeforeDeclaration {
@@ -113,6 +119,10 @@ _ = EnumWithHashablePayload.A(1).hashValue
 _ = EnumWithHashablePayload.B("x", 1).hashValue
 _ = EnumWithHashablePayload.C.hashValue
 
+EnumWithHashablePayload.A(1).hash(into: &hasher)
+EnumWithHashablePayload.B("x", 1).hash(into: &hasher)
+EnumWithHashablePayload.C.hash(into: &hasher)
+
 // ...and they should also inherit equatability from Hashable.
 if EnumWithHashablePayload.A(1) == .B("x", 1) { }
 if EnumWithHashablePayload.A(1) == .C { }
@@ -135,12 +145,13 @@ var genericHashableHash: Int = GenericHashable<String>.A("a").hashValue
 
 // But it should be an error if the generic argument doesn't have the necessary
 // constraints to satisfy the conditions for derivation.
-enum GenericNotHashable<T: Equatable>: Hashable { // expected-error {{does not conform}}
+enum GenericNotHashable<T: Equatable>: Hashable { // expected-error 2 {{does not conform to protocol 'Hashable'}}
   case A(T)
   case B
 }
 if GenericNotHashable<String>.A("a") == .B { }
-var genericNotHashableHash: Int = GenericNotHashable<String>.A("a").hashValue // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hashValue'}}
+let _: Int = GenericNotHashable<String>.A("a").hashValue // No error. hashValue is always synthesized, even if Hashable derivation fails
+GenericNotHashable<String>.A("a").hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
 
 // An enum with no cases should not derive conformance.
 enum NoCases: Hashable {} // expected-error 2 {{does not conform}}
@@ -167,6 +178,13 @@ enum Instrument {
 
 extension Instrument : Equatable {}
 
+extension Instrument : CaseIterable {}
+
+enum UnusedGeneric<T> {
+    case a, b, c
+}
+extension UnusedGeneric : CaseIterable {}
+
 // Explicit conformance should work too
 public enum Medicine {
   case Antibiotic
@@ -175,15 +193,14 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 3 {{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 4 {{non-matching type}}
   return true
 }
 
-// No explicit conformance; it could be derived, but we don't support extensions
-// yet.
-extension Complex : Hashable {}  // expected-error 2 {{cannot be automatically synthesized in an extension}}
+// No explicit conformance; but it can be derived, for the same-file cases.
+extension Complex : Hashable {}
 extension Complex : CaseIterable {}  // expected-error {{type 'Complex' does not conform to protocol 'CaseIterable'}}
-extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension}} expected-error {{does not conform to protocol 'CaseIterable'}}
+extension FromOtherFile: CaseIterable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}} expected-error {{does not conform to protocol 'CaseIterable'}}
 
 // No explicit conformance and it cannot be derived.
 enum NotExplicitlyHashableAndCannotDerive {
@@ -195,13 +212,13 @@ extension NotExplicitlyHashableAndCannotDerive : CaseIterable {} // expected-err
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 3 {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 4 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
 }
 // ...but synthesis in a type defined in another file doesn't work yet.
-extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension}}
+extension YetOtherFileNonconforming: Equatable {} // expected-error {{cannot be automatically synthesized in an extension in a different file to the type}}
 extension YetOtherFileNonconforming: CaseIterable {} // expected-error {{does not conform}}
 
 // Verify that an indirect enum doesn't emit any errors as long as its "leaves"
@@ -243,6 +260,35 @@ struct NotEquatable { }
 enum ArrayOfNotEquatables : Equatable { // expected-error{{type 'ArrayOfNotEquatables' does not conform to protocol 'Equatable'}}
 case only([NotEquatable])
 }
+
+// Conditional conformances should be able to be synthesized
+enum GenericDeriveExtension<T> {
+    case A(T)
+}
+extension GenericDeriveExtension: Equatable where T: Equatable {}
+extension GenericDeriveExtension: Hashable where T: Hashable {}
+
+// Incorrectly/insufficiently conditional shouldn't work
+enum BadGenericDeriveExtension<T> {
+    case A(T)
+}
+extension BadGenericDeriveExtension: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+extension BadGenericDeriveExtension: Hashable where T: Equatable {}
+// expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
+
+// But some cases don't need to be conditional, even if they look similar to the
+// above
+struct AlwaysHashable<T>: Hashable {}
+enum UnusedGenericDeriveExtension<T> {
+    case A(AlwaysHashable<T>)
+}
+extension UnusedGenericDeriveExtension: Hashable {}
+
+// Cross-file synthesis is disallowed for conditional cases just as it is for
+// non-conditional ones.
+extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
+// expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'

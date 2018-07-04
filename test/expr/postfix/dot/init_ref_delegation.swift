@@ -338,8 +338,9 @@ class TestNestedExpr {
   }
 
   convenience init(b: Int) {
-    func use(_ x: ()) {}
-    use(self.init()) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(self.init())
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   convenience init(c: Int) {
@@ -352,8 +353,9 @@ class TestNestedExpr {
   }
 
   convenience init(e: Int) {
-    func use(_ x: ()) {}
-    use(self.init(fail: true)!) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(self.init(fail: true)!)
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   convenience init(f: Int) {
@@ -366,8 +368,9 @@ class TestNestedExpr {
   }
 
   convenience init(h: Int) {
-    func use(_ x: ()) {}
-    use(try! self.init(error: true)) // expected-error {{initializer delegation ('self.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(try! self.init(error: true))
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   convenience init(i: Int) {
@@ -406,8 +409,9 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(b: Int) {
-    func use(_ x: ()) {}
-    use(super.init()) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(super.init())
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   init(c: Int) {
@@ -420,8 +424,9 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(e: Int) {
-    func use(_ x: ()) {}
-    use(super.init(fail: true)!) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(super.init(fail: true)!)
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   init(f: Int) {
@@ -434,8 +439,9 @@ class TestNestedExprSub : TestNestedExpr {
   }
 
   init(h: Int) {
-    func use(_ x: ()) {}
-    use(try! super.init(error: true)) // expected-error {{initializer chaining ('super.init') cannot be nested in another expression}}
+    func use(_ x: ()) {} // expected-note {{'use' declared here}}
+    use(try! super.init(error: true))
+    // FIXME: rdar://41416911 // expected-error@-1 {{missing argument for parameter #1 in call}}
   }
 
   init(i: Int) {

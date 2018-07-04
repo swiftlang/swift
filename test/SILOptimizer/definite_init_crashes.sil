@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-ownership -enable-sil-verify-all %s -definite-init -raw-sil-inst-lowering | %FileCheck %s
 
 // These are all regression tests to ensure that the memory promotion pass
 // doesn't crash.

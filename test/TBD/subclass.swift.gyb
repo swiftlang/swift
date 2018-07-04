@@ -1,0 +1,75 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+
+// Same-module superclass, both resilient and not, and enable-testing and not:
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -DSAME_MODULE -enable-testing -O
+
+
+// Other-module superclass is not resilient:
+// RUN: %empty-directory(%t/super)
+// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing -O
+
+// Other-module superclass is resilient:
+// RUN: %empty-directory(%t/super)
+// RUN: %target-build-swift %S/Inputs/subclass_super.swift -emit-library -emit-module -o %t/super/subclass_super.%target-dylib-extension -Xfrontend -enable-resilience
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %t/main.swift -I %t/super -enable-testing -O
+
+#if SAME_MODULE
+open class Super {
+    open func function() {}
+
+    open var getter: Int { return 0 }
+    open var getterSetter: Int {
+        get { return 0 }
+        set {}
+    }
+}
+#else
+import subclass_super
+#endif
+
+// Create a variety of variations like `open class ... { open override
+// func function() }` and `public class ... { public final override
+// func function() }`.
+% for access in ["open", "public", "internal", "fileprivate"]:
+% for class_final in [""] if access == "open" else ["", "final"]:
+% for member_final in [""] if access == "open" else ["", "final"]:
+% class_mod = "%s %s" % (access, class_final)
+% name = "Sub_%s_%s_%s" % (access, class_final, member_final)
+% member_mod = "%s %s" % (access, member_final)
+${class_mod} class ${name} : Super {
+    ${member_mod} override func function() {}
+
+    ${member_mod} override var getter: Int { return 0 }
+
+    ${member_mod} override var getterSetter: Int {
+        get { return 0 }
+        set {}
+    }
+}
+% end
+% end

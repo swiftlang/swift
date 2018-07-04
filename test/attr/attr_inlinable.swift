@@ -1,9 +1,12 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 4.2
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-testing
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4.2 -enable-resilience -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
+
+@inlinable @usableFromInline func redundantAttribute() {}
+// expected-warning@-1 {{'@inlinable' declaration is already '@usableFromInline'}}
 
 private func privateFunction() {}
 // expected-note@-1{{global function 'privateFunction()' is not '@usableFromInline' or public}}
@@ -101,8 +104,7 @@ public struct Struct {
   }
 
   @inlinable
-  @usableFromInline
-  func versionedInlinableMethod() {
+  func internalInlinableMethod() {
     struct Nested {}
     // expected-error@-1 {{type 'Nested' cannot be nested inside an '@inlinable' function}}
   }
@@ -121,8 +123,8 @@ public struct Struct {
   }
 
   @inlinable
-  func internalInlinableMethod() {
-  // expected-error@-2 {{'@inlinable' attribute can only be applied to public declarations, but 'internalInlinableMethod' is internal}}
+  private func privateInlinableMethod() {
+  // expected-error@-2 {{'@inlinable' attribute can only be applied to public declarations, but 'privateInlinableMethod' is private}}
     struct Nested {}
     // OK
   }
@@ -148,7 +150,6 @@ extension VersionedProtocol {
   // expected-note@-1 {{instance method 'internalMethod()' is not '@usableFromInline' or public}}
 
   @inlinable
-  @usableFromInline
   func versionedMethod() -> T {
     internalMethod()
     // expected-error@-1 {{instance method 'internalMethod()' is internal and cannot be referenced from an '@inlinable' function}}
@@ -158,7 +159,8 @@ extension VersionedProtocol {
 }
 
 enum InternalEnum {
-// expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-1 2{{enum 'InternalEnum' is not '@usableFromInline' or public}}
+  // expected-note@-2 {{type declared here}}
   case apple
   case orange
 }
@@ -173,8 +175,8 @@ enum InternalEnum {
 @usableFromInline enum VersionedEnum {
   case apple
   case orange
-  // FIXME: Should this be banned?
   case pear(InternalEnum)
+  // expected-warning@-1 {{type of enum case in '@usableFromInline' enum should be '@usableFromInline' or public}}
   case persimmon(String)
 }
 
@@ -199,7 +201,26 @@ class Middle : Base {}
 @usableFromInline
 @_fixed_layout
 class Derived : Middle {
-  @usableFromInline
+  @inlinable
+  init(y: Int) {
+    super.init(x: y)
+  }
+}
+
+// More inherited initializers
+@_fixed_layout
+public class Base2 {
+  @inlinable
+  public init(x: Int) {}
+}
+
+@_fixed_layout
+@usableFromInline
+class Middle2 : Base2 {}
+
+@_fixed_layout
+@usableFromInline
+class Derived2 : Middle2 {
   @inlinable
   init(y: Int) {
     super.init(x: y)

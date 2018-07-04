@@ -27,7 +27,6 @@ public struct LazyMapSequence<Base : Sequence, Element> {
   /// Creates an instance with elements `transform(x)` for each element
   /// `x` of base.
   @inlinable
-  @usableFromInline
   internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
@@ -46,7 +45,6 @@ extension LazyMapSequence {
     public var base: Base.Iterator { return _base }
 
     @inlinable
-    @usableFromInline
     internal init(
       _base: Base.Iterator, 
       _transform: @escaping (Base.Element) -> Element
@@ -108,7 +106,6 @@ public struct LazyMapCollection<Base: Collection, Element> {
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
   @inlinable
-  @usableFromInline
   internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
@@ -260,22 +257,6 @@ extension LazyCollectionProtocol {
   }
 }
 
-extension LazyMapCollection {
-  // This overload is needed to re-enable Swift 3 source compatibility related
-  // to a bugfix in ranking behavior of the constraint solver.
-  @available(swift, obsoleted: 4.0)
-  public static func + <
-    Other : LazyCollectionProtocol
-  >(lhs: LazyMapCollection, rhs: Other) -> [Element]
-  where Other.Element == Element {
-    var result: [Element] = []
-    result.reserveCapacity(numericCast(lhs.count + rhs.count))
-    result.append(contentsOf: lhs)
-    result.append(contentsOf: rhs)
-    return result
-  }
-}
-
 extension LazyMapSequence {
   @inlinable
   @available(swift, introduced: 5)
@@ -299,10 +280,3 @@ extension LazyMapCollection {
       transform: {transform(self._transform($0))})
   }
 }
-
-// @available(*, deprecated, renamed: "LazyMapSequence.Iterator")
-public typealias LazyMapIterator<T, E> = LazyMapSequence<T, E>.Iterator where T: Sequence
-@available(*, deprecated, renamed: "LazyMapCollection")
-public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "LazyMapCollection")
-public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T : RandomAccessCollection

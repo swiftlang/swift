@@ -152,7 +152,8 @@ public:
     if (ParsedArgs.getLastArg(OPT_help)) {
       std::string ExecutableName = llvm::sys::path::stem(MainExecutablePath);
       Table->PrintHelp(llvm::outs(), ExecutableName.c_str(),
-                       "Swift Format Tool", options::SwiftFormatOption, 0);
+                       "Swift Format Tool", options::SwiftFormatOption, 0,
+                       /*ShowAllAliases*/false);
       return 1;
     }
 

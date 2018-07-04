@@ -10,14 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type that provides subscript access to its elements.
-///
-/// In most cases, it's best to ignore this protocol and use the
-/// `MutableCollection` protocol instead, because it has a more complete
-/// interface.
-@available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'MutableCollection' instead")
-public typealias MutableIndexable = MutableCollection
-
 /// A collection that supports subscript assignment.
 ///
 /// Collections that conform to `MutableCollection` gain the ability to
@@ -25,7 +17,7 @@ public typealias MutableIndexable = MutableCollection
 /// modify one of the names in an array of students.
 ///
 ///     var students = ["Ben", "Ivy", "Jordell", "Maxime"]
-///     if let i = students.index(of: "Maxime") {
+///     if let i = students.firstIndex(of: "Maxime") {
 ///         students[i] = "Max"
 ///     }
 ///     print(students)
@@ -112,7 +104,7 @@ where SubSequence: MutableCollection
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"
@@ -211,7 +203,7 @@ extension MutableCollection {
   ///     print(streetsSlice)
   ///     // Prints "["Channing", "Douglas", "Evarts"]"
   ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
+  ///     let index = streetsSlice.firstIndex(of: "Evarts")    // 4
   ///     streets[index!] = "Eustace"
   ///     print(streets[index!])
   ///     // Prints "Eustace"

@@ -8,6 +8,9 @@ class B : A, A { } // expected-error{{duplicate inheritance from 'A'}}{{12-15=}}
 
 // Duplicate inheritance from protocol
 class B2 : P, P { } // expected-error{{duplicate inheritance from 'P'}}{{13-16=}}
+// FIXME: These are unnecessary
+// expected-note@-2 {{'B2' declares conformance to protocol 'P' here}}
+// expected-error@-3 {{redundant conformance of 'B2' to protocol 'P'}}
 
 // Multiple inheritance
 class C : B, A { } // expected-error{{multiple inheritance from classes 'B' and 'A'}}
@@ -34,7 +37,7 @@ struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to pr
                          // expected-note @-3 {{'S3' declares conformance to protocol 'P' here}}
 struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
-struct S7 : protocol<P, Q> { }  // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
                                 // expected-error @-1 {{'Q' requires that 'S7' inherit from 'A'}}
                                 // expected-note @-2 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
 

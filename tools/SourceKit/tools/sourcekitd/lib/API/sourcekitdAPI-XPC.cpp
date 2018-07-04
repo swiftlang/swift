@@ -583,9 +583,9 @@ sourcekitd_response_get_value(sourcekitd_response_t resp) {
 #define XPC_OBJ(var) ((xpc_object_t)(var).data[1])
 
 #define CUSTOM_BUF_KIND(xobj) \
-  ((CustomBufferKind)*(uint64_t*)xpc_data_get_bytes_ptr(xobj))
+  ((CustomBufferKind)*(const uint64_t*)xpc_data_get_bytes_ptr(xobj))
 #define CUSTOM_BUF_START(xobj) \
-  ((void*)(((uint64_t*)xpc_data_get_bytes_ptr(xobj))+1))
+  ((const void*)(((const uint64_t*)xpc_data_get_bytes_ptr(xobj))+1))
 
 static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
   xpc_object_t obj = XPC_OBJ(var);

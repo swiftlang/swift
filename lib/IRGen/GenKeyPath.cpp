@@ -230,8 +230,7 @@ getAccessorForComputedComponent(IRGenModule &IGM,
     // Use the bound generic metadata to form a call to the original generic
     // accessor.
     WitnessMetadata ignoreWitnessMetadata;
-    auto forwardingSubs = genericEnv->getGenericSignature()->getSubstitutionMap(
-      genericEnv->getForwardingSubstitutions());
+    auto forwardingSubs = genericEnv->getForwardingSubstitutionMap();
     emitPolymorphicArguments(IGF, accessor->getLoweredFunctionType(),
                              forwardingSubs,
                              &ignoreWitnessMetadata,
@@ -338,12 +337,12 @@ getWitnessTableForComputedComponent(IRGenModule &IGM,
     if (auto existing =
           IGM.Module.getNamedGlobal("swift_keyPathGenericWitnessTable"))
       return existing;
-    
-    auto linkInfo = LinkInfo::get(IGM, "swift_keyPathGenericWitnessTable",
-                                  SILLinkage::PublicExternal,
-                                  NotForDefinition,
+
+    auto linkInfo = LinkInfo::get(UniversalLinkageInfo(IGM),
+                                  "swift_keyPathGenericWitnessTable",
+                                  SILLinkage::PublicExternal, NotForDefinition,
                                   /*weak imported*/ false);
-    
+
     return createVariable(IGM, linkInfo,
                           IGM.Int8PtrTy, IGM.getPointerAlignment());
   }
@@ -753,8 +752,7 @@ emitKeyPathComponent(IRGenModule &IGM,
     SmallVector<llvm::Constant*, 4> descriptorArgs;
     auto componentSig = component.getExternalDecl()->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-    auto subs = componentSig->getSubstitutionMap(
-                                        component.getExternalSubstitutions());
+    auto subs = component.getExternalSubstitutions();
     enumerateGenericSignatureRequirements(
       componentSig->getCanonicalSignature(),
       [&](GenericRequirement reqt) {
@@ -1220,6 +1218,33 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
 }
 
 void IRGenModule::emitSILProperty(SILProperty *prop) {
+  if (prop->isTrivial()) {
+    // All trivial property descriptors can share a single definition in the
+    // translation unit.
+    if (!TheTrivialPropertyDescriptor) {
+      // Emit a definition if we don't have one yet.
+      ConstantInitBuilder builder(*this);
+      ConstantStructBuilder fields = builder.beginStruct();
+      fields.addInt32(
+        _SwiftKeyPathComponentHeader_TrivialPropertyDescriptorMarker);
+      auto var = cast<llvm::GlobalVariable>(
+        getAddrOfPropertyDescriptor(prop->getDecl(),
+                                    fields.finishAndCreateFuture()));
+      var->setConstant(true);
+      var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+      var->setAlignment(4);
+      
+      TheTrivialPropertyDescriptor = var;
+    } else {
+      auto entity = LinkEntity::forPropertyDescriptor(prop->getDecl());
+      auto linkInfo = LinkInfo::get(*this, entity, ForDefinition);
+      llvm::GlobalAlias::create(linkInfo.getLinkage(),
+                                linkInfo.getName(),
+                                TheTrivialPropertyDescriptor);
+    }
+    return;
+  }
+
   ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();
   fields.setPacked(true);
@@ -1247,7 +1272,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
   
-  emitKeyPathComponent(*this, fields, prop->getComponent(),
+  emitKeyPathComponent(*this, fields, *prop->getComponent(),
                        isInstantiableInPlace, genericEnv, requirements,
                        prop->getDecl()->getInnermostDeclContext()
                                       ->getInnermostTypeContext()
@@ -1262,6 +1287,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
     getAddrOfPropertyDescriptor(prop->getDecl(),
                                 fields.finishAndCreateFuture()));
   var->setConstant(true);
+  var->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   // A simple stored component descriptor can fit in four bytes. Anything else
   // needs pointer alignment.
   if (size <= Size(4))

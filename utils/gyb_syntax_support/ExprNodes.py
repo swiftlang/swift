@@ -75,6 +75,7 @@ EXPR_NODES = [
                        'SelfToken',
                        'CapitalSelfToken',
                        'DollarIdentifierToken',
+                       'SpacedBinaryOperatorToken',
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True),
@@ -299,7 +300,9 @@ EXPR_NODES = [
     # a.b
     Node('MemberAccessExpr', kind='Expr',
          children=[
-             Child("Base", kind='Expr'),
+             # The base needs to be optional to parse expressions in key paths
+             # like \.a
+             Child("Base", kind='Expr', is_optional=True),
              Child("Dot", kind='PeriodToken'),
              Child("Name", kind='Token'),
              Child('DeclNameArguments', kind='DeclNameArguments',
@@ -495,7 +498,19 @@ EXPR_NODES = [
     Node('KeyPathExpr', kind='Expr',
          children=[
              Child('Backslash', kind='BackslashToken'),
+             Child('RootExpr', kind='Expr', is_optional=True, 
+                   node_choices=[
+                       Child('IdentifierExpr', kind='IdentifierExpr'),
+                       Child('SpecializeExpr', kind='SpecializeExpr')
+                   ]), 
              Child('Expression', kind='Expr'),
+         ]),
+
+    # The period in the key path serves as the base on which the 
+    # right-hand-side of the key path is evaluated
+    Node('KeyPathBaseExpr', kind='Expr', 
+         children=[
+             Child('Period', kind='PeriodToken'),
          ]),
 
     # e.g. "a." or "a"
@@ -515,6 +530,21 @@ EXPR_NODES = [
              Child('KeyPath', kind='PoundKeyPathToken'),
              Child('LeftParen', kind='LeftParenToken'),
              Child('Name', kind='ObjcName'),
+             Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # e.g. "#selector(getter:Foo.bar)"
+    Node('ObjcSelectorExpr', kind='Expr',
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundSelector', kind='PoundSelectorToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Kind', kind='ContextualKeywordToken',
+                   text_choices=['getter', 'setter'],
+                   is_optional=True),
+             Child('Colon', kind='ColonToken',
+                   is_optional=True),
+             Child('Name', kind='Expr'),
              Child('RightParen', kind='RightParenToken'),
          ]),
 

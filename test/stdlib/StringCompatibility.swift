@@ -279,8 +279,10 @@ Tests.test("Substring/Range/Slice/ExpectedType/\(swift)") {
   var sub = s[s.startIndex ..< s.endIndex]
   var subsub = sub[s.startIndex ..< s.endIndex]
 
-  expectType(ExpectedConcreteSlice.self, &sub)
-  expectType(ExpectedConcreteSlice.self, &subsub)
+  // slicing a String in Swift 3 produces a String
+  // but slicing a Substring should still produce a Substring
+  expectType(Substring.self, &sub)
+  expectType(Substring.self, &subsub)
 }
 
 Tests.test("Substring/ClosedRange/Slice/ExpectedType/\(swift)") {

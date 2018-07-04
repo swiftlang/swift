@@ -204,7 +204,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-warning{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
 }
 
 struct S0 {
@@ -352,6 +352,6 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    if x == x && x = x { } // expected-error{{cannot assign to value: '&&' returns immutable value}}
+    if x == x && x = x { } // expected-error{{expression is not assignable: '&&' returns immutable value}}
   }
 }

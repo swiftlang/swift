@@ -169,23 +169,21 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
 }
 
 static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *metadata,
-                                 const TypeContextDescriptor *description);
+areAllTransitiveMetadataComplete_cheap(const Metadata *metadata);
 
 static MetadataDependency
-checkTransitiveCompleteness(const Metadata *metadata,
-                            const TypeContextDescriptor *description);
+checkTransitiveCompleteness(const Metadata *metadata);
 
 namespace {
-  struct GenericCacheEntry final : MetadataCacheEntryBase<GenericCacheEntry> {
+  struct GenericCacheEntry final :
+      VariadicMetadataCacheEntryBase<GenericCacheEntry> {
     static const char *getName() { return "GenericCache"; }
 
     template <class... Args>
     GenericCacheEntry(MetadataCacheKey key, Args &&...args)
-      : MetadataCacheEntryBase(key) {}
+      : VariadicMetadataCacheEntryBase(key) {}
 
-    AllocationResult allocate(MetadataRequest request,
-                              const TypeContextDescriptor *description,
+    AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
       // Find a pattern.  Currently we always use the default pattern.
       auto &generics = description->getFullGenericContextHeader();
@@ -201,7 +199,7 @@ namespace {
       // some extra locking.
       PrivateMetadataState state;
       if (pattern->CompletionFunction.isNull()) {
-        if (areAllTransitiveMetadataComplete_cheap(metadata, description)) {
+        if (areAllTransitiveMetadataComplete_cheap(metadata)) {
           state = PrivateMetadataState::Complete;
         } else {
           state = PrivateMetadataState::NonTransitiveComplete;
@@ -221,20 +219,22 @@ namespace {
       return PrivateMetadataState::LayoutComplete;
     }
 
-    // Note that we have to pass 'arguments' separately here instead of
-    // using the key data because there might be non-key arguments,
-    // like protocol conformances.
+    static const TypeContextDescriptor *getDescription(Metadata *type) {
+      if (auto classType = dyn_cast<ClassMetadata>(type))
+        return classType->getDescription();
+      else
+        return cast<ValueMetadata>(type)->getDescription();
+    }
+
     TryInitializeResult tryInitialize(Metadata *metadata,
                                       PrivateMetadataState state,
-                                      PrivateMetadataCompletionContext *context,
-                                      const TypeContextDescriptor *description,
-                                      const void * const *arguments) {
+                               PrivateMetadataCompletionContext *context) {
       assert(state != PrivateMetadataState::Complete);
 
       // Finish the completion function.
       if (state < PrivateMetadataState::NonTransitiveComplete) {
         // Find a pattern.  Currently we always use the default pattern.
-        auto &generics = description->getFullGenericContextHeader();
+        auto &generics = getDescription(metadata)->getFullGenericContextHeader();
         auto pattern = generics.DefaultInstantiationPattern.get();
 
         // Complete the metadata's instantiation.
@@ -243,23 +243,18 @@ namespace {
 
         // If this failed with a dependency, infer the current metadata state
         // and return.
-        if (dependency.Value) {
-          return { inferStateForMetadata(metadata),
-                   dependency.State, dependency.Value };
+        if (dependency) {
+          return { inferStateForMetadata(metadata), dependency };
         }
       }
 
       // Check for transitive completeness.
-      auto dependency =
-        checkTransitiveCompleteness(metadata, description);
-      if (dependency.Value) {
-        return { PrivateMetadataState::NonTransitiveComplete,
-                 dependency.State, dependency.Value };
+      if (auto dependency = checkTransitiveCompleteness(metadata)) {
+        return { PrivateMetadataState::NonTransitiveComplete, dependency };
       }
 
       // We're done.
-      return { PrivateMetadataState::Complete,
-               MetadataState::Complete, nullptr };
+      return { PrivateMetadataState::Complete, MetadataDependency() };
     }
   };
 } // end anonymous namespace
@@ -789,8 +784,12 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
 namespace {
 
-class TupleCacheEntry {
+class TupleCacheEntry
+    : public MetadataCacheEntryBase<TupleCacheEntry,
+                                    TupleTypeMetadata::Element> {
 public:
+  static const char *getName() { return "TupleCache"; }
+
   // NOTE: if you change the layout of this type, you'll also need
   // to update tuple_getValueWitnesses().
   ExtraInhabitantsValueWitnessTable Witnesses;
@@ -802,7 +801,28 @@ public:
     const char *Labels;
   };
 
-  TupleCacheEntry(const Key &key, const ValueWitnessTable *proposedWitnesses);
+  ValueType getValue() {
+    return &Data;
+  }
+  void setValue(ValueType value) {
+    assert(value == &Data);
+  }
+
+  TupleCacheEntry(const Key &key, MetadataRequest request,
+                  const ValueWitnessTable *proposedWitnesses);
+
+  AllocationResult allocate(const ValueWitnessTable *proposedWitnesses);
+
+  TryInitializeResult tryInitialize(Metadata *metadata,
+                                    PrivateMetadataState state,
+                                    PrivateMetadataCompletionContext *context);
+
+  TryInitializeResult checkTransitiveCompleteness() {
+    auto dependency = ::checkTransitiveCompleteness(&Data);
+    return { dependency ? PrivateMetadataState::NonTransitiveComplete
+                        : PrivateMetadataState::Complete,
+             dependency };
+  }
 
   size_t getNumElements() const {
     return Data.NumElements;
@@ -822,7 +842,7 @@ public:
     // The element types.
     for (size_t i = 0, e = key.NumElements; i != e; ++i) {
       if (auto result = comparePointers(key.Elements[i],
-                                        Data.getElements()[i].Type))
+                                        Data.getElement(i).Type))
         return result;
     }
 
@@ -842,19 +862,39 @@ public:
     return 0;
   }
 
-  static size_t getExtraAllocationSize(const Key &key,
-                                       const ValueWitnessTable *proposed) {
-    return key.NumElements * sizeof(TupleTypeMetadata::Element);
+  size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>) const {
+    return getNumElements();
   }
-  size_t getExtraAllocationSize() const {
-    return Data.NumElements * sizeof(TupleTypeMetadata::Element);
+
+  template <class... Args>
+  static size_t numTrailingObjects(OverloadToken<TupleTypeMetadata::Element>,
+                                   const Key &key,
+                                   Args &&...extraArgs) {
+    return key.NumElements;
   }
+};
+
+class TupleCache : public MetadataCache<TupleCacheEntry, false, TupleCache> {
+public:
+// FIXME: https://bugs.swift.org/browse/SR-1155
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+  static TupleCacheEntry *
+  resolveExistingEntry(const TupleTypeMetadata *metadata) {
+    // The correctness of this arithmetic is verified by an assertion in
+    // the TupleCacheEntry constructor.
+    auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
+    bytes -= offsetof(TupleCacheEntry, Data);
+    auto entry = reinterpret_cast<const TupleCacheEntry*>(bytes);
+    return const_cast<TupleCacheEntry*>(entry);
+  }
+#pragma clang diagnostic pop
 };
 
 } // end anonymous namespace
 
 /// The uniquing structure for tuple type metadata.
-static SimpleGlobalCache<TupleCacheEntry> TupleTypes;
+static Lazy<TupleCache> TupleTypes;
 
 /// Given a metatype pointer, produce the value-witness table for it.
 /// This is equivalent to metatype->ValueWitnesses but more efficient.
@@ -1017,23 +1057,6 @@ static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
   return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
 }
 
-/// Generic tuple value witness for 'initializeBufferWithTakeOfBuffer'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_initializeBufferWithTakeOfBuffer(ValueBuffer *dest,
-                                                           ValueBuffer *src,
-                                                     const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-  if (IsInline) {
-    return tuple_initializeWithTake<IsPOD, IsInline>(
-        tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
-        tuple_projectBuffer<IsPOD, IsInline>(src, metatype), metatype);
-  }
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-  return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
-}
-
 template <bool IsPOD, bool IsInline>
 static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
@@ -1143,26 +1166,31 @@ static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
 /// Perform basic sequential layout given a vector of metadata pointers,
 /// calling a functor with the offset of each field, and returning the
 /// final layout characteristics of the type.
-/// FUNCTOR should have signature:
-///   void (size_t index, const Metadata *type, size_t offset)
-template<typename FUNCTOR, typename LAYOUT>
+///
+/// GetLayoutFn should have signature:
+///   const TypeLayout *(ElementType &type);
+///
+/// SetOffsetFn should have signature:
+///   void (size_t index, ElementType &type, size_t offset)
+template<typename ElementType, typename GetLayoutFn, typename SetOffsetFn>
 static void performBasicLayout(TypeLayout &layout,
-                               const LAYOUT * const *elements,
+                               ElementType *elements,
                                size_t numElements,
-                               FUNCTOR &&f) {
+                               GetLayoutFn &&getLayout,
+                               SetOffsetFn &&setOffset) {
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   for (unsigned i = 0; i != numElements; ++i) {
-    auto elt = elements[i];
+    auto &elt = elements[i];
 
     // Lay out this element.
-    const TypeLayout *eltLayout = elt->getTypeLayout();
+    const TypeLayout *eltLayout = getLayout(elt);
     size = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
 
     // Report this record to the functor.
-    f(i, elt, size);
+    setOffset(i, elt, size);
 
     // Update the size and alignment of the aggregate..
     size += eltLayout->size;
@@ -1170,18 +1198,21 @@ static void performBasicLayout(TypeLayout &layout,
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
   }
-  bool isInline = ValueWitnessTable::isValueInline(size, alignMask + 1);
+  bool isInline =
+      ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
 
   layout.size = size;
-  layout.flags = ValueWitnessFlags().withAlignmentMask(alignMask)
-                                    .withPOD(isPOD)
-                                    .withBitwiseTakable(isBitwiseTakable)
-                                    .withInlineStorage(isInline);
+  layout.flags = ValueWitnessFlags()
+                     .withAlignmentMask(alignMask)
+                     .withPOD(isPOD)
+                     .withBitwiseTakable(isBitwiseTakable)
+                     .withInlineStorage(isInline);
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
 }
 
-const TupleTypeMetadata *
-swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
+MetadataResponse
+swift::swift_getTupleTypeMetadata(MetadataRequest request,
+                                  TupleTypeFlags flags,
                                   const Metadata * const *elements,
                                   const char *labels,
                                   const ValueWitnessTable *proposedWitnesses) {
@@ -1189,54 +1220,122 @@ swift::swift_getTupleTypeMetadata(TupleTypeFlags flags,
 
   // Bypass the cache for the empty tuple. We might reasonably get called
   // by generic code, like a demangler that produces type objects.
-  if (numElements == 0) return &METADATA_SYM(EMPTY_TUPLE_MANGLING);
+  if (numElements == 0)
+    return { &METADATA_SYM(EMPTY_TUPLE_MANGLING), MetadataState::Complete };
 
   // Search the cache.
   TupleCacheEntry::Key key = { numElements, elements, labels };
 
+  auto &cache = TupleTypes.get();
+
   // If we have constant labels, directly check the cache.
   if (!flags.hasNonConstantLabels())
-    return &TupleTypes.getOrInsert(key, proposedWitnesses).first->Data;
+    return cache.getOrInsert(key, request, proposedWitnesses).second;
 
   // If we have non-constant labels, we can't simply record the result.
   // Look for an existing result, first.
-  if (auto found = TupleTypes.find(key))
-    return &found->Data;
+  if (auto response = cache.tryAwaitExisting(key, request))
+    return *response;
 
   // Allocate a copy of the labels string within the tuple type allocator.
   size_t labelsLen = strlen(labels);
   size_t labelsAllocSize = roundUpToAlignment(labelsLen + 1, sizeof(void*));
   char *newLabels =
-    (char *)TupleTypes.getAllocator().Allocate(labelsAllocSize, alignof(char));
+    (char *) cache.getAllocator().Allocate(labelsAllocSize, alignof(char));
   strcpy(newLabels, labels);
   key.Labels = newLabels;
 
   // Update the metadata cache.
-  auto result = TupleTypes.getOrInsert(key, proposedWitnesses);
+  auto result = cache.getOrInsert(key, request, proposedWitnesses).second;
 
   // If we didn't manage to perform the insertion, free the memory associated
   // with the copy of the labels: nobody else can reference it.
-  if (!result.second) {
-    TupleTypes.getAllocator().Deallocate(newLabels, labelsAllocSize);
+  if (cast<TupleTypeMetadata>(result.Value)->Labels != newLabels) {
+    cache.getAllocator().Deallocate(newLabels, labelsAllocSize);
   }
 
   // Done.
-  return &result.first->Data;
+  return result;
 }
 
-TupleCacheEntry::TupleCacheEntry(const Key &key,
+TupleCacheEntry::TupleCacheEntry(const Key &key, MetadataRequest request,
                                  const ValueWitnessTable *proposedWitnesses) {
   Data.setKind(MetadataKind::Tuple);
-  Data.ValueWitnesses = &Witnesses;
   Data.NumElements = key.NumElements;
   Data.Labels = key.Labels;
 
+  // Stash the proposed witnesses in the value-witnesses slot for now.
+  Data.ValueWitnesses = proposedWitnesses;
+
+  for (size_t i = 0, e = key.NumElements; i != e; ++i)
+    Data.getElement(i).Type = key.Elements[i];
+
+  assert(TupleCache::resolveExistingEntry(&Data) == this);
+}
+
+TupleCacheEntry::AllocationResult
+TupleCacheEntry::allocate(const ValueWitnessTable *proposedWitnesses) {
+  // All the work we can reasonably do here was done in the constructor.
+  return { &Data, PrivateMetadataState::Abstract };
+}
+
+TupleCacheEntry::TryInitializeResult
+TupleCacheEntry::tryInitialize(Metadata *metadata,
+                               PrivateMetadataState state,
+                               PrivateMetadataCompletionContext *context) {
+  // If we've already reached non-transitive completeness, just check that.
+  if (state == PrivateMetadataState::NonTransitiveComplete)
+    return checkTransitiveCompleteness();
+
+  // Otherwise, we must still be abstract, because tuples don't have an
+  // intermediate state between that and non-transitive completeness.
+  assert(state == PrivateMetadataState::Abstract);
+
+  bool allElementsTransitivelyComplete = true;
+  const Metadata *knownIncompleteElement = nullptr;
+
+  // Require all of the elements to be layout-complete.
+  for (size_t i = 0, e = Data.NumElements; i != e; ++i) {
+    auto request = MetadataRequest(MetadataState::LayoutComplete,
+                                   /*non-blocking*/ true);
+    auto eltType = Data.getElement(i).Type;
+    auto response = swift_checkMetadataState(request, eltType);
+
+    // Immediately continue in the most common scenario, which is that
+    // the element is transitively complete.
+    if (response.State == MetadataState::Complete)
+      continue;
+
+    // If the metadata is not layout-complete, we have to suspend.
+    if (!isAtLeast(response.State, MetadataState::LayoutComplete))
+      return { PrivateMetadataState::Abstract,
+               MetadataDependency(eltType, MetadataState::LayoutComplete) };
+
+    // Remember that there's a non-fully-complete element.
+    allElementsTransitivelyComplete = false;
+
+    // Remember the first element that's not even non-transitively complete.
+    if (!knownIncompleteElement &&
+        !isAtLeast(response.State, MetadataState::NonTransitiveComplete))
+      knownIncompleteElement = eltType;
+  }
+
+  // Okay, we're going to succeed now.
+
+  // Reload the proposed witness from where we stashed them.
+  auto proposedWitnesses = Data.ValueWitnesses;
+
+  // Set the real value-witness table.
+  Data.ValueWitnesses = &Witnesses;
+
   // Perform basic layout on the tuple.
   auto layout = getInitialLayoutForValueType();
-  performBasicLayout(layout, key.Elements, key.NumElements,
-    [&](size_t i, const Metadata *elt, size_t offset) {
-      Data.getElement(i).Type = elt;
-      Data.getElement(i).Offset = offset;
+  performBasicLayout(layout, Data.getElements(), Data.NumElements,
+    [](const TupleTypeMetadata::Element &elt) {
+      return elt.getTypeLayout();
+    },
+    [](size_t i, TupleTypeMetadata::Element &elt, size_t offset) {
+      elt.Offset = offset;
     });
 
   Witnesses.size = layout.size;
@@ -1247,7 +1346,7 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   // FIXME: generalize this.
   bool hasExtraInhabitants = false;
   if (auto firstEltEIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                             key.Elements[0]->getValueWitnesses())) {
+                                Data.getElement(0).Type->getValueWitnesses())) {
     hasExtraInhabitants = true;
     Witnesses.flags = Witnesses.flags.withExtraInhabitants(true);
     Witnesses.extraInhabitantFlags = firstEltEIVWT->extraInhabitantFlags;
@@ -1258,15 +1357,8 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   // Copy the function witnesses in, either from the proposed
   // witnesses or from the standard table.
   if (!proposedWitnesses) {
-    // For a tuple with a single element, just use the witnesses for
-    // the element type.
-    if (key.NumElements == 1) {
-      proposedWitnesses = key.Elements[0]->getValueWitnesses();
-
-      // Otherwise, use generic witnesses (when we can't pattern-match
-      // into something better).
-    } else if (layout.flags.isInlineStorage()
-               && layout.flags.isPOD()) {
+    // Try to pattern-match into something better than the generic witnesses.
+    if (layout.flags.isInlineStorage() && layout.flags.isPOD()) {
       if (!hasExtraInhabitants && layout.size == 8 && layout.flags.getAlignmentMask() == 7)
         proposedWitnesses = &VALUE_WITNESS_SYM(Bi64_);
       else if (!hasExtraInhabitants && layout.size == 4 && layout.flags.getAlignmentMask() == 3)
@@ -1294,24 +1386,47 @@ TupleCacheEntry::TupleCacheEntry(const Key &key,
   Witnesses.LOWER_ID = proposedWitnesses->LOWER_ID;
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
+
+  // Okay, we're all done with layout and setting up the elements.
+  // Check transitive completeness.
+
+  // We don't need to check the element statuses again in a couple of cases:
+
+  // - If all the elements are transitively complete, we are, too.
+  if (allElementsTransitivelyComplete)
+    return { PrivateMetadataState::Complete, MetadataDependency() };
+
+  // - If there was an incomplete element, wait for it to be become
+  //   at least non-transitively complete.
+  if (knownIncompleteElement)
+    return { PrivateMetadataState::NonTransitiveComplete,
+             MetadataDependency(knownIncompleteElement,
+                                MetadataState::NonTransitiveComplete) };
+
+  // Otherwise, we need to do a more expensive check.
+  return checkTransitiveCompleteness();
 }
 
-const TupleTypeMetadata *
-swift::swift_getTupleTypeMetadata2(const Metadata *elt0, const Metadata *elt1,
+MetadataResponse
+swift::swift_getTupleTypeMetadata2(MetadataRequest request,
+                                   const Metadata *elt0, const Metadata *elt1,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1 };
-  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(2),
+  return swift_getTupleTypeMetadata(request,
+                                    TupleTypeFlags().withNumElements(2),
                                     elts, labels, proposedWitnesses);
 }
 
-const TupleTypeMetadata *
-swift::swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
+MetadataResponse
+swift::swift_getTupleTypeMetadata3(MetadataRequest request,
+                                   const Metadata *elt0, const Metadata *elt1,
                                    const Metadata *elt2,
                                    const char *labels,
                                    const ValueWitnessTable *proposedWitnesses) {
   const Metadata *elts[] = { elt0, elt1, elt2 };
-  return swift_getTupleTypeMetadata(TupleTypeFlags().withNumElements(3),
+  return swift_getTupleTypeMetadata(request,
+                                    TupleTypeFlags().withNumElements(3),
                                     elts, labels, proposedWitnesses);
 }
 
@@ -1358,7 +1473,20 @@ bool swift::equalContexts(const ContextDescriptor *a,
         && kind <= ContextDescriptorKind::Type_Last) {
       auto typeA = cast<TypeContextDescriptor>(a);
       auto typeB = cast<TypeContextDescriptor>(b);
-      return strcmp(typeA->Name.get(), typeB->Name.get()) == 0;
+      if (strcmp(typeA->Name.get(), typeB->Name.get()) != 0)
+        return false;
+      
+      // A synthesized entity has to match the related entity tag too.
+      if (typeA->isSynthesizedRelatedEntity()) {
+        if (!typeB->isSynthesizedRelatedEntity())
+          return false;
+        
+        if (typeA->getSynthesizedDeclRelatedEntityTag()
+            != typeB->getSynthesizedDeclRelatedEntityTag())
+          return false;
+      }
+      
+      return true;
     }
     
     // Otherwise, this runtime doesn't know anything about this context kind.
@@ -1428,20 +1556,6 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
 }
 
-static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
-                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
-  auto wtable = self->getValueWitnesses();
-  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
-  *reinterpret_cast<HeapObject**>(dest) = srcReference;
-
-  // Project the address of the value in the buffer.
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr = reinterpret_cast<char *>(srcReference);
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-}
-
 static void pod_noop(void *object, const Metadata *self) {
 }
 #define pod_direct_destroy \
@@ -1457,9 +1571,6 @@ static OpaqueValue *pod_direct_initializeWithCopy(OpaqueValue *dest,
 #define pod_indirect_initializeWithCopy pod_direct_initializeWithCopy
 #define pod_direct_initializeBufferWithCopyOfBuffer \
   pointer_function_cast<value_witness_types::initializeBufferWithCopyOfBuffer> \
-    (pod_direct_initializeWithCopy)
-#define pod_direct_initializeBufferWithTakeOfBuffer \
-  pointer_function_cast<value_witness_types::initializeBufferWithTakeOfBuffer> \
     (pod_direct_initializeWithCopy)
 #define pod_direct_assignWithCopy pod_direct_initializeWithCopy
 #define pod_indirect_assignWithCopy pod_direct_initializeWithCopy
@@ -1573,23 +1684,12 @@ void swift::installCommonValueWitnesses(const TypeLayout &layout,
     // Use POD value witnesses for operations that do an initializeWithTake.
     if (flags.isInlineStorage()) {
       vwtable->initializeWithTake = pod_direct_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_direct_initializeBufferWithTakeOfBuffer;
     } else {
       vwtable->initializeWithTake = pod_indirect_initializeWithTake;
-      vwtable->initializeBufferWithTakeOfBuffer
-        = pod_indirect_initializeBufferWithTakeOfBuffer;
     }
     return;
   }
 
-  if (!flags.isInlineStorage()) {
-    // For values stored out-of-line, initializeBufferWithTakeOfBuffer is
-    // always a memcpy.
-    vwtable->initializeBufferWithTakeOfBuffer
-      = pod_indirect_initializeBufferWithTakeOfBuffer;
-    return;
-  }
 }
 
 /***************************************************************************/
@@ -1632,11 +1732,12 @@ static ValueWitnessTable *getMutableVWTableForInit(StructMetadata *self,
 void swift::swift_initStructMetadata(StructMetadata *structType,
                                      StructLayoutFlags layoutFlags,
                                      size_t numFields,
-                                     const TypeLayout * const *fieldTypes,
-                                     size_t *fieldOffsets) {
+                                     const TypeLayout *const *fieldTypes,
+                                     uint32_t *fieldOffsets) {
   auto layout = getInitialLayoutForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
-    [&](size_t i, const TypeLayout *fieldType, size_t offset) {
+    [&](const TypeLayout *fieldType) { return fieldType; },
+    [&](size_t i, const TypeLayout *fieldType, uint32_t offset) {
       assignUnlessEqual(fieldOffsets[i], offset);
     });
 
@@ -2438,7 +2539,7 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
   Data.flags = ValueWitnessFlags()
     .withAlignment(Box::Container::getAlignment(numWitnessTables))
     .withPOD(false)
-    .withBitwiseTakable(false)
+    .withBitwiseTakable(true)
     .withInlineStorage(false)
     .withExtraInhabitants(false);
   Data.stride = Box::Container::getStride(numWitnessTables);
@@ -2969,6 +3070,58 @@ swift::swift_getForeignTypeMetadata(ForeignTypeMetadata *nonUnique) {
   return uniqueMetadata;
 }
 
+/// Unique-ing of foreign types' witness tables.
+namespace {
+  class ForeignWitnessTableCacheEntry {
+  public:
+    struct Key {
+      const TypeContextDescriptor *type;
+      const ProtocolDescriptor *protocol;
+    };
+
+    const Key key;
+    const WitnessTable *data;
+
+    ForeignWitnessTableCacheEntry(const ForeignWitnessTableCacheEntry::Key k,
+                                  const WitnessTable *d)
+        : key(k), data(d) {}
+
+    intptr_t getKeyIntValueForDump() {
+      return reinterpret_cast<intptr_t>(key.type);
+    }
+
+    int compareWithKey(const Key other) const {
+      if (auto r = comparePointers(other.protocol, key.protocol))
+        return r;
+      return strcmp(other.type->Name.get(), key.type->Name.get());
+    }
+
+    static size_t getExtraAllocationSize(const Key,
+                                         const WitnessTable *) {
+      return 0;
+    }
+
+    size_t getExtraAllocationSize() const {
+      return 0;
+    }
+  };
+}
+
+static SimpleGlobalCache<ForeignWitnessTableCacheEntry> ForeignWitnessTables;
+
+const WitnessTable *swift::swift_getForeignWitnessTable(
+    const WitnessTable *witnessTableCandidate,
+    const TypeContextDescriptor *contextDescriptor,
+    const ProtocolDescriptor *protocol) {
+  auto result =
+      ForeignWitnessTables
+          .getOrInsert(
+              ForeignWitnessTableCacheEntry::Key{contextDescriptor, protocol},
+              witnessTableCandidate)
+          .first->data;
+  return result;
+}
+
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
@@ -2986,23 +3139,9 @@ Metadata::getClassObject() const {
     return wrapper->Class;
   }
   // Other kinds of types don't have class objects.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::ForeignClass:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::Metatype:
-  case MetadataKind::HeapLocalVariable:
-  case MetadataKind::HeapGenericLocalVariable:
-  case MetadataKind::ErrorObject:
+  default:
     return nullptr;
   }
-
-  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
@@ -3076,9 +3215,10 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
     case MetadataKind::NAME: \
       return #NAME;
 #include "swift/ABI/MetadataKind.def"
+      
+  default:
+    return "<unknown>";
   }
-
-  swift_runtime_unreachable("Unhandled metadata kind?!");
 }
 
 #ifndef NDEBUG
@@ -3312,6 +3452,11 @@ static Result performOnMetadataCache(const Metadata *metadata,
     description = classMetadata->getDescription();
   } else if (auto valueMetadata = dyn_cast<ValueMetadata>(metadata)) {
     description = valueMetadata->getDescription();
+  } else if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(metadata)) {
+    // The empty tuple is special and doesn't belong to a metadata cache.
+    if (tupleMetadata->NumElements == 0)
+      return std::move(callbacks).forOtherMetadata(tupleMetadata);
+    return std::move(callbacks).forTupleMetadata(tupleMetadata);
   } else {
     return std::move(callbacks).forOtherMetadata(metadata);
   }
@@ -3332,58 +3477,50 @@ static Result performOnMetadataCache(const Metadata *metadata,
                                                  getCache(generics), key);
 }
 
-bool swift::addToMetadataQueue(
-                  std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry,
-                  const Metadata *dependency,
-                  MetadataState dependencyRequirement) {
+bool swift::addToMetadataQueue(MetadataCompletionQueueEntry *queueEntry,
+                               MetadataDependency dependency) {
   struct EnqueueCallbacks {
-    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
+    MetadataCompletionQueueEntry *QueueEntry;
+    MetadataDependency Dependency;
 
     bool forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
-      return cache.enqueue(key, std::move(QueueEntry));
+      return cache.enqueue(key, QueueEntry, Dependency);
+    }
+
+    bool forTupleMetadata(const TupleTypeMetadata *metadata) {
+      return TupleTypes.get().enqueue(metadata, QueueEntry, Dependency);
     }
 
     bool forOtherMetadata(const Metadata *metadata) && {
       swift_runtime_unreachable("metadata should always be complete");
     }
-  } callbacks = { std::move(queueEntry) };
+  } callbacks = { queueEntry, dependency };
 
-  // Set the requirement.
-  queueEntry->DependencyRequirement = dependencyRequirement;
-
-  return performOnMetadataCache<bool>(dependency, std::move(callbacks));
+  return performOnMetadataCache<bool>(dependency.Value, std::move(callbacks));
 }
 
-void swift::resumeMetadataCompletion(
-                   std::unique_ptr<MetadataCompletionQueueEntry> &&queueEntry) {
+void swift::resumeMetadataCompletion(MetadataCompletionQueueEntry *queueEntry) {
   struct ResumeCallbacks {
-    std::unique_ptr<MetadataCompletionQueueEntry> &&QueueEntry;
-
-    static MetadataRequest getRequest() {
-      return MetadataRequest(MetadataState::Complete,
-                             /*non-blocking*/ true);
-    }
+    MetadataCompletionQueueEntry *QueueEntry;
 
     void forGenericMetadata(const Metadata *metadata,
                             const TypeContextDescriptor *description,
                             GenericMetadataCache &cache,
                             MetadataCacheKey key) && {
-      cache.resumeInitialization(key, std::move(QueueEntry),
-                                 getRequest(),
-                                 description,
-                                 // This array comes from the metadata, so
-                                 // we can just "unslice" it to get the
-                                 // non-key arguments.
-                                 key.KeyData.begin());
+      cache.resumeInitialization(key, QueueEntry);
+    }
+
+    void forTupleMetadata(const TupleTypeMetadata *metadata) {
+      TupleTypes.get().resumeInitialization(metadata, QueueEntry);
     }
 
     void forOtherMetadata(const Metadata *metadata) && {
       swift_runtime_unreachable("metadata should always be complete");
     }
-  } callbacks = { std::move(queueEntry) };
+  } callbacks = { queueEntry };
 
   auto metadata = queueEntry->Value;
   performOnMetadataCache<void>(metadata, std::move(callbacks));
@@ -3402,6 +3539,10 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
       return cache.await(key, Request);
     }
 
+    MetadataResponse forTupleMetadata(const TupleTypeMetadata *metadata) {
+      return TupleTypes.get().await(metadata, Request);
+    }
+
     /// All other type metadata are always complete.
     MetadataResponse forOtherMetadata(const Metadata *type) && {
       return MetadataResponse{type, MetadataState::Complete};
@@ -3414,19 +3555,33 @@ MetadataResponse swift::swift_checkMetadataState(MetadataRequest request,
 /// Search all the metadata that the given type has transitive completeness
 /// requirements on for something that matches the given predicate.
 template <class T>
-static bool findAnyTransitiveMetadata(const Metadata *type,
-                                      const TypeContextDescriptor *description,
-                                      T &&predicate) {
-  // Classes require their superclass to be transitively complete.
-  //
-  // We check for a class by looking at the type descriptor because we'll be
-  // loading the descriptor flags again when checking for a generic type,
-  // whereas we won't otherwise be touching the metadata kind.
-  if (isa<ClassDescriptor>(description)) {
-    if (auto super = cast<ClassMetadata>(type)->Superclass) {
+static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
+  const TypeContextDescriptor *description;
+
+  // Classes require their superclass to be transitively complete,
+  // and they can be generic.
+  if (auto classType = dyn_cast<ClassMetadata>(type)) {
+    description = classType->getDescription();
+    if (auto super = classType->Superclass) {
       if (super->isTypeMetadata() && predicate(super))
         return true;
     }
+
+  // Value types can be generic.
+  } else if (auto valueType = dyn_cast<ValueMetadata>(type)) {
+    description = valueType->getDescription();
+
+  // Tuples require their element types to be transitively complete.
+  } else if (auto tupleType = dyn_cast<TupleTypeMetadata>(type)) {
+    for (size_t i = 0, e = tupleType->NumElements; i != e; ++i)
+      if (predicate(tupleType->getElement(i).Type))
+        return true;
+
+    return false;
+
+  // Other types do not have transitive completeness requirements.
+  } else {
+    return false;
   }
 
   // Generic types require their type arguments to be transitively complete.
@@ -3454,11 +3609,9 @@ static bool findAnyTransitiveMetadata(const Metadata *type,
 
 /// Do a quick check to see if all the transitive type metadata are complete.
 static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *type,
-                                     const TypeContextDescriptor *description) {
+areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
   // Look for any transitive metadata that's incomplete.
-  return !findAnyTransitiveMetadata(type, description,
-                                    [](const Metadata *type) {
+  return !findAnyTransitiveMetadata(type, [](const Metadata *type) {
     struct IsIncompleteCallbacks {
       bool forGenericMetadata(const Metadata *type,
                               const TypeContextDescriptor *description,
@@ -3466,6 +3619,11 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type,
                               MetadataCacheKey key) && {
         // Metadata cache lookups aren't really cheap enough for this
         // optimization.
+        return true;
+      }
+
+      bool forTupleMetadata(const TupleTypeMetadata *metadata) {
+        // TODO: this could be cheap enough.
         return true;
       }
 
@@ -3488,8 +3646,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type,
 /// incomplete.  If we don't find anything, then we know all the transitive
 /// dependencies actually hold, and we can keep going.
 static MetadataDependency
-checkTransitiveCompleteness(const Metadata *initialType,
-                            const TypeContextDescriptor *initialDescription) {
+checkTransitiveCompleteness(const Metadata *initialType) {
   // TODO: it would nice to avoid allocating memory in common cases here.
   // In particular, we don't usually add *anything* to the worklist, and we
   // usually only add a handful of types to the map.
@@ -3531,7 +3688,7 @@ checkTransitiveCompleteness(const Metadata *initialType,
   // Consider the type itself to be presumed-complete.  We're looking for
   // a greatest fixed point.
   presumedCompleteTypes.insert(initialType);
-  if (findAnyTransitiveMetadata(initialType, initialDescription, isIncomplete))
+  if (findAnyTransitiveMetadata(initialType, isIncomplete))
     return dependency;
 
   // Drain the worklist.  The order we do things in doesn't really matter,
@@ -3540,22 +3697,126 @@ checkTransitiveCompleteness(const Metadata *initialType,
     auto type = worklist.back();
     worklist.pop_back();
 
-    // Only nominal types have transitive dependencies (for now).
-    const TypeContextDescriptor *description;
-    if (auto classType = dyn_cast<ClassMetadata>(type)) {
-      description = classType->getDescription();
-    } else {
-      description = cast<ValueMetadata>(type)->getDescription();
-    }
-
     // Search for incomplete dependencies.  This will set Dependency
     // if it finds anything.
-    if (findAnyTransitiveMetadata(type, description, isIncomplete))
+    if (findAnyTransitiveMetadata(type, isIncomplete))
       return dependency;
   }
 
   // Otherwise, we're transitively complete.
   return { nullptr, MetadataState::Complete };
+}
+
+/// Diagnose a metadata dependency cycle.
+LLVM_ATTRIBUTE_NORETURN
+static void diagnoseMetadataDependencyCycle(const Metadata *start,
+                                            ArrayRef<MetadataDependency> links){
+  assert(start == links.back().Value);
+
+  std::string diagnostic =
+    "runtime error: unresolvable type metadata dependency cycle detected\n  ";
+  diagnostic += nameForMetadata(start);
+
+  for (auto &link : links) {
+    // If the diagnostic gets too large, just cut it short.
+    if (diagnostic.size() >= 128 * 1024) {
+      diagnostic += "\n  (limiting diagnostic text at 128KB)";
+      break;
+    }
+
+    diagnostic += "\n  depends on ";
+
+    switch (link.Requirement) {
+    case MetadataState::Complete:
+      diagnostic += "transitive completion of ";
+      break;
+    case MetadataState::NonTransitiveComplete:
+      diagnostic += "completion of ";
+      break;
+    case MetadataState::LayoutComplete:
+      diagnostic += "layout of ";
+      break;
+    case MetadataState::Abstract:
+      diagnostic += "<corruption> of ";
+      break;
+    }
+
+    diagnostic += nameForMetadata(link.Value);
+  }
+
+  diagnostic += "\nAborting!\n";
+
+  if (_swift_shouldReportFatalErrorsToDebugger()) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc99-extensions"
+    RuntimeErrorDetails details = {
+      .version = RuntimeErrorDetails::currentVersion,
+      .errorType = "type-metadata-cycle",
+      .currentStackDescription = "fetching metadata", // TODO?
+      .framesToSkip = 1, // skip out to the check function
+      .memoryAddress = start
+      // TODO: describe the cycle using notes instead of one huge message?
+    };
+#pragma GCC diagnostic pop
+
+    _swift_reportToDebugger(RuntimeErrorFlagFatal, diagnostic.c_str(),
+                            &details);
+  }
+
+  fatalError(0, diagnostic.c_str());
+}
+
+/// Check whether the given metadata dependency is satisfied, and if not,
+/// return its current dependency, if one exists.
+static MetadataDependency
+checkMetadataDependency(MetadataDependency dependency) {
+  struct IsIncompleteCallbacks {
+    MetadataState Requirement;
+    MetadataDependency forGenericMetadata(const Metadata *type,
+                                          const TypeContextDescriptor *desc,
+                                          GenericMetadataCache &cache,
+                                          MetadataCacheKey key) && {
+      return cache.checkDependency(key, Requirement);
+    }
+
+    MetadataDependency forTupleMetadata(const TupleTypeMetadata *metadata) {
+      return TupleTypes.get().checkDependency(metadata, Requirement);
+    }
+
+    MetadataDependency forOtherMetadata(const Metadata *type) && {
+      return MetadataDependency();
+    }
+  } callbacks = { dependency.Requirement };
+
+  return performOnMetadataCache<MetadataDependency>(dependency.Value,
+                                                    std::move(callbacks));
+}
+
+/// Check for an unbreakable metadata-dependency cycle.
+void swift::checkMetadataDependencyCycle(const Metadata *startMetadata,
+                                         MetadataDependency firstLink,
+                                         MetadataDependency secondLink) {
+  std::vector<MetadataDependency> links;
+  auto checkNewLink = [&](MetadataDependency newLink) {
+    links.push_back(newLink);
+    if (newLink.Value == startMetadata)
+      diagnoseMetadataDependencyCycle(startMetadata, links);
+    for (auto i = links.begin(), e = links.end() - 1; i != e; ++i) {
+      if (i->Value == newLink.Value) {
+        auto next = i + 1;
+        diagnoseMetadataDependencyCycle(i->Value,
+                                llvm::makeArrayRef(&*next, links.end() - next));
+      }
+    }
+  };
+
+  checkNewLink(firstLink);
+  checkNewLink(secondLink);
+  while (true) {
+    auto newLink = checkMetadataDependency(links.back());
+    if (!newLink) return;
+    checkNewLink(newLink);
+  }
 }
 
 /***************************************************************************/
@@ -3665,4 +3926,34 @@ bool Metadata::satisfiesClassConstraint() const {
 
   // or it's a class.
   return isAnyClass();
+}
+
+#if !NDEBUG
+void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
+  // Enable verification when a special environment variable is set.
+  // Some metatypes crash when going through the mangler or demangler. A
+  // lot of tests currently trigger those crashes, resulting in failing
+  // tests which are still usefully testing something else. This
+  // variable lets us easily turn on verification to find and fix these
+  // bugs. Remove this and leave it permanently on once everything works
+  // with it enabled.
+  bool verificationEnabled =
+    SWIFT_LAZY_CONSTANT((bool)getenv("SWIFT_ENABLE_MANGLED_NAME_VERIFICATION"));
+  
+  if (!verificationEnabled) return;
+  
+  Demangle::Demangler Dem;
+  auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  auto mangledName = Demangle::mangleNode(node);
+  auto result = _getTypeByMangledName(mangledName,
+                                      [](unsigned, unsigned){ return nullptr; });
+  if (metadata != result)
+    swift::warning(RuntimeErrorFlagNone,
+                   "Metadata mangled name failed to roundtrip: %p -> %s -> %p",
+                   metadata, mangledName.c_str(), (const Metadata *)result);
+}
+#endif
+
+const TypeContextDescriptor *swift::swift_getTypeContextDescriptor(const Metadata *type) {
+    return type->getTypeContextDescriptor();
 }

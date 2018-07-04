@@ -1,0 +1,15 @@
+Name: TestMyTime
+Globals:
+- Name: kMyTimeZero
+  SwiftName: "MyTime.z"
+Functions:
+- Name: MyTimeAdd
+  SwiftName: "MyTime.add(this:that:)"
+SwiftVersions:
+- Version: 3
+  Globals:
+  - Name: kMyTimeZero
+    SwiftName: "kMyTimeZero"
+  Functions:
+  - Name: MyTimeAdd
+    SwiftName: "MyTimeAdd(_:_:)"

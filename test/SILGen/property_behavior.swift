@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-experimental-property-behaviors -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-property-behaviors -enable-sil-ownership %s | %FileCheck %s
 // REQUIRES: property_behavior_value_substitution
 protocol behavior {
   associatedtype Value

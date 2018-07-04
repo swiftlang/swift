@@ -106,7 +106,7 @@ public:
   Size getNextOffsetFromGlobal() const {
     return Size(super::getNextOffsetFromGlobal().getQuantity());
   }
-  
+
   void addAlignmentPadding(Alignment align) {
     auto misalignment = getNextOffsetFromGlobal() % IGM().getPointerAlignment();
     if (misalignment != Size(0))
@@ -119,10 +119,26 @@ public:
 class ConstantArrayBuilder
     : public clang::CodeGen::ConstantArrayBuilderTemplateBase<
                                                     ConstantInitBuilderTraits> {
+private:
+  llvm::Type *EltTy;
+
 public:
-  template <class... As>
-  ConstantArrayBuilder(As &&... args)
-    : ConstantArrayBuilderTemplateBase(std::forward<As>(args)...) {}
+  ConstantArrayBuilder(InitBuilder &builder,
+                       AggregateBuilderBase *parent,
+                       llvm::Type *eltTy)
+    : ConstantArrayBuilderTemplateBase(builder, parent, eltTy), EltTy(eltTy) {}
+
+  void addAlignmentPadding(Alignment align) {
+    auto misalignment = getNextOffsetFromGlobal() % align;
+    if (misalignment == Size(0))
+      return;
+
+    auto eltSize = IGM().DataLayout.getTypeStoreSize(EltTy);
+    assert(misalignment.getValue() % eltSize == 0);
+
+    for (unsigned i = 0, n = misalignment.getValue() / eltSize; i != n; ++i)
+      add(llvm::Constant::getNullValue(EltTy));
+  }
 };
 
 class ConstantStructBuilder

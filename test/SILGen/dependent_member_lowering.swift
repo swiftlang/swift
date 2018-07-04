@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name dependent_member_lowering -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name dependent_member_lowering -enable-sil-ownership %s | %FileCheck %s
 
 protocol P {
   associatedtype A

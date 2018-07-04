@@ -49,8 +49,7 @@ ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
 NOTE(previous_decldef,none,
-     "previous %select{declaration|definition}0 of %1 is here",
-     (bool, DeclBaseName))
+     "previous definition of %0 is here", (DeclBaseName))
 
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
@@ -67,10 +66,10 @@ ERROR(super_not_in_class_method,none,
 
 ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "
-      "use 'static' to declare a static method", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 method", (bool))
 ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
-      "use 'static' to declare a static property", ())
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 property", (bool))
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
@@ -87,6 +86,30 @@ NOTE(profile_read_error,none,
 
 ERROR(generic_signature_not_minimal,none,
       "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+
+ERROR(attr_only_on_parameters, none,
+      "'%0' may only be used on parameters", (StringRef))
+
+ERROR(function_type_no_parens,none,
+      "single argument function types require parentheses", ())
+
+//------------------------------------------------------------------------------
+// MARK: Circular reference diagnostics
+//------------------------------------------------------------------------------
+ERROR(circular_reference, none,
+      "circular reference", ())
+
+ERROR(redundant_type_alias_define, none,
+      "redundant type alias declaration", ())
+
+NOTE(circular_reference_through, none,
+     "through reference here", ())
+
+ERROR(circular_class_inheritance,none,
+      "%0 inherits from itself", (Identifier))
+
+ERROR(circular_enum_inheritance,none,
+      "%0 has a raw type that depends on itself", (Identifier))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

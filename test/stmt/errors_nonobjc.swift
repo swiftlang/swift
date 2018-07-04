@@ -5,14 +5,13 @@
 
 import Foundation
 
-// Catching `as NSError` ought *not* to be exhaustive when ObjC interop is
-// disabled. It's just another error type.
+// Since we enabled bridging on non-ObjC platforms, NSError ought to be treated as exhaustive.
 
 func bar() throws {}
 
 func foo() {
   do {
-    try bar() // expected-error{{enclosing catch is not exhaustive}}
+    try bar()
   } catch _ as NSError {
   }
 }

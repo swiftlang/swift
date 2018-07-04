@@ -110,7 +110,6 @@ public struct OpaquePointer {
   internal var _rawValue: Builtin.RawPointer
 
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline
   @_transparent
   internal init(_ v: Builtin.RawPointer) {
     self._rawValue = v
@@ -175,25 +174,19 @@ extension OpaquePointer: Equatable {
 }
 
 extension OpaquePointer: Hashable {
-  /// The pointer's hash value.
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
   ///
-  /// The hash value is not guaranteed to be stable across different
-  /// invocations of the same program.  Do not persist the hash value across
-  /// program runs.
-  @inlinable // FIXME(sil-serialize-all)
-  public var hashValue: Int {
-    return _hashValue(for: self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(Int(Builtin.ptrtoint_Word(_rawValue)))
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 
 extension OpaquePointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
@@ -242,13 +235,11 @@ public struct CVaListPointer {
 
 extension CVaListPointer : CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
-  @inlinable // FIXME(sil-serialize-all)
   public var debugDescription: String {
     return value.debugDescription
   }
 }
 
-@usableFromInline
 @inlinable
 internal func _memcpy(
   dest destination: UnsafeMutableRawPointer,
@@ -268,7 +259,6 @@ internal func _memcpy(
 ///
 /// The memory regions `source..<source + count` and
 /// `dest..<dest + count` may overlap.
-@usableFromInline
 @inlinable
 internal func _memmove(
   dest destination: UnsafeMutableRawPointer,

@@ -19,7 +19,6 @@ public struct LazyDropWhileSequence<Base: Sequence> {
   /// Create an instance with elements `transform(x)` for each element
   /// `x` of base.
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
@@ -43,7 +42,6 @@ extension LazyDropWhileSequence {
     public typealias Element = Base.Element
     
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Iterator, predicate: @escaping (Element) -> Bool) {
       self._base = _base
       self._predicate = predicate
@@ -126,7 +124,6 @@ public struct LazyDropWhileCollection<Base: Collection> {
   public typealias Element = Base.Element
   
   @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
   internal init(_base: Base, predicate: @escaping (Element) -> Bool) {
     self._base = _base
     self._predicate = predicate
@@ -161,7 +158,6 @@ extension LazyDropWhileCollection {
     public let base: Base.Index
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Base.Index) {
       self.base = _base
     }
@@ -187,14 +183,20 @@ extension LazyDropWhileCollection.Index: Equatable, Comparable {
 }
 
 extension LazyDropWhileCollection.Index: Hashable where Base.Index: Hashable {
-  @inlinable // FIXME(sil-serialize-all)
+  /// The hash value.
+  @inlinable
   public var hashValue: Int {
     return base.hashValue
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public func _hash(into hasher: inout _Hasher) {
-    hasher.append(base)
+  /// Hashes the essential components of this value by feeding them into the
+  /// given hasher.
+  ///
+  /// - Parameter hasher: The hasher to use when combining the components
+  ///   of this instance.
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(base)
   }
 }
 
@@ -253,11 +255,4 @@ extension LazyCollectionProtocol {
       _base: self.elements, predicate: predicate)
   }
 }
-
-@available(*, deprecated, renamed: "LazyDropWhileSequence.Iterator")
-public typealias LazyDropWhileIterator<T> = LazyDropWhileSequence<T>.Iterator where T: Sequence
-@available(*, deprecated, renamed: "LazyDropWhileCollection.Index")
-public typealias LazyDropWhileIndex<T> = LazyDropWhileCollection<T>.Index where T: Collection
-@available(*, deprecated, renamed: "LazyDropWhileCollection")
-public typealias LazyDropWhileBidirectionalCollection<T> = LazyDropWhileCollection<T> where T: BidirectionalCollection
 

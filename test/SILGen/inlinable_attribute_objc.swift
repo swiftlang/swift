@@ -2,14 +2,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -module-name inlinable_attribute_objc -Xllvm -sil-full-demangle -primary-file %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name inlinable_attribute_objc -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
 import Foundation
 
 public class Horse : NSObject {
-  public dynamic func gallop() {}
+  @objc public dynamic func gallop() {}
 }
 
 // Make sure we can reference dynamic thunks and curry thunks

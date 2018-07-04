@@ -212,3 +212,12 @@ module Warnings6 { header "Warnings6.h" }
 module Warnings7 { header "Warnings7.h" }
 module Warnings8 { header "Warnings8.h" }
 module Warnings9 { header "Warnings9.h" }
+
+module ConditionallyFoo {
+  header "ConditionallyFoo.h"
+  config_macros [exhaustive] WANT_FOO
+}
+
+module ForwardDeclarationsHelper {
+  header "ForwardDeclarationsHelper.h"
+}

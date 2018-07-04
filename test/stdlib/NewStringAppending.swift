@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift | %FileCheck %s
+// RUN: %target-run-stdlib-swift-swift3 | %FileCheck %s
 // REQUIRES: executable_test
 //
 // Parts of this test depend on memory allocator specifics.  The test
@@ -69,27 +69,25 @@ var s = "⓪" // start non-empty
 
 // To make this test independent of the memory allocator implementation,
 // explicitly request initial capacity.
-s.reserveCapacity(8)
+s.reserveCapacity(16)
 
-// CHECK-NEXT: String(Native(owner: @[[storage0:[x0-9a-f]+]], count: 1, capacity: 8)) = "⓪"
+// CHECK-NEXT: String(Native(owner: @[[storage0:[x0-9a-f]+]], count: 1, capacity: 16)) = "⓪"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Native(owner: @[[storage0]], count: 2, capacity: 8)) = "⓪1"
+// CHECK-NEXT: String(Native(owner: @[[storage0]], count: 2, capacity: 16)) = "⓪1"
 s += "1"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Native(owner: @[[storage0]], count: 8, capacity: 8)) = "⓪1234567"
+// CHECK-NEXT: String(Native(owner: @[[storage0]], count: 8, capacity: 16)) = "⓪1234567"
 s += "234567"
 print("\(repr(s))")
 
-// -- expect a reallocation here
-
-// CHECK-NEXT: String(Native(owner: @[[storage1:[x0-9a-f]+]], count: 9, capacity: 16)) = "⓪12345678"
+// CHECK-NEXT: String(Native(owner: @[[storage0:[x0-9a-f]+]], count: 9, capacity: 16)) = "⓪12345678"
 // CHECK-NOT: @[[storage0]],
 s += "8"
 print("\(repr(s))")
 
-// CHECK-NEXT: String(Native(owner: @[[storage1]], count: 16, capacity: 16)) = "⓪123456789012345"
+// CHECK-NEXT: String(Native(owner: @[[storage0]], count: 16, capacity: 16)) = "⓪123456789012345"
 s += "9012345"
 print("\(repr(s))")
 

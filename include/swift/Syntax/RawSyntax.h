@@ -48,17 +48,17 @@ using llvm::StringRef;
 
 #ifndef NDEBUG
 #define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)                    \
-  ({                                                                           \
+  do {                                                                         \
     if (auto &__Child = Raw->getChild(Cursor))                                 \
       assert(__Child->getKind() == ExpectedKind);                              \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_kind(Raw, Cursor, ExpectedKind) ({});
+#define syntax_assert_child_kind(Raw, Cursor, ExpectedKind)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_child_token(Raw, CursorName, ...)                        \
-  ({                                                                           \
+  do {                                                                         \
     bool __Found = false;                                                      \
     if (auto &__Token = Raw->getChild(Cursor::CursorName)) {                   \
       assert(__Token->isToken());                                              \
@@ -73,14 +73,14 @@ using llvm::StringRef;
                           ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
     }                                                                          \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_token(Raw, CursorName, ...) ({});
+#define syntax_assert_child_token(Raw, CursorName, ...)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)        \
-  ({                                                                           \
+  do {                                                                         \
     bool __Found = false;                                                      \
     if (auto &__Child = Raw->getChild(Cursor::CursorName)) {                   \
       assert(__Child->isToken());                                              \
@@ -96,19 +96,19 @@ using llvm::StringRef;
                           ", expected one of {" #__VA_ARGS__ "}");             \
       }                                                                        \
     }                                                                          \
-  })
+  } while (false)
 #else
-#define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...) ({});
+#define syntax_assert_child_token_text(Raw, CursorName, TokenKind, ...)
 #endif
 
 #ifndef NDEBUG
 #define syntax_assert_token_is(Tok, Kind, Text)                                \
-  ({                                                                           \
+  do {                                                                         \
     assert(Tok.getTokenKind() == Kind);                                        \
     assert(Tok.getText() == Text);                                             \
-  })
+  } while (false)
 #else
-#define syntax_assert_token_is(Tok, Kind, Text) ({});
+#define syntax_assert_token_is(Tok, Kind, Text)
 #endif
 
 namespace swift {
@@ -222,7 +222,7 @@ class RawSyntax final
   friend TrailingObjects;
 
   union {
-    uint64_t Clear;
+    uint64_t OpaqueBits;
     struct {
       /// The kind of syntax this node represents.
       unsigned Kind : bitmax(NumSyntaxKindBits, 8);
@@ -231,40 +231,50 @@ class RawSyntax final
       /// Whether this piece of syntax was constructed with manually managed
       /// memory.
       unsigned ManualMemory : 1;
-    };
-    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 };
+    } Common;
+    enum { NumRawSyntaxBits = bitmax(NumSyntaxKindBits, 8) + 1 + 1 };
 
     // For "layout" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 32);
+      static_assert(NumRawSyntaxBits <= 32,
+                    "Only 32 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 32); // align to 32 bits
       /// Number of children this "layout" node has.
       unsigned NumChildren : 32;
-    };
+      /// Number of bytes this node takes up spelled out in the source code
+      unsigned TextLength : 32;
+    } Layout;
 
     // For "token" nodes.
     struct {
-      uint64_t : bitmax(NumRawSyntaxBits, 16);
+      static_assert(NumRawSyntaxBits <= 16,
+                    "Only 16 bits reserved for standard syntax bits");
+      uint64_t : bitmax(NumRawSyntaxBits, 16); // align to 16 bits
       /// The kind of token this "token" node represents.
       unsigned TokenKind : 16;
       /// Number of leading  trivia pieces.
       unsigned NumLeadingTrivia : 16;
       /// Number of trailing trivia pieces.
       unsigned NumTrailingTrivia : 16;
-    };
+    } Token;
   } Bits;
 
   size_t numTrailingObjects(OverloadToken<RC<RawSyntax>>) const {
-    return isToken() ? 0 : Bits.NumChildren;
+    return isToken() ? 0 : Bits.Layout.NumChildren;
   }
   size_t numTrailingObjects(OverloadToken<OwnedString>) const {
     return isToken() ? 1 : 0;
   }
   size_t numTrailingObjects(OverloadToken<TriviaPiece>) const {
-    return isToken() ? Bits.NumLeadingTrivia + Bits.NumTrailingTrivia : 0;
+    return isToken()
+             ? Bits.Token.NumLeadingTrivia + Bits.Token.NumTrailingTrivia
+             : 0;
   }
 
+  /// Constructor for creating layout nodes
   RawSyntax(SyntaxKind Kind, ArrayRef<RC<RawSyntax>> Layout,
             SourcePresence Presence, bool ManualMemory);
+  /// Constructor for creating token nodes
   RawSyntax(tok TokKind, OwnedString Text,
             ArrayRef<TriviaPiece> LeadingTrivia,
             ArrayRef<TriviaPiece> TrailingTrivia,
@@ -274,12 +284,12 @@ public:
   ~RawSyntax();
 
   void Release() const {
-    if (Bits.ManualMemory)
+    if (Bits.Common.ManualMemory)
       return;
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Release();
   }
   void Retain() const {
-    if (Bits.ManualMemory)
+    if (Bits.Common.ManualMemory)
       return;
     return llvm::ThreadSafeRefCountedBase<RawSyntax>::Retain();
   }
@@ -318,10 +328,12 @@ public:
   /// @}
 
   SourcePresence getPresence() const {
-    return static_cast<SourcePresence>(Bits.Presence);
+    return static_cast<SourcePresence>(Bits.Common.Presence);
   }
 
-  SyntaxKind getKind() const { return static_cast<SyntaxKind>(Bits.Kind); }
+  SyntaxKind getKind() const {
+    return static_cast<SyntaxKind>(Bits.Common.Kind);
+  }
 
   /// Returns true if the node is "missing" in the source (i.e. it was
   /// expected (or optional) but not written.
@@ -357,7 +369,7 @@ public:
   /// Get the kind of the token.
   tok getTokenKind() const {
     assert(isToken());
-    return static_cast<tok>(Bits.TokenKind);
+    return static_cast<tok>(Bits.Token.TokenKind);
   }
 
   /// Return the text of the token.
@@ -369,13 +381,13 @@ public:
   /// Return the leading trivia list of the token.
   ArrayRef<TriviaPiece> getLeadingTrivia() const {
     assert(isToken());
-    return {getTrailingObjects<TriviaPiece>(), Bits.NumLeadingTrivia};
+    return {getTrailingObjects<TriviaPiece>(), Bits.Token.NumLeadingTrivia};
   }
   /// Return the trailing trivia list of the token.
   ArrayRef<TriviaPiece> getTrailingTrivia() const {
     assert(isToken());
-    return {getTrailingObjects<TriviaPiece>() + Bits.NumLeadingTrivia,
-            Bits.NumTrailingTrivia};
+    return {getTrailingObjects<TriviaPiece>() + Bits.Token.NumLeadingTrivia,
+            Bits.Token.NumTrailingTrivia};
   }
 
   /// Return \c true if this is the given kind of token.
@@ -419,19 +431,35 @@ public:
   ArrayRef<RC<RawSyntax>> getLayout() const {
     if (isToken())
       return {};
-    return {getTrailingObjects<RC<RawSyntax>>(), Bits.NumChildren};
+    return {getTrailingObjects<RC<RawSyntax>>(), Bits.Layout.NumChildren};
   }
 
   size_t getNumChildren() const {
     if (isToken())
       return 0;
-    return Bits.NumChildren;
+    return Bits.Layout.NumChildren;
   }
 
   /// Get a child based on a particular node's "Cursor", indicating
   /// the position of the terms in the production of the Swift grammar.
   const RC<RawSyntax> &getChild(CursorIndex Index) const {
     return getLayout()[Index];
+  }
+
+  /// Return the number of bytes this node takes when spelled out in the source
+  size_t getTextLength() {
+    // For tokens the computation of the length is fast enough to justify the
+    // space for caching it. For layout nodes, we cache the length to avoid
+    // traversing the tree
+
+    // FIXME: Or would it be sensible to cache the size of token nodes as well?
+    if (isToken()) {
+      AbsolutePosition Pos;
+      accumulateAbsolutePosition(Pos);
+      return Pos.getOffset();
+    } else {
+      return Bits.Layout.TextLength;
+    }
   }
 
   /// @}
@@ -457,6 +485,10 @@ public:
   /// token. If this contains no tokens, return None.
   llvm::Optional<AbsolutePosition>
   accumulateAbsolutePosition(AbsolutePosition &Pos) const;
+
+  /// Advance the provided AbsolutePosition by the first trivia of this node.
+  /// Return true if we found this trivia; otherwise false.
+  bool accumulateLeadingTrivia(AbsolutePosition &Pos) const;
 
   /// Print this piece of syntax recursively.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts) const;

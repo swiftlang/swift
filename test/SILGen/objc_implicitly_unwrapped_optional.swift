@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-sil-ownership -emit-sil -assert-config Release %s | %FileCheck %s
+// RUN: %target-swift-emit-sil(mock-sdk: %clang-importer-sdk) -enable-sil-ownership -assert-config Release %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

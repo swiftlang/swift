@@ -641,6 +641,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::GuaranteedToOwned))
+      Out << 'o';
     if (kindValue & unsigned(FunctionSigSpecializationParamKind::SROA))
       Out << 's';
     Out << '_';
@@ -1240,11 +1243,7 @@ void Remangler::mangleBuiltinTypeName(Node *node) {
 }
 
 void Remangler::mangleTypeAlias(Node *node, EntityContext &ctx) {
-  SubstitutionEntry entry;
-  if (trySubstitution(node, entry)) return;
-  Out << 'a';
-  mangleChildNodes(node); // context, identifier
-  addSubstitution(entry);
+  mangleAnyNominalType(node, ctx);
 }
 
 void Remangler::mangleFunctionType(Node *node) {
@@ -1625,11 +1624,6 @@ void Remangler::mangleAssociatedType(Node *node) {
   }
 }
 
-void Remangler::mangleQualifiedArchetype(Node *node) {
-  Out << "Qq";
-  mangleChildNodes(node); // index, declcontext
-}
-
 void Remangler::mangleDeclContext(Node *node) {
   mangleSingleChildNode(node);
 }
@@ -1754,6 +1748,9 @@ void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {
 }
 
 void Remangler::mangleProtocolWithoutPrefix(Node *node) {
+  if (mangleStandardSubstitution(node))
+    return;
+
   if (node->getKind() == Node::Kind::Type) {
     assert(node->getNumChildren() == 1);
     node = node->begin()[0];
@@ -1823,6 +1820,9 @@ void Remangler::mangleAnyNominalType(Node *node, EntityContext &ctx) {
   case Node::Kind::Class:
     mangleNominalType(node, 'C', ctx);
     break;
+  case Node::Kind::TypeAlias:
+    mangleNominalType(node, 'a', ctx);
+    break;
   default:
     unreachable("bad nominal type kind");
   }
@@ -1868,6 +1868,16 @@ void Remangler::mangleBoundGenericEnum(Node *node) {
 }
 
 void Remangler::mangleBoundGenericOtherNominalType(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericProtocol(Node *node) {
+  EntityContext ctx;
+  mangleAnyNominalType(node, ctx);
+}
+
+void Remangler::mangleBoundGenericTypeAlias(Node *node) {
   EntityContext ctx;
   mangleAnyNominalType(node, ctx);
 }

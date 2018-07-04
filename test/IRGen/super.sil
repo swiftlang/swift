@@ -52,7 +52,7 @@ bb0(%0 : $ChildToResilientParent):
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC6methodyyF"(%T5super22ChildToResilientParentC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC6methodyyF"(%T5super22ChildToResilientParentC* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS:{.*}]], {{.*}}* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
@@ -75,7 +75,7 @@ bb0(%0 : $@thick ChildToResilientParent.Type):
 }
 
 // ChildToResilientParent is in our resilience domain - can load the superclass's metadata directly.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC11classMethodyyFZ"(%swift.type* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S5super22ChildToResilientParentC11classMethodyyFZ"(%swift.type* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class22ResilientOutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[BASE:%.*]] = load [[INT]], [[INT]]* getelementptr inbounds ([[BOUNDS]], [[BOUNDS]]* @"$S15resilient_class22ResilientOutsideParentCMo", i32 0, i32 0)
@@ -106,7 +106,7 @@ bb0(%0 : $ChildToFixedParent):
   return %7 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super18ChildToFixedParentC6methodyyF"(%T5super18ChildToFixedParentC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S5super18ChildToFixedParentC6methodyyF"(%T5super18ChildToFixedParentC* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class13OutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%T15resilient_class13OutsideParentC*)**
@@ -127,7 +127,7 @@ bb0(%0 : $@thick ChildToFixedParent.Type):
 }
 
 // ChildToFixedParent is in our resilience domain - load super metadata directly.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S5super18ChildToFixedParentC11classMethodyyFZ"(%swift.type* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S5super18ChildToFixedParentC11classMethodyyFZ"(%swift.type* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class13OutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[OPAQUE_SUPER_METADATA:%.*]] = bitcast %swift.type* [[SUPER_METADATA]] to void (%swift.type*)**
@@ -150,7 +150,7 @@ bb0(%0 : $ResilientOutsideChild):
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15resilient_class21ResilientOutsideChildC5superE15callSuperMethodyyF"(%T15resilient_class21ResilientOutsideChildC* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S15resilient_class21ResilientOutsideChildC5superE15callSuperMethodyyF"(%T15resilient_class21ResilientOutsideChildC* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class21ResilientOutsideChildCMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**
@@ -177,7 +177,7 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 }
 
 // Extending a resilient class - load super metadata indirectly.
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @"$S15resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyyFZ"(%swift.type* swiftself)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$S15resilient_class21ResilientOutsideChildC5superE20callSuperClassMethodyyFZ"(%swift.type* swiftself)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$S15resilient_class21ResilientOutsideChildCMa"([[INT]] 0)
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[OPAQUE_METADATA:%.*]] = bitcast %swift.type* [[METADATA]] to %swift.type**

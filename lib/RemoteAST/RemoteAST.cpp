@@ -65,11 +65,18 @@ struct IRGenContext {
 
 private:
   IRGenContext(ASTContext &ctx, ModuleDecl *module)
-    : SILMod(SILModule::createEmptyModule(module, SILOpts)),
+    : IROpts(createIRGenOptions()),
+      SILMod(SILModule::createEmptyModule(module, SILOpts)),
       IRGen(IROpts, *SILMod),
       IGM(IRGen, IRGen.createTargetMachine(), /*SourceFile*/ nullptr,
           LLVMContext, "<fake module name>", "<fake output filename>",
           "<fake main input filename>") {}
+
+  static IRGenOptions createIRGenOptions() {
+    IRGenOptions IROpts;
+    IROpts.EnableResilienceBypass = true;
+    return IROpts;
+  }
 
 public:
   static std::unique_ptr<IRGenContext>
@@ -176,7 +183,8 @@ public:
     if (genericParams.size() != args.size())
       return Type();
 
-    auto subMap = genericSig->getSubstitutionMap(
+    auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *t) -> Type {
           for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
             if (t->isEqual(genericParams[i]))
@@ -746,7 +754,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        Result = cast<NominalTypeDecl>(decl);
+        // A synthesized type from the Clang importer may resolve to a
+        // compatibility alias.
+        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
+          if (resultAlias->isCompatibilityAlias()) {
+            Result = resultAlias->getUnderlyingTypeLoc().getType()
+                                ->getAnyNominal();
+          }
+        } else {
+          Result = dyn_cast<NominalTypeDecl>(decl);
+        }
+        HadError |= !Result;
       } else {
         HadError = true;
         Result = nullptr;

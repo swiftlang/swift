@@ -1,29 +1,31 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -swift-version 4
 
-// Simple structs where Codable conformance is added in extensions should not
-// derive conformance yet.
-struct SimpleStruct { // expected-note {{did you mean 'init'?}}
+// Simple structs where Codable conformance is added in extensions should derive
+// conformance.
+struct SimpleStruct {
   var x: Int
   var y: Double
   static var z: String = "foo"
-
   func foo() {
-    // They should not receive a synthesized CodingKeys enum.
-    let _ = SimpleStruct.CodingKeys.self // expected-error {{type 'SimpleStruct' has no member 'CodingKeys'}}
-    let _ = SimpleStruct.CodingKeys.x // expected-error {{type 'SimpleStruct' has no member 'CodingKeys'}}
-    let _ = SimpleStruct.CodingKeys.y // expected-error {{type 'SimpleStruct' has no member 'CodingKeys'}}
-    let _ = SimpleStruct.CodingKeys.z // expected-error {{type 'SimpleStruct' has no member 'CodingKeys'}}
+    // They should receive a synthesized CodingKeys enum.
+    let _ = SimpleStruct.CodingKeys.self
+
+    // The enum should have a case for each of the vars.
+    let _ = SimpleStruct.CodingKeys.x
+    let _ = SimpleStruct.CodingKeys.y
+
+    // Static vars should not be part of the CodingKeys enum.
+    let _ = SimpleStruct.CodingKeys.z // expected-error {{type 'SimpleStruct.CodingKeys' has no member 'z'}}
   }
 }
 
-extension SimpleStruct : Codable {} // expected-error {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-1 {{implementation of 'Decodable' cannot be automatically synthesized in an extension}}
-// expected-error@-2 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
-// expected-error@-3 {{implementation of 'Encodable' cannot be automatically synthesized in an extension}}
+extension SimpleStruct : Codable {
+}
 
-// They should not receive Codable methods.
-let _ = SimpleStruct.init(from:) // expected-error {{type 'SimpleStruct' has no member 'init(from:)'}}
-let _ = SimpleStruct.encode(to:) // expected-error {{type 'SimpleStruct' has no member 'encode(to:)'}}
+// They should receive synthesized init(from:) and an encode(to:).
+let _ = SimpleStruct.init(from:)
+let _ = SimpleStruct.encode(to:)
 
-// They should not get a CodingKeys type.
-let _ = SimpleStruct.CodingKeys.self // expected-error {{type 'SimpleStruct' has no member 'CodingKeys'}}
+// The synthesized CodingKeys type should not be accessible from outside the
+// struct.
+let _ = SimpleStruct.CodingKeys.self // expected-error {{'CodingKeys' is inaccessible due to 'private' protection level}}

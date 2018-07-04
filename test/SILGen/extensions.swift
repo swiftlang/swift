@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
 
 class Foo {
   // CHECK-LABEL: sil hidden @$S10extensions3FooC3zim{{[_0-9a-zA-Z]*}}F

@@ -23,7 +23,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ProfileData/InstrProfReader.h"
 #include <deque>
 
 namespace swift {
@@ -95,6 +94,11 @@ public:
 
   /// The most recent conformance...
   NormalProtocolConformance *lastEmittedConformance = nullptr;
+
+  /// Profiler instances for constructors, grouped by associated decl.
+  /// Each profiler is shared by all member initializers for a nominal type.
+  /// Constructors within extensions are profiled separately.
+  llvm::DenseMap<Decl *, SILProfiler *> constructorProfilers;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
 
@@ -244,7 +248,7 @@ public:
 
   /// Emits the default argument generator with the given expression.
   void emitDefaultArgGenerator(SILDeclRef constant, Expr *arg,
-                               DefaultArgumentKind kind);
+                               DefaultArgumentKind kind, DeclContext *DC);
 
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
@@ -339,7 +343,7 @@ public:
                               GenericEnvironment *genericEnv,
                               unsigned &baseOperand,
                               bool &needsGenericContext,
-                              SubstitutionList subs,
+                              SubstitutionMap subs,
                               AbstractStorageDecl *storage,
                               ArrayRef<ProtocolConformanceRef> indexHashables,
                               CanType baseTy,
@@ -421,7 +425,7 @@ public:
   void useConformance(ProtocolConformanceRef conformance);
 
   /// Mark protocol conformances from the given set of substitutions as used.
-  void useConformancesFromSubstitutions(SubstitutionList subs);
+  void useConformancesFromSubstitutions(SubstitutionMap subs);
 
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
@@ -430,12 +434,18 @@ public:
 
   /// Get the substitutions necessary to invoke a non-member (global or local)
   /// property.
-  SubstitutionList
+  SubstitutionMap
   getNonMemberVarDeclSubstitutions(VarDecl *var);
 
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
-  
+
+  /// Get or create the shared profiler instance for a type's constructors.
+  /// This takes care to create separate profilers for extensions, which may
+  /// reside in a different file than the one where the base type is defined.
+  SILProfiler *getOrCreateProfilerForConstructors(DeclContext *ctx,
+                                                  ConstructorDecl *cd);
+
 private:
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);

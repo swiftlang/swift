@@ -27,6 +27,7 @@ add_swift_library(swiftAST STATIC
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  Evaluator.cpp
   Expr.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
@@ -48,11 +49,10 @@ add_swift_library(swiftAST STATIC
   SyntaxASTMap.cpp
   SILLayout.cpp
   Stmt.cpp
-  Substitution.cpp
-  SubstitutionList.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
+  TypeCheckRequests.cpp
   TypeJoinMeet.cpp
   TypeRefinementContext.cpp
   TypeRepr.cpp

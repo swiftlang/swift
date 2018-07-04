@@ -3,7 +3,7 @@
 sil_stage canonical
 
 protocol P { func foo() }
-// CHECK-LABEL: define{{( protected)?}} swiftcc void @phi_witness_method(%swift.type* %T, i8** %T.P) #0 {
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @phi_witness_method(%swift.type* %T, i8** %T.P) #0 {
 sil @phi_witness_method : $@convention(thin) <T: P> () -> () {
 entry:
   // CHECK: [[T0_GEP:%.*]] = getelementptr inbounds i8*, i8** %T.P, i32 1

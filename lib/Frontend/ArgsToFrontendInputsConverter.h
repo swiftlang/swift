@@ -16,7 +16,9 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Option/ArgList.h"
+#include <set>
 
 namespace swift {
 

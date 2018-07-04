@@ -173,10 +173,14 @@ STMT_NODES = [
              Child('TrailingComma', kind='CommaToken',
                    is_optional=True),
          ]),
+
+    # availability-condition -> '#available' '(' availability-spec ')'
     Node('AvailabilityCondition', kind='Syntax',
          children=[
              Child('PoundAvailableKeyword', kind='PoundAvailableToken'),
-             Child('Arguments', kind='TokenList'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('AvailabilitySpec', kind='AvailabilitySpecList'),
+             Child('RightParen', kind='RightParenToken'),
          ]),
     Node('MatchingPatternCondition', kind='Syntax',
          children=[
@@ -253,11 +257,12 @@ STMT_NODES = [
              Child('Body', kind='CodeBlock'),
          ]),
 
-    # switch-case -> switch-case-label stmt-list
-    #              | default-label stmt-list
+    # switch-case -> unknown-attr? switch-case-label stmt-list
+    #              | unknown-attr? switch-default-label stmt-list
     Node('SwitchCase', kind='Syntax',
          traits=['WithStatements'],
          children=[
+             Child('UnknownAttr', kind='Attribute', is_optional=True),
              Child('Label', kind='Syntax',
                    node_choices=[
                        Child('Default', kind='SwitchDefaultLabel'),

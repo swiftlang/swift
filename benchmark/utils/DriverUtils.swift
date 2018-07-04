@@ -63,7 +63,7 @@ struct Test {
   }
 
   /// The "main routine" of the benchmark.
-  var runFunction: (Int) -> () {
+  var runFunction: ((Int) -> ())? {
     return benchInfo.runFunction
   }
 
@@ -93,6 +93,7 @@ enum TestAction {
   case run
   case listTests
   case fail(String)
+  case help([String])
 }
 
 struct TestConfig {
@@ -136,7 +137,7 @@ struct TestConfig {
     let validOptions = [
       "--iter-scale", "--num-samples", "--num-iters",
       "--verbose", "--delim", "--list", "--sleep",
-      "--tags", "--skip-tags"
+      "--tags", "--skip-tags", "--help"
     ]
     let maybeBenchArgs: Arguments? = parseArgs(validOptions)
     if maybeBenchArgs == nil {
@@ -145,6 +146,10 @@ struct TestConfig {
     let benchArgs = maybeBenchArgs!
 
     filters = benchArgs.positionalArgs
+
+    if benchArgs.optionalArgsMap["--help"] != nil {
+      return .help(validOptions)
+    }
 
     if let x = benchArgs.optionalArgsMap["--iter-scale"] {
       if x.isEmpty { return .fail("--iter-scale requires a value") }
@@ -358,8 +363,18 @@ class SampleRunner {
 }
 
 /// Invoke the benchmark entry point and return the run time in milliseconds.
-func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
+func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
   var samples = [UInt64](repeating: 0, count: c.numSamples)
+
+  // Before we do anything, check that we actually have a function to
+  // run. If we don't it is because the benchmark is not supported on
+  // the platform and we should skip it.
+  guard let testFn = test.runFunction else {
+    if c.verbose {
+	print("Skipping unsupported benchmark \(test.name)!")
+    }
+    return nil
+  }
 
   if c.verbose {
     print("Running \(test.name) for \(c.numSamples) samples.")
@@ -373,7 +388,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
       test.setUpFunction?()
-      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: 1)
+      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
       test.tearDownFunction?()
 
       if elapsed_time > 0 {
@@ -388,6 +403,10 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
       // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
       scale = c.fixedNumIters
     }
+    // Make integer overflow less likely on platforms where Int is 32 bits wide.
+    // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
+    // benchmarks to not let scaling get off the charts.
+    scale = min(scale, UInt(Int.max) / 10_000)
 
     // Rerun the test with the computed scale factor.
     if scale > 1 {
@@ -395,7 +414,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults {
         print("    Measuring with scale \(scale).")
       }
       test.setUpFunction?()
-      elapsed_time = sampler.run(test.name, fn: test.runFunction, num_iters: scale)
+      elapsed_time = sampler.run(test.name, fn: testFn, num_iters: scale)
       test.tearDownFunction?()
     } else {
       scale = 1
@@ -442,7 +461,11 @@ func runBenchmarks(_ c: TestConfig) {
   sumBenchResults.sampleCount = 0
 
   for t in c.tests {
-    let results = runBench(t, c)
+    guard let results = runBench(t, c) else {
+      print("\(t.index)\(c.delim)\(t.name)\(c.delim)Unsupported")
+      fflush(stdout)
+      continue
+    }
     print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
@@ -464,6 +487,11 @@ public func main() {
   var config = TestConfig()
 
   switch (config.processArguments()) {
+    case let .help(validOptions):
+      print("Valid options:")
+      for v in validOptions {
+        print("    \(v)")
+      }
     case let .fail(msg):
       // We do this since we need an autoclosure...
       fatalError("\(msg)")

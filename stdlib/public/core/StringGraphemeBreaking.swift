@@ -14,55 +14,29 @@ import SwiftShims
 
 /// CR and LF are common special cases in grapheme breaking logic
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline
 internal var _CR: UInt8 { return 0x0d }
 @inlinable // FIXME(sil-serialize-all)
-@usableFromInline
 internal var _LF: UInt8 { return 0x0a }
 
-extension String.Index {
-  @inlinable // FIXME(sil-serialize-all)
-  @usableFromInline // FIXME(sil-serialize-all)
-  internal init(encodedOffset: Int, characterStride stride: Int) {
-    if _slowPath(stride == 0 || stride > UInt16.max) {
-      // Don't store a 0 stride for the endIndex
-      // or a truncated stride for an overlong grapheme cluster.
-      self.init(encodedOffset: encodedOffset)
-      return
-    }
-    self.init(
-      encodedOffset: encodedOffset,
-      .character(stride: UInt16(truncatingIfNeeded: stride)))
-  }
-}
-
 extension _StringVariant {
-  @usableFromInline
   @inlinable
   internal func _stride(at i: String.Index) -> Int {
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      _sanityCheck(stride > 0)
-      return Int(stride)
-    }
+    if let stride = i.characterStride { return stride }
     return characterStride(atOffset: i.encodedOffset)
   }
 
-  @usableFromInline
   @inlinable
   internal func characterStride(atOffset offset: Int) -> Int {
     let slice = self.checkedSlice(from: offset)
     return slice.measureFirstExtendedGraphemeCluster()
   }
 
-  @usableFromInline
   @inlinable
   internal func characterIndex(atOffset offset: Int) -> String.Index {
     let stride = self.characterStride(atOffset: offset)
     return String.Index(encodedOffset: offset, characterStride: stride)
   }
 
-  @usableFromInline
   @inlinable
   internal func characterIndex(after i: String.Index) -> String.Index {
     let offset = i.encodedOffset
@@ -78,7 +52,6 @@ extension _StringVariant {
       characterStride: stride2)
   }
 
-  @usableFromInline
   @inlinable
   internal func characterIndex(before i: String.Index) -> String.Index {
     let offset = i.encodedOffset
@@ -92,7 +65,6 @@ extension _StringVariant {
       characterStride: stride)
   }
 
-  @usableFromInline
   @inlinable
   internal func characterIndex(
     _ i: String.Index,
@@ -111,7 +83,6 @@ extension _StringVariant {
     return i
   }
 
-  @usableFromInline
   @inlinable
   internal func characterIndex(
     _ i: String.Index,
@@ -160,7 +131,6 @@ extension _StringVariant {
   }
 
   @inlinable
-  @usableFromInline
   internal func character(at i: String.Index) -> Character {
     let stride = _stride(at: i)
     let offset = i.encodedOffset
@@ -180,7 +150,6 @@ extension _StringVariant {
   // paths of grapheme breaking that we have high confidence won't change.
   /// Returns the length of the first extended grapheme cluster in UTF-16
   /// code units.
-  @usableFromInline
   @inlinable
   internal
   func measureFirstExtendedGraphemeCluster() -> Int {
@@ -211,7 +180,6 @@ extension _StringVariant {
   //
   /// Returns the length of the last extended grapheme cluster in UTF-16
   /// code units.
-  @usableFromInline
   @inlinable
   internal
   func measureLastExtendedGraphemeCluster() -> Int {
@@ -287,7 +255,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureFirstExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
@@ -314,7 +282,7 @@ extension _UnmanagedOpaqueString {
 
     // Nuclear option: copy out the rest of the string into a contiguous buffer.
     let longStart = UnsafeMutablePointer<UInt16>.allocate(capacity: count)
-    defer { longStart.deallocate(capacity: count) }
+    defer { longStart.deallocate() }
     self._copy(into: UnsafeMutableBufferPointer(start: longStart, count: count))
     return UTF16._measureLastExtendedGraphemeCluster(
       in: UnsafeBufferPointer(start: longStart, count: count))
@@ -324,7 +292,6 @@ extension _UnmanagedOpaqueString {
 extension Unicode.UTF16 {
   /// Fast check for a (stable) grapheme break between two UInt16 code units
   @inlinable // Safe to inline
-  @usableFromInline
   internal static func _quickCheckGraphemeBreakBetween(
     _ lhs: UInt16, _ rhs: UInt16
   ) -> Bool {

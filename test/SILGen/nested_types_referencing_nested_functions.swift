@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name nested_types_referencing_nested_functions -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name nested_types_referencing_nested_functions -enable-sil-ownership %s | %FileCheck %s
 
 do {
   func foo() { bar(2) }

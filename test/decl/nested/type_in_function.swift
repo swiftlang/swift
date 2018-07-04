@@ -23,7 +23,7 @@ func hasAClosure() {
 }
 
 protocol Racoon {
-  associatedtype Stripes // expected-note{{protocol requires nested type 'Stripes'; do you want to add it?}}
+  associatedtype Stripes
 }
 
 // Types inside generic functions -- not supported yet
@@ -117,7 +117,7 @@ struct OuterGenericStruct<A> {
   }
 
   func middleFunction() {
-    struct ConformingType : Racoon { // expected-error{{type 'ConformingType' does not conform to protocol 'Racoon'}}
+    struct ConformingType : Racoon {
     // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction()'}}
       typealias Stripes = A
     }
@@ -130,7 +130,7 @@ func genericFunction<T>(t: T) {
   // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
   class Second<T> : Second { }
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
-  // expected-error@-2 2 {{circular class inheritance Second}}
+  // expected-error@-2 2 {{'Second' inherits from itself}}
 }
 
 // Spurious "Self or associated type requirements" diagnostic.

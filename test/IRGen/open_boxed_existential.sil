@@ -2,7 +2,7 @@
 
 import Swift
 
-// CHECK-LABEL: define{{( protected)?}} swiftcc {{i[0-9]+}} @open_boxed_existential(%swift.error*)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i[0-9]+}} @open_boxed_existential(%swift.error*)
 sil @open_boxed_existential : $@convention(thin) (@owned Error) -> Int {
 entry(%b : $Error):
   // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])

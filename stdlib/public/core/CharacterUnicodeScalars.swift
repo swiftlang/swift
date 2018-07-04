@@ -16,7 +16,6 @@ extension Character {
     internal let _base: Character
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: Character) {
       self._base = _base
     }
@@ -35,7 +34,6 @@ extension Character.UnicodeScalarView {
     internal var _base: IndexingIterator<Character.UnicodeScalarView>
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_base: IndexingIterator<Character.UnicodeScalarView>) {
       self._base = _base
     }
@@ -67,7 +65,6 @@ extension Character.UnicodeScalarView {
     internal let _stride: UInt8
 
     @inlinable // FIXME(sil-serialize-all)
-    @usableFromInline // FIXME(sil-serialize-all)
     internal init(_encodedOffset: Int, _scalar: Unicode.UTF16.EncodedScalar, _stride: UInt8) {
       self._encodedOffset = _encodedOffset
       self._scalar = _scalar

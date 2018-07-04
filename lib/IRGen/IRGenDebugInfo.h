@@ -57,7 +57,7 @@ public:
   /// Update the IRBuilder's current debug location to the location
   /// Loc and the lexical scope DS.
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
-                     Optional<SILLocation> Loc = None);
+                     SILLocation Loc);
 
   void clearLoc(IRBuilder &Builder);
 
@@ -136,16 +136,18 @@ public:
                         unsigned Line, unsigned Col, llvm::DILocalScope *Scope,
                         const SILDebugScope *DS);
 
+  enum { NotHeapAllocated = false };
+  
   /// Create debug metadata for a global variable.
   void emitGlobalVariableDeclaration(llvm::GlobalVariable *Storage,
                                      StringRef Name, StringRef LinkageName,
                                      DebugTypeInfo DebugType,
-                                     bool IsLocalToUnit,
+                                     bool IsLocalToUnit, bool InFixedBuffer,
                                      Optional<SILLocation> Loc);
 
   /// Emit debug metadata for type metadata (for generic types). So meta.
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
-                        StringRef Name);
+                        unsigned Depth, unsigned Index, StringRef AssocType);
 
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder();

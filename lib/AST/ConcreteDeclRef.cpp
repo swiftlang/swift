@@ -25,17 +25,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
-ConcreteDeclRef::SpecializedDeclRef *
-ConcreteDeclRef::SpecializedDeclRef::create(
-                                       ASTContext &ctx, ValueDecl *decl,
-                                       SubstitutionList substitutions) {
-  size_t size = totalSizeToAlloc<Substitution>(substitutions.size());
-  void *memory = ctx.Allocate(size, alignof(SpecializedDeclRef));
-  return new (memory) SpecializedDeclRef(decl, substitutions);
-}
-
-ConcreteDeclRef
-ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
+ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   auto *derivedDecl = getDecl();
   auto *baseDecl = derivedDecl->getOverriddenDecl();
 
@@ -44,16 +34,15 @@ ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
   auto *derivedSig = derivedDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
 
-  SmallVector<Substitution, 4> subs = {};
+  SubstitutionMap subs;
   if (baseSig) {
     Optional<SubstitutionMap> derivedSubMap;
     if (derivedSig)
-      derivedSubMap = derivedSig->getSubstitutionMap(getSubstitutions());
-    auto subMap = SubstitutionMap::getOverrideSubstitutions(
-        baseDecl, derivedDecl, derivedSubMap);
-    baseSig->getSubstitutions(subMap, subs);
+      derivedSubMap = getSubstitutions();
+    subs = SubstitutionMap::getOverrideSubstitutions(baseDecl, derivedDecl,
+                                                     derivedSubMap);
   }
-  return ConcreteDeclRef(ctx, baseDecl, subs);
+  return ConcreteDeclRef(baseDecl, subs);
 }
 
 void ConcreteDeclRef::dump(raw_ostream &os) {
@@ -67,26 +56,7 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
   // If specialized, dump the substitutions.
   if (isSpecialized()) {
     os << " [with ";
-    interleave(getSubstitutions(),
-               [&](const Substitution &sub) {
-                 os << sub.getReplacement().getString();
-
-                 if (sub.getConformances().size()) {
-                   os << '[';
-                   interleave(sub.getConformances(),
-                              [&](ProtocolConformanceRef c) {
-                                if (c.isConcrete()) {
-                                  c.getConcrete()->printName(os);
-                                } else {
-                                  os << "abstract:"
-                                     << c.getAbstract()->getName();
-                                }
-                              },
-                              [&] { os << ", "; });
-                   os << ']';
-                 }
-               },
-               [&] { os << ", "; });
+    getSubstitutions().dump(os, SubstitutionMap::DumpStyle::Minimal);
     os << ']';
   }
 }

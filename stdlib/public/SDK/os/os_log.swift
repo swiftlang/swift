@@ -14,13 +14,37 @@
 @_exported import os.log
 import _SwiftOSOverlayShims
 
+@available(macOS 10.14, iOS 12.0, watchOS 5.0, tvOS 12.0, *)
+public func os_log(
+  _ type: OSLogType,
+  dso: UnsafeRawPointer = #dsohandle,
+  log: OSLog = .default,
+  _ message: StaticString,
+  _ args: CVarArg...)
+{
+  guard log.isEnabled(type: type) else { return }
+  let ra = _swift_os_log_return_address()
+
+  message.withUTF8Buffer { (buf: UnsafeBufferPointer<UInt8>) in
+    // Since dladdr is in libc, it is safe to unsafeBitCast
+    // the cstring argument type.
+    buf.baseAddress!.withMemoryRebound(
+      to: CChar.self, capacity: buf.count
+    ) { str in
+      withVaList(args) { valist in
+        _swift_os_log(dso, ra, log, type, str, valist)
+      }
+    }
+  }
+}
+
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 public func os_log(
-  _ message: StaticString, 
+  _ message: StaticString,
   dso: UnsafeRawPointer? = #dsohandle,
-  log: OSLog = .default, 
-  type: OSLogType = .default, 
-  _ args: CVarArg...) 
+  log: OSLog = .default,
+  type: OSLogType = .default,
+  _ args: CVarArg...)
 {
   guard log.isEnabled(type: type) else { return }
   let ra = _swift_os_log_return_address()

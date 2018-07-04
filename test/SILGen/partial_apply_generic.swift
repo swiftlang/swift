@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name partial_apply_generic -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name partial_apply_generic -enable-sil-ownership %s | %FileCheck %s
 
 protocol Panda {
   associatedtype Cuddles : Foo

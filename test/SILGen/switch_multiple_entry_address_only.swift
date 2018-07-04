@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name switch_multiple_entry_address_only %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name switch_multiple_entry_address_only %s | %FileCheck %s
 
 enum E {
 case a(Any)

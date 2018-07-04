@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name types -parse-as-library -emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name types -parse-as-library -enable-sil-ownership %s | %FileCheck %s
 
 class C {
   var member: Int = 0

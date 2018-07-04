@@ -14,9 +14,12 @@
 
 namespace llvm {
   class LLVMContext;
+  template<typename T, unsigned N> class SmallVector;
 }
 
 namespace swift {
+class ASTContext;
+class LinkLibrary;
 class SILModule;
 
 namespace irgen {

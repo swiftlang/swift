@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name generic_casts -Xllvm -sil-full-demangle -emit-silgen -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
+// RUN: %target-swift-emit-silgen -module-name generic_casts -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-runtime %s
 
 protocol ClassBound : class {}
 protocol NotClassBound {}
@@ -59,11 +59,9 @@ func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T) -> U {
   return t as! U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK-objc: unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
-  // CHECK-objc: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
-  // CHECK-objc: return [[DOWNCAST]] : $U
-
-  // CHECK-native: [[DOWNCAST:%.*]] = unconditional_checked_cast {{.*}} : $T to $U
+  // CHECK: unconditional_checked_cast_addr T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: return [[DOWNCAST]] : $U
 }
 
 // CHECK-LABEL: sil hidden @$S13generic_casts019class_archetype_is_c1_D0{{[_0-9a-zA-Z]*}}F
@@ -71,8 +69,7 @@ func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(_ t:T, u:U.Type) -> Bool {
   return t is U
   // Error bridging can change the identity of class-constrained archetypes.
-  // CHECK-objc: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
-  // CHECK-native: checked_cast_br {{.*}} : $T to $U
+  // CHECK: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
 }
 
 // CHECK-LABEL: sil hidden @$S13generic_casts38opaque_archetype_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F
@@ -161,19 +158,16 @@ func opaque_existential_is_class_archetype
 func class_existential_to_class_archetype
 <T:ClassBound>(_ p:ClassBound) -> T {
   return p as! T
-  // CHECK-objc: unconditional_checked_cast_addr ClassBound in {{%.*}} : $*ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
-  // CHECK-objc: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
-  // CHECK-objc: return [[DOWNCAST]] : $T
-
-  // CHECK-native: [[DOWNCAST:%.*]] = unconditional_checked_cast {{.*}} : $ClassBound to $T
+  // CHECK: unconditional_checked_cast_addr ClassBound in {{%.*}} : $*ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
+  // CHECK: [[DOWNCAST:%.*]] = load [take] [[DOWNCAST_ADDR]]
+  // CHECK: return [[DOWNCAST]] : $T
 }
 
 // CHECK-LABEL: sil hidden @$S13generic_casts021class_existential_is_C10_archetype{{[_0-9a-zA-Z]*}}F
 func class_existential_is_class_archetype
 <T:ClassBound>(_ p:ClassBound, _: T) -> Bool {
   return p is T
-  // CHECK-objc: checked_cast_addr_br {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in {{%.*}} : $*T
-  // CHECK-native: checked_cast_br {{.*}} : $ClassBound to $T
+  // CHECK: checked_cast_addr_br {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in {{%.*}} : $*T
 }
 
 // CHECK-LABEL: sil hidden @$S13generic_casts40opaque_existential_to_addr_only_concrete{{[_0-9a-zA-Z]*}}F

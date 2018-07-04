@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -devirtualizer -inline -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-objc-interop -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -sil-combine -devirtualizer -inline -sil-combine | %FileCheck %s
 
 // Check that type propagation is performed correctly for existentials.
 // The concrete type set in init_existential instructions should be propagated

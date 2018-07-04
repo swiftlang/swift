@@ -14,6 +14,7 @@
 #define LLVM_SOURCEKIT_SUPPORT_TRACING_H
 
 #include "SourceKit/Core/LLVM.h"
+#include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Support/UIdent.h"
 #include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -28,34 +29,15 @@ namespace trace {
 
 struct SwiftArguments {
   std::string PrimaryFile;
-  std::vector<std::string> Args;
+  std::string Arguments;
 };
 
 enum class OperationKind : uint64_t {
-  SimpleParse = 1 << 0,
-  PerformSema = 1 << 1,
-  AnnotAndDiag = 1 << 2,
+  PerformSema = 1 << 0,
+  IndexSource = 1 << 1,
+  CodeCompletion = 1 << 2,
 
-  ReadSyntaxInfo = 1 << 3,
-  ReadDiagnostics = 1 << 4,
-  ReadSemanticInfo = 1 << 5,
-
-  IndexModule = 1 << 6,
-  IndexSource = 1 << 7,
-
-  CursorInfoForIFaceGen = 1 << 8,
-  CursorInfoForSource = 1 << 9,
-
-  ExpandPlaceholder = 1 << 10,
-  FormatText = 1 << 11,
-  RelatedIdents = 1 << 12,
-  CodeCompletion = 1 << 13,
-  OpenInterface = 1 << 14,
-  OpenHeaderInterface = 1 << 15,
-
-  CodeCompletionInit = 1 << 16,
-
-  Last = CodeCompletionInit,
+  Last = CodeCompletion,
   All = (Last << 1) - 1
 };
 
@@ -63,11 +45,6 @@ typedef std::vector<std::pair<std::string, std::string>> StringPairs;
 
 struct SwiftInvocation {
   SwiftArguments Args;
-  StringPairs Files;
-
-  void addFile(std::string FileName, std::string Text) {
-    Files.push_back(std::make_pair(std::move(FileName), std::move(Text)));
-  }
 };
   
 class TraceConsumer {
@@ -115,8 +92,11 @@ void unregisterConsumer(TraceConsumer *Consumer);
 
 // Class that utilizes the RAII idiom for the operations being traced
 class TracedOperation final {
+  using DiagnosticProvider = std::function<void(SmallVectorImpl<DiagnosticEntryInfo> &)>;
+
   OperationKind OpKind;
   llvm::Optional<uint64_t> OpId;
+  llvm::Optional<DiagnosticProvider> DiagProvider;
   bool Enabled;
 
 public:
@@ -140,13 +120,20 @@ public:
     OpId = startOperation(OpKind, Inv, OpArgs);
   }
 
-  void finish(ArrayRef<DiagnosticEntryInfo> Diagnostics = llvm::None) {
+  void finish() {
     if (OpId.hasValue()) {
+      SmallVector<DiagnosticEntryInfo, 8> Diagnostics;
+      if (DiagProvider.hasValue())
+        (*DiagProvider)(Diagnostics);
       operationFinished(OpId.getValue(), OpKind, Diagnostics);
       OpId.reset();
     }
   }
 
+  void setDiagnosticProvider(DiagnosticProvider &&DiagProvider) {
+    assert(!this->DiagProvider.hasValue());
+    this->DiagProvider = std::move(DiagProvider);
+  }
 };
 
 } // namespace sourcekitd

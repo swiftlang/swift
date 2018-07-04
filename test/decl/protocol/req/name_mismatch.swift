@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P {
-  func foo(_ i: Int, x: Float) // expected-note 4{{requirement 'foo(_:x:)' declared here}}
+  func foo(_ i: Int, x: Float) // expected-note 5 {{requirement 'foo(_:x:)' declared here}}
 }
 
 struct S1 : P {
@@ -23,6 +23,11 @@ struct S4 : P {
 struct S5 : P {
   func foo(_ i: Int, z x: Float) { } // expected-error{{method 'foo(_:z:)' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}}{{22-24=}}
 }
+
+struct S5a {
+  func foo(_ i: Int, z x: Float) { } // expected-note {{'foo(_:z:)' declared here}} {{none}}
+}
+extension S5a: P {} // expected-error{{method 'foo(_:z:)' has different argument labels from those required by protocol 'P' ('foo(_:x:)')}} {{none}}
 
 struct Loadable { }
 

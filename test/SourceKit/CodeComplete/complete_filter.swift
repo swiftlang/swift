@@ -70,6 +70,7 @@ func foo() {
 // CHECK-NEXT:   abc()
 // CHECK-NEXT:   b()
 // CHECK-NEXT:   c()
+// CHECK-NEXT:   self
 // CHECK-NEXT: ]
 // CHECK-LABEL: Results for filterText: a [
 // CHECK-NEXT:   aaa()

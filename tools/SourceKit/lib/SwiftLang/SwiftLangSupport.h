@@ -39,6 +39,7 @@ namespace swift {
   class Type;
   class AbstractStorageDecl;
   class SourceFile;
+  class SILOptions;
   class ValueDecl;
   enum class AccessorKind;
 
@@ -396,7 +397,7 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                   EditorConsumer &Consumer,
                   ArrayRef<const char *> Args) override;
 
@@ -516,9 +517,9 @@ namespace trace {
   void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
                      StringRef InputFile,
                      ArrayRef<const char *> Args);
-
-  void initTraceFiles(trace::SwiftInvocation &SwiftArgs,
-                      swift::CompilerInstance &CI);
+  void initTraceInfo(trace::SwiftInvocation &SwiftArgs,
+                     StringRef InputFile,
+                     ArrayRef<std::string> Args);
 }
 
 /// When we cannot build any more clang modules, close the .pcm / files to
@@ -531,6 +532,10 @@ public:
   CloseClangModuleFiles(swift::ClangModuleLoader &loader) : loader(loader) {}
   ~CloseClangModuleFiles();
 };
+
+
+/// Disable expensive SIL options which do not affect indexing or diagnostics.
+void disableExpensiveSILOptions(swift::SILOptions &Opts);
 
 } // namespace SourceKit
 

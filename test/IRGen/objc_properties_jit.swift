@@ -1,21 +1,19 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
-
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir -disable-objc-attr-requires-foundation-module -use-jit | %FileCheck %s
 
 import Foundation
 
 extension NSString {
-  class var classProp: Int {
+  @objc class var classProp: Int {
     get { fatalError() }
     set { fatalError() }
   }
-  var instanceProp: Int {
+  @objc var instanceProp: Int {
     get { fatalError() }
     set { fatalError() }
   }
 }
 
-// CHECK-LABEL: define{{( protected)?}} private void @runtime_registration
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
 // CHECK:         [[GET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(classProp)
 // CHECK:         call i8* @class_replaceMethod(%objc_class* @"OBJC_METACLASS_$_NSString", i8* [[GET_CLASS_PROP]]
 // CHECK:         [[SET_CLASS_PROP:%.*]] = call i8* @sel_registerName({{.*}}(setClassProp:)
