@@ -944,22 +944,6 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
     tc.diagnose(comp->getIdLoc(), diag::no_module_type,
                 comp->getIdentifier(), moduleType->getModule()->getName());
   } else {
-    // Situation where class tries to inherit from itself, such
-    // would produce an assertion when trying to lookup members of the class.
-    //
-    // FIXME: Handle this in a more principled way, since there are many
-    // similar checks.
-    if (auto superClass = parentType->getSuperclass()) {
-      if (superClass->isEqual(parentType)) {
-        auto decl = parentType->getAnyNominal();
-        if (decl) {
-          tc.diagnose(decl->getLoc(), diag::circular_class_inheritance,
-                      decl->getName());
-          return ErrorType::get(tc.Context);
-        }
-      }
-    }
-
     LookupResult memberLookup;
     // Let's try to lookup given identifier as a member of the parent type,
     // this allows for more precise diagnostic, which distinguishes between
