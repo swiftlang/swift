@@ -173,7 +173,7 @@ extension NSKeyedUnarchiver {
   public static func unarchivedObject<DecodedObjectType>(ofClass cls: DecodedObjectType.Type, from data: Data) throws -> DecodedObjectType? where DecodedObjectType : NSCoding, DecodedObjectType : NSObject {
     var error: NSError?
     let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClass(cls as AnyClass, data, &error)
-    try resolveError(error)
+    if let error = error { throw error }
     return result as? DecodedObjectType
   }
 
@@ -183,7 +183,7 @@ extension NSKeyedUnarchiver {
     var error: NSError?
     let classesAsNSObjects = NSSet(array: classes.map { $0 as AnyObject })
     let result = __NSKeyedUnarchiverSecureUnarchiveObjectOfClasses(classesAsNSObjects, data, &error)
-    try resolveError(error)
+    if let error = error { throw error }
     return result
   }
   
