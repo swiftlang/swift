@@ -2855,17 +2855,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 # test dependencies. Ultimately we want to delete as much lldb-specific logic
                 # from this file as possible and just have a single call to lldb-dotest.
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
-                    with_pushd ${lldb_build_dir} \
-                        ${NINJA_BIN} lldb-dotest
-
-                    lldb_dotest="${lldb_build_dir}"/bin/lldb-dotest
                     with_pushd ${results_dir} \
-                        call "${lldb_dotest}" \
-                        ${LLDB_TEST_SUBDIR_CLAUSE} \
-                        ${LLDB_TEST_CATEGORIES} \
-                        ${LLDB_FORMATTER_OPTS} \
-                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        -E "${DOTEST_EXTRA}"
+                     call "${llvm_build_dir}/bin/llvm-lit" "${lldb_build_dir}/lit" -sv --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -E \"${DOTEST_EXTRA}\""
+
                 else
                     with_pushd "${results_dir}" \
                         call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
