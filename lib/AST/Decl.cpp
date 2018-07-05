@@ -2290,17 +2290,6 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   return effectiveAccess;
 }
 
-AccessLevel ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert((getFormalAccess() == AccessLevel::Internal ||
-          getFormalAccess() == AccessLevel::Public) &&
-         "should be able to fast-path non-internal cases");
-  assert(useDC && "should fast-path non-scoped cases");
-  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(getModuleContext()))
-      return getTestableAccess(this);
-  return getFormalAccess();
-}
-
 AccessLevel ValueDecl::getFormalAccess(const DeclContext *useDC,
                                        bool treatUsableFromInlineAsPublic) const {
   ASTContext &ctx = getASTContext();
@@ -2311,8 +2300,11 @@ AccessLevel ValueDecl::getFormalAccess(const DeclContext *useDC,
     return AccessLevel::Public;
   }
   if (useDC && (result == AccessLevel::Internal ||
-                result == AccessLevel::Public))
-    return getFormalAccessImpl(useDC);
+                result == AccessLevel::Public)) {
+    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+      if (useSF->hasTestableImport(getModuleContext()))
+        return getTestableAccess(this);
+  }
   return result;
 }
 

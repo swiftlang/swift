@@ -2258,9 +2258,6 @@ public:
   /// Access control is done by Requests.
   friend class AccessLevelRequest;
 
-  /// \see getFormalAccess
-  AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
-
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
   ///
