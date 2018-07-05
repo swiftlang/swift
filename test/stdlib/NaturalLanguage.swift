@@ -2,13 +2,6 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
-// FIXME: these lines should be removed effectively making NaturalLanguage
-// available on all platforms where ObjC runtime is available, once the SDK
-// issue has been figured out.
-// REQUIRES: OS=macosx
-// REQUIRES: OS=ios
-// REQUIRES: OS=tvos
-
 import StdlibUnittest
 
 import NaturalLanguage
