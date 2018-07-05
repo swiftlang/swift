@@ -2177,28 +2177,32 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int) {
     _precondition(count >= 0, "Invalid count")
-    // The user is expected to provide a storage of the correct size
+    guard count > 0 else { return }
+    var i = 0 // Current position in the output buffers
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
-        for (offset: i, element: (key: key, value: val)) in full.enumerated() {
-          guard i < count else { break }
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+        for (key, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
-        for (offset: i, element: (key: key, value: _)) in full.enumerated() {
-          guard i < count else { break }
+        for (key, _) in full {
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       }
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
-        for (offset: i, element: (key: _, value: val)) in full.enumerated() {
+        for (_, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+          i += 1
           guard i < count else { break }
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
         }
       } else {
         // do nothing, both are null
@@ -2971,9 +2975,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _ count: Int
   ) {
     _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
     bridgeEverything()
-    // The user is expected to provide a storage of the correct size
-    var i = 0 // Position in the input storage
+    var i = 0 // Current position in the output buffers
     let bucketCount = nativeBuffer.bucketCount
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
@@ -2981,19 +2985,19 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         // keys nonnull, objects nonnull
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
-            guard i < count else { break }
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
         // keys nonnull, objects null
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
-            guard i < count else { break }
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       }
@@ -3002,9 +3006,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         // keys null, objects nonnull
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
-            guard i < count else { break }
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
