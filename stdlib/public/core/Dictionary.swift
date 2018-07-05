@@ -2176,28 +2176,29 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
     _ objects: UnsafeMutablePointer<AnyObject>?,
     andKeys keys: UnsafeMutablePointer<AnyObject>?,
     count: Int) {
+    _precondition(count >= 0, "Invalid count")
     // The user is expected to provide a storage of the correct size
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
         for (offset: i, element: (key: key, value: val)) in full.enumerated() {
+          guard i < count else { break }
           unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
-          guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
         for (offset: i, element: (key: key, value: _)) in full.enumerated() {
-          unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
           guard i < count else { break }
+          unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
         }
       }
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
         for (offset: i, element: (key: _, value: val)) in full.enumerated() {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
           guard i < count else { break }
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
         }
       } else {
         // do nothing, both are null
@@ -2969,6 +2970,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     _ keys: UnsafeMutablePointer<AnyObject>?,
     _ count: Int
   ) {
+    _precondition(count >= 0, "Invalid count")
     bridgeEverything()
     // The user is expected to provide a storage of the correct size
     var i = 0 // Position in the input storage
@@ -2979,19 +2981,19 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         // keys nonnull, objects nonnull
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
+            guard i < count else { break }
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
-            guard i < count else { break }
           }
         }
       } else {
         // keys nonnull, objects null
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
+            guard i < count else { break }
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
-            guard i < count else { break }
           }
         }
       }
@@ -3000,9 +3002,9 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
         // keys null, objects nonnull
         for position in 0..<bucketCount {
           if bridgedBuffer.isInitializedEntry(at: position) {
+            guard i < count else { break }
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
-            guard i < count else { break }
           }
         }
       } else {
