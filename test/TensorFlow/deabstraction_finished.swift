@@ -73,6 +73,22 @@ CHECK: graph_op "Pack,L,e,e,e"({{.*}} : $TensorHandle<Float>, {{.*}} : $TensorHa
 CHECK-LABEL: ---- END OF INPUT FUNCTION
 */
 
+// expected-warning @+1 {{implicitly copied to the accelerator}}
+public func inputListMultipleUses(a: TensorHandle<Float>)
+   -> (Tensor<Float>, [TensorHandle<Float>]) {
+  let arr = [a, a, a]
+  let x: TensorHandle<Float> = #tfop("Pack", arr)  // expected-note {{value used here}}
+  return (Tensor(handle: x).toHost(), arr)
+}
+
+/*
+CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}inputListMultipleUses
+CHECK: bb0(%0 : $TensorHandle<Float>):
+CHECK:   %1 = graph_op "Pack,L,e,e,e"(%0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>, %0 : $TensorHandle<Float>)
+CHECK:   return %1 : $TensorHandle<Float>
+CHECK-LABEL: ----
+*/
+
 
 #if false
 // FIXME: Constexpr propagation of tensorshape should handle this.

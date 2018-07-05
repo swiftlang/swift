@@ -1677,8 +1677,9 @@ static bool analyzeArrayInitUses(SILValue v,
   for (auto *use : v->getUses()) {
     auto *user = use->getUser();
 
-    // We can always remove retain/release instructions.
-    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user)) {
+    // We can always remove retain/release instructions and debug_value.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<DebugValueInst>(user)) {
       if (arrayInsts) arrayInsts->insert(user);
       continue;
     }
@@ -1691,6 +1692,9 @@ static bool analyzeArrayInitUses(SILValue v,
         return true;
       continue;
     }
+
+    // Oops we found an unknown use!
+    return true;
   }
   return false;
 }
@@ -1780,8 +1784,8 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
         user = iai->getSingleUserOfType<StoreInst>();
       }
 
-      // Check to see if we have a store to a valid index that hasn't been stored
-      // to yet.
+      // Check to see if we have a store to a valid index that hasn't been
+      // stored to yet.
       auto *store = dyn_cast_or_null<StoreInst>(user);
       if (!store || index >= elements.size() || elements[index] != SILValue())
         return Type();
