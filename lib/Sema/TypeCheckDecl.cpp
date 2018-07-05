@@ -1395,12 +1395,17 @@ static void inferDynamic(ASTContext &ctx, ValueDecl *D) {
     (D->getOverriddenDecl() &&
      D->getOverriddenDecl()->hasClangNode());
 
+  bool overridesDyanmic =
+    (D->getOverriddenDecl() &&
+     D->getOverriddenDecl()->isDynamic());
+
   bool isNSManaged = D->getAttrs().hasAttribute<NSManagedAttr>();
 
   bool isExtension = isa<ExtensionDecl>(D->getDeclContext());
 
   // We only infer 'dynamic' in these three cases.
-  if (!isExtension && !isNSManaged && !overridesImportedMethod)
+  if (!isExtension && !isNSManaged && !overridesImportedMethod &&
+      !overridesDyanmic)
     return;
 
   // The presence of 'final' blocks the inference of 'dynamic'.
@@ -2906,6 +2911,19 @@ public:
       }
     }
 
+    if (!checkOverrides(TC, VD)) {
+      // If a property has an override attribute but does not override
+      // anything, complain.
+      auto overridden = VD->getOverriddenDecl();
+      if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!overridden) {
+          TC.diagnose(VD, diag::property_does_not_override)
+            .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
+
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
@@ -3050,6 +3068,18 @@ public:
 
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
+
+    if (!checkOverrides(TC, SD)) {
+      // If a subscript has an override attribute but does not override
+      // anything, complain.
+      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!SD->getOverriddenDecl()) {
+          TC.diagnose(SD, diag::subscript_does_not_override)
+            .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
 
     triggerAccessorSynthesis(TC, SD);
   }
@@ -3541,6 +3571,18 @@ public:
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
+    if (!checkOverrides(TC, FD)) {
+      // If a method has an 'override' keyword but does not
+      // override anything, complain.
+      if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!FD->getOverriddenDecl()) {
+          TC.diagnose(FD, diag::method_does_not_override)
+            .highlight(OA->getLocation());
+          OA->setInvalid();
+        }
+      }
+    }
+
     if (FD->hasBody()) {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -3669,6 +3711,61 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *CD) {
     TC.validateDecl(CD);
+
+    // Check whether this initializer overrides an initializer in its
+    // superclass.
+    if (!checkOverrides(TC, CD)) {
+      // If an initializer has an override attribute but does not override
+      // anything or overrides something that doesn't need an 'override'
+      // keyword (e.g., a convenience initializer), complain.
+      // anything, or overrides something that complain.
+      if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
+        if (!CD->getOverriddenDecl()) {
+          TC.diagnose(CD, diag::initializer_does_not_override)
+            .highlight(attr->getLocation());
+          attr->setInvalid();
+        } else if (attr->isImplicit()) {
+          // Don't diagnose implicit attributes.
+        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
+          // Special case: we are overriding a 'required' initializer, so we
+          // need (only) the 'required' keyword.
+          if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
+            if (CD->getAttrs().hasAttribute<RequiredAttr>()) {
+              TC.diagnose(CD, diag::required_initializer_override_keyword)
+                .fixItRemove(attr->getLocation());
+            } else {
+              TC.diagnose(CD, diag::required_initializer_override_wrong_keyword)
+                .fixItReplace(attr->getLocation(), "required");
+              CD->getAttrs().add(
+                new (TC.Context) RequiredAttr(/*IsImplicit=*/true));
+            }
+
+            TC.diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
+                        diag::overridden_required_initializer_here);
+          } else {
+            // We tried to override a convenience initializer.
+            TC.diagnose(CD, diag::initializer_does_not_override)
+              .highlight(attr->getLocation());
+            TC.diagnose(CD->getOverriddenDecl(),
+                        diag::convenience_init_override_here);
+          }
+        }
+      }
+
+      // A failable initializer cannot override a non-failable one.
+      // This would normally be diagnosed by the covariance rules;
+      // however, those are disabled so that we can provide a more
+      // specific diagnostic here.
+      if (CD->getFailability() != OTK_None &&
+          CD->getOverriddenDecl() &&
+          CD->getOverriddenDecl()->getFailability() == OTK_None) {
+        TC.diagnose(CD, diag::failable_initializer_override,
+                    CD->getFullName());
+        TC.diagnose(CD->getOverriddenDecl(),
+                    diag::nonfailable_initializer_override_here,
+                    CD->getOverriddenDecl()->getFullName());
+      }
+    }
 
     // If this initializer overrides a 'required' initializer, it must itself
     // be marked 'required'.
@@ -4442,19 +4539,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
 
-    if (!checkOverrides(*this, VD)) {
-      // If a property has an override attribute but does not override
-      // anything, complain.
-      auto overridden = VD->getOverriddenDecl();
-      if (auto *OA = VD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!overridden) {
-          diagnose(VD, diag::property_does_not_override)
-            .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
-    }
-
     // Properties need some special validation logic.
     if (auto *nominalDecl = VD->getDeclContext()
             ->getAsNominalTypeOrNominalTypeExtensionContext()) {
@@ -4733,18 +4817,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
-      if (!checkOverrides(*this, FD)) {
-        // If a method has an 'override' keyword but does not
-        // override anything, complain.
-        if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
-          if (!FD->getOverriddenDecl()) {
-            diagnose(FD, diag::method_does_not_override)
-              .highlight(OA->getLocation());
-            OA->setInvalid();
-          }
-        }
-      }
-
       if (FD->isOperator())
         checkMemberOperator(*this, FD);
 
@@ -4931,59 +5003,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, CD);
 
-    // Check whether this initializer overrides an initializer in its
-    // superclass.
-    if (!checkOverrides(*this, CD)) {
-      // If an initializer has an override attribute but does not override
-      // anything or overrides something that doesn't need an 'override'
-      // keyword (e.g., a convenience initializer), complain.
-      // anything, or overrides something that complain.
-      if (auto *attr = CD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!CD->getOverriddenDecl()) {
-          diagnose(CD, diag::initializer_does_not_override)
-            .highlight(attr->getLocation());
-          attr->setInvalid();
-        } else if (!overrideRequiresKeyword(CD->getOverriddenDecl())) {
-          // Special case: we are overriding a 'required' initializer, so we
-          // need (only) the 'required' keyword.
-          if (cast<ConstructorDecl>(CD->getOverriddenDecl())->isRequired()) {
-            if (CD->getAttrs().hasAttribute<RequiredAttr>()) {
-              diagnose(CD, diag::required_initializer_override_keyword)
-                .fixItRemove(attr->getLocation());
-            } else {
-              diagnose(CD, diag::required_initializer_override_wrong_keyword)
-                .fixItReplace(attr->getLocation(), "required");
-              CD->getAttrs().add(
-                new (Context) RequiredAttr(/*IsImplicit=*/true));
-            }
-
-            diagnose(findNonImplicitRequiredInit(CD->getOverriddenDecl()),
-                     diag::overridden_required_initializer_here);
-          } else {
-            // We tried to override a convenience initializer.
-            diagnose(CD, diag::initializer_does_not_override)
-              .highlight(attr->getLocation());
-            diagnose(CD->getOverriddenDecl(),
-                     diag::convenience_init_override_here);
-          }
-        }
-      }
-
-      // A failable initializer cannot override a non-failable one.
-      // This would normally be diagnosed by the covariance rules;
-      // however, those are disabled so that we can provide a more
-      // specific diagnostic here.
-      if (CD->getFailability() != OTK_None &&
-          CD->getOverriddenDecl() &&
-          CD->getOverriddenDecl()->getFailability() == OTK_None) {
-        diagnose(CD, diag::failable_initializer_override,
-                 CD->getFullName());
-        diagnose(CD->getOverriddenDecl(),
-                 diag::nonfailable_initializer_override_here,
-                 CD->getOverriddenDecl()->getFullName());
-      }
-    }
-
     // An initializer is ObjC-compatible if it's explicitly @objc or a member
     // of an ObjC-compatible class.
     if (CD->getDeclContext()->isTypeContext()) {
@@ -5123,18 +5142,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       auto &C = SD->getASTContext();
       SD->getAttrs().add(
           new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-
-    if (!checkOverrides(*this, SD)) {
-      // If a subscript has an override attribute but does not override
-      // anything, complain.
-      if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
-        if (!SD->getOverriddenDecl()) {
-          diagnose(SD, diag::subscript_does_not_override)
-              .highlight(OA->getLocation());
-          OA->setInvalid();
-        }
-      }
     }
 
     // Member subscripts need some special validation logic.
