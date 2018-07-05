@@ -2252,7 +2252,7 @@ TypeConverter::getConstantOverrideInfo(SILDeclRef derived, SILDeclRef base) {
     auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
     overrideInterfaceTy =
         GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
-                                 overrideInterfaceFnTy->getInput(),
+                                 overrideInterfaceFnTy->getParams(),
                                  overrideInterfaceFnTy->getResult(),
                                  overrideInterfaceFnTy->getExtInfo());
   }
