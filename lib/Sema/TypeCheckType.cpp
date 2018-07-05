@@ -3178,7 +3178,7 @@ static void lookupAndAddLibraryTypes(TypeChecker &TC,
 static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
                                ObjCReason Reason) {
   if (Reason == ObjCReason::MemberOfObjCProtocol) {
-    TC.diagnose(VD->getLoc(), diag::objc_inferring_on_objc_protocol_member);
+    VD->diagnose(diag::objc_inferring_on_objc_protocol_member);
   } else if (Reason == ObjCReason::OverridesObjC) {
     unsigned kind = isa<VarDecl>(VD) ? 0
                   : isa<SubscriptDecl>(VD) ? 1
@@ -3186,36 +3186,139 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
                   : 3;
 
     auto overridden = VD->getOverriddenDecl();
-    TC.diagnose(overridden, diag::objc_overriding_objc_decl,
-                kind, VD->getOverriddenDecl()->getFullName());
+    overridden->diagnose(diag::objc_overriding_objc_decl,
+                         kind, VD->getOverriddenDecl()->getFullName());
   } else if (Reason == ObjCReason::WitnessToObjC) {
     auto requirement = TC.findWitnessedObjCRequirements(VD).front();
-    TC.diagnose(requirement, diag::objc_witness_objc_requirement,
+    requirement->diagnose(diag::objc_witness_objc_requirement,
                 VD->getDescriptiveKind(), requirement->getFullName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
                   ->getFullName());
   }
 }
 
+static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
+                                               Type T,
+                                               SourceRange TypeRange) {
+  auto &diags = DC->getASTContext().Diags;
+
+  // Special diagnostic for tuples.
+  if (T->is<TupleType>()) {
+    if (T->isVoid())
+      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
+          .highlight(TypeRange);
+    else
+      diags.diagnose(TypeRange.Start, diag::not_objc_tuple)
+          .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for classes.
+  if (auto *CD = T->getClassOrBoundGenericClass()) {
+    if (!CD->isObjC())
+      diags.diagnose(TypeRange.Start, diag::not_objc_swift_class)
+          .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for structs.
+  if (T->is<StructType>()) {
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
+        .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for enums.
+  if (T->is<EnumType>()) {
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
+        .highlight(TypeRange);
+    return;
+  }
+
+  // Special diagnostic for protocols and protocol compositions.
+  if (T->isExistentialType()) {
+    if (T->isAny()) {
+      // Any is not @objc.
+      diags.diagnose(TypeRange.Start,
+                     diag::not_objc_empty_protocol_composition);
+      return;
+    }
+
+    auto layout = T->getExistentialLayout();
+
+    // See if the superclass is not @objc.
+    if (auto superclass = layout.explicitSuperclass) {
+      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+        diags.diagnose(TypeRange.Start, diag::not_objc_class_constraint,
+                       superclass);
+        return;
+      }
+    }
+
+    // Find a protocol that is not @objc.
+    bool sawErrorProtocol = false;
+    for (auto P : layout.getProtocols()) {
+      auto *PD = P->getDecl();
+
+      if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
+        sawErrorProtocol = true;
+        break;
+      }
+
+      if (!PD->isObjC()) {
+        diags.diagnose(TypeRange.Start, diag::not_objc_protocol,
+                       PD->getDeclaredType());
+        return;
+      }
+    }
+
+    if (sawErrorProtocol) {
+      diags.diagnose(TypeRange.Start,
+                     diag::not_objc_error_protocol_composition);
+      return;
+    }
+
+    return;
+  }
+
+  if (T->is<ArchetypeType>() || T->isTypeParameter()) {
+    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
+        .highlight(TypeRange);
+    return;
+  }
+
+  if (auto fnTy = T->getAs<FunctionType>()) {
+    if (fnTy->getExtInfo().throws() ) {
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
+        .highlight(TypeRange);
+      return;
+    }
+
+    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param)
+      .highlight(TypeRange);
+    return;
+  }
+}
+
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
-  if (!shouldDiagnoseObjCReason(Reason, TC.Context))
+  if (!shouldDiagnoseObjCReason(Reason, AFD->getASTContext()))
     return;
 
   if (NumParams == 1) {
-    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_single_param_type,
-                getObjCDiagnosticAttrKind(Reason));
+    AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
+                  getObjCDiagnosticAttrKind(Reason));
   } else {
-    TC.diagnose(AFD->getLoc(), diag::objc_invalid_on_func_param_type,
-                ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
+    AFD->diagnose(diag::objc_invalid_on_func_param_type,
+                  ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
   if (P->hasType()) {
     Type ParamTy = P->getType();
     SourceRange SR;
     if (auto typeRepr = P->getTypeLoc().getTypeRepr())
       SR = typeRepr->getSourceRange();
-    TC.diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
+    diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
   describeObjCReason(TC, AFD, Reason);
 }
@@ -3854,105 +3957,6 @@ bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
                                  ObjCReason::MemberOfObjCMembersClass);
 
   return false;
-}
-
-void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
-                                                     Type T,
-                                                     SourceRange TypeRange) {
-  // Special diagnostic for tuples.
-  if (T->is<TupleType>()) {
-    if (T->isVoid())
-      diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
-          .highlight(TypeRange);
-    else
-      diagnose(TypeRange.Start, diag::not_objc_tuple)
-          .highlight(TypeRange);
-    return;
-  }
-
-  // Special diagnostic for classes.
-  if (auto *CD = T->getClassOrBoundGenericClass()) {
-    if (!CD->isObjC())
-      diagnose(TypeRange.Start, diag::not_objc_swift_class)
-          .highlight(TypeRange);
-    return;
-  }
-
-  // Special diagnostic for structs.
-  if (T->is<StructType>()) {
-    diagnose(TypeRange.Start, diag::not_objc_swift_struct)
-        .highlight(TypeRange);
-    return;
-  }
-
-  // Special diagnostic for enums.
-  if (T->is<EnumType>()) {
-    diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-        .highlight(TypeRange);
-    return;
-  }
-
-  // Special diagnostic for protocols and protocol compositions.
-  if (T->isExistentialType()) {
-    if (T->isAny()) {
-      // Any is not @objc.
-      diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
-      return;
-    }
-
-    auto layout = T->getExistentialLayout();
-
-    // See if the superclass is not @objc.
-    if (auto superclass = layout.explicitSuperclass) {
-      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
-        diagnose(TypeRange.Start, diag::not_objc_class_constraint,
-                 superclass);
-        return;
-      }
-    }
-
-    // Find a protocol that is not @objc.
-    bool sawErrorProtocol = false;
-    for (auto P : layout.getProtocols()) {
-      auto *PD = P->getDecl();
-
-      if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
-        sawErrorProtocol = true;
-        break;
-      }
-
-      if (!PD->isObjC()) {
-        diagnose(TypeRange.Start, diag::not_objc_protocol,
-                 PD->getDeclaredType());
-        return;
-      }
-    }
-
-    if (sawErrorProtocol) {
-      diagnose(TypeRange.Start, diag::not_objc_error_protocol_composition);
-      return;
-    }
-
-    return;
-  }
-
-  if (T->is<ArchetypeType>() || T->isTypeParameter()) {
-    diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
-        .highlight(TypeRange);
-    return;
-  }
-
-  if (auto fnTy = T->getAs<FunctionType>()) {
-    if (fnTy->getExtInfo().throws() ) {
-      diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
-        .highlight(TypeRange);
-      return;
-    }
-
-    diagnose(TypeRange.Start, diag::not_objc_function_type_param)
-      .highlight(TypeRange);
-    return;
-  }
 }
 
 void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {

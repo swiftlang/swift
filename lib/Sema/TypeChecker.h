@@ -2289,9 +2289,6 @@ public:
 
   bool canBeRepresentedInObjC(const ValueDecl *decl);
 
-  void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
-                                          Type T, SourceRange TypeRange);
-
   void fillObjCRepresentableTypeCache(const DeclContext *DC);
 
   /// \name Resilience diagnostics
