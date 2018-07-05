@@ -1590,10 +1590,11 @@ Optional<FindLocalApplySitesResult>
 swift::findLocalApplySites(FunctionRefInst *FRI) {
   SmallVector<Operand *, 32> worklist(FRI->use_begin(), FRI->use_end());
 
-  FindLocalApplySitesResult f;
+  Optional<FindLocalApplySitesResult> f;
+  f.emplace();
 
   // Optimistically state that we have no escapes before our def-use dataflow.
-  f.escapes = false;
+  f->escapes = false;
 
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
@@ -1602,7 +1603,7 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
     // If we have a full apply site as our user.
     if (auto apply = FullApplySite::isa(user)) {
       if (apply.getCallee() == op->get()) {
-        f.fullApplySites.push_back(apply);
+        f->fullApplySites.push_back(apply);
         continue;
       }
     }
@@ -1613,7 +1614,7 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
       if (pai->getCallee() == op->get()) {
         // Track the partial apply that we saw so we can potentially eliminate
         // dead closure arguments.
-        f.partialApplySites.push_back(pai);
+        f->partialApplySites.push_back(pai);
         // Look to see if we can find a full application of this partial apply
         // as well.
         copy(pai->getUses(), std::back_inserter(worklist));
@@ -1646,12 +1647,12 @@ swift::findLocalApplySites(FunctionRefInst *FRI) {
     }
 
     // But everything else is considered an escape.
-    f.escapes = true;
+    f->escapes = true;
   }
 
   // If we did escape and didn't find any apply sites, then we have no
   // information for our users that is interesting.
-  if (f.escapes && f.partialApplySites.empty() && f.fullApplySites.empty())
+  if (f->escapes && f->partialApplySites.empty() && f->fullApplySites.empty())
     return None;
   return f;
 }
