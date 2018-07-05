@@ -4077,13 +4077,22 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (conformsToProtocol(toType, errorTypeProto, dc,
                              (ConformanceCheckFlags::InExpression|
-                              ConformanceCheckFlags::Used)))
-        if (auto NSErrorTy = getNSErrorType(dc))
+                              ConformanceCheckFlags::Used))) {
+        auto nsError = Context.getNSErrorDecl();
+        if (nsError) {
+          if (!nsError->hasInterfaceType()) {
+            auto resolver = Context.getLazyResolver();
+            assert(resolver);
+            resolver->resolveDeclSignature(nsError);
+          }
+          Type NSErrorTy = nsError->getDeclaredInterfaceType();
           if (isSubtypeOf(fromType, NSErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
               // Error itself.
               && !isSubtypeOf(fromType, toType, dc))
             return CheckedCastKind::ValueCast;
+        }
+      }
     }
   }
 

@@ -570,8 +570,6 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   return options;
 }
 
-class ObjCReason;
-
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
@@ -790,7 +788,6 @@ private:
   Type Int8Type;
   Type UInt8Type;
   Type NSObjectType;
-  Type NSErrorType;
   Type NSNumberType;
   Type NSValueType;
   Type ObjCSelectorType;
@@ -951,7 +948,6 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getMaxIntegerType(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
-  Type getNSErrorType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
   
@@ -2184,12 +2180,6 @@ public:
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,
                       ValueDecl *requirement) override;
-
-  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                             ObjCReason Reason,
-                             Optional<ForeignErrorConvention> &errorConvention);
-
-  bool canBeRepresentedInObjC(const ValueDecl *decl);
 
   /// \name Resilience diagnostics
 

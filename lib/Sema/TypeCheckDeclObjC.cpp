@@ -404,7 +404,7 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
-bool TypeChecker::isRepresentableInObjC(
+bool swift::isRepresentableInObjC(
        const AbstractFunctionDecl *AFD,
        ObjCReason Reason,
        Optional<ForeignErrorConvention> &errorConvention) {
@@ -603,8 +603,15 @@ bool TypeChecker::isRepresentableInObjC(
     }
 
     // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
-    Type errorParameterType = getNSErrorType(dc);
-    if (errorParameterType) {
+    auto nsError = ctx.getNSErrorDecl();
+    Type errorParameterType;
+    if (nsError) {
+      if (!nsError->hasInterfaceType()) {
+        auto resolver = ctx.getLazyResolver();
+        assert(resolver);
+        resolver->resolveDeclSignature(nsError);
+      }
+      errorParameterType = nsError->getDeclaredInterfaceType();
       errorParameterType = OptionalType::get(errorParameterType);
       errorParameterType
         = BoundGenericType::get(
@@ -828,8 +835,9 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   return Result;
 }
 
-bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
-  if (!Context.LangOpts.EnableObjCInterop)
+bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
+  ASTContext &ctx = decl->getASTContext();
+  if (!ctx.LangOpts.EnableObjCInterop)
     return false;
 
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -839,12 +847,11 @@ bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
-    return swift::isRepresentableInObjC(var,
-                                        ObjCReason::MemberOfObjCMembersClass);
+    return isRepresentableInObjC(var, ObjCReason::MemberOfObjCMembersClass);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
-    return swift::isRepresentableInObjC(subscript,
-                                        ObjCReason::MemberOfObjCMembersClass);
+    return isRepresentableInObjC(subscript,
+                                 ObjCReason::MemberOfObjCMembersClass);
 
   return false;
 }
@@ -883,13 +890,6 @@ Type TypeChecker::getNSObjectType(DeclContext *dc) {
                                 Context.getSwiftId(
                                   KnownFoundationEntity::NSObject),
                                 dc);
-}
-
-Type TypeChecker::getNSErrorType(DeclContext *dc) {
-  return getObjectiveCNominalType(NSErrorType, Context.Id_Foundation,
-                                  Context.getSwiftId(
-                                    KnownFoundationEntity::NSError),
-                                  dc);
 }
 
 Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
