@@ -198,7 +198,7 @@ public:
 
     /// This is an enum without payload.
     Enum,
-    /// This is an enum with payload.
+    /// This is an enum with payload (formally known as "associated value").
     EnumWithPayload,
 
     /// These values are generally only seen internally to the system, external
@@ -313,7 +313,7 @@ public:
 
   EnumElementDecl *getEnumValue() const;
 
-  SymbolicValue getEnumPayload() const;
+  SymbolicValue getEnumPayloadValue() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some

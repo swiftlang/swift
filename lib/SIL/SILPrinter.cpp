@@ -1237,7 +1237,7 @@ public:
       *this << "(";
       *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
       *this << ", ";
-      visitSymbolicValue(v.getEnumPayload());
+      visitSymbolicValue(v.getEnumPayloadValue());
       *this << ")";
       return;
     case SymbolicValue::UninitMemory:

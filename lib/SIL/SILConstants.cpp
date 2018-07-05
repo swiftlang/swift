@@ -94,7 +94,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "enum: ";
     decl->print(os);
     os <<", payload: ";
-    getEnumPayload().print(os, indent);
+    getEnumPayloadValue().print(os, indent);
     return;
   }
   }
@@ -108,17 +108,26 @@ void SymbolicValue::dump() const {
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
-  case RK_UninitMemory: return UninitMemory;
-  case RK_Unknown:      return Unknown;
-  case RK_Metatype:     return Metatype;
-  case RK_Function:     return Function;
-  case RK_Aggregate:    return Aggregate;
-  case RK_Enum:         return Enum;
+  case RK_UninitMemory:
+    return UninitMemory;
+  case RK_Unknown:
+    return Unknown;
+  case RK_Metatype:
+    return Metatype;
+  case RK_Function:
+    return Function;
+  case RK_Aggregate:
+    return Aggregate;
+  case RK_Enum:
+    return Enum;
   case RK_EnumWithPayload:
     return EnumWithPayload;
-  case RK_Integer:      return Integer;
-  case RK_Float:        return Float;
-  case RK_String:       return String;
+  case RK_Integer:
+    return Integer;
+  case RK_Float:
+    return Float;
+  case RK_String:
+    return String;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -158,8 +167,8 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   case SymbolicValue::Enum:
     return SymbolicValue::getEnum(getEnumValue());
   case SymbolicValue::EnumWithPayload:
-    return SymbolicValue::getEnumWithPayload(getEnumValue(), getEnumPayload(),
-                                             allocator);
+    return SymbolicValue::getEnumWithPayload(getEnumValue(),
+                                             getEnumPayloadValue(), allocator);
   }
 }
 
@@ -507,7 +516,7 @@ EnumElementDecl *SymbolicValue::getEnumValue() const {
   return value.enumValWithPayload->getEnumDecl();
 }
 
-SymbolicValue SymbolicValue::getEnumPayload() const {
+SymbolicValue SymbolicValue::getEnumPayloadValue() const {
   assert(representationKind == RK_EnumWithPayload);
   return value.enumValWithPayload->getPayload();
 }

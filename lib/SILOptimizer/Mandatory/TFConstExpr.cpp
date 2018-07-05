@@ -242,8 +242,7 @@ namespace {
     /// key, unless `initialValue` is an unknown value, representing a failure in
     /// compiler-time evaluation.
     AddressValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
-      if (!initialValue.isUnknown())
-        assert(!addressValues.count(addr));
+      assert(initialValue.isUnknown() || !addressValues.count(addr));
       unsigned objectID = memoryObjects.size();
       auto objectType = simplifyType(addr->getType().getASTType());
       memoryObjects.push_back({initialValue, objectType});
@@ -1039,6 +1038,9 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// end up demanding values that are returned by address.  Handle this by
 /// finding the temporary stack value that they were stored into and analyzing
 /// the single store that should exist into that memory (there are a few forms).
+///
+/// Invariant: Before the call, `addressValues` must not contain `addr` as a
+/// key.
 AddressValue
 ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   // The only value we can otherwise handle is an alloc_stack instruction.
@@ -1198,7 +1200,7 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
 }
 
 /// Invariant: Before the call, `addressValues` must not contain `addr` as a
-/// key. After the call, it must do.
+/// key.
 AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
   assert(!addressValues.count(addr));
   // If this is a struct or tuple element addressor, compute a more derived
@@ -1229,7 +1231,7 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
     auto enumAddr = dai->getOperand();
     auto enumVal = computeLoadResult(enumAddr);
     if (enumVal.isConstant())
-      return createMemoryObject(addr, enumVal.getEnumPayload());
+      return createMemoryObject(addr, enumVal.getEnumPayloadValue());
   }
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
@@ -1314,19 +1316,6 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       return stored;
 
     return computeFSStore(stored, inst->getOperand(1));
-  }
-
-  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
-    auto enumVal = computeLoadResult(dai->getOperand());
-    if (!enumVal.isConstant())
-      return enumVal;
-    assert(enumVal.getKind() == SymbolicValue::EnumWithPayload);
-
-    assert(dai->getType().isAddress());
-    auto payload = computeLoadResult(dai);
-    assert(payload.isConstant());
-    (void)payload;
-    return None;
   }
 
   // Copy addr is a load + store combination.
@@ -1521,7 +1510,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
         // When there are multiple payload components, they form a single
         // tuple-typed argument.
         assert(caseBB->getNumArguments() == 1);
-        auto argument = value.getEnumPayload();
+        auto argument = value.getEnumPayloadValue();
         assert(argument.isConstant());
         state.setValue(caseBB->getArgument(0), argument);
       }
