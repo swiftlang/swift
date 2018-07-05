@@ -228,6 +228,30 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: cond_br [[BOOLVAL]],
 
+// expected-warning @+1 {{'status' implicitly copied to the accelerator}}
+public func test_multiple_ifs(status: Bool) {
+  var a = Tensor<Int32>(0)
+  let b = a
+  if status { // expected-note {{value used here}}
+    a += b
+  }
+  a += b
+  if status {
+    a += b
+  }
+  a -= b
+  _hostOp(a)
+}
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
+// CHECK-NEXT: [sequence
+// CHECK-NEXT:   {condition Header: bb0
+// CHECK-NEXT:     block bb2
+// CHECK-NEXT:     block bb1}
+// CHECK-NEXT:   {condition Header: bb3
+// CHECK-NEXT:     block bb5
+// CHECK-NEXT:     block bb4}
+// CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {

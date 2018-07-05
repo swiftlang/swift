@@ -213,9 +213,9 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
     // Analyze the successors of the branch: each of them is post dominated by
     // endBB (and any of the successors may be exactly endBB).
     auto trueRegion =
-      processAcyclicRegionExcludingEnd(condBr->getTrueBB(), endBB);
+      processAcyclicRegionExcludingEnd(condBr->getTrueBB(), postidom);
     auto falseRegion =
-      processAcyclicRegionExcludingEnd(condBr->getFalseBB(), endBB);
+      processAcyclicRegionExcludingEnd(condBr->getFalseBB(), postidom);
 
     // Finally, form our conditional region.
     auto condRegion = new ConditionalSESERegion(startBB, std::move(trueRegion),
@@ -362,6 +362,3 @@ namespace {
 SILTransform *swift::createTFXLACFGCanonicalize() {
   return new TFXLACFGCanonicalizeTestPass();
 }
-
-
-
