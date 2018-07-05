@@ -40,7 +40,7 @@ class VarDecl;
 
 class TypeChecker;
 
-enum class ObjCReason;
+class ObjCReason;
 
 /// A function which needs to have its body synthesized.
 ///

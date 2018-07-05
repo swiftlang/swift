@@ -78,8 +78,7 @@ unsigned swift::getObjCDiagnosticAttrKind(ObjCReason reason) {
 
 /// Emit an additional diagnostic describing why we are applying @objc to the
 /// decl, if this is not obvious from the decl itself.
-static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
-                               ObjCReason Reason) {
+static void describeObjCReason(const ValueDecl *VD, ObjCReason Reason) {
   if (Reason == ObjCReason::MemberOfObjCProtocol) {
     VD->diagnose(diag::objc_inferring_on_objc_protocol_member);
   } else if (Reason == ObjCReason::OverridesObjC) {
@@ -92,7 +91,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
     overridden->diagnose(diag::objc_overriding_objc_decl,
                          kind, VD->getOverriddenDecl()->getFullName());
   } else if (Reason == ObjCReason::WitnessToObjC) {
-    auto requirement = TC.findWitnessedObjCRequirements(VD).front();
+    auto requirement = Reason.getObjCRequirement();
     requirement->diagnose(diag::objc_witness_objc_requirement,
                 VD->getDescriptiveKind(), requirement->getFullName(),
                 cast<ProtocolDecl>(requirement->getDeclContext())
@@ -223,7 +222,7 @@ static void diagnoseFunctionParamNotRepresentable(
       SR = typeRepr->getSourceRange();
     diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
   }
-  describeObjCReason(TC, AFD, Reason);
+  describeObjCReason(AFD, Reason);
 }
 
 static bool isParamListRepresentableInObjC(TypeChecker &TC,
@@ -245,7 +244,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
         TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
-        describeObjCReason(TC, AFD, Reason);
+        describeObjCReason(AFD, Reason);
       }
 
       return false;
@@ -257,7 +256,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
         TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                     getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
-        describeObjCReason(TC, AFD, Reason);
+        describeObjCReason(AFD, Reason);
       }
 
       return false;
@@ -306,7 +305,7 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
     if (Diagnose) {
       TC.diagnose(AFD->getLoc(), diag::objc_invalid_with_generic_params,
                   getObjCDiagnosticAttrKind(Reason));
-      describeObjCReason(TC, AFD, Reason);
+      describeObjCReason(AFD, Reason);
     }
 
     return true;
@@ -338,7 +337,7 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
     if (Diagnose) {
       TC.diagnose(VD, diag::objc_invalid_on_foreign_class,
                   getObjCDiagnosticAttrKind(Reason));
-      describeObjCReason(TC, VD, Reason);
+      describeObjCReason(VD, Reason);
     }
     break;
 
@@ -347,7 +346,7 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
       TC.diagnose(VD, diag::objc_in_objc_runtime_visible,
                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
                   clas->getName());
-      describeObjCReason(TC, VD, Reason);
+      describeObjCReason(VD, Reason);
     }
     break;
   }
@@ -456,7 +455,7 @@ bool TypeChecker::isRepresentableInObjC(
                        : diag::objc_setter_for_nonobjc_subscript);
 
         diagnose(accessor->getLoc(), error);
-        describeObjCReason(*this, accessor, Reason);
+        describeObjCReason(accessor, Reason);
       }
       return false;
     }
@@ -468,7 +467,7 @@ bool TypeChecker::isRepresentableInObjC(
         // always directly dispatched from the synthesized setter.
       if (Diagnose) {
         diagnose(accessor->getLoc(), diag::objc_observing_accessor);
-        describeObjCReason(*this, accessor, Reason);
+        describeObjCReason(accessor, Reason);
       }
       return false;
 
@@ -484,7 +483,7 @@ bool TypeChecker::isRepresentableInObjC(
     case AccessorKind::MutableAddress:
       if (Diagnose) {
         diagnose(accessor->getLoc(), diag::objc_addressor);
-        describeObjCReason(*this, accessor, Reason);
+        describeObjCReason(accessor, Reason);
       }
       return false;
     }
@@ -528,7 +527,7 @@ bool TypeChecker::isRepresentableInObjC(
         SourceRange Range =
             FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
         diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
-        describeObjCReason(*this, FD, Reason);
+        describeObjCReason(FD, Reason);
       }
       return false;
     }
@@ -562,7 +561,7 @@ bool TypeChecker::isRepresentableInObjC(
           diagnose(AFD->getLoc(), diag::objc_invalid_on_failing_init,
                    getObjCDiagnosticAttrKind(Reason))
             .highlight(throwsLoc);
-          describeObjCReason(*this, AFD, Reason);
+          describeObjCReason(AFD, Reason);
         }
 
         return false;
@@ -599,7 +598,7 @@ bool TypeChecker::isRepresentableInObjC(
                  getObjCDiagnosticAttrKind(Reason),
                  resultType)
           .highlight(throwsLoc);
-        describeObjCReason(*this, AFD, Reason);
+        describeObjCReason(AFD, Reason);
       }
       return false;
     } else {
@@ -610,7 +609,7 @@ bool TypeChecker::isRepresentableInObjC(
                  getObjCDiagnosticAttrKind(Reason),
                  resultType)
           .highlight(throwsLoc);
-        describeObjCReason(*this, AFD, Reason);
+        describeObjCReason(AFD, Reason);
       }
       return false;
     }
@@ -780,7 +779,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                      VD->getInterfaceType(),
                                      TypeRange);
-  describeObjCReason(*this, VD, Reason);
+  describeObjCReason(VD, Reason);
 
   return Result;
 }
@@ -837,7 +836,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                      !IndicesResult ? IndicesType
                                                     : ElementType,
                                      TypeRange);
-  describeObjCReason(*this, SD, Reason);
+  describeObjCReason(SD, Reason);
 
   return Result;
 }
@@ -1046,12 +1045,12 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
           .fixItRemove(attr->getRangeWithAt());
     }
 
-    return ObjCReason::ExplicitlyObjC;
+    return ObjCReason(ObjCReason::ExplicitlyObjC);
   }
 
   if (kind == ObjCClassKind::ObjCWithSwiftRoot ||
       kind == ObjCClassKind::ObjC)
-    return ObjCReason::ImplicitlyObjC;
+    return ObjCReason(ObjCReason::ImplicitlyObjC);
 
   return None;
 }
@@ -1088,24 +1087,24 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
 
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
-    return ObjCReason::ExplicitlyObjC;
+    return ObjCReason(ObjCReason::ExplicitlyObjC);
   // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
   //
   // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
   // (where they warn on failure) and loudly in Swift 4 (error on failure).
   if (VD->getAttrs().hasAttribute<IBOutletAttr>())
-    return ObjCReason::ExplicitlyIBOutlet;
+    return ObjCReason(ObjCReason::ExplicitlyIBOutlet);
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
-    return ObjCReason::ExplicitlyIBAction;
+    return ObjCReason(ObjCReason::ExplicitlyIBAction);
   if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
-    return ObjCReason::ExplicitlyIBInspectable;
+    return ObjCReason(ObjCReason::ExplicitlyIBInspectable);
   if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
-    return ObjCReason::ExplicitlyGKInspectable;
+    return ObjCReason(ObjCReason::ExplicitlyGKInspectable);
   if (VD->getAttrs().hasAttribute<NSManagedAttr>())
-    return ObjCReason::ExplicitlyNSManaged;
+    return ObjCReason(ObjCReason::ExplicitlyNSManaged);
   // A member of an @objc protocol is implicitly @objc.
   if (isMemberOfObjCProtocol)
-    return ObjCReason::MemberOfObjCProtocol;
+    return ObjCReason(ObjCReason::MemberOfObjCProtocol);
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
@@ -1114,23 +1113,25 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
         .hasAttribute<NonObjCAttr>()))
     return None;
   if (isMemberOfObjCClassExtension(VD))
-    return ObjCReason::MemberOfObjCExtension;
+    return ObjCReason(ObjCReason::MemberOfObjCExtension);
   if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
-    return ObjCReason::MemberOfObjCMembersClass;
+    return ObjCReason(ObjCReason::MemberOfObjCMembersClass);
   // An override of an @objc declaration is implicitly @objc.
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
-    return ObjCReason::OverridesObjC;
+    return ObjCReason(ObjCReason::OverridesObjC);
   // A witness to an @objc protocol requirement is implicitly @objc.
-  if (VD->getDeclContext()->getAsClassOrClassExtensionContext() &&
-      !TC.findWitnessedObjCRequirements(VD,
-                                        /*anySingleRequirement=*/true).empty())
-    return ObjCReason::WitnessToObjC;
+  if (VD->getDeclContext()->getAsClassOrClassExtensionContext()) {
+    auto requirements =
+      TC.findWitnessedObjCRequirements(VD, /*anySingleRequirement=*/true);
+    if (!requirements.empty())
+      return ObjCReason::witnessToObjC(requirements.front());
+  }
 
   // Infer '@objc' for 'dynamic' members.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
     // For implicit 'dynamic', just infer '@objc' implicitly.
     if (attr->isImplicit())
-      return ObjCReason::ImplicitlyObjC;
+      return ObjCReason(ObjCReason::ImplicitlyObjC);
 
     bool isGetterOrSetter =
       isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
@@ -1148,7 +1149,7 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
                       "@objc ");
       }
 
-      return ObjCReason::ExplicitlyDynamic;
+      return ObjCReason(ObjCReason::ExplicitlyDynamic);
     }
 
     // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
@@ -1159,7 +1160,7 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
                    "@objc ");
 
-    return ObjCReason::ImplicitlyObjC;
+    return ObjCReason(ObjCReason::ImplicitlyObjC);
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.
@@ -1183,8 +1184,8 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       return None;
 
     if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
-      return VD->isImplicit() ? ObjCReason::ImplicitlyObjC
-                              : ObjCReason::MemberOfObjCSubclass;
+      return VD->isImplicit() ? ObjCReason(ObjCReason::ImplicitlyObjC)
+                              : ObjCReason(ObjCReason::MemberOfObjCSubclass);
     }
   }
 

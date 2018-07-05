@@ -32,39 +32,73 @@ using llvm::Optional;
 ///
 /// Should only affect diagnostics. If you change this enum, also change
 /// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
-enum class ObjCReason {
-  /// Has the '@cdecl' attribute.
-  ExplicitlyCDecl,
-  /// Has the 'dynamic' modifier.
-  ExplicitlyDynamic,
-  /// Has an explicit '@objc' attribute.
-  ExplicitlyObjC,
-  /// Has an explicit '@IBOutlet' attribute.
-  ExplicitlyIBOutlet,
-  /// Has an explicit '@IBAction' attribute.
-  ExplicitlyIBAction,
-  /// Has an explicit '@NSManaged' attribute.
-  ExplicitlyNSManaged,
-  /// Is a member of an @objc protocol.
-  MemberOfObjCProtocol,
-  /// Implicitly-introduced @objc.
-  ImplicitlyObjC,
-  /// Is an override of an @objc member.
-  OverridesObjC,
-  /// Is a witness to an @objc protocol requirement.
-  WitnessToObjC,
-  /// Has an explicit '@IBInspectable' attribute.
-  ExplicitlyIBInspectable,
-  /// Has an explicit '@GKInspectable' attribute.
-  ExplicitlyGKInspectable,
-  /// Is it a member of an @objc extension of a class.
-  MemberOfObjCExtension,
-  /// Is it a member of an @objcMembers class.
-  MemberOfObjCMembersClass,
-  /// A member of an Objective-C-defined class or subclass.
-  MemberOfObjCSubclass,
-  /// An accessor to a property.
-  Accessor,
+class ObjCReason {
+public:
+  // The kind of reason.
+  enum Kind {
+    /// Has the '@cdecl' attribute.
+    ExplicitlyCDecl,
+    /// Has the 'dynamic' modifier.
+    ExplicitlyDynamic,
+    /// Has an explicit '@objc' attribute.
+    ExplicitlyObjC,
+    /// Has an explicit '@IBOutlet' attribute.
+    ExplicitlyIBOutlet,
+    /// Has an explicit '@IBAction' attribute.
+    ExplicitlyIBAction,
+    /// Has an explicit '@NSManaged' attribute.
+    ExplicitlyNSManaged,
+    /// Is a member of an @objc protocol.
+    MemberOfObjCProtocol,
+    /// Implicitly-introduced @objc.
+    ImplicitlyObjC,
+    /// Is an override of an @objc member.
+    OverridesObjC,
+    /// Is a witness to an @objc protocol requirement.
+    WitnessToObjC,
+    /// Has an explicit '@IBInspectable' attribute.
+    ExplicitlyIBInspectable,
+    /// Has an explicit '@GKInspectable' attribute.
+    ExplicitlyGKInspectable,
+    /// Is it a member of an @objc extension of a class.
+    MemberOfObjCExtension,
+    /// Is it a member of an @objcMembers class.
+    MemberOfObjCMembersClass,
+    /// A member of an Objective-C-defined class or subclass.
+    MemberOfObjCSubclass,
+    /// An accessor to a property.
+    Accessor,
+  };
+
+private:
+  Kind kind;
+
+  /// When the kind is \c WitnessToObjC, the requirement being witnessed.
+  ValueDecl * decl = nullptr;
+
+  ObjCReason(Kind kind, ValueDecl *decl) : kind(kind), decl(decl) { }
+
+public:
+  /// Implicit conversion from the trivial reason kinds.
+  ObjCReason(Kind kind) : kind(kind) {
+    assert(kind != WitnessToObjC && "Use ObjCReason::witnessToObjC()");
+  }
+
+  /// Retrieve the kind of requirement.
+  operator Kind() const { return kind; }
+
+  /// Form a reason specifying that we have a witness to the given @objc
+  /// requirement.
+  static ObjCReason witnessToObjC(ValueDecl *requirement) {
+    return ObjCReason(WitnessToObjC, requirement);
+  }
+
+  /// When the entity should be @objc because it is a witness to an @objc
+  /// requirement, retrieve the requirement.
+  ValueDecl *getObjCRequirement() const {
+    assert(kind == WitnessToObjC);
+    return decl;
+  }
 };
 
 /// Determine whether we should diagnose conflicts due to inferring @objc
@@ -80,7 +114,7 @@ Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                       const ValueDecl *VD,
                                       bool allowImplicit = false);
 
-/// Record whether the given declatation is @objc, and why.
+/// Record whether the given declaration is @objc, and why.
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = llvm::None);

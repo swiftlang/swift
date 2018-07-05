@@ -570,7 +570,7 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   return options;
 }
 
-enum class ObjCReason;
+class ObjCReason;
 
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {

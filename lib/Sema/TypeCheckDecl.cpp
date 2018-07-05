@@ -3919,7 +3919,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
     if (proto->getAttrs().hasAttribute<ObjCAttr>()) {
-      Optional<ObjCReason> isObjC = ObjCReason::ImplicitlyObjC;
+      Optional<ObjCReason> isObjC = ObjCReason(ObjCReason::ImplicitlyObjC);
 
       for (auto inherited : proto->getInheritedProtocols()) {
         if (!inherited->isObjC()) {
@@ -4544,7 +4544,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Destructors are always @objc, because their Objective-C entry point is
     // -dealloc.
     if (Context.LangOpts.EnableObjCInterop)
-      markAsObjC(*this, DD, ObjCReason::ImplicitlyObjC);
+      markAsObjC(*this, DD, ObjCReason(ObjCReason::ImplicitlyObjC));
     else
       DD->setIsObjC(false);
 
