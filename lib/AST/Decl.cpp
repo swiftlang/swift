@@ -344,6 +344,11 @@ ModuleDecl *Decl::getModuleContext() const {
   return getDeclContext()->getParentModule();
 }
 
+/// Retrieve the diagnostic engine for diagnostics emission.
+DiagnosticEngine &Decl::getDiags() const {
+  return getASTContext().Diags;
+}
+
 // Helper functions to verify statically whether source-location
 // functions have been overridden.
 typedef const char (&TwoChars)[2];

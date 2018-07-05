@@ -2399,9 +2399,7 @@ extension BinaryFloatingPoint {
 % for Range in ['Range', 'ClosedRange']:
 %   exampleRange = '10.0..<20.0' if Range == 'Range' else '10.0...20.0'
 extension BinaryFloatingPoint
-where Self.RawSignificand : FixedWidthInteger,
-      Self.RawSignificand.Stride : SignedInteger,
-      Self.RawSignificand.Magnitude : UnsignedInteger {
+where Self.RawSignificand : FixedWidthInteger {
 
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.

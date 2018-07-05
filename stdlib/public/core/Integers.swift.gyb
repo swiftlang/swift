@@ -2271,7 +2271,8 @@ extension BinaryInteger {
 /// other arithmetic methods and operators.
 public protocol FixedWidthInteger :
   BinaryInteger, LosslessStringConvertible
-  where Magnitude : FixedWidthInteger
+  where Magnitude : FixedWidthInteger & UnsignedInteger,
+        Stride : FixedWidthInteger & SignedInteger
 {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
@@ -2531,9 +2532,7 @@ ${assignmentOperatorComment(x.operator, False)}
 % for Range in ['Range', 'ClosedRange']:
 %   exampleRange = '1..<100' if Range == 'Range' else '1...100'
 
-extension FixedWidthInteger
-where Self.Stride : SignedInteger,
-      Self.Magnitude : UnsignedInteger {
+extension FixedWidthInteger {
 
   /// Returns a random value within the specified range, using the given
   /// generator as a source for randomness.
