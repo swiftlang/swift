@@ -568,8 +568,9 @@ struct TFGraphLowering : public SILInstructionVisitor<TFGraphLowering, GLStatus>
 
   GLStatus visitTFOpInst(BuiltinInst *inst);
 
-  GLStatus visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo);
   GLStatus visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo);
+  GLStatus visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo);
+  GLStatus visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo);
   // D2D means device-to-device.
   GLStatus visitBuiltinD2DTensorRecvInst(SILTensorOpInfo &tfopInfo);
   GLStatus visitBuiltinD2DTensorSendInst(SILTensorOpInfo &tfopInfo);
@@ -882,7 +883,8 @@ static void decodeShapeArray(const SILTensorOpInfo &tfopInfo,
   }
 }
 
-GLStatus TFGraphLowering::visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo) {
+GLStatus
+TFGraphLowering::visitGraphOpSendToHostInst(GraphOperationInfo &graphOpInfo) {
   auto &graphFn = getCurrentGraphFunction();
   // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
   // the while cond function.
@@ -890,10 +892,10 @@ GLStatus TFGraphLowering::visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo) 
 
   // Type check and process the parameters.
   // SendToHost has type <T> (input$T, tensorId$int, device$str) -> ()
-  auto *inst = tfopInfo.inst;
+  auto *inst = graphOpInfo.inst;
   assert(inst->getNumResults() == 1);
-  assert(inst->getNumOperands() == 3);
-  assert(tfopInfo.isInput(0));
+  assert(inst->getNumOperands() == 1);
+  assert(inst->getNumAttributes() == 2);
 
   TF_Output inputOp;
   TF_DataType inputType;
@@ -903,10 +905,13 @@ GLStatus TFGraphLowering::visitBuiltinSendToHostInst(SILTensorOpInfo &tfopInfo) 
     if (!inputOp.oper) return GLStatus::Error;
     inputType = getTensorFlowDataType(operand->getType(), inst->getLoc());
   }
-  int tensorId = tfopInfo.getIntAttrOperand(1, "tensorId");
-  assert(tfopInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
-         "SendToHost must run on CPU device");
 
+  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+         "SendToHost must run on CPU device");
+  int tensorId = inst->getAttribute("tensorId")
+                     .getValue()
+                     .getIntegerValue()
+                     .getLimitedValue();
   // Add enqueue to the local graph function, and the corresponding dequeue to
   // the top level function, so that caller can dequeue tensors via SessionRun.
   TF_Operation *queueOp;
@@ -1037,6 +1042,124 @@ GLStatus TFGraphLowering::visitBuiltinRecvFromHostInst(SILTensorOpInfo &tfopInfo
     if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
       return GLStatus::Error;
     addValueMapping({inst, 0}, {dequeueOp, 0});
+  }
+
+  // Now add enqueue to the top level graph function. Multiple graph functions
+  // can have their own dequeue ops over the same tensorId.
+  // One example is to dequeue tensors both within the while op's body
+  // function, and also right after the while op is executed.
+  // In that case, we only generate a single enqueue op at the top level.
+  if (!processedTensorIdsForReceive.insert(tensorId).second)
+    return GLStatus::Success;
+
+  // The code here is different enough from the above that it's not worth
+  // extracting common code into functions.
+  TF_Operation *globalQueueOp;
+  {
+    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "FIFOQueueV2", opName.c_str());
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+    // FIXME: Revisit whether to populate "shared_name".
+    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
+    globalQueueOp = TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return GLStatus::Error;
+  }
+
+  TF_Operation *inputTensorPlaceholder;
+  {
+    auto opName = "arg_tensor_enqueue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "Placeholder", opName.c_str());
+    TF_SetAttrType(desc, "dtype", outputType);
+
+    inputTensorPlaceholder = TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return GLStatus::Error;
+  }
+
+  {
+    auto opName = "fifo_queue_enqueue_" + llvm::itostr(tensorId);
+    auto *desc = TF_NewOperation(resultGraph, "QueueEnqueueV2", opName.c_str());
+    TF_AddInput(desc, {globalQueueOp, 0});
+    TF_Output inputTensor{inputTensorPlaceholder, 0};
+    TF_AddInputList(desc, &inputTensor, 1);
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetAttrTypeList(desc, "Tcomponents", &outputType, 1);
+    TF_FinishOperation(desc, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return GLStatus::Error;
+  }
+  return GLStatus::Success;
+}
+
+GLStatus
+TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
+  auto &graphFn = getCurrentGraphFunction();
+  // TODO(b/78472806): Add a more thorough and proper fix for effectful ops in
+  // the while cond function.
+  if (!graphFn.shouldLowerEffectfulOps) {
+    internalError(
+        getUserSourceLocation(graphOpInfo.inst->getDebugLocation()),
+        "FIXME: cannot lower a Host->TF tensor transfer in a loop header",
+        diag::tfop_invalid_tfop);
+    return GLStatus::Error;
+  }
+
+  // Type check and process the parameters.
+  // recvFromHost has type <T> (tensorId$int, device$string) -> (T)
+  // Optionally it can carry a shape array attr, only used for shape propagation
+  // in XLA compilation.
+  auto *inst = graphOpInfo.inst;
+  assert(inst->getNumResults() == 1);
+  assert(inst->getNumOperands() == 0);
+  assert(inst->getNumAttributes() >= 2);
+
+  // int tensorId = graphOpInfo.getIntAttrOperand(0, "tensorId");
+  assert(graphOpInfo.getDeviceString() == DEFAULT_CPU_DEVICE &&
+         "SendToHost must run on CPU device");
+  int tensorId = inst->getAttribute("tensorId")
+                     .getValue()
+                     .getIntegerValue()
+                     .getLimitedValue();
+
+  TF_DataType outputType;
+  {
+    outputType =
+        getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
+  }
+
+  // Add dequeue to the local graph function, and the corresponding enqueue to
+  // the top level function, so that caller can enqueue tensors via SessionRun.
+  TF_Operation *queueOp;
+  {
+    auto opName = "fifo_queue_" + llvm::itostr(tensorId);
+    auto *desc =
+        TF_NewOperation(graphFn.getGraph(), "FIFOQueueV2", opName.c_str());
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetAttrInt(desc, "capacity", NAMED_TENSOR_QUEUE_CAPACITY);
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+    TF_SetAttrString(desc, "shared_name", opName.data(), opName.size());
+    queueOp = graphFn.finishOp(desc, /*hasSideEffects*/ false,
+                               /*isEligibleForTPU*/ false, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return GLStatus::Error;
+  }
+
+  {
+    auto opName = "fifo_queue_dequeue_" + llvm::itostr(tensorId);
+    auto *desc =
+        TF_NewOperation(graphFn.getGraph(), "QueueDequeueV2", opName.c_str());
+    TF_AddInput(desc, {queueOp, 0});
+    TF_SetDevice(desc, DEFAULT_CPU_DEVICE);
+    TF_SetAttrTypeList(desc, "component_types", &outputType, 1);
+
+    auto dequeueOp = graphFn.finishOp(desc, /*hasSideEffects*/ true,
+                                      /*isEligibleForTPU*/ false, status);
+    if (checkStatus(getUserSourceLocation(inst->getDebugLocation())))
+      return GLStatus::Error;
+    addValueMapping({inst->getResult(0), 0}, {dequeueOp, 0});
   }
 
   // Now add enqueue to the top level graph function. Multiple graph functions
@@ -1497,6 +1620,12 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   SmallVector<GraphOperationInfo::InputMarker, 4> inputInfos;
   auto opName = decoder.decodeName(inputInfos);
 
+  // Swift host <-> TF device sends/recvs.
+  if (opName == "tfc.RecvFromHost")
+    return visitGraphOpRecvFromHostInst(decoder);
+  else if (opName == "tfc.SendToHost")
+    return visitGraphOpSendToHostInst(decoder);
+
   // The name label we put on the op is summarized from the "stack trace" of
   // the operation's source location.
   auto opLocString = getUniqueName(inst->getDebugLocation(), "op");
@@ -1709,10 +1838,9 @@ GLStatus TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
   SILTensorOpInfo tfopInfo = SILTensorOpInfo::decode(inst).getValue();
 
   // Swift host <-> TF device sends/recvs.
+  assert(tfopInfo.opName != "tfc.SendToHost"); // Already switched to graph op.
   if (tfopInfo.opName == "tfc.RecvFromHost")
     return visitBuiltinRecvFromHostInst(tfopInfo);
-  else if (tfopInfo.opName == "tfc.SendToHost")
-    return visitBuiltinSendToHostInst(tfopInfo);
 
   // Device-to-device sends/recvs.
   if (tfopInfo.opName == "tfc.D2DTensorRecv")

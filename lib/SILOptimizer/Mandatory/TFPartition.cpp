@@ -17,20 +17,21 @@
 
 #define DEBUG_TYPE "tf-partition"
 #include "TFUtilities.h"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/Module.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/Demangling/Demangle.h"
+#include "swift/SIL/SILConstants.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
 
 #undef DEBUG_TYPE
@@ -2490,6 +2491,8 @@ static SILValue createIntValue(intmax_t value, SILBuilder &B, SILLocation loc,
 /// `isScalar` specifies whether the value being received is a promoted scalar.
 ///
 /// recvFromHost has type <T> (tensorId$int, device$string) -> (T)
+//
+// TODO: Remove this function after migration to GraphOpInst.
 static SILValue
 createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
                          bool isScalar, unsigned idNumber,
@@ -2541,6 +2544,29 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
     getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
   auto name = ctx.getIdentifier(instName);
   return B.createBuiltin(loc, name, valueTy, subMap, operands);
+}
+
+static SILValue createAcceleratorReceiveViaGraphOp(
+    SILBuilder &B, SILLocation loc, SILType valueTy, bool isScalar,
+    unsigned idNumber, GraphGlobalConfiguration &configuration) {
+  // TODO: lift this restriction once GraphOpInst supports shape array attrs.
+  assert(configuration.primaryDeviceType != DeviceType::TPU || !isScalar);
+
+  auto &ctx = B.getASTContext();
+  auto opType = "tfc.RecvFromHost";
+  std::string instName = "tfc.RecvFromHost";
+  SmallVector<GraphOperationAttribute, 2> attributes;
+  auto &allocator = B.getModule().getASTContext().getAllocator();
+  attributes.push_back(
+      {ctx.getIdentifier("tensorId"),
+       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
+                                      attributes);
+
+  auto *inst = B.createGraphOperation(loc, ctx.getIdentifier(instName),
+                                      /*operands*/ {}, attributes, {valueTy});
+  assert(inst->getNumResults() == 1);
+  return inst->getResult(0);
 }
 
 static void
@@ -2611,19 +2637,17 @@ void createAcceleratorSend(SILBuilder &B, SILLocation loc, SILValue value,
   auto &ctx = B.getASTContext();
   auto voidTy = B.getModule().Types.getEmptyTupleType();
   auto opType = "tfc.SendToHost";
-  std::string instName = std::string("__tfop_") + opType + ",$in,tensorId";
-
-  SmallVector<SILValue, 3> operands;
-  operands.push_back(value);
-  auto tensorIdAttr = B.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(32, ctx), idNumber);
-  operands.push_back(tensorIdAttr);
-  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc, operands,
-                                      instName);
-  auto subMap = getSingleSubstitutionMapForElementType(
-      value->getType().getASTType(), ctx);
-  auto name = ctx.getIdentifier(instName);
-  B.createBuiltin(loc, name, voidTy, subMap, operands);
+  std::string instName = opType;
+  instName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+  SmallVector<GraphOperationAttribute, 2> attributes;
+  auto &allocator = B.getModule().getASTContext().getAllocator();
+  attributes.push_back(
+      {ctx.getIdentifier("tensorId"),
+       SymbolicValue::getInteger(APInt(/*width*/ 32, idNumber), allocator)});
+  configuration.handleDevicePlacement(opType, /*opDevice*/ "", B, loc,
+                                      attributes);
+  B.createGraphOperation(loc, ctx.getIdentifier(instName),
+                         /*operands*/ {value}, attributes, {voidTy});
 }
 
 template<typename T>
@@ -2833,8 +2857,13 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto acceleratorCaseId =
-      createAcceleratorReceive(BA, loc, remapType(intFieldSILType),
-                               /*isScalar*/ true, nextSendID, FP.configuration);
+      (FP.configuration.primaryDeviceType == DeviceType::TPU)
+          ? createAcceleratorReceive(BA, loc, remapType(intFieldSILType),
+                                     /*isScalar*/ true, nextSendID,
+                                     FP.configuration)
+          : createAcceleratorReceiveViaGraphOp(
+                BA, loc, remapType(intFieldSILType),
+                /*isScalar*/ true, nextSendID, FP.configuration);
 
   assert(inst->getNumCases() == 2 &&
          "switch enums with 1 or >2 cases will be supported later.");
@@ -2914,8 +2943,12 @@ void PartitionCloner::insertSend(SILInstruction &inst) {
     // Create the receive in the accelerator code.  Each send/receive pair gets
     // a unique ID to associate one with the other.
     this->ValueMap[result] =
-        createAcceleratorReceive(BA, loc, remapType(result->getType()),
-                                 isScalar, nextSendID, FP.configuration);
+        (FP.configuration.primaryDeviceType == DeviceType::TPU && isScalar)
+            ? createAcceleratorReceive(BA, loc, remapType(result->getType()),
+                                       isScalar, nextSendID, FP.configuration)
+            : createAcceleratorReceiveViaGraphOp(
+                  BA, loc, remapType(result->getType()), isScalar, nextSendID,
+                  FP.configuration);
 
     // if `result` is a scalar, we need to convert it to TensorHandle<T>,
     // before sending that value to accelerator. We pass such a function

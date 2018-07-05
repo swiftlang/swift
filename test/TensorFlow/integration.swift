@@ -25,7 +25,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NEXT:   %5 = metatype $@thick Float.Type
 // CHECK-NEXT:   %6 = string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT:   %7 = builtin "__tfop_Sub,$in,$in,T,__device"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>, %5 : $@thick Float.Type, %6 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK:        builtin "__tfop_tfc.SendToHost,$in,tensorId,__device"<TensorHandle<Float>>(
+// CHECK:        graph_op "tfc.SendToHost
 // CHECK-NEXT:   metatype $@thick Float.Type
 // CHECK-NEXT:   string_literal utf8 "/device:CPU:0"
 // CHECK:        [[RESULT:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
@@ -151,7 +151,7 @@ public func testExitBranch2(i: Int) {
 
 // CHECK:      bb1:
 // CHECK:        builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK:        builtin "__tfop_tfc.SendToHost
+// CHECK:        graph_op "tfc.SendToHost
 // CHECK-NEXT:   br bb2
 
 // CHECK: bb2:
@@ -329,11 +329,11 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:  %6 = unchecked_ref_cast %5 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 
 // CHECK:       %9 = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %6 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:       builtin "__tfop_tfc.SendToHost
+// CHECK:       graph_op "tfc.SendToHost
 // CHECK-NEXT:  float_literal $Builtin.FPIEEE32, 0x40000000
 // CHECK-NEXT:  integer_literal $Builtin.Int32, 1
 // CHECK:       builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
-// CHECK:       builtin "__tfop_tfc.RecvFromHost
+// CHECK:       graph_op "tfc.RecvFromHost
 // CHECK:       builtin "__tfop_Add,$in,$in,__device"(
 // CHECK-NEXT:  unchecked_ref_cast {{.*}} : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 // CHECK:       builtin "__tfop_Add,$in,$in,T,__device"(
