@@ -19,7 +19,8 @@ class SomeCellSub1 : SomeCell {
   @objc func initWithString(_ string: String) { }
 
   var isEnabled: Bool { // expected-error{{overriding declaration requires an 'override' keyword}}
-    get { return super.isEnabled }
+    // FIXE: The error that follows is a bit strange.
+    get { return super.isEnabled } // expected-error{{'@objc' getter for non-'@objc' property}}
   }
 
   @objc(enabled)
