@@ -344,11 +344,16 @@ namespace swift {
     Implementation &Impl;
   };
 
-  /// Register request functions with the evaluator.
+  /// Register AST-level request functions with the evaluator.
   ///
-  /// Clients that form an ASTContext and will perform any semantic
-  /// queries should call these functions after forming the ASTContext.
+  /// The ASTContext will automatically call these upon construction.
   void registerAccessRequestFunctions(Evaluator &evaluator);
+
+  /// Register Sema-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any semantic queries
+  /// using Sema-level logic should call these functions after forming the
+  /// ASTContext.
   void registerTypeCheckerRequestFunctions(Evaluator &evaluator);
 
 } // end namespace swift

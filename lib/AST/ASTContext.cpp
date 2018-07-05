@@ -43,6 +43,7 @@
 #include "swift/Parse/Lexer.h" // bad dependency
 #include "swift/Syntax/SyntaxArena.h"
 #include "swift/Strings.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -509,6 +510,9 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.FrameworkSearchPaths)
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
+
+  // Register any request-evaluator functions available at the AST layer.
+  registerAccessRequestFunctions(evaluator);
 }
 
 ASTContext::~ASTContext() {

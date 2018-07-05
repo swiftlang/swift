@@ -152,7 +152,6 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Context.reset(ASTContext::get(Invocation.getLangOptions(),
                                 Invocation.getSearchPathOptions(), SourceMgr,
                                 Diagnostics));
-  registerAccessRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
   if (setUpModuleLoaders())
