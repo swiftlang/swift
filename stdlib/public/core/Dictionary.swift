@@ -1582,7 +1582,7 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
   let storage = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
 
-  nsd.getObjects(nil, andKeys: storage.baseAddress)
+  nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
 #endif
