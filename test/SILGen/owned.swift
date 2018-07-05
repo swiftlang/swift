@@ -28,3 +28,9 @@ struct Foo {
 func oneUnnamedArgument1(_: __owned ValueAggregate) {}
 // CHECK-LABEL: sil hidden @$S5owned19oneUnnamedArgument2yyAA12RefAggregateCnF : $@convention(thin) (@owned RefAggregate) -> () {
 func oneUnnamedArgument2(_: __owned RefAggregate) {}
+
+public final class C {
+  // CHECK-LABEL: sil @{{.*}}bar{{.*}} : $@convention(method) (@owned Optional<String>, @thick C.Type) -> ()
+  public static func bar(_ x: __owned String?) {
+ }
+}
