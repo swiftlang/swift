@@ -386,12 +386,6 @@ static bool checkObjCInExtensionContext(const ValueDecl *value,
   return false;
 }
 
-bool TypeChecker::isCIntegerType(const DeclContext *DC, Type T) {
-  if (CIntegerTypes.empty())
-    fillObjCRepresentableTypeCache(DC);
-  return CIntegerTypes.count(T->getCanonicalType());
-}
-
 /// Determines whether the given type is bridged to an Objective-C class type.
 static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
   switch (type->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, dc)
@@ -885,36 +879,6 @@ static Type getObjectiveCNominalType(Type &cache,
   return nullptr;
 }
 
-static void lookupAndAddLibraryTypes(TypeChecker &TC,
-                                     ModuleDecl *Stdlib,
-                                     ArrayRef<Identifier> TypeNames,
-                                     llvm::DenseSet<CanType> &Types) {
-  SmallVector<ValueDecl *, 4> Results;
-  for (Identifier Id : TypeNames) {
-    Stdlib->lookupValue({}, Id, NLKind::UnqualifiedLookup, Results);
-    for (auto *VD : Results) {
-      if (auto *TD = dyn_cast<TypeDecl>(VD)) {
-        TC.validateDecl(TD);
-        Types.insert(TD->getDeclaredInterfaceType()->getCanonicalType());
-      }
-    }
-    Results.clear();
-  }
-}
-
-void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
-  if (!CIntegerTypes.empty())
-    return;
-
-  SmallVector<Identifier, 32> StdlibTypeNames;
-  ModuleDecl *Stdlib = getStdlibModule(DC);
-#define MAP_BUILTIN_TYPE(_, __)
-#define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
-  StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-  lookupAndAddLibraryTypes(*this, Stdlib, StdlibTypeNames, CIntegerTypes);
-}
-
 #pragma mark Objective-C-specific types
 
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
@@ -1183,6 +1147,116 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
   }
 
   return None;
+}
+
+/// Determine whether the given type is a C integer type.
+static bool isCIntegerType(Type type) {
+  auto nominal = type->getAnyNominal();
+  if (!nominal) return false;
+
+  ASTContext &ctx = nominal->getASTContext();
+  auto stdlibModule = ctx.getStdlibModule();
+  if (nominal->getParentModule() != stdlibModule)
+    return false;
+
+  // Check for each of the C integer type equivalents in the standard library.
+  auto matchesStdlibTypeNamed = [&](StringRef name) {
+    auto identifier = ctx.getIdentifier(name);
+    SmallVector<ValueDecl *, 2> foundDecls;
+    stdlibModule->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+                              foundDecls);
+    for (auto found : foundDecls) {
+      auto foundType = dyn_cast<TypeDecl>(found);
+      if (!foundType) continue;
+
+      if (!foundType->hasInterfaceType()) {
+        auto resolver = ctx.getLazyResolver();
+        assert(resolver);
+        resolver->resolveDeclSignature(foundType);
+      }
+
+      if (foundType->getDeclaredInterfaceType()->isEqual(type))
+        return true;
+    }
+
+    return false;
+  };
+
+#define MAP_BUILTIN_TYPE(_, __)
+#define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
+  if (matchesStdlibTypeNamed(#SWIFT_TYPE_NAME))                       \
+    return true;
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  return false;
+}
+
+/// Determine whether the given enum should be @objc.
+static bool isEnumObjC(EnumDecl *enumDecl) {
+  // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
+
+  // If there is no @objc attribute, it's not @objc.
+  if (!enumDecl->getAttrs().hasAttribute<ObjCAttr>())
+    return false;
+
+  Type rawType = enumDecl->getRawType();
+
+  // @objc enums must have a raw type.
+  if (!rawType) {
+    enumDecl->diagnose(diag::objc_enum_no_raw_type);
+    return false;
+  }
+
+  // If the raw type contains an error, we've already diagnosed it.
+  if (rawType->hasError())
+    return false;
+
+  // The raw type must be one of the C integer types.
+  if (!isCIntegerType(rawType)) {
+    SourceRange errorRange;
+    if (!enumDecl->getInherited().empty())
+      errorRange = enumDecl->getInherited().front().getSourceRange();
+    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, rawType)
+      .highlight(errorRange);
+    return false;
+  }
+
+  return true;
+}
+
+void TypeChecker::resolveIsObjC(ValueDecl *VD) {
+  auto dc = VD->getDeclContext();
+  if (dc->getAsClassOrClassExtensionContext()) {
+    // Members of classes can be @objc.
+  }
+  else if (isa<ClassDecl>(VD)) {
+    // Classes can be @objc.
+
+    // Protocols and enums can also be @objc, but this is covered by the
+    // isObjC() check at the beginning.
+  } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
+    // Enums can be @objc so long as they have a raw type that is representable
+    // as an arithmetic type in C.
+    auto isObjC = isEnumObjC(enumDecl);
+    VD->setIsObjC(isObjC);
+    if (!isObjC) {
+      if (auto objcAttr = enumDecl->getAttrs().getAttribute<ObjCAttr>()) {
+        objcAttr->setInvalid();
+      }
+    }
+  } else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
+    // Members of @objc protocols are @objc.
+  } else {
+    // Cannot be @objc; do nothing.
+    return;
+  }
+
+  // Short-circuit this operation if we already know that the entity is @objc.
+  if (VD->isObjC()) return;
+
+
+  // FIXME: Narrow this computation to just the @objc bits.
+  validateDeclForNameLookup(VD);
 }
 
 /// Infer the Objective-C name for a given declaration.

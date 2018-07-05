@@ -799,9 +799,6 @@ private:
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
 
-  /// A set of types that can be mapped to C integer types.
-  llvm::DenseSet<CanType> CIntegerTypes;
-
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, ExprAndConstraintSystem> DiagnosedExprs;
 
@@ -2188,7 +2185,6 @@ public:
   void resolveWitness(const NormalProtocolConformance *conformance,
                       ValueDecl *requirement) override;
 
-  bool isCIntegerType(const DeclContext *DC, Type T);
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                              ObjCReason Reason,
                              Optional<ForeignErrorConvention> &errorConvention);
@@ -2196,8 +2192,6 @@ public:
   bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 
   bool canBeRepresentedInObjC(const ValueDecl *decl);
-
-  void fillObjCRepresentableTypeCache(const DeclContext *DC);
 
   /// \name Resilience diagnostics
 

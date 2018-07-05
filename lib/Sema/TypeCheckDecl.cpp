@@ -1345,9 +1345,6 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   Type rawTy = ED->getRawType();
 
   if (!rawTy) {
-    // @objc enums must have a raw type.
-    if (ED->isObjC())
-      TC.diagnose(ED->getNameLoc(), diag::objc_enum_no_raw_type);
     return;
   }
 
@@ -1357,47 +1354,33 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     return;
 
   AutomaticEnumValueKind valueKind;
+  // Swift enums require that the raw type is convertible from one of the
+  // primitive literal protocols.
+  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
+      ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+  };
 
-  if (ED->isObjC()) {
-    // @objc enums must have a raw type that's an ObjC-representable
-    // integer type.
-    if (!TC.isCIntegerType(ED, rawTy)) {
-      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                  diag::objc_enum_raw_type_not_integer,
-                  rawTy);
-      ED->getInherited().front().setInvalidType(TC.Context);
-      return;
-    }
+  static auto otherLiteralProtocolKinds = {
+    KnownProtocolKind::ExpressibleByFloatLiteral,
+    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
+    KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
+  };
+
+  if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     valueKind = AutomaticEnumValueKind::Integer;
+  } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
+    valueKind = AutomaticEnumValueKind::String;
+  } else if (std::any_of(otherLiteralProtocolKinds.begin(),
+                         otherLiteralProtocolKinds.end(),
+                         conformsToProtocol)) {
+    valueKind = AutomaticEnumValueKind::None;
   } else {
-    // Swift enums require that the raw type is convertible from one of the
-    // primitive literal protocols.
-    auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-        ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-        return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
-    };
-
-    static auto otherLiteralProtocolKinds = {
-      KnownProtocolKind::ExpressibleByFloatLiteral,
-      KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
-      KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
-    };
-
-    if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-      valueKind = AutomaticEnumValueKind::Integer;
-    } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
-      valueKind = AutomaticEnumValueKind::String;
-    } else if (std::any_of(otherLiteralProtocolKinds.begin(),
-                           otherLiteralProtocolKinds.end(),
-                           conformsToProtocol)) {
-      valueKind = AutomaticEnumValueKind::None;
-    } else {
-      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                  diag::raw_type_not_literal_convertible,
-                  rawTy);
-      ED->getInherited().front().setInvalidType(TC.Context);
-      return;
-    }
+    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                diag::raw_type_not_literal_convertible,
+                rawTy);
+    ED->getInherited().front().setInvalidType(TC.Context);
+    return;
   }
 
   // We need at least one case to have a raw value.
@@ -2100,32 +2083,6 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
   }
 
   if (isInvalid) PGD->setInvalid();
-}
-
-void TypeChecker::resolveIsObjC(ValueDecl *VD) {
-  // Short-circuit this operation if we already know that the entity is @objc.
-  if (VD->isObjC()) return;
-
-  auto dc = VD->getDeclContext();
-  if (dc->getAsClassOrClassExtensionContext()) {
-    // Members of classes can be @objc.
-  }
-  else if (isa<ClassDecl>(VD)) {
-    // Classes can be @objc.
-
-    // Protocols and enums can also be @objc, but this is covered by the
-    // isObjC() check at the beginning.
-  }
-  else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
-    // Members of @objc protocols are @objc.
-  }
-  else {
-    // Cannot be @objc; do nothing.
-    return;
-  }
-
-  // FIXME: Narrow this computation to just the @objc bits.
-  validateDeclForNameLookup(VD);
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
@@ -3858,6 +3815,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
       // need to force the values to be checked.
+      resolveIsObjC(ED);
       if (ED->isObjC())
         checkEnumRawValues(*this, ED);
     }
