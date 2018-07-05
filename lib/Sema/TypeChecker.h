@@ -2188,8 +2188,6 @@ public:
   bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
                              ObjCReason Reason,
                              Optional<ForeignErrorConvention> &errorConvention);
-  bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
-  bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 
   bool canBeRepresentedInObjC(const ValueDecl *decl);
 

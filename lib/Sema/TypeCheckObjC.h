@@ -23,8 +23,10 @@
 namespace swift {
 
 class ASTContext;
+class SubscriptDecl;
 class TypeChecker;
 class ValueDecl;
+class VarDecl;
 
 using llvm::Optional;
 
@@ -118,6 +120,12 @@ Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = llvm::None);
+
+/// Determine whether the given variable can be represented in Objective-C.
+bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
+
+/// Determine whether the given subscript can be represented in Objective-C.
+bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 
 } // end namespace swift
 

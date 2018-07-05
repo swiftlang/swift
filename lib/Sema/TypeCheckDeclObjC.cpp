@@ -412,8 +412,8 @@ bool TypeChecker::isRepresentableInObjC(
   errorConvention = None;
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
+  ASTContext &ctx = AFD->getASTContext();
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
@@ -423,9 +423,9 @@ bool TypeChecker::isRepresentableInObjC(
     return false;
 
   if (AFD->isOperator()) {
-    diagnose(AFD, (isa<ProtocolDecl>(AFD->getDeclContext())
-                   ? diag::objc_operator_proto
-                   : diag::objc_operator));
+    AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
+                    ? diag::objc_operator_proto
+                    : diag::objc_operator));
     return false;
   }
 
@@ -433,7 +433,6 @@ bool TypeChecker::isRepresentableInObjC(
     // Accessors can only be @objc if the storage declaration is.
     // Global computed properties may however @_cdecl their accessors.
     auto storage = accessor->getStorage();
-    validateDecl(storage);
     if (!storage->isObjC() && Reason != ObjCReason::ExplicitlyCDecl &&
         Reason != ObjCReason::WitnessToObjC) {
       if (Diagnose) {
@@ -445,7 +444,7 @@ bool TypeChecker::isRepresentableInObjC(
                        ? diag::objc_setter_for_nonobjc_property
                        : diag::objc_setter_for_nonobjc_subscript);
 
-        diagnose(accessor->getLoc(), error);
+        accessor->diagnose(error);
         describeObjCReason(accessor, Reason);
       }
       return false;
@@ -457,7 +456,7 @@ bool TypeChecker::isRepresentableInObjC(
         // willSet/didSet implementations are never exposed to objc, they are
         // always directly dispatched from the synthesized setter.
       if (Diagnose) {
-        diagnose(accessor->getLoc(), diag::objc_observing_accessor);
+        accessor->diagnose(diag::objc_observing_accessor);
         describeObjCReason(accessor, Reason);
       }
       return false;
@@ -473,7 +472,7 @@ bool TypeChecker::isRepresentableInObjC(
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       if (Diagnose) {
-        diagnose(accessor->getLoc(), diag::objc_addressor);
+        accessor->diagnose(diag::objc_addressor);
         describeObjCReason(accessor, Reason);
       }
       return false;
@@ -513,8 +512,8 @@ bool TypeChecker::isRepresentableInObjC(
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {
-        diagnose(AFD->getLoc(), diag::objc_invalid_on_func_result_type,
-                 getObjCDiagnosticAttrKind(Reason));
+        AFD->diagnose(diag::objc_invalid_on_func_result_type,
+                      getObjCDiagnosticAttrKind(Reason));
         SourceRange Range =
             FD->getBodyResultTypeLoc().getTypeRepr()->getSourceRange();
         diagnoseTypeNotRepresentableInObjC(FD, ResultType, Range);
@@ -549,8 +548,8 @@ bool TypeChecker::isRepresentableInObjC(
       // Only non-failing initializers can throw.
       if (ctor->getFailability() != OTK_None) {
         if (Diagnose) {
-          diagnose(AFD->getLoc(), diag::objc_invalid_on_failing_init,
-                   getObjCDiagnosticAttrKind(Reason))
+          AFD->diagnose(diag::objc_invalid_on_failing_init,
+                        getObjCDiagnosticAttrKind(Reason))
             .highlight(throwsLoc);
           describeObjCReason(AFD, Reason);
         }
@@ -561,15 +560,15 @@ bool TypeChecker::isRepresentableInObjC(
       // Functions that return nothing (void) can be throwing; they indicate
       // failure with a 'false' result.
       kind = ForeignErrorConvention::ZeroResult;
-      NominalTypeDecl *boolDecl = Context.getObjCBoolDecl();
+      NominalTypeDecl *boolDecl = ctx.getObjCBoolDecl();
       // On Linux, we might still run @objc tests even though there's
       // no ObjectiveC Foundation, so use Swift.Bool instead of crapping
       // out.
       if (boolDecl == nullptr)
-        boolDecl = Context.getBoolDecl();
+        boolDecl = ctx.getBoolDecl();
 
       if (boolDecl == nullptr) {
-        diagnose(AFD->getLoc(), diag::broken_bool);
+        AFD->diagnose(diag::broken_bool);
         return false;
       }
 
@@ -584,10 +583,9 @@ bool TypeChecker::isRepresentableInObjC(
       // Cannot return an optional bridged type, because 'nil' is reserved
       // to indicate failure. Call this out in a separate diagnostic.
       if (Diagnose) {
-        diagnose(AFD->getLoc(),
-                 diag::objc_invalid_on_throwing_optional_result,
-                 getObjCDiagnosticAttrKind(Reason),
-                 resultType)
+        AFD->diagnose(diag::objc_invalid_on_throwing_optional_result,
+                      getObjCDiagnosticAttrKind(Reason),
+                      resultType)
           .highlight(throwsLoc);
         describeObjCReason(AFD, Reason);
       }
@@ -595,10 +593,9 @@ bool TypeChecker::isRepresentableInObjC(
     } else {
       // Other result types are not permitted.
       if (Diagnose) {
-        diagnose(AFD->getLoc(),
-                 diag::objc_invalid_on_throwing_result,
-                 getObjCDiagnosticAttrKind(Reason),
-                 resultType)
+        AFD->diagnose(diag::objc_invalid_on_throwing_result,
+                      getObjCDiagnosticAttrKind(Reason),
+                      resultType)
           .highlight(throwsLoc);
         describeObjCReason(AFD, Reason);
       }
@@ -611,7 +608,7 @@ bool TypeChecker::isRepresentableInObjC(
       errorParameterType = OptionalType::get(errorParameterType);
       errorParameterType
         = BoundGenericType::get(
-            Context.getAutoreleasingUnsafeMutablePointerDecl(),
+            ctx.getAutoreleasingUnsafeMutablePointerDecl(),
             nullptr,
             errorParameterType);
       errorParameterType = OptionalType::get(errorParameterType);
@@ -630,7 +627,7 @@ bool TypeChecker::isRepresentableInObjC(
           // If the selector piece is "error", this is the location of
           // the error parameter.
           auto piece = selectorPieces[i-1];
-          if (piece == Context.Id_error) {
+          if (piece == ctx.Id_error) {
             errorParameterIndex = i-1;
             foundErrorParameterIndex = true;
             break;
@@ -732,7 +729,7 @@ bool TypeChecker::isRepresentableInObjC(
   return true;
 }
 
-bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
+bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
   if (VD->isInvalid())
@@ -746,9 +743,10 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
     // Because of this, look through @weak and @unowned.
     T = RST->getReferentType();
   }
+  ASTContext &ctx = VD->getASTContext();
   bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                      VD->getDeclContext());
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (Result && checkObjCInExtensionContext(VD, Diagnose))
     return false;
@@ -764,8 +762,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   if (TypeRange.isInvalid())
     TypeRange = VD->getNameLoc();
 
-  diagnose(VD->getLoc(), diag::objc_invalid_on_var,
-           getObjCDiagnosticAttrKind(Reason))
+  VD->diagnose(diag::objc_invalid_on_var, getObjCDiagnosticAttrKind(Reason))
       .highlight(TypeRange);
   diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                      VD->getInterfaceType(),
@@ -775,11 +772,10 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   return Result;
 }
 
-bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
-                                        ObjCReason Reason) {
+bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
-
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
+  ASTContext &ctx = SD->getASTContext();
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(SD, Reason))
     return false;
@@ -805,8 +801,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   // Make sure we know how to map the selector appropriately.
   if (Result && SD->getObjCSubscriptKind() == ObjCSubscriptKind::None) {
     SourceRange IndexRange = SD->getIndices()->getSourceRange();
-    diagnose(SD->getLoc(), diag::objc_invalid_subscript_key_type,
-             getObjCDiagnosticAttrKind(Reason), IndicesType)
+    SD->diagnose(diag::objc_invalid_subscript_key_type,
+                 getObjCDiagnosticAttrKind(Reason), IndicesType)
       .highlight(IndexRange);
     return false;
   }
@@ -819,8 +815,8 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
     TypeRange = SD->getIndices()->getSourceRange();
   else
     TypeRange = SD->getElementTypeLoc().getSourceRange();
-  diagnose(SD->getLoc(), diag::objc_invalid_on_subscript,
-           getObjCDiagnosticAttrKind(Reason))
+  SD->diagnose(diag::objc_invalid_on_subscript,
+               getObjCDiagnosticAttrKind(Reason))
     .highlight(TypeRange);
 
   diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
@@ -843,11 +839,12 @@ bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
   }
 
   if (auto var = dyn_cast<VarDecl>(decl))
-    return isRepresentableInObjC(var, ObjCReason::MemberOfObjCMembersClass);
+    return swift::isRepresentableInObjC(var,
+                                        ObjCReason::MemberOfObjCMembersClass);
 
   if (auto subscript = dyn_cast<SubscriptDecl>(decl))
-    return isRepresentableInObjC(subscript,
-                                 ObjCReason::MemberOfObjCMembersClass);
+    return swift::isRepresentableInObjC(subscript,
+                                        ObjCReason::MemberOfObjCMembersClass);
 
   return false;
 }

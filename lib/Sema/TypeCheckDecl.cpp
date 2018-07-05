@@ -3973,7 +3973,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // Objective-C.
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
 
-      if (isObjC && !isRepresentableInObjC(VD, *isObjC))
+      if (isObjC && !swift::isRepresentableInObjC(VD, *isObjC))
         isObjC = None;
 
       markAsObjC(*this, VD, isObjC);
@@ -4580,7 +4580,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       // member of an ObjC-compatible class or protocol.
       Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, SD);
 
-      if (isObjC && !isRepresentableInObjC(SD, *isObjC))
+      if (isObjC && !swift::isRepresentableInObjC(SD, *isObjC))
         isObjC = None;
       markAsObjC(*this, SD, isObjC);
 
