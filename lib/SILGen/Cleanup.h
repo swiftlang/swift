@@ -37,6 +37,21 @@ class ManagedValue;
 class SharedBorrowFormalAccess;
 class FormalEvaluationScope;
 
+/// Is a cleanup being executed as a result of some sort of forced
+/// unwinding, such as an error being thrown, or are we just cleaning up
+/// after some operation?
+///
+/// Most cleanups don't care, but the cleanups tied to l-value accesses do:
+/// the access will be aborted rather than ended normally, which may cause
+/// e.g. writebacks to be skipped.  It is also important that no actions
+/// be undertaken by an unwind cleanup that might change control flow,
+/// such as throwing an error.  In contrast, non-unwinding cleanups are
+/// permitted to change control flow.
+enum ForUnwind_t : bool {
+  NotForUnwind,
+  IsForUnwind
+};
+
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
   /// The cleanup is inactive but may be activated later.
@@ -80,7 +95,8 @@ public:
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &SGF, CleanupLocation loc) = 0;
+  virtual void emit(SILGenFunction &SGF, CleanupLocation loc,
+                    ForUnwind_t forUnwind) = 0;
   virtual void dump(SILGenFunction &SGF) const = 0;
 };
 
@@ -120,6 +136,7 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
 
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
+                    ForUnwind_t forUnwind,
                     bool popCleanups=true);
   void endScope(CleanupsDepth depth, CleanupLocation l);
 
@@ -151,7 +168,8 @@ public:
   /// \param branchLoc  The location of the branch instruction.
   /// \param args       Arguments to pass to the destination block.
   void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
-                             ArrayRef<SILValue> args = {});
+                             ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
 
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
@@ -161,7 +179,8 @@ public:
   /// cleanups based on its level.  If there are no cleanups to run, this just
   /// returns the dest block.
   SILBasicBlock *emitBlockForCleanups(JumpDest dest, SILLocation branchLoc,
-                                      ArrayRef<SILValue> args = {});
+                                      ArrayRef<SILValue> args = {},
+                                      ForUnwind_t forUnwind = NotForUnwind);
 
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>

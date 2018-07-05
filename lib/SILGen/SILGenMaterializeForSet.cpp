@@ -952,7 +952,8 @@ namespace {
   public:
     DeallocateValueBuffer(SILType valueType, SILValue buffer)
       : Buffer(buffer), ValueType(valueType) {}
-    void emit(SILGenFunction &SGF, CleanupLocation loc) override {
+    void emit(SILGenFunction &SGF, CleanupLocation loc,
+              ForUnwind_t forUnwind) override {
       SGF.B.createDeallocValueBuffer(loc, ValueType, Buffer);
     }
     void dump(SILGenFunction &) const override {
