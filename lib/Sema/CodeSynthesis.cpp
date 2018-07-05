@@ -18,6 +18,7 @@
 
 #include "ConstraintSystem.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
@@ -2428,7 +2429,8 @@ static void configureDesignatedInitAttributes(TypeChecker &tc,
     }
 
     auto errorConvention = superclassCtor->getForeignErrorConvention();
-    markAsObjC(tc, ctor, ObjCReason::ImplicitlyObjC, errorConvention);
+    markAsObjC(tc, ctor, ObjCReason(ObjCReason::ImplicitlyObjC),
+               errorConvention);
   }
   if (superclassCtor->isRequired())
     ctor->getAttrs().add(new (ctx) RequiredAttr(/*IsImplicit=*/true));

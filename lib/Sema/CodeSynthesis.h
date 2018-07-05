@@ -18,6 +18,7 @@
 #ifndef SWIFT_TYPECHECKING_CODESYNTHESIS_H
 #define SWIFT_TYPECHECKING_CODESYNTHESIS_H
 
+#include "TypeCheckObjC.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
@@ -39,7 +40,7 @@ class VarDecl;
 
 class TypeChecker;
 
-enum class ObjCReason;
+class ObjCReason;
 
 /// A function which needs to have its body synthesized.
 ///
@@ -95,9 +96,6 @@ public:
 // These are implemented in TypeCheckDecl.cpp.
 void makeFinal(ASTContext &ctx, ValueDecl *D);
 void makeDynamic(ASTContext &ctx, ValueDecl *D);
-void markAsObjC(TypeChecker &TC, ValueDecl *D,
-                Optional<ObjCReason> isObjC,
-                Optional<ForeignErrorConvention> errorConvention = None);
 
 // Implemented in TypeCheckerOverride.cpp
 bool checkOverrides(TypeChecker &TC, ValueDecl *decl);
