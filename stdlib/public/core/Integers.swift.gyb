@@ -2272,7 +2272,7 @@ extension BinaryInteger {
 public protocol FixedWidthInteger :
   BinaryInteger, LosslessStringConvertible
   where Magnitude : FixedWidthInteger & UnsignedInteger,
-           Stride : FixedWidthInteger & SignedInteger
+        Stride : FixedWidthInteger & SignedInteger
 {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
