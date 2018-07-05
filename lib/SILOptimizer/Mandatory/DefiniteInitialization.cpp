@@ -1815,21 +1815,15 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
     return;
   }
   
-  if (auto *SW = dyn_cast<StoreWeakInst>(Inst)) {
-    assert(!SW->isInitializationOfDest() &&
-           "should not modify store_weak that already knows it is initialized");
-
-    SW->setIsInitializationOfDest(InitKind);
-    return;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  if (auto *SW = dyn_cast<Store##Name##Inst>(Inst)) { \
+    if (SW->isInitializationOfDest()) \
+           llvm_unreachable("should not modify store_" #name \
+                            " that already knows it is initialized"); \
+    SW->setIsInitializationOfDest(InitKind); \
+    return; \
   }
-
-  if (auto *SU = dyn_cast<StoreUnownedInst>(Inst)) {
-    assert(!SU->isInitializationOfDest() &&
-           "should not modify store_unowned that already knows it is an init");
-
-    SU->setIsInitializationOfDest(InitKind);
-    return;
-  }
+#include "swift/AST/ReferenceStorage.def"
   
   // If this is an assign, rewrite it based on whether it is an initialization
   // or not.

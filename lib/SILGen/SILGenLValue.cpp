@@ -3277,30 +3277,36 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case ReferenceOwnership::Weak:
-    // Weak storage types are handled with their underlying type.
-    llvm_unreachable("weak pointers are always the right optional types");
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case ReferenceOwnership::Unowned: {
-    // For @unowned(safe) types, we need to generate a strong retain and
-    // strip the unowned box.
-    auto unownedType = storageType.castTo<UnownedStorageType>();
-    assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
-    (void) unownedType;
-
-    return B.createCopyUnownedValue(loc, src);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    /* Address-only storage types are handled with their underlying type. */ \
+    llvm_unreachable("address-only pointers are handled elsewhere");
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    return B.createCopy##Name##Value(loc, src);
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For loadable reference storage types, we need to generate a strong */ \
+    /* retain and strip the box. */ \
+    assert(storageType.castTo<Name##StorageType>()->isLoadable( \
+                                               ResilienceExpansion::Maximal)); \
+    return B.createCopy##Name##Value(loc, src); \
   }
-  case ReferenceOwnership::Unmanaged: {
-    // For @unowned(unsafe) types, we need to strip the unmanaged box
-    // and then do an (unsafe) retain.
-    auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
-    auto result = B.createUnmanagedToRef(loc, src,
-              SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-    // SEMANTIC ARC TODO: Does this need a cleanup?
-    return B.createCopyValue(loc, result);
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For static reference storage types, we need to strip the box and */ \
+    /* then do an (unsafe) retain. */ \
+    auto type = storageType.castTo<Name##StorageType>(); \
+    auto result = B.create##Name##ToRef(loc, src, \
+              SILType::getPrimitiveObjectType(type.getReferentType())); \
+    /* SEMANTIC ARC TODO: Does this need a cleanup? */ \
+    return B.createCopyValue(loc, result); \
   }
+#include "swift/AST/ReferenceStorage.def"
   }
+  llvm_unreachable("impossible");
 }
 
 ManagedValue SILGenFunction::emitConversionToSemanticRValue(
@@ -3308,20 +3314,23 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   auto swiftStorageType = src.getType().castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case ReferenceOwnership::Weak:
-    // Weak storage types are handled with their underlying type.
-    llvm_unreachable("weak pointers are always the right optional types");
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case ReferenceOwnership::Unowned:
-    // For @unowned(safe) types, we need to generate a strong retain and
-    // strip the unowned box.
-    return B.createCopyUnownedValue(loc, src);
-  case ReferenceOwnership::Unmanaged:
-    // For @unowned(unsafe) types, we need to strip the unmanaged box
-    // and then do an (unsafe) retain.
-    return B.createUnsafeCopyUnownedValue(loc, src);
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    /* Address-only storage types are handled with their underlying type. */ \
+    llvm_unreachable("address-only pointers are handled elsewhere");
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    /* Generate a strong retain and strip the box. */ \
+    return B.createCopy##Name##Value(loc, src);
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    /* Strip the box and then do an (unsafe) retain. */ \
+    return B.createUnsafeCopy##Name##Value(loc, src);
+#include "swift/AST/ReferenceStorage.def"
   }
+  llvm_unreachable("impossible");
 }
 
 /// Given that the type-of-rvalue differs from the type-of-storage,
@@ -3336,44 +3345,52 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case ReferenceOwnership::Weak: {
-    // For @weak types, we need to create an Optional<T>.
-    // Optional<T> is currently loadable, but it probably won't be forever.
-    return SGF.B.createLoadWeak(loc, src, isTake);
-  }
-  case ReferenceOwnership::Unowned: {
-    // For @unowned(safe) types, we need to strip the unowned box.
-    auto unownedType = storageType.castTo<UnownedStorageType>();
-    if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
-      return SGF.B.createLoadUnowned(loc, src, isTake);
-    }
-
-    // If we are not performing a take, use a load_borrow.
-    if (!isTake) {
-      SILValue unownedValue = SGF.B.createLoadBorrow(loc, src);
-      SILValue strongValue = SGF.B.createCopyUnownedValue(loc, unownedValue);
-      SGF.B.createEndBorrow(loc, unownedValue, src);
-      return strongValue;
-    }
-
-    // Otherwise, we need to perform a load take and destroy the stored value.
-    auto unownedValue =
-        SGF.B.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
-    SILValue strongValue = SGF.B.createCopyUnownedValue(loc, unownedValue);
-    SGF.B.createDestroyValue(loc, unownedValue);
-    return strongValue;
-  }
-  case ReferenceOwnership::Unmanaged: {
-    // For @unowned(unsafe) types, we need to strip the unmanaged box.
-    auto unmanagedType = storageType.castTo<UnmanagedStorageType>();
-    auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);
-    auto result = SGF.B.createUnmanagedToRef(loc, value,
-            SILType::getPrimitiveObjectType(unmanagedType.getReferentType()));
-    // SEMANTIC ARC TODO: Does this need a cleanup?
-    return SGF.B.createCopyValue(loc, result);
-  }
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    return SGF.B.createLoad##Name(loc, src, isTake);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
+  { \
+    /* For loadable types, we need to strip the box. */ \
+    /* If we are not performing a take, use a load_borrow. */ \
+    if (!isTake) { \
+      SILValue value = SGF.B.createLoadBorrow(loc, src); \
+      SILValue strongValue = SGF.B.createCopy##Name##Value(loc, value); \
+      SGF.B.createEndBorrow(loc, value, src); \
+      return strongValue; \
+    } \
+    /* Otherwise perform a load take and destroy the stored value. */ \
+    auto value = SGF.B.emitLoadValueOperation(loc, src, \
+                                              LoadOwnershipQualifier::Take); \
+    SILValue strongValue = SGF.B.createCopy##Name##Value(loc, value); \
+    SGF.B.createDestroyValue(loc, value); \
+    return strongValue; \
+  }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For loadable types, we need to strip the box. */ \
+    auto type = storageType.castTo<Name##StorageType>(); \
+    if (!type->isLoadable(ResilienceExpansion::Maximal)) { \
+      return SGF.B.createLoad##Name(loc, src, isTake); \
+    } \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
+  }
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For static reference storage types, we need to strip the box. */ \
+    auto type = storageType.castTo<Name##StorageType>(); \
+    auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial); \
+    auto result = SGF.B.create##Name##ToRef(loc, value, \
+            SILType::getPrimitiveObjectType(type.getReferentType())); \
+    /* SEMANTIC ARC TODO: Does this need a cleanup? */ \
+    return SGF.B.createCopyValue(loc, result); \
+  }
+#include "swift/AST/ReferenceStorage.def"
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
   }
 }
 
@@ -3390,47 +3407,55 @@ static void emitStoreOfSemanticRValue(SILGenFunction &SGF,
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
 
   switch (swiftStorageType->getOwnership()) {
-  case ReferenceOwnership::Weak: {
-    // For @weak types, we need to break down an Optional<T> and then
-    // emit the storeWeak ourselves.
-    SGF.B.createStoreWeak(loc, value, dest, isInit);
-
-    // store_weak doesn't take ownership of the input, so cancel it out.
-    SGF.B.emitDestroyValueOperation(loc, value);
-    return;
-  }
-  case ReferenceOwnership::Unowned: {
-    // For @unowned(safe) types, we need to enter the unowned box by
-    // turning the strong retain into an unowned retain.
-    auto unownedType = storageType.castTo<UnownedStorageType>();
-    // FIXME: resilience
-    if (!unownedType->isLoadable(ResilienceExpansion::Maximal)) {
-      SGF.B.createStoreUnowned(loc, value, dest, isInit);
-
-      // store_unowned doesn't take ownership of the input, so cancel it out.
-      SGF.B.emitDestroyValueOperation(loc, value);
-      return;
-    }
-
-    auto unownedValue =
-      SGF.B.createRefToUnowned(loc, value, storageType.getObjectType());
-    auto copiedVal = SGF.B.createCopyValue(loc, unownedValue);
-    emitUnloweredStoreOfCopy(SGF.B, loc, copiedVal, dest, isInit);
-    SGF.B.emitDestroyValueOperation(loc, value);
-    return;
-  }
-  case ReferenceOwnership::Unmanaged: {
-    // For @unowned(unsafe) types, we need to enter the unmanaged box and
-    // release the strong retain.
-    auto unmanagedValue =
-      SGF.B.createRefToUnmanaged(loc, value, storageType.getObjectType());
-    emitUnloweredStoreOfCopy(SGF.B, loc, unmanagedValue, dest, isInit);
-    SGF.B.emitDestroyValueOperation(loc, value);
-    return;
-  }
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    SGF.B.createStore##Name(loc, value, dest, isInit); \
+    /* store doesn't take ownership of the input, so cancel it out. */ \
+    SGF.B.emitDestroyValueOperation(loc, value); \
+    return; \
   }
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
+  { \
+    auto typedValue = SGF.B.createRefTo##Name(loc, value, \
+                                              storageType.getObjectType()); \
+    auto copiedVal = SGF.B.createCopyValue(loc, typedValue); \
+    emitUnloweredStoreOfCopy(SGF.B, loc, copiedVal, dest, isInit); \
+    SGF.B.emitDestroyValueOperation(loc, value); \
+    return; \
+  }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For loadable types, we need to enter the box by */ \
+    /* turning the strong retain into an type-specific retain. */ \
+    auto type = storageType.castTo<Name##StorageType>(); \
+    /* FIXME: resilience */ \
+    if (!type->isLoadable(ResilienceExpansion::Maximal)) { \
+      SGF.B.createStore##Name(loc, value, dest, isInit); \
+      /* store doesn't take ownership of the input, so cancel it out. */ \
+      SGF.B.emitDestroyValueOperation(loc, value); \
+      return; \
+    } \
+    ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
+  }
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For static reference storage types, we need to enter the box and */ \
+    /* release the strong retain. */ \
+    auto typedValue = SGF.B.createRefTo##Name(loc, value, \
+                                              storageType.getObjectType()); \
+    emitUnloweredStoreOfCopy(SGF.B, loc, typedValue, dest, isInit); \
+    SGF.B.emitDestroyValueOperation(loc, value); \
+    return; \
+  }
+#include "swift/AST/ReferenceStorage.def"
+#undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
+  }
+  llvm_unreachable("impossible");
 }
 
 /// Load a value of the type-of-rvalue out of the given address as a
@@ -3510,29 +3535,39 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
 
   auto swiftStorageType = storageType.castTo<ReferenceStorageType>();
   switch (swiftStorageType->getOwnership()) {
-  case ReferenceOwnership::Weak:
-    llvm_unreachable("weak types are never loadable");
   case ReferenceOwnership::Strong:
     llvm_unreachable("strong reference storage type should be impossible");
-  case ReferenceOwnership::Unowned: {
-    // For @unowned types, place into an unowned box.
-    auto unownedType = storageType.castTo<UnownedStorageType>();
-    assert(unownedType->isLoadable(ResilienceExpansion::Maximal));
-    (void) unownedType;
-
-    SILValue unowned = B.createRefToUnowned(loc, semanticValue, storageType);
-    unowned = B.createCopyValue(loc, unowned);
-    B.emitDestroyValueOperation(loc, semanticValue);
-    return unowned;
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: \
+    llvm_unreachable("address-only types are never loadable");
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
+    value = B.createCopyValue(loc, value); \
+    B.emitDestroyValueOperation(loc, semanticValue); \
+    return value; \
   }
-  case ReferenceOwnership::Unmanaged: {
-    // For @unmanaged types, place into an unmanaged box.
-    SILValue unmanaged =
-      B.createRefToUnmanaged(loc, semanticValue, storageType);
-    B.emitDestroyValueOperation(loc, semanticValue);
-    return unmanaged;
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For loadable types, place into a box. */ \
+    auto type = storageType.castTo<Name##StorageType>(); \
+    assert(type->isLoadable(ResilienceExpansion::Maximal)); \
+    (void) type; \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
+    value = B.createCopyValue(loc, value); \
+    B.emitDestroyValueOperation(loc, semanticValue); \
+    return value; \
   }
+#define UNCHECKED_REF_STORAGE(Name, ...) \
+  case ReferenceOwnership::Name: { \
+    /* For static reference storage types, place into a box. */ \
+    SILValue value = B.createRefTo##Name(loc, semanticValue, storageType); \
+    B.emitDestroyValueOperation(loc, semanticValue); \
+    return value; \
   }
+#include "swift/AST/ReferenceStorage.def"
+  }
+  llvm_unreachable("impossible");
 }
 
 static void emitTsanInoutAccess(SILGenFunction &SGF, SILLocation loc,

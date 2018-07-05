@@ -4082,12 +4082,10 @@ getActualReferenceOwnership(serialization::ReferenceOwnership raw) {
   switch (raw) {
   case serialization::ReferenceOwnership::Strong:
     return swift::ReferenceOwnership::Strong;
-  case serialization::ReferenceOwnership::Unmanaged:
-    return swift::ReferenceOwnership::Unmanaged;
-  case serialization::ReferenceOwnership::Unowned:
-    return swift::ReferenceOwnership::Unowned;
-  case serialization::ReferenceOwnership::Weak:
-    return swift::ReferenceOwnership::Weak;
+#define REF_STORAGE(Name, ...) \
+  case serialization::ReferenceOwnership::Name: \
+    return swift::ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
   }
   return None;
 }

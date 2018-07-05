@@ -949,11 +949,14 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
       }
       continue;
 
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::Name##RetainInst: \
+    case SILInstructionKind::Name##ReleaseInst: \
+    case SILInstructionKind::StrongRetain##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::RetainValueInst:
     case SILInstructionKind::StrongRetainInst:
     case SILInstructionKind::StrongReleaseInst:
-    case SILInstructionKind::UnownedRetainInst:
-    case SILInstructionKind::UnownedReleaseInst:
     case SILInstructionKind::ReleaseValueInst: // Destroy overwritten value
       // These are ignored.
       continue;

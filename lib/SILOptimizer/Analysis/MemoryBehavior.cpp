@@ -99,9 +99,11 @@ public:
   MemBehavior visitTryApplyInst(TryApplyInst *AI);
   MemBehavior visitBuiltinInst(BuiltinInst *BI);
   MemBehavior visitStrongReleaseInst(StrongReleaseInst *BI);
-  MemBehavior visitUnownedReleaseInst(UnownedReleaseInst *BI);
   MemBehavior visitReleaseValueInst(ReleaseValueInst *BI);
   MemBehavior visitSetDeallocatingInst(SetDeallocatingInst *BI);
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  MemBehavior visit##Name##ReleaseInst(Name##ReleaseInst *BI);
+#include "swift/AST/ReferenceStorage.def"
 
   // Instructions which are none if our SILValue does not alias one of its
   // arguments. If we cannot prove such a thing, return the relevant memory
@@ -151,10 +153,12 @@ public:
     return I->getMemoryBehavior();                                             \
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
-  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainUnownedInst)
-  REFCOUNTINC_MEMBEHAVIOR_INST(CopyUnownedValueInst)
-  REFCOUNTINC_MEMBEHAVIOR_INST(UnownedRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainInst) \
+  REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetain##Name##Inst) \
+  REFCOUNTINC_MEMBEHAVIOR_INST(Copy##Name##ValueInst)
+#include "swift/AST/ReferenceStorage.def"
 #undef REFCOUNTINC_MEMBEHAVIOR_INST
 };
 
@@ -305,12 +309,14 @@ MemoryBehaviorVisitor::visitStrongReleaseInst(StrongReleaseInst *SI) {
   return MemBehavior::MayHaveSideEffects;
 }
 
-MemBehavior
-MemoryBehaviorVisitor::visitUnownedReleaseInst(UnownedReleaseInst *SI) {
-  if (!EA->canEscapeTo(V, SI))
-    return MemBehavior::None;
-  return MemBehavior::MayHaveSideEffects;
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+MemBehavior \
+MemoryBehaviorVisitor::visit##Name##ReleaseInst(Name##ReleaseInst *SI) { \
+  if (!EA->canEscapeTo(V, SI)) \
+    return MemBehavior::None; \
+  return MemBehavior::MayHaveSideEffects; \
 }
+#include "swift/AST/ReferenceStorage.def"
 
 MemBehavior MemoryBehaviorVisitor::visitReleaseValueInst(ReleaseValueInst *SI) {
   if (!EA->canEscapeTo(V, SI))

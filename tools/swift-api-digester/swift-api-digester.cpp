@@ -3563,18 +3563,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   }
   case NodeAnnotation::OwnershipChange: {
     auto getOwnershipDescription = [&](swift::ReferenceOwnership O) {
-      switch (O) {
-      case ReferenceOwnership::Strong:
+      if (O == ReferenceOwnership::Strong)
         return Ctx.buffer("strong");
-      case ReferenceOwnership::Weak:
-        return Ctx.buffer("weak");
-      case ReferenceOwnership::Unowned:
-        return Ctx.buffer("unowned");
-      case ReferenceOwnership::Unmanaged:
-        return Ctx.buffer("unowned(unsafe)");
-      }
-
-      llvm_unreachable("Unhandled Ownership in switch.");
+      return keywordOf(O);
     };
     auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     AttrChangedDecls.Diags.emplace_back(

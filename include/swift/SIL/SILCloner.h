@@ -913,48 +913,85 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                                         *Inst->getVarInfo()));
 }
 
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitLoadUnownedInst(LoadUnownedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createLoadUnowned(getOpLocation(Inst->getLoc()),
-                                   getOpValue(Inst->getOperand()),
-                                   Inst->isTake()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitStoreUnownedInst(StoreUnownedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStoreUnowned(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getSrc()),
-                                    getOpValue(Inst->getDest()),
-                                    Inst->isInitializationOfDest()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitLoadWeakInst(LoadWeakInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createLoadWeak(getOpLocation(Inst->getLoc()),
-                                getOpValue(Inst->getOperand()),
-                                Inst->isTake()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitStoreWeakInst(StoreWeakInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStoreWeak(getOpLocation(Inst->getLoc()),
-                                 getOpValue(Inst->getSrc()),
-                                 getOpValue(Inst->getDest()),
-                                 Inst->isInitializationOfDest()));
-}
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  template<typename ImplClass> \
+  void SILCloner<ImplClass>::visitLoad##Name##Inst(Load##Name##Inst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().createLoad##Name(getOpLocation(Inst->getLoc()), \
+                                    getOpValue(Inst->getOperand()), \
+                                    Inst->isTake())); \
+  } \
+  template<typename ImplClass> \
+  void SILCloner<ImplClass>::visitStore##Name##Inst(Store##Name##Inst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().createStore##Name(getOpLocation(Inst->getLoc()), \
+                                     getOpValue(Inst->getSrc()), \
+                                     getOpValue(Inst->getDest()), \
+                                     Inst->isInitializationOfDest())); \
+  }
+#define LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  template<typename ImplClass> \
+  void SILCloner<ImplClass>::visitRefTo##Name##Inst(RefTo##Name##Inst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().createRefTo##Name(getOpLocation(Inst->getLoc()), \
+                                      getOpValue(Inst->getOperand()), \
+                                      getOpType(Inst->getType()))); \
+  } \
+  template<typename ImplClass> \
+  void SILCloner<ImplClass>::visit##Name##ToRefInst(Name##ToRefInst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().create##Name##ToRef(getOpLocation(Inst->getLoc()), \
+                                      getOpValue(Inst->getOperand()), \
+                                      getOpType(Inst->getType()))); \
+  }
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name) \
+  template<typename ImplClass> \
+  void SILCloner<ImplClass>:: \
+  visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().createStrongRetain##Name(getOpLocation(Inst->getLoc()), \
+                                            getOpValue(Inst->getOperand()), \
+                                            Inst->getAtomicity())); \
+  } \
+  template<typename ImplClass> \
+  void \
+  SILCloner<ImplClass>::visit##Name##RetainInst(Name##RetainInst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().create##Name##Retain(getOpLocation(Inst->getLoc()), \
+                                        getOpValue(Inst->getOperand()), \
+                                        Inst->getAtomicity())); \
+  } \
+  template<typename ImplClass> \
+  void \
+  SILCloner<ImplClass>::visit##Name##ReleaseInst(Name##ReleaseInst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().create##Name##Release(getOpLocation(Inst->getLoc()), \
+                                        getOpValue(Inst->getOperand()), \
+                                        Inst->getAtomicity())); \
+  } \
+  template <typename ImplClass> \
+  void SILCloner<ImplClass>::visitCopy##Name##ValueInst( \
+      Copy##Name##ValueInst *Inst) { \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope())); \
+    doPostProcess(Inst, \
+      getBuilder().createCopy##Name##Value(getOpLocation(Inst->getLoc()), \
+                                           getOpValue(Inst->getOperand()))); \
+  }
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...) \
+  LOADABLE_REF_STORAGE_HELPER(Name, name)
+#include "swift/AST/ReferenceStorage.def"
+#undef LOADABLE_REF_STORAGE_HELPER
 
 template<typename ImplClass>
 void
@@ -1175,46 +1212,6 @@ SILCloner<ImplClass>::visitRawPointerToRefInst(RawPointerToRefInst *Inst) {
 
 template<typename ImplClass>
 void
-SILCloner<ImplClass>::visitRefToUnownedInst(RefToUnownedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createRefToUnowned(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitUnownedToRefInst(UnownedToRefInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createUnownedToRef(getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getOperand()),
-                                    getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitRefToUnmanagedInst(RefToUnmanagedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createRefToUnmanaged(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitUnmanagedToRefInst(UnmanagedToRefInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createUnmanagedToRef(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      getOpType(Inst->getType())));
-}
-
-template<typename ImplClass>
-void
 SILCloner<ImplClass>::
 visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -1322,15 +1319,6 @@ void SILCloner<ImplClass>::visitCopyValueInst(CopyValueInst *Inst) {
   doPostProcess(Inst,
                 getBuilder().createCopyValue(getOpLocation(Inst->getLoc()),
                                              getOpValue(Inst->getOperand())));
-}
-
-template <typename ImplClass>
-void SILCloner<ImplClass>::visitCopyUnownedValueInst(
-    CopyUnownedValueInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(
-      Inst, getBuilder().createCopyUnownedValue(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand())));
 }
 
 template <typename ImplClass>
@@ -1982,36 +1970,6 @@ SILCloner<ImplClass>::visitStrongReleaseInst(StrongReleaseInst *Inst) {
                                      Inst->getAtomicity()));
 }
 
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::
-visitStrongRetainUnownedInst(StrongRetainUnownedInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createStrongRetainUnowned(getOpLocation(Inst->getLoc()),
-                                           getOpValue(Inst->getOperand()),
-                                           Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitUnownedRetainInst(UnownedRetainInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createUnownedRetain(getOpLocation(Inst->getLoc()),
-                                     getOpValue(Inst->getOperand()),
-                                     Inst->getAtomicity()));
-}
-
-template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitUnownedReleaseInst(UnownedReleaseInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  doPostProcess(Inst,
-    getBuilder().createUnownedRelease(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
-                                      Inst->getAtomicity()));
-}
 template<typename ImplClass>
 void SILCloner<ImplClass>::visitIsUniqueInst(IsUniqueInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

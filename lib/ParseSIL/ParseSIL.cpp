@@ -2690,7 +2690,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(IsUniqueOrPinned)
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
-    UNARY_INSTRUCTION(CopyUnownedValue)
     UNARY_INSTRUCTION(DestroyValue)
     UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrowArgument)
@@ -2703,15 +2702,18 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(StrongRetain)
     REFCOUNTING_INSTRUCTION(StrongRelease)
     REFCOUNTING_INSTRUCTION(StrongUnpin)
-    REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
-    REFCOUNTING_INSTRUCTION(UnownedRetain)
-    REFCOUNTING_INSTRUCTION(UnownedRelease)
     REFCOUNTING_INSTRUCTION(AutoreleaseValue)
     REFCOUNTING_INSTRUCTION(SetDeallocating)
     REFCOUNTING_INSTRUCTION(ReleaseValue)
     REFCOUNTING_INSTRUCTION(RetainValue)
     REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
+    REFCOUNTING_INSTRUCTION(Name##Retain) \
+    REFCOUNTING_INSTRUCTION(Name##Release) \
+    UNARY_INSTRUCTION(Copy##Name##Value)
+#include "swift/AST/ReferenceStorage.def"
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
@@ -2798,32 +2800,22 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
    break;
  }
 
- case SILInstructionKind::LoadUnownedInst:
- case SILInstructionKind::LoadWeakInst: {
-   bool isTake = false;
-   SourceLoc addrLoc;
-   if (parseSILOptional(isTake, *this, "take") ||
-       parseTypedValueRef(Val, addrLoc, B) ||
-       parseSILDebugLocation(InstLoc, B))
-     return true;
-
-   if (Opcode == SILInstructionKind::LoadUnownedInst) {
-     if (!Val->getType().is<UnownedStorageType>()) {
-       P.diagnose(addrLoc, diag::sil_operand_not_unowned_address, "source",
-                  OpcodeName);
-     }
-     ResultVal = B.createLoadUnowned(InstLoc, Val, IsTake_t(isTake));
-
-   } else {
-     if (!Val->getType().is<WeakStorageType>()) {
-       P.diagnose(addrLoc, diag::sil_operand_not_weak_address, "source",
-                  OpcodeName);
-     }
-     ResultVal = B.createLoadWeak(InstLoc, Val, IsTake_t(isTake));
-   }
-
-   break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst: { \
+    bool isTake = false; \
+    SourceLoc addrLoc; \
+    if (parseSILOptional(isTake, *this, "take") || \
+        parseTypedValueRef(Val, addrLoc, B) || \
+        parseSILDebugLocation(InstLoc, B)) \
+      return true; \
+    if (!Val->getType().is<Name##StorageType>()) { \
+      P.diagnose(addrLoc, diag::sil_operand_not_ref_storage_address, \
+                 "source", OpcodeName, ReferenceOwnership::Name); \
+    } \
+    ResultVal = B.createLoad##Name(InstLoc, Val, IsTake_t(isTake)); \
+    break; \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   case SILInstructionKind::CopyBlockWithoutEscapingInst: {
     SILValue Closure;
@@ -2988,10 +2980,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::RefToUnownedInst:
-  case SILInstructionKind::UnownedToRefInst:
-  case SILInstructionKind::RefToUnmanagedInst:
-  case SILInstructionKind::UnmanagedToRefInst:
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::RefTo##Name##Inst: \
+  case SILInstructionKind::Name##ToRefInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::ThinFunctionToPointerInst:
   case SILInstructionKind::PointerToThinFunctionInst:
   case SILInstructionKind::ThinToThickFunctionInst:
@@ -3070,18 +3062,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     case SILInstructionKind::RawPointerToRefInst:
       ResultVal = B.createRawPointerToRef(InstLoc, Val, Ty);
       break;
-    case SILInstructionKind::RefToUnownedInst:
-      ResultVal = B.createRefToUnowned(InstLoc, Val, Ty);
+#define LOADABLE_REF_STORAGE(Name, ...) \
+    case SILInstructionKind::RefTo##Name##Inst: \
+      ResultVal = B.createRefTo##Name(InstLoc, Val, Ty); \
+      break; \
+    case SILInstructionKind::Name##ToRefInst: \
+      ResultVal = B.create##Name##ToRef(InstLoc, Val, Ty); \
       break;
-    case SILInstructionKind::UnownedToRefInst:
-      ResultVal = B.createUnownedToRef(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::RefToUnmanagedInst:
-      ResultVal = B.createRefToUnmanaged(InstLoc, Val, Ty);
-      break;
-    case SILInstructionKind::UnmanagedToRefInst:
-      ResultVal = B.createUnmanagedToRef(InstLoc, Val, Ty);
-      break;
+#include "swift/AST/ReferenceStorage.def"
     case SILInstructionKind::ThinFunctionToPointerInst:
       ResultVal = B.createThinFunctionToPointer(InstLoc, Val, Ty);
       break;
@@ -3569,11 +3557,16 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::AssignInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst: {
+  case SILInstructionKind::AssignInst: {
     UnresolvedValueName from;
+    bool isRefStorage = false;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    isRefStorage |= Opcode == SILInstructionKind::Store##Name##Inst;
+#include "swift/AST/ReferenceStorage.def"
 
     SourceLoc toLoc, addrLoc;
     Identifier toToken;
@@ -3582,9 +3575,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseValueName(from) ||
         parseSILIdentifier(toToken, toLoc,
                            diag::expected_tok_in_sil_instr, "to") ||
-        ((Opcode == SILInstructionKind::StoreWeakInst ||
-          Opcode == SILInstructionKind::StoreUnownedInst) &&
-         parseSILOptional(isInit, *this, "initialization")) ||
+        (isRefStorage && parseSILOptional(isInit, *this, "initialization")) ||
         parseTypedValueRef(addrVal, addrLoc, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
@@ -3607,33 +3598,21 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       break;
     }
 
-    if (Opcode == SILInstructionKind::StoreUnownedInst) {
-      auto refType = addrVal->getType().getAs<UnownedStorageType>();
-      if (!refType) {
-        P.diagnose(addrLoc, diag::sil_operand_not_unowned_address,
-                   "destination", OpcodeName);
-        return true;
-      }
-      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStoreUnowned(InstLoc,
-                                       getLocalValue(from, valueTy, InstLoc, B),
-                                       addrVal, IsInitialization_t(isInit));
-      break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (Opcode == SILInstructionKind::Store##Name##Inst) { \
+      auto refType = addrVal->getType().getAs<Name##StorageType>(); \
+      if (!refType) { \
+        P.diagnose(addrLoc, diag::sil_operand_not_ref_storage_address, \
+                   "destination", OpcodeName, ReferenceOwnership::Name); \
+        return true; \
+      } \
+      auto valueTy =SILType::getPrimitiveObjectType(refType.getReferentType());\
+      ResultVal = B.createStore##Name(InstLoc, \
+                                      getLocalValue(from, valueTy, InstLoc, B),\
+                                      addrVal, IsInitialization_t(isInit)); \
+      break; \
     }
-
-    if (Opcode == SILInstructionKind::StoreWeakInst) {
-      auto refType = addrVal->getType().getAs<WeakStorageType>();
-      if (!refType) {
-        P.diagnose(addrLoc, diag::sil_operand_not_weak_address,
-                   "destination", OpcodeName);
-        return true;
-      }
-      auto valueTy = SILType::getPrimitiveObjectType(refType.getReferentType());
-      ResultVal = B.createStoreWeak(InstLoc,
-                                    getLocalValue(from, valueTy, InstLoc, B),
-                                    addrVal, IsInitialization_t(isInit));
-      break;
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     SILType ValType = addrVal->getType().getObjectType();
 

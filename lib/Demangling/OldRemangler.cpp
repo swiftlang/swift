@@ -18,6 +18,7 @@
 
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/Punycode.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include <vector>
 #include <cstdio>
@@ -1466,20 +1467,12 @@ void Remangler::mangleProtocolListWithoutPrefix(Node *node,
   Out << '_';
 }
 
-void Remangler::mangleUnowned(Node *node) {
-  Out << "Xo";
-  mangleSingleChildNode(node); // type
-}
-
-void Remangler::mangleUnmanaged(Node *node) {
-  Out << "Xu";
-  mangleSingleChildNode(node); // type
-}
-
-void Remangler::mangleWeak(Node *node) {
-  Out << "Xw";
-  mangleSingleChildNode(node); // type
-}
+#define REF_STORAGE(Name, ...) \
+  void Remangler::mangle##Name(Node *node) { \
+    Out << manglingOf(ReferenceOwnership::Name); \
+    mangleSingleChildNode(node); /* type */ \
+  }
+#include "swift/AST/ReferenceStorage.def"
 
 void Remangler::mangleShared(Node *node) {
   Out << 'h';

@@ -20,6 +20,7 @@
 #include "swift/Demangling/Punycode.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1779,16 +1780,6 @@ void Remangler::mangleUncurriedFunctionType(Node *node) {
   Buffer << 'c';
 }
 
-void Remangler::mangleUnmanaged(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xu";
-}
-
-void Remangler::mangleUnowned(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xo";
-}
-
 void Remangler::mangleUnsafeAddressor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "lu");
 }
@@ -1826,10 +1817,12 @@ void Remangler::mangleVTableThunk(Node *node) {
   Buffer << "TV";
 }
 
-void Remangler::mangleWeak(Node *node) {
-  mangleSingleChildNode(node);
-  Buffer << "Xw";
-}
+#define REF_STORAGE(Name, ...) \
+  void Remangler::mangle##Name(Node *node) { \
+    mangleSingleChildNode(node); \
+    Buffer << manglingOf(ReferenceOwnership::Name); \
+  }
+#include "swift/AST/ReferenceStorage.def"
 
 void Remangler::mangleWillSet(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "w");
