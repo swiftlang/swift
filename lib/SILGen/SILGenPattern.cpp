@@ -1806,8 +1806,7 @@ CaseBlocks::CaseBlocks(
       enumDecl->isEffectivelyExhaustive(SGF.getModule().getSwiftModule(),
                                         SGF.F.getResilienceExpansion());
   if (canAssumeExhaustive) {
-    // Check that Sema didn't let any cases slip through. (This can happen
-    // with @_downgrade_exhaustivity_check.)
+    // Check that Sema didn't let any cases slip through.
     canAssumeExhaustive = llvm::all_of(enumDecl->getAllElements(),
                                        [&](const EnumElementDecl *elt) {
       return caseToIndex.count(elt);
