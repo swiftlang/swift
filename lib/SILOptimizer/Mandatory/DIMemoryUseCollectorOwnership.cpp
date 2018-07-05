@@ -736,10 +736,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (isa<LoadWeakInst>(User)) {
-      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
-      continue;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (isa<Load##Name##Inst>(User)) { \
+      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1)); \
+      continue; \
     }
+#include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
     if ((isa<StoreInst>(User) || isa<AssignInst>(User)) &&
@@ -765,35 +767,22 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto SWI = dyn_cast<StoreWeakInst>(User))
-      if (Op->getOperandNumber() == 1) {
-        DIUseKind Kind;
-        if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
-        else if (SWI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
-        else if (isDefiniteInitFinished)
-          Kind = DIUseKind::Assign;
-        else
-          Kind = DIUseKind::InitOrAssign;
-        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (auto SWI = dyn_cast<Store##Name##Inst>(User)) \
+      if (Op->getOperandNumber() == 1) { \
+        DIUseKind Kind; \
+        if (InStructSubElement) \
+          Kind = DIUseKind::PartialStore; \
+        else if (SWI->isInitializationOfDest()) \
+          Kind = DIUseKind::Initialization; \
+        else if (isDefiniteInitFinished) \
+          Kind = DIUseKind::Assign; \
+        else \
+          Kind = DIUseKind::InitOrAssign; \
+        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1)); \
+        continue; \
       }
-
-    if (auto SUI = dyn_cast<StoreUnownedInst>(User))
-      if (Op->getOperandNumber() == 1) {
-        DIUseKind Kind;
-        if (InStructSubElement)
-          Kind = DIUseKind::PartialStore;
-        else if (SUI->isInitializationOfDest())
-          Kind = DIUseKind::Initialization;
-        else if (isDefiniteInitFinished)
-          Kind = DIUseKind::Assign;
-        else
-          Kind = DIUseKind::InitOrAssign;
-        trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
-      }
+#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't

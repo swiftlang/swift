@@ -3526,9 +3526,9 @@ static uint8_t
 getRawStableReferenceOwnership(swift::ReferenceOwnership ownership) {
   switch (ownership) {
   SIMPLE_CASE(ReferenceOwnership, Strong)
-  SIMPLE_CASE(ReferenceOwnership, Weak)
-  SIMPLE_CASE(ReferenceOwnership, Unowned)
-  SIMPLE_CASE(ReferenceOwnership, Unmanaged)
+#define REF_STORAGE(Name, ...) \
+  SIMPLE_CASE(ReferenceOwnership, Name)
+#include "swift/AST/ReferenceStorage.def"
   }
   llvm_unreachable("bad ownership kind");
 }
@@ -3934,9 +3934,10 @@ void Serializer::writeType(Type ty) {
     break;
   }
 
-  case TypeKind::UnownedStorage:
-  case TypeKind::UnmanagedStorage:
-  case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+  case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+  {
     auto refTy = cast<ReferenceStorageType>(ty.getPointer());
 
     unsigned abbrCode = DeclTypeAbbrCodes[ReferenceStorageTypeLayout::Code];

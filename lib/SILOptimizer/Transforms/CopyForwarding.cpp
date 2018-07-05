@@ -171,10 +171,11 @@ static SILArgumentConvention getAddressArgConvention(ApplyInst *Apply,
 /// If the given instruction is a store, return the stored value.
 static SILValue getStoredValue(SILInstruction *I) {
   switch (I->getKind()) {
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Store##Name##Inst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::StoreBorrowInst:
-  case SILInstructionKind::StoreUnownedInst:
-  case SILInstructionKind::StoreWeakInst:
     return I->getOperand(0);
   default:
     return SILValue();

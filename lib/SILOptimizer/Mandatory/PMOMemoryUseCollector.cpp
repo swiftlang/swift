@@ -410,10 +410,12 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (isa<LoadWeakInst>(User)) {
-      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Load, BaseEltNo, 1));
-      continue;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (isa<Load##Name##Inst>(User)) { \
+      Uses.push_back(PMOMemoryUse(User, PMOUseKind::Load, BaseEltNo, 1)); \
+      continue; \
     }
+#include "swift/AST/ReferenceStorage.def"
 
     // Stores *to* the allocation are writes.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1) {
@@ -436,33 +438,21 @@ bool ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto *SWI = dyn_cast<StoreWeakInst>(User)) {
-      if (UI->getOperandNumber() == 1) {
-        PMOUseKind Kind;
-        if (InStructSubElement)
-          Kind = PMOUseKind::PartialStore;
-        else if (SWI->isInitializationOfDest())
-          Kind = PMOUseKind::Initialization;
-        else
-          Kind = PMOUseKind::Assign;
-        Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
-      }
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+    if (auto *SI = dyn_cast<Store##Name##Inst>(User)) { \
+      if (UI->getOperandNumber() == 1) { \
+        PMOUseKind Kind; \
+        if (InStructSubElement) \
+          Kind = PMOUseKind::PartialStore; \
+        else if (SI->isInitializationOfDest()) \
+          Kind = PMOUseKind::Initialization; \
+        else \
+          Kind = PMOUseKind::Assign; \
+        Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, 1)); \
+        continue; \
+      } \
     }
-
-    if (auto *SUI = dyn_cast<StoreUnownedInst>(User)) {
-      if (UI->getOperandNumber() == 1) {
-        PMOUseKind Kind;
-        if (InStructSubElement)
-          Kind = PMOUseKind::PartialStore;
-        else if (SUI->isInitializationOfDest())
-          Kind = PMOUseKind::Initialization;
-        else
-          Kind = PMOUseKind::Assign;
-        Uses.push_back(PMOMemoryUse(User, Kind, BaseEltNo, 1));
-        continue;
-      }
-    }
+#include "swift/AST/ReferenceStorage.def"
 
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
       // If this is a copy of a tuple, we should scalarize it so that we don't

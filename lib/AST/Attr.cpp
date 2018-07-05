@@ -625,17 +625,7 @@ StringRef DeclAttribute::getAttrName() const {
     llvm_unreachable("bad access level");
 
   case DAK_ReferenceOwnership:
-    switch (cast<ReferenceOwnershipAttr>(this)->get()) {
-    case ReferenceOwnership::Strong:
-      llvm_unreachable("Never present in the attribute");
-    case ReferenceOwnership::Weak:
-      return "weak";
-    case ReferenceOwnership::Unowned:
-      return "unowned";
-    case ReferenceOwnership::Unmanaged:
-      return "unowned(unsafe)";
-    }
-    llvm_unreachable("bad ownership kind");
+    return keywordOf(cast<ReferenceOwnershipAttr>(this)->get());
   case DAK_RawDocComment:
     return "<<raw doc comment>>";
   case DAK_ObjCBridged:

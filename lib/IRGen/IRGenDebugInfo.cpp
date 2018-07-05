@@ -1270,9 +1270,10 @@ private:
     }
 
     // Reference storage types.
-    case TypeKind::UnownedStorage:
-    case TypeKind::UnmanagedStorage:
-    case TypeKind::WeakStorage: {
+#define REF_STORAGE(Name, ...) \
+    case TypeKind::Name##Storage:
+#include "swift/AST/ReferenceStorage.def"
+    {
       auto *ReferenceTy = cast<ReferenceStorageType>(BaseTy);
       auto CanTy = ReferenceTy->getReferentType();
       auto L = getDebugLoc(*this, DbgTy.getDecl());

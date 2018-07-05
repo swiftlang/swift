@@ -412,23 +412,13 @@ public:
     return Type();
   }
 
-  Type createUnownedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnownedStorageType::get(base, Ctx);
+#define REF_STORAGE(Name, ...) \
+  Type create##Name##StorageType(Type base) { \
+    if (!base->allowsOwnership()) \
+      return Type(); \
+    return Name##StorageType::get(base, Ctx); \
   }
-
-  Type createUnmanagedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnmanagedStorageType::get(base, Ctx);
-  }
-
-  Type createWeakStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return WeakStorageType::get(base, Ctx);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   Type createSILBoxType(Type base) {
     return SILBoxType::get(base->getCanonicalType());

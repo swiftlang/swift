@@ -1115,6 +1115,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(OpenExistentialValue)
   ONEOPERAND_ONETYPE_INST(OpenExistentialBoxValue)
   // Conversion instructions.
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  ONEOPERAND_ONETYPE_INST(RefTo##Name) \
+  ONEOPERAND_ONETYPE_INST(Name##ToRef)
+#include "swift/AST/ReferenceStorage.def"
   ONEOPERAND_ONETYPE_INST(UncheckedRefCast)
   ONEOPERAND_ONETYPE_INST(UncheckedAddrCast)
   ONEOPERAND_ONETYPE_INST(UncheckedTrivialBitCast)
@@ -1125,10 +1129,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   ONEOPERAND_ONETYPE_INST(AddressToPointer)
   ONEOPERAND_ONETYPE_INST(RefToRawPointer)
   ONEOPERAND_ONETYPE_INST(RawPointerToRef)
-  ONEOPERAND_ONETYPE_INST(RefToUnowned)
-  ONEOPERAND_ONETYPE_INST(UnownedToRef)
-  ONEOPERAND_ONETYPE_INST(RefToUnmanaged)
-  ONEOPERAND_ONETYPE_INST(UnmanagedToRef)
   ONEOPERAND_ONETYPE_INST(ThinToThickFunction)
   ONEOPERAND_ONETYPE_INST(ThickToObjCMetatype)
   ONEOPERAND_ONETYPE_INST(ObjCToThickMetatype)
@@ -1604,12 +1604,17 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (Atomicity)Attr);          \
     break;
 
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  REFCOUNTING_INSTRUCTION(Name##Retain) \
+  REFCOUNTING_INSTRUCTION(Name##Release) \
+  REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
+  UNARY_INSTRUCTION(Copy##Name##Value)
+#include "swift/AST/ReferenceStorage.def"
   UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
   UNARY_INSTRUCTION(CopyValue)
-  UNARY_INSTRUCTION(CopyUnownedValue)
   UNARY_INSTRUCTION(DestroyValue)
   REFCOUNTING_INSTRUCTION(ReleaseValue)
   REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
@@ -1634,9 +1639,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(StrongUnpin)
   REFCOUNTING_INSTRUCTION(StrongRetain)
   REFCOUNTING_INSTRUCTION(StrongRelease)
-  REFCOUNTING_INSTRUCTION(StrongRetainUnowned)
-  REFCOUNTING_INSTRUCTION(UnownedRetain)
-  REFCOUNTING_INSTRUCTION(UnownedRelease)
   UNARY_INSTRUCTION(IsUnique)
   UNARY_INSTRUCTION(IsUniqueOrPinned)
   UNARY_INSTRUCTION(AbortApply)
@@ -1687,24 +1689,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
 
-  case SILInstructionKind::LoadUnownedInst: {
-    auto Ty = MF->getType(TyID);
-    bool isTake = (Attr > 0);
-    ResultVal = Builder.createLoadUnowned(Loc,
-        getLocalValue(ValID,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-        IsTake_t(isTake));
-    break;
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Load##Name##Inst: { \
+    auto Ty = MF->getType(TyID); \
+    bool isTake = (Attr > 0); \
+    auto Val = getLocalValue(ValID, getSILType(Ty, \
+                                               SILValueCategory(TyCategory)));\
+    ResultVal = Builder.createLoad##Name(Loc, Val, IsTake_t(isTake)); \
+    break; \
+  } \
+  case SILInstructionKind::Store##Name##Inst: { \
+    auto Ty = MF->getType(TyID); \
+    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory); \
+    auto refType = addrType.castTo<Name##StorageType>(); \
+    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType()); \
+    bool isInit = (Attr > 0); \
+    ResultVal = Builder.createStore##Name(Loc, \
+                                          getLocalValue(ValID, ValType), \
+                                          getLocalValue(ValID2, addrType), \
+                                          IsInitialization_t(isInit)); \
+    break; \
   }
-  case SILInstructionKind::LoadWeakInst: {
-    auto Ty = MF->getType(TyID);
-    bool isTake = (Attr > 0);
-    ResultVal = Builder.createLoadWeak(Loc,
-        getLocalValue(ValID,
-                      getSILType(Ty, (SILValueCategory)TyCategory)),
-        IsTake_t(isTake));
-    break;
-  }
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::MarkUninitializedInst: {
     auto Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
     auto Kind = (MarkUninitializedInst::Kind)Attr;
@@ -1779,30 +1785,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     bool fromBuiltin = (Attr >> 3) & 0x01;
     ResultVal = Builder.createEndUnpairedAccess(Loc, op, enforcement, aborted,
                                                 fromBuiltin);
-    break;
-  }
-  case SILInstructionKind::StoreUnownedInst: {
-    auto Ty = MF->getType(TyID);
-    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.castTo<UnownedStorageType>();
-    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
-    bool isInit = (Attr > 0);
-    ResultVal = Builder.createStoreUnowned(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType),
-                    IsInitialization_t(isInit));
-    break;
-  }
-  case SILInstructionKind::StoreWeakInst: {
-    auto Ty = MF->getType(TyID);
-    SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    auto refType = addrType.castTo<WeakStorageType>();
-    auto ValType = SILType::getPrimitiveObjectType(refType.getReferentType());
-    bool isInit = (Attr > 0);
-    ResultVal = Builder.createStoreWeak(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType),
-                    IsInitialization_t(isInit));
     break;
   }
   case SILInstructionKind::CopyAddrInst: {

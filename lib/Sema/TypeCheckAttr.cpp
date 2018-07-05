@@ -2133,54 +2133,49 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
   // A weak variable must have type R? or R! for some ownership-capable type R.
   auto underlyingType = type->getOptionalObjectType();
   auto isOptional = bool(underlyingType);
-  auto allowOptional = false;
-  switch (ownershipKind) {
-  case ReferenceOwnership::Strong:
-    llvm_unreachable("Cannot specify 'strong' in an ownership attribute");
-  case ReferenceOwnership::Unowned:
-    break;
-  case ReferenceOwnership::Unmanaged:
-    // The Clang importer can create optional Unmanaged. Otherwise this is not
-    // allowed. Allow optionalness under SIL for testing and debugging.
+
+  switch (optionalityOf(ownershipKind)) {
+  case ReferenceOwnershipOptionality::AllowedIfImporting:
+    // Allow SIL to emulate importing testing and debugging.
     if (auto sourceFile = var->getDeclContext()->getParentSourceFile())
       if (sourceFile->Kind == SourceFileKind::SIL)
-        allowOptional = true;
+        break;
+    LLVM_FALLTHROUGH;
+  case ReferenceOwnershipOptionality::Disallowed:
+    if (isOptional) {
+      diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
+               ownershipKind)
+        .fixItReplace(attr->getRange(), "weak");
+      attr->setInvalid();
+    }
     break;
-  case ReferenceOwnership::Weak:
-    allowOptional = true;
+  case ReferenceOwnershipOptionality::Allowed:
+    if (!isOptional)
+      break;
+    LLVM_FALLTHROUGH;
+  case ReferenceOwnershipOptionality::Required:
     if (var->isLet()) {
-      diagnose(var->getStartLoc(), diag::invalid_weak_let);
+      diagnose(var->getStartLoc(), diag::invalid_ownership_is_let,
+               ownershipKind);
       attr->setInvalid();
     }
 
-    if (isOptional)
-      break;
-
-    attr->setInvalid();
-
     // While @IBOutlet can be weak, it must be optional. Let it diagnose.
-    if (var->getAttrs().hasAttribute<IBOutletAttr>())
-      break;
-
-    auto diag = diagnose(var->getStartLoc(),
-                         diag::invalid_weak_ownership_not_optional,
-                         OptionalType::get(type));
-    auto typeRange = var->getTypeSourceRangeForDiagnostics();
-    if (type->hasSimpleTypeRepr()) {
-      diag.fixItInsertAfter(typeRange.End, "?");
-    } else {
-      diag.fixItInsert(typeRange.Start, "(")
-        .fixItInsertAfter(typeRange.End, ")?");
+    if (!isOptional && !var->getAttrs().hasAttribute<IBOutletAttr>()) {
+      attr->setInvalid();
+      auto diag = diagnose(var->getStartLoc(),
+                           diag::invalid_ownership_not_optional,
+                           ownershipKind,
+                           OptionalType::get(type));
+      auto typeRange = var->getTypeSourceRangeForDiagnostics();
+      if (type->hasSimpleTypeRepr()) {
+        diag.fixItInsertAfter(typeRange.End, "?");
+      } else {
+        diag.fixItInsert(typeRange.Start, "(")
+          .fixItInsertAfter(typeRange.End, ")?");
+      }
     }
     break;
-  }
-
-
-  if (!allowOptional && isOptional) {
-    diagnose(var->getStartLoc(), diag::invalid_ownership_with_optional,
-             ownershipKind)
-      .fixItReplace(attr->getRange(), "weak");
-    attr->setInvalid();
   }
 
   if (!underlyingType)

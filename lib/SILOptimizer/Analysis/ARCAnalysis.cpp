@@ -36,14 +36,30 @@ using BasicBlockRetainValue = std::pair<SILBasicBlock *, SILValue>;
 //===----------------------------------------------------------------------===//
 
 bool swift::isRetainInstruction(SILInstruction *I) {
-  return isa<StrongRetainInst>(I) || isa<RetainValueInst>(I) ||
-         isa<UnownedRetainInst>(I);
+  switch (I->getKind()) {
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst:
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::StrongRetainInst:
+  case SILInstructionKind::RetainValueInst:
+    return true;
+  default:
+    return false;
+  }
 }
 
 
 bool swift::isReleaseInstruction(SILInstruction *I) {
-  return isa<StrongReleaseInst>(I) || isa<ReleaseValueInst>(I) ||
-         isa<UnownedReleaseInst>(I);
+  switch (I->getKind()) {
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##ReleaseInst:
+#include "swift/AST/ReferenceStorage.def"
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::ReleaseValueInst:
+    return true;
+  default:
+    return false;
+  }
 }
 
 //===----------------------------------------------------------------------===//

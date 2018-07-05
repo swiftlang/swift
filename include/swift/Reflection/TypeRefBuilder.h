@@ -296,18 +296,11 @@ public:
     return DependentMemberTypeRef::create(*this, member, base, *protocol);
   }
 
-  const UnownedStorageTypeRef *createUnownedStorageType(const TypeRef *base) {
-    return UnownedStorageTypeRef::create(*this, base);
+#define REF_STORAGE(Name, ...) \
+  const Name##StorageTypeRef *create##Name##StorageType(const TypeRef *base) { \
+    return Name##StorageTypeRef::create(*this, base); \
   }
-
-  const UnmanagedStorageTypeRef *
-  createUnmanagedStorageType(const TypeRef *base) {
-    return UnmanagedStorageTypeRef::create(*this, base);
-  }
-
-  const WeakStorageTypeRef *createWeakStorageType(const TypeRef *base) {
-    return WeakStorageTypeRef::create(*this, base);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   const SILBoxTypeRef *createSILBoxType(const TypeRef *base) {
     return SILBoxTypeRef::create(*this, base);

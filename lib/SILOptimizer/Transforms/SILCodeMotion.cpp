@@ -1056,11 +1056,11 @@ cheaperToPassOperandsAsArguments(SILInstruction *First,
   // This will further enable to sink strong_retain_unowned instructions,
   // which provides more opportunities for the unowned-optimization in
   // LLVMARCOpts.
-  auto *UTORI1 = dyn_cast<UnownedToRefInst>(First);
-  auto *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
-  if (UTORI1 && UTORI2) {
-    return 0;
+#define LOADABLE_REF_STORAGE(Name, ...) \
+  if (isa<Name##ToRefInst>(First) && isa<Name##ToRefInst>(Second)) { \
+    return 0; \
   }
+#include "swift/AST/ReferenceStorage.def"
 
   // TODO: Add more cases than Struct
   auto *FirstStruct = dyn_cast<StructInst>(First);

@@ -2275,23 +2275,15 @@ namespace {
       // object.
 
       auto &C = IGF.IGM.Context;
-      CanType referent;
-      switch (type->getOwnership()) {
-      case ReferenceOwnership::Strong:
-        llvm_unreachable("shouldn't be a ReferenceStorageType");
-      case ReferenceOwnership::Weak:
-        referent = type.getReferentType().getOptionalObjectType();
-        break;
-      case ReferenceOwnership::Unmanaged:
-      case ReferenceOwnership::Unowned:
-        referent = type.getReferentType();
-        break;
-      }
+      CanType referent = type.getReferentType();
+      CanType underlyingTy = referent;
+      if (auto Ty = referent.getOptionalObjectType())
+        underlyingTy = Ty;
 
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
-      if (referent.isExistentialType()) {
-        auto layout = referent.getExistentialLayout();
+      if (underlyingTy.isExistentialType()) {
+        auto layout = underlyingTy.getExistentialLayout();
         for (auto *protoTy : layout.getProtocols()) {
           auto *protoDecl = protoTy->getDecl();
           if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
@@ -2310,7 +2302,7 @@ namespace {
       }
 
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForType(IGF.IGM, referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, underlyingTy)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -2331,7 +2323,7 @@ namespace {
 
       // Get the reference storage type of the builtin object whose value
       // witness we can borrow.
-      if (type->getOwnership() == ReferenceOwnership::Weak)
+      if (referent->getOptionalObjectType())
         valueWitnessReferent = OptionalType::get(valueWitnessReferent)
           ->getCanonicalType();
 

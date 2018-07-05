@@ -179,13 +179,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   RefCountedPtrTy = RefCountedStructTy->getPointerTo(/*addrspace*/ 0);
   RefCountedNull = llvm::ConstantPointerNull::get(RefCountedPtrTy);
 
-  // For now, native weak references are just a pointer.
-  WeakReferencePtrTy =
-    createStructPointerType(*this, "swift.weak", { RefCountedPtrTy });
-
-  // Native unowned references are just a pointer.
-  UnownedReferencePtrTy =
-    createStructPointerType(*this, "swift.unowned", { RefCountedPtrTy });
+  // For now, references storage types are just pointers.
+#define CHECKED_REF_STORAGE(Name, name, ...) \
+  Name##ReferencePtrTy = \
+    createStructPointerType(*this, "swift." #name, { RefCountedPtrTy });
+#include "swift/AST/ReferenceStorage.def"
 
   // A type metadata record is the structure pointed to by the canonical
   // address point of a type metadata.  This is at least one word, and
