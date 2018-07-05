@@ -3346,6 +3346,91 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
+/// Check for buffer overruns/underruns in Swift's
+/// `-[NSDictionary getObjects:andKeys:count:]` implementations.
+func checkGetObjectsAndKeys(
+  _ dictionary: NSDictionary,
+  count: Int,
+  file: String = #file,
+  line: UInt = #line) {
+  let canary = NSObject()
+  let storageSize = 2 * max(count, dictionary.count) + 2
+
+  // Create buffers for storing keys and values at +0 refcounts,
+  // then call getObjects:andKeys:count: via a shim in
+  // StdlibUnittestFoundationExtras.
+  typealias UnmanagedPointer = UnsafeMutablePointer<Unmanaged<AnyObject>>
+  var keys = UnmanagedPointer.allocate(capacity: storageSize)
+  keys.initialize(to: Unmanaged.passUnretained(canary), count: storageSize)
+  var values = UnmanagedPointer.allocate(capacity: storageSize)
+  values.initialize(to: Unmanaged.passUnretained(canary), count: storageSize)
+  keys.withMemoryRebound(to: AnyObject.self, capacity: storageSize) { k in
+    values.withMemoryRebound(to: AnyObject.self, capacity: storageSize) { v in
+      dictionary.available_getObjects(
+        AutoreleasingUnsafeMutablePointer(v),
+        andKeys: AutoreleasingUnsafeMutablePointer(k),
+        count: count)
+    }
+  }
+  // Check results.
+  for i in 0 ..< storageSize {
+    let key = keys[i].takeUnretainedValue()
+    let value = values[i].takeUnretainedValue()
+    if i < min(count, dictionary.count) {
+      expectTrue(
+        key !== canary,
+        """
+        Buffer underrun at offset \(i) with count \(count):
+        keys[\(i)] was left unchanged
+        """,
+        file: file, line: line)
+      expectTrue(
+        value !== canary,
+        """
+        Buffer underrun at offset \(i) with count \(count):
+        values[\(i)] was left unchanged
+        """,
+        file: file, line: line)
+      expectTrue(
+        value === dictionary.object(forKey: key) as AnyObject,
+        """
+        Inconsistency at offset \(i) with count \(count):
+        values[\(i)] does not match value for keys[\(i)]
+        """,
+        file: file, line: line)
+    } else {
+      expectTrue(
+        key === canary,
+        """
+        Buffer overrun at offset \(i) with count \(count):
+        keys[\(i)] was overwritten with value \(key)
+        """,
+        file: file, line: line)
+      expectTrue(
+        value === canary,
+        """
+        Buffer overrun at offset \(i) with count \(count):
+        values[\(i)] was overwritten with value \(key)
+        """,
+        file: file, line: line)
+    }
+  }
+  keys.deinitialize(count: storageSize) // noop
+  keys.deallocate()
+  values.deinitialize(count: storageSize) // noop
+  values.deallocate()
+  withExtendedLifetime(canary) {}
+}
+
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
+  let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
+  for count in 0 ..< d.count + 2 {
+    checkGetObjectsAndKeys(d, count: count)
+  }
+  expectCrashLater()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 //===---
 // Dictionary -> NSDictionary bridging tests.
 //
@@ -3444,6 +3529,15 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
+  let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
+  for count in 0 ..< d.count + 2 {
+    checkGetObjectsAndKeys(d, count: count)
+  }
+  expectCrashLater()
+  checkGetObjectsAndKeys(d, count: -1)
+}
+
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
@@ -3503,7 +3597,6 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 
   expectAutoreleasedKeysAndValues(unopt: (3, 3))
 }
-
 
 //===---
 // NSDictionary -> Dictionary -> NSDictionary bridging tests.
@@ -4491,7 +4584,7 @@ DictionaryTestSuite.test("dropsBridgedCache") {
   }
 }
 
-DictionaryTestSuite.test("getObjects:andKeys:") {
+DictionaryTestSuite.test("getObjects:andKeys:count:") {
   let native = [1: "one", 2: "two"] as Dictionary<Int, String>
   let d = native as NSDictionary
   var keys = UnsafeMutableBufferPointer(
@@ -4512,15 +4605,15 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
     expectedValues = ["two", "one"]
   }
 
-  d.available_getObjects(null, andKeys: null) // don't segfault
+  d.available_getObjects(null, andKeys: null, count: 2) // don't segfault
 
-  d.available_getObjects(null, andKeys: kp)
+  d.available_getObjects(null, andKeys: kp, count: 2)
   expectEqual(expectedKeys, Array(keys))
 
-  d.available_getObjects(vp, andKeys: null)
+  d.available_getObjects(vp, andKeys: null, count: 2)
   expectEqual(expectedValues, Array(values))
 
-  d.available_getObjects(vp, andKeys: kp)
+  d.available_getObjects(vp, andKeys: kp, count: 2)
   expectEqual(expectedKeys, Array(keys))
   expectEqual(expectedValues, Array(values))
 }

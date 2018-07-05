@@ -1582,7 +1582,7 @@ internal func _stdlib_NSDictionary_allKeys(_ nsd: _NSDictionary)
   let storage = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
 
-  nsd.getObjects(nil, andKeys: storage.baseAddress)
+  nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
 #endif
@@ -1959,8 +1959,11 @@ internal class _RawNativeDictionaryStorage
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  internal func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
+  @objc(getObjects:andKeys:count:)
+  internal func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
     // Do nothing, we're empty
   }
 #endif
@@ -2130,28 +2133,38 @@ final internal class _HashableTypedNativeDictionaryStorage<Key: Hashable, Value>
 
   // We also override the following methods for efficiency.
   @inlinable // FIXME(sil-serialize-all)
-  @objc
-  override func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?) {
-    // The user is expected to provide a storage of the correct size
+  @objc(getObjects:andKeys:count:)
+  override func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
+    var i = 0 // Current position in the output buffers
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys nonnull, objects nonnull
-        for (offset: i, element: (key: key, value: val)) in full.enumerated() {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+        for (key, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       } else {
         // keys nonnull, objects null
-        for (offset: i, element: (key: key, value: _)) in full.enumerated() {
+        for (key, _) in full {
           unmanagedKeys[i] = _bridgeAnythingToObjectiveC(key)
+          i += 1
+          guard i < count else { break }
         }
       }
     } else {
       if let unmanagedObjects = _UnmanagedAnyObjectArray(objects) {
         // keys null, objects nonnull
-        for (offset: i, element: (key: _, value: val)) in full.enumerated() {
-          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(val)
+        for (_, value) in full {
+          unmanagedObjects[i] = _bridgeAnythingToObjectiveC(value)
+          i += 1
+          guard i < count else { break }
         }
       } else {
         // do nothing, both are null
@@ -2835,12 +2848,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   @inlinable // FIXME(sil-serialize-all)
-  @objc
+  @objc(getObjects:andKeys:count:)
   internal func getObjects(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
   ) {
-    bridgedAllKeysAndValues(objects, keys)
+    bridgedAllKeysAndValues(objects, keys, count)
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -2930,11 +2944,13 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @nonobjc
   internal func bridgedAllKeysAndValues(
     _ objects: UnsafeMutablePointer<AnyObject>?,
-    _ keys: UnsafeMutablePointer<AnyObject>?
+    _ keys: UnsafeMutablePointer<AnyObject>?,
+    _ count: Int
   ) {
+    _precondition(count >= 0, "Invalid count")
+    guard count > 0 else { return }
     bridgeEverything()
-    // The user is expected to provide a storage of the correct size
-    var i = 0 // Position in the input storage
+    var i = 0 // Current position in the output buffers
     let bucketCount = nativeBuffer.bucketCount
 
     if let unmanagedKeys = _UnmanagedAnyObjectArray(keys) {
@@ -2945,6 +2961,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
@@ -2953,6 +2970,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedKeys[i] = bridgedBuffer.key(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       }
@@ -2963,6 +2981,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
           if bridgedBuffer.isInitializedEntry(at: position) {
             unmanagedObjects[i] = bridgedBuffer.value(at: position)
             i += 1
+            guard i < count else { break }
           }
         }
       } else {
