@@ -24,6 +24,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DefaultArgumentKind.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/LayoutConstraint.h"
@@ -889,6 +890,17 @@ public:
   ///
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
+
+  /// Emit a diagnostic tied to this declaration.
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) const {
+    return getDiags().diagnose(this, ID, std::move(Args)...);
+  }
+
+  /// Retrieve the diagnostic engine for diagnostics emission.
+  DiagnosticEngine &getDiags() const;
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
