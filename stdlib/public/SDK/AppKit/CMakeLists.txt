@@ -5,6 +5,7 @@ add_swift_library(swiftAppKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OV
   AppKit.swift
   AppKit_FoundationExtensions.swift
   NSError.swift
+  NSEvent.swift
   NSGraphics.swift
   NSOpenGL.swift
 
