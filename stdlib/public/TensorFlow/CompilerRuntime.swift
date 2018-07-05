@@ -181,6 +181,7 @@ private func configureRuntimeFromEnvironment() {
 // TODO(b/77572335): Reassess how to reset TPU after execution error.
 private func initializeTPU(withSession session: CTFSession, graph: CTFGraph,
                            status: CTFStatus) {
+  debugLog("Initializing TPU.")
   let configOp = TF_GraphOperationByName(graph, "ConfigureDistributedTPU")
   internalConsistencyCheck(configOp != nil)
   var configNode = TF_Output(oper: configOp, index: 0)
