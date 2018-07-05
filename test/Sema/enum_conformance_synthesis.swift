@@ -45,7 +45,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 5 {{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note 4 {{non-matching type}}
   return true
 }
 
@@ -63,7 +63,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 5 {{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note 4 {{non-matching type}}
   return ""
 }
 func invalidCustomHashable() {
@@ -173,8 +173,8 @@ func genericNotHashable() {
   GenericNotHashable<String>.A("a").hash(into: &hasher) // expected-error {{value of type 'GenericNotHashable<String>' has no member 'hash'}}
 }
 
-// An enum with no cases should not derive conformance.
-enum NoCases: Hashable {} // expected-error 2 {{does not conform}}
+// An enum with no cases should also derive conformance.
+enum NoCases: Hashable {}
 
 // rdar://19773050
 private enum Bar<T> {
@@ -213,7 +213,7 @@ public enum Medicine {
 
 extension Medicine : Equatable {}
 
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 5 {{non-matching type}}
+public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note 4 {{non-matching type}}
   return true
 }
 
@@ -236,7 +236,7 @@ extension NotExplicitlyHashableAndCannotDerive : CaseIterable {} // expected-err
 // Verify that conformance (albeit manually implemented) can still be added to
 // a type in a different file.
 extension OtherFileNonconforming: Hashable {
-  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 5 {{non-matching type}}
+  static func ==(lhs: OtherFileNonconforming, rhs: OtherFileNonconforming) -> Bool { // expected-note 4 {{non-matching type}}
     return true
   }
   var hashValue: Int { return 0 }
