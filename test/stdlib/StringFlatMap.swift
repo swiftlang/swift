@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/a.out4 -swift-version 4 && %target-run %t/a.out4
+// RUN: %target-build-swift %s -o %t/a.out && %target-run %t/a.out
 
 // REQUIRES: executable_test
 
@@ -7,23 +7,22 @@ import StdlibUnittest
 
 
 public typealias ExpectedResultType = [Character]
-let swiftVersion = "4"
 
 var Tests = TestSuite("StringFlatMap")
 
-Tests.test("DefaultReturnType/\(swiftVersion)") {
+Tests.test("DefaultReturnType") {
   var result = ["hello", "world"].flatMap { $0 }
   expectType(ExpectedResultType.self, &result)
 }
 
-Tests.test("ExplicitTypeContext/\(swiftVersion)") {
+Tests.test("ExplicitTypeContext") {
   expectEqualSequence(["hello", "world"],
     ["hello", "world"].flatMap { $0 } as [String])
   expectEqualSequence("helloworld".characters,
     ["hello", "world"].flatMap { $0 } as [Character])
 }
 
-Tests.test("inference/\(swiftVersion)") {
+Tests.test("inference") {
   let result = [1, 2].flatMap { x in
     if String(x) == "foo" {
       return "bar"
