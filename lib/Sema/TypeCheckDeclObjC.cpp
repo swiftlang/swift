@@ -903,8 +903,7 @@ Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
 
 /// Check runtime functions responsible for implicit bridging of Objective-C
 /// types.
-static void checkObjCBridgingFunctions(TypeChecker &TC,
-                                       ModuleDecl *mod,
+static void checkObjCBridgingFunctions(ModuleDecl *mod,
                                        StringRef bridgedTypeName,
                                        StringRef forwardConversion,
                                        StringRef reverseConversion) {
@@ -912,16 +911,21 @@ static void checkObjCBridgingFunctions(TypeChecker &TC,
   ModuleDecl::AccessPathTy unscopedAccess = {};
   SmallVector<ValueDecl *, 4> results;
 
-  auto &Ctx = TC.Context;
-  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(bridgedTypeName),
+  auto &ctx = mod->getASTContext();
+  mod->lookupValue(unscopedAccess, ctx.getIdentifier(bridgedTypeName),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(forwardConversion),
+  mod->lookupValue(unscopedAccess, ctx.getIdentifier(forwardConversion),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, Ctx.getIdentifier(reverseConversion),
+  mod->lookupValue(unscopedAccess, ctx.getIdentifier(reverseConversion),
                    NLKind::QualifiedLookup, results);
 
-  for (auto D : results)
-    TC.validateDecl(D);
+  for (auto D : results) {
+    if (!D->hasInterfaceType()) {
+      auto resolver = ctx.getLazyResolver();
+      assert(resolver);
+      resolver->resolveDeclSignature(D);
+    }
+  }
 }
 
 static void checkBridgedFunctions(TypeChecker &TC) {
@@ -933,14 +937,14 @@ static void checkBridgedFunctions(TypeChecker &TC) {
   #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
   Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
   if (ModuleDecl *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
-    checkObjCBridgingFunctions(TC, module, #BRIDGED_TYPE, \
+    checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
     "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
     "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
   }
   #include "swift/SIL/BridgedTypes.def"
 
   if (ModuleDecl *module = TC.Context.getLoadedModule(TC.Context.Id_Foundation)) {
-    checkObjCBridgingFunctions(TC, module,
+    checkObjCBridgingFunctions(module,
                                TC.Context.getSwiftName(
                                  KnownFoundationEntity::NSError),
                                "_convertNSErrorToError",
@@ -970,8 +974,8 @@ static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
 
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
-static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
-                                                  const ClassDecl *CD) {
+static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
+  ASTContext &ctx = CD->getASTContext();
   ObjCClassKind kind = CD->checkObjCAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
@@ -980,22 +984,23 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
         // @objc with a name on a non-generic subclass of a generic class is
         // just controlling the runtime name. Don't diagnose this case.
         const_cast<ClassDecl *>(CD)->getAttrs().add(
-          new (TC.Context) ObjCRuntimeNameAttr(*attr));
+          new (ctx) ObjCRuntimeNameAttr(*attr));
         return None;
       }
 
-      TC.diagnose(attr->getLocation(), diag::objc_for_generic_class)
+      ctx.Diags.diagnose(attr->getLocation(), diag::objc_for_generic_class)
         .fixItRemove(attr->getRangeWithAt());
     }
 
     // Only allow ObjC-rooted classes to be @objc.
     // (Leave a hole for test cases.)
     if (kind == ObjCClassKind::ObjCWithSwiftRoot) {
-      if (TC.getLangOpts().EnableObjCAttrRequiresFoundation)
-        TC.diagnose(attr->getLocation(), diag::invalid_objc_swift_rooted_class)
+      if (ctx.LangOpts.EnableObjCAttrRequiresFoundation)
+        ctx.Diags.diagnose(attr->getLocation(),
+                           diag::invalid_objc_swift_rooted_class)
           .fixItRemove(attr->getRangeWithAt());
-      if (!TC.getLangOpts().EnableObjCInterop)
-        TC.diagnose(attr->getLocation(), diag::objc_interop_disabled)
+      if (!ctx.LangOpts.EnableObjCInterop)
+        ctx.Diags.diagnose(attr->getLocation(), diag::objc_interop_disabled)
           .fixItRemove(attr->getRangeWithAt());
     }
 
@@ -1014,7 +1019,7 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
                                              bool allowImplicit) {
   if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
-    return shouldMarkClassAsObjC(TC, classDecl);
+    return shouldMarkClassAsObjC(classDecl);
   }
 
   ProtocolDecl *protocolContext =
@@ -1081,6 +1086,8 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       return ObjCReason::witnessToObjC(requirements.front());
   }
 
+  ASTContext &ctx = VD->getASTContext();
+
   // Infer '@objc' for 'dynamic' members.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
     // For implicit 'dynamic', just infer '@objc' implicitly.
@@ -1091,13 +1098,13 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
       isa<AccessorDecl>(VD) && cast<AccessorDecl>(VD)->isGetterOrSetter();
 
     // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
-    if (TC.Context.LangOpts.EnableSwift3ObjCInference) {
+    if (ctx.LangOpts.EnableSwift3ObjCInference) {
       // If we've been asked to warn about deprecated @objc inference, do so
       // now.
-      if (TC.Context.LangOpts.WarnSwift3ObjCInference !=
+      if (ctx.LangOpts.WarnSwift3ObjCInference !=
             Swift3ObjCInferenceWarnings::None &&
           !isGetterOrSetter) {
-        TC.diagnose(VD, diag::objc_inference_swift3_dynamic)
+        VD->diagnose(diag::objc_inference_swift3_dynamic)
           .highlight(attr->getLocation())
           .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
                       "@objc ");
@@ -1108,8 +1115,8 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
 
     // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
     // anyway for better recovery.
-    TC.diagnose(VD, diag::dynamic_requires_objc,
-                VD->getDescriptiveKind(), VD->getFullName())
+    VD->diagnose(diag::dynamic_requires_objc,
+                 VD->getDescriptiveKind(), VD->getFullName())
       .highlight(attr->getRange())
       .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
                    "@objc ");
@@ -1118,7 +1125,7 @@ Optional<ObjCReason> swift::shouldMarkAsObjC(TypeChecker &TC,
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.
-  if (!TC.Context.LangOpts.EnableSwift3ObjCInference)
+  if (!ctx.LangOpts.EnableSwift3ObjCInference)
     return None;
 
   // Infer '@objc' for valid, non-implicit, non-operator, members of classes
@@ -1265,6 +1272,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   auto attr = decl->getAttrs().getAttribute<ObjCAttr>();
 
   /// Set the @objc name.
+  ASTContext &ctx = decl->getASTContext();
   auto setObjCName = [&](ObjCSelector selector) {
     // If there already is an @objc attribute, update its name.
     if (attr) {
@@ -1273,7 +1281,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
     }
 
     // Otherwise, create an @objc attribute with the implicit name.
-    attr = ObjCAttr::create(tc.Context, selector, /*implicitName=*/true);
+    attr = ObjCAttr::create(ctx, selector, /*implicitName=*/true);
     decl->getAttrs().add(attr);
   };
 
@@ -1291,14 +1299,14 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
           // If the user explicitly wrote the incorrect name, complain.
           if (!attr->isNameImplicit()) {
             {
-              auto diag = tc.diagnose(
+              auto diag = ctx.Diags.diagnose(
                             attr->AtLoc,
                             diag::objc_override_method_selector_mismatch,
                             *attr->getName(), overriddenSelector);
               fixDeclarationObjCName(diag, decl, overriddenSelector);
             }
 
-            tc.diagnose(overriddenFunc, diag::overridden_here);
+            overriddenFunc->diagnose(diag::overridden_here);
           }
 
           shouldFixName = true;
@@ -1315,7 +1323,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
       // Handle properties.
       if (auto overriddenProp = dyn_cast<VarDecl>(overridden)) {
         Identifier overriddenName = overriddenProp->getObjCPropertyName();
-        ObjCSelector overriddenNameAsSel(tc.Context, 0, overriddenName);
+        ObjCSelector overriddenNameAsSel(ctx, 0, overriddenName);
 
         // Determine whether there is a name conflict.
         bool shouldFixName = !attr || !attr->hasName();
@@ -1323,14 +1331,14 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
             *attr->getName() != overriddenNameAsSel) {
           // If the user explicitly wrote the wrong name, complain.
           if (!attr->isNameImplicit()) {
-            tc.diagnose(attr->AtLoc,
+            ctx.Diags.diagnose(attr->AtLoc,
                         diag::objc_override_property_name_mismatch,
                         attr->getName()->getSelectorPieces()[0],
                         overriddenName)
               .fixItReplaceChars(attr->getNameLocs().front(),
                                  attr->getRParenLoc(),
                                  overriddenName.str());
-            tc.diagnose(overridden, diag::overridden_here);
+            overridden->diagnose(diag::overridden_here);
           }
 
           shouldFixName = true;
@@ -1364,18 +1372,17 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
     // If this requirement has a different name from one we've seen,
     // note the ambiguity.
     if (*requirementObjCName != *req->getObjCRuntimeName()) {
-      tc.diagnose(decl, diag::objc_ambiguous_inference,
-                  decl->getDescriptiveKind(), decl->getFullName(),
-                  *requirementObjCName, *req->getObjCRuntimeName());
+      decl->diagnose(diag::objc_ambiguous_inference,
+                     decl->getDescriptiveKind(), decl->getFullName(),
+                     *requirementObjCName, *req->getObjCRuntimeName());
 
       // Note the candidates and what Objective-C names they provide.
       auto diagnoseCandidate = [&](ValueDecl *req) {
         auto proto = cast<ProtocolDecl>(req->getDeclContext());
-        auto diag = tc.diagnose(decl,
-                                diag::objc_ambiguous_inference_candidate,
-                                req->getFullName(),
-                                proto->getFullName(),
-                                *req->getObjCRuntimeName());
+        auto diag = decl->diagnose(diag::objc_ambiguous_inference_candidate,
+                                   req->getFullName(),
+                                   proto->getFullName(),
+                                   *req->getObjCRuntimeName());
         fixDeclarationObjCName(diag, decl, req->getObjCRuntimeName());
       };
       diagnoseCandidate(firstReq);
@@ -1383,7 +1390,7 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
 
       // Suggest '@nonobjc' to suppress this error, and not try to
       // infer @objc for anything.
-      tc.diagnose(decl, diag::req_near_match_nonobjc, true)
+      decl->diagnose(diag::req_near_match_nonobjc, true)
         .fixItInsert(decl->getAttributeInsertionLoc(false), "@nonobjc ");
       break;
     }
@@ -1412,14 +1419,16 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     return;
   }
 
+  ASTContext &ctx = D->getASTContext();
+
   // By now, the caller will have handled the case where an implicit @objc
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (!shouldDiagnoseObjCReason(*isObjC, TC.Context))
+    if (!shouldDiagnoseObjCReason(*isObjC, ctx))
       isObjC = ObjCReason::ImplicitlyObjC;
 
-    TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
+    D->diagnose(diag::nonobjc_not_allowed,
                 getObjCDiagnosticAttrKind(*isObjC));
 
     attr->setInvalid();
@@ -1465,18 +1474,18 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       // Swift does not permit class methods with Objective-C selectors 'load',
       // 'alloc', or 'allocWithZone:'.
       if (!method->isInstanceMember()) {
-        auto isForbiddenSelector = [&TC](ObjCSelector sel)
+        auto isForbiddenSelector = [&](ObjCSelector sel)
         -> Optional<Diag<unsigned, DeclName, ObjCSelector>> {
           switch (sel.getNumArgs()) {
           case 0:
-            if (sel.getSelectorPieces().front() == TC.Context.Id_load ||
-                sel.getSelectorPieces().front() == TC.Context.Id_alloc)
+            if (sel.getSelectorPieces().front() == ctx.Id_load ||
+                sel.getSelectorPieces().front() == ctx.Id_alloc)
               return diag::objc_class_method_not_permitted;
             // Swift 3 and earlier allowed you to override `initialize`, but
             // Swift's semantics do not guarantee that it will be called at
             // the point you expect. It is disallowed in Swift 4 and later.
-            if (sel.getSelectorPieces().front() == TC.Context.Id_initialize) {
-              if (TC.getLangOpts().isSwiftVersion3())
+            if (sel.getSelectorPieces().front() == ctx.Id_initialize) {
+              if (ctx.LangOpts.isSwiftVersion3())
                 return
                   diag::objc_class_method_not_permitted_swift3_compat_warning;
               else
@@ -1484,7 +1493,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
             }
             return None;
           case 1:
-            if (sel.getSelectorPieces().front() == TC.Context.Id_allocWithZone)
+            if (sel.getSelectorPieces().front() == ctx.Id_allocWithZone)
               return diag::objc_class_method_not_permitted;
             return None;
           default:
@@ -1494,8 +1503,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
         auto sel = method->getObjCSelector();
         if (auto diagID = isForbiddenSelector(sel)) {
           auto diagInfo = getObjCMethodDiagInfo(method);
-          TC.diagnose(method, *diagID,
-                      diagInfo.first, diagInfo.second, sel);
+          method->diagnose(*diagID, diagInfo.first, diagInfo.second, sel);
         }
       }
     } else if (isa<VarDecl>(D)) {
@@ -1524,14 +1532,14 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
     // accessors---just the main storage declarations.
-    if (TC.Context.LangOpts.WarnSwift3ObjCInference ==
+    if (ctx.LangOpts.WarnSwift3ObjCInference ==
           Swift3ObjCInferenceWarnings::Complete &&
         !(isa<AccessorDecl>(D) && cast<AccessorDecl>(D)->isGetterOrSetter())) {
-      TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
-      TC.diagnose(D, diag::objc_inference_swift3_addobjc)
+      D->diagnose(diag::objc_inference_swift3_objc_derived);
+      D->diagnose(diag::objc_inference_swift3_addobjc)
         .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
                      "@objc ");
-      TC.diagnose(D, diag::objc_inference_swift3_addnonobjc)
+      D->diagnose(diag::objc_inference_swift3_addnonobjc)
         .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
                      "@nonobjc ");
     }
@@ -1540,7 +1548,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // implicit @objc for that purpose.
     auto attr = D->getAttrs().getAttribute<ObjCAttr>();
     if (!attr) {
-      attr = ObjCAttr::createUnnamedImplicit(TC.Context);
+      attr = ObjCAttr::createUnnamedImplicit(ctx);
       D->getAttrs().add(attr);
     }
     attr->setSwift3Inferred();
