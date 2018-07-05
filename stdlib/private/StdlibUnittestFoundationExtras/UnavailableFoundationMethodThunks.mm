@@ -24,9 +24,10 @@ NSArray_getObjects(NSArray SWIFT_NS_RELEASES_ARGUMENT *_Nonnull nsArray,
 
 SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY
 extern "C" void
-NSDictionary_getObjects(NSDictionary *_Nonnull nsDictionary,
-                        id *objects, id *keys) {
-  [nsDictionary getObjects:objects andKeys:keys];
+NSDictionary_getObjectsAndKeysWithCount(NSDictionary *_Nonnull nsDictionary,
+                                        id *objects, id *keys,
+                                        NSInteger count) {
+  [nsDictionary getObjects:objects andKeys:keys count:count];
   SWIFT_CC_PLUSONE_GUARD([nsDictionary release]);
 }
 

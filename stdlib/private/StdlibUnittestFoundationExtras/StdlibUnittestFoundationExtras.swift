@@ -100,23 +100,26 @@ extension NSArray {
   }
 }
 
-@_silgen_name("NSDictionary_getObjects")
-func NSDictionary_getObjects(
+@_silgen_name("NSDictionary_getObjectsAndKeysWithCount")
+func NSDictionary_getObjectsAndKeysWithCount(
   nsDictionary: NSDictionary,
   objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
-  andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
+  andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
+  count: Int
 )
 
 extension NSDictionary {
   @nonobjc // FIXME: there should be no need in this attribute.
   public func available_getObjects(
     _ objects: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
-    andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?
+    andKeys keys: AutoreleasingUnsafeMutablePointer<AnyObject?>?,
+    count: Int
   ) {
-    return NSDictionary_getObjects(
+    return NSDictionary_getObjectsAndKeysWithCount(
       nsDictionary: self,
       objects: objects,
-      andKeys: keys)
+      andKeys: keys,
+      count: count)
   }
 }
 
