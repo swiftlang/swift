@@ -203,7 +203,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 }
 
 static void diagnoseFunctionParamNotRepresentable(
-    TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
+    const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
   if (!shouldDiagnoseObjCReason(Reason, AFD->getASTContext()))
     return;
@@ -225,14 +225,14 @@ static void diagnoseFunctionParamNotRepresentable(
   describeObjCReason(AFD, Reason);
 }
 
-static bool isParamListRepresentableInObjC(TypeChecker &TC,
-                                           const AbstractFunctionDecl *AFD,
+static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
                                            const ParameterList *PL,
                                            ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
+  ASTContext &ctx = AFD->getASTContext();
+  auto &diags = ctx.Diags;
 
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
-
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
   bool IsObjC = true;
   unsigned NumParams = PL->size();
   for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
@@ -240,9 +240,9 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
 
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
-      if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
-        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
-                    getObjCDiagnosticAttrKind(Reason))
+      if (Diagnose && shouldDiagnoseObjCReason(Reason, ctx)) {
+        diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
+                       getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
         describeObjCReason(AFD, Reason);
       }
@@ -252,9 +252,9 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
 
     // Swift inout parameters are not representable in Objective-C.
     if (param->isInOut()) {
-      if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
-        TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
-                    getObjCDiagnosticAttrKind(Reason))
+      if (Diagnose && shouldDiagnoseObjCReason(Reason, ctx)) {
+        diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
+                       getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
         describeObjCReason(AFD, Reason);
       }
@@ -287,7 +287,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
       // producing diagnostics.
       return IsObjC;
     }
-    diagnoseFunctionParamNotRepresentable(TC, AFD, NumParams, ParamIndex,
+    diagnoseFunctionParamNotRepresentable(AFD, NumParams, ParamIndex,
                                           param, Reason);
   }
   return IsObjC;
@@ -295,16 +295,15 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
 
 /// Check whether the given declaration contains its own generic parameters,
 /// and therefore is not representable in Objective-C.
-static bool checkObjCWithGenericParams(TypeChecker &TC,
-                                       const AbstractFunctionDecl *AFD,
+static bool checkObjCWithGenericParams(const AbstractFunctionDecl *AFD,
                                        ObjCReason Reason) {
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, AFD->getASTContext());
 
   if (AFD->getGenericParams()) {
     // Diagnose this problem, if asked to.
     if (Diagnose) {
-      TC.diagnose(AFD->getLoc(), diag::objc_invalid_with_generic_params,
-                  getObjCDiagnosticAttrKind(Reason));
+      AFD->diagnose(diag::objc_invalid_with_generic_params,
+                    getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(AFD, Reason);
     }
 
@@ -316,10 +315,9 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
 
 /// CF types cannot have @objc methods, because they don't have real class
 /// objects.
-static bool checkObjCInForeignClassContext(TypeChecker &TC,
-                                           const ValueDecl *VD,
+static bool checkObjCInForeignClassContext(const ValueDecl *VD,
                                            ObjCReason Reason) {
-  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, VD->getASTContext());
 
   auto type = VD->getDeclContext()->getDeclaredInterfaceType();
   if (!type)
@@ -335,17 +333,17 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
 
   case ClassDecl::ForeignKind::CFType:
     if (Diagnose) {
-      TC.diagnose(VD, diag::objc_invalid_on_foreign_class,
-                  getObjCDiagnosticAttrKind(Reason));
+      VD->diagnose(diag::objc_invalid_on_foreign_class,
+                   getObjCDiagnosticAttrKind(Reason));
       describeObjCReason(VD, Reason);
     }
     break;
 
   case ClassDecl::ForeignKind::RuntimeOnly:
     if (Diagnose) {
-      TC.diagnose(VD, diag::objc_in_objc_runtime_visible,
-                  VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
-                  clas->getName());
+      VD->diagnose(diag::objc_in_objc_runtime_visible,
+                   VD->getDescriptiveKind(), getObjCDiagnosticAttrKind(Reason),
+                   clas->getName());
       describeObjCReason(VD, Reason);
     }
     break;
@@ -358,15 +356,14 @@ static bool checkObjCInForeignClassContext(TypeChecker &TC,
 /// extension, or an extension of a class with generic ancestry, or an
 /// extension of an Objective-C runtime visible class, and
 /// therefore is not representable in Objective-C.
-static bool checkObjCInExtensionContext(TypeChecker &tc,
-                                        const ValueDecl *value,
+static bool checkObjCInExtensionContext(const ValueDecl *value,
                                         bool diagnose) {
   auto DC = value->getDeclContext();
 
   if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
     if (ED->getTrailingWhereClause()) {
       if (diagnose) {
-        tc.diagnose(value->getLoc(), diag::objc_in_extension_context);
+        value->diagnose(diag::objc_in_extension_context);
       }
       return true;
     }
@@ -379,7 +376,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
                            ->getGenericAncestor()) {
       if (!generic->getClassOrBoundGenericClass()->hasClangNode()) {
         if (diagnose) {
-          tc.diagnose(value, diag::objc_in_generic_extension);
+          value->diagnose(diag::objc_in_generic_extension);
         }
         return true;
       }
@@ -424,11 +421,11 @@ bool TypeChecker::isRepresentableInObjC(
 
   bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
-  if (checkObjCInForeignClassContext(*this, AFD, Reason))
+  if (checkObjCInForeignClassContext(AFD, Reason))
     return false;
-  if (checkObjCWithGenericParams(*this, AFD, Reason))
+  if (checkObjCWithGenericParams(AFD, Reason))
     return false;
-  if (checkObjCInExtensionContext(*this, AFD, Diagnose))
+  if (checkObjCInExtensionContext(AFD, Diagnose))
     return false;
 
   if (AFD->isOperator()) {
@@ -505,7 +502,7 @@ bool TypeChecker::isRepresentableInObjC(
     isSpecialInit = init->isObjCZeroParameterWithLongSelector();
 
   if (!isSpecialInit &&
-      !isParamListRepresentableInObjC(*this, AFD,
+      !isParamListRepresentableInObjC(AFD,
                                       AFD->getParameterLists().back(),
                                       Reason)) {
     if (!Diagnose) {
@@ -759,10 +756,10 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
                                      VD->getDeclContext());
   bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
-  if (Result && checkObjCInExtensionContext(*this, VD, Diagnose))
+  if (Result && checkObjCInExtensionContext(VD, Diagnose))
     return false;
 
-  if (checkObjCInForeignClassContext(*this, VD, Reason))
+  if (checkObjCInForeignClassContext(VD, Reason))
     return false;
 
   if (!Diagnose || Result)
@@ -790,7 +787,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
 
   bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
-  if (checkObjCInForeignClassContext(*this, SD, Reason))
+  if (checkObjCInForeignClassContext(SD, Reason))
     return false;
 
   // Figure out the type of the indices.
@@ -808,7 +805,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
         ForeignLanguage::ObjectiveC, SD->getDeclContext());
   bool Result = IndicesResult && ElementResult;
 
-  if (Result && checkObjCInExtensionContext(*this, SD, Diagnose))
+  if (Result && checkObjCInExtensionContext(SD, Diagnose))
     return false;
 
   // Make sure we know how to map the selector appropriately.
