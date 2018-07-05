@@ -103,8 +103,12 @@ public protocol _NSDictionaryCore :
   @objc(copyWithZone:)
   func copy(with zone: _SwiftNSZone?) -> AnyObject
 
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-    andKeys keys: UnsafeMutablePointer<AnyObject>?)
+  @objc(getObjects:andKeys:count:)
+  func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int
+  )
 
   @objc(countByEnumeratingWithState:objects:count:)
   func countByEnumerating(
@@ -125,9 +129,11 @@ public protocol _NSDictionaryCore :
 public protocol _NSDictionary : _NSDictionaryCore {
   // Note! This API's type is different from what is imported by the clang
   // importer.
-  func getObjects(_ objects: UnsafeMutablePointer<AnyObject>?,
-      andKeys keys: UnsafeMutablePointer<AnyObject>?)
-    }
+  func getObjects(
+    _ objects: UnsafeMutablePointer<AnyObject>?,
+    andKeys keys: UnsafeMutablePointer<AnyObject>?,
+    count: Int)
+}
 
 /// A shadow for the "core operations" of NSSet.
 ///
