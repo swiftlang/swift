@@ -687,7 +687,7 @@ class DevicePartitionerImpl
     } else {
       // Find an arbitrary device which hosts `opValue`, and do a tensor
       // transfer if needed.
-      assert(isa<SILInstruction>((SILNode *)opValue));
+      assert(opValue->getDefiningInstruction());
       operandDeviceType =
           getSomeDevicePlacement(opValue->getDefiningInstruction());
     }
@@ -786,7 +786,7 @@ class DevicePartitionerImpl
   ///
   /// When we insert a TensorTransfer builtin, S cannot be ALL, since otherwise
   /// we know the operand is already local to D.  Note D can be ALL though. In
-  /// that case, when the device-specifc function on D processes this
+  /// that case, when the device-specific function on D processes this
   /// TensorTransfer, it should send the operand to all devices but itself.
   void makeOperandLocal(DeviceType deviceType, SILInstruction *inst,
                         unsigned operIdx) {
@@ -862,13 +862,14 @@ class DevicePartitionerImpl
         }
       }
 
-      // The operand must have been produced by a `builtin` inst or an
-      // UncheckedRefCastInst.
+      // The operand must have been produced by a `builtin` tfop inst, graph op
+      // inst, or an UncheckedRefCastInst.
       SubstitutionMap subMap;
       if (auto *builtinInst = dyn_cast<BuiltinInst>(operandInst)) {
         subMap = builtinInst->getSubstitutions();
       } else {
-        assert(isa<UncheckedRefCastInst>(operandInst));
+        assert(isa<UncheckedRefCastInst>(operandInst) ||
+               isa<GraphOperationInst>(operandInst));
         auto tensorTy = operandInst->getResults()[0]->getType();
         assert(isTensorFlowValue(tensorTy));
         auto &ctx = srcFn.getASTContext();

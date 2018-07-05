@@ -1887,6 +1887,43 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn,
   return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
 }
 
+void GraphGlobalConfiguration::handleDevicePlacement(
+    StringRef opType, StringRef opDevice, SILBuilder &B, SILLocation loc,
+    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+  // No device placement for this special-case "pseudo-op" for
+  // scalar-to-tensor promotion. It will later be translated by compiler (in
+  // PartitionCloner) into real TF ops, where device placement is handled at
+  // that time.
+  if (opType == "tfc.scalarToTensor") {
+    assert(opDevice.empty());
+    return;
+  }
+
+  DeviceType chosenDevice;
+  if (!opDevice.empty())
+    chosenDevice = getOpDeviceType(opDevice);
+  else
+    chosenDevice = chooseDevice(opType);
+
+  markDeviceUsed(chosenDevice);
+
+  // Example output SIL:
+  // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
+  // %3 = builtin "__tfop_Const,dtype,value$tensor,__device"(%0 : $@thin
+  // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
+  // %$TensorHandle<Float> // user: %4
+  //
+  // Note we generate the StringLiteral inst for op device even when the input
+  // `opDevice` is not empty. This is redundant but keeps the code simple, and
+  // we expect the original StringLiteral inst for the op device to get DCE'd
+  // in a later compiler pass.
+  auto deviceString = getDeviceString(chosenDevice);
+  auto &ctx = B.getModule().getASTContext();
+  attributes.push_back(
+      {ctx.getIdentifier(DEVICE_ATTR),
+       SymbolicValue::getString(deviceString, ctx.getAllocator())});
+}
+
 //===----------------------------------------------------------------------===//
 // Source Location Manipulation Helpers
 //===----------------------------------------------------------------------===//
