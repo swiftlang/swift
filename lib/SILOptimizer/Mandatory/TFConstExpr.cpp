@@ -242,9 +242,8 @@ namespace {
     /// key, unless `initialValue` is an unknown value, representing a failure in
     /// compiler-time evaluation.
     AddressValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
-      if (!initialValue.isUnknown()) {
+      if (!initialValue.isUnknown())
         assert(!addressValues.count(addr));
-      }
       unsigned objectID = memoryObjects.size();
       auto objectType = simplifyType(addr->getType().getASTType());
       memoryObjects.push_back({initialValue, objectType});
@@ -1529,7 +1528,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
       nextInst = caseBB->begin();
       continue;
     }
-    
+
     DEBUG(llvm::dbgs() << "ConstExpr: Unknown Terminator: " << *inst << "\n");
 
     // TODO: Enum switches when we support enums?

@@ -198,7 +198,7 @@ public:
 
     /// This is an enum without payload.
     Enum,
-    /// This is an enum without payload.
+    /// This is an enum with payload.
     EnumWithPayload,
 
     /// These values are generally only seen internally to the system, external
