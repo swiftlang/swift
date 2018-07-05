@@ -1070,9 +1070,8 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Stmt *stmt) {
 }
 
 /// Find all of the (non-nested) closures referenced within this expression.
-static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
-  SmallVector<ClosureExpr *, 4> closures;
-  if (!expr) return closures;
+static void findClosures(Expr *expr, SmallVectorImpl<ClosureExpr *> &closures) {
+  if (!expr) return;
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
@@ -1110,14 +1109,20 @@ static SmallVector<ClosureExpr *, 4> findClosures(Expr *expr) {
   };
 
   expr->walk(ClosureFinder(closures));
-  return closures;
 }
 
 ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Expr *expr) {
   if (!expr) return nullptr;
+  return createIfNeeded(parent, llvm::makeArrayRef(expr));
+}
 
-  // Dig out closure expressions within the given expression.
-  auto closures = findClosures(expr);
+ASTScope *ASTScope::createIfNeeded(const ASTScope *parent,
+                                   ArrayRef<Expr *> exprs) {
+  SmallVector<ClosureExpr*, 4> closures;
+
+  // Dig out closure expressions within the given expressions.
+  for (auto expr: exprs)
+    findClosures(expr, closures);
   if (closures.empty())
     return nullptr;
 
