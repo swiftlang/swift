@@ -4,6 +4,8 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_library(swiftAST STATIC
+  AccessScopeChecker.cpp
+  AccessRequests.cpp
   ASTContext.cpp
   ASTDumper.cpp
   ASTMangler.cpp

@@ -1502,7 +1502,6 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
     }
 
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
-    TC.computeDefaultAccessLevel(extension);
     AccessLevel maxAccess = extension->getMaxAccessLevel();
     if (std::min(attr->getAccess(), AccessLevel::Public) > maxAccess) {
       // FIXME: It would be nice to say what part of the requirements actually
