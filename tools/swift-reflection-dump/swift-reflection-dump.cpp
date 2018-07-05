@@ -263,12 +263,8 @@ static int doDumpReflectionSections(ArrayRef<std::string> binaryFilenames,
     objectOwners.push_back(std::move(objectOwner));
     objectFiles.push_back(objectFile);
 
-#if defined(__APPLE__)
     auto startAddress = (uintptr_t)objectFile->getData().begin();
     context.addImage(RemoteAddress(startAddress));
-#else
-    context.addReflectionInfo(findReflectionInfo(objectFile));
-#endif
   }
 
   switch (action) {
