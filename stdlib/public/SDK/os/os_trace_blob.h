@@ -13,8 +13,11 @@
 #ifndef __BLOB_H__
 #define __BLOB_H__
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include "thunks.h"
 
 OS_ENUM(os_trace_blob_flags, uint16_t,
