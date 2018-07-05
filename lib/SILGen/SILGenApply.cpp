@@ -5292,8 +5292,10 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
 
   auto origAccessType = SGM.Types.getConstantInfo(materializeForSet).FormalType;
 
-  auto origSelfType = origAccessType->getInput()
-      ->getInOutObjectType()
+  assert(origAccessType->getParams().size() == 1 &&
+         "more than one self parameter?");
+  auto origSelfType = origAccessType
+      ->getParams()[0].getPlainType()
       ->getCanonicalType();
 
   CanGenericSignature genericSig;
