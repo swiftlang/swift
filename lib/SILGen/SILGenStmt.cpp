@@ -426,7 +426,7 @@ namespace {
     SourceLoc deferLoc;
   public:
     DeferEscapeCheckerCleanup(SourceLoc deferLoc) : deferLoc(deferLoc) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       assert(false && "Sema didn't catch exit out of a defer?");
     }
     void dump(SILGenFunction &) const override {
@@ -446,7 +446,7 @@ namespace {
   public:
     DeferCleanup(SourceLoc deferLoc, Expr *call)
       : deferLoc(deferLoc), call(call) {}
-    void emit(SILGenFunction &SGF, CleanupLocation l) override {
+    void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
       SGF.Cleanups.pushCleanup<DeferEscapeCheckerCleanup>(deferLoc);
       auto TheCleanup = SGF.Cleanups.getTopCleanup();
 
@@ -1010,5 +1010,5 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
   }
 
   // Branch to the cleanup destination.
-  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn);
+  Cleanups.emitBranchAndCleanups(ThrowDest, loc, exn, IsForUnwind);
 }

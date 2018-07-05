@@ -44,7 +44,9 @@ struct LValueWritebackCleanup : Cleanup {
 
   LValueWritebackCleanup() : Depth() {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation loc) override {
+  void emit(SILGenFunction &SGF, CleanupLocation loc,
+            ForUnwind_t forUnwind) override {
+    // TODO: honor forUnwind!
     auto &evaluation = *SGF.FormalEvalContext.find(Depth);
     assert(evaluation.getKind() == FormalAccess::Exclusive);
     auto &lvalue = static_cast<ExclusiveBorrowFormalAccess &>(evaluation);
@@ -554,7 +556,8 @@ struct UnenforcedAccessCleanup : Cleanup {
 
   UnenforcedAccessCleanup() : Depth() {}
 
-  void emit(SILGenFunction &SGF, CleanupLocation loc) override {
+  void emit(SILGenFunction &SGF, CleanupLocation loc,
+            ForUnwind_t forUnwind) override {
     auto &evaluation = *SGF.FormalEvalContext.find(Depth);
     assert(evaluation.getKind() == FormalAccess::Unenforced);
     auto &formalAccess = static_cast<UnenforcedFormalAccess &>(evaluation);
