@@ -135,6 +135,55 @@ struct LLVM_LIBRARY_VISIBILITY FindClosureResult {
 /// by a reabstraction thunk.
 FindClosureResult findClosureForAppliedArg(SILValue V);
 
+struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
+  /// Set to true if the function-ref_ref escapes into a use that our analysis
+  /// does not understand. Set to false if we found a use that had an actual
+  /// escape. Set to None if we did not find any call sites, but also didn't
+  /// find any "escaping uses" as well.
+  ///
+  /// The none case is so that we can distinguish in between saying that a value
+  /// did escape and saying that we did not find any conservative information.
+  Optional<bool> escapes;
+
+  /// Contains the list of local non fully applied partial apply sites that we
+  /// found.
+  SmallVector<ApplySite, 1> partialApplySites;
+
+  /// Contains the list of full apply sites that we found.
+  SmallVector<FullApplySite, 1> fullApplySites;
+
+  /// Deleted default constructor. This is a move only type.
+  FindLocalApplySitesResult()
+      : escapes(), partialApplySites(), fullApplySites() {}
+  FindLocalApplySitesResult(const FindLocalApplySitesResult &) = delete;
+  FindLocalApplySitesResult(FindLocalApplySitesResult &&) = default;
+  ~FindLocalApplySitesResult() = default;
+
+  /// Treat this function ref as escaping if we either found an actual user we
+  /// didn't understand.
+  ///
+  /// When determining if we have an "interesting" result, we want to return
+  /// true if escaping is true or false. That is because conservatively we want
+  /// to know that we found some sort of information. On the other hand, for
+  /// determining if non-conservatively we actually did escape, we do not want
+  /// to consider not finding a value for escaping as equivalent to having an
+  /// escape.
+  bool isEscaping() const { return escapes.getValueOr(false); }
+
+  /// We convert to true if we have any "non"-conservative information about the
+  /// FunctionRefInst that was processed.
+  ///
+  /// NOTE: We want to return true if escapes has any value. Otherwise, we may
+  /// ignore e
+  operator bool() const {
+    return escapes.hasValue() || partialApplySites.size() ||
+           fullApplySites.size();
+  }
+};
+
+/// Returns true if we found any apply sites for the given function_ref.
+FindLocalApplySitesResult findLocalApplySites(FunctionRefInst *FRI);
+
 /// A utility class for evaluating whether a newly parsed or deserialized
 /// function has qualified or unqualified ownership.
 ///
