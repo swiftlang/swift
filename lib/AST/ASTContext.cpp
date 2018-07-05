@@ -3395,8 +3395,6 @@ ReferenceStorageType *ReferenceStorageType::get(Type T,
     break;
   case ReferenceOwnershipOptionality::Allowed:
     break;
-  case ReferenceOwnershipOptionality::AllowedIfImporting:
-    break;
   case ReferenceOwnershipOptionality::Required:
     assert(T->getOptionalObjectType() && "optional type is required");
     break;
