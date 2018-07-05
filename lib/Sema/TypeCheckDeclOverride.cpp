@@ -86,6 +86,12 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
     auto owningType = dc->getDeclaredInterfaceType();
     assert(owningType);
 
+    if (!derivedDecl->hasInterfaceType()) {
+      auto lazyResolver = ctx.getLazyResolver();
+      assert(lazyResolver && "Need to resolve interface type");
+      lazyResolver->resolveDeclSignature(derivedDecl);
+    }
+
     memberType = owningType->adjustSuperclassMemberDeclType(member, derivedDecl,
                                                             memberType);
     if (memberType->hasError())
