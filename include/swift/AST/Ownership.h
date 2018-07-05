@@ -45,7 +45,7 @@ enum : unsigned { NumReferenceOwnershipBits =
 static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
   switch (ownership) {
   case ReferenceOwnership::Strong:
-    assert(false && "not applicable");
+    llvm_unreachable("not applicable");
   case ReferenceOwnership::Weak: return "weak";
   case ReferenceOwnership::Unowned: return "unowned";
   case ReferenceOwnership::Unmanaged: return "unowned(unsafe)";
@@ -56,7 +56,7 @@ static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
 static inline llvm::StringRef manglingOf(ReferenceOwnership ownership) {
   switch (ownership) {
   case ReferenceOwnership::Strong:
-    assert(false && "not applicable");
+    llvm_unreachable("not applicable");
   case ReferenceOwnership::Weak: return "Xw";
   case ReferenceOwnership::Unowned: return "Xo";
   case ReferenceOwnership::Unmanaged: return "Xu";
