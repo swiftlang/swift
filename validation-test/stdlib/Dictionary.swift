@@ -3,9 +3,9 @@
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control ; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control; \
 // RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control ; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control; \
 // RUN: fi
 //
 // RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
@@ -1347,12 +1347,10 @@ DictionaryTestSuite.test("COW.Fast.ValuesAccessDoesNotReallocate") {
   assert(d1.values[i] == 1010)
   assert(d1[i] == (10, 1010))
   
-#if swift(>=4.0)
   d2.values[i] += 1
   assert(d2.values[i] == 1011)
   assert(d2[10]! == 1011)
   assert(identity1 != d2._rawIdentifier())
-#endif
   
   assert(d1[10]! == 1010)
   assert(identity1 == d1._rawIdentifier())
@@ -1411,9 +1409,7 @@ DictionaryTestSuite.test("COW.Fast.KeysAccessDoesNotReallocate") {
     // keys.firstIndex(of:) - O(1) bucket + linear search
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     let l = d2.keys.firstIndex(of: lastKey)!
-#if swift(>=4.0)
     expectLE(MinimalHashableValue.timesEqualEqualWasCalled, 4)
-#endif
 
     expectEqual(j, k)
     expectEqual(k, l)

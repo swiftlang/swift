@@ -514,14 +514,8 @@ DispatchAPI.test("DispatchData.bufferUnsafeRawBufferPointer") {
 
 DispatchAPI.test("DispatchIO.initRelativePath") {
 	let q = DispatchQueue(label: "initRelativePath queue")
-#if swift(>=4.0)
 	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
 	expectEqual(chan, nil)
-#else
-	expectCrashLater()
-	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
-	chan.setInterval(interval: .seconds(1)) // Dereference of unexpected nil should crash
-#endif
 }
 
 if #available(OSX 10.13, iOS 11.0, watchOS 4.0, tvOS 11.0, *) {
