@@ -13,8 +13,8 @@
 //  This file defines type checking requests.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SEMA_REQUESTS_H
-#define SWIFT_SEMA_REQUESTS_H
+#ifndef SWIFT_TYPE_CHECK_REQUESTS_H
+#define SWIFT_TYPE_CHECK_REQUESTS_H
 
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
@@ -127,6 +127,8 @@ public:
 #define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
+#undef SWIFT_TYPEID_ZONE
+#undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
 #define SWIFT_TYPEID(RequestType)                                \
@@ -140,4 +142,4 @@ inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
 
 } // end namespace swift
 
-#endif // SWIFT_SEMA_REQUESTS_H
+#endif // SWIFT_TYPE_CHECK_REQUESTS_H

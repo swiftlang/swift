@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
@@ -983,6 +984,18 @@ bool ExtensionDecl::isEquivalentToExtendedContext() const {
   return getParentModule() == decl->getParentModule()
     && !isConstrainedExtension()
     && !getDeclaredInterfaceType()->isExistentialType();
+}
+
+AccessLevel ExtensionDecl::getDefaultAccessLevel() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)}).first;
+}
+
+AccessLevel ExtensionDecl::getMaxAccessLevel() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+    DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)}).second;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -2279,15 +2292,22 @@ AccessLevel ValueDecl::getEffectiveAccess() const {
   return effectiveAccess;
 }
 
-AccessLevel ValueDecl::getFormalAccessImpl(const DeclContext *useDC) const {
-  assert((getFormalAccess() == AccessLevel::Internal ||
-          getFormalAccess() == AccessLevel::Public) &&
-         "should be able to fast-path non-internal cases");
-  assert(useDC && "should fast-path non-scoped cases");
-  if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
-    if (useSF->hasTestableImport(getModuleContext()))
-      return getTestableAccess(this);
-  return getFormalAccess();
+AccessLevel ValueDecl::getFormalAccess(const DeclContext *useDC,
+                                       bool treatUsableFromInlineAsPublic) const {
+  ASTContext &ctx = getASTContext();
+  AccessLevel result = ctx.evaluator(AccessLevelRequest{const_cast<ValueDecl *>(this)});
+  if (treatUsableFromInlineAsPublic &&
+      result == AccessLevel::Internal &&
+      isUsableFromInline()) {
+    return AccessLevel::Public;
+  }
+  if (useDC && (result == AccessLevel::Internal ||
+                result == AccessLevel::Public)) {
+    if (auto *useSF = dyn_cast<SourceFile>(useDC->getModuleScopeContext()))
+      if (useSF->hasTestableImport(getModuleContext()))
+        return getTestableAccess(this);
+  }
+  return result;
 }
 
 AccessScope
@@ -3912,6 +3932,13 @@ bool AbstractStorageDecl::AccessorRecord::registerAccessor(AccessorDecl *decl,
     assert(getAccessor(decl->getAccessorKind()) == decl);
     return true;
   }
+}
+
+AccessLevel
+AbstractStorageDecl::getSetterFormalAccess() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(
+        SetterAccessLevelRequest{const_cast<AbstractStorageDecl *>(this)});
 }
 
 void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {

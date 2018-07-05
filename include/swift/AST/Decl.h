@@ -1678,27 +1678,18 @@ public:
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
   }
 
-  AccessLevel getDefaultAccessLevel() const {
-    assert(hasDefaultAccessLevel() && "not computed yet");
-    if (Bits.ExtensionDecl.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(AccessLevel::FilePrivate) - 1)))
-      return AccessLevel::FilePrivate;
-    if (Bits.ExtensionDecl.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
-      return AccessLevel::Internal;
-    return AccessLevel::Public;
+  uint8_t getDefaultAndMaxAccessLevelBits() const {
+    return Bits.ExtensionDecl.DefaultAndMaxAccessLevel;
+  }
+  void setDefaultAndMaxAccessLevelBits(AccessLevel defaultAccess,
+                                       AccessLevel maxAccess) {
+    Bits.ExtensionDecl.DefaultAndMaxAccessLevel =
+      (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
+      (1 << (static_cast<unsigned>(maxAccess) - 1));
   }
 
-  AccessLevel getMaxAccessLevel() const {
-    assert(hasDefaultAccessLevel() && "not computed yet");
-    if (Bits.ExtensionDecl.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(AccessLevel::Public) - 1)))
-      return AccessLevel::Public;
-    if (Bits.ExtensionDecl.DefaultAndMaxAccessLevel &
-        (1 << (static_cast<unsigned>(AccessLevel::Internal) - 1)))
-      return AccessLevel::Internal;
-    return AccessLevel::FilePrivate;
-  }
+  AccessLevel getDefaultAccessLevel() const;
+  AccessLevel getMaxAccessLevel() const;
 
   void setDefaultAndMaxAccess(AccessLevel defaultAccess,
                               AccessLevel maxAccess) {
@@ -1706,9 +1697,7 @@ public:
     assert(maxAccess >= defaultAccess);
     assert(maxAccess != AccessLevel::Private && "private not valid");
     assert(defaultAccess != AccessLevel::Private && "private not valid");
-    Bits.ExtensionDecl.DefaultAndMaxAccessLevel =
-        (1 << (static_cast<unsigned>(defaultAccess) - 1)) |
-        (1 << (static_cast<unsigned>(maxAccess) - 1));
+    setDefaultAndMaxAccessLevelBits(defaultAccess, maxAccess);
     assert(getDefaultAccessLevel() == defaultAccess && "not enough bits");
     assert(getMaxAccessLevel() == maxAccess && "not enough bits");
   }
@@ -2278,8 +2267,8 @@ public:
     return TypeAndAccess.getInt().hasValue();
   }
 
-  /// \see getFormalAccess
-  AccessLevel getFormalAccessImpl(const DeclContext *useDC) const;
+  /// Access control is done by Requests.
+  friend class AccessLevelRequest;
 
   /// Returns the access level specified explicitly by the user, or provided by
   /// default according to language rules.
@@ -2296,19 +2285,7 @@ public:
   ///
   /// \sa getFormalAccessScope
   AccessLevel getFormalAccess(const DeclContext *useDC = nullptr,
-                              bool treatUsableFromInlineAsPublic = false) const {
-    assert(hasAccess() && "access not computed yet");
-    AccessLevel result = TypeAndAccess.getInt().getValue();
-    if (treatUsableFromInlineAsPublic &&
-        result == AccessLevel::Internal &&
-        isUsableFromInline()) {
-      return AccessLevel::Public;
-    }
-    if (useDC && (result == AccessLevel::Internal ||
-                  result == AccessLevel::Public))
-      return getFormalAccessImpl(useDC);
-    return result;
-  }
+                              bool treatUsableFromInlineAsPublic = false) const;
 
   /// If this declaration is a member of a protocol extension, return the
   /// minimum of the given access level and the protocol's access level.
@@ -4046,6 +4023,7 @@ struct alignas(1 << 3) BehaviorRecord {
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
+  friend class SetterAccessLevelRequest;
 public:
   static const size_t MaxNumAccessors = 255;
 private:
@@ -4261,11 +4239,7 @@ public:
     return getAccessor(AccessorKind::Set);
   }
 
-  AccessLevel getSetterFormalAccess() const {
-    assert(hasAccess());
-    assert(Accessors.getInt().hasValue());
-    return Accessors.getInt().getValue();
-  }
+  AccessLevel getSetterFormalAccess() const;
 
   void setSetterAccess(AccessLevel accessLevel) {
     assert(!Accessors.getInt().hasValue());
@@ -6502,6 +6476,8 @@ AbstractStorageDecl::overwriteSetterAccess(AccessLevel accessLevel) {
     setter->overwriteAccess(accessLevel);
   if (auto materializeForSet = getMaterializeForSetFunc())
     materializeForSet->overwriteAccess(accessLevel);
+  if (auto mutableAddressor = getMutableAddressor())
+    mutableAddressor->overwriteAccess(accessLevel);
 }
 
 inline bool AbstractStorageDecl::isStatic() const {
