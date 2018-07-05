@@ -593,7 +593,7 @@ swift::swift_getObjCClassFromMetadata(const Metadata *theMetadata) {
 
   // Otherwise, the input should already be a Swift class object.
   auto theClass = cast<ClassMetadata>(theMetadata);
-  assert(theClass->isTypeMetadata() && !theClass->isArtificialSubclass());
+  assert(theClass->isTypeMetadata());
   return theClass;
 }
 
