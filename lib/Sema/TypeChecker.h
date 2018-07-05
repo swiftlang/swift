@@ -678,11 +678,6 @@ public:
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
     specializedOverloadComparisonCache;
   
-  // We delay validation of C and Objective-C type-bridging functions in the
-  // standard library until we encounter a declaration that requires one. This
-  // flag is set to 'true' once the bridge functions have been checked.
-  bool HasCheckedBridgeFunctions = false;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;

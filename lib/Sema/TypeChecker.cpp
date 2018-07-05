@@ -17,6 +17,7 @@
 
 #include "swift/Subsystems.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "GenericTypeResolver.h"
@@ -669,6 +670,10 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
         }
       }
     });
+
+    // Look for bridging functions. This only matters when
+    // -enable-source-import is provided.
+    checkBridgedFunctions(TC.Context);
 
     // Type check the top-level elements of the source file.
     bool hasTopLevelCode = false;

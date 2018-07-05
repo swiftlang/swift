@@ -137,6 +137,11 @@ bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
 /// Check whether the given declaration can be represented in Objective-C.
 bool canBeRepresentedInObjC(const ValueDecl *decl);
 
+/// Check that specific, known bridging functions are fully type-checked.
+///
+/// NOTE: This is only here to support the --enable-source-import hack.
+void checkBridgedFunctions(ASTContext &ctx);
+
 } // end namespace swift
 
 #endif // SWIFT_SEMA_TYPE_CHECK_OBJC_H

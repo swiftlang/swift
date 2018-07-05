@@ -928,24 +928,19 @@ static void checkObjCBridgingFunctions(ModuleDecl *mod,
   }
 }
 
-static void checkBridgedFunctions(TypeChecker &TC) {
-  if (TC.HasCheckedBridgeFunctions)
-    return;
-
-  TC.HasCheckedBridgeFunctions = true;
-
+void swift::checkBridgedFunctions(ASTContext &ctx) {
   #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
-  Identifier ID_##BRIDGED_MOD = TC.Context.getIdentifier(#BRIDGED_MOD);\
-  if (ModuleDecl *module = TC.Context.getLoadedModule(ID_##BRIDGED_MOD)) {\
+  Identifier ID_##BRIDGED_MOD = ctx.getIdentifier(#BRIDGED_MOD);\
+  if (ModuleDecl *module = ctx.getLoadedModule(ID_##BRIDGED_MOD)) {\
     checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
     "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
     "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
   }
   #include "swift/SIL/BridgedTypes.def"
 
-  if (ModuleDecl *module = TC.Context.getLoadedModule(TC.Context.Id_Foundation)) {
+  if (ModuleDecl *module = ctx.getLoadedModule(ctx.Id_Foundation)) {
     checkObjCBridgingFunctions(module,
-                               TC.Context.getSwiftName(
+                               ctx.getSwiftName(
                                  KnownFoundationEntity::NSError),
                                "_convertNSErrorToError",
                                "_convertErrorToNSError");
@@ -1434,9 +1429,6 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     attr->setInvalid();
   }
 
-  // Make sure we have the appropriate bridging operations.
-  if (!isa<DestructorDecl>(D))
-    checkBridgedFunctions(TC);
   TC.useObjectiveCBridgeableConformances(D->getInnermostDeclContext(),
                                          D->getInterfaceType());
 
