@@ -502,13 +502,6 @@ namespace {
         }
       }
 
-      /// Convenience declaration to make the intersection operation look more
-      /// symmetric.
-      static Space intersect(const Space &a, const Space &b, TypeChecker &TC,
-                             const DeclContext *DC) {
-        return a.intersect(b, TC, DC);
-      }
-
       // Returns the intersection of this space with another.  The intersection
       // is the largest shared subspace occupied by both arguments.
       Space intersect(const Space &other, TypeChecker &TC,
@@ -530,7 +523,7 @@ namespace {
           std::transform(
               other.getSpaces().begin(), other.getSpaces().end(),
               std::back_inserter(intersectedCases),
-              [&](const Space &s) { return intersect(*this, s, TC, DC); });
+              [&](const Space &s) { return this->intersect(s, TC, DC); });
           return Space::forDisjunct(intersectedCases);
         }
 
@@ -540,7 +533,7 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
           // Optimization: The intersection of equal types is that type.
@@ -548,10 +541,10 @@ namespace {
             return other;
           } else if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           } else {
             return other;
           }
@@ -559,7 +552,7 @@ namespace {
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else {
             return other;
           }
@@ -580,7 +573,7 @@ namespace {
           std::transform(this->getSpaces().begin(), this->getSpaces().end(),
                          std::back_inserter(newSubSpaces),
                          [&](const Space &subSpace) {
-                           return intersect(subSpace, other, TC, DC);
+                           return subSpace.intersect(other, TC, DC);
                          });
           return Space::forConstructor(this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
@@ -605,7 +598,7 @@ namespace {
           auto j = other.getSpaces().begin();
           for (; i != this->getSpaces().end() && j != other.getSpaces().end();
                ++i, ++j) {
-            auto result = intersect(*i, *j, TC, DC);
+            auto result = i->intersect(*j, TC, DC);
             // If at least one of the constructor sub-spaces is empty,
             // it makes the whole space empty as well.
             if (result.isEmpty()) {
@@ -619,7 +612,7 @@ namespace {
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
           if (other.isAllowedButNotRequired())
             return other;
@@ -635,7 +628,7 @@ namespace {
 
           if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           }
           return Space();
         }
@@ -645,7 +638,7 @@ namespace {
           return Space();
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          return intersect(other, *this, TC, DC);
+          return other.intersect(*this, TC, DC);
         }
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
@@ -689,10 +682,10 @@ namespace {
             return Space();
           } else if (canDecompose(this->getType(), DC)) {
             auto decomposition = decompose(TC, DC, this->getType());
-            return intersect(decomposition, other, TC, DC);
+            return decomposition.intersect(other, TC, DC);
           } else if (canDecompose(other.getType(), DC)) {
             auto decomposition = decompose(TC, DC, other.getType());
-            return intersect(*this, decomposition, TC, DC);
+            return this->intersect(decomposition, TC, DC);
           }
           return Space();
         }
@@ -783,7 +776,7 @@ namespace {
             auto &s2 = *j;
             // If the intersection of each subspace is ever empty then the
             // two spaces are disjoint and their difference is the first space.
-            if (intersect(s1, s2, TC, DC).isEmpty()) {
+            if (s1.intersect(s2, TC, DC).isEmpty()) {
               return *this;
             }
 
