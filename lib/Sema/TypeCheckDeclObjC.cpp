@@ -858,31 +858,27 @@ bool TypeChecker::canBeRepresentedInObjC(const ValueDecl *decl) {
   return false;
 }
 
-static Type getObjectiveCNominalType(TypeChecker &TC,
-                                     Type &cache,
+static Type getObjectiveCNominalType(Type &cache,
                                      Identifier ModuleName,
                                      Identifier TypeName,
                                      DeclContext *dc) {
   if (cache)
     return cache;
 
-  auto &Context = TC.Context;
-
   // FIXME: Does not respect visibility of the module.
-  ModuleDecl *module = Context.getLoadedModule(ModuleName);
+  ASTContext &ctx = dc->getASTContext();
+  ModuleDecl *module = ctx.getLoadedModule(ModuleName);
   if (!module)
     return nullptr;
 
-  NameLookupOptions lookupOptions
-    = defaultMemberLookupOptions |
-      NameLookupFlags::KnownPrivate;
-  if (auto result = TC.lookupMemberType(dc, ModuleType::get(module), TypeName,
-                                        lookupOptions)) {
-    for (auto pair : result) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(pair.Member)) {
-        cache = nominal->getDeclaredType();
-        return cache;
-      }
+  SmallVector<ValueDecl *, 4> decls;
+  NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
+  dc->lookupQualified(ModuleType::get(module), TypeName, options, nullptr,
+                      decls);
+  for (auto decl : decls) {
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      cache = nominal->getDeclaredType();
+      return cache;
     }
   }
 
@@ -922,21 +918,21 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 #pragma mark Objective-C-specific types
 
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  return getObjectiveCNominalType(*this, NSObjectType, Context.Id_ObjectiveC,
+  return getObjectiveCNominalType(NSObjectType, Context.Id_ObjectiveC,
                                 Context.getSwiftId(
                                   KnownFoundationEntity::NSObject),
                                 dc);
 }
 
 Type TypeChecker::getNSErrorType(DeclContext *dc) {
-  return getObjectiveCNominalType(*this, NSErrorType, Context.Id_Foundation,
+  return getObjectiveCNominalType(NSErrorType, Context.Id_Foundation,
                                   Context.getSwiftId(
                                     KnownFoundationEntity::NSError),
                                   dc);
 }
 
 Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
-  return getObjectiveCNominalType(*this, ObjCSelectorType,
+  return getObjectiveCNominalType(ObjCSelectorType,
                                   Context.Id_ObjectiveC,
                                   Context.Id_Selector,
                                   dc);
