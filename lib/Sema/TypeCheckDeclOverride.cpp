@@ -660,6 +660,8 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
     assert(parentMethod || parentStorage);
+    (void)parentMethod;
+    (void)parentStorage;
 
     // Check whether the types are identical.
     auto parentDeclTy = getMemberTypeForComparison(ctx, parentDecl, decl);
