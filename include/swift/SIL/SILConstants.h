@@ -104,9 +104,7 @@ class SymbolicValue {
     RK_String,
 
     /// This value is an array, struct, or tuple of constants.  This is
-    /// tracked by the "aggregate" member of the value union.  Note that we
-    /// cheat and represent single-element structs as the value of their
-    /// element (since they are so common).
+    /// tracked by the "aggregate" member of the value union.
     RK_Aggregate,
 
     /// This value is an enum with no payload.
@@ -149,7 +147,7 @@ class SymbolicValue {
     StringSymbolicValue *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements, count, and element type.
+    /// information about the array elements and count.
     AggregateSymbolicValue *aggregate;
 
     /// When this SymbolicValue is of "Enum" kind, this pointer stores
