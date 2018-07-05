@@ -44,125 +44,226 @@ public:
   class FunctionInfo;
 
 private:
+  struct CallerInfo;
+
   /// Current module we are analyzing.
-  SILModule &Mod;
+  SILModule &mod;
 
   /// A map between all the functions and their callsites in the module.
-  llvm::DenseMap<SILFunction *, FunctionInfo> FuncInfos;
+  ///
+  /// We use a map vector to ensure that when we dump the state of the caller
+  /// analysis,
+  llvm::DenseMap<SILFunction *, FunctionInfo> funcInfos;
 
   /// A list of functions that needs to be recomputed.
-  llvm::SetVector<SILFunction *> RecomputeFunctionList;
-
-  /// Iterate over all the call sites in the function and update
-  /// CallInfo.
-  void processFunctionCallSites(SILFunction *F); 
-
-  /// This function is about to become "unknown" to us. Invalidate any 
-  /// callsite information related to it.
-  void invalidateExistingCalleeRelation(SILFunction *F); 
-
-  void processRecomputeFunctionList() {
-    for (auto &F : RecomputeFunctionList) {
-      processFunctionCallSites(F);
-    }
-    RecomputeFunctionList.clear(); 
-  }
+  llvm::SetVector<SILFunction *> recomputeFunctionList;
 
 public:
-  CallerAnalysis(SILModule *M) : SILAnalysis(AnalysisKind::Caller), Mod(*M) {
-    // Make sure we compute everything first time called.
-    for (auto &F : Mod) {
-      FuncInfos.FindAndConstruct(&F);
-      RecomputeFunctionList.insert(&F);
-    }
-  }
+  CallerAnalysis(SILModule *m);
 
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == AnalysisKind::Caller;
+  static bool classof(const SILAnalysis *s) {
+    return s->getKind() == AnalysisKind::Caller;
   }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {
-    FuncInfos.clear();
-    RecomputeFunctionList.clear();
-    for (auto &F : Mod) {
-      RecomputeFunctionList.insert(&F);
+    funcInfos.clear();
+    recomputeFunctionList.clear();
+    for (auto &f : mod) {
+      recomputeFunctionList.insert(&f);
     }
   }
 
-  /// Invalidate all of the information for a specific function.
-  virtual void invalidate(SILFunction *F, InvalidationKind K) override {
+  /// Invalidate all of the information for a specific caller function.
+  virtual void invalidate(SILFunction *caller, InvalidationKind k) override {
     // Should we invalidate based on the invalidation kind.
-    bool shouldInvalidate = K & InvalidationKind::CallsAndInstructions;
+    bool shouldInvalidate = k & InvalidationKind::CallsAndInstructions;
     if (!shouldInvalidate)
       return;
 
     // This function has become "unknown" to us. Invalidate any callsite
     // information related to this function.
-    invalidateExistingCalleeRelation(F);
+    invalidateExistingCalleeRelation(caller);
+
     // Make sure this function is recomputed next time.
-    RecomputeFunctionList.insert(F);
+    recomputeFunctionList.insert(caller);
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override {
-    RecomputeFunctionList.insert(F);
+  virtual void notifyAddFunction(SILFunction *f) override {
+    recomputeFunctionList.insert(f);
   }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
-    invalidateExistingCalleeRelation(F);
-    RecomputeFunctionList.remove(F);
+  virtual void notifyDeleteFunction(SILFunction *f) override {
+    invalidateExistingCalleeRelation(f);
+    recomputeFunctionList.remove(f);
   }
 
   /// Notify the analysis about changed witness or vtables.
-  virtual void invalidateFunctionTables() override { }
+  virtual void invalidateFunctionTables() override {}
 
-  const FunctionInfo &getCallerInfo(SILFunction *F) {
-    // Recompute every function in the invalidated function list and empty the
-    // list.
-    processRecomputeFunctionList();
-    return FuncInfos[F];
+  /// Look up the function info that we have stored for f, recomputing all
+  /// invalidating parts of the call graph.
+  const FunctionInfo &getCallerInfo(SILFunction *f) const;
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+#endif
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking.
+  void print(llvm::raw_ostream &os) const;
+
+  /// Print the state of the caller analysis as a sequence of yaml documents for
+  /// each callee we are tracking to the passed in file path.
+  LLVM_ATTRIBUTE_DEPRECATED(void print(const char *filePath)
+                                const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+
+private:
+  /// Iterate over all the call sites in the function and update
+  /// CallInfo.
+  void processFunctionCallSites(SILFunction *f);
+
+  /// This function is about to become "unknown" to us. Invalidate any
+  /// callsite information related to it.
+  void invalidateExistingCalleeRelation(SILFunction *f);
+
+  void processRecomputeFunctionList() {
+    for (auto &f : recomputeFunctionList) {
+      processFunctionCallSites(f);
+    }
+    recomputeFunctionList.clear();
   }
+
+  /// Internal only way for getting a caller info. Will insert f if needed and
+  /// _WILL NOT_ preform any recomputation of the callgraph.
+  FunctionInfo &getOrInsertCallerInfo(SILFunction *f);
 };
 
-/// NOTE: this can be extended to contain the callsites of the function.
+/// Auxillary information that we store about a specific caller.
+struct CallerAnalysis::CallerInfo {
+  /// Given a SILFunction F that contains at least one partial apply of the
+  /// given function, map F to the minimum number of partial applied
+  /// arguments of any partial application in F.
+  ///
+  /// By storing the minimum number of partial applied arguments, we are able
+  /// to decide quickly if we are able to eliminate dead captured arguments.
+  Optional<unsigned> numPartialAppliedArguments;
+
+  /// True if this caller performs at least one full application of the
+  /// callee.
+  bool hasFullApply : 1;
+
+  /// True if this caller can guarantee that all direct caller's of this
+  /// function inside of it can be found.
+  ///
+  /// NOTE: This does not imply that a function can not be called
+  /// indirectly. That is a separate query that is type system specific.
+  bool isDirectCallerSetComplete : 1;
+
+  CallerInfo()
+      : numPartialAppliedArguments(), hasFullApply(false),
+        isDirectCallerSetComplete(false) {}
+};
+
+/// This is a representation of the caller information that we have associated
+/// with a specific function.
+///
+/// NOTE: this can be extended to contain the callsites of the function. For
+/// now there is no need for the exact call sites due to us using only the
+/// caller information. By not implementing this we save memory and get rid of
+/// dead code.
 class CallerAnalysis::FunctionInfo {
   friend class CallerAnalysis;
-
-  /// A list of all the functions this function calls or partially applies.
-  llvm::SetVector<SILFunction *> Callees;
-  /// A list of all the callers this function has.
-  llvm::SmallSet<SILFunction *, 4> Callers;
-
-  /// The number of partial applied arguments of this function.
-  ///
-  /// Specifically, it stores the minimum number of partial applied arguments
-  /// of each function which contain one or multiple partial_applys of this
-  /// function.
-  /// This is a little bit off-topic because a partial_apply is not really
-  /// a "call" of this function.
-  llvm::DenseMap<SILFunction *, int> PartialAppliers;
+  using CallerInfo = CallerAnalysis::CallerInfo;
+  struct YAMLRepresentation;
 
 public:
+  /// FIXME: Upstream in LLVM this is a public using declaration on
+  /// MapVector (MapVector::value_type). In the version of LLVM that
+  /// Swift compiles against currently this is not true, so we provide
+  /// this for ease of use now.
+  ///
+  /// This is meant to be an internal implementation detail.
+  using CallerStatesValueType = std::pair<SILFunction *, CallerInfo>;
+
+private:
+  /// A map from a function containing uses of a function_ref of the callee to
+  /// the state that we store about the caller's body.
+  llvm::SmallMapVector<SILFunction *, CallerInfo, 1> callerStates;
+
+  /// True if this function is something that could be called via a vtable or
+  /// a witness table. This does not include escaping uses.
+  ///
+  /// For now this is very conservative and is only set to not be true if we
+  /// have a function whose representation never can escape. In future cases,
+  /// we should consider refining this to take into account the compilation
+  /// visibility of a protocol conformance or class (and thus if we have
+  /// enough visibility to).
+  bool mayHaveIndirectCallers : 1;
+
+  /// This is a special set vector that is an abuse as a performance
+  /// optimization. We in this case are treating the function info data
+  /// structure as a source of info about callers so that we can update a
+  /// caller's callees when we invalidate a caller. (See
+  /// invalidateExistingCalleeRelation).
+  llvm::SmallSetVector<SILFunction *, 1> calleeStates;
+
+public:
+  FunctionInfo(SILFunction *f);
+
+  bool hasAllCallers() const {
+    return hasOnlyCompleteDirectCallerSets() && !mayHaveIndirectCallers;
+  }
+
   /// Returns true if this function has at least one caller.
-  bool hasCaller() const { return !Callers.empty(); }
+  bool hasCaller() const {
+    return callerStates.size() &&
+           llvm::any_of(callerStates, [](const CallerStatesValueType &v) {
+             return v.second.hasFullApply;
+           });
+  }
 
   /// Returns non zero if this function is partially applied anywhere.
   ///
   /// The return value is the minimum number of partially applied arguments.
   /// Usually all partial applies of a function partially apply the same
   /// number of arguments anyway.
-  int getMinPartialAppliedArgs() const {
-    int minArgs = 0;
-    for (auto Iter : PartialAppliers) {
-      int numArgs = Iter.second;
-      if (minArgs == 0 || numArgs < minArgs)
-        minArgs = numArgs;
+  unsigned getMinPartialAppliedArgs() const {
+    if (callerStates.empty())
+      return 0;
+
+    bool foundArg = false;
+    unsigned minArgs = UINT_MAX;
+    for (const auto &iter : callerStates) {
+      if (auto numArgs = iter.second.numPartialAppliedArguments) {
+        foundArg = true;
+        minArgs = std::min(minArgs, numArgs.getValue());
+      }
     }
-    return minArgs;
+
+    return foundArg ? minArgs : 0;
   }
+
+  bool hasOnlyCompleteDirectCallerSets() const {
+    return llvm::all_of(callerStates, [](const CallerStatesValueType &v) {
+      return v.second.isDirectCallerSetComplete;
+    });
+  }
+
+  auto getAllReferencingCallers() const
+      -> decltype(llvm::make_range(callerStates.begin(), callerStates.end())) {
+    return llvm::make_range(callerStates.begin(), callerStates.end());
+  }
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "Only for use in the debugger");
+
+  void print(llvm::raw_ostream &os) const;
 };
 
 } // end namespace swift

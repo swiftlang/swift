@@ -755,7 +755,7 @@ public:
       return;
     }
 
-    CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
+    const CallerAnalysis *CA = PM->getAnalysis<CallerAnalysis>();
     const CallerAnalysis::FunctionInfo &FuncInfo = CA->getCallerInfo(F);
 
     // Check the signature of F to make sure that it is a function that we
