@@ -52,6 +52,7 @@ import DictTest3
 import DictTest4
 import DictTest4Legacy
 import DictionaryBridge
+import DictionaryBridgeToObjC
 import DictionaryCopy
 import DictionaryGroup
 import DictionaryLiteral
@@ -208,6 +209,7 @@ registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(Dictionary4Legacy)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryBridgeToObjC)
 registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryLiteral)
