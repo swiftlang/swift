@@ -1665,7 +1665,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public subscript<R: RangeExpression>(_ rangeExpression: R) -> Data
-        where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+        where R.Bound: FixedWidthInteger {
         get {
             let lower = R.Bound(_sliceRange.lowerBound)
             let upper = R.Bound(_sliceRange.upperBound)

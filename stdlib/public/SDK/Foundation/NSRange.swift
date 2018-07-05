@@ -140,7 +140,7 @@ extension NSRange {
 
 extension NSRange {
   public init<R: RangeExpression>(_ region: R)
-  where R.Bound: FixedWidthInteger, R.Bound.Stride : SignedInteger {
+  where R.Bound: FixedWidthInteger {
     let r = region.relative(to: 0..<R.Bound.max)
     self.init(location: numericCast(r.lowerBound), length: numericCast(r.count))
   }
