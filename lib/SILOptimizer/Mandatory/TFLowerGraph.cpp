@@ -1124,11 +1124,8 @@ TFGraphLowering::visitGraphOpRecvFromHostInst(GraphOperationInfo &graphOpInfo) {
                      .getIntegerValue()
                      .getLimitedValue();
 
-  TF_DataType outputType;
-  {
-    outputType =
-        getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
-  }
+  TF_DataType outputType =
+      getTensorFlowDataType(inst->getResults()[0]->getType(), inst->getLoc());
 
   // Add dequeue to the local graph function, and the corresponding enqueue to
   // the top level function, so that caller can enqueue tensors via SessionRun.
