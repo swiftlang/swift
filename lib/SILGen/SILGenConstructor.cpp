@@ -31,7 +31,10 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
                                            ValueDecl *ctor) {
   // In addition to the declared arguments, the constructor implicitly takes
   // the metatype as its first argument, like a static function.
-  Type metatype = ctor->getInterfaceType()->castTo<AnyFunctionType>()->getInput();
+  auto ctorFnType = ctor->getInterfaceType()->castTo<AnyFunctionType>();
+  assert(ctorFnType->getParams().size() == 1 &&
+         "more than one self parameter?");
+  Type metatype = ctorFnType->getParams()[0].getType();
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =

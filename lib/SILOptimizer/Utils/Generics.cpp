@@ -150,12 +150,18 @@ static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   if (auto *FnTy = t->getAs<FunctionType>()) {
     Depth++;
     unsigned MaxTypeDepth = 0;
+    auto Params = FnTy->getParams();
+    Width += Params.size();
+    for (auto &Param : Params) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
     unsigned TypeWidth;
     unsigned TypeDepth;
-    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getInput());
-    if (TypeDepth > MaxTypeDepth)
-      MaxTypeDepth = TypeDepth;
-    Width += TypeWidth;
     std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getResult());
     if (TypeDepth > MaxTypeDepth)
       MaxTypeDepth = TypeDepth;
