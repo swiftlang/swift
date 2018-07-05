@@ -279,6 +279,10 @@ if #available(macOS 10.14, iOS 12.0, tvOS 12.0, *) {
 		expectEqual(parameters.allowFastOpen, false)
 		parameters.allowFastOpen = true;
 		expectEqual(parameters.allowFastOpen, true)
+
+        expectEqual(parameters.includePeerToPeer, false)
+        parameters.includePeerToPeer = true;
+        expectEqual(parameters.includePeerToPeer, true)
 	}
 
 	NetworkAPI.test("NWProtocolTCP") {
@@ -399,6 +403,8 @@ if #available(macOS 10.14, iOS 12.0, tvOS 12.0, *) {
 		expectEqual(metadata.serviceClass, .bestEffort)
 		metadata.serviceClass = .background;
 		expectEqual(metadata.serviceClass, .background)
+
+        expectEqual(metadata.receiveTime, 0)
 	}
 
 	NetworkAPI.test("NWProtocolTLS") {
@@ -821,7 +827,7 @@ if #available(macOS 10.14, iOS 12.0, tvOS 12.0, *) {
 		listener.newConnectionHandler = { (newConn) in
 			expectNotNil(newConn)
 			inboundConnection = newConn
-			newConn.receive() { (receivedContent, context, isComplete, receivedError) in
+			newConn.receiveMessage() { (receivedContent, context, isComplete, receivedError) in
 				expectTrue(isComplete)
 				expectNil(receivedError)
 				expectNotNil(receivedContent)
