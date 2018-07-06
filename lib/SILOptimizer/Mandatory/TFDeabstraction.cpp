@@ -275,6 +275,9 @@ void TFDeabstraction::inlineCalls() {
   auto &module = fn.getModule();
   module.invalidateSILLoaderCaches();
 
+  if (!inlinedCallees.empty())
+    fn.setOptimizationMode(OptimizationMode::ForSpeed);
+
   // Now that we've inlined some functions, clean them up to avoid burning
   // compile time in later passes.  We do this with a simple linear scan,
   // because functions that reference each other have already been flattened
@@ -293,16 +296,7 @@ void TFDeabstraction::inlineCalls() {
     //
     // TODO: Build infra to find unused witness tables and remove them.
     if (callee->getRefCount() != 0) {
-
-      // FIXME: As a super hack, disable all optimization of the inlined
-      // methods that are defined and kept alive by the DifferentiableModule
-      // abstraction in the TensorFlow module.  These don't get removed because
-      // of the witness tables for DifferentiableModule, but we know that they
-      // don't matter.  Don't burn time optimizing them.
-      if (callee->getName().contains("adjoint3for4with") || //adjoint(for:with:
-          callee->getName().contains("6primal3for")) // primal(for:)
-        callee->setOptimizationMode(OptimizationMode::NoOptimization);
-
+      callee->setOptimizationMode(OptimizationMode::ForSpeed);
       continue;
     }
 
