@@ -4620,6 +4620,12 @@ public:
         continue;
       }
 
+      // If a scope has an inlined call site, skip it.
+      // TODO: Inlined call sites should be verified to ensure that the inliner
+      // handles scopes correctly.
+      if (DS->InlinedCallSite)
+        continue;
+
       // Otherwise, we're allowed to re-enter a scope only if
       // the scope is an ancestor of the scope we're currently leaving.
       auto isAncestorScope = [](const SILDebugScope *Cur,
