@@ -44,7 +44,7 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   // CHECK-objc-32:   store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32:[0-9a-f]+]], i32 0, i32 0)
   unowned(safe)   var ps:  P
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
-  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32_2:[0-0a-f]+]], i32 0, i32 0)
+  // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32_2:[0-9a-f]+]], i32 0, i32 0)
   weak            var pwo: P?
   // CHECK-64: store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff, i32 0, i32 0)
   // CHECK-32: store i8** getelementptr inbounds ([{{(3|4)}} x i8*], [{{(3|4)}} x i8*]* @type_layout_8_4_[[REF_XI32_2]], i32 0, i32 0)
