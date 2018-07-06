@@ -38,7 +38,7 @@ provides a debugging dump that illustrates the one of the dependency cycles via 
          `--SuperclassTypeRequest(circular_inheritance.(file).Outer2@test/decl/class/circular_inheritance.swift:38:7) (cyclic dependency)
 ```
 
-Within the compiler, the core [`Evaluator` class]([request-evaluator](https://github.com/apple/swift/blob/master/include/swift/AST/Evaluator.h) provides dumping routines such as `dumpDependencies()`, so one can see the dependencies for any request as part of a debugging session. It uses the same textual dump format as `-debug-cycles`.
+Within the compiler, the core [`Evaluator` class](https://github.com/apple/swift/blob/master/include/swift/AST/Evaluator.h) provides dumping routines such as `dumpDependencies()`, so one can see the dependencies for any request as part of a debugging session. It uses the same textual dump format as `-debug-cycles`.
 
 The request-evaluator has the ability to emit "real" Swift diagnostics when it encounters a cycle, but they are currently disabled because they fire too often in real-world code. Once enough of the cyclic dependencies in well-formed code have been removed, such that the only errors come from ill-formed code, these diagnostics will be enabled. For example, they will be used to detect ill-formed programs such as:
 
