@@ -672,6 +672,19 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
              : Ordering::After;
   }
 
+  // If one of the conformances comes from the same file as the type
+  // declaration, pick that one; this is so that conformance synthesis works if
+  // there's any implied conformance in the same file as the type.
+  auto NTD =
+      lhs->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  auto typeSF = NTD->getParentSourceFile();
+  if (typeSF) {
+    if (typeSF == lhsSF)
+      return Ordering::Before;
+    if (typeSF == rhsSF)
+      return Ordering::After;
+  }
+
   // Otherwise, pick the earlier file unit.
   auto lhsFileUnit
     = dyn_cast<FileUnit>(lhs->getDeclContext()->getModuleScopeContext());
