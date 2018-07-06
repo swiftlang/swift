@@ -3707,13 +3707,13 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
       return errorAndSkipToEnd();
     // Function that parses one parameter.
     auto parseParam = [&]() -> bool {
-      SyntaxParsingContext DiffParamContext(
-          SyntaxContext, SyntaxKind::DifferentiationParameter);
+      // SyntaxParsingContext DiffParamContext(
+      //     SyntaxContext, SyntaxKind::DifferentiationParameter);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix: {
         SyntaxParsingContext IndexParamContext(
-            SyntaxContext, SyntaxKind::DifferentiationIndexParameter);
+            SyntaxContext, SyntaxKind::DifferentiationIndexParam);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,
@@ -3723,10 +3723,6 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
           AutoDiffParameter::getIndexParameter(paramLoc, index));
         break;
       }
-      case tok::kw_self:
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
-        break;
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);
         return true;
@@ -3744,7 +3740,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
       if (parseParam())
         return errorAndSkipToEnd(2);
     SyntaxContext->collectNodesInPlace(
-        SyntaxKind::DifferentiationParameterList);
+        SyntaxKind::DifferentiationIndexParamList);
   }
   // Parse the closing ')'.
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName))

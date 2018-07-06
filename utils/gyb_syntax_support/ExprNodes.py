@@ -570,6 +570,12 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
+    # differentiation-index-param-list ->
+    #     differentiation-index-param differentiable-index-param-list?
+    # NOTE: This is used by #gradient and #valueAndGradient expressions.
+    Node('DifferentiationIndexParamList', kind='SyntaxCollection',
+         element='DifferentiationIndexParam'),
+
     # SWIFT_ENABLE_TENSORFLOW
     # Expression generalizing #gradient and #valueAndGradient.
     # e.g. #gradient(foo(_:_:), wrt: .0, .1)
@@ -587,7 +593,7 @@ EXPR_NODES = [
              Child('WithRespectToLabel', kind='IdentifierToken', is_optional=True,
                    text_choices=['wrt']),
              Child('Colon', kind='ColonToken', is_optional=True),
-             Child('DiffParams', kind='DifferentiationParameterList',
+             Child('DiffParams', kind='DifferentiationIndexParamList',
                    is_optional=True),
              Child('RightParen', kind='RightParenToken'),
          ]),

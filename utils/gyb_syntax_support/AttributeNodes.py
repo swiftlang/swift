@@ -173,36 +173,36 @@ ATTRIBUTE_NODES = [
                    The colon separating "wrt" and the parameter list.
                    '''),
              Child('LeftParen', kind='LeftParenToken'),
-             Child('DiffParams', kind='DifferentiationParameterList',
+             Child('DiffParams', kind='DifferentiableAttributeDiffParamList',
                    description='The parameters for differentiation.'),
              Child('RightParen', kind='RightParenToken'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiation-parameter-list ->
-    #     differentiation-parameter differentiation-parameter-list?
-    Node('DifferentiationParameterList', kind='SyntaxCollection',
-         element='DifferentiationParameter'),
+    # differentiable-attr-diff-param-list ->
+    #     differentiable-attr-diff-param differentiable-attr-diff-param-list?
+    Node('DifferentiableAttributeDiffParamList', kind='SyntaxCollection',
+         element='DifferentiableAttributeDiffParam'),
 
-    # differentiation-parameter ->
+    # differentiable-attr-diff-param ->
     #     'self' | differentiation-index-parameter
-    Node('DifferentiationParameter', kind='Syntax',
+    Node('DifferentiableAttributeDiffParam', kind='Syntax',
          description='''
          A differentiation parameter: either the "self" identifier or a period
          followed by an unsigned integer (e.g. `.0`).
          ''',
          traits=['WithTrailingComma'],
          children=[
-             Child('DiffParam', kind='Syntax',
+             Child('Parameter', kind='Syntax',
                    node_choices=[
                        Child('Self', kind='SelfToken'),
-                       Child('Index', kind='DifferentiationIndexParameter'),
+                       Child('Index', kind='DifferentiationIndexParam'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
-    # differentiation-index-parameter -> '.' integer-literal
-    Node('DifferentiationIndexParameter', kind='Syntax',
+    # differentiation-index-param -> '.' integer-literal
+    Node('DifferentiationIndexParam', kind='Syntax',
          description='''
          A differentiation index parameter: a period followed by an unsigned \
          integer (e.g. `.0`)
