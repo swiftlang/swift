@@ -2325,8 +2325,7 @@ public:
       }
     }
     if (auto KP = dyn_cast<KeyPathExpr>(E)) {
-      walkKeyPath(KP);
-      return skipChildren();
+      maybeDiagKeyPath(KP);
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
@@ -2424,7 +2423,7 @@ private:
 
   /// Walk a keypath expression, checking all of its components for
   /// availability.
-  void walkKeyPath(KeyPathExpr *KP) {
+  void maybeDiagKeyPath(KeyPathExpr *KP) {
     for (auto &component : KP->getComponents()) {
       switch (component.getKind()) {
       case KeyPathExpr::Component::Kind::Property:
