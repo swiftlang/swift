@@ -66,6 +66,16 @@ LoopsTests.testAllBackends("SR8164") {
   SR8164(count: 70, expectedVal: 70)
 }
 
+LoopsTests.testAllBackends("SR-8191") {
+  let t = Tensor<Float>(1.0)
+  var i = 0
+  repeat {
+    let y = t + t
+    print(y)
+    i += 1
+  } while i < 10
+}
+
 // FIXME: Compiler bug (b/73607740)
 // error: internal error generating TensorFlow graph:
 // GraphGen cannot lower a 'send' to the host yet

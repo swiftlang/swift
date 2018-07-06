@@ -607,7 +607,8 @@ public final class _TensorComputation {
   /// The thread to run tensor computation in. The global config flag
   /// '_RuntimeConfig.usesSynchronousExecution' decides whether tensor
   /// computation should be synchronous: if true, this property will always be
-  /// nil.
+  /// nil. Otherwise, this property is non-nil only when the tensor computation
+  /// is on-going.
   private var pthread: pthread_t?
 
   /// Loads the TF program from a binary TF FunctionDef proto given by
@@ -764,6 +765,13 @@ public extension _TensorComputation {
       let joinStatus = pthread_join(pthread, nil)
       internalConsistencyCheck(joinStatus == 0)
       self.pthread = nil
+    } else {
+      internalConsistencyCheck(
+        _RuntimeConfig.usesSynchronousExecution,
+        """
+          finish() is called in async execution mode with pthread == nil -- \
+          Was finish() already called?
+          """)
     }
     debugLog("Done executing TF graph.")
 
