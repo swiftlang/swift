@@ -1185,6 +1185,7 @@ namespace {
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
+            continue;
           } else {
             Expr *cachedExpr = nullptr;
             if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
@@ -1195,6 +1196,7 @@ namespace {
               TC.diagnose(cachedExpr->getLoc(),
                           diag::redundant_particular_literal_case_here)
                 .highlight(cachedExpr->getSourceRange());
+              continue;
             }
           }
           spaces.push_back(projection);
