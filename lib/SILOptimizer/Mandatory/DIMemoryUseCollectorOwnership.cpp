@@ -939,6 +939,31 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    // unchecked_take_enum_data_addr takes the address of the payload of an
+    // optional, which could be used to update the payload. So, visit the
+    // users of this instruction and ensure that there are no overwrites to an
+    // immutable optional. Note that this special handling is for checking
+    // immutability and is not for checking initialization before use.
+    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
+      // Keep track of the fact that we're inside of an enum. This informs our
+      // recursion that tuple stores should not be treated as a partial
+      // store. This is needed because if the enum has data it would be accessed
+      // through tuple_element_addr instruction. The entire enum is expected
+      // to be initialized before any such access.
+      llvm::SaveAndRestore<bool> X(InEnumSubElement, true);
+      collectUses(enumDataAddr, BaseEltNo);
+      continue;
+    }
+
+    // 'select_enum_addr' selects one of the two operands based on the case
+    // of an enum value.
+    // 'switch_enum_addr' jumps to one of the two branch labels (provided as
+    // operands) based on the case of the enum value.
+    if (isa<SelectEnumAddrInst>(User) || isa<SwitchEnumAddrInst>(User)) {
+      trackUse(DIMemoryUse(User, DIUseKind::Load, BaseEltNo, 1));
+      continue;
+    }
+
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
       trackDestroy(User);
