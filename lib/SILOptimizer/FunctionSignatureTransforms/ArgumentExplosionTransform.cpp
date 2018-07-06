@@ -151,12 +151,18 @@ shouldExplode(FunctionSignatureTransformDescriptor &transformDesc,
         return n->getType().isTrivial(module);
       });
 
-  // If we reduced the number of non-trivial leaf types, we want to split this
-  // given that we already know that we are not going to drastically change the
-  // number of arguments.
-  if (naiveExplosionSize <= maxExplosionSize &&
-      numNonTrivialLiveLeafNodes < numInputNonTrivialLeafNodes) {
-    return true;
+  // If we will reduce the number of values without adding too many arguments...
+  if (naiveExplosionSize <= maxExplosionSize) {
+    // ... and we know that we will not introduce a thunk, be aggressive.
+    if (transformDesc.hasOnlyDirectCallers) {
+      return true;
+    }
+
+    // Otherwise, only explode if we will reduce the number of non-trivial leaf
+    // types.
+    if (numNonTrivialLiveLeafNodes < numInputNonTrivialLeafNodes) {
+      return true;
+    }
   }
 
   // Ok, this is an argument with more than 3 live leaf nodes. See if after
