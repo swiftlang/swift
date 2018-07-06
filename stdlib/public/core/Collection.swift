@@ -804,7 +804,7 @@ extension Collection {
   ///
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @inline(__always)
   public func formIndex(after i: inout Index) {
     i = index(after: i)
@@ -1094,7 +1094,7 @@ extension Collection {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)

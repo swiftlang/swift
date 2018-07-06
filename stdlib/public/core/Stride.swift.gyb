@@ -226,7 +226,7 @@ extension ${Base} {
 //===----------------------------------------------------------------------===//
 
 extension Strideable {
-  @inlinable
+  @inlinable // protocol-only
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -236,7 +236,7 @@ extension Strideable {
 }
 
 extension Strideable where Stride : FloatingPoint {
-  @inlinable
+  @inlinable // protocol-only
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -251,7 +251,7 @@ extension Strideable where Stride : FloatingPoint {
 }
 
 extension Strideable where Self : FloatingPoint, Self == Stride {
-  @inlinable
+  @inlinable // protocol-only
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride

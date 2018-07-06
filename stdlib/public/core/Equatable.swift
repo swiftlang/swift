@@ -188,7 +188,7 @@ extension Equatable {
   /// - Parameters:
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   @_transparent
   public static func != (lhs: Self, rhs: Self) -> Bool {
     return !(lhs == rhs)
