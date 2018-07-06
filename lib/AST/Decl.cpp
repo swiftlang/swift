@@ -3691,6 +3691,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.AncestryComputed = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
+  Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
 }
 
 bool ClassDecl::hasResilientMetadata() const {
@@ -3772,6 +3773,16 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
 bool ClassDecl::hasMissingVTableEntries() const {
   (void)getMembers();
   return Bits.ClassDecl.HasMissingVTableEntries;
+}
+
+bool ClassDecl::isIncompatibleWithWeakReferences() const {
+  if (Bits.ClassDecl.IsIncompatibleWithWeakReferences) {
+    return true;
+  }
+  if (auto superclass = getSuperclassDecl()) {
+    return superclass->isIncompatibleWithWeakReferences();
+  }
+  return false;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {

@@ -2678,6 +2678,15 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     attr->setInvalid();
   }
 
+  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
+    diagnose(attr->getLocation(),
+             diag::invalid_ownership_incompatible_class,
+             underlyingType, ownershipKind)
+      .fixItRemove(attr->getRange());
+    attr->setInvalid();
+  }
+
   auto PDC = dyn_cast<ProtocolDecl>((var->getDeclContext()));
   if (PDC && !PDC->isObjC()) {
     // Ownership does not make sense in protocols, except for "weak" on
