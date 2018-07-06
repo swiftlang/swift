@@ -2171,6 +2171,7 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
 
 void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
                                                  const Pattern *pattern,
+                                                 SourceLoc equalLoc,
                                                  const Expr *initExpr) {
   pattern = pattern->getSemanticsProvidingPattern();
 
@@ -2186,15 +2187,13 @@ void swift::diagnoseUnownedImmediateDeallocation(TypeChecker &TC,
         const Pattern *subPattern = elt.getPattern();
         Expr *subInitExpr = TE->getElement(i);
 
-        diagnoseUnownedImmediateDeallocation(TC, subPattern, subInitExpr);
+        diagnoseUnownedImmediateDeallocation(TC, subPattern, equalLoc,
+                                             subInitExpr);
       }
     }
   } else if (auto *NP = dyn_cast<NamedPattern>(pattern)) {
-    // FIXME: Ideally the diagnostic location should be on the equals '=' token
-    // of the pattern binding rather than at the start of the initializer
-    // expression (matching the above diagnostic logic for an assignment).
     diagnoseUnownedImmediateDeallocationImpl(TC, NP->getDecl(), initExpr,
-                                             initExpr->getStartLoc(),
+                                             equalLoc,
                                              initExpr->getSourceRange());
   }
 }

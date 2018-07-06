@@ -4440,7 +4440,8 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
     Pattern *pattern =
       new (Context) TypedPattern(new (Context) NamedPattern(storage),
                                  TypeLoc::withoutLoc(ErrorType::get(Context)));
-    PatternBindingEntry entry(pattern, /*init*/ nullptr, /*initDC*/ nullptr);
+    PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
+                              /*Init*/ nullptr, /*InitContext*/ nullptr);
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
                                               StaticSpellingKind::None,
                                               VarLoc, entry, CurDeclContext);
@@ -4867,7 +4868,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
     // Initializer will be added later when/if it is parsed.
-    PBDEntries.push_back({pattern, nullptr, nullptr});
+    PBDEntries.push_back({pattern, /*EqualLoc*/ SourceLoc(), /*Init*/ nullptr,
+                          /*InitContext*/ nullptr});
 
     Expr *PatternInit = nullptr;
     
@@ -4912,6 +4914,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       
       SourceLoc EqualLoc = consumeToken(tok::equal);
+      PBDEntries.back().setEqualLoc(EqualLoc);
+
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
       
       // If this Pattern binding was not supposed to have an initializer, but it
