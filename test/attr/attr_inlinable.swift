@@ -251,3 +251,13 @@ public struct PublicFixedStructWithInit {
   var x = internalGlobal // expected-error {{let 'internalGlobal' is internal and cannot be referenced from a property initializer in a '@_fixed_layout' type}}
   var y = publicGlobal // OK
 }
+
+public struct KeypathStruct {
+  var x: Int
+  // expected-note@-1 {{var 'x' is not '@usableFromInline' or public}}
+
+  @inlinable public func usesKeypath() {
+    _ = \KeypathStruct.x
+    // expected-error@-1 {{var 'x' is internal and cannot be referenced from an '@inlinable' function}}
+  }
+}

@@ -44,6 +44,24 @@ struct C<T> {
   subscript<X>(noHashableConstraint sub: X) -> X { get { return sub } set { } }
 }
 
+struct Unavailable {
+  @available(*, unavailable)
+  var unavailableProperty: Int
+  // expected-note@-1 {{'unavailableProperty' has been explicitly marked unavailable here}}
+
+  @available(*, unavailable)
+  subscript(x: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript' has been explicitly marked unavailable here}}
+}
+
+struct Deprecated {
+  @available(*, deprecated)
+  var deprecatedProperty: Int
+
+  @available(*, deprecated)
+  subscript(x: Sub) -> Int { get { } set { } }
+}
+
 extension Array where Element == A {
   var property: Prop { fatalError() }
 }
@@ -178,6 +196,12 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _ = \C<Int>.[sub]
   let _ = \C<Int>.[noHashableConstraint: sub]
   let _ = \C<Int>.[noHashableConstraint: nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
+
+  let _ = \Unavailable.unavailableProperty // expected-error {{'unavailableProperty' is unavailable}}
+  let _ = \Unavailable.[sub] // expected-error {{'subscript' is unavailable}}
+
+  let _ = \Deprecated.deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated}}
+  let _ = \Deprecated.[sub] // expected-warning {{'subscript' is deprecated}}
 }
 
 func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
