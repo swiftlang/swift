@@ -770,8 +770,7 @@ public extension _TensorComputation {
         _RuntimeConfig.usesSynchronousExecution,
         """
           finish() is called in async execution mode with pthread == nil -- \
-          Was finish() already called?
-          """)
+          Was finish() already called?""")
     }
     debugLog("Done executing TF graph.")
 

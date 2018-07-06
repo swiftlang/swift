@@ -1014,10 +1014,8 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       // In those cases, continue walking `pred` if we haven't processed it,
       // since it may be control-dependent on something.
       if (tensorCodeBlocks.properlyPostDominates(BB, pred)) {
-        if (!addedToList.count(pred)) {
+        if (addedToList.insert(pred).second)
           worklist.push_back(pred);
-          addedToList.insert(pred);
-        }
         continue;
       }
 
