@@ -12,4 +12,4 @@
 // RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
 // RUN:   | %FileCheck %s --check-prefix NUMITERS1
 // NUMITERS1: AngryPhonebook,1
-// NUMITERS1-SAME: 0,0,0,0,0
+// NUMITERS1-NOT: 0,0,0,0,0

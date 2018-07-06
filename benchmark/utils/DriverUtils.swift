@@ -401,6 +401,9 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
     } else {
       // Compute the scaling factor if a fixed c.fixedNumIters is not specified.
       scale = c.fixedNumIters
+      if scale == 1 {
+        elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
+      }
     }
     // Make integer overflow less likely on platforms where Int is 32 bits wide.
     // FIXME: Switch BenchmarkInfo to use Int64 for the iteration scale, or fix
