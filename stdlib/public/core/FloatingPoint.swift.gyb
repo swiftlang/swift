@@ -2461,7 +2461,13 @@ where Self.RawSignificand : FixedWidthInteger {
 %     end
     }
     let unitRandom = Self.init(rand) * Self.ulpOfOne / 2
-    return delta * unitRandom + range.lowerBound
+    let randFloat = delta * unitRandom + range.lowerBound
+%   if 'Closed' not in Range:
+    if randFloat == range.upperBound {
+      return Self.random(in: range, using: &generator)
+    }
+%   end
+    return randFloat
   }
 
   /// Returns a random value within the specified range.
