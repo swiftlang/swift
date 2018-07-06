@@ -3948,8 +3948,13 @@ static void diagnoseDeprecatedWritableKeyPath(TypeChecker &TC, const Expr *E,
     const DeclContext *DC;
 
     void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
-      if (E->hasLValueAccessKind() &&
-          E->getLValueAccessKind() == AccessKind::Read)
+      bool isWrite = false;
+      if (auto *P = Parent.getAsExpr())
+        if (auto *AE = dyn_cast<AssignExpr>(P))
+          if (AE->getDest() == E)
+            isWrite = true;
+
+      if (!isWrite)
         return;
 
       if (auto *keyPathExpr = dyn_cast<KeyPathExpr>(E->getKeyPath())) {

@@ -3062,7 +3062,6 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
 
   // Load lvalues.
   if (auto lvalue = exprTy->getAs<LValueType>()) {
-    expr->propagateLValueAccessKind(AccessKind::Read, getType);
     auto result = new (Context) LoadExpr(expr, lvalue->getObjectType());
     setType(result, lvalue->getObjectType());
     return result;

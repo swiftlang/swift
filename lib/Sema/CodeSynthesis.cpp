@@ -1620,7 +1620,6 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
       // Access the base as inout if the accessor is mutating.
       auto lvTy = LValueType::get(selfTy);
       selfExpr->setType(lvTy);
-      selfExpr->propagateLValueAccessKind(AccessKind::ReadWrite);
       selfExpr = new (Context) InOutExpr(SourceLoc(),
                                          selfExpr, selfTy, /*implicit*/ true);
     }
@@ -1643,7 +1642,6 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
     if (ValueImpl->isSettable(VD->getDeclContext())) {
       auto valueLVTy = LValueType::get(valueTy);
       implMemberExpr->setType(valueLVTy);
-      implMemberExpr->propagateLValueAccessKind(AccessKind::Read);
       returnExpr = new (Context) LoadExpr(implMemberExpr,
                                           valueTy);
       returnExpr->setImplicit();
@@ -1672,7 +1670,6 @@ void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                                       /*implicit*/ true);
     auto valueLVTy = LValueType::get(valueTy);
     implMemberExpr->setType(valueLVTy);
-    implMemberExpr->propagateLValueAccessKind(AccessKind::Write);
 
     ConcreteDeclRef newValueRef = getFirstParamDecl(setter);
     auto newValueExpr = new (Context) DeclRefExpr(newValueRef, DeclNameLoc(),
