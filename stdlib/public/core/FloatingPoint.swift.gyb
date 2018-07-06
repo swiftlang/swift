@@ -1415,31 +1415,26 @@ public enum FloatingPointRoundingRule {
 }
 
 extension FloatingPoint {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.isEqual(to: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLessThanOrEqualTo(rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLess(than: lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
@@ -1668,7 +1663,6 @@ extension FloatingPoint {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1698,7 +1692,6 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1723,7 +1716,6 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
@@ -1739,7 +1731,6 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var nextDown: Self {
     return -(-self).nextUp
@@ -1776,7 +1767,6 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1816,7 +1806,6 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1838,7 +1827,6 @@ extension FloatingPoint {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1859,7 +1847,6 @@ extension FloatingPoint {
   ///   - lhs: One of the values to multiply before adding to this value.
   ///   - rhs: The other value to multiply.
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self

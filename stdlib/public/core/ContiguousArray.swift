@@ -1039,8 +1039,7 @@ extension ContiguousArray: CustomStringConvertible, CustomDebugStringConvertible
 }
 
 extension ContiguousArray {
-  @inlinable
-  @_transparent
+  @usableFromInline @_transparent
   internal func _cPointerArgs() -> (AnyObject?, UnsafeRawPointer?) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {

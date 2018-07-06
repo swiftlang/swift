@@ -435,14 +435,12 @@ public struct PartialRangeUpTo<Bound: Comparable> {
 }
 
 extension PartialRangeUpTo: RangeExpression {
-  @inlinable // trivial-implementation
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
   
-  @inlinable // trivial-implementation
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
@@ -479,13 +477,11 @@ public struct PartialRangeThrough<Bound: Comparable> {
 }
 
 extension PartialRangeThrough: RangeExpression {
-  @inlinable // trivial-implementation
   @_transparent
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return collection.startIndex..<collection.index(after: self.upperBound)
   }
-  @inlinable // trivial-implementation
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element <= upperBound
@@ -582,7 +578,6 @@ public struct PartialRangeFrom<Bound: Comparable> {
 }
 
 extension PartialRangeFrom: RangeExpression {
-  @inlinable // trivial-implementation
   @_transparent
   public func relative<C: Collection>(
     to collection: C
@@ -644,7 +639,6 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // protocol-only
   @_transparent
   public static func ..< (minimum: Self, maximum: Self) -> Range<Self> {
     _precondition(minimum <= maximum,
@@ -674,7 +668,6 @@ extension Comparable {
   ///     // Prints "[10, 20, 30]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @inlinable // protocol-only
   @_transparent
   public static prefix func ..< (maximum: Self) -> PartialRangeUpTo<Self> {
     return PartialRangeUpTo(maximum)
@@ -702,7 +695,6 @@ extension Comparable {
   ///     // Prints "[10, 20, 30, 40]"
   ///
   /// - Parameter maximum: The upper bound for the range.
-  @inlinable // protocol-only
   @_transparent
   public static prefix func ... (maximum: Self) -> PartialRangeThrough<Self> {
     return PartialRangeThrough(maximum)
@@ -730,7 +722,6 @@ extension Comparable {
   ///     // Prints "[40, 50, 60, 70]"
   ///
   /// - Parameter minimum: The lower bound for the range.
-  @inlinable // protocol-only
   @_transparent
   public static postfix func ... (minimum: Self) -> PartialRangeFrom<Self> {
     return PartialRangeFrom(minimum)

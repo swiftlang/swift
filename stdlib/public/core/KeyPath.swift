@@ -12,8 +12,7 @@
 
 import SwiftShims
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _abstract(
   methodName: StaticString = #function,
   file: StaticString = #file, line: UInt = #line

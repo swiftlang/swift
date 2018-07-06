@@ -30,8 +30,7 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
-@inlinable // FIXME(sil-serialize-all)
-@_transparent
+@usableFromInline @_transparent
 internal func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
