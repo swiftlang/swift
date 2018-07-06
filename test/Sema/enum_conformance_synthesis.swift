@@ -314,6 +314,18 @@ extension UnusedGenericDeriveExtension: Hashable {}
 extension GenericOtherFileNonconforming: Equatable where T: Equatable {}
 // expected-error@-1{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
+// rdar://problem/41852654
+
+// There is a conformance to Equatable (or at least, one that implies Equatable)
+// in the same file as the type, so the synthesis is okay. Both orderings are
+// tested, to catch choosing extensions based on the order of the files, etc.
+protocol ImplierMain: Equatable {}
+enum ImpliedMain: ImplierMain {
+  case a(Int)
+}
+extension ImpliedOther: ImplierMain {}
+
+
 // FIXME: Remove -verify-ignore-unknown.
 // <unknown>:0: error: unexpected error produced: invalid redeclaration of 'hashValue'
 // <unknown>:0: error: unexpected note produced: candidate has non-matching type '(Foo, Foo) -> Bool'
