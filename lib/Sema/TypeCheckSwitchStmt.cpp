@@ -319,38 +319,6 @@ namespace {
         return TypeAndVal.getInt();
       }
 
-      // Defines a "usefulness" metric that returns whether the given space
-      // contributes meaningfully to the exhaustiveness of a pattern.
-      bool isUseful() const {
-        auto subspacesUseful = [](const Space &space) {
-          for (auto &subspace : space.getSpaces()) {
-            if (!subspace.isUseful()) {
-              return false;
-            }
-          }
-          return true;
-        };
-
-        switch (getKind()) {
-        case SpaceKind::Empty:
-          return false;
-        case SpaceKind::Type:
-        case SpaceKind::BooleanConstant:
-        case SpaceKind::UnknownCase:
-          return true;
-        case SpaceKind::Disjunct:
-          if (getSpaces().empty()) {
-            return false;
-          }
-          return subspacesUseful(*this);
-        case SpaceKind::Constructor:
-          if (getSpaces().empty()) {
-            return true;
-          }
-          return subspacesUseful(*this);
-        }
-      }
-
       // An optimization that computes if the difference of this space and
       // another space is empty.
       bool isSubspace(const Space &other, TypeChecker &TC,
@@ -1180,8 +1148,8 @@ namespace {
           Space projection = projectPattern(TC, caseItem.getPattern(),
                                             sawDowngradablePattern);
 
-          if (projection.isUseful()
-                && projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
+          if (!projection.isEmpty() &&
+              projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
             sawRedundantPattern |= true;
 
             TC.diagnose(caseItem.getStartLoc(),
