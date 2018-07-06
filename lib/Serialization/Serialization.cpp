@@ -44,6 +44,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
@@ -1092,15 +1093,33 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::SearchPathLayout SearchPath(Out);
 
   if (options.SerializeOptionsForDebugging) {
+    // Remapping the paths can result in duplicates when the same path is passed
+    // to the compiler that is also loaded from an imported module; the
+    // compilation invocation will contain the unmapped path but the loaded
+    // module will have the remapped path. We uniquify the paths before writing
+    // to prevent this.
+    llvm::StringSet<> FrameworkPathsSeen;
+    llvm::StringSet<> ImportPathsSeen;
+
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                      options.DebugPrefixMap.remapPath(framepath.Path));
-    for (auto &path : searchPathOpts.ImportSearchPaths)
-      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                      options.DebugPrefixMap.remapPath(path));
+    for (auto &framepath : searchPathOpts.FrameworkSearchPaths) {
+      auto remapped = options.DebugPrefixMap.remapPath(framepath.Path);
+      if (FrameworkPathsSeen.find(remapped) == FrameworkPathsSeen.end()) {
+        SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
+                        remapped);
+        FrameworkPathsSeen.insert(remapped);
+      }
+    }
+    for (auto &path : searchPathOpts.ImportSearchPaths) {
+      auto remapped = options.DebugPrefixMap.remapPath(path);
+      if (ImportPathsSeen.find(remapped) == ImportPathsSeen.end()) {
+        SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
+                        remapped);
+        ImportPathsSeen.insert(remapped);
+      }
+    }
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports
