@@ -61,6 +61,14 @@ CallerAnalysis::CallerAnalysis(SILModule *m)
   }
 }
 
+static bool mayHaveIndirectCallers(SILFunction *calleeFn) {
+  // We do not support specialized vtables so specialized methods should never
+  // be able to be called indirectly.
+  if (calleeFn->getLinkage() == SILLinkage::Shared)
+    return false;
+  return canBeCalledIndirectly(calleeFn->getRepresentation());
+}
+
 void CallerAnalysis::processFunctionCallSites(SILFunction *callerFn) {
   // First grab our caller info so that we can store back references
   // from our callerFn to the calleeFn so that we can invalidate all
@@ -89,10 +97,8 @@ void CallerAnalysis::processFunctionCallSites(SILFunction *callerFn) {
           auto *calleeFn = fri->getReferencedFunction();
           FunctionInfo &calleeInfo = getOrInsertCallerInfo(calleeFn);
 
-          // TODO: Make this more aggressive by considering
-          // final/visibility/etc.
           calleeInfo.mayHaveIndirectCallers =
-              canBeCalledIndirectly(calleeFn->getRepresentation());
+            mayHaveIndirectCallers(calleeFn);
 
           // Next create our caller state.
           auto iter = calleeInfo.callerStates.insert({callerFn, {}});
