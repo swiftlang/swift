@@ -84,12 +84,10 @@ internal func _makeCollectionDescription<C: Collection>
 }
 
 @usableFromInline
-@_fixed_layout
-internal struct _InitializeMemoryFromCollection<
-  C: Collection
-> : _PointerFunction {
-  @inlinable
-  internal func call(_ rawMemory: UnsafeMutablePointer<C.Element>, count: Int) {
+internal func _initializeMemory<C: Collection>(
+  from newValues: C
+) -> ((UnsafeMutablePointer<C.Element>, Int) -> ()) {
+  return { rawMemory, count in
     var p = rawMemory
     var q = newValues.startIndex
     for _ in 0..<count {
@@ -99,14 +97,6 @@ internal struct _InitializeMemoryFromCollection<
     }
     _expectEnd(of: newValues, is: q)
   }
-
-  @inlinable
-  internal init(_ newValues: C) {
-    self.newValues = newValues
-  }
-
-  @usableFromInline
-  internal var newValues: C
 }
 
 extension _ArrayBufferProtocol {
@@ -126,7 +116,7 @@ extension _ArrayBufferProtocol {
     _arrayOutOfPlaceUpdate(
       &newBuffer,
       bounds.lowerBound - startIndex, insertCount,
-      _InitializeMemoryFromCollection(newValues)
+      _initializeMemory(from: newValues)
     )
   }
 }
@@ -206,12 +196,6 @@ extension _ArrayBufferProtocol {
   }
 }
 
-@usableFromInline
-internal protocol _PointerFunction {
-  associatedtype Element
-  func call(_: UnsafeMutablePointer<Element>, count: Int)
-}
-
 extension _ArrayBufferProtocol {
   /// Initialize the elements of dest by copying the first headCount
   /// items from source, calling initializeNewElements on the next
@@ -222,14 +206,13 @@ extension _ArrayBufferProtocol {
   /// copying when it isUniquelyReferenced.
   @inline(never)
   @inlinable // @specializable
-  internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
+  internal mutating func _arrayOutOfPlaceUpdate(
     _ dest: inout _ContiguousArrayBuffer<Element>,
     _ headCount: Int, // Count of initial source elements to copy/move
     _ newCount: Int,  // Number of new elements to insert
-    _ initializeNewElements: Initializer
-  ) where
-    Initializer: _PointerFunction,
-    Initializer.Element == Element {
+    _ initializeNewElements: 
+        ((UnsafeMutablePointer<Element>, _ count: Int) -> ())? = nil
+  ) {
 
     _sanityCheck(headCount >= 0)
     _sanityCheck(newCount >= 0)
@@ -263,7 +246,7 @@ extension _ArrayBufferProtocol {
       // Destroy unused source items
       oldStart.deinitialize(count: oldCount)
 
-      initializeNewElements.call(newStart, count: newCount)
+      initializeNewElements?(newStart, newCount)
 
       // Move the tail items
       newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
@@ -281,25 +264,12 @@ extension _ArrayBufferProtocol {
       let newStart = _copyContents(
         subRange: headStart..<headEnd,
         initializing: destStart)
-      initializeNewElements.call(newStart, count: newCount)
+      initializeNewElements?(newStart, newCount)
       let tailStart = headEnd + oldCount
       let tailEnd = endIndex
       _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
-  }
-}
-
-@usableFromInline
-@_fixed_layout
-internal struct _IgnorePointer<T>: _PointerFunction {
-  @inlinable
-  internal func call(_: UnsafeMutablePointer<T>, count: Int) {
-    _sanityCheck(count == 0)
-  }
-
-  @inlinable
-  internal init() {
   }
 }
 
@@ -315,7 +285,7 @@ extension _ArrayBufferProtocol {
 
     var newBuffer = _forceCreateUniqueMutableBuffer(
       newCount: bufferCount, requiredCapacity: bufferCount)
-    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0, _IgnorePointer())
+    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0)
   }
 
   /// Append items from `newItems` to a buffer.
@@ -343,7 +313,7 @@ extension _ArrayBufferProtocol {
         // need to request 1 more than current count/capacity
         minNewCapacity: newCount + 1)
 
-      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0, _IgnorePointer())
+      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0)
 
       let currentCapacity = self.capacity
       let base = self.firstElementAddress

@@ -768,7 +768,7 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
     _buffer._arrayOutOfPlaceUpdate(
-      &newBuffer, oldCount, 0, _IgnorePointer())
+      &newBuffer, oldCount, 0)
   }
 
   @inlinable

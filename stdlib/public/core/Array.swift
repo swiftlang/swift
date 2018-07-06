@@ -1067,8 +1067,7 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(
       countForNewBuffer: oldCount, minNewCapacity: newCount)
-    _buffer._arrayOutOfPlaceUpdate(
-      &newBuffer, oldCount, 0, _IgnorePointer())
+    _buffer._arrayOutOfPlaceUpdate(&newBuffer, oldCount, 0)
   }
 
   @inlinable
