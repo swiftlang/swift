@@ -624,8 +624,12 @@ SILSerializer::writeKeyPathPatternComponent(
       break;
     }
   };
-  auto handleComputedIndices
+  auto handleComputedExternalReferenceAndIndices
     = [&](const KeyPathPatternComponent &component) {
+      ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
+      ListOfValues.push_back(
+        S.addSubstitutionMapRef(component.getExternalSubstitutions()));
+  
       auto indices = component.getSubscriptIndices();
       ListOfValues.push_back(indices.size());
       for (auto &index : indices) {
@@ -654,7 +658,7 @@ SILSerializer::writeKeyPathPatternComponent(
     handleComputedId(component.getComputedPropertyId());
     ListOfValues.push_back(
                   addSILFunctionRef(component.getComputedPropertyGetter()));
-    handleComputedIndices(component);
+    handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::SettableProperty:
     handleComponentCommon(KeyPathComponentKindEncoding::SettableProperty);
@@ -663,7 +667,7 @@ SILSerializer::writeKeyPathPatternComponent(
                   addSILFunctionRef(component.getComputedPropertyGetter()));
     ListOfValues.push_back(
                   addSILFunctionRef(component.getComputedPropertySetter()));
-    handleComputedIndices(component);
+    handleComputedExternalReferenceAndIndices(component);
     break;
   case KeyPathPatternComponent::Kind::OptionalChain:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalChain);
@@ -673,13 +677,6 @@ SILSerializer::writeKeyPathPatternComponent(
     break;
   case KeyPathPatternComponent::Kind::OptionalWrap:
     handleComponentCommon(KeyPathComponentKindEncoding::OptionalWrap);
-    break;
-  case KeyPathPatternComponent::Kind::External:
-    handleComponentCommon(KeyPathComponentKindEncoding::External);
-    ListOfValues.push_back(S.addDeclRef(component.getExternalDecl()));
-    ListOfValues.push_back(
-      S.addSubstitutionMapRef(component.getExternalSubstitutions()));
-    handleComputedIndices(component);
     break;
   }
 }

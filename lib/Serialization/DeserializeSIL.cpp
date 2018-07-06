@@ -838,8 +838,15 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   ArrayRef<KeyPathPatternComponent::Index> indices;
   SILFunction *indicesEquals = nullptr;
   SILFunction *indicesHash = nullptr;
+  AbstractStorageDecl *externalDecl = nullptr;
+  SubstitutionMap externalSubs;
 
-  auto handleComputedIndices = [&] {
+  auto handleComputedExternalReferenceAndIndices = [&] {
+    auto externalDeclID = ListOfValues[nextValue++];
+    externalDecl =
+      cast_or_null<AbstractStorageDecl>(MF->getDecl(externalDeclID));
+    externalSubs = MF->getSubstitutionMap(ListOfValues[nextValue++]);
+    
     SmallVector<KeyPathPatternComponent::Index, 4> indicesBuf;
     auto numIndexes = ListOfValues[nextValue++];
     indicesBuf.reserve(numIndexes);
@@ -874,9 +881,10 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     auto id = handleComputedId();
     auto getterName = MF->getIdentifier(ListOfValues[nextValue++]);
     auto getter = getFuncForReference(getterName.str());
-    handleComputedIndices();
+    handleComputedExternalReferenceAndIndices();
     return KeyPathPatternComponent::forComputedGettableProperty(
-        id, getter, indices, indicesEquals, indicesHash, type);
+        id, getter, indices, indicesEquals, indicesHash,
+        externalDecl, externalSubs, type);
   }
   case KeyPathComponentKindEncoding::SettableProperty: {
     auto id = handleComputedId();
@@ -884,9 +892,10 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
     auto getter = getFuncForReference(getterName.str());
     auto setterName = MF->getIdentifier(ListOfValues[nextValue++]);
     auto setter = getFuncForReference(setterName.str());
-    handleComputedIndices();
+    handleComputedExternalReferenceAndIndices();
     return KeyPathPatternComponent::forComputedSettableProperty(
-        id, getter, setter, indices, indicesEquals, indicesHash, type);
+        id, getter, setter, indices, indicesEquals, indicesHash,
+        externalDecl, externalSubs, type);
     break;
   }
   case KeyPathComponentKindEncoding::OptionalChain:
@@ -898,15 +907,6 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::OptionalWrap:
     return KeyPathPatternComponent::forOptional(
         KeyPathPatternComponent::Kind::OptionalWrap, type);
-  case KeyPathComponentKindEncoding::External: {
-    auto declID = ListOfValues[nextValue++];
-    auto decl = cast<AbstractStorageDecl>(MF->getDecl(declID));
-    auto subMap = MF->getSubstitutionMap(ListOfValues[nextValue++]);
-    handleComputedIndices();
-    return KeyPathPatternComponent::forExternal(decl, subMap, indices,
-                                                indicesEquals, indicesHash,
-                                                type);
-  }
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }

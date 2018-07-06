@@ -344,54 +344,6 @@ void verifyKeyPathComponent(SILModule &M,
     
     break;
   }
-  case KeyPathPatternComponent::Kind::External: {
-    // The component type should match the substituted type of the
-    // referenced property.
-    auto decl = component.getExternalDecl();
-    auto sig = decl->getInnermostDeclContext()
-                   ->getGenericSignatureOfContext();
-    SubstitutionMap subs;
-    CanGenericSignature canSig = nullptr;
-    if (sig) {
-      canSig = sig->getCanonicalSignature();
-      subs = component.getExternalSubstitutions();
-    }
-    auto substType = component.getExternalDecl()->getStorageInterfaceType()
-      .subst(subs);
-    require(substType->isEqual(component.getComponentType()),
-            "component type should match storage type of referenced "
-            "declaration");
-
-    // Index types should match the lowered index types expected by the
-    // external declaration.
-    if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-      auto indexParams = sub->getIndices();
-      require(indexParams->size() == component.getSubscriptIndices().size(),
-              "number of subscript indices should match referenced decl");
-      for (unsigned i : indices(*indexParams)) {
-        auto param = (*indexParams)[i];
-        auto &index = component.getSubscriptIndices()[i];
-        auto paramTy = param->getInterfaceType()->getCanonicalType();
-        auto substParamTy = paramTy.subst(subs);
-        auto loweredTy = M.Types.getLoweredType(
-          AbstractionPattern(canSig, paramTy), substParamTy);
-        require(index.LoweredType == loweredTy,
-                "index lowered types should match referenced decl");
-        require(index.FormalType == substParamTy->getCanonicalType(),
-                "index formal types should match referenced decl");
-      }
-      
-      checkIndexEqualsAndHash();
-    } else {
-      require(component.getSubscriptIndices().empty(),
-              "external var reference should not apply indices");
-      require(!component.getSubscriptIndexEquals()
-              && !component.getSubscriptIndexHash(),
-              "external var reference should not apply hash");
-    }
-    
-    break;
-  }
   case KeyPathPatternComponent::Kind::OptionalChain: {
     require(baseTy->getOptionalObjectType()->isEqual(componentTy),
             "chaining component should unwrap optional");
@@ -4222,14 +4174,6 @@ public:
       for (auto &component : pattern->getComponents()) {
         bool hasIndices;
         switch (component.getKind()) {
-        case KeyPathPatternComponent::Kind::External:
-          if (auto subscript =
-                           dyn_cast<SubscriptDecl>(component.getExternalDecl()))
-            hasIndices = subscript->getIndices()->size() != 0;
-          else
-            hasIndices = false;
-          break;
-        
         case KeyPathPatternComponent::Kind::GettableProperty:
         case KeyPathPatternComponent::Kind::SettableProperty:
           hasIndices = !component.getSubscriptIndices().empty();

@@ -410,33 +410,6 @@ entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
   return undef : $()
 }
 
-sil @generic_external : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B, @in_guaranteed A, @in_guaranteed B) -> () {
-entry(%0 : $*A, %1 : $*B, %2 : $*A, %3 : $*B, %4 : $*A, %5 : $*B):
-  %t = keypath $KeyPath<G<B>, B>, <Z> (
-    root $G<Z>;
-    external #G.x<Z> : $Z
-  ) <B>
-
-  %u = keypath $KeyPath<G<A>, A>, <X: Hashable, Y: Hashable> (
-    root $G<Y>;
-    external #G.subscript<Y, X> [%$0 : $X : $*X] : $Y,
-      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
-  ) <B, A> (%1)
-
-  %v = keypath $KeyPath<G<G<B>>, B>, <X: Hashable, Y: Hashable> (
-    root $G<G<X>>;
-    external #G.subscript<G<X>, Y> [%$1 : $Y : $*Y] : $G<X>,
-      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int;
-    external #G.subscript<X, X> [%$0 : $X : $*X] : $X,
-      indices_equals @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool,
-      indices_hash @s_hash : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer) -> Int
-  ) <B, A> (%3, %4)
-
-  return undef : $()
-}
-
 sil @s_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, UnsafeRawPointer) -> @out B
 sil @s_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, @in_guaranteed A, UnsafeRawPointer) -> ()
 sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool

@@ -84,7 +84,6 @@ enum class KeyPathComponentKindEncoding : uint8_t {
   OptionalChain,
   OptionalForce,
   OptionalWrap,
-  External,
   Trivial,
 };
 enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
