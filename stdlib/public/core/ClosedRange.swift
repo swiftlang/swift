@@ -96,7 +96,7 @@ extension ClosedRange {
 }
 
 extension ClosedRange: RangeExpression {
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   public func relative<C: Collection>(to collection: C) -> Range<Bound>
   where C.Index == Bound {
     return Range(
@@ -330,7 +330,7 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
@@ -362,7 +362,7 @@ extension Strideable where Stride: SignedInteger {
   /// - Parameters:)`.
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.
@@ -404,7 +404,7 @@ extension ClosedRange: Hashable where Bound: Hashable {
 
 extension ClosedRange : CustomStringConvertible {
   /// A textual representation of the range.
-  @inlinable // FIXME(sil-serialize-all)...
+  @inlinable // trivial-implementation...
   public var description: String {
     return "\(lowerBound)...\(upperBound)"
   }
@@ -444,7 +444,7 @@ extension ClosedRange {
   ///
   /// - Parameter limits: The range to clamp the bounds of this range.
   /// - Returns: A new range clamped to the bounds of `limits`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // trivial-implementation
   @inline(__always)
   public func clamped(to limits: ClosedRange) -> ClosedRange {
     let lower =         

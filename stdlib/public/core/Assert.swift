@@ -267,7 +267,7 @@ public func _debugPrecondition(
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug mode.
-  if _isDebugAssertConfiguration() {
+  if _slowPath(_isDebugAssertConfiguration()) {
     if !_branchHint(condition(), expected: true) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
@@ -281,7 +281,7 @@ public func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  if _isDebugAssertConfiguration() {
+  if _slowPath(_isDebugAssertConfiguration()) {
     _precondition(false, message, file: file, line: line)
   }
   _conditionallyUnreachable()

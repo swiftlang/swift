@@ -22,7 +22,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements in the
   ///   collection.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // protocol-only
   public mutating func reverse() {
     if isEmpty { return }
     var f = startIndex

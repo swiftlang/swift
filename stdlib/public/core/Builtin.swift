@@ -78,7 +78,7 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 ///   - type: The type to cast `x` to. `type` and the type of `x` must have the
 ///     same size of memory representation and compatible memory layout.
 /// - Returns: A new instance of type `U`, cast from `x`.
-@inlinable // FIXME(sil-serialize-all)
+@inlinable // unsafe-performance
 @_transparent
 public func unsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
   _precondition(MemoryLayout<T>.size == MemoryLayout<U>.size,
