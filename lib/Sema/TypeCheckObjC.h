@@ -22,9 +22,12 @@
 
 namespace swift {
 
+class AbstractFunctionDecl;
 class ASTContext;
+class SubscriptDecl;
 class TypeChecker;
 class ValueDecl;
+class VarDecl;
 
 using llvm::Optional;
 
@@ -118,6 +121,26 @@ Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
 void markAsObjC(TypeChecker &TC, ValueDecl *D,
                 Optional<ObjCReason> isObjC,
                 Optional<ForeignErrorConvention> errorConvention = llvm::None);
+
+/// Determine whether the given function can be represented in Objective-C,
+/// and figure out its foreign error convention (if any).
+bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
+                           ObjCReason Reason,
+                           Optional<ForeignErrorConvention> &errorConvention);
+
+/// Determine whether the given variable can be represented in Objective-C.
+bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
+
+/// Determine whether the given subscript can be represented in Objective-C.
+bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
+
+/// Check whether the given declaration can be represented in Objective-C.
+bool canBeRepresentedInObjC(const ValueDecl *decl);
+
+/// Check that specific, known bridging functions are fully type-checked.
+///
+/// NOTE: This is only here to support the --enable-source-import hack.
+void checkBridgedFunctions(ASTContext &ctx);
 
 } // end namespace swift
 

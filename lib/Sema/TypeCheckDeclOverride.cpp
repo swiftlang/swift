@@ -1418,7 +1418,7 @@ static bool recordOverride(TypeChecker &TC, ValueDecl *override,
   if ((base->getDeclContext()->isExtensionContext() ||
        override->getDeclContext()->isExtensionContext()) &&
       !base->isObjC() && !isKnownObjC) {
-    bool baseCanBeObjC = TC.canBeRepresentedInObjC(base);
+    bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
                    !base->getDeclContext()->isExtensionContext());
     if (baseCanBeObjC) {

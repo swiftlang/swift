@@ -570,8 +570,6 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
   return options;
 }
 
-class ObjCReason;
-
 /// Flags that control protocol conformance checking.
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
@@ -668,11 +666,6 @@ public:
   llvm::DenseMap<std::pair<ValueDecl*, ValueDecl*>, bool> 
     specializedOverloadComparisonCache;
   
-  // We delay validation of C and Objective-C type-bridging functions in the
-  // standard library until we encounter a declaration that requires one. This
-  // flag is set to 'true' once the bridge functions have been checked.
-  bool HasCheckedBridgeFunctions = false;
-
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AnyFunctionRef> ClosuresWithUncomputedCaptures;
@@ -778,7 +771,6 @@ private:
   Type Int8Type;
   Type UInt8Type;
   Type NSObjectType;
-  Type NSErrorType;
   Type NSNumberType;
   Type NSValueType;
   Type ObjCSelectorType;
@@ -786,9 +778,6 @@ private:
 
   /// The \c Swift.UnsafeMutablePointer<T> declaration.
   Optional<NominalTypeDecl *> ArrayDecl;
-
-  /// A set of types that can be mapped to C integer types.
-  llvm::DenseSet<CanType> CIntegerTypes;
 
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, ExprAndConstraintSystem> DiagnosedExprs;
@@ -942,7 +931,6 @@ public:
   Type getUInt8Type(DeclContext *dc);
   Type getMaxIntegerType(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);
-  Type getNSErrorType(DeclContext *dc);
   Type getObjCSelectorType(DeclContext *dc);
   Type getExceptionType(DeclContext *dc, SourceLoc loc);
   
@@ -2172,17 +2160,6 @@ public:
                           AssociatedTypeDecl *assocType) override;
   void resolveWitness(const NormalProtocolConformance *conformance,
                       ValueDecl *requirement) override;
-
-  bool isCIntegerType(const DeclContext *DC, Type T);
-  bool isRepresentableInObjC(const AbstractFunctionDecl *AFD,
-                             ObjCReason Reason,
-                             Optional<ForeignErrorConvention> &errorConvention);
-  bool isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason);
-  bool isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason);
-
-  bool canBeRepresentedInObjC(const ValueDecl *decl);
-
-  void fillObjCRepresentableTypeCache(const DeclContext *DC);
 
   /// \name Resilience diagnostics
 
