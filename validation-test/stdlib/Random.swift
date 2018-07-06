@@ -43,8 +43,7 @@ RandomTests.test("basic random numbers") {
 
 // Random integers in ranges
 
-func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) 
-  where T.Stride: SignedInteger, T.Magnitude: UnsignedInteger {
+func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) {
     
   func testRange(_ range: Range<T>, iterations: Int = 1_000) {
     var integerSet: Set<T> = []
@@ -104,10 +103,8 @@ RandomTests.test("random integers in ranges") {
 // Random floating points in ranges
 
 func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type) 
-  where T.RawSignificand: FixedWidthInteger,
-        T.RawSignificand.Stride: SignedInteger & FixedWidthInteger,
-        T.RawSignificand.Magnitude: UnsignedInteger {
-          
+  where T.RawSignificand: FixedWidthInteger {
+  
   let testRange = 0 ..< 1_000
   
   // open range
@@ -130,6 +127,39 @@ RandomTests.test("random floating points in ranges") {
   floatingPointRangeTest(Double.self)
 #if !os(Windows) && (arch(i386) || arch(x86_64))
   floatingPointRangeTest(Float80.self)
+#endif
+}
+
+// Random floating points with max values (SR-8178)
+
+public struct MaxRNG: RandomNumberGenerator {
+  public func next() -> UInt64 {
+    return .max
+  }
+}
+
+func floatingPointRangeMaxTest<T: BinaryFloatingPoint>(_ type: T.Type)
+  where T.RawSignificand: FixedWidthInteger {
+  
+  let testRange = 0 ..< 1_000
+  
+  var rng = MaxRNG()
+  let ranges: [Range<T>] = [0 ..< 1, 1 ..< 2, 10 ..< 11, 0 ..< 10]
+  for range in ranges {
+    for _ in testRange {
+      let random = T.random(in: range, using: &rng)
+      expectTrue(range.contains(random))
+      expectTrue(range.lowerBound < random)
+      expectTrue(random < range.upperBound)
+    }
+  }
+}
+
+RandomTests.test("random floating point range maxes") {
+  floatingPointRangeMaxTest(Float.self)
+  floatingPointRangeMaxTest(Double.self)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  floatingPointRangeMaxTest(Float80.self)
 #endif
 }
 
@@ -248,7 +278,7 @@ func chi2Test(_ samples: [Double]) -> Bool {
 
   if chi2 > cvHigh {
     return false
-  }else {
+  } else {
     return true
   }
 }
