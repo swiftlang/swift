@@ -48,8 +48,7 @@
 
 // CHECK-MUTATING-ATTR: mutating func
 
-func foo(x: _Pointer) {} // Checks that this protocol actually exists.
-// CHECK-NOT: _Pointer
+func foo<P: _Pointer>(x: P) {} // Checks that this protocol actually exists.
 
 // NO-FIXMES-NOT: FIXME
 // RUN: %target-swift-ide-test -print-module-groups -module-to-print=Swift -source-filename %s -print-interface > %t-group.txt

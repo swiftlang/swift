@@ -10,30 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-%import gyb
-
-% for mutable in (True, False):
-%  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
-%  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
-%  Mutable = 'Mutable' if mutable else ''
-/// A pointer for accessing ${'and manipulating' if mutable else ''} data of a
+/// A pointer for accessing  data of a
 /// specific type.
 ///
-/// You use instances of the `Unsafe${Mutable}Pointer` type to access data of a
+/// You use instances of the `UnsafePointer` type to access data of a
 /// specific type in memory. The type of data that a pointer can access is the
-/// pointer's `Pointee` type. `Unsafe${Mutable}Pointer` provides no automated
+/// pointer's `Pointee` type. `UnsafePointer` provides no automated
 /// memory management or alignment guarantees. You are responsible for
 /// handling the life cycle of any memory you work with through unsafe
 /// pointers to avoid leaks or undefined behavior.
 ///
 /// Memory that you manually manage can be either *untyped* or *bound* to a
-/// specific type. You use the `Unsafe${Mutable}Pointer` type to access and
+/// specific type. You use the `UnsafePointer` type to access and
 /// manage memory that has been bound to a specific type.
 ///
 /// Understanding a Pointer's Memory State
 /// ======================================
 ///
-/// The memory referenced by an `Unsafe${Mutable}Pointer` instance can be in
+/// The memory referenced by an `UnsafePointer` instance can be in
 /// one of several states. Many pointer operations must only be applied to
 /// pointers with memory in a specific state---you must keep track of the
 /// state of the memory you are working with and understand the changes to
@@ -50,12 +44,6 @@
 /// deinitialized is in an *uninitialized* state. Uninitialized memory must be
 /// initialized before it can be accessed for reading.
 ///
-%if mutable:
-/// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
-/// `moveInitialize(from:count:)` to initialize the memory referenced by a
-/// pointer with a value or series of values.
-///
-% end
 /// Initialized Memory
 /// ------------------
 ///
@@ -63,29 +51,24 @@
 /// `pointee` property or through subscript notation. In the following
 /// example, `ptr` is a pointer to memory initialized with a value of `23`:
 ///
-///     let ptr: Unsafe${Mutable}Pointer<Int> = ...
+///     let ptr: UnsafePointer<Int> = ...
 ///     // ptr.pointee == 23
 ///     // ptr[0] == 23
 ///
 /// Accessing a Pointer's Memory as a Different Type
 /// ================================================
 ///
-/// When you access memory through an `Unsafe${Mutable}Pointer` instance, the
+/// When you access memory through an `UnsafePointer` instance, the
 /// `Pointee` type must be consistent with the bound type of the memory. If
 /// you do need to access memory that is bound to one type as a different
 /// type, Swift's pointer types provide type-safe ways to temporarily or
 /// permanently change the bound type of the memory, or to load typed
 /// instances directly from raw memory.
 ///
-/// An `Unsafe${Mutable}Pointer<UInt8>` instance allocated with eight bytes of
+/// An `UnsafePointer<UInt8>` instance allocated with eight bytes of
 /// memory, `uint8Pointer`, will be used for the examples below.
 ///
-% if mutable:
-///     let uint8Pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 8)
-///     uint8Pointer.initialize(from: [39, 77, 111, 111, 102, 33, 39, 0])
-% else:
 ///     let uint8Pointer: UnsafePointer<UInt8> = fetchEightBytes()
-% end
 ///
 /// When you only need to temporarily access a pointer's memory as a different
 /// type, use the `withMemoryRebound(to:capacity:)` method. For example, you
@@ -108,7 +91,7 @@
 /// example binds the memory referenced by `uint8Pointer` to one instance of
 /// the `UInt64` type:
 ///
-///     let uint64Pointer = Unsafe${Mutable}RawPointer(uint8Pointer)
+///     let uint64Pointer = UnsafeRawPointer(uint8Pointer)
 ///                               .bindMemory(to: UInt64.self, capacity: 1)
 ///
 /// After rebinding the memory referenced by `uint8Pointer` to `UInt64`,
@@ -118,22 +101,13 @@
 ///     var fullInteger = uint64Pointer.pointee          // OK
 ///     var firstByte = uint8Pointer.pointee             // undefined
 ///
-% if mutable:
-/// Alternatively, you can access the same memory as a different type without
-/// rebinding through untyped memory access, so long as the bound type and the
-/// destination type are trivial types. Convert your pointer to an
-/// `UnsafeMutableRawPointer` instance and then use the raw pointer's
-/// `load(fromByteOffset:as:)` and `storeBytes(of:toByteOffset:as:)` methods
-/// to read and write values.
-% else:
 /// Alternatively, you can access the same memory as a different type without
 /// rebinding through untyped memory access, so long as the bound type and the
 /// destination type are trivial types. Convert your pointer to an
 /// `UnsafeRawPointer` instance and then use the raw pointer's
 /// `load(fromByteOffset:as:)` method to read values.
-% end
 ///
-///     let rawPointer = Unsafe${Mutable}RawPointer(uint64Pointer)
+///     let rawPointer = UnsafeRawPointer(uint64Pointer)
 ///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
 ///     firstByte = rawPointer.load(as: UInt8.self)      // OK
 ///
@@ -141,12 +115,12 @@
 /// ===================================
 ///
 /// Pointer arithmetic with a typed pointer is counted in strides of the
-/// pointer's `Pointee` type. When you add to or subtract from an `${Self}`
+/// pointer's `Pointee` type. When you add to or subtract from an `UnsafePointer`
 /// instance, the result is a new pointer of the same type, offset by that
 /// number of instances of the `Pointee` type.
 ///
 ///     // 'intPointer' points to memory initialized with [10, 20, 30, 40]
-///     let intPointer: ${Self}<Int> = ...
+///     let intPointer: UnsafePointer<Int> = ...
 ///
 ///     // Load the first value in memory
 ///     let x = intPointer.pointee
@@ -166,60 +140,20 @@
 /// Implicit Casting and Bridging
 /// =============================
 ///
-%if mutable:
-/// When calling a function or method with an `${Self}` parameter, you can pass
-/// an instance of that specific pointer type or use Swift's implicit bridging
-/// to pass a compatible pointer.
-///
-/// For example, the `printInt(atAddress:)` function in the following code
-/// sample expects an `${Self}<Int>` instance as its first parameter:
-///
-///     func printInt(atAddress p: ${Self}<Int>) {
-///         print(p.pointee)
-///     }
-///
-/// As is typical in Swift, you can call the `printInt(atAddress:)` function
-/// with an `${Self}` instance. This example passes `intPointer`, a mutable
-/// pointer to an `Int` value, to `print(address:)`.
-///
-///     printInt(atAddress: intPointer)
-///     // Prints "42"
-///
-/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
-/// an instance or to the elements of an array. The following example passes a
-/// pointer to the `value` variable by using inout syntax:
-///
-///     var value: Int = 23
-///     printInt(atAddress: &value)
-///     // Prints "23"
-///
-/// A mutable pointer to the elements of an array is implicitly created when
-/// you pass the array using inout syntax. This example uses implicit bridging
-/// to pass a pointer to the elements of `numbers` when calling
-/// `printInt(atAddress:)`.
-///
-///     var numbers = [5, 10, 15, 20]
-///     printInt(atAddress: &numbers)
-///     // Prints "5"
-///
-/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
-/// guarantees that you can only pass a pointer to the type required by the
-/// function---in this case, a pointer to an `Int`.
-%else:
-/// When calling a function or method with an `${Self}` parameter, you can pass
+/// When calling a function or method with an `UnsafePointer` parameter, you can pass
 /// an instance of that specific pointer type, pass an instance of a
 /// compatible pointer type, or use Swift's implicit bridging to pass a
 /// compatible pointer.
 ///
 /// For example, the `printInt(atAddress:)` function in the following code
-/// sample expects an `${Self}<Int>` instance as its first parameter:
+/// sample expects an `UnsafePointer<Int>` instance as its first parameter:
 ///
-///     func printInt(atAddress p: ${Self}<Int>) {
+///     func printInt(atAddress p: UnsafePointer<Int>) {
 ///         print(p.pointee)
 ///     }
 ///
 /// As is typical in Swift, you can call the `printInt(atAddress:)` function
-/// with an `${Self}` instance. This example passes `intPointer`, a pointer to
+/// with an `UnsafePointer` instance. This example passes `intPointer`, a pointer to
 /// an `Int` value, to `print(address:)`.
 ///
 ///     printInt(atAddress: intPointer)
@@ -260,128 +194,31 @@
 /// No matter which way you call `printInt(atAddress:)`, Swift's type safety
 /// guarantees that you can only pass a pointer to the type required by the
 /// function---in this case, a pointer to an `Int`.
-%end
 ///
 /// - Important: The pointer created through implicit bridging of an instance
 ///   or of an array's elements is only valid during the execution of the
 ///   called function. Escaping the pointer to use after the execution of the
 ///   function is undefined behavior. In particular, do not use implicit
-///   bridging when calling an `${Self}` initializer.
+///   bridging when calling an `UnsafePointer` initializer.
 ///
 ///       var number = 5
-///       let numberPointer = Unsafe${Mutable}Pointer<Int>(&number)
+///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @_fixed_layout
-public struct ${Self}<Pointee>: _Pointer {
-
-  /// A type that represents the distance between two pointers.
-  public typealias Distance = Int
+public struct UnsafePointer<Pointee>: _Pointer {
 
   /// The underlying raw (untyped) pointer.
   public let _rawValue: Builtin.RawPointer
 
-  /// Creates ${a_Self} from a builtin raw pointer.
+  /// Creates an `UnsafePointer` from a builtin raw pointer.
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ _rawValue : Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
+}
 
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ from : OpaquePointer) {
-    _rawValue = from._rawValue
-  }
-
-  /// Creates a new typed pointer from the given opaque pointer.
-  ///
-  /// - Parameter from: The opaque pointer to convert to a typed pointer. If
-  ///   `from` is `nil`, the result of this initializer is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ from : OpaquePointer?) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
-  }
-
-  /// Creates a new typed pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// The address passed as `bitPattern` must have the correct alignment for
-  /// the pointer's `Pointee` type. That is,
-  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(bitPattern: Int) {
-    if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
-  }
-
-  /// Creates a new typed pointer from the given address, specified as a bit
-  /// pattern.
-  ///
-  /// The address passed as `bitPattern` must have the correct alignment for
-  /// the pointer's `Pointee` type. That is,
-  /// `bitPattern % MemoryLayout<Pointee>.alignment` must be `0`.
-  ///
-  /// - Parameter bitPattern: A bit pattern to use for the address of the new
-  ///   pointer. If `bitPattern` is zero, the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(bitPattern: UInt) {
-    if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
-  }
-
-  /// Creates a new pointer from the given typed pointer.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(_ other: ${Self}<Pointee>) {
-    self = other
-  }
-
-  /// Creates a new pointer from the given typed pointer.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(_ other: ${Self}<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self = unwrapped
-  }
-
-%  if mutable:
-  /// Creates a mutable typed pointer referencing the same memory as the given
-  /// immutable pointer.
-  ///
-  /// - Parameter other: The immutable pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init(mutating other: UnsafePointer<Pointee>) {
-    self._rawValue = other._rawValue
-  }
-
-  /// Creates a mutable typed pointer referencing the same memory as the given
-  /// immutable pointer.
-  ///
-  /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
-  ///   the result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public init?(mutating other: UnsafePointer<Pointee>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(mutating: unwrapped)
-  }
-% else:
+extension UnsafePointer {
   /// Creates an immutable typed pointer referencing the same memory as the
   /// given mutable pointer.
   ///
@@ -389,7 +226,7 @@ public struct ${Self}<Pointee>: _Pointer {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ other: UnsafeMutablePointer<Pointee>) {
-    self._rawValue = other._rawValue
+    self.init(other._rawValue)
   }
 
   /// Creates an immutable typed pointer referencing the same memory as the
@@ -403,9 +240,332 @@ public struct ${Self}<Pointee>: _Pointer {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped)
   }
-%  end
 
-%  if mutable:
+
+  /// Deallocates the memory block previously allocated at this pointer.
+  ///
+  /// This pointer must be a pointer to the start of a previously allocated memory 
+  /// block. The memory must not be initialized or `Pointee` must be a trivial type.
+  @inlinable
+  public func deallocate() {
+    Builtin.deallocRaw(_rawValue, (-1)._builtinWordValue, (-1)._builtinWordValue)
+  }
+
+  /// Accesses the instance referenced by this pointer.
+  ///
+  /// When reading from the `pointee` property, the instance referenced by
+  /// this pointer must already be initialized.
+  @inlinable // FIXME(sil-serialize-all)
+  public var pointee: Pointee {
+    @_transparent unsafeAddress {
+      return self
+    }
+  }
+
+  /// Executes the given closure while temporarily binding the specified number
+  /// of instances to the given type.
+  ///
+  /// Use this method when you have a pointer to memory bound to one type and
+  /// you need to access that memory as instances of another type. Accessing
+  /// memory as type `T` requires that the memory be bound to that type. A
+  /// memory location may only be bound to one type at a time, so accessing
+  /// the same memory as an unrelated type without first rebinding the memory
+  /// is undefined.
+  ///
+  /// The region of memory starting at this pointer and covering `count`
+  /// instances of the pointer's `Pointee` type must be initialized.
+  ///
+  /// The following example temporarily rebinds the memory of a `UInt64`
+  /// pointer to `Int64`, then accesses a property on the signed integer.
+  ///
+  ///     let uint64Pointer: UnsafePointer<UInt64> = fetchValue()
+  ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
+  ///         return ptr.pointee < 0
+  ///     }
+  ///
+  /// Because this pointer's memory is no longer bound to its `Pointee` type
+  /// while the `body` closure executes, do not access memory using the
+  /// original pointer from within `body`. Instead, use the `body` closure's
+  /// pointer argument to access the values in memory as instances of type
+  /// `T`.
+  ///
+  /// After executing `body`, this method rebinds memory back to the original
+  /// `Pointee` type.
+  ///
+  /// - Note: Only use this method to rebind the pointer's memory to a type
+  ///   with the same size and stride as the currently bound `Pointee` type.
+  ///   To bind a region of memory to a type that is a different size, convert
+  ///   the pointer to a raw pointer and use the `bindMemory(to:capacity:)`
+  ///   method.
+  ///
+  /// - Parameters:
+  ///   - type: The type to temporarily bind the memory referenced by this
+  ///     pointer. The type `T` must be the same size and be layout compatible
+  ///     with the pointer's `Pointee` type.
+  ///   - count: The number of instances of `T` to bind to `type`.
+  ///   - body: A closure that takes a  typed pointer to the
+  ///     same memory as this pointer, only bound to type `T`. The closure's
+  ///     pointer argument is valid only for the duration of the closure's
+  ///     execution. If `body` has a return value, that value is also used as
+  ///     the return value for the `withMemoryRebound(to:capacity:_:)` method.
+  /// - Returns: The return value, if any, of the `body` closure parameter.
+  @inlinable
+  public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
+    _ body: (UnsafePointer<T>) throws -> Result
+  ) rethrows -> Result {
+    Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
+    defer {
+      Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
+    }
+    return try body(UnsafePointer<T>(_rawValue))
+  }
+
+  /// Accesses the pointee at the specified offset from this pointer.
+  ///
+  ///
+  /// For a pointer `p`, the memory at `p + i` must be initialized.
+  ///
+  /// - Parameter i: The offset from this pointer at which to access an
+  ///   instance, measured in strides of the pointer's `Pointee` type.
+  @inlinable
+  public subscript(i: Int) -> Pointee {
+    @_transparent
+    unsafeAddress {
+      return self + i
+    }
+  }
+}
+
+extension UnsafePointer {
+  @inlinable // FIXME(sil-serialize-all)
+  internal static var _max : UnsafePointer {
+    return UnsafePointer(
+      bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
+    )._unsafelyUnwrappedUnchecked
+  }
+}
+
+/// A pointer for accessing and manipulating data of a
+/// specific type.
+///
+/// You use instances of the `UnsafeMutablePointer` type to access data of a
+/// specific type in memory. The type of data that a pointer can access is the
+/// pointer's `Pointee` type. `UnsafeMutablePointer` provides no automated
+/// memory management or alignment guarantees. You are responsible for
+/// handling the life cycle of any memory you work with through unsafe
+/// pointers to avoid leaks or undefined behavior.
+///
+/// Memory that you manually manage can be either *untyped* or *bound* to a
+/// specific type. You use the `UnsafeMutablePointer` type to access and
+/// manage memory that has been bound to a specific type.
+///
+/// Understanding a Pointer's Memory State
+/// ======================================
+///
+/// The memory referenced by an `UnsafeMutablePointer` instance can be in
+/// one of several states. Many pointer operations must only be applied to
+/// pointers with memory in a specific state---you must keep track of the
+/// state of the memory you are working with and understand the changes to
+/// that state that different operations perform. Memory can be untyped and
+/// uninitialized, bound to a type and uninitialized, or bound to a type and
+/// initialized to a value. Finally, memory that was allocated previously may
+/// have been deallocated, leaving existing pointers referencing unallocated
+/// memory.
+///
+/// Uninitialized Memory
+/// --------------------
+///
+/// Memory that has just been allocated through a typed pointer or has been
+/// deinitialized is in an *uninitialized* state. Uninitialized memory must be
+/// initialized before it can be accessed for reading.
+///
+/// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
+/// `moveInitialize(from:count:)` to initialize the memory referenced by a
+/// pointer with a value or series of values.
+///
+/// Initialized Memory
+/// ------------------
+///
+/// *Initialized* memory has a value that can be read using a pointer's
+/// `pointee` property or through subscript notation. In the following
+/// example, `ptr` is a pointer to memory initialized with a value of `23`:
+///
+///     let ptr: UnsafeMutablePointer<Int> = ...
+///     // ptr.pointee == 23
+///     // ptr[0] == 23
+///
+/// Accessing a Pointer's Memory as a Different Type
+/// ================================================
+///
+/// When you access memory through an `UnsafeMutablePointer` instance, the
+/// `Pointee` type must be consistent with the bound type of the memory. If
+/// you do need to access memory that is bound to one type as a different
+/// type, Swift's pointer types provide type-safe ways to temporarily or
+/// permanently change the bound type of the memory, or to load typed
+/// instances directly from raw memory.
+///
+/// An `UnsafeMutablePointer<UInt8>` instance allocated with eight bytes of
+/// memory, `uint8Pointer`, will be used for the examples below.
+///
+///     let uint8Pointer = UnsafeMutablePointer<UInt8>.allocate(capacity: 8)
+///     uint8Pointer.initialize(from: [39, 77, 111, 111, 102, 33, 39, 0])
+///
+/// When you only need to temporarily access a pointer's memory as a different
+/// type, use the `withMemoryRebound(to:capacity:)` method. For example, you
+/// can use this method to call an API that expects a pointer to a different
+/// type that is layout compatible with your pointer's `Pointee`. The following
+/// code temporarily rebinds the memory that `uint8Pointer` references from
+/// `UInt8` to `Int8` to call the imported C `strlen` function.
+///
+///     // Imported from C
+///     func strlen(_ __s: UnsafePointer<Int8>!) -> UInt
+///
+///     let length = uint8Pointer.withMemoryRebound(to: Int8.self, capacity: 8) {
+///         return strlen($0)
+///     }
+///     // length == 7
+///
+/// When you need to permanently rebind memory to a different type, first
+/// obtain a raw pointer to the memory and then call the
+/// `bindMemory(to:capacity:)` method on the raw pointer. The following
+/// example binds the memory referenced by `uint8Pointer` to one instance of
+/// the `UInt64` type:
+///
+///     let uint64Pointer = UnsafeMutableRawPointer(uint8Pointer)
+///                               .bindMemory(to: UInt64.self, capacity: 1)
+///
+/// After rebinding the memory referenced by `uint8Pointer` to `UInt64`,
+/// accessing that pointer's referenced memory as a `UInt8` instance is
+/// undefined.
+///
+///     var fullInteger = uint64Pointer.pointee          // OK
+///     var firstByte = uint8Pointer.pointee             // undefined
+///
+/// Alternatively, you can access the same memory as a different type without
+/// rebinding through untyped memory access, so long as the bound type and the
+/// destination type are trivial types. Convert your pointer to an
+/// `UnsafeMutableRawPointer` instance and then use the raw pointer's
+/// `load(fromByteOffset:as:)` and `storeBytes(of:toByteOffset:as:)` methods
+/// to read and write values.
+///
+///     let rawPointer = UnsafeMutableRawPointer(uint64Pointer)
+///     fullInteger = rawPointer.load(as: UInt64.self)   // OK
+///     firstByte = rawPointer.load(as: UInt8.self)      // OK
+///
+/// Performing Typed Pointer Arithmetic
+/// ===================================
+///
+/// Pointer arithmetic with a typed pointer is counted in strides of the
+/// pointer's `Pointee` type. When you add to or subtract from an `UnsafeMutablePointer`
+/// instance, the result is a new pointer of the same type, offset by that
+/// number of instances of the `Pointee` type.
+///
+///     // 'intPointer' points to memory initialized with [10, 20, 30, 40]
+///     let intPointer: UnsafeMutablePointer<Int> = ...
+///
+///     // Load the first value in memory
+///     let x = intPointer.pointee
+///     // x == 10
+///
+///     // Load the third value in memory
+///     let offsetPointer = intPointer + 2
+///     let y = offsetPointer.pointee
+///     // y == 30
+///
+/// You can also use subscript notation to access the value in memory at a
+/// specific offset.
+///
+///     let z = intPointer[2]
+///     // z == 30
+///
+/// Implicit Casting and Bridging
+/// =============================
+///
+/// When calling a function or method with an `UnsafeMutablePointer` parameter, you can pass
+/// an instance of that specific pointer type or use Swift's implicit bridging
+/// to pass a compatible pointer.
+///
+/// For example, the `printInt(atAddress:)` function in the following code
+/// sample expects an `UnsafeMutablePointer<Int>` instance as its first parameter:
+///
+///     func printInt(atAddress p: UnsafeMutablePointer<Int>) {
+///         print(p.pointee)
+///     }
+///
+/// As is typical in Swift, you can call the `printInt(atAddress:)` function
+/// with an `UnsafeMutablePointer` instance. This example passes `intPointer`, a mutable
+/// pointer to an `Int` value, to `print(address:)`.
+///
+///     printInt(atAddress: intPointer)
+///     // Prints "42"
+///
+/// Alternatively, you can use Swift's *implicit bridging* to pass a pointer to
+/// an instance or to the elements of an array. The following example passes a
+/// pointer to the `value` variable by using inout syntax:
+///
+///     var value: Int = 23
+///     printInt(atAddress: &value)
+///     // Prints "23"
+///
+/// A mutable pointer to the elements of an array is implicitly created when
+/// you pass the array using inout syntax. This example uses implicit bridging
+/// to pass a pointer to the elements of `numbers` when calling
+/// `printInt(atAddress:)`.
+///
+///     var numbers = [5, 10, 15, 20]
+///     printInt(atAddress: &numbers)
+///     // Prints "5"
+///
+/// No matter which way you call `printInt(atAddress:)`, Swift's type safety
+/// guarantees that you can only pass a pointer to the type required by the
+/// function---in this case, a pointer to an `Int`.
+///
+/// - Important: The pointer created through implicit bridging of an instance
+///   or of an array's elements is only valid during the execution of the
+///   called function. Escaping the pointer to use after the execution of the
+///   function is undefined behavior. In particular, do not use implicit
+///   bridging when calling an `UnsafeMutablePointer` initializer.
+///
+///       var number = 5
+///       let numberPointer = UnsafeMutablePointer<Int>(&number)
+///       // Accessing 'numberPointer' is undefined behavior.
+@_fixed_layout
+public struct UnsafeMutablePointer<Pointee>: _Pointer {
+
+  /// The underlying raw (untyped) pointer.
+  public let _rawValue: Builtin.RawPointer
+
+  /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  public init(_ _rawValue : Builtin.RawPointer) {
+    self._rawValue = _rawValue
+  }
+}
+
+extension UnsafeMutablePointer {
+  /// Creates a mutable typed pointer referencing the same memory as the given
+  /// immutable pointer.
+  ///
+  /// - Parameter other: The immutable pointer to convert.
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  public init(mutating other: UnsafePointer<Pointee>) {
+    self.init(other._rawValue)
+  }
+
+  /// Creates a mutable typed pointer referencing the same memory as the given
+  /// immutable pointer.
+  ///
+  /// - Parameter other: The immutable pointer to convert. If `other` is `nil`,
+  ///   the result is `nil`.
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  public init?(mutating other: UnsafePointer<Pointee>?) {
+    guard let unwrapped = other else { return nil }
+    self.init(mutating: unwrapped)
+  }
+
   /// Allocates uninitialized memory for the specified number of instances of
   /// type `Pointee`.
   ///
@@ -436,7 +596,6 @@ public struct ${Self}<Pointee>: _Pointer {
     Builtin.bindMemory(rawPtr, count._builtinWordValue, Pointee.self)
     return UnsafeMutablePointer(rawPtr)
   }
-%  end
 
   /// Deallocates the memory block previously allocated at this pointer.
   ///
@@ -449,7 +608,6 @@ public struct ${Self}<Pointee>: _Pointer {
 
   /// Accesses the instance referenced by this pointer.
   ///
-%  if mutable:
   /// When reading from the `pointee` property, the instance referenced by this
   /// pointer must already be initialized. When `pointee` is used as the left
   /// side of an assignment, the instance must be initialized or this
@@ -458,27 +616,16 @@ public struct ${Self}<Pointee>: _Pointer {
   /// Do not assign an instance of a nontrivial type through `pointee` to
   /// uninitialized memory. Instead, use an initializing method, such as
   /// `initialize(to:count:)`.
-%  else:
-  /// When reading from the `pointee` property, the instance referenced by
-  /// this pointer must already be initialized.
-%  end
   @inlinable // FIXME(sil-serialize-all)
   public var pointee: Pointee {
-%  if mutable:
     @_transparent unsafeAddress {
       return UnsafePointer(self)
     }
     @_transparent nonmutating unsafeMutableAddress {
       return self
     }
-%  else:
-    @_transparent unsafeAddress {
-      return self
-    }
-%  end
   }
 
-%  if mutable:
   /// Initializes this pointer's memory with the specified number of
   /// consecutive copies of the given value.
   ///
@@ -494,7 +641,7 @@ public struct ${Self}<Pointee>: _Pointer {
   public func initialize(repeating repeatedValue: Pointee, count: Int) {
     // FIXME: add tests (since the `count` has been added)
     _debugPrecondition(count >= 0,
-      "${Self}.initialize(repeating:count:): negative count")
+      "UnsafeMutablePointer.initialize(repeating:count:): negative count")
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
@@ -552,7 +699,7 @@ public struct ${Self}<Pointee>: _Pointer {
   ///     `count` must not be negative. 
   @inlinable
   public func assign(repeating repeatedValue: Pointee, count: Int) {
-    _debugPrecondition(count >= 0, "${Self}.assign(repeating:count:) with negative count")
+    _debugPrecondition(count >= 0, "UnsafeMutablePointer.assign(repeating:count:) with negative count")
     for i in 0..<count {
       self[i] = repeatedValue
     }
@@ -577,7 +724,7 @@ public struct ${Self}<Pointee>: _Pointer {
   @inlinable
   public func assign(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.assign with negative count")
+      count >= 0, "UnsafeMutablePointer.assign with negative count")
     if UnsafePointer(self) < source || UnsafePointer(self) >= source + count {
       // assign forward from a disjoint or following overlapping range.
       Builtin.assignCopyArrayFrontToBack(
@@ -617,9 +764,9 @@ public struct ${Self}<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveInitialize(from source: ${Self}, count: Int) {
+  public func moveInitialize(from source: UnsafeMutablePointer, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveInitialize with negative count")
+      count >= 0, "UnsafeMutablePointer.moveInitialize with negative count")
     if self < source || self >= source + count {
       // initialize forward from a disjoint or following overlapping range.
       Builtin.takeArrayFrontToBack(
@@ -659,11 +806,11 @@ public struct ${Self}<Pointee>: _Pointer {
   @inlinable
   public func initialize(from source: UnsafePointer<Pointee>, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.initialize with negative count")
+      count >= 0, "UnsafeMutablePointer.initialize with negative count")
     _debugPrecondition(
       UnsafePointer(self) + count <= source ||
       source + count <= UnsafePointer(self),
-      "${Self}.initialize overlapping range")
+      "UnsafeMutablePointer.initialize overlapping range")
     Builtin.copyArray(
       Pointee.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
@@ -688,9 +835,9 @@ public struct ${Self}<Pointee>: _Pointer {
   ///   - count: The number of instances to move from `source` to this
   ///     pointer's memory. `count` must not be negative.
   @inlinable
-  public func moveAssign(from source: ${Self}, count: Int) {
+  public func moveAssign(from source: UnsafeMutablePointer, count: Int) {
     _debugPrecondition(
-      count >= 0, "${Self}.moveAssign(from:) with negative count")
+      count >= 0, "UnsafeMutablePointer.moveAssign(from:) with negative count")
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssign overlapping range")
@@ -716,13 +863,12 @@ public struct ${Self}<Pointee>: _Pointer {
   @inlinable
   @discardableResult
   public func deinitialize(count: Int) -> UnsafeMutableRawPointer {
-    _debugPrecondition(count >= 0, "${Self}.deinitialize with negative count")
+    _debugPrecondition(count >= 0, "UnsafeMutablePointer.deinitialize with negative count")
     // FIXME: optimization should be implemented, where if the `count` value
     // is 1, the `Builtin.destroy(Pointee.self, _rawValue)` gets called.
     Builtin.destroyArray(Pointee.self, _rawValue, count._builtinWordValue)
     return UnsafeMutableRawPointer(self)
   }
-%  end
 
   /// Executes the given closure while temporarily binding the specified number
   /// of instances to the given type.
@@ -740,7 +886,7 @@ public struct ${Self}<Pointee>: _Pointer {
   /// The following example temporarily rebinds the memory of a `UInt64`
   /// pointer to `Int64`, then accesses a property on the signed integer.
   ///
-  ///     let uint64Pointer: Unsafe${Mutable}Pointer<UInt64> = fetchValue()
+  ///     let uint64Pointer: UnsafeMutablePointer<UInt64> = fetchValue()
   ///     let isNegative = uint64Pointer.withMemoryRebound(to: Int64.self) { ptr in
   ///         return ptr.pointee < 0
   ///     }
@@ -765,7 +911,7 @@ public struct ${Self}<Pointee>: _Pointer {
   ///     pointer. The type `T` must be the same size and be layout compatible
   ///     with the pointer's `Pointee` type.
   ///   - count: The number of instances of `T` to bind to `type`.
-  ///   - body: A closure that takes a ${Mutable.lower()} typed pointer to the
+  ///   - body: A closure that takes a mutable typed pointer to the
   ///     same memory as this pointer, only bound to type `T`. The closure's
   ///     pointer argument is valid only for the duration of the closure's
   ///     execution. If `body` has a return value, that value is also used as
@@ -773,18 +919,17 @@ public struct ${Self}<Pointee>: _Pointer {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
   public func withMemoryRebound<T, Result>(to type: T.Type, capacity count: Int,
-    _ body: (${Self}<T>) throws -> Result
+    _ body: (UnsafeMutablePointer<T>) throws -> Result
   ) rethrows -> Result {
     Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
     defer {
       Builtin.bindMemory(_rawValue, count._builtinWordValue, Pointee.self)
     }
-    return try body(${Self}<T>(_rawValue))
+    return try body(UnsafeMutablePointer<T>(_rawValue))
   }
 
   /// Accesses the pointee at the specified offset from this pointer.
   ///
-%  if mutable:
   /// For a pointer `p`, the memory at `p + i` must be initialized when reading
   /// the value by using the subscript. When the subscript is used as the left
   /// side of an assignment, the memory at `p + i` must be initialized or
@@ -793,16 +938,11 @@ public struct ${Self}<Pointee>: _Pointer {
   /// Do not assign an instance of a nontrivial type through the subscript to
   /// uninitialized memory. Instead, use an initializing method, such as
   /// `initialize(to:count:)`.
-%  else:
-  ///
-  /// For a pointer `p`, the memory at `p + i` must be initialized.
-%  end
   ///
   /// - Parameter i: The offset from this pointer at which to access an
   ///   instance, measured in strides of the pointer's `Pointee` type.
   @inlinable
   public subscript(i: Int) -> Pointee {
-%  if mutable:
     @_transparent
     unsafeAddress {
       return UnsafePointer(self + i)
@@ -811,200 +951,14 @@ public struct ${Self}<Pointee>: _Pointer {
     nonmutating unsafeMutableAddress {
       return self + i
     }
-%  else:
-    @_transparent
-    unsafeAddress {
-      return self + i
-    }
-%  end
   }
 }
 
-extension ${Self}: Equatable {
-  // - Note: Strideable's implementation is potentially less efficient and cannot
-  //   handle misaligned pointers.
-  /// Returns a Boolean value indicating whether two pointers are equal.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` and `rhs` reference the same memory address;
-  ///   otherwise, `false`.
+extension UnsafeMutablePointer {
   @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func == (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-
-extension ${Self}: Comparable {
-  // - Note: Strideable's implementation is potentially less efficient and
-  // cannot handle misaligned pointers.
-  //
-  // - Note: This is an unsigned comparison unlike Strideable's implementation.
-  /// Returns a Boolean value indicating whether the first pointer references
-  /// an earlier memory location than the second pointer.
-  ///
-  /// - Parameters:
-  ///   - lhs: A pointer.
-  ///   - rhs: Another pointer.
-  /// - Returns: `true` if `lhs` references a memory address earlier than
-  ///   `rhs`; otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
-  public static func < (lhs: ${Self}<Pointee>, rhs: ${Self}<Pointee>) -> Bool {
-    return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
-  }
-}
-extension ${Self}: Hashable {
-  /// Hashes the essential components of this value by feeding them into the
-  /// given hasher.
-  ///
-  /// - Parameter hasher: The hasher to use when combining the components
-  ///   of this instance.
-  @inlinable
-  public func hash(into hasher: inout Hasher) {
-    hasher.combine(UInt(bitPattern: self))
-  }
-
-  @inlinable
-  public func _rawHashValue(seed: (UInt64, UInt64)) -> Int {
-    return Hasher._hash(seed: seed, UInt(bitPattern: self))
-  }
-}
-
-extension ${Self}: Strideable {
-  /// Returns a pointer to the next consecutive instance.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Returns: A pointer advanced from this pointer by
-  ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
-  public func successor() -> ${Self} {
-    return advanced(by: 1)
-  }
-
-  /// Returns a pointer to the previous consecutive instance.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Returns: A pointer shifted backward from this pointer by
-  ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
-  public func predecessor() -> ${Self} {
-    return self - 1
-  }
-
-  /// Returns the distance from this pointer to the given pointer, counted as
-  /// instances of the pointer's `Pointee` type.
-  ///
-  /// With pointers `p` and `q`, the result of `p.distance(to: q)` is
-  /// equivalent to `q - p`.
-  ///
-  /// Typed pointers are required to be properly aligned for their `Pointee`
-  /// type. Proper alignment ensures that the result of `distance(to:)`
-  /// accurately measures the distance between the two pointers, counted in
-  /// strides of `Pointee`. To find the distance in bytes between two
-  /// pointers, convert them to `UnsafeRawPointer` instances before calling
-  /// `distance(to:)`.
-  ///
-  /// - Parameter end: The pointer to calculate the distance to.
-  /// - Returns: The distance from this pointer to `end`, in strides of the
-  ///   pointer's `Pointee` type. To access the stride, use
-  ///   `MemoryLayout<Pointee>.stride`.
-  @inlinable
-  public func distance(to end: ${Self}) -> Int {
-    return
-      Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
-                           Builtin.ptrtoint_Word(_rawValue)))
-      / MemoryLayout<Pointee>.stride
-  }
-
-  /// Returns a pointer offset from this pointer by the specified number of
-  /// instances.
-  ///
-  /// With pointer `p` and distance `n`, the result of `p.advanced(by: n)` is
-  /// equivalent to `p + n`.
-  ///
-  /// The resulting pointer must be within the bounds of the same allocation as
-  /// this pointer.
-  ///
-  /// - Parameter n: The number of strides of the pointer's `Pointee` type to
-  ///   offset this pointer. To access the stride, use
-  ///   `MemoryLayout<Pointee>.stride`. `n` may be positive, negative, or
-  ///   zero.
-  /// - Returns: A pointer offset from this pointer by `n` instances of the
-  ///   `Pointee` type.
-  @inlinable
-  public func advanced(by n: Int) -> ${Self} {
-    return ${Self}(Builtin.gep_Word(
-      self._rawValue, n._builtinWordValue, Pointee.self))
-  }
-}
-
-extension ${Self} : CustomDebugStringConvertible {
-  /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
-  }
-}
-
-extension ${Self} : CustomReflectable {
-  public var customMirror: Mirror {
-    let ptrValue = UInt64(bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
-    return Mirror(self, children: ["pointerValue": ptrValue])
-  }
-}
-
-extension Int {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init<U>(bitPattern pointer: ${Self}<U>?) {
-    if let pointer = pointer {
-      self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
-  }
-}
-
-extension UInt {
-  /// Creates a new value with the bit pattern of the given pointer.
-  ///
-  /// The new value represents the address of the pointer passed as `pointer`.
-  /// If `pointer` is `nil`, the result is `0`.
-  ///
-  /// - Parameter pointer: The pointer to use as the source for the new
-  ///   integer.
-  @inlinable
-  public init<U>(bitPattern pointer: ${Self}<U>?) {
-    if let pointer = pointer {
-      self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
-    } else {
-      self = 0
-    }
-  }
-}
-
-extension ${Self} {
-  @inlinable // FIXME(sil-serialize-all)
-  internal static var _max : ${Self} {
-    return ${Self}(
+  internal static var _max : UnsafeMutablePointer {
+    return UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
   }
 }
-% end # for mutable
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
