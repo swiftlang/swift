@@ -3,9 +3,9 @@
 // RUN: %gyb %s -o %t/main.swift
 // RUN: if [ %target-runtime == "objc" ]; then \
 // RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control -swift-version 3; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control ; \
 // RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control -swift-version 3; \
+// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control ; \
 // RUN: fi
 //
 // RUN: %line-directive %t/main.swift -- %target-run %t/Dictionary
@@ -1671,10 +1671,10 @@ DictionaryTestSuite.test("init(_:uniquingKeysWith:)") {
   struct TE: Error {}
   do {
     // No duplicate keys, so no error thrown.
-    var d1 = try Dictionary([(10, 1), (20, 2), (30, 3)]) { _ in throw TE() }
+    var d1 = try Dictionary([(10, 1), (20, 2), (30, 3)]) { _, _ in throw TE() }
     expectEqual(d1.count, 3)
     // Duplicate keys, should throw error.
-    var d2 = try Dictionary([(10, 1), (10, 2)]) { _ in throw TE() }
+    var d2 = try Dictionary([(10, 1), (10, 2)]) { _, _ in throw TE() }
     assertionFailure()
   } catch {
     assert(error is TE)
@@ -1762,7 +1762,7 @@ DictionaryTestSuite.test("capacity/reserveCapacity(_:)") {
 
   // Fill up to the limit, no reallocation.
   d1.merge(stride(from: 50, through: 240, by: 10).lazy.map { ($0, 1000 + $0) },
-    uniquingKeysWith: { _ in fatalError() })
+    uniquingKeysWith: { _, _ in fatalError() })
   expectEqual(24, d1.count)
   expectEqual(24, d1.capacity)
   d1[250] = 1250
@@ -4297,28 +4297,28 @@ DictionaryDerivedAPIs.test("values") {
 var ObjCThunks = TestSuite("ObjCThunks")
 
 class ObjCThunksHelper : NSObject {
-  dynamic func acceptArrayBridgedVerbatim(_ array: [TestObjCValueTy]) {
+  @objc dynamic func acceptArrayBridgedVerbatim(_ array: [TestObjCValueTy]) {
     expectEqual(10, array[0].value)
     expectEqual(20, array[1].value)
     expectEqual(30, array[2].value)
   }
 
-  dynamic func acceptArrayBridgedNonverbatim(_ array: [TestBridgedValueTy]) {
+  @objc dynamic func acceptArrayBridgedNonverbatim(_ array: [TestBridgedValueTy]) {
     // Cannot check elements because doing so would bridge them.
     expectEqual(3, array.count)
   }
 
-  dynamic func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
+  @objc dynamic func returnArrayBridgedVerbatim() -> [TestObjCValueTy] {
     return [ TestObjCValueTy(10), TestObjCValueTy(20),
         TestObjCValueTy(30) ]
   }
 
-  dynamic func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
+  @objc dynamic func returnArrayBridgedNonverbatim() -> [TestBridgedValueTy] {
     return [ TestBridgedValueTy(10), TestBridgedValueTy(20),
         TestBridgedValueTy(30) ]
   }
 
-  dynamic func acceptDictionaryBridgedVerbatim(
+  @objc dynamic func acceptDictionaryBridgedVerbatim(
       _ d: [TestObjCKeyTy : TestObjCValueTy]) {
     expectEqual(3, d.count)
     expectEqual(1010, d[TestObjCKeyTy(10)]!.value)
@@ -4326,13 +4326,13 @@ class ObjCThunksHelper : NSObject {
     expectEqual(1030, d[TestObjCKeyTy(30)]!.value)
   }
 
-  dynamic func acceptDictionaryBridgedNonverbatim(
+  @objc dynamic func acceptDictionaryBridgedNonverbatim(
       _ d: [TestBridgedKeyTy : TestBridgedValueTy]) {
     expectEqual(3, d.count)
     // Cannot check elements because doing so would bridge them.
   }
 
-  dynamic func returnDictionaryBridgedVerbatim() ->
+  @objc dynamic func returnDictionaryBridgedVerbatim() ->
       [TestObjCKeyTy : TestObjCValueTy] {
     return [
         TestObjCKeyTy(10): TestObjCValueTy(1010),
@@ -4341,7 +4341,7 @@ class ObjCThunksHelper : NSObject {
     ]
   }
 
-  dynamic func returnDictionaryBridgedNonverbatim() ->
+  @objc dynamic func returnDictionaryBridgedNonverbatim() ->
       [TestBridgedKeyTy : TestBridgedValueTy] {
     return [
         TestBridgedKeyTy(10): TestBridgedValueTy(1010),

@@ -874,7 +874,8 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   for i in 0..<3 {
     var actualContents = [ExpectedDictionaryElement]()
     let sink: (AnyObjectTuple2) -> Void = {
-      (key, value) in
+      pair in
+      let (key, value) = pair
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
         value: convertValue(value),
