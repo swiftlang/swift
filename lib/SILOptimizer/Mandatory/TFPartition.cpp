@@ -746,6 +746,33 @@ private:
 };
 } // end anonymous namespace
 
+
+/// Determine the marking strategy (Mark::Copy / Mark::Send) according
+/// to the type of TermInst of a predecessor BasicBlock.
+/// For general terminators (like br/cond_br), we'd generate code to
+/// run on accelerator;
+/// for other SIL-specific terminators (like try_apply), we'd keep it
+/// running on the host and send its result to accelerator.
+//@{
+static inline bool shouldMarkCopy(TermInst *predTerm) {
+  auto termKind = predTerm->getTermKind();
+  return termKind == TermKind::BranchInst ||
+      termKind == TermKind::CondBranchInst;
+}
+static inline bool shouldMarkSend(TermInst *predTerm) {
+  // TODO : support SwitchValueInst and CheckedCastValueBranchInst
+  // once they are properly tested.
+  auto termKind = predTerm->getTermKind();
+  return termKind == TermKind::SwitchEnumInst ||
+      termKind == TermKind::SwitchEnumAddrInst ||
+      termKind == TermKind::TryApplyInst ||
+      termKind == TermKind::DynamicMethodBranchInst ||
+      termKind == TermKind::CheckedCastBranchInst ||
+      termKind == TermKind::CheckedCastAddrBranchInst;
+}
+//@}
+
+
 /// Check to see if the specified value being copied into a partition for the
 /// accelerator is our designated "send" operation.  If so, we're fine,
 /// otherwise emit a warning to tell the programmer that they are doing
@@ -1050,22 +1077,23 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       assert(BB != pred || numTensorSuccs > 1);
 
       auto predTerm = pred->getTerminator();
-      if (isa<BranchInst>(predTerm) || isa<CondBranchInst>(predTerm)) {
+      if (shouldMarkCopy(predTerm)) {
         markInstruction(*predTerm, Marking::Copy);
         continue;
       }
 
-      if (isa<SwitchEnumInst>(predTerm)) {
+      if (shouldMarkSend(predTerm)) {
         // We intend for `predTerm` to still run on host (and thus did not
         // mark its parent block), but send its result to accelerator.
         markedInstructions.insert({predTerm, Marking::Send});
         continue;
       }
 
-      // TODO: support other term inst types.
-      predTerm->dump();
-      assert(0 && "FIXME: Handle non-branch terminators like try_apply, which"
-                  "cannot (in general) be moved to the accelerator");
+      diagnose(hostFn.getModule().getASTContext(),
+               predTerm->getLoc().getSourceLoc(),
+               diag::tf_internal_error,
+               "TermInst " + getSILInstructionName(predTerm->getKind()).str()
+               + " not supported for TFFunctionPartition");
     }
   }
 }
@@ -2079,7 +2107,7 @@ class PartitionCloner : public SILClonerWithScopes<PartitionCloner> {
   // On error, returns false.
   bool finalizeOriginal();
 
-  void handleSwitchEnum(SwitchEnumInst *inst);
+  void handleSendRecvForTerminator(TermInst *inst);
   void insertSend(SILInstruction &inst);
   // On error, returns false.
   bool insertReceive(SILValue value, SILLocation loc);
@@ -2843,7 +2871,9 @@ static SILBasicBlock *getLastSuccessorBlock(TermInst *inst) {
   return *--lastIt;
 }
 
-/// The partitioned code is illustrated by the snippet below:
+/// Handle the send/recv between host and accelerator for TermInst.
+/// For example, the partitioned code for switch_enum is illustrated
+/// by the snippet below:
 ///
 /// Host side:
 /// bb0:
@@ -2868,7 +2898,7 @@ static SILBasicBlock *getLastSuccessorBlock(TermInst *inst) {
 ///   else if %case_id == 1 goto bb2
 ///   else ...
 ///
-void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
+void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
   auto &ctx = FP.hostFn.getASTContext();
   auto int32Decl = ctx.getInt32Decl();
   auto int32SILType = extractBuiltinTypeFromStdlibNumericType(int32Decl);
@@ -3014,12 +3044,12 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
 /// Insert a send of values from the specified instruction result(s) to the
 /// accelerator, and insert receives in it.
 void PartitionCloner::insertSend(SILInstruction &inst) {
-  if (isa<TermInst>(inst)) {
-    if (auto *SEI = dyn_cast<SwitchEnumInst>(&inst)) {
-      handleSwitchEnum(SEI);
+  if (auto *Term = dyn_cast<TermInst>(&inst)) {
+    if (shouldMarkSend(Term)) {
+      handleSendRecvForTerminator(Term);
       return;
     }
-    inst.dump();
+    Term->dump();
     llvm_unreachable("Cannot handle the above terminator with Marking::Send");
   }
 
