@@ -120,7 +120,40 @@ namespace {
     };
 
   #define PAIRCASE(XS, YS) case PairSwitch(XS, YS)
-    
+
+    template <typename Element>
+    class FixedSizeVector final :
+        private llvm::TrailingObjects<FixedSizeVector<Element>, Element> {
+      friend llvm::TrailingObjects<FixedSizeVector<Element>, Element>;
+
+      size_t Size;
+      FixedSizeVector(size_t size) : Size(size) {}
+    public:
+      template <typename Allocator, typename FromElement>
+      static FixedSizeVector *create(Allocator &allocator,
+                                     ArrayRef<FromElement> elements) {
+        size_t bytes = FixedSizeVector::
+            template totalSizeToAlloc<Element>(elements.size());
+        void *memory = allocator.Allocate(bytes, alignof(FixedSizeVector));
+        auto *result = new (memory) FixedSizeVector(elements.size());
+        std::uninitialized_copy(elements.begin(), elements.end(),
+                                result->begin());
+        return result;
+      }
+
+      Element *begin() {
+        return this->template getTrailingObjects<Element>();
+      }
+      const Element *begin() const {
+        return const_cast<FixedSizeVector *>(this)->begin();
+      }
+      Element *end() { return begin() + Size; }
+      const Element *end() const { return begin() + Size; }
+
+      bool empty() const { return Size == 0; }
+      size_t size() const { return Size; }
+    };
+
     class Space final : public RelationalOperationsBase<Space> {
     private:
       SpaceKind Kind;
@@ -129,7 +162,7 @@ namespace {
       // In type space, we reuse HEAD to help us print meaningful name, e.g.,
       // tuple element name in fixits.
       Identifier Head;
-      std::forward_list<Space> Spaces;
+      const FixedSizeVector<Space> *Spaces = nullptr;
 
       // NB: This constant is arbitrary.  Anecdotally, the Space Engine is
       // capable of efficiently handling Spaces of around size 200, but it would
@@ -137,6 +170,7 @@ namespace {
       static const size_t MAX_SPACE_SIZE = 128;
 
       size_t computeSize(TypeChecker &TC, const DeclContext *DC,
+                         llvm::BumpPtrAllocator &alloc,
                          SmallPtrSetImpl<TypeBase *> &cache) const {
         switch (getKind()) {
         case SpaceKind::Empty:
@@ -152,11 +186,11 @@ namespace {
           cache.insert(getType().getPointer());
 
           SmallVector<Space, 4> spaces;
-          decompose(TC, DC, getType(), spaces);
+          decompose(TC, DC, alloc, getType(), spaces);
           size_t acc = 0;
           for (auto &sp : spaces) {
             // Decomposed pattern spaces grow with the sum of the subspaces.
-            acc += sp.computeSize(TC, DC, cache);
+            acc += sp.computeSize(TC, DC, alloc, cache);
           }
           
           cache.erase(getType().getPointer());
@@ -164,7 +198,9 @@ namespace {
         }
         case SpaceKind::Constructor: {
           size_t acc = 1;
-          for (auto &sp : getSpaces()) {
+          if (!getSpaces())
+            return acc;
+          for (auto &sp : *getSpaces()) {
             // Break self-recursive references among enum arguments.
             if (sp.getKind() == SpaceKind::Type
                   && cache.count(sp.getType().getPointer())) {
@@ -172,15 +208,15 @@ namespace {
             }
             
             // Constructor spaces grow with the product of their arguments.
-            acc *= sp.computeSize(TC, DC, cache);
+            acc *= sp.computeSize(TC, DC, alloc, cache);
           }
           return acc;
         }
         case SpaceKind::Disjunct: {
           size_t acc = 0;
-          for (auto &sp : getSpaces()) {
+          for (auto &sp : *getSpaces()) {
             // Disjoint grow with the sum of the subspaces.
-            acc += sp.computeSize(TC, DC, cache);
+            acc += sp.computeSize(TC, DC, alloc, cache);
           }
           return acc;
         }
@@ -189,29 +225,25 @@ namespace {
 
       explicit Space(Type T, Identifier NameForPrinting)
         : Kind(SpaceKind::Type), TypeAndVal(T),
-          Head(NameForPrinting), Spaces({}){}
+          Head(NameForPrinting), Spaces(){}
       explicit Space(UnknownCase_t, bool allowedButNotRequired)
         : Kind(SpaceKind::UnknownCase),
           TypeAndVal(Type(), allowedButNotRequired), Head(Identifier()),
-          Spaces({}) {}
+          Spaces() {}
       explicit Space(Type T, Identifier H, bool downgrade,
-                     ArrayRef<Space> SP)
-        : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
-          Spaces(SP.begin(), SP.end()) {}
-      explicit Space(Type T, Identifier H, bool downgrade,
-                     std::forward_list<Space> SP)
+                     const FixedSizeVector<Space> *SP)
         : Kind(SpaceKind::Constructor), TypeAndVal(T, downgrade), Head(H),
           Spaces(SP) {}
-      explicit Space(ArrayRef<Space> SP)
+      explicit Space(const FixedSizeVector<Space> *SP)
         : Kind(SpaceKind::Disjunct), TypeAndVal(Type()),
-          Head(Identifier()), Spaces(SP.begin(), SP.end()) {}
+          Head(Identifier()), Spaces(SP) {}
       explicit Space(bool C)
         : Kind(SpaceKind::BooleanConstant), TypeAndVal(Type(), C),
-          Head(Identifier()), Spaces({}) {}
+          Head(Identifier()), Spaces() {}
     public:
       explicit Space()
         : Kind(SpaceKind::Empty), TypeAndVal(Type()), Head(Identifier()),
-          Spaces({}) {}
+          Spaces() {}
 
       static Space forType(Type T, Identifier NameForPrinting) {
         if (T->isStructurallyUninhabited())
@@ -221,17 +253,21 @@ namespace {
       static Space forUnknown(bool allowedButNotRequired) {
         return Space(UnknownCase, allowedButNotRequired);
       }
-      static Space forConstructor(Type T, Identifier H, bool downgrade,
+      static Space forConstructor(llvm::BumpPtrAllocator &alloc, Type T,
+                                  Identifier H, bool downgrade,
                                   ArrayRef<Space> SP) {
+        if (SP.empty())
+          return Space(T, H, downgrade, nullptr);
         if (llvm::any_of(SP, std::mem_fn(&Space::isEmpty))) {
           // A constructor with an unconstructible parameter can never actually
           // be used.
           return Space();
         }
-        return Space(T, H, downgrade, SP);
+        return Space(T, H, downgrade, FixedSizeVector<Space>::create(alloc,
+                                                                     SP));
       }
       static Space forConstructor(Type T, Identifier H, bool downgrade,
-                                  std::forward_list<Space> SP) {
+                                  const FixedSizeVector<Space> *SP) {
         // No need to filter SP here; this is only used to copy other
         // Constructor spaces.
         return Space(T, H, downgrade, SP);
@@ -239,7 +275,8 @@ namespace {
       static Space forBool(bool C) {
         return Space(C);
       }
-      static Space forDisjunct(ArrayRef<Space> SP) {
+      static Space forDisjunct(llvm::BumpPtrAllocator &alloc,
+                               ArrayRef<Space> SP) {
         SmallVector<Space, 4> spaces(SP.begin(), SP.end());
         spaces.erase(
             std::remove_if(spaces.begin(), spaces.end(),
@@ -251,21 +288,23 @@ namespace {
         if (spaces.size() == 1)
           return spaces.front();
 
-        return Space(spaces);
+        return Space(FixedSizeVector<Space>::create(alloc, SP));
       }
 
       bool operator==(const Space &other) const {
         return Kind == other.Kind && TypeAndVal == other.TypeAndVal &&
-               Head == other.Head && Spaces == other.Spaces;
+               Head == other.Head &&
+        (Spaces ? llvm::makeArrayRef(Spaces->begin(), Spaces->end()) == llvm::makeArrayRef(other.Spaces->begin(), other.Spaces->end()) : other.Spaces == nullptr);
       }
 
       SpaceKind getKind() const { return Kind; }
 
       void dump() const LLVM_ATTRIBUTE_USED;
 
-      size_t getSize(TypeChecker &TC, const DeclContext *DC) const {
+      size_t getSize(TypeChecker &TC, const DeclContext *DC,
+                     llvm::BumpPtrAllocator &alloc) const {
         SmallPtrSet<TypeBase *, 4> cache;
-        return computeSize(TC, DC, cache);
+        return computeSize(TC, DC, alloc, cache);
       }
 
       static size_t getMaximumSize() {
@@ -306,7 +345,7 @@ namespace {
         return Head;
       }
 
-      const std::forward_list<Space> &getSpaces() const {
+      const FixedSizeVector<Space> *getSpaces() const {
         assert((getKind() == SpaceKind::Constructor
                 || getKind() == SpaceKind::Disjunct)
                && "Wrong kind of space tried to access subspace list");
@@ -323,7 +362,7 @@ namespace {
       // contributes meaningfully to the exhaustiveness of a pattern.
       bool isUseful() const {
         auto subspacesUseful = [](const Space &space) {
-          for (auto &subspace : space.getSpaces()) {
+          for (auto &subspace : *space.getSpaces()) {
             if (!subspace.isUseful()) {
               return false;
             }
@@ -339,12 +378,12 @@ namespace {
         case SpaceKind::UnknownCase:
           return true;
         case SpaceKind::Disjunct:
-          if (getSpaces().empty()) {
+          if (!getSpaces()) {
             return false;
           }
           return subspacesUseful(*this);
         case SpaceKind::Constructor:
-          if (getSpaces().empty()) {
+          if (!getSpaces()) {
             return true;
           }
           return subspacesUseful(*this);
@@ -354,7 +393,8 @@ namespace {
       // An optimization that computes if the difference of this space and
       // another space is empty.
       bool isSubspace(const Space &other, TypeChecker &TC,
-                      const DeclContext *DC) const {
+                      const DeclContext *DC,
+                      llvm::BumpPtrAllocator &alloc) const {
         if (this->isEmpty()) {
           return true;
         }
@@ -371,8 +411,8 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           // (S1 | ... | Sn) <= S iff (S1 <= S) && ... && (Sn <= S)
-          for (auto &space : this->getSpaces()) {
-            if (!space.isSubspace(other, TC, DC)) {
+          for (auto &space : *this->getSpaces()) {
+            if (!space.isSubspace(other, TC, DC, alloc)) {
               return false;
             }
           }
@@ -386,23 +426,23 @@ namespace {
 
           // (_ : Ty1) <= (_ : Ty2) iff D(Ty1) == D(Ty2)
           if (canDecompose(this->getType(), DC)) {
-            Space or1Space = decompose(TC, DC, this->getType());
-            if (or1Space.isSubspace(other, TC, DC)) {
+            Space or1Space = decompose(TC, DC, alloc, this->getType());
+            if (or1Space.isSubspace(other, TC, DC, alloc)) {
               return true;
             }
           }
 
           if (canDecompose(other.getType(), DC)) {
-            Space or2Space = decompose(TC, DC, other.getType());
-            return this->isSubspace(or2Space, TC, DC);
+            Space or2Space = decompose(TC, DC, alloc, other.getType());
+            return this->isSubspace(or2Space, TC, DC, alloc);
           }
 
           return true;
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct): {
           // (_ : Ty1) <= (S1 | ... | Sn) iff (S1 <= S) || ... || (Sn <= S)
-          for (auto &dis : other.getSpaces()) {
-            if (this->isSubspace(dis, TC, DC)) {
+          for (auto &dis : *other.getSpaces()) {
+            if (this->isSubspace(dis, TC, DC, alloc)) {
               return true;
             }
           }
@@ -411,14 +451,14 @@ namespace {
           if (!canDecompose(this->getType(), DC)) {
             return false;
           }
-          Space or1Space = decompose(TC, DC, this->getType());
-          return or1Space.isSubspace(other, TC, DC);
+          Space or1Space = decompose(TC, DC, alloc, this->getType());
+          return or1Space.isSubspace(other, TC, DC, alloc);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           // (_ : Ty1) <= H(p1 | ... | pn) iff D(Ty1) <= H(p1 | ... | pn)
           if (canDecompose(this->getType(), DC)) {
-            Space or1Space = decompose(TC, DC, this->getType());
-            return or1Space.isSubspace(other, TC, DC);
+            Space or1Space = decompose(TC, DC, alloc, this->getType());
+            return or1Space.isSubspace(other, TC, DC, alloc);
           }
           // An undecomposable type is always larger than its constructor space.
           return false;
@@ -442,24 +482,26 @@ namespace {
           
           // Special Case: Short-circuit comparisons with payload-less
           // constructors.
-          if (other.getSpaces().empty()) {
+          if (!other.getSpaces()) {
             return true;
           }
 
           // H(a1, ..., an) <= H(b1, ..., bn) iff a1 <= b1 && ... && an <= bn
-          auto i = this->getSpaces().begin();
-          auto j = other.getSpaces().begin();
-          for (; i != this->getSpaces().end() && j != other.getSpaces().end();
+          auto i = this->getSpaces()->begin();
+          auto j = other.getSpaces()->begin();
+          for (; i != this->getSpaces()->end() && j != other.getSpaces()->end();
                ++i, ++j) {
-            if (!(*i).isSubspace(*j, TC, DC)) {
+            if (!(*i).isSubspace(*j, TC, DC, alloc)) {
               return false;
             }
           }
           return true;
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase):
-          for (auto &param : this->getSpaces()) {
-            if (param.isSubspace(other, TC, DC)) {
+          if (!getSpaces())
+            return false;
+          for (auto &param : *this->getSpaces()) {
+            if (param.isSubspace(other, TC, DC, alloc)) {
               return true;
             }
           }
@@ -469,8 +511,8 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Disjunct): {
           // S <= (S1 | ... | Sn) <= S iff (S <= S1) || ... || (S <= Sn)
-          for (auto &param : other.getSpaces()) {
-            if (this->isSubspace(param, TC, DC)) {
+          for (auto &param : *other.getSpaces()) {
+            if (this->isSubspace(param, TC, DC, alloc)) {
               return true;
             }
           }
@@ -505,7 +547,8 @@ namespace {
       // Returns the intersection of this space with another.  The intersection
       // is the largest shared subspace occupied by both arguments.
       Space intersect(const Space &other, TypeChecker &TC,
-                      const DeclContext *DC) const {
+                      const DeclContext *DC,
+                      llvm::BumpPtrAllocator &alloc) const {
         // The intersection of an empty space is empty.
         if (this->isEmpty() || other.isEmpty()) {
           return Space();
@@ -521,10 +564,12 @@ namespace {
           // S & (S1 || ... || Sn) iff (S & S1) && ... && (S & Sn)
           SmallVector<Space, 4> intersectedCases;
           std::transform(
-              other.getSpaces().begin(), other.getSpaces().end(),
+              other.getSpaces()->begin(), other.getSpaces()->end(),
               std::back_inserter(intersectedCases),
-              [&](const Space &s) { return this->intersect(s, TC, DC); });
-          return Space::forDisjunct(intersectedCases);
+              [&](const Space &s) {
+                return this->intersect(s, TC, DC, alloc);
+              });
+          return Space::forDisjunct(alloc, intersectedCases);
         }
 
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
@@ -533,26 +578,26 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-          return other.intersect(*this, TC, DC);
+          return other.intersect(*this, TC, DC, alloc);
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
           // Optimization: The intersection of equal types is that type.
           if (this->getType()->isEqual(other.getType())) {
             return other;
           } else if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, this->getType());
+            return decomposition.intersect(other, TC, DC, alloc);
           } else if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, other.getType());
+            return this->intersect(decomposition, TC, DC, alloc);
           } else {
             return other;
           }
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, this->getType());
+            return decomposition.intersect(other, TC, DC, alloc);
           } else {
             return other;
           }
@@ -569,13 +614,15 @@ namespace {
           return *this;
 
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
+          if (!this->getSpaces())
+            return *this;
           SmallVector<Space, 4> newSubSpaces;
-          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
+          std::transform(this->getSpaces()->begin(), this->getSpaces()->end(),
                          std::back_inserter(newSubSpaces),
                          [&](const Space &subSpace) {
-                           return subSpace.intersect(other, TC, DC);
+                           return subSpace.intersect(other, TC, DC, alloc);
                          });
-          return Space::forConstructor(this->getType(), this->getHead(),
+          return Space::forConstructor(alloc, this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
                                        newSubSpaces);
         }
@@ -589,16 +636,16 @@ namespace {
           
           // Special Case: Short circuit patterns without payloads.  Their
           // intersection is the whole space.
-          if (other.getSpaces().empty()) {
+          if (!other.getSpaces()) {
             return *this;
           }
 
           SmallVector<Space, 4> paramSpace;
-          auto i = this->getSpaces().begin();
-          auto j = other.getSpaces().begin();
-          for (; i != this->getSpaces().end() && j != other.getSpaces().end();
+          auto i = this->getSpaces()->begin();
+          auto j = other.getSpaces()->begin();
+          for (; i != this->getSpaces()->end() && j != other.getSpaces()->end();
                ++i, ++j) {
-            auto result = i->intersect(*j, TC, DC);
+            auto result = i->intersect(*j, TC, DC, alloc);
             // If at least one of the constructor sub-spaces is empty,
             // it makes the whole space empty as well.
             if (result.isEmpty()) {
@@ -607,12 +654,12 @@ namespace {
             paramSpace.push_back(result);
           }
 
-          return Space::forDisjunct(paramSpace);
+          return Space::forDisjunct(alloc, paramSpace);
         }
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return other.intersect(*this, TC, DC);
+          return other.intersect(*this, TC, DC, alloc);
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
           if (other.isAllowedButNotRequired())
             return other;
@@ -627,8 +674,8 @@ namespace {
           }
 
           if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, other.getType());
+            return this->intersect(decomposition, TC, DC, alloc);
           }
           return Space();
         }
@@ -638,7 +685,7 @@ namespace {
           return Space();
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          return other.intersect(*this, TC, DC);
+          return other.intersect(*this, TC, DC, alloc);
         }
 
         PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
@@ -661,7 +708,9 @@ namespace {
       // times minus has run.
       // Returns None if the computation "timed out".
       Optional<Space> minus(const Space &other, TypeChecker &TC,
-                            const DeclContext *DC, unsigned *minusCount) const {
+                            const DeclContext *DC,
+                            llvm::BumpPtrAllocator &alloc,
+                            unsigned *minusCount) const {
 
         if (minusCount && TC.getSwitchCheckingInvocationThreshold() &&
             (*minusCount)++ >= TC.getSwitchCheckingInvocationThreshold())
@@ -681,18 +730,18 @@ namespace {
           if (this->getType()->isEqual(other.getType())) {
             return Space();
           } else if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, this->getType());
+            return decomposition.intersect(other, TC, DC, alloc);
           } else if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
+            auto decomposition = decompose(TC, DC, alloc, other.getType());
+            return this->intersect(decomposition, TC, DC, alloc);
           }
           return Space();
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.minus(other, TC, DC, minusCount);
+            auto decomposition = decompose(TC, DC, alloc, this->getType());
+            return decomposition.minus(other, TC, DC, alloc, minusCount);
           } else {
             return *this;
           }
@@ -712,8 +761,8 @@ namespace {
         PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct):
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Disjunct): {
           Space tot = *this;
-          for (auto s : other.getSpaces()) {
-            if (auto diff = tot.minus(s, TC, DC, minusCount))
+          for (auto s : *other.getSpaces()) {
+            if (auto diff = tot.minus(s, TC, DC, alloc, minusCount))
               tot = *diff;
             else
               return None;
@@ -727,27 +776,29 @@ namespace {
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
         PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
           SmallVector<Space, 4> smallSpaces;
-          for (auto s : this->getSpaces()) {
-            if (auto diff = s.minus(other, TC, DC, minusCount))
+          for (auto s : *this->getSpaces()) {
+            if (auto diff = s.minus(other, TC, DC, alloc, minusCount))
               smallSpaces.push_back(*diff);
             else
               return None;
           }
-          return Space::forDisjunct(smallSpaces);
+          return Space::forDisjunct(alloc, smallSpaces);
         }
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
           return Space();
         PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
+          if (!this->getSpaces())
+            return *this;
           SmallVector<Space, 4> newSubSpaces;
-          for (auto subSpace : this->getSpaces()) {
-            auto nextSpace = subSpace.minus(other, TC, DC, minusCount);
+          for (auto subSpace : *this->getSpaces()) {
+            auto nextSpace = subSpace.minus(other, TC, DC, alloc, minusCount);
             if (!nextSpace)
               return None;
             if (nextSpace.getValue().isEmpty())
               return Space();
             newSubSpaces.push_back(nextSpace.getValue());
           }
-          return Space::forConstructor(this->getType(), this->getHead(),
+          return Space::forConstructor(alloc, this->getType(), this->getHead(),
                                        this->canDowngradeToWarning(),
                                        newSubSpaces);
         }
@@ -761,37 +812,37 @@ namespace {
 
           // Special Case: Short circuit patterns without payloads.  Their
           // difference is empty.
-          if (other.getSpaces().empty()) {
+          if (!other.getSpaces()) {
             return Space();
           }
           
           SmallVector<Space, 4> constrSpaces;
           bool foundBad = false;
-          auto i = this->getSpaces().begin();
-          auto j = other.getSpaces().begin();
+          auto i = this->getSpaces()->begin();
+          auto j = other.getSpaces()->begin();
           for (auto idx = 0;
-               i != this->getSpaces().end() && j != other.getSpaces().end();
+               i != this->getSpaces()->end() && j != other.getSpaces()->end();
                ++i, ++j, ++idx) {
             auto &s1 = *i;
             auto &s2 = *j;
             // If the intersection of each subspace is ever empty then the
             // two spaces are disjoint and their difference is the first space.
-            if (s1.intersect(s2, TC, DC).isEmpty()) {
+            if (s1.intersect(s2, TC, DC, alloc).isEmpty()) {
               return *this;
             }
 
             // If one constructor parameter doesn't cover the other then we've
             // got to report the uncovered cases in a user-friendly way.
-            if (!s1.isSubspace(s2, TC, DC)) {
+            if (!s1.isSubspace(s2, TC, DC, alloc)) {
               foundBad = true;
             }
             // Copy the params and replace the parameter at each index with the
             // difference of the two spaces.  This unpacks one constructor head
             // into each parameter.
-            SmallVector<Space, 4> copyParams(this->getSpaces().begin(),
-                                             this->getSpaces().end());
+            SmallVector<Space, 4> copyParams(this->getSpaces()->begin(),
+                                             this->getSpaces()->end());
 
-            auto reducedSpaceOrNone = s1.minus(s2, TC, DC, minusCount);
+            auto reducedSpaceOrNone = s1.minus(s2, TC, DC, alloc, minusCount);
             if (!reducedSpaceOrNone)
               return None;
             auto reducedSpace = *reducedSpaceOrNone;
@@ -811,14 +862,14 @@ namespace {
               return *this;
 
             copyParams[idx] = reducedSpace;
-            Space CS = Space::forConstructor(this->getType(), this->getHead(),
+            Space CS = Space::forConstructor(alloc, this->getType(), this->getHead(),
                                              this->canDowngradeToWarning(),
                                              copyParams);
             constrSpaces.push_back(CS);
           }
 
           if (foundBad) {
-            return Space::forDisjunct(constrSpaces);
+            return Space::forDisjunct(alloc, constrSpaces);
           }
           return Space();
         }
@@ -836,8 +887,8 @@ namespace {
           }
 
           if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->minus(decomposition, TC, DC, minusCount);
+            auto decomposition = decompose(TC, DC, alloc, other.getType());
+            return this->minus(decomposition, TC, DC, alloc, minusCount);
           }
           return *this;
         }
@@ -848,8 +899,8 @@ namespace {
 
         PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
           if (canDecompose(this->getType(), DC)) {
-            auto orSpace = decompose(TC, DC, this->getType());
-            return orSpace.minus(other, TC, DC, minusCount);
+            auto orSpace = decompose(TC, DC, alloc, this->getType());
+            return orSpace.minus(other, TC, DC, alloc, minusCount);
           } else {
             return *this;
           }
@@ -889,7 +940,7 @@ namespace {
             llvm_unreachable("Attempted to display disjunct to user!");
           } else {
             buffer << "DISJOIN(";
-            for (auto &sp : Spaces) {
+            for (auto &sp : *Spaces) {
               buffer << "\n";
               sp.show(buffer, forDisplay);
               buffer << " |";
@@ -907,13 +958,13 @@ namespace {
             buffer << Head.str();
           }
 
-          if (Spaces.empty()) {
+          if (!Spaces) {
             return;
           }
 
           buffer << "(";
           bool first = true;
-          for (auto &param : Spaces) {
+          for (auto &param : *Spaces) {
             if (!first) {
               buffer << ", ";
             }
@@ -958,7 +1009,8 @@ namespace {
       }
 
       // Decompose a type into its component spaces.
-      static void decompose(TypeChecker &TC, const DeclContext *DC, Type tp,
+      static void decompose(TypeChecker &TC, const DeclContext *DC,
+                            llvm::BumpPtrAllocator &alloc, Type tp,
                             SmallVectorImpl<Space> &arr) {
         assert(canDecompose(tp, DC) && "Non-decomposable type?");
 
@@ -1007,8 +1059,8 @@ namespace {
               }
             }
             bool canDowngrade = isSwift3DowngradeExhaustivityCase(TC, eed);
-            return Space::forConstructor(tp, eed->getName(), canDowngrade,
-                                         constElemSpaces);
+            return Space::forConstructor(alloc, tp, eed->getName(),
+                                         canDowngrade, constElemSpaces);
           });
 
           if (!E->isExhaustive(DC)) {
@@ -1026,7 +1078,7 @@ namespace {
             return Space::forType(elt.getType(), elt.getName());
           });
           // Create an empty constructor head for the tuple space.
-          arr.push_back(Space::forConstructor(tp, Identifier(),
+          arr.push_back(Space::forConstructor(alloc, tp, Identifier(),
                                               /*canDowngrade*/false,
                                               constElemSpaces));
         } else {
@@ -1035,10 +1087,10 @@ namespace {
       }
 
       static Space decompose(TypeChecker &TC, const DeclContext *DC,
-                             Type type) {
+                             llvm::BumpPtrAllocator &alloc, Type type) {
         SmallVector<Space, 4> spaces;
-        decompose(TC, DC, type, spaces);
-        return Space::forDisjunct(spaces);
+        decompose(TC, DC, alloc, type, spaces);
+        return Space::forDisjunct(alloc, spaces);
       }
 
       static bool canDecompose(Type tp, const DeclContext *DC) {
@@ -1060,17 +1112,19 @@ namespace {
           auto result = DowngradeToWarning::No;
           if (canDowngradeToWarning())
             result = DowngradeToWarning::ForSwift3Case;
+          if (!getSpaces())
+            return result;
           // Traverse the constructor and its subspaces.
-          for (const Space &space : getSpaces())
+          for (const Space &space : *getSpaces())
             result = std::max(result, space.checkDowngradeToWarning());
           return result;
         }
         case SpaceKind::Disjunct: {
-          if (getSpaces().empty())
+          if (!getSpaces())
             return DowngradeToWarning::No;
           // Traverse the disjunct's subspaces.
           auto result = DowngradeToWarning::LAST;
-          for (const Space &space : getSpaces())
+          for (const Space &space : *getSpaces())
             result = std::min(result, space.checkDowngradeToWarning());
           return result;
         }
@@ -1078,6 +1132,7 @@ namespace {
       }
     };
 
+    llvm::BumpPtrAllocator Alloc;
     TypeChecker &TC;
     const SwitchStmt *Switch;
     const DeclContext *DC;
@@ -1175,11 +1230,11 @@ namespace {
           if (caseItem.isDefault())
             return;
 
-          Space projection = projectPattern(TC, caseItem.getPattern(),
+          Space projection = projectPattern(caseItem.getPattern(),
                                             sawDowngradablePattern);
 
           if (projection.isUseful()
-                && projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
+                && projection.isSubspace(Space::forDisjunct(Alloc, spaces), TC, DC, Alloc)) {
             sawRedundantPattern |= true;
 
             TC.diagnose(caseItem.getStartLoc(),
@@ -1202,16 +1257,16 @@ namespace {
       }
 
       Space totalSpace = Space::forType(subjectType, Identifier());
-      Space coveredSpace = Space::forDisjunct(spaces);
+      Space coveredSpace = Space::forDisjunct(Alloc, spaces);
 
-      const size_t totalSpaceSize = totalSpace.getSize(TC, DC);
+      const size_t totalSpaceSize = totalSpace.getSize(TC, DC, Alloc);
       if (totalSpaceSize > Space::getMaximumSize()) {
         diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
                             unknownCase);
         return;
       }
       unsigned minusCount = 0;
-      auto diff = totalSpace.minus(coveredSpace, TC, DC, &minusCount);
+      auto diff = totalSpace.minus(coveredSpace, TC, DC, Alloc, &minusCount);
       if (!diff) {
         diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
                             unknownCase);
@@ -1228,7 +1283,7 @@ namespace {
       // all handled; otherwise, we ignore the ones that were added for enums
       // that are implicitly frozen.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
-                                   TC, DC, /*&minusCount*/ nullptr);
+                                   TC, DC, Alloc, /*&minusCount*/ nullptr);
 
       if (uncovered.isEmpty())
         return;
@@ -1239,8 +1294,8 @@ namespace {
       if (uncovered.getKind() == SpaceKind::Type) {
         if (Space::canDecompose(uncovered.getType(), DC)) {
           SmallVector<Space, 4> spaces;
-          Space::decompose(TC, DC, uncovered.getType(), spaces);
-          diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(spaces),
+          Space::decompose(TC, DC, Alloc, uncovered.getType(), spaces);
+          diagnoseMissingCases(RequiresDefault::No, Space::forDisjunct(Alloc, spaces),
                                unknownCase, /*sawDowngradablePattern*/false);
         } else {
           diagnoseMissingCases(Switch->getCases().empty()
@@ -1276,7 +1331,7 @@ namespace {
       // a 'default' to be inserted.
       // FIXME: Do something sensible for non-frozen enums.
       if (!sawRedundantPattern &&
-          coveredSpace.getSize(TC, DC) >= totalSpaceSize)
+          coveredSpace.getSize(TC, DC, Alloc) >= totalSpaceSize)
         return;
       diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
                            unknownCase);
@@ -1391,7 +1446,7 @@ namespace {
           flatsSortedBySize.push_back(&space);
         std::stable_sort(flatsSortedBySize.begin(), flatsSortedBySize.end(),
                          [&](const Space *left, const Space *right) {
-          return left->getSize(TC, DC) > right->getSize(TC, DC);
+          return left->getSize(TC, DC, Alloc) > right->getSize(TC, DC, Alloc);
         });
 
         // ...and then remove any of the later spaces that are contained
@@ -1400,7 +1455,7 @@ namespace {
         for (const Space *space : flatsSortedBySize) {
           bool alreadyHandled =
               llvm::any_of(flatsToEmit, [&](const Space *previousSpace) {
-            return space->isSubspace(*previousSpace, TC, DC);
+            return space->isSubspace(*previousSpace, TC, DC, Alloc);
           });
           if (alreadyHandled)
             continue;
@@ -1492,12 +1547,12 @@ namespace {
     // into its component parts such that the resulting array of flattened
     // spaces contains no further disjunctions.  The resulting flattened array
     // will never be empty.
-    static void flatten(const Space space, SmallVectorImpl<Space> &flats) {
+    void flatten(const Space space, SmallVectorImpl<Space> &flats) {
       switch (space.getKind()) {
       case SpaceKind::Constructor: {
         // Optimization: If this space is just a constructor head, it is already
         // flat.
-        if (space.getSpaces().empty()) {
+        if (!space.getSpaces()) {
           flats.push_back(space);
           return;
         }
@@ -1513,7 +1568,7 @@ namespace {
         // 6) Wrap each matrix row in the constructor under scrutiny.
         size_t multiplier = 1;
         SmallVector<SmallVector<Space, 4>, 2> matrix;
-        for (auto &subspace : space.getSpaces()) {
+        for (auto &subspace : *space.getSpaces()) {
           SmallVector<Space, 4> columnVect;
           flatten(subspace, columnVect);
 
@@ -1566,7 +1621,7 @@ namespace {
 
         // Wrap the matrix rows into this constructor.
         for (auto &row : matrix) {
-          flats.push_back(Space::forConstructor(space.getType(),
+          flats.push_back(Space::forConstructor(Alloc, space.getType(),
                                                 space.getHead(),
                                                 space.canDowngradeToWarning(),
                                                 row));
@@ -1574,7 +1629,7 @@ namespace {
       }
         break;
       case SpaceKind::Disjunct: {
-        for (auto &subspace : space.getSpaces()) {
+        for (auto &subspace : *space.getSpaces()) {
           SmallVector<Space, 4> buf;
           flatten(subspace, buf);
           flats.append(buf.begin(), buf.end());
@@ -1593,8 +1648,7 @@ namespace {
     /// Instead, whether or not a Swift 3 downgradable pattern was seen is
     /// recorded in \p sawDowngradablePattern. (This does not include
     /// downgradable warnings for exhaustive enums in Swift 4.)
-    static Space projectPattern(TypeChecker &TC, const Pattern *item,
-                                bool &sawDowngradablePattern) {
+    Space projectPattern(const Pattern *item, bool &sawDowngradablePattern) {
       switch (item->getKind()) {
       case PatternKind::Any:
         return Space::forType(item->getType(), Identifier());
@@ -1610,8 +1664,7 @@ namespace {
         case CheckedCastKind::BridgingCoercion: {
           if (auto *subPattern = IP->getSubPattern()) {
             // Project the cast target's subpattern.
-            Space castSubSpace = projectPattern(TC, subPattern,
-                                                sawDowngradablePattern);
+            Space castSubSpace = projectPattern(subPattern, sawDowngradablePattern);
             // If we recieved a type space from a named pattern or a wildcard
             // we have to re-project with the cast's target type to maintain
             // consistency with the scrutinee's type.
@@ -1642,17 +1695,17 @@ namespace {
         return Space();
       case PatternKind::Var: {
         auto *VP = cast<VarPattern>(item);
-        return projectPattern(TC, VP->getSubPattern(), sawDowngradablePattern);
+        return projectPattern(VP->getSubPattern(), sawDowngradablePattern);
       }
       case PatternKind::Paren: {
         auto *PP = cast<ParenPattern>(item);
-        return projectPattern(TC, PP->getSubPattern(), sawDowngradablePattern);
+        return projectPattern(PP->getSubPattern(), sawDowngradablePattern);
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
         Identifier name = TC.Context.getOptionalSomeDecl()->getName();
 
-        auto subSpace = projectPattern(TC, OSP->getSubPattern(),
+        auto subSpace = projectPattern(OSP->getSubPattern(),
                                        sawDowngradablePattern);
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
         // tuple pattern to .some(_, _, ...) first.
@@ -1660,9 +1713,9 @@ namespace {
             && subSpace.getHead().empty()) {
           return Space::forConstructor(item->getType(), name,
                                        /*canDowngrade*/false,
-                                       std::move(subSpace.getSpaces()));
+                                       subSpace.getSpaces());
         }
-        return Space::forConstructor(item->getType(), name,
+        return Space::forConstructor(Alloc, item->getType(), name,
                                      /*canDowngrade*/false, subSpace);
       }
       case PatternKind::EnumElement: {
@@ -1679,7 +1732,7 @@ namespace {
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
-          return Space::forConstructor(item->getType(), VP->getName(),
+          return Space::forConstructor(Alloc, item->getType(), VP->getName(),
                                        /*canDowngrade*/false, None);
         }
 
@@ -1690,10 +1743,10 @@ namespace {
           std::transform(TP->getElements().begin(), TP->getElements().end(),
                          std::back_inserter(conArgSpace),
                          [&](TuplePatternElt pate) {
-                           return projectPattern(TC, pate.getPattern(),
+                           return projectPattern(pate.getPattern(),
                                                  sawDowngradablePattern);
                          });
-          return Space::forConstructor(item->getType(), VP->getName(),
+          return Space::forConstructor(Alloc, item->getType(), VP->getName(),
                                        /*canDowngrade*/false, conArgSpace);
         }
         case PatternKind::Paren: {
@@ -1713,25 +1766,22 @@ namespace {
                                                      ty.getName()));
               }
             } else {
-              conArgSpace.push_back(projectPattern(TC, SP,
-                                                   sawDowngradablePattern));
+              conArgSpace.push_back(projectPattern(SP, sawDowngradablePattern));
             }
           } else if (SP->getKind() == PatternKind::Tuple) {
-            Space argTupleSpace = projectPattern(TC, SP,
-                                                 sawDowngradablePattern);
+            Space argTupleSpace = projectPattern(SP, sawDowngradablePattern);
             assert(argTupleSpace.getKind() == SpaceKind::Constructor);
             conArgSpace.insert(conArgSpace.end(),
-                               argTupleSpace.getSpaces().begin(),
-                               argTupleSpace.getSpaces().end());
+                               argTupleSpace.getSpaces()->begin(),
+                               argTupleSpace.getSpaces()->end());
           } else {
-            conArgSpace.push_back(projectPattern(TC, SP,
-                                                 sawDowngradablePattern));
+            conArgSpace.push_back(projectPattern(SP, sawDowngradablePattern));
           }
-          return Space::forConstructor(item->getType(), VP->getName(),
+          return Space::forConstructor(Alloc, item->getType(), VP->getName(),
                                        /*canDowngrade*/false, conArgSpace);
         }
         default:
-          return projectPattern(TC, SP, sawDowngradablePattern);
+          return projectPattern(SP, sawDowngradablePattern);
         }
       }
       case PatternKind::Tuple: {
@@ -1740,9 +1790,9 @@ namespace {
         std::transform(TP->getElements().begin(), TP->getElements().end(),
                        std::back_inserter(conArgSpace),
                        [&](TuplePatternElt pate) {
-          return projectPattern(TC, pate.getPattern(), sawDowngradablePattern);
+          return projectPattern(pate.getPattern(), sawDowngradablePattern);
         });
-        return Space::forConstructor(item->getType(), Identifier(),
+        return Space::forConstructor(Alloc, item->getType(), Identifier(),
                                      /*canDowngrade*/false, conArgSpace);
       }
       }
