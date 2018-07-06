@@ -6949,12 +6949,17 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 
         // Drop non-property, non-type candidates.
         if (!isa<VarDecl>(result.getValueDecl()) &&
-            !isa<TypeDecl>(result.getValueDecl()))
+            !isa<TypeDecl>(result.getValueDecl()) &&
+            !isa<SubscriptDecl>(result.getValueDecl()))
           return false;
 
         return true;
       });
     }
+
+    // If all results were unavailable, fail.
+    if (!lookup)
+      break;
 
     // If we *still* have more than one result, fail.
     if (lookup.size() > 1) {
