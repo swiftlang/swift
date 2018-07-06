@@ -2324,6 +2324,10 @@ public:
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
       }
     }
+    if (auto KP = dyn_cast<KeyPathExpr>(E)) {
+      walkKeyPath(KP);
+      return skipChildren();
+    }
     if (auto A = dyn_cast<AssignExpr>(E)) {
       walkAssignExpr(A);
       return skipChildren();
@@ -2417,7 +2421,32 @@ private:
     // Diagnose for appropriate accessors, given the access context.
     maybeDiagStorageAccess(D, E->getSourceRange(), DC);
   }
-  
+
+  /// Walk a keypath expression, checking all of its components for
+  /// availability.
+  void walkKeyPath(KeyPathExpr *KP) {
+    for (auto &component : KP->getComponents()) {
+      switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::Subscript: {
+        auto *decl = component.getDeclRef().getDecl();
+        auto loc = component.getLoc();
+        SourceRange range(loc, loc);
+        diagAvailability(decl, range, nullptr);
+        break;
+      }
+
+      case KeyPathExpr::Component::Kind::Invalid:
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      case KeyPathExpr::Component::Kind::OptionalChain:
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        break;
+      }
+    }
+  }
+
   /// Walk an inout expression, checking for availability.
   void walkInOutExpr(InOutExpr *E) {
     walkInContext(E, E->getSubExpr(), MemberAccessContext::InOut);
