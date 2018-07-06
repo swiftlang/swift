@@ -3687,7 +3687,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
   // If found comma, parse 'wrt:'.
-  SmallVector<AutoDiffParameter, 8> params;
+  SmallVector<AutoDiffIndexParameter, 8> params;
   if (consumeIf(tok::comma)) {
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
@@ -3713,8 +3713,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
         if (parseUnsignedInteger(index, paramLoc,
                                  diag::gradient_expr_expected_parameter))
           return true;
-        params.push_back(
-          AutoDiffParameter::getIndexParameter(paramLoc, index));
+        params.push_back(AutoDiffIndexParameter(paramLoc, index));
         break;
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);

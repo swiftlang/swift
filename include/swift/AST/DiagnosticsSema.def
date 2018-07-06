@@ -721,7 +721,7 @@ ERROR(gradient_expr_parameter_self_unsupported,none,
 ERROR(gradient_expr_parameter_indices_not_ascending,none,
       "parameter indices must be ascending", ())
 ERROR(gradient_expr_parameter_index_out_of_bounds,none,
-      "the parameter index is out of bounds for type %0, which has %1"
+      "the parameter index is out of bounds for type %0, which has %1 "
       "parameters", (Type, unsigned))
 ERROR(gradient_expr_parameter_not_value_type,none,
       "gradient parameter has non-value type %0 and thus cannot be a "

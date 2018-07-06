@@ -1845,15 +1845,8 @@ public:
     auto parameters = E->getParameters();
     if (!parameters.empty()) {
       OS << " wrt=(";
-      interleave(parameters, [&](const AutoDiffParameter &param) {
-        switch (param.getKind()) {
-        case AutoDiffParameter::Kind::Index:
-          OS << '.' << param.getIndex();
-          break;
-        case AutoDiffParameter::Kind::Self:
-          OS << "self";
-          break;
-        }
+      interleave(parameters, [&](const AutoDiffIndexParameter &param) {
+        OS << '.' << param.getIndex();
       }, [&]{
         OS << ", ";
       });

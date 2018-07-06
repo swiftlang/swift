@@ -2446,8 +2446,7 @@ namespace {
           diffParamTypes.push_back(gradParam.getType());
       } else {
         for (auto &param : expr->getParameters())
-          if (param.getKind() == AutoDiffParameter::Kind::Index)
-            diffParamTypes.push_back(gradParams[param.getIndex()].getType());
+          diffParamTypes.push_back(gradParams[param.getIndex()].getType());
       }
       for (auto &paramTy : diffParamTypes) {
         if (!(TC.isCompatibleWithScalarAutoDiff(paramTy, dc) ||

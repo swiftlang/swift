@@ -26,6 +26,18 @@ enum class AutoDiffMode {
   Forward, Reverse
 };
 
+class AutoDiffIndexParameter {
+  SourceLoc Loc;
+  unsigned Index;
+
+public:
+  AutoDiffIndexParameter(SourceLoc loc, unsigned index)
+    : Loc(loc), Index(index) {}
+
+  unsigned getIndex() const { return Index; }
+  SourceLoc getLoc() const { return Loc; }
+};
+
 class AutoDiffParameter {
 public:
   enum class Kind { Index, Self };

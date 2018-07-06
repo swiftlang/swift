@@ -3851,13 +3851,13 @@ public:
     OriginalExpr = newOriginal;
   }
 
-  AutoDiffParameter *getParametersData() {
-    return reinterpret_cast<AutoDiffParameter *>(this+1);
+  AutoDiffIndexParameter *getParametersData() {
+    return reinterpret_cast<AutoDiffIndexParameter *>(this+1);
   }
 
-  ArrayRef<AutoDiffParameter> getParameters() const;
+  ArrayRef<AutoDiffIndexParameter> getParameters() const;
 
-  MutableArrayRef<AutoDiffParameter> getParameters() {
+  MutableArrayRef<AutoDiffIndexParameter> getParameters() {
     return { getParametersData(), NumParameters };
   }
 
@@ -3886,7 +3886,7 @@ protected:
   explicit ReverseAutoDiffExpr(ExprKind kind, SourceLoc loc,
                                SourceLoc lParenLoc,
                                Expr *originalExpr,
-                               ArrayRef<AutoDiffParameter> parameters,
+                               ArrayRef<AutoDiffIndexParameter> parameters,
                                SourceLoc rParenLoc);
 };
 
@@ -3902,7 +3902,7 @@ class GradientExpr : public ReverseAutoDiffExpr {
 public:
   static GradientExpr *create(ASTContext &ctx, SourceLoc loc,
                               SourceLoc lParenLoc, Expr *originalExpr,
-                              ArrayRef<AutoDiffParameter> parameters,
+                              ArrayRef<AutoDiffIndexParameter> parameters,
                               SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
@@ -3911,7 +3911,8 @@ public:
 
 private:
   explicit GradientExpr(SourceLoc loc, SourceLoc lParenLoc, Expr *originalExpr,
-                        ArrayRef<AutoDiffParameter> params, SourceLoc rParenLoc)
+                        ArrayRef<AutoDiffIndexParameter> params,
+                        SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::Gradient, loc, lParenLoc, originalExpr,
                           params, rParenLoc) {}
 };
@@ -3929,7 +3930,7 @@ class ValueAndGradientExpr : public ReverseAutoDiffExpr {
 public:
   static ValueAndGradientExpr *create(ASTContext &ctx, SourceLoc loc,
                                       SourceLoc lParenLoc, Expr *originalExpr,
-                                      ArrayRef<AutoDiffParameter> parameters,
+                                      ArrayRef<AutoDiffIndexParameter> params,
                                       SourceLoc rParenLoc);
 
   static bool classof(const Expr *E) {
@@ -3939,7 +3940,7 @@ public:
 private:
   explicit ValueAndGradientExpr(SourceLoc loc, SourceLoc lParenLoc,
                                 Expr *originalExpr,
-                                ArrayRef<AutoDiffParameter> params,
+                                ArrayRef<AutoDiffIndexParameter> params,
                                 SourceLoc rParenLoc)
     : ReverseAutoDiffExpr(ExprKind::ValueAndGradient, loc, lParenLoc,
                           originalExpr, params, rParenLoc) {}

@@ -1302,43 +1302,34 @@ namespace {
       else {
         int lastIndex = -1;
         for (auto &param : GE->getParameters()) {
-          switch (param.getKind()) {
-          case AutoDiffParameter::Kind::Index: {
-            auto index = param.getIndex();
-            // Indices must be ascending.
-            if (lastIndex >= (int)index) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_indices_not_ascending);
-              return nullptr;
-            }
-            // Indices cannot exceed the number of parameters in the original
-            // function.
-            if (index >= originalParams.size()) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_index_out_of_bounds,
-                          originalTy, originalParams.size());
-              return nullptr;
-            }
-            // The parameter cannot be a reference object or a protocol
-            // existential.
-            auto paramTy = originalParams[index].getType();
-            if (paramTy->isAnyClassReferenceType() ||
-                paramTy->isExistentialType()) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_not_value_type,
-                          paramTy);
-              return nullptr;
-            }
-            lastIndex = index;
-            diffParamTypes.push_back(paramTy);
-            break;
-          }
-          case AutoDiffParameter::Kind::Self:
-            // The 'self' parameter is unsupported by #gradient.
+          auto index = param.getIndex();
+          llvm::errs() << "CSGEN PARAMETER INDEX: " << param.getIndex() << "\n";
+          // Indices must be ascending.
+          if (lastIndex >= (int)index) {
             TC.diagnose(param.getLoc(),
-                        diag::gradient_expr_parameter_self_unsupported);
+                        diag::gradient_expr_parameter_indices_not_ascending);
             return nullptr;
           }
+          // Indices cannot exceed the number of parameters in the original
+          // function.
+          if (index >= originalParams.size()) {
+            TC.diagnose(param.getLoc(),
+                        diag::gradient_expr_parameter_index_out_of_bounds,
+                        originalTy, originalParams.size());
+            return nullptr;
+          }
+          // The parameter cannot be a reference object or a protocol
+          // existential.
+          auto paramTy = originalParams[index].getType();
+          if (paramTy->isAnyClassReferenceType() ||
+              paramTy->isExistentialType()) {
+            TC.diagnose(param.getLoc(),
+                        diag::gradient_expr_parameter_not_value_type,
+                        paramTy);
+            return nullptr;
+          }
+          lastIndex = index;
+          diffParamTypes.push_back(paramTy);
         }
       }
 
