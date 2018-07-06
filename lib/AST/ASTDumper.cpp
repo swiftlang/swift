@@ -1846,7 +1846,7 @@ public:
     if (!parameters.empty()) {
       OS << " wrt=(";
       interleave(parameters, [&](const AutoDiffIndexParameter &param) {
-        OS << '.' << param.getIndex();
+        OS << '.' << param.index;
       }, [&]{
         OS << ", ";
       });

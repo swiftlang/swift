@@ -1302,18 +1302,17 @@ namespace {
       else {
         int lastIndex = -1;
         for (auto &param : GE->getParameters()) {
-          auto index = param.getIndex();
-          llvm::errs() << "CSGEN PARAMETER INDEX: " << param.getIndex() << "\n";
+          auto index = param.index;
           // Indices must be ascending.
           if (lastIndex >= (int)index) {
-            TC.diagnose(param.getLoc(),
+            TC.diagnose(param.loc,
                         diag::gradient_expr_parameter_indices_not_ascending);
             return nullptr;
           }
           // Indices cannot exceed the number of parameters in the original
           // function.
           if (index >= originalParams.size()) {
-            TC.diagnose(param.getLoc(),
+            TC.diagnose(param.loc,
                         diag::gradient_expr_parameter_index_out_of_bounds,
                         originalTy, originalParams.size());
             return nullptr;
@@ -1323,8 +1322,7 @@ namespace {
           auto paramTy = originalParams[index].getType();
           if (paramTy->isAnyClassReferenceType() ||
               paramTy->isExistentialType()) {
-            TC.diagnose(param.getLoc(),
-                        diag::gradient_expr_parameter_not_value_type,
+            TC.diagnose(param.loc, diag::gradient_expr_parameter_not_value_type,
                         paramTy);
             return nullptr;
           }

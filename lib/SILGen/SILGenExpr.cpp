@@ -2971,13 +2971,13 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
   // with respect to all of original's parameters.
   if (E->getParameters().empty()) {
     for (unsigned i : range(0, origTy->getNumParams()))
-      allParamIndices.push_back(AutoDiffIndexParameter(E->getStartLoc(), i));
+      allParamIndices.push_back({ E->getStartLoc(), i });
     diffParams = allParamIndices;
   }
   SmallVector<unsigned, 8> loweredParamIndices;
   for (auto param : diffParams) {
     auto silParamIndices =
-      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), origTy);
+      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.index, origTy);
     for (auto idx : silParamIndices)
       loweredParamIndices.push_back(idx);
   }

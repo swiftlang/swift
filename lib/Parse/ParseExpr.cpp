@@ -3713,7 +3713,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
         if (parseUnsignedInteger(index, paramLoc,
                                  diag::gradient_expr_expected_parameter))
           return true;
-        params.push_back(AutoDiffIndexParameter(paramLoc, index));
+        params.push_back({ paramLoc, index });
         break;
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);
