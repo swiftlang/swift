@@ -62,6 +62,11 @@ struct Deprecated {
   subscript(x: Sub) -> Int { get { } set { } }
 }
 
+@available(*, deprecated)
+func getDeprecatedSub() -> Sub {
+  return Sub()
+}
+
 extension Array where Element == A {
   var property: Prop { fatalError() }
 }
@@ -202,6 +207,8 @@ func testKeyPath(sub: Sub, optSub: OptSub,
 
   let _ = \Deprecated.deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated}}
   let _ = \Deprecated.[sub] // expected-warning {{'subscript' is deprecated}}
+
+  let _ = \A.[getDeprecatedSub()] // expected-warning {{'getDeprecatedSub()' is deprecated}}
 }
 
 func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
