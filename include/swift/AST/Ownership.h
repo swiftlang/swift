@@ -21,9 +21,11 @@
 
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <stdint.h>
+#include <assert.h>
 
 namespace swift {
 
@@ -52,6 +54,7 @@ static inline llvm::StringRef keywordOf(ReferenceOwnership ownership) {
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
   assert(false && "impossible");
+  LLVM_BUILTIN_UNREACHABLE;
 }
 
 static inline llvm::StringRef manglingOf(ReferenceOwnership ownership) {
@@ -64,6 +67,7 @@ static inline llvm::StringRef manglingOf(ReferenceOwnership ownership) {
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
   assert(false && "impossible");
+  LLVM_BUILTIN_UNREACHABLE;
 }
 
 static inline bool isLessStrongThan(ReferenceOwnership left,
