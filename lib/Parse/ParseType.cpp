@@ -684,16 +684,11 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   }
 
   if (isParsingQualifiedDeclName) {
-    // If components are empty, discard the syntax parsing context.
-    if (ComponentsR.empty()) {
-      IdentTypeCtxt.setDiscard();
+    // Set the parsing context to transparent to propagate the trailing period
+    // after the base type to the parent context.
+    IdentTypeCtxt.setTransparent();
+    if (ComponentsR.empty())
       Status.setIsParseError();
-    }
-    // Otherwise, set the parsing context to transparent to propagate the
-    // trailing period after the base type to the parent context.
-    else {
-      IdentTypeCtxt.setTransparent();
-    }
   }
 
   IdentTypeRepr *ITR = nullptr;
