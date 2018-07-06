@@ -62,6 +62,11 @@ struct Deprecated {
   subscript(x: Sub) -> Int { get { } set { } }
 }
 
+@available(*, deprecated)
+func getDeprecatedSub() -> Sub {
+  return Sub()
+}
+
 extension Array where Element == A {
   var property: Prop { fatalError() }
 }
@@ -202,6 +207,8 @@ func testKeyPath(sub: Sub, optSub: OptSub,
 
   let _ = \Deprecated.deprecatedProperty // expected-warning {{'deprecatedProperty' is deprecated}}
   let _ = \Deprecated.[sub] // expected-warning {{'subscript' is deprecated}}
+
+  let _ = \A.[getDeprecatedSub()] // expected-warning {{'getDeprecatedSub()' is deprecated}}
 }
 
 func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
@@ -493,6 +500,33 @@ struct BassSubscript {
 func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.[Treble()]
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
+}
+
+// Crash in diagnostics
+struct AmbiguousSubscript {
+  subscript(sub: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript' declared here}}
+
+  subscript(y y: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript(y:)' declared here}}
+}
+
+func useAmbiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
+  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+}
+
+struct BothUnavailableSubscript {
+  @available(*, unavailable)
+  subscript(sub: Sub) -> Int { get { } set { } }
+
+  @available(*, unavailable)
+  subscript(y y: Sub) -> Int { get { } set { } }
+}
+
+func useBothUnavailableSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
 }
 
 // SR-6106
