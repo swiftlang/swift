@@ -1823,9 +1823,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       if (Attributes.has(TAK_noescape)) {
         diagnose(Loc, diag::attr_noescape_conflicts_escaping_autoclosure);
       } else {
-        diagnose(Loc, Context.isSwiftVersion3()
-                          ? diag::swift3_attr_autoclosure_escaping_deprecated
-                          : diag::attr_autoclosure_escaping_deprecated)
+        diagnose(Loc, diag::attr_autoclosure_escaping_deprecated)
             .fixItReplace(autoclosureEscapingParenRange, " @escaping ");
       }
       Attributes.setAttr(TAK_escaping, Loc);
@@ -1850,9 +1848,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     // In SIL, the polarity of @escaping is reversed.
     // @escaping is the default and @noescape is explicit.
     if (!isInSILMode()) {
-      diagnose(Loc, Context.isSwiftVersion3()
-               ? diag::swift3_attr_noescape_deprecated
-               : diag::attr_noescape_deprecated)
+      diagnose(Loc, diag::attr_noescape_deprecated)
         .fixItRemove({Attributes.AtLoc, Loc});
     }
     break;
@@ -5192,10 +5188,7 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
     if (Flags & PD_InProtocol) {
       switch (StaticSpelling) {
       case StaticSpellingKind::None: {
-        auto Message = Context.isSwiftVersion3()
-                           ? diag::swift3_operator_static_in_protocol
-                           : diag::operator_static_in_protocol;
-        diagnose(NameLoc, Message, SimpleName.str())
+        diagnose(NameLoc, diag::operator_static_in_protocol, SimpleName.str())
             .fixItInsert(FuncLoc, "static ");
         StaticSpelling = StaticSpellingKind::KeywordStatic;
         break;
@@ -6428,15 +6421,9 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
   SourceLoc lBraceLoc;
   if (consumeIf(tok::l_brace, lBraceLoc)) {
     if (isInfix && !Tok.is(tok::r_brace)) {
-      auto message = Context.isSwiftVersion3()
-                         ? diag::swift3_deprecated_operator_body_use_group
-                         : diag::deprecated_operator_body_use_group;
-      diagnose(lBraceLoc, message);
+      diagnose(lBraceLoc, diag::deprecated_operator_body_use_group);
     } else {
-      auto message = Context.isSwiftVersion3()
-                         ? diag::swift3_deprecated_operator_body
-                         : diag::deprecated_operator_body;
-      auto Diag = diagnose(lBraceLoc, message);
+      auto Diag = diagnose(lBraceLoc, diag::deprecated_operator_body);
       if (Tok.is(tok::r_brace)) {
         SourceLoc lastGoodLoc = precedenceGroupNameLoc;
         if (lastGoodLoc.isInvalid())
