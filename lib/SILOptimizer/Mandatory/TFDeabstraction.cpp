@@ -275,9 +275,6 @@ void TFDeabstraction::inlineCalls() {
   auto &module = fn.getModule();
   module.invalidateSILLoaderCaches();
 
-  if (!inlinedCallees.empty())
-    fn.setOptimizationMode(OptimizationMode::ForSpeed);
-
   // Now that we've inlined some functions, clean them up to avoid burning
   // compile time in later passes.  We do this with a simple linear scan,
   // because functions that reference each other have already been flattened
@@ -296,7 +293,6 @@ void TFDeabstraction::inlineCalls() {
     //
     // TODO: Build infra to find unused witness tables and remove them.
     if (callee->getRefCount() != 0) {
-      callee->setOptimizationMode(OptimizationMode::ForSpeed);
       continue;
     }
 
