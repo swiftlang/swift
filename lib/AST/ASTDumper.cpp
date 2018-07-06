@@ -328,15 +328,6 @@ static StringRef getAccessorKindString(AccessorKind value) {
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
 }
-static StringRef getAccessKindString(AccessKind value) {
-  switch (value) {
-    case AccessKind::Read: return "read";
-    case AccessKind::Write: return "write";
-    case AccessKind::ReadWrite: return "readwrite";
-  }
-
-  llvm_unreachable("Unhandled AccessKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
