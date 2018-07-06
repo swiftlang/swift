@@ -2464,7 +2464,7 @@ where Self.RawSignificand : FixedWidthInteger {
     let randFloat = delta * unitRandom + range.lowerBound
 %   if 'Closed' not in Range:
     if randFloat == range.upperBound {
-      return randFloat.nextDown
+      return Self.random(in: range, using: &generator)
     }
 %   end
     return randFloat

@@ -130,39 +130,6 @@ RandomTests.test("random floating points in ranges") {
 #endif
 }
 
-// Random floating points with max values (SR-8178)
-
-public struct MaxRNG: RandomNumberGenerator {
-  public func next() -> UInt64 {
-    return .max
-  }
-}
-
-func floatingPointRangeMaxTest<T: BinaryFloatingPoint>(_ type: T.Type)
-  where T.RawSignificand: FixedWidthInteger {
-  
-  let testRange = 0 ..< 1_000
-  
-  var rng = MaxRNG()
-  let ranges: [Range<T>] = [0 ..< 1, 1 ..< 2, 10 ..< 11, 0 ..< 10]
-  for range in ranges {
-    for _ in testRange {
-      let random = T.random(in: range, using: &rng)
-      expectTrue(range.contains(random))
-      expectTrue(range.lowerBound < random)
-      expectTrue(random < range.upperBound)
-    }
-  }
-}
-
-RandomTests.test("random floating point range maxes") {
-  floatingPointRangeMaxTest(Float.self)
-  floatingPointRangeMaxTest(Double.self)
-#if !os(Windows) && (arch(i386) || arch(x86_64))
-  floatingPointRangeMaxTest(Float80.self)
-#endif
-}
-
 // Random Elements from collection
 
 RandomTests.test("random elements from collection") {
@@ -258,6 +225,56 @@ RandomTests.test("different random number generators") {
   expectEqual(boolPasses[0], boolPasses[1])
   expectEqual(collectionPasses[0], collectionPasses[1])
   expectEqual(shufflePasses[0], shufflePasses[1])
+}
+
+// Random floating points with max values (SR-8178)
+
+var lcrng = LCRNG(seed: 1234567890)
+
+public struct RotatingRNG: RandomNumberGenerator {
+  public let rotation: [() -> UInt64] = [
+    { return .min },
+    { return .max },
+    { return lcrng.next() }
+  ]
+  public var rotationIndex = 0
+  
+  public mutating func next() -> UInt64 {
+    if rotationIndex == rotation.count {
+      rotationIndex = 0
+    }
+    
+    defer {
+      rotationIndex += 1
+    }
+    
+    return rotation[rotationIndex]()
+  }
+}
+
+func floatingPointRangeMaxTest<T: BinaryFloatingPoint>(_ type: T.Type)
+  where T.RawSignificand: FixedWidthInteger {
+  
+  let testRange = 0 ..< 1_000
+  
+  var rng = RotatingRNG()
+  let ranges: [Range<T>] = [0 ..< 1, 1 ..< 2, 10 ..< 11, 0 ..< 10]
+  for range in ranges {
+    for _ in testRange {
+      let random = T.random(in: range, using: &rng)
+      expectTrue(range.contains(random))
+      expectTrue(range.lowerBound <= random)
+      expectTrue(random < range.upperBound)
+    }
+  }
+}
+
+RandomTests.test("random floating point range maxes") {
+  floatingPointRangeMaxTest(Float.self)
+  floatingPointRangeMaxTest(Double.self)
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+  floatingPointRangeMaxTest(Float80.self)
+#endif
 }
 
 // Uniform Distribution
