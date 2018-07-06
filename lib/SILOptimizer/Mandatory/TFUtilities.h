@@ -275,6 +275,12 @@ private:
     return convertSwiftTypeToTF(ty) != 0;
   }
 
+  /// Given a decl for a struct that has a single field (typically because it is
+  /// known to be a standard library type like Int or Float), return the
+  /// canonical type of the single member, asserting and aborting if we get
+  /// something unexpected.
+  CanType getSingleElementDeclFieldType(NominalTypeDecl *decl);
+
   /// Looks up a function in `module`, which must exist.
   /// If needed, load and link it, so that the function body is available to the
   /// caller.

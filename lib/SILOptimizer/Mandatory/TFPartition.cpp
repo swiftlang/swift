@@ -52,20 +52,6 @@ static bool isUserIgnoredByPartitioning(SILInstruction *inst) {
   return isa<DebugValueInst>(inst) || isa<RefCountingInst>(inst);
 }
 
-/// Given a decl for a struct that has a single field (typically because it is
-/// known to be a standard library type like Int or Float), return the canonical
-/// type of the single member, asserting and aborting if we get something
-/// unexpected.
-static CanType getSingleElementDeclFieldType(NominalTypeDecl *decl) {
-  auto fieldIt = decl->getStoredProperties().begin();
-  assert(fieldIt != decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  auto fieldType = (*fieldIt++)->getType()->getCanonicalType();
-  assert(fieldIt == decl->getStoredProperties().end() &&
-         "Struct should have one member");
-  return fieldType;
-}
-
 /// Given a generic function with a single generic parameter `<T>(...) -> ...`
 /// an a type for substitution, return a substitution map that's suitable for
 /// calling this func.

@@ -242,6 +242,20 @@ SILType tf::convertElementTypeToTensorValueType(SILType ty) {
   return convertElementTypeToTensorValueType(ty.getASTType(), ty.getASTContext());
 }
 
+/// Given a decl for a struct that has a single field (typically because it is
+/// known to be a standard library type like Int or Float), return the canonical
+/// type of the single member, asserting and aborting if we get something
+/// unexpected.
+CanType tf::getSingleElementDeclFieldType(NominalTypeDecl *decl) {
+  auto fieldIt = decl->getStoredProperties().begin();
+  assert(fieldIt != decl->getStoredProperties().end() &&
+         "Struct should have one member");
+  auto fieldType = (*fieldIt++)->getType()->getCanonicalType();
+  assert(fieldIt == decl->getStoredProperties().end() &&
+         "Struct should have one member");
+  return fieldType;
+}
+
 /// Looks up a function in the current module. If it exists, returns it.
 /// Otherwise, attempt to link it from imported modules. Returns null if such
 /// function name does not exist.
