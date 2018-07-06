@@ -564,7 +564,7 @@ func bar(_ x: Float, _: Float) -> Float { return 1 }
 func bar<T : Numeric>(_ x: T, _: T) -> T { return 1 }
 
 #gradient(foo)
-#gradient(foo, wrt: .0, .1, self)
+#gradient(foo, wrt: .0, .1)
 #valueAndGradient(foo, wrt: .0, .1)
 
 #adjoint(+)

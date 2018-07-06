@@ -2964,35 +2964,22 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
   auto *origExpr = E->getOriginalExpr();
   auto origTy = origExpr->getType()->getAs<AnyFunctionType>();
   ManagedValue origVal = RVE.visit(origExpr, C).getAsSingleValue(RVE.SGF, loc);
-  auto origSILTy = origVal.getType().getAs<SILFunctionType>();
   // Lower Swift parameters to SIL parameters.
   auto diffParams = E->getParameters();
-  SmallVector<AutoDiffParameter, 4> allParamIndices;
+  SmallVector<AutoDiffIndexParameter, 4> allParamIndices;
   // If no differentiation parameters are specified, differentiation is done
   // with respect to all of original's parameters.
   if (E->getParameters().empty()) {
     for (unsigned i : range(0, origTy->getNumParams()))
-      allParamIndices.push_back(
-        AutoDiffParameter::getIndexParameter(E->getStartLoc(), i));
+      allParamIndices.push_back({ E->getStartLoc(), i });
     diffParams = allParamIndices;
   }
   SmallVector<unsigned, 8> loweredParamIndices;
   for (auto param : diffParams) {
-    switch (param.getKind()) {
-    case swift::AutoDiffParameter::Kind::Index: {
-      auto silParamIndices =
-      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.getIndex(), origTy);
-      for (auto idx : silParamIndices)
-        loweredParamIndices.push_back(idx);
-      break;
-    }
-    case swift::AutoDiffParameter::Kind::Self: {
-      // `self` is the last parameter of the SIL function.
-      auto selfIdx = origSILTy->getNumParameters() - 1;
-      loweredParamIndices.push_back(selfIdx);
-      break;
-    }
-    }
+    auto silParamIndices =
+      RVE.SGF.SGM.getLoweredFunctionParameterIndex(param.index, origTy);
+    for (auto idx : silParamIndices)
+      loweredParamIndices.push_back(idx);
   }
   auto gradInst = RVE.SGF.B.createGradient(loc, origVal.forward(RVE.SGF),
                                            /*sourceIndex*/ 0,
@@ -3081,7 +3068,14 @@ visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
 
     // Emit the tensor arguments as well as the attribute values.
     for (auto &elt : tuple->getElements().drop_front()) {
-      args.push_back(visit(elt).forwardAsSingleValue(SGF, elt));
+      // Arguments of this builtin will be taken at +0 instead of +1, for
+      // consistency with the default calling convention of taking function
+      // parameters as @guaranteed instead of @owned.
+      // e.g. Say E represents #tfop("Add", x, x). x can be passed into this
+      // expression without having to do a strong_retain (or copy_value) first.
+      args.push_back(
+          SGF.emitRValueAsSingleValue(elt, SGFContext::AllowGuaranteedPlusZero)
+              .getValue());
     }
   }
   auto &resultTL = SGF.getTypeLowering(E->getType());

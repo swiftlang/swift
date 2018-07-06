@@ -570,12 +570,6 @@ EXPR_NODES = [
              Child('RightParen', kind='RightParenToken'),
          ]),
 
-    # differentiation-index-param-list ->
-    #     differentiation-index-param differentiable-index-param-list?
-    # NOTE: This is used by #gradient and #valueAndGradient expressions.
-    Node('DifferentiationIndexParamList', kind='SyntaxCollection',
-         element='DifferentiationIndexParam'),
-
     # SWIFT_ENABLE_TENSORFLOW
     # Expression generalizing #gradient and #valueAndGradient.
     # e.g. #gradient(foo(_:_:), wrt: .0, .1)
@@ -590,12 +584,30 @@ EXPR_NODES = [
              Child('LeftParen', kind='LeftParenToken'),
              Child('OriginalFunction', kind='Expr'),
              Child('Commna', kind='CommaToken', is_optional=True),
-             Child('WithRespectToLabel', kind='IdentifierToken', is_optional=True,
+             Child('WrtLabel', kind='IdentifierToken', is_optional=True,
                    text_choices=['wrt']),
              Child('Colon', kind='ColonToken', is_optional=True),
-             Child('DiffParams', kind='DifferentiationIndexParamList',
+             Child('DiffParams', kind='GradientExprParamList',
                    is_optional=True),
              Child('RightParen', kind='RightParenToken'),
+         ]),
+
+    # gradient-expr-diff-param-list ->
+    #     gradient-expr-diff-param gradient-expr-diff-param-list?
+    Node('GradientExprParamList', kind='SyntaxCollection',
+         element='GradientExprDiffParam'),
+
+    # gradient-expr-diff-param ->
+    #     differentiation-index-param ','?
+    Node('GradientExprDiffParam', kind='Syntax',
+         description='''
+         A differentiation parameter: a period followed by an unsigned integer \
+         (e.g. `.0`).
+         ''',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Index', kind='DifferentiationIndexParam'),
+             Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW

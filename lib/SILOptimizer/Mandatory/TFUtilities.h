@@ -130,6 +130,8 @@ static std::string getDeviceShortName(DeviceType deviceType) {
 /// This struct holds information about the global configuration of the graph
 /// we are generating.  This can be different between distinct graphs in the
 /// same program though.
+//
+// TODO: rename this struct.
 struct GraphGlobalConfiguration {
   const DeviceType primaryDeviceType;
   const bool isTPUInfeedEnabled;
@@ -157,6 +159,8 @@ struct GraphGlobalConfiguration {
   //
   // For some tfops (e.g. "tfc.scalarToTensor"), device placement is handled
   // specially, so this function call will be a no-op.
+  //
+  // TODO: remove this function once we complete the migration to GraphOpInst.
   void handleDevicePlacement(StringRef opType, StringRef opDevice,
                              SILBuilder &B, SILLocation loc,
                              SmallVectorImpl<SILValue> &operands,
@@ -195,6 +199,22 @@ struct GraphGlobalConfiguration {
     operands.push_back(deviceStrInst);
     newInstName += std::string(",") + DEVICE_ATTR;
   }
+
+  // Choose a device for the graphOpInst under construction, extend `attributes`
+  // accordingly with the device attribute, and track the chosen device in
+  // `usedDeviceTypes`.
+  //
+  // If `opDevice` is already set, respects that device choice. Otherwise,
+  // chooses a device based on this configuration and op kernel device
+  // availability.
+  //
+  // For some tfops (e.g. "tfc.scalarToTensor"), device placement is handled
+  // specially, so this function call will be a no-op.
+  //
+  void
+  handleDevicePlacement(StringRef opType, StringRef opDevice, SILBuilder &B,
+                        SILLocation loc,
+                        SmallVectorImpl<GraphOperationAttribute> &attributes);
 
   DeviceType chooseDevice(StringRef opType) const {
     if (opType == "tfc.RecvFromHost" || opType == "tfc.SendToHost")

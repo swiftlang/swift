@@ -1677,8 +1677,9 @@ static bool analyzeArrayInitUses(SILValue v,
   for (auto *use : v->getUses()) {
     auto *user = use->getUser();
 
-    // We can always remove retain/release instructions.
-    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user)) {
+    // We can always remove retain/release instructions and debug_value.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<DebugValueInst>(user)) {
       if (arrayInsts) arrayInsts->insert(user);
       continue;
     }
@@ -1691,6 +1692,9 @@ static bool analyzeArrayInitUses(SILValue v,
         return true;
       continue;
     }
+
+    // Oops we found an unknown use!
+    return true;
   }
   return false;
 }
@@ -1780,8 +1784,8 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
         user = iai->getSingleUserOfType<StoreInst>();
       }
 
-      // Check to see if we have a store to a valid index that hasn't been stored
-      // to yet.
+      // Check to see if we have a store to a valid index that hasn't been
+      // stored to yet.
       auto *store = dyn_cast_or_null<StoreInst>(user);
       if (!store || index >= elements.size() || elements[index] != SILValue())
         return Type();
@@ -1885,6 +1889,43 @@ GraphGlobalConfiguration::getForFunction(SILFunction &fn,
     }
   }
   return GraphGlobalConfiguration(deviceType, isTPUInfeedEnabled);
+}
+
+void GraphGlobalConfiguration::handleDevicePlacement(
+    StringRef opType, StringRef opDevice, SILBuilder &B, SILLocation loc,
+    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+  // No device placement for this special-case "pseudo-op" for
+  // scalar-to-tensor promotion. It will later be translated by compiler (in
+  // PartitionCloner) into real TF ops, where device placement is handled at
+  // that time.
+  if (opType == "tfc.scalarToTensor") {
+    assert(opDevice.empty());
+    return;
+  }
+
+  DeviceType chosenDevice;
+  if (!opDevice.empty())
+    chosenDevice = getOpDeviceType(opDevice);
+  else
+    chosenDevice = chooseDevice(opType);
+
+  markDeviceUsed(chosenDevice);
+
+  // Example output SIL:
+  // %2 = string_literal utf8 "/device:GPU:0"        // user: %3
+  // %3 = builtin "__tfop_Const,dtype,value$tensor,__device"(%0 : $@thin
+  // %Float.Type, %1 : $Builtin.FPIEEE64, %2 : $Builtin.RawPointer) :
+  // %$TensorHandle<Float> // user: %4
+  //
+  // Note we generate the StringLiteral inst for op device even when the input
+  // `opDevice` is not empty. This is redundant but keeps the code simple, and
+  // we expect the original StringLiteral inst for the op device to get DCE'd
+  // in a later compiler pass.
+  auto deviceString = getDeviceString(chosenDevice);
+  auto &ctx = B.getModule().getASTContext();
+  attributes.push_back(
+      {ctx.getIdentifier(DEVICE_ATTR),
+       SymbolicValue::getString(deviceString, ctx.getAllocator())});
 }
 
 //===----------------------------------------------------------------------===//

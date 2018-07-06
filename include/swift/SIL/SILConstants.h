@@ -30,6 +30,7 @@ struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
 struct StringSymbolicValue;
 struct AggregateSymbolicValue;
+struct EnumWithPayloadSymbolicValue;
 
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
@@ -103,10 +104,13 @@ class SymbolicValue {
     RK_String,
 
     /// This value is an array, struct, or tuple of constants.  This is
-    /// tracked by the "aggregate" member of the value union.  Note that we
-    /// cheat and represent single-element structs as the value of their
-    /// element (since they are so common).
+    /// tracked by the "aggregate" member of the value union.
     RK_Aggregate,
+
+    /// This value is an enum with no payload.
+    RK_Enum,
+    /// This value is an enum with a payload.
+    RK_EnumWithPayload,
   };
 
   RepresentationKind representationKind : 8;
@@ -143,8 +147,16 @@ class SymbolicValue {
     StringSymbolicValue *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements, count, and element type.
+    /// information about the array elements and count.
     AggregateSymbolicValue *aggregate;
+
+    /// When this SymbolicValue is of "Enum" kind, this pointer stores
+    /// information about the enum case type.
+    EnumElementDecl *enumVal;
+
+    /// When this SymbolicValue is of "EnumWithPayload" kind, this pointer
+    /// stores information about the enum case type and its payload.
+    EnumWithPayloadSymbolicValue *enumValWithPayload;
   } value;
 
   union {
@@ -181,6 +193,11 @@ public:
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
+
+    /// This is an enum without payload.
+    Enum,
+    /// This is an enum with payload (formally known as "associated value").
+    EnumWithPayload,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -284,6 +301,17 @@ public:
                                     llvm::BumpPtrAllocator &allocator);
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
+
+  static SymbolicValue getEnum(EnumElementDecl *decl);
+
+  /// `payload` must be a constant.
+  static SymbolicValue getEnumWithPayload(EnumElementDecl *decl,
+                                          SymbolicValue payload,
+                                          llvm::BumpPtrAllocator &allocator);
+
+  EnumElementDecl *getEnumValue() const;
+
+  SymbolicValue getEnumPayloadValue() const;
 
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some

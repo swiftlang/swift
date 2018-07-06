@@ -1509,6 +1509,8 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
   case SymbolicValue::Function:
+  case SymbolicValue::Enum:
+  case SymbolicValue::EnumWithPayload:
     // TODO: Unsupported right now.
     return nullptr;
 
@@ -1996,23 +1998,13 @@ formGraphOp(SILTensorOpInfo &opInfo,
         elt = eltVal;
 
         opName += elementMarker;
-
-        // graph_op notationally takes its tensor operands at +1, so we need to
-        // retain them.
-        // TODO: move to a +0 model like the rest of Swift some day.
-        B.createStrongRetain(opInfo.inst->getLoc(), elt,
-                             Atomicity::Atomic);
         inputs.push_back(elt);
       }
 
-      // Okay, now that we updated this operand, try to remove the array.  If
-      // we can't remove it entirely, just emit a destroy_value to balance the
-      // former +1 use.
-      // TODO: When builtin's start using values as +0, this can go away.
-      if (arrayInsts.empty()) {
-        SILBuilder B2(++SILBasicBlock::iterator(opInfo.inst));
-        B2.emitDestroyValueOperation(opInfo.inst->getLoc(), operand);
-      } else {
+      // Okay, now that we updated this operand, try to remove the array
+      // entirely  If we can't, then we just leave it alone: we were using it as
+      // a +0 value, so we can just drop the use.
+      if (!arrayInsts.empty()) {
         // If we can remove it, drop all inter-dependent references.
         for (auto inst : arrayInsts)
           inst->dropAllReferences();

@@ -139,8 +139,8 @@ ATTRIBUTE_NODES = [
     #     differentiable-attr-func-specifier?
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiable` attribute: differentiation
-         mode ('forward' or 'reverse'), an optional differentiation parameter
+         The arguments for the `@differentiable` attribute: differentiation \
+         mode ('forward' or 'reverse'), an optional differentiation parameter \
          list, an optional primal function, and an adjoint function.
          ''',
          children=[
@@ -149,7 +149,7 @@ ATTRIBUTE_NODES = [
                     description='The mode of automatic differentiation.'),
              Child('Comma', kind='CommaToken', is_optional=True,
                    description='''
-                   The comma separating the differentiation mode and the
+                   The comma separating the differentiation mode and the \
                    differentiation parameter list.
                    '''),
              Child('DiffParams', kind='DifferentiableAttributeDiffParams',
@@ -185,10 +185,10 @@ ATTRIBUTE_NODES = [
          element='DifferentiableAttributeDiffParam'),
 
     # differentiable-attr-diff-param ->
-    #     'self' | differentiation-index-parameter
+    #     ('self' | differentiation-index-parameter) ','?
     Node('DifferentiableAttributeDiffParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a period
+         A differentiation parameter: either the "self" identifier or a period \
          followed by an unsigned integer (e.g. `.0`).
          ''',
          traits=['WithTrailingComma'],

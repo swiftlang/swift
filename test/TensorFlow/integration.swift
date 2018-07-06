@@ -25,7 +25,7 @@ public func testTensor(a: Tensor<Float>, b: Tensor<Float>) {
 // CHECK-NEXT:   %5 = metatype $@thick Float.Type
 // CHECK-NEXT:   %6 = string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT:   %7 = builtin "__tfop_Sub,$in,$in,T,__device"(%4 : $TensorHandle<Float>, %4 : $TensorHandle<Float>, %5 : $@thick Float.Type, %6 : $Builtin.RawPointer) : $TensorHandle<Float>
-// CHECK:        builtin "__tfop_tfc.SendToHost,$in,tensorId,__device"<TensorHandle<Float>>(
+// CHECK:        graph_op "tfc.SendToHost
 // CHECK-NEXT:   metatype $@thick Float.Type
 // CHECK-NEXT:   string_literal utf8 "/device:CPU:0"
 // CHECK:        [[RESULT:%.*]] = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
@@ -135,7 +135,7 @@ public func testExitBranch2(i: Int) {
   var x = Tensor<Float>(1.0)
 
   // expected-warning @+1 {{implicitly copied to the accelerator}}
-  if i == 0 {  // expected-error {{Length for attr 'Tout' of 0 must be at least minimum 1}}
+  if i == 0 {
     return
   }
 
@@ -151,7 +151,7 @@ public func testExitBranch2(i: Int) {
 
 // CHECK:      bb1:
 // CHECK:        builtin "__tfop_Add,$in,$in,T,__device"(
-// CHECK:        builtin "__tfop_tfc.SendToHost
+// CHECK:        graph_op "tfc.SendToHost
 // CHECK-NEXT:   br bb2
 
 // CHECK: bb2:
@@ -228,6 +228,30 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK-NEXT: [[PROGRAM:%.*]] = apply [[STARTFN:%.*]](
 // CHECK: cond_br [[BOOLVAL]],
 
+// expected-warning @+1 {{'status' implicitly copied to the accelerator}}
+public func test_multiple_ifs(status: Bool) {
+  var a = Tensor<Int32>(0)
+  let b = a
+  if status { // expected-note {{value used here}}
+    a += b
+  }
+  a += b
+  if status {
+    a += b
+  }
+  a -= b
+  _hostOp(a)
+}
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}test_multiple_ifs{{.*}}
+// CHECK-NEXT: [sequence
+// CHECK-NEXT:   {condition Header: bb0
+// CHECK-NEXT:     block bb2
+// CHECK-NEXT:     block bb1}
+// CHECK-NEXT:   {condition Header: bb3
+// CHECK-NEXT:     block bb5
+// CHECK-NEXT:     block bb4}
+// CHECK-NEXT:   block bb6]
 
 public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implicitly copied to the accelerator}}
                         arg1: Tensor<Float>, arg2: Tensor<Float>) {
@@ -305,11 +329,11 @@ public func scalar_manipulation(a : Float) -> Tensor<Float> {
 // CHECK-NEXT:  %6 = unchecked_ref_cast %5 : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 
 // CHECK:       %9 = builtin "__tfop_Add,$in,$in,T,__device"(%1 : $TensorHandle<Float>, %6 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK:       builtin "__tfop_tfc.SendToHost
+// CHECK:       graph_op "tfc.SendToHost
 // CHECK-NEXT:  float_literal $Builtin.FPIEEE32, 0x40000000
 // CHECK-NEXT:  integer_literal $Builtin.Int32, 1
 // CHECK:       builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
-// CHECK:       builtin "__tfop_tfc.RecvFromHost
+// CHECK:       graph_op "tfc.RecvFromHost
 // CHECK:       builtin "__tfop_Add,$in,$in,__device"(
 // CHECK-NEXT:  unchecked_ref_cast {{.*}} : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
 // CHECK:       builtin "__tfop_Add,$in,$in,T,__device"(

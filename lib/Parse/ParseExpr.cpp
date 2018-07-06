@@ -3645,7 +3645,7 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-param-list:
 ///     expr-gradient-param-index (',' expr-gradient-param-index)*
 ///   expr-gradient-param-index:
-///     'self' | '.' [0-9]+
+///     '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   SyntaxParsingContext GradientContext(SyntaxContext, SyntaxKind::GradientExpr);
@@ -3667,11 +3667,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     llvm_unreachable("Not a reverse AD expression");
   }
 
-  auto errorAndSkipToEnd = [&](unsigned parenDepth = 1) -> ParserResult<Expr> {
-    for (unsigned i = 0; i < parenDepth; ++i) {
-      skipUntilDeclStmtRBrace(tok::r_paren);
-      parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName);
-    }
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    rParenLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
   };
@@ -3689,7 +3687,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
   // If found comma, parse 'wrt:'.
-  SmallVector<AutoDiffParameter, 8> params;
+  SmallVector<AutoDiffIndexParameter, 8> params;
   if (consumeIf(tok::comma)) {
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
@@ -3707,8 +3705,8 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
       return errorAndSkipToEnd();
     // Function that parses one parameter.
     auto parseParam = [&]() -> bool {
-      // SyntaxParsingContext DiffParamContext(
-      //     SyntaxContext, SyntaxKind::DifferentiationParameter);
+      SyntaxParsingContext DiffParamContext(
+          SyntaxContext, SyntaxKind::GradientExprDiffParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
       case tok::period_prefix: {
@@ -3719,8 +3717,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
         if (parseUnsignedInteger(index, paramLoc,
                                  diag::gradient_expr_expected_parameter))
           return true;
-        params.push_back(
-          AutoDiffParameter::getIndexParameter(paramLoc, index));
+        params.push_back({ paramLoc, index });
         break;
       }
       default:
@@ -3738,9 +3735,8 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     // Parse remaining parameters until ')'.
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
-        return errorAndSkipToEnd(2);
-    SyntaxContext->collectNodesInPlace(
-        SyntaxKind::DifferentiationIndexParamList);
+        return errorAndSkipToEnd();
+    SyntaxContext->collectNodesInPlace(SyntaxKind::GradientExprParamList);
   }
   // Parse the closing ')'.
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName))
