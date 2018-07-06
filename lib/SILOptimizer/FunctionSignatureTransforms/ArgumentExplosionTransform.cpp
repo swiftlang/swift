@@ -30,11 +30,6 @@ static llvm::cl::opt<bool> FSODisableArgExplosion(
     llvm::cl::desc("Do not perform argument explosion during FSO. Intended "
                    "only for testing purposes"));
 
-STATISTICS(NumTrivialArgumentsWithUnknownCallersNotExploded,
-           "Number of trivial arguments not exploded due to unknown callers");
-STATISTICS(NumTrivialArgumentsWithOnlyDirectCallersExploded,
-           "Number of trivial arguments we did explode since we saw all callers");
-
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
@@ -45,10 +40,8 @@ shouldExplodeTrivial(FunctionSignatureTransformDescriptor &transformDesc,
                      unsigned maxExplosionSize) {
   // Only blow up trivial parameters if we will not form a thunk...
   if (!transformDesc.hasOnlyDirectCallers) {
-    ++NumTrivialArgumentsWithUnknownCallersNotExploded;
     return false;
   }
-  ++NumTrivialArgumentsWithOnlyDirectCallersExploded;
 
   // ... and reduce the size of the argument by a reasonable amount.
   unsigned explosionSize = argDesc.ProjTree.getLiveLeafCount();
