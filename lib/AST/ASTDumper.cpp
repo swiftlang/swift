@@ -1735,11 +1735,6 @@ public:
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
     PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
 
-    if (E->hasLValueAccessKind()) {
-      PrintWithColorRAII(OS, ExprModifierColor)
-        << " accessKind=" << getAccessKindString(E->getLValueAccessKind());
-    }
-
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();

@@ -454,7 +454,6 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
   selfRef->setType(LValueType::get(selfDecl->getType()));
-  selfRef->propagateLValueAccessKind(AccessKind::Write);
 
   auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
                                       /*implicit*/ true);
@@ -1184,7 +1183,6 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   Expr *lhs = new (context) DeclRefExpr(selfDecl,
                                         DeclNameLoc(), /*Implicit=*/true);
   lhs->setType(LValueType::get(selfType));
-  lhs->propagateLValueAccessKind(AccessKind::Write);
 
   auto emptyTuple = TupleType::getEmpty(context);
 
@@ -1326,7 +1324,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
                                           /*Implicit=*/true,
                                           semantics);
         lhs->setType(LValueType::get(var->getType()));
-        lhs->propagateLValueAccessKind(AccessKind::Write);
 
         // Construct right-hand side.
         auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
@@ -1474,7 +1471,6 @@ static ConstructorDecl *createRawValueBridgingConstructor(
                                   DeclNameLoc(), /*Implicit=*/true,
                                   AccessSemantics::DirectToStorage);
     lhs->setType(LValueType::get(storedType));
-    lhs->propagateLValueAccessKind(AccessKind::Write);
 
     // Construct right-hand side.
     // FIXME: get the parameter from the init, and plug it in here.
