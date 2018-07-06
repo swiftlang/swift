@@ -497,9 +497,6 @@ SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_stdlib_UBool
     __swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32,
                                        __swift_stdlib_UProperty);
-SWIFT_RUNTIME_STDLIB_INTERFACE
-__swift_stdlib_UBool
-    __swift_stdlib_u_isdefined(__swift_stdlib_UChar32);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_u_charAge(
@@ -513,7 +510,7 @@ __swift_int32_t
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t __swift_stdlib_u_charName(
     __swift_stdlib_UChar32 code, __swift_stdlib_UCharNameChoice nameChoice,
-    char *buffer, __swift_int32_t bufferLength,
+    char *_Nullable buffer, __swift_int32_t bufferLength,
     __swift_stdlib_UErrorCode *pErrorCode);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE

@@ -53,7 +53,6 @@ int32_t unorm2_normalize(const UNormalizer2 *, const UChar *, int32_t, UChar *,
 const UNormalizer2 *unorm2_getNFCInstance(UErrorCode *);
 UBool unorm2_hasBoundaryBefore(const UNormalizer2 *norm2, UChar32 c);
 UBool u_hasBinaryProperty(UChar32, UProperty);
-UBool u_isdefined(UChar32);
 void u_charAge(UChar32, UVersionInfo);
 int32_t u_getIntPropertyValue(UChar32, UProperty);
 int32_t u_charName(UChar32, UCharNameChoice, char *, int32_t, UErrorCode *);
@@ -243,11 +242,6 @@ swift::__swift_stdlib_UBool
 swift::__swift_stdlib_u_hasBinaryProperty(__swift_stdlib_UChar32 c,
                                           __swift_stdlib_UProperty p) {
   return u_hasBinaryProperty(c, static_cast<UProperty>(p));
-}
-
-swift::__swift_stdlib_UBool
-swift::__swift_stdlib_u_isdefined(UChar32 c) {
-  return u_isdefined(c);
 }
 
 void
