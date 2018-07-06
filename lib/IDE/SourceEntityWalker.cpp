@@ -34,6 +34,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   bool Cancelled = false;
+  Optional<AccessKind> OpAccess;
 
 public:
   explicit SemaAnnotator(SourceEntityWalker &SEWalker)
@@ -243,12 +244,6 @@ static SemaReferenceKind getReferenceKind(Expr *Parent, Expr *E) {
   return SemaReferenceKind::DeclRef;
 }
 
-static Optional<AccessKind> getAccessKind(Expr *E) {
-  if (E->hasLValueAccessKind())
-    return E->getLValueAccessKind();
-  return None;
-}
-
 std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (isDone())
     return { false, nullptr };
@@ -259,10 +254,10 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
   if (auto *CtorRefE = dyn_cast<ConstructorRefCallExpr>(E))
     CtorRefs.push_back(CtorRefE);
 
-  if (E->isImplicit())
+  if (!isa<InOutExpr>(E) &&
+      !isa<LoadExpr>(E) &&
+      E->isImplicit())
     return { true, E };
-
-  Optional<AccessKind> OpAccess = getAccessKind(E);
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
@@ -276,9 +271,25 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     }
   } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    // Visit in source order.
-    if (!MRE->getBase()->walk(*this))
-      return { false, nullptr };
+    {
+      // This could be made more accurate if the member is nonmutating,
+      // or whatever.
+      Optional<AccessKind> NewOpAccess;
+      if (OpAccess) {
+        if (*OpAccess == AccessKind::Write)
+          NewOpAccess = AccessKind::ReadWrite;
+        else
+          NewOpAccess = OpAccess;
+      }
+
+      llvm::SaveAndRestore<Optional<AccessKind>>
+        C(this->OpAccess, NewOpAccess);
+
+      // Visit in source order.
+      if (!MRE->getBase()->walk(*this))
+        return { false, nullptr };
+    }
+
     if (!passReference(MRE->getMember().getDecl(), MRE->getType(),
                        MRE->getNameLoc(),
                        ReferenceMetaData(SemaReferenceKind::DeclMemberRef,
@@ -343,6 +354,44 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       if (!passCallArgNames(CallE->getFn(), TupleE))
         return { false, nullptr };
     }
+  } else if (auto IOE = dyn_cast<InOutExpr>(E)) {
+    llvm::SaveAndRestore<Optional<AccessKind>>
+      C(this->OpAccess, AccessKind::ReadWrite);
+
+    if (!IOE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto LE = dyn_cast<LoadExpr>(E)) {
+    llvm::SaveAndRestore<Optional<AccessKind>>
+      C(this->OpAccess, AccessKind::Read);
+
+    if (!LE->getSubExpr()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
+  } else if (auto AE = dyn_cast<AssignExpr>(E)) {
+    {
+      llvm::SaveAndRestore<Optional<AccessKind>>
+        C(this->OpAccess, AccessKind::Write);
+
+      if (!AE->getDest()->walk(*this))
+        return { false, nullptr };
+    }
+
+    if (!AE->getSrc()->walk(*this))
+      return { false, nullptr };
+
+    // We already visited the children.
+    if (!walkToExprPost(E))
+      return { false, nullptr };
+    return { false, E };
   }
 
   return { true, E };
