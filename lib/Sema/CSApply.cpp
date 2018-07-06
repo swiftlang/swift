@@ -2445,8 +2445,6 @@ namespace {
         for (auto &gradParam : gradParams)
           diffParamTypes.push_back(gradParam.getType());
       } else {
-        // Check only index parameters. 'self' parameters are already checked in
-        // CSGen.
         for (auto &param : expr->getParameters())
           if (param.getKind() == AutoDiffParameter::Kind::Index)
             diffParamTypes.push_back(gradParams[param.getIndex()].getType());

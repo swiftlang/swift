@@ -716,11 +716,8 @@ ERROR(gradient_expr_not_a_function,none,
       (Type))
 ERROR(gradient_expr_original_func_decl_unresolved,none,
       "original function declaration could not be resolved", ())
-ERROR(gradient_expr_parameter_self_not_first,none,
-      "the 'self' parameter must be the first in the parameter list", ())
-ERROR(gradient_expr_parameter_self_not_in_instance_context,none,
-      "a 'self' parameter can only be used in an instance declaration context "
-      "where the function being differentiated is also located", ())
+ERROR(gradient_expr_parameter_self_unsupported,none,
+      "the 'self' parameter is unsupported by #gradient", ())
 ERROR(gradient_expr_parameter_indices_not_ascending,none,
       "parameter indices must be ascending", ())
 ERROR(gradient_expr_parameter_index_out_of_bounds,none,

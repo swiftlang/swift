@@ -2987,10 +2987,8 @@ static RValue emitGradientInst(RValueEmitter &RVE, const SGFContext &C,
       break;
     }
     case swift::AutoDiffParameter::Kind::Self: {
-      // `self` is the last parameter of the SIL function.
-      auto selfIdx = origSILTy->getNumParameters() - 1;
-      loweredParamIndices.push_back(selfIdx);
-      break;
+      assert(false &&
+             "'self' parameter is unsupported by #gradient/#valueAndGradient");
     }
     }
   }

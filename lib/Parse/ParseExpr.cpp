@@ -3645,7 +3645,7 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-param-list:
 ///     expr-gradient-param-index (',' expr-gradient-param-index)*
 ///   expr-gradient-param-index:
-///     'self' | '.' [0-9]+
+///     '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
@@ -3715,10 +3715,6 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
           return true;
         params.push_back(
           AutoDiffParameter::getIndexParameter(paramLoc, index));
-        break;
-      case tok::kw_self:
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
         break;
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);

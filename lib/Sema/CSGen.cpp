@@ -1333,44 +1333,11 @@ namespace {
             diffParamTypes.push_back(paramTy);
             break;
           }
-          case AutoDiffParameter::Kind::Self: {
-            // Self must come first in the parameter list.
-            if (lastIndex != -1) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_self_not_first);
-              return nullptr;
-            }
-            // To use 'self', #gradient must be located in an instance type
-            // context.
-            auto *method = CurDC->getInnermostMethodContext();
-            // Must be within an instance method to use 'self'.
-            if (!method || !method->isInstanceMember()) {
-              TC.diagnose(param.getLoc(),
-                    diag::gradient_expr_parameter_self_not_in_instance_context);
-              return nullptr;
-            }
-            // 'self' cannot be a reference or existential type.
-            auto *selfDecl = method->getImplicitSelfDecl();
-            auto selfTy = selfDecl->getType();
-            if (selfTy->isAnyClassReferenceType() ||
-                selfTy->isExistentialType()) {
-              TC.diagnose(param.getLoc(),
-                        diag::gradient_expr_parameter_not_value_type, selfTy);
-              return nullptr;
-            }
-            // 'self' type must conform to either FloatingPoint or
-            // VectorNumeric.
-            if (!(TC.isCompatibleWithScalarAutoDiff(selfTy, CurDC) ||
-                  TC.isCompatibleWithVectorAutoDiff(selfTy, CurDC))) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_not_differentiable,
-                          selfTy);
-              return nullptr;
-            }
-            // Collect the type.
-            diffParamTypes.push_back(selfTy);
-            break;
-          }
+          case AutoDiffParameter::Kind::Self:
+            // The 'self' parameter is unsupported by #gradient.
+            TC.diagnose(param.getLoc(),
+                        diag::gradient_expr_parameter_self_unsupported);
+            return nullptr;
           }
         }
       }
