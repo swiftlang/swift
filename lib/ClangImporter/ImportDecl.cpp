@@ -148,7 +148,8 @@ createVarWithPattern(ASTContext &ctx, DeclContext *dc, Identifier name, Type ty,
   Pattern *varPattern = createTypedNamedPattern(var);
   auto *patternBinding = PatternBindingDecl::create(
       ctx, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-      /*VarLoc*/ SourceLoc(), varPattern, /*InitExpr*/ nullptr, dc);
+      /*VarLoc*/ SourceLoc(), varPattern, /*EqualLoc*/ SourceLoc(),
+      /*InitExpr*/ nullptr, dc);
   if (isImplicit)
     patternBinding->setImplicit();
 

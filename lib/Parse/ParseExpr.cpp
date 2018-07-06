@@ -2494,6 +2494,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       Expr *initializer;
       Identifier name;
       SourceLoc nameLoc = Tok.getLoc();
+      SourceLoc equalLoc;
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
@@ -2511,7 +2512,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       } else {
         // Otherwise, the name is a new declaration.
         consumeIdentifier(&name);
-        consumeToken(tok::equal);
+        equalLoc = consumeToken(tok::equal);
 
         auto ExprResult = parseExpr(diag::expected_init_capture_specifier);
         if (ExprResult.isNull())
@@ -2536,10 +2537,10 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
 
       auto pattern = new (Context) NamedPattern(VD, /*implicit*/true);
 
-      auto *PBD = PatternBindingDecl::create(Context, /*staticloc*/SourceLoc(),
-                                             StaticSpellingKind::None,
-                                             nameLoc, pattern, initializer,
-                                             CurDeclContext);
+      auto *PBD = PatternBindingDecl::create(
+          Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
+          /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
+          CurDeclContext);
 
       captureList.push_back(CaptureListEntry(VD, PBD));
     } while (HasNext);
