@@ -575,9 +575,7 @@ namespace {
             paramSpace.push_back(result);
           }
 
-          return Space::forConstructor(this->getType(), this->getHead(),
-                                       this->canDowngradeToWarning(),
-                                       paramSpace);
+          return Space::forDisjunct(paramSpace);
         }
 
         PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
