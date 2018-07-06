@@ -247,14 +247,7 @@ getImplicitMemberReferenceAccessSemantics(Expr *base, VarDecl *member,
 }
 
 void ConstraintSystem::propagateLValueAccessKind(Expr *E, AccessKind accessKind,
-                                                 bool isShallow,
                                                  bool allowOverwrite) {
-  // If solver is set up in "shallow" mode we expect that some of the
-  // sub-expressions are already type-checked which means that they
-  // already have access kind set.
-  if (isShallow && E->hasLValueAccessKind() && !allowOverwrite)
-    return;
-
   E->propagateLValueAccessKind(accessKind,
                                [&](Expr *E) -> Type {
                                  return getType(E);
@@ -425,7 +418,6 @@ namespace {
     DeclContext *dc;
     const Solution &solution;
     bool SuppressDiagnostics;
-    bool IsShallow;
 
     /// Recognize used conformances from an imported type when we must emit
     /// the witness table.
@@ -902,8 +894,7 @@ namespace {
       // will handle this.
       if (record.OpaqueValue && record.OpaqueValue->hasLValueAccessKind())
         cs.propagateLValueAccessKind(record.ExistentialValue,
-                                     record.OpaqueValue->getLValueAccessKind(),
-                                     IsShallow);
+                                     record.OpaqueValue->getLValueAccessKind());
 
       // Form the open-existential expression.
       result = new (tc.Context) OpenExistentialExpr(
@@ -1854,9 +1845,9 @@ namespace {
     
   public:
     ExprRewriter(ConstraintSystem &cs, const Solution &solution,
-                 bool suppressDiagnostics, bool shallow = false)
+                 bool suppressDiagnostics)
         : cs(cs), dc(cs.DC), solution(solution),
-          SuppressDiagnostics(suppressDiagnostics), IsShallow(shallow) {}
+          SuppressDiagnostics(suppressDiagnostics) {}
 
     ConstraintSystem &getConstraintSystem() const { return cs; }
 
@@ -2309,6 +2300,122 @@ namespace {
       return handleStringLiteralExpr(expr);
     }
 
+    // This is kind of weird. The string interpolation protocol only has a
+    // single init(stringInterpolationSegment:) requirement with an
+    // unconstrained generic parameter, but we in fact have an optimization
+    // where if interpolation result type is String and the segment type
+    // confroms to CustomStringConvertible, we use a more specific overload
+    // of init(stringInterpolationSegment:).
+    static ConcreteDeclRef findRightSegmentMemberOverload(
+        SourceLoc loc, Type baseType, Type segmentType,
+        ConstraintSystem &cs) {
+      auto &tc = cs.getTypeChecker();
+
+      auto proto
+        = tc.getProtocol(loc, KnownProtocolKind::CustomStringConvertible);
+
+      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
+                           { tc.Context.Id_stringInterpolationSegment });
+
+      if (tc.conformsToProtocol(segmentType, proto, cs.DC,
+                                (ConformanceCheckFlags::InExpression |
+                                 ConformanceCheckFlags::Used))) {
+        auto results = baseType->getAnyNominal()->lookupDirect(segmentName);
+        for (auto result : results) {
+          auto *ctor = dyn_cast<ConstructorDecl>(result);
+          if (ctor == nullptr)
+            continue;
+
+          auto *genericSig = ctor->getGenericSignature();
+          if (!genericSig || genericSig->getGenericParams().size() != 1)
+            continue;
+
+          auto *genericParam = genericSig->getGenericParams()[0];
+          auto conformsTo = genericSig->getConformsTo(genericParam);
+          if (conformsTo.size() != 1)
+            continue;
+
+          if (conformsTo[0] != proto)
+            continue;
+
+          return ctor;
+        }
+      }
+
+      auto interpolationProto
+        = tc.getProtocol(loc,
+                         KnownProtocolKind::ExpressibleByStringInterpolation);
+
+      auto ref = findNamedWitnessImpl(
+          tc, cs.DC, baseType, interpolationProto, segmentName,
+          diag::interpolation_broken_proto);
+      if (!ref || !isa<ConstructorDecl>(ref.getDecl()))
+        return ConcreteDeclRef();
+
+      return ref;
+    }
+
+    static std::pair<Type, ConcreteDeclRef> buildSubstitutedSegmentMemberRef(
+        ConcreteDeclRef segmentMember,
+        Type segmentType,
+        ConstraintSystem &cs) {
+      auto subs = segmentMember.getSubstitutions();
+      auto segmentMemberType = segmentMember.getDecl()->getInterfaceType();
+
+      // The init(stringInterpolationSegment:) constructor is generic.
+      //
+      // Build a substitution map consisting of the outer generic parameters
+      // of the type itself, together with a substitution for the constructor's
+      // generic parameter.
+      ConcreteDeclRef substSegmentMember;
+
+      // FIXME: This will become less awkward once SubstitutionList goes away.
+      //
+      // Also most of this is overkill unless we have generic conformers of
+      // ExpressibleByStringInterpolation. String is concrete, so parentSubMap
+      // will be empty. But there's no harm in trying to handle the general
+      // case.
+      auto *genericFnType = segmentMemberType->castTo<GenericFunctionType>();
+
+      SubstitutionMap parentSubMap;
+      if (auto *parentSig = segmentMember.getDecl()->getDeclContext()
+          ->getGenericSignatureOfContext()) {
+        parentSubMap = parentSig->getSubstitutionMap(subs);
+      }
+
+      auto *genericSig = genericFnType->getGenericSignature();
+      auto subMap = genericSig->getSubstitutionMap(
+        [&](SubstitutableType *type) -> Type {
+          // This is the segment type. For everything else, we just delegate
+          // to the parentSubMap.
+          if (type->isEqual(genericSig->getGenericParams().back()))
+            return segmentType;
+
+          return Type(type).subst(parentSubMap);
+        },
+        [&](CanType depTy, Type substTy, ProtocolType *proto) {
+          if (depTy->isEqual(genericSig->getGenericParams().back())) {
+            return cs.getTypeChecker().conformsToProtocol(
+                substTy, proto->getDecl(), cs.DC,
+                (ConformanceCheckFlags::InExpression |
+                 ConformanceCheckFlags::Used));
+          }
+          return parentSubMap.lookupConformance(depTy, proto->getDecl());
+        });
+
+      // Pack this down into a SubstitutionList.
+      SmallVector<Substitution, 2> tempSubs;
+      genericSig->getSubstitutions(subMap, tempSubs);
+      segmentMemberType = genericFnType->substGenericArgs(subMap);
+
+      // Build a new ConcreteDeclRef with the segment type substitution.
+      substSegmentMember = ConcreteDeclRef(cs.getASTContext(),
+                                           segmentMember.getDecl(),
+                                           tempSubs);
+
+      return std::make_pair(segmentMemberType, substSegmentMember);
+    }
+
     Expr *
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
       // Figure out the string type we're converting to.
@@ -2331,35 +2438,34 @@ namespace {
             interpolationProto, name,
             diag::interpolation_broken_proto);
 
-      DeclName segmentName(tc.Context, DeclBaseName::createConstructor(),
-                           { tc.Context.Id_stringInterpolationSegment });
-      auto segmentMember
-        = findNamedWitnessImpl(
-            tc, dc, type, interpolationProto, segmentName,
-            diag::interpolation_broken_proto);
       if (!member ||
-          !segmentMember ||
-          !isa<ConstructorDecl>(member.getDecl()) ||
-          !isa<ConstructorDecl>(segmentMember.getDecl()))
-        return nullptr;
+          !isa<ConstructorDecl>(member.getDecl()))
+        return expr;
 
       // Build a reference to the init(stringInterpolation:) initializer.
+      auto subs = member.getSubstitutions();
+      auto memberType = member.getDecl()->getInterfaceType();
+      if (auto *genericFnType = memberType->getAs<GenericFunctionType>())
+        memberType = genericFnType->substGenericArgs(subs);
+
+      auto *declRef =
+        new (tc.Context) DeclRefExpr(member,
+                                     DeclNameLoc(expr->getLoc()),
+                                     /*Implicit=*/true);
+      cs.setType(declRef, memberType);
+
       // FIXME: This location info is bogus.
       auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
                                                    tc.Context);
+      cs.cacheExprTypes(typeRef);
 
-      Expr *memberRef =
-        new (tc.Context) MemberRefExpr(typeRef,
-                                       expr->getStartLoc(),
-                                       member.getDecl(),
-                                       DeclNameLoc(expr->getStartLoc()),
-                                       /*Implicit=*/true);
-      cs.cacheSubExprTypes(memberRef);
-      cs.setSubExprTypes(memberRef);
-      bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-      cs.cacheExprTypes(memberRef);
-      assert(!failed && "Could not reference string interpolation witness");
-      (void)failed;
+      // Apply the self metatype parameter.
+      auto *memberRef =
+        new (tc.Context) ConstructorRefCallExpr(declRef, typeRef);
+      memberRef->setImplicit();
+      auto ctorType =
+        memberType->castTo<FunctionType>()->getResult();
+      cs.setType(memberRef, ctorType);
 
       // Create a tuple containing all of the segments.
       SmallVector<Expr *, 4> segments;
@@ -2370,18 +2476,49 @@ namespace {
       };
 
       for (auto segment : expr->getSegments()) {
-        ApplyExpr *apply =
+        // We need an RValue to call init(stringInterpolationSegment:) with.
+        segment = cs.coerceToRValue(segment);
+
+        auto segmentMember =
+          findRightSegmentMemberOverload(expr->getLoc(), type,
+                                         cs.getType(segment), cs);
+        if (!segmentMember)
+          continue;
+
+        // Build a reference to the init(stringInterpolationSegment:) initializer.
+        Type segmentMemberType;
+        ConcreteDeclRef substSegmentMember;
+
+        std::tie(segmentMemberType, substSegmentMember)
+          = buildSubstitutedSegmentMemberRef(segmentMember,
+                                             cs.getType(segment),
+                                             cs);
+        auto *declRef =
+          new (tc.Context) DeclRefExpr(substSegmentMember,
+                                       DeclNameLoc(expr->getLoc()),
+                                       /*Implicit=*/true);
+        cs.setType(declRef, segmentMemberType);
+
+        // Apply the self metatype parameter.
+        auto ctorType =
+          segmentMemberType->castTo<FunctionType>()->getResult();
+        auto *memberRef =
+          new (tc.Context) ConstructorRefCallExpr(declRef, typeRef);
+        cs.setType(memberRef, ctorType);
+
+        // Apply the arguments.
+        auto *convertedSegment =
           CallExpr::createImplicit(
-            tc.Context, typeRef,
+            tc.Context, memberRef,
             { segment },
             { tc.Context.Id_stringInterpolationSegment }, getType);
-        cs.cacheSubExprTypes(apply);
+        cs.setType(convertedSegment,
+                   ctorType->castTo<FunctionType>()->getResult());
 
-        Expr *convertedSegment = apply;
-        cs.setSubExprTypes(convertedSegment);
-        if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
-          continue;
-        cs.cacheExprTypes(convertedSegment);
+        // FIXME: This will go away once CallExpr stores a list of arguments
+        // instead of a single TupleExpr argument.
+        cs.setType(convertedSegment->getArg(),
+                   convertedSegment->getArg()->getType());
 
         segments.push_back(convertedSegment);
 
@@ -2392,14 +2529,15 @@ namespace {
         }
       }
 
-      // If all of the segments had errors, bail out.
-      if (segments.empty())
-        return nullptr;
-
       // Call the init(stringInterpolation:) initializer with the arguments.
       ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
                                                   segments, names, getType);
-      cs.cacheExprTypes(apply);
+      cs.setType(apply, ctorType->castTo<FunctionType>()->getResult());
+
+      // FIXME: Kill this once ApplyExpr stores a list of arguments instead
+      // of a TupleExpr
+      cs.setType(apply->getArg(), apply->getArg()->getType());
+
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
     }
@@ -3181,8 +3319,7 @@ namespace {
       // case (when we turn the inout into an UnsafePointer) than to try to
       // discover that we're in that case right now.
       if (!cs.getType(expr->getSubExpr())->is<UnresolvedType>())
-        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite,
-                                     IsShallow);
+        cs.propagateLValueAccessKind(expr->getSubExpr(), AccessKind::ReadWrite);
       auto objectTy = cs.getType(expr->getSubExpr())->getRValueType();
 
       // The type is simply inout of whatever the lvalue's object type was.
@@ -3875,8 +4012,7 @@ namespace {
       auto destTy = cs.computeAssignDestType(expr->getDest(), expr->getLoc());
       if (!destTy)
         return nullptr;
-      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write,
-                                   IsShallow);
+      cs.propagateLValueAccessKind(expr->getDest(), AccessKind::Write);
 
       // Convert the source to the simplified destination type.
       auto locator =
@@ -4199,7 +4335,7 @@ namespace {
 
         if (cs.getType(subExpr)->hasLValueType()) {
           // Treat this like a read of the property.
-          cs.propagateLValueAccessKind(subExpr, AccessKind::Read, IsShallow);
+          cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
         }
 
         // Check that we requested a property getter or setter.
@@ -6601,7 +6737,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       // Load from the lvalue. If we're loading the result of a force,
       // swap the order so that we load first and force the result.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
         fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
         auto *loadExpr = cs.cacheType(
@@ -6712,7 +6848,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         // Overwrite the l-value access kind to be read-only if we're
         // converting to a non-mutable pointer type.
         auto *E = cast<InOutExpr>(expr->getValueProvidingExpr())->getSubExpr();
-        cs.propagateLValueAccessKind(E, AccessKind::Read, IsShallow,
+        cs.propagateLValueAccessKind(E, AccessKind::Read,
                                      /*overwrite*/ true);
       }
 
@@ -6820,7 +6956,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // In an 'inout' operator like "i += 1", the operand is converted from
       // an implicit lvalue to an inout argument.
       assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
-      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
       return cs.cacheType(new (tc.Context)
                               InOutExpr(expr->getStartLoc(), expr,
                                         toIO->getObjectType(),
@@ -6839,7 +6975,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     if (performLoad) {
       // Load from the lvalue.
-      cs.propagateLValueAccessKind(expr, AccessKind::Read, IsShallow);
+      cs.propagateLValueAccessKind(expr, AccessKind::Read);
       expr = cs.cacheType(new (tc.Context)
                               LoadExpr(expr, fromLValue->getObjectType()));
 
@@ -7100,7 +7236,7 @@ ExprRewriter::coerceObjectArgumentToType(Expr *expr,
 
   // Use InOutExpr to convert it to an explicit inout argument for the
   // receiver.
-  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite, IsShallow);
+  cs.propagateLValueAccessKind(expr, AccessKind::ReadWrite);
   return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
                                           toInOutTy->getInOutObjectType(),
                                           /*isImplicit*/ true));
@@ -8257,17 +8393,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   if (result)
     rewriter.finalize(result);
 
-  return result;
-}
-
-Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
-                                             Expr *expr,
-                                             bool suppressDiagnostics) {
-  ExprRewriter rewriter(*this, solution, suppressDiagnostics, true);
-  rewriter.walkToExprPre(expr);
-  Expr *result = rewriter.walkToExprPost(expr);
-  if (result)
-    rewriter.finalize(result);
   return result;
 }
 
