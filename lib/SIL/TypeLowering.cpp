@@ -272,13 +272,13 @@ namespace {
       return visitAbstractTypeParamType(type);
     }
 
-    bool hasNativeReferenceCounting(CanType type) {
+    Type getConcreteReferenceStorageReferent(Type type) {
       if (type->isTypeParameter()) {
         auto signature = getGenericSignature();
         assert(signature && "dependent type without generic signature?!");
 
         if (auto concreteType = signature->getConcreteType(type))
-          return hasNativeReferenceCounting(concreteType->getCanonicalType());
+          return concreteType->getCanonicalType();
 
         assert(signature->requiresClass(type));
 
@@ -288,17 +288,14 @@ namespace {
         // at some point the type-checker should prove acyclic-ness.
         auto bound = signature->getSuperclassBound(type);
         if (bound) {
-          return hasNativeReferenceCounting(bound->getCanonicalType());
+          return getConcreteReferenceStorageReferent(bound->getCanonicalType());
         }
 
-        // Ask whether Builtin.UnknownObject uses native reference counting.
         auto &ctx = M.getASTContext();
-        return ctx.TheUnknownObjectType->
-                 usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+        return ctx.TheUnknownObjectType;
       }
 
-      // FIXME: resilience
-      return type->usesNativeReferenceCounting(ResilienceExpansion::Maximal);
+      return type;
     }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -321,7 +318,11 @@ namespace {
                                                IsAddressOnly}); \
     } \
     RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
-      if (type->isLoadable(ResilienceExpansion::Maximal)) { \
+      auto referentType = type->getReferentType(); \
+      auto concreteType = getConcreteReferenceStorageReferent(referentType); \
+      auto &ctx = M.getASTContext(); \
+      if (Name##StorageType::get(concreteType, ctx) \
+            ->isLoadable(ResilienceExpansion::Maximal)) {         \
         return asImpl().visitLoadable##Name##StorageType(type); \
       } else { \
         return asImpl().visitAddressOnly##Name##StorageType(type); \
