@@ -3645,7 +3645,7 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-param-list:
 ///     expr-gradient-param-index (',' expr-gradient-param-index)*
 ///   expr-gradient-param-index:
-///     'self' | '.' [0-9]+
+///     '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
@@ -3687,7 +3687,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
   // If found comma, parse 'wrt:'.
-  SmallVector<AutoDiffParameter, 8> params;
+  SmallVector<AutoDiffIndexParameter, 8> params;
   if (consumeIf(tok::comma)) {
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
@@ -3713,12 +3713,7 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
         if (parseUnsignedInteger(index, paramLoc,
                                  diag::gradient_expr_expected_parameter))
           return true;
-        params.push_back(
-          AutoDiffParameter::getIndexParameter(paramLoc, index));
-        break;
-      case tok::kw_self:
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
+        params.push_back({ paramLoc, index });
         break;
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);
