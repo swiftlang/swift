@@ -133,7 +133,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   case some(Wrapped)
 
   /// Creates an instance that stores the given value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(_ some: Wrapped) { self = .some(some) }
 
@@ -210,7 +209,6 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   ///
   /// In this example, the assignment to the `i` variable calls this
   /// initializer behind the scenes.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(nilLiteral: ()) {
     self = .none
@@ -296,7 +294,6 @@ extension Optional : CustomReflectable {
   }
 }
 
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
@@ -430,7 +427,6 @@ extension Optional: Hashable where Wrapped: Hashable {
 @_fixed_layout
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init(nilLiteral: ()) {
   }
@@ -467,7 +463,6 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to match against `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ~=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
@@ -502,7 +497,6 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ==(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
@@ -534,7 +528,6 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A value to compare to `nil`.
   ///   - rhs: A `nil` literal.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func !=(lhs: Wrapped?, rhs: _OptionalNilComparisonType) -> Bool {
     switch lhs {
@@ -566,7 +559,6 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func ==(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
@@ -598,7 +590,6 @@ extension Optional {
   /// - Parameters:
   ///   - lhs: A `nil` literal.
   ///   - rhs: A value to compare to `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func !=(lhs: _OptionalNilComparisonType, rhs: Wrapped?) -> Bool {
     switch rhs {
@@ -642,7 +633,6 @@ extension Optional {
 ///   - optional: An optional value.
 ///   - defaultValue: A value to use as a default. `defaultValue` is the same
 ///     type as the `Wrapped` type of `optional`.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
     rethrows -> T {
@@ -696,7 +686,6 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///   - optional: An optional value.
 ///   - defaultValue: A value to use as a default. `defaultValue` and
 ///     `optional` have the same type.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
     rethrows -> T? {

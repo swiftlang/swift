@@ -314,7 +314,6 @@ public typealias AnyClass = AnyObject.Type
 /// - Parameters:
 ///   - lhs: A value to compare.
 ///   - rhs: Another value to compare.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func ~= <T : Equatable>(a: T, b: T) -> Bool {
   return a == b

@@ -116,7 +116,6 @@ public struct OpaquePointer {
   }
 
   /// Creates an `OpaquePointer` from a given address in memory.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
@@ -124,7 +123,6 @@ public struct OpaquePointer {
   }
 
   /// Creates an `OpaquePointer` from a given address in memory.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
@@ -132,7 +130,6 @@ public struct OpaquePointer {
   }
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ from: UnsafePointer<T>) {
     self._rawValue = from._rawValue
@@ -141,7 +138,6 @@ public struct OpaquePointer {
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
   ///
   /// The result is `nil` if `from` is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ from: UnsafePointer<T>?) {
     guard let unwrapped = from else { return nil }
@@ -149,7 +145,6 @@ public struct OpaquePointer {
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ from: UnsafeMutablePointer<T>) {
     self._rawValue = from._rawValue
@@ -158,7 +153,6 @@ public struct OpaquePointer {
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
   ///
   /// The result is `nil` if `from` is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ from: UnsafeMutablePointer<T>?) {
     guard let unwrapped = from else { return nil }
