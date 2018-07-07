@@ -397,6 +397,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     // Forward -debug-prefix-map arguments from Swift to Clang as
     // -fdebug-prefix-map. This is required to ensure DIFiles created there,
     // like "<swift-imported-modules>", have their paths remapped properly.
+    // (Note, however, that Clang's usage of std::map means that the remapping
+    // may not be applied in the same order, which can matter if one mapping is
+    // a prefix of another.)
     Opts.ExtraArgs.push_back("-fdebug-prefix-map=" + A);
   }
 

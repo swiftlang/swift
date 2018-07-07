@@ -46,6 +46,11 @@ public:
   /// Returns a remapped `Path` if it starts with a prefix in the map; otherwise
   /// the original path is returned.
   std::string remapPath(StringRef Path) const {
+    // Clang's implementation of this feature also compares the path string
+    // directly instead of treating path segments as indivisible units. The
+    // latter would arguably be more accurate, but we choose to preserve
+    // compatibility with Clang (especially because we propagate the flag to
+    // ClangImporter as well).
     for (const auto &Mapping : PathMappings)
       if (Path.startswith(Mapping.first))
         return (Twine(Mapping.second) +
