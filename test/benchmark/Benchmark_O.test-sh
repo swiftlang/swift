@@ -5,8 +5,8 @@
 
 // RUN: %Benchmark_O --list | %FileCheck %s --check-prefix LISTTAGS
 // LISTTAGS: AngryPhonebook,[
-// LISTTAGS-SAME: TestsUtils.BenchmarkCategory.
-// LISTTAGS-SAME: String
+// LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
+// LISTTAGS-SAME: String,
 // LISTTAGS-SAME: ]
 
 // RUN: %Benchmark_O AngryPhonebook --num-iters=1 \

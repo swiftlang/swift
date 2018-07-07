@@ -69,7 +69,7 @@ struct Test {
 
   /// The benchmark categories that this test belongs to. Used for filtering.
   var tags: [BenchmarkCategory] {
-    return benchInfo.tags
+    return benchInfo.tags.sorted()
   }
 
   /// An optional initialization function for a benchmark that is run before
@@ -181,7 +181,7 @@ struct TestConfig {
 
       // We support specifying multiple tags by splitting on comma, i.e.:
       //
-      //  --tags=array,set
+      //  --tags=Array,Dictionary
       //
       // FIXME: If we used Error instead of .fail, then we could have a cleaner
       // impl here using map on x and tags.formUnion.
@@ -200,7 +200,7 @@ struct TestConfig {
 
       // We support specifying multiple tags by splitting on comma, i.e.:
       //
-      //  --skip-tags=array,set
+      //  --skip-tags=Array,Set,unstable,skip
       //
       // FIXME: If we used Error instead of .fail, then we could have a cleaner
       // impl here using map on x and tags.formUnion.

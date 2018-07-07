@@ -70,6 +70,18 @@ public enum BenchmarkCategory : String {
   case skip
 }
 
+extension BenchmarkCategory : CustomStringConvertible {
+  public var description: String {
+    return self.rawValue
+  }
+}
+
+extension BenchmarkCategory : Comparable {
+    public static func < (lhs: BenchmarkCategory, rhs: BenchmarkCategory) -> Bool {
+        return lhs.rawValue < rhs.rawValue
+    }
+}
+
 public struct BenchmarkPlatformSet : OptionSet {
   public let rawValue: Int
 
