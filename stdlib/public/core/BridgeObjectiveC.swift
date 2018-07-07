@@ -373,7 +373,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 
   public let _rawValue: Builtin.RawPointer
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public // COMPILER_INTRINSIC
   init(_ _rawValue: Builtin.RawPointer) {
@@ -440,7 +439,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<U>(_ from: UnsafeMutablePointer<U>) {
     self._rawValue = from._rawValue
@@ -456,7 +454,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<U>(_ from: UnsafeMutablePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -494,7 +491,6 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
 }
 
 extension AutoreleasingUnsafeMutablePointer: Equatable {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (
     lhs: AutoreleasingUnsafeMutablePointer,
@@ -509,7 +505,6 @@ extension UnsafeMutableRawPointer {
   /// instance.
   ///
   /// - Parameter other: The pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -520,7 +515,6 @@ extension UnsafeMutableRawPointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -533,7 +527,6 @@ extension UnsafeRawPointer {
   /// instance.
   ///
   /// - Parameter other: The pointer to convert.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init<T>(_ other: AutoreleasingUnsafeMutablePointer<T>) {
     _rawValue = other._rawValue
@@ -544,7 +537,6 @@ extension UnsafeRawPointer {
   ///
   /// - Parameter other: The pointer to convert. If `other` is `nil`, the
   ///   result is `nil`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public init?<T>(_ other: AutoreleasingUnsafeMutablePointer<T>?) {
     guard let unwrapped = other else { return nil }
@@ -631,7 +623,6 @@ internal struct _CocoaFastEnumerationStackBuf {
 ///
 /// This is used by the Foundation overlays. The compiler will error if the
 /// passed-in type is generic or not representable in Objective-C
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
   // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is

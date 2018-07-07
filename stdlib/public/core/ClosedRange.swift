@@ -330,7 +330,6 @@ extension Comparable {
   /// - Parameters:
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // trivial-implementation
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     _precondition(
@@ -362,7 +361,6 @@ extension Strideable where Stride: SignedInteger {
   /// - Parameters:)`.
   ///   - minimum: The lower bound for the range.
   ///   - maximum: The upper bound for the range.
-  @inlinable // trivial-implementation
   @_transparent
   public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
     // FIXME: swift-3-indexing-model: tests for traps.

@@ -71,7 +71,6 @@ extension String {
 
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public func _fixLifetime<T>(_ x: T) {
   Builtin.fixLifetime(x)
