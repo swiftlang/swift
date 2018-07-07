@@ -4143,8 +4143,7 @@ public:
                      : LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     ModuleDecl *M = CurrDeclContext->getParentModule();
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
-                                                  TypeResolver.get());
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     M->lookupVisibleDecls({}, FilteringConsumer, NLKind::UnqualifiedLookup);
   }
 
@@ -4159,8 +4158,7 @@ public:
       LookupAccessPath.push_back(
           std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
     }
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this,
-                                                  TypeResolver.get());
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     TheModule->lookupVisibleDecls(LookupAccessPath, FilteringConsumer,
                                   NLKind::UnqualifiedLookup);
   }
