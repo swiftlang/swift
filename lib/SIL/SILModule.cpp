@@ -265,7 +265,9 @@ SILFunction *SILModule::getOrCreateFunction(
     SILLocation loc, StringRef name, SILLinkage linkage,
     CanSILFunctionType type, IsBare_t isBareSILFunction,
     IsTransparent_t isTransparent, IsSerialized_t isSerialized,
-    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope) {
+    ProfileCounter entryCount, IsThunk_t isThunk, SubclassScope subclassScope,
+    // SWIFT_ENABLE_TENSORFLOW
+    bool isAcceleratorFn) {
   assert(!type->isNoEscape() && "Function decls always have escaping types.");
   if (auto fn = lookUpFunction(name)) {
     assert(fn->getLoweredFunctionType() == type);
@@ -274,9 +276,11 @@ SILFunction *SILModule::getOrCreateFunction(
     return fn;
   }
 
-  auto fn = SILFunction::create(*this, linkage, name, type, nullptr, loc,
-                                isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isThunk, subclassScope);
+  auto fn = SILFunction::create(
+      *this, linkage, name, type, nullptr, loc, isBareSILFunction,
+      isTransparent, isSerialized, entryCount, isThunk, subclassScope,
+      InlineDefault, EffectsKind::Unspecified, /*InsertBefore*/ nullptr,
+      /*DebugScope*/ nullptr, isAcceleratorFn);
   fn->setDebugScope(new (*this) SILDebugScope(loc, fn));
   return fn;
 }

@@ -87,14 +87,17 @@ ArrayRef<unsigned> SILReverseDifferentiableAttr::getParamIndices() const {
   };
 }
 
-SILFunction *SILFunction::create(
-    SILModule &M, SILLinkage linkage, StringRef name,
-    CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
-    Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsSerialized_t isSerialized,
-    ProfileCounter entryCount, IsThunk_t isThunk,
-    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
-    SILFunction *insertBefore, const SILDebugScope *debugScope) {
+SILFunction *
+SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
+                    CanSILFunctionType loweredType,
+                    GenericEnvironment *genericEnv, Optional<SILLocation> loc,
+                    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+                    IsSerialized_t isSerialized, ProfileCounter entryCount,
+                    IsThunk_t isThunk, SubclassScope classSubclassScope,
+                    Inline_t inlineStrategy, EffectsKind E,
+                    SILFunction *insertBefore, const SILDebugScope *debugScope,
+                    // SWIFT_ENABLE_TENSORFLOW
+                    bool isAcceleratorFn) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
@@ -105,10 +108,10 @@ SILFunction *SILFunction::create(
     name = entry->getKey();
   }
 
-  auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
-                                isBareSILFunction, isTrans, isSerialized,
-                                entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope);
+  auto fn = new (M) SILFunction(
+      M, linkage, name, loweredType, genericEnv, loc, isBareSILFunction,
+      isTrans, isSerialized, entryCount, isThunk, classSubclassScope,
+      inlineStrategy, E, insertBefore, debugScope, isAcceleratorFn);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -123,7 +126,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          SubclassScope classSubclassScope,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
-                         const SILDebugScope *DebugScope)
+                         const SILDebugScope *DebugScope,
+                         // SWIFT_ENABLE_TENSORFLOW
+                         bool isAcceleratorFn)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
@@ -132,7 +137,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
-      EntryCount(entryCount) {
+      EntryCount(entryCount), isAcceleratorFn(isAcceleratorFn) {
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else

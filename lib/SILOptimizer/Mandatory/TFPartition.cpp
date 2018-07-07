@@ -2219,15 +2219,17 @@ void PartitionCloner::visitCondBranchInst(CondBranchInst *inst) {
   B.setCurrentDebugScope(getOpScope(inst->getDebugScope()));
 
   auto cond = getOpValue(inst->getCondition());
-  auto condTy = cond->getType().getASTType();
+  auto condTy = cond->getType();
 
-  if (auto eltTy = getTensorHandleElementType(condTy)) {
-    assert(eltTy->isBuiltinIntegerType(1) && "expected Tensor<i1>");
-
-    auto name = B.getASTContext().getIdentifier("tf_tensor_to_i1");
-    cond = B.createBuiltin(getOpLocation(inst->getLoc()), name,
-                   SILType::getPrimitiveObjectType(eltTy->getCanonicalType()),
-                           /*substitutionlist*/{}, cond);
+  // Sanity check that `condTy` must be a TensorHandle of $Bool or BuiltIn.i1.
+  bool condIsRightType = false;
+  if (isTensorHandle(condTy)) {
+    auto eltTy = getTensorHandleElementType(condTy.getASTType());
+    condIsRightType = eltTy->isBuiltinIntegerType(1) || eltTy->isBool();
+  }
+  if (!condIsRightType) {
+    condTy.dump();
+    llvm_unreachable("Expected TensorHandle<i1> or TensorHandle<Bool>");
   }
 
   doPostProcess(inst,
@@ -2877,8 +2879,7 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   // %zeroScalarTensor = graph_op "Const"...
   // Both operands have type $TensorHandle<Builtin.Int64>
   // %eq = graph_op "Equal,i,i"(%caseId, %zeroScalarTensor)
-  // %cond = graph_op "tf_tensor_to_i1"(%eq : $TensorHandle<Builtin.Int1>)
-  // cond_br %cond, bb1, bb2
+  // cond_br %eq, bb1, bb2
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
   auto receivedCaseId =
@@ -2938,11 +2939,7 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
       auto *equalComparisonInst =
           BA.createGraphOperation(loc, ctx.getIdentifier(equalOpName), operands,
                                   attributes, {tensorHandleI1Ty});
-      auto *condBrInst = BA.createGraphOperation(
-          loc, ctx.getIdentifier("tf_tensor_to_i1"),
-          /*operands*/ {getSingleValueResult(equalComparisonInst)},
-          /*attributes*/ {}, {boolFieldSILType});
-      condBrOperand = getSingleValueResult(condBrInst);
+      condBrOperand = getSingleValueResult(equalComparisonInst);
     }
 
     // For case `caseId`, the true branch dispatches to the corresponding enum
@@ -4059,7 +4056,11 @@ auto TFFunctionPartition::partition() -> PartitionedTensorProgram {
   auto resultFn = hostFn.getModule().getOrCreateFunction(
       hostFn.getLocation(), hostFn.getName().str() + ".tf", SILLinkage::Private,
       newFnType,
-      /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+      /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized,
+      /*entryCount*/ ProfileCounter(),
+      /*isThunk*/ IsNotThunk,
+      /*subclassScope*/ SubclassScope::NotApplicable,
+      /*isAcceleratorFn*/ true);
 
   PartitionCloner PC(*this, *resultFn, resultProgram.theTensorComputation,
                      tensorFlowModule);

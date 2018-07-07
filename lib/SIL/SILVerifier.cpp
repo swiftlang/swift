@@ -20,6 +20,8 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/TensorFlow.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/DebugUtils.h"
@@ -4097,16 +4099,22 @@ public:
   }
 
   void checkCondBranchInst(CondBranchInst *CBI) {
-    // It is important that cond_br keeps an i1 type. ARC Sequence Opts assumes
-    // that cond_br does not use reference counted values or decrement reference
-    // counted values under the assumption that the instruction that computes
-    // the i1 is the use/decrement that ARC cares about and that after that
-    // instruction is evaluated, the scalar i1 has a different identity and the
-    // object can be deallocated.
-    require(CBI->getCondition()->getType() ==
-             SILType::getBuiltinIntegerType(1,
-                                 CBI->getCondition()->getType().getASTContext()),
-            "condition of conditional branch must have Int1 type");
+    /// SWIFT_ENABLE_TENSORFLOW
+    if (F.getIsAcceleratorFn()) {
+      require(tf::isTensorHandle(CBI->getCondition()->getType().getASTType()),
+              "condition of conditional branch must have TensorHandle<> type");
+    } else {
+      // It is important that cond_br keeps an i1 type. ARC Sequence Opts
+      // assumes that cond_br does not use reference counted values or
+      // decrement reference counted values under the assumption that the
+      // instruction that computes the i1 is the use/decrement that ARC cares
+      // about and that after that instruction is evaluated, the scalar i1 has
+      // a different identity and the object can be deallocated.
+      require(CBI->getCondition()->getType() ==
+                  SILType::getBuiltinIntegerType(
+                      1, CBI->getCondition()->getType().getASTContext()),
+              "condition of conditional branch must have Int1 type");
+    }
 
     require(CBI->getTrueArgs().size() == CBI->getTrueBB()->args_size(),
             "true branch has wrong number of arguments for dest bb");

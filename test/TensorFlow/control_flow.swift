@@ -2,6 +2,28 @@
 
 import TensorFlow
 
+// The operand of cond_br is a TensorHandle<Bool>
+public func testBoolCondForWhile() {
+  let t = Tensor<Float>(1.0)
+  var i = Tensor<Int32>(0)
+  repeat {
+    // expected-warning @+1{{value implicitly copied to the host}}
+    let y = t + t
+    print(y)
+    i += 1
+    // expected-warning @+1{{value implicitly copied to the host}}
+  } while i != Tensor<Int32>(10)
+}
+
+// TODO: currently the loop condition comparison uses scalarized(), which
+// generates send/recv, and uses Reshape. See if we can generate more efficient
+// TF code in our stdlib.
+
+// CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}testBoolCondForWhile{{.*}}
+// CHECK:    bb1(
+// CHECK:      [[COND:%.*]] = builtin "__tfop_Reshape{{.*}} : $TensorHandle<Bool>
+// CHECK:      cond_br [[COND]], bb2, bb3
+
 public enum Pet {
   case bird, cat, dog, fish
 }
