@@ -53,51 +53,34 @@ public func printT(_ message: String) {
 }
 
 extension TestSuite {
-  // Use the three macros CPU, CUDA and TPU to differentiate the 3 associated
-  // backends.
-  // Notes:
-  // 1. When Cuda is enabled, we still run testCPU(). This might change in the
-  // future, as the runtime based on TF C API will place nodes on GPU when GPU
-  // is available.
-  // 2. TPU is mutually exclusive with {CPU, CUDA} (requiring different
-  // hardware).
+  // If the macro TPU is not specified, run the tests with CPU or GPU. Otherwise
+  // use TPU.
+  // For GPU execution, TensorFlow must have been built with --config=cuda,
+  // and a gpu device must be available.
   public func testAllBackends(_ name: String, _ body: @escaping () -> Void) {
-#if CPU
-    testCPU(name, body)
-#endif
-#if CUDA && !TPU
-    testGPU(name, body)
-#endif // CUDA && !TPU
-#if TPU && !CUDA
-    // If CUDA is also defined, don't run the TPU tests.
+#if !TPU
+    testCPUOrGPU(name, body)
+#else
     testTPU(name, body)
-#endif // TPU && !CUDA
+#endif // TPU
   }
-  public func testCPU(_ name: String, _ body: @escaping () -> Void) {
-#if CPU
-    test(name + "_CPU") {
-      _RuntimeConfig.executionMode = .cpu
+  public func testCPUOrGPU(_ name: String, _ body: @escaping () -> Void) {
+#if !TPU
+    test(name + "_CPU_OR_GPU") {
+      _RuntimeConfig.executionMode = .auto
+      _RuntimeConfig.gpuMemoryAllowGrowth = true
       _RuntimeConfig.printsDebugLog = false
       body()
     }
-#endif // CPU
-  }
-  public func testGPU(_ name: String, _ body: @escaping () -> Void) {
-#if CUDA && !TPU
-    test(name + "_GPU") {
-      _RuntimeConfig.executionMode = .gpu
-      _RuntimeConfig.printsDebugLog = false
-      body()
-    }
-#endif // CUDA && !TPU
+#endif // TPU
   }
   public func testTPU(_ name: String, _ body: @escaping () -> Void) {
-#if TPU && !CUDA
+#if TPU
     test(name + "_TPU") {
       _RuntimeConfig.executionMode = .tpu
       _RuntimeConfig.printsDebugLog = false
       body()
     }
-#endif // TPU && !CUDA
+#endif // TPU
   }
 }

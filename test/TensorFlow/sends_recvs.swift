@@ -131,7 +131,7 @@ public func testSendsInALoopGPU() {
 // then sends it to host.
 // CHECK:      bb1
 // CHECK:      builtin "__tfop_tfc.TensorTransfer
-// CHECK:      builtin "__tfop_tfc.SendToHost
+// CHECK:      graph_op "tfc.SendToHost
 
 // In the loop body (a trivial back-edge), we should not need to do transfer,
 // but since we are replicating BB args to BB1 to all devices, there is
@@ -213,9 +213,9 @@ public func test1RecvScalarCPU() {
 //
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test1RecvScalarCPU{{.*}}
 //
-// CHECK:      builtin "__tfop_tfc.SendToHost
+// CHECK:      graph_op "tfc.SendToHost
 // Ideally this generic type should be changed to TensorHandle<Float>
-// CHECK:      [[X2:%.*]] = builtin "__tfop_tfc.RecvFromHost
+// CHECK:      [[X2:%.*]] = graph_op "tfc.RecvFromHost
 // the promoted tensor add on "x.scalar! + 2.0"
 // CHECK:      builtin "__tfop_Add,$in,$in,__device"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
@@ -252,7 +252,7 @@ public func test1RecvScalarGPU() {
 // On receiving x.scalar in CPU, send it to ALL devices, because
 // "+ 2.0" is promoted to run on all devices.
 // CHECK-LABEL: --- TFDevicePartition Cross Device Tensor Transfer Annotation Result: {{.*}}test1RecvScalarGPU{{.*}}
-// CHECK:      builtin "__tfop_tfc.RecvFromHost
+// CHECK:      graph_op "tfc.RecvFromHost
 // CHECK:      string_literal utf8 "/device:CPU:0"
 // CHECK-NEXT: string_literal utf8 "ALL_DEVICES"
 // CHECK-NEXT: builtin "__tfop_tfc.TensorTransfer
@@ -303,8 +303,8 @@ public func test1RecvTensorCPU() {
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test1RecvTensor{{.*}}
 //
-// CHECK:      builtin "__tfop_tfc.SendToHost{{.*}}<TensorHandle<Float>>([[A:%.*]] : $TensorHandle<Float>
-// CHECK:      [[B:%.*]] = builtin "__tfop_tfc.RecvFromHost
+// CHECK:      graph_op "tfc.SendToHost{{.*}}([[A:%.*]] : $TensorHandle<Float>
+// CHECK:      [[B:%.*]] = graph_op "tfc.RecvFromHost
 // CHECK:      builtin "__tfop_Add,$in,$in,T,__device"([[B]] : $TensorHandle<Float>, [[A]] : $TensorHandle<Float>
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test1RecvTensor{{.*}}

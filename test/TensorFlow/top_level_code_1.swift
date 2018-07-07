@@ -41,12 +41,8 @@ let y2 = y*y*y*y
 // CHECK:   [[ADD2:%.*]] = builtin "__tfop_Add,$in,$in,T"([[ADD1]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
 // CHECK:   builtin "__tfop_Sub,$in,$in,T"([[ONE]] : $TensorHandle<Float>, [[ONE]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type) : $TensorHandle<Float>
 // CHECK:   [[TWO:%.*]] = builtin "__tfop_tfc.scalarToTensor
-// CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
-// CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
 // CHECK:   [[MUL1:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[TWO]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
 // CHECK:   [[MUL2:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL1]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
-// CHECK:   strong_retain [[TWO]] : $TensorHandle<Float>
 // CHECK:   [[MUL3:%.*]] = builtin "__tfop_Mul,$in,$in,T"([[MUL2]] : $TensorHandle<Float>, [[TWO]] : $TensorHandle<Float>, {{.*}} : $@thick Float.Type)
 
 // b/76155918

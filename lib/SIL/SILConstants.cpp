@@ -83,6 +83,20 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os.indent(indent) << "]\n";
     return;
   }
+  case RK_Enum: {
+    auto *decl = getEnumValue();
+    os << "enum: ";
+    decl->print(os);
+    return;
+  }
+  case RK_EnumWithPayload: {
+    auto *decl = getEnumValue();
+    os << "enum: ";
+    decl->print(os);
+    os <<", payload: ";
+    getEnumPayloadValue().print(os, indent);
+    return;
+  }
   }
 }
 
@@ -94,14 +108,26 @@ void SymbolicValue::dump() const {
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
-  case RK_UninitMemory: return UninitMemory;
-  case RK_Unknown:      return Unknown;
-  case RK_Metatype:     return Metatype;
-  case RK_Function:     return Function;
-  case RK_Aggregate:    return Aggregate;
-  case RK_Integer:      return Integer;
-  case RK_Float:        return Float;
-  case RK_String:       return String;
+  case RK_UninitMemory:
+    return UninitMemory;
+  case RK_Unknown:
+    return Unknown;
+  case RK_Metatype:
+    return Metatype;
+  case RK_Function:
+    return Function;
+  case RK_Aggregate:
+    return Aggregate;
+  case RK_Enum:
+    return Enum;
+  case RK_EnumWithPayload:
+    return EnumWithPayload;
+  case RK_Integer:
+    return Integer;
+  case RK_Float:
+    return Float;
+  case RK_String:
+    return String;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -138,6 +164,11 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
       results.push_back(elt.cloneInto(allocator));
     return getAggregate(results, allocator);
   }
+  case SymbolicValue::Enum:
+    return SymbolicValue::getEnum(getEnumValue());
+  case SymbolicValue::EnumWithPayload:
+    return SymbolicValue::getEnumWithPayload(getEnumValue(),
+                                             getEnumPayloadValue(), allocator);
   }
 }
 
@@ -419,6 +450,80 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Enums
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// This is the representation of a constant enum value with payload.
+struct alignas(SymbolicValue) EnumWithPayloadSymbolicValue final {
+  /// The enum case.
+  EnumElementDecl *decl;
+
+  SymbolicValue payload;
+
+  /// `payload` must be a constant.
+  static EnumWithPayloadSymbolicValue *
+  create(EnumElementDecl *decl, SymbolicValue payload,
+         llvm::BumpPtrAllocator &allocator) {
+    assert(decl);
+    auto rawMem = allocator.Allocate(sizeof(EnumWithPayloadSymbolicValue),
+                                     alignof(EnumWithPayloadSymbolicValue));
+    //  Placement initialize the EnumWithPayloadSymbolicValue.
+    return ::new (rawMem) EnumWithPayloadSymbolicValue(decl, payload);
+  }
+
+  EnumElementDecl *getEnumDecl() const { return decl; }
+
+  SymbolicValue getPayload() const { return payload; }
+
+private:
+  EnumWithPayloadSymbolicValue() = delete;
+  EnumWithPayloadSymbolicValue(const EnumWithPayloadSymbolicValue &) = delete;
+  EnumWithPayloadSymbolicValue(EnumElementDecl *decl, SymbolicValue payload)
+      : decl(decl), payload(payload) {
+    assert(payload.isConstant());
+  }
+};
+
+/// This returns a constant Symbolic value for the enum case in `decl`.
+SymbolicValue SymbolicValue::getEnum(EnumElementDecl *decl) {
+  assert(decl);
+  SymbolicValue result;
+  result.representationKind = RK_Enum;
+  result.value.enumVal = decl;
+  return result;
+}
+
+/// This returns a constant Symbolic value for the enum case in `decl` with a
+/// payload.
+SymbolicValue
+SymbolicValue::getEnumWithPayload(EnumElementDecl *decl, SymbolicValue payload,
+                                  llvm::BumpPtrAllocator &allocator) {
+  auto enumVal = EnumWithPayloadSymbolicValue::create(decl, payload, allocator);
+  assert(enumVal);
+  SymbolicValue result;
+  result.representationKind = RK_EnumWithPayload;
+  result.value.enumValWithPayload = enumVal;
+  return result;
+}
+
+EnumElementDecl *SymbolicValue::getEnumValue() const {
+  if (representationKind == RK_Enum)
+    return value.enumVal;
+
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->getEnumDecl();
+}
+
+SymbolicValue SymbolicValue::getEnumPayloadValue() const {
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->getPayload();
+}
+
+} // end namespace swift
+
+//===----------------------------------------------------------------------===//
 // Higher level code
 //===----------------------------------------------------------------------===//
 
@@ -494,5 +599,3 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
            diag::tf_op_misuse_note, error)
     .highlight(loc.getSourceRange());
 }
-
-

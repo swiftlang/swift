@@ -1302,76 +1302,32 @@ namespace {
       else {
         int lastIndex = -1;
         for (auto &param : GE->getParameters()) {
-          switch (param.getKind()) {
-          case AutoDiffParameter::Kind::Index: {
-            auto index = param.getIndex();
-            // Indices must be ascending.
-            if (lastIndex >= (int)index) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_indices_not_ascending);
-              return nullptr;
-            }
-            // Indices cannot exceed the number of parameters in the original
-            // function.
-            if (index >= originalParams.size()) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_index_out_of_bounds,
-                          originalTy, originalParams.size());
-              return nullptr;
-            }
-            // The parameter cannot be a reference object or a protocol
-            // existential.
-            auto paramTy = originalParams[index].getType();
-            if (paramTy->isAnyClassReferenceType() ||
-                paramTy->isExistentialType()) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_not_value_type,
-                          paramTy);
-              return nullptr;
-            }
-            lastIndex = index;
-            diffParamTypes.push_back(paramTy);
-            break;
+          auto index = param.index;
+          // Indices must be ascending.
+          if (lastIndex >= (int)index) {
+            TC.diagnose(param.loc,
+                        diag::gradient_expr_parameter_indices_not_ascending);
+            return nullptr;
           }
-          case AutoDiffParameter::Kind::Self: {
-            // Self must come first in the parameter list.
-            if (lastIndex != -1) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_self_not_first);
-              return nullptr;
-            }
-            // To use 'self', #gradient must be located in an instance type
-            // context.
-            auto *method = CurDC->getInnermostMethodContext();
-            // Must be within an instance method to use 'self'.
-            if (!method || !method->isInstanceMember()) {
-              TC.diagnose(param.getLoc(),
-                    diag::gradient_expr_parameter_self_not_in_instance_context);
-              return nullptr;
-            }
-            // 'self' cannot be a reference or existential type.
-            auto *selfDecl = method->getImplicitSelfDecl();
-            auto selfTy = selfDecl->getType();
-            if (selfTy->isAnyClassReferenceType() ||
-                selfTy->isExistentialType()) {
-              TC.diagnose(param.getLoc(),
-                        diag::gradient_expr_parameter_not_value_type, selfTy);
-              return nullptr;
-            }
-            // 'self' type must conform to either FloatingPoint or
-            // VectorNumeric.
-            if (!(TC.isCompatibleWithScalarAutoDiff(selfTy, CurDC) ||
-                  TC.isCompatibleWithVectorAutoDiff(selfTy, CurDC))) {
-              TC.diagnose(param.getLoc(),
-                          diag::gradient_expr_parameter_not_differentiable,
-                          selfTy);
-              return nullptr;
-            }
-            // Collect the type.
-            diffParamTypes.push_back(selfTy);
-            break;
+          // Indices cannot exceed the number of parameters in the original
+          // function.
+          if (index >= originalParams.size()) {
+            TC.diagnose(param.loc,
+                        diag::gradient_expr_parameter_index_out_of_bounds,
+                        originalTy, originalParams.size());
+            return nullptr;
           }
+          // The parameter cannot be a reference object or a protocol
+          // existential.
+          auto paramTy = originalParams[index].getType();
+          if (paramTy->isAnyClassReferenceType() ||
+              paramTy->isExistentialType()) {
+            TC.diagnose(param.loc, diag::gradient_expr_parameter_not_value_type,
+                        paramTy);
+            return nullptr;
           }
+          lastIndex = index;
+          diffParamTypes.push_back(paramTy);
         }
       }
 

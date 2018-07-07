@@ -15,9 +15,6 @@ let _: (Float, Float) -> (value: Float, gradient: (Float, Float)) = #valueAndGra
 let _: (Float, Float) -> Float = #gradient(foo, wrt: .0) // ok
 let _: (Float, Float) -> (value: Float, gradient: Float)
   = #valueAndGradient(foo, wrt: .0) // ok
-let _: (Float, Float) -> (Float, Float) = #gradient(foo, wrt: self, .0) // expected-error {{a 'self' parameter can only be used in an instance declaration}}
-let _: (Float, Float) -> (Float, Float) = #gradient(foo, wrt: self, .0) // expected-error {{a 'self' parameter can only be used in an instance declaration}}
-let _: (Float, Float) -> (Float, Float) = #gradient(foo, wrt: .0, self) // expected-error {{the 'self' parameter must be the first}}
 let _: (Float, Float) -> (Float, Float) = #gradient(foo, wrt: .0, .1) // ok
 let _: (Float, Float) -> (Float, Float, Float) = #gradient(foo, wrt: .0, .1, .2) // expected-error {{the parameter index is out of bounds for type}}
 
@@ -32,14 +29,9 @@ struct S {
 
   func b() {
     let _: (Float) -> Float = #gradient(a) // ok
-    let _: (Float) -> S = #gradient(a, wrt: self) // expected-error {{gradient parameter has non-differentiable type 'S'}}
   }
 
   static func c(_ x: Float) -> Float {}
-
-  static func d() -> Float {
-    let _: (Float) -> S = #gradient(c, wrt: self) // expected-error {{a 'self' parameter can only be used in an instance declaration context}}
-  }
 }
 
 let s = S()
