@@ -186,3 +186,21 @@ public func run_YourTestName(N: Int) {
 
 The current set of tags are defined by the `BenchmarkCategory` enum in
 `TestsUtils.swift` .
+
+Testing the Benchmark Drivers
+-----------------------------
+When working on tests, after the initial build
+````
+swift-source$ ./swift/utils/build-script -R -B
+````
+you can rebuild just the benchmarks:
+````
+swift-source$ export SWIFT_BUILD_DIR=`pwd`/build/Ninja-ReleaseAssert/swift-macosx-x86_64
+swift-source$ ninja -C ${SWIFT_BUILD_DIR} swift-benchmark-macosx-x86_64
+````
+
+When modifying the testing infrastructure, you should verify that your changes
+pass all the tests:
+````
+swift-source$ ./llvm/utils/lit/lit.py -sv ${SWIFT_BUILD_DIR}/test-macosx-x86_64/benchmark
+````
