@@ -590,15 +590,15 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
 
     // SWIFT_ENABLE_TENSORFLOW
     // Returns true if the last type identifier component has been parsed.
-    // Lambda is used only when `isParsingQualifiedDeclName` is true.
-    auto parsedLastComponent = [](Parser &P) {
+    // This function is used only when `isParsingQualifiedDeclName` is true.
+    auto parsedLastComponent = [&] {
       // First, parse a single type identifier component.
-      if (!P.Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+      if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
         return false;
-      P.consumeToken();
+      consumeToken();
 
-      if (P.startsWithLess(P.Tok)) {
-        if (!P.canParseGenericArguments())
+      if (startsWithLess(Tok)) {
+        if (!canParseGenericArguments())
           return false;
       }
 
@@ -606,19 +606,19 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
       // (e.g. `.+` in `Float.+`).
       // If this is encountered, return false so that the type identifier
       // component can be parsed.
-      if (P.startsWithSymbol(P.Tok, '.') && P.Tok.getLength() != 1)
+      if (startsWithSymbol(Tok, '.') && Tok.getLength() != 1)
         return false;
 
       // If the next token is not a period, then this must be the last component
       // in the type identifier.
-      return P.Tok.isNot(tok::period) && P.Tok.isNot(tok::period_prefix);
+      return Tok.isNot(tok::period) && Tok.isNot(tok::period_prefix);
     };
     if (isParsingQualifiedDeclName) {
       BacktrackingScope backtrack(*this);
       // If last type identifier component has been parsed, then the next
       // token is (the start of) the final decl name. Break to stop parsing type
       // components.
-      if (parsedLastComponent(*this))
+      if (parsedLastComponent())
         break;
     }
 
