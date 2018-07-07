@@ -62,6 +62,8 @@ private:
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
+  bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
+                     ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
   bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
 
@@ -324,6 +326,32 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
       return { false, nullptr };
     return { false, E };
 
+  } else if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
+    for (auto &component : KPE->getComponents()) {
+      switch (component.getKind()) {
+      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::Subscript: {
+        auto *decl = component.getDeclRef().getDecl();
+        auto loc = component.getLoc();
+        SourceRange range(loc, loc);
+        passReference(decl, component.getComponentType(), loc, range,
+                      ReferenceMetaData(
+                        (isa<SubscriptDecl>(decl)
+                          ? SemaReferenceKind::SubscriptRef
+                          : SemaReferenceKind::DeclMemberRef),
+                        OpAccess));
+        break;
+      }
+
+      case KeyPathExpr::Component::Kind::Invalid:
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      case KeyPathExpr::Component::Kind::OptionalChain:
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+      case KeyPathExpr::Component::Kind::OptionalForce:
+        break;
+      }
+    }
   } else if (auto *BinE = dyn_cast<BinaryExpr>(E)) {
     // Visit in source order.
     if (!BinE->getArg()->getElement(0)->walk(*this))
@@ -459,31 +487,37 @@ bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
+  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
+}
+
+bool SemaAnnotator::
+passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
+              ReferenceMetaData Data) {
   TypeDecl *CtorTyRef = nullptr;
   ExtensionDecl *ExtDecl = nullptr;
 
   if (auto *TD = dyn_cast<TypeDecl>(D)) {
-    if (!CtorRefs.empty() && Loc.isValid()) {
+    if (!CtorRefs.empty() && BaseNameLoc.isValid()) {
       Expr *Fn = CtorRefs.back()->getFn();
-      if (Fn->getLoc() == Loc.getBaseNameLoc()) {
+      if (Fn->getLoc() == BaseNameLoc) {
         D = extractDecl(Fn);
         CtorTyRef = TD;
       }
     }
 
-    if (!ExtDecls.empty() && Loc.isValid()) {
+    if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
       auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
-      if (ExtTyLoc.isValid() && ExtTyLoc == Loc.getBaseNameLoc()) {
+      if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }
     }
   }
 
-  CharSourceRange Range =
+  CharSourceRange CharRange =
     Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
-                                             Loc.getSourceRange());
-  bool Continue = SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty,
-                                              Data);
+                                             Range);
+  bool Continue = SEWalker.visitDeclReference(D, CharRange, CtorTyRef, ExtDecl,
+                                              Ty, Data);
   if (!Continue)
     Cancelled = true;
   return Continue;
