@@ -374,6 +374,7 @@ typedef enum __swift_stdlib_UBreakIteratorType {
 } __swift_stdlib_UBreakIteratorType;
 
 typedef struct __swift_stdlib_UBreakIterator __swift_stdlib_UBreakIterator;
+typedef struct __swift_stdlib_UText __swift_stdlib_UText;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;
 typedef __swift_int8_t __swift_stdlib_UBool;
 typedef __swift_int32_t __swift_stdlib_UChar32;
@@ -399,10 +400,26 @@ __swift_stdlib_ubrk_open(__swift_stdlib_UBreakIteratorType type,
                          __swift_stdlib_UErrorCode *status);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+void __swift_stdlib_ubrk_setUText(__swift_stdlib_UBreakIterator *bi,
+                                  __swift_stdlib_UText *text,
+                                  __swift_stdlib_UErrorCode *status);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 void __swift_stdlib_ubrk_setText(__swift_stdlib_UBreakIterator *bi,
                                  const __swift_stdlib_UChar *text,
                                  __swift_int32_t textLength,
                                  __swift_stdlib_UErrorCode *status);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UText *
+__swift_stdlib_utext_openUTF8(__swift_stdlib_UText * _Nullable, const char *,
+                              __swift_int64_t, __swift_stdlib_UErrorCode*);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_stdlib_UText *
+__swift_stdlib_utext_openUChars(__swift_stdlib_UText * _Nullable,
+                                const __swift_stdlib_UChar *,
+                                __swift_int64_t, __swift_stdlib_UErrorCode*);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_int32_t __swift_stdlib_ubrk_preceding(__swift_stdlib_UBreakIterator *bi,
