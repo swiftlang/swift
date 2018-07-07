@@ -593,7 +593,7 @@ void SILModule::removeFromZombieList(StringRef Name) {
 
 /// Erase a function from the module.
 void SILModule::eraseFunction(SILFunction *F) {
-  assert(! F->isZombie() && "zombie function is in list of alive functions");
+  assert(!F->isZombie() && "zombie function is in list of alive functions");
   // The owner of the function's Name is the FunctionTable key. As we remove
   // the function from the table we have to store the name string elsewhere:
   // in zombieFunctionNames.
