@@ -35,6 +35,10 @@
 using namespace swift;
 using namespace tf;
 
+static llvm::cl::opt<bool> TFEnsureSingleLoopExit(
+    "tf-ensure-single-loop-exit", llvm::cl::init(false),
+    llvm::cl::desc("Transform loops to have a single exit from header."));
+
 //===----------------------------------------------------------------------===//
 // SESERegionTree Implementation
 //===----------------------------------------------------------------------===//
@@ -133,7 +137,9 @@ namespace {
       canonicalizeAllLoops(&DI, &LI);
       // We need to ensure more invariants as SIL loop canonicalization
       // transformations don't do everything that we need.
-      ensureSingleExitFromLoops();
+      if (TFEnsureSingleLoopExit) {
+        ensureSingleExitFromLoops();
+      }
 
       for (auto *loop : LI)
         processLoop(loop);
