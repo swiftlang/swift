@@ -1707,8 +1707,8 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
                                                             numElements,
                                                             elements,
                                                             arrayInsts))
-    return elementType;
-  return Type();
+    return Type();
+  return elementType;
 }
 
 

@@ -903,9 +903,9 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
       return numElements;
 
     SmallVector<SILValue, 8> elements;
-    if (!ConstExprEvaluator::decodeAllocUninitializedArray(apply,
+    if (ConstExprEvaluator::decodeAllocUninitializedArray(apply,
                             numElements.getIntegerValue().getLimitedValue(),
-                                                           elements,
+                                                          elements,
                                                        /*arrayInsts*/nullptr))
       return SymbolicValue::getUnknown((SILInstruction*)apply,
                                        UnknownReason::Default);
@@ -922,7 +922,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
     auto v = SymbolicValue::getAggregate(elementConstants,
                                          evaluator.getAllocator());
-    //llvm::errs() << "Got it: " << v;
+#if 0   // TODO: Build array representation we don't have yet.
+#endif
     (void)v;
     break;
   }
@@ -1676,7 +1677,7 @@ static bool analyzeArrayInitUses(SILValue v,
 /// Try to decode the specified apply of the _allocateUninitializedArray
 /// function in the standard library.  This attempts to figure out what the
 /// resulting elements will be.  This fills in the elements result and returns
-/// true on success.
+/// false on success.
 ///
 /// If arrayInsts is non-null and if decoding succeeds, this function adds
 /// all of the instructions relevant to the definition of this array into
@@ -1710,7 +1711,7 @@ decodeAllocUninitializedArray(ApplyInst *apply,
 
     auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
     if (!tupleExtract)
-      return false;
+      return true;
     if (arrayInsts) arrayInsts->insert(tupleExtract);
 
     // If this is the array result of _allocateUninitialized, try to determine
@@ -1727,7 +1728,7 @@ decodeAllocUninitializedArray(ApplyInst *apply,
     auto pointer2addr =
     tupleExtract->getSingleUserOfType<PointerToAddressInst>();
     if (!pointer2addr)
-      return false;
+      return true;
     if (arrayInsts) arrayInsts->insert(pointer2addr);
 
     // Okay, process the use list of the pointer_to_address, each user is
@@ -1741,7 +1742,7 @@ decodeAllocUninitializedArray(ApplyInst *apply,
 
         auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
         if (!ili)
-          return false;
+          return true;
 
         index = ili->getValue().getLimitedValue();
         user = iai->getSingleUserOfType<StoreInst>();
@@ -1751,7 +1752,7 @@ decodeAllocUninitializedArray(ApplyInst *apply,
       // stored to yet.
       auto *store = dyn_cast_or_null<StoreInst>(user);
       if (!store || index >= elements.size() || elements[index] != SILValue())
-        return false;
+        return true;
 
       if (arrayInsts) arrayInsts->insert(store);
 
@@ -1765,10 +1766,10 @@ decodeAllocUninitializedArray(ApplyInst *apply,
 
   // Make sure that all of the elements were found.
   if (numElements != 0)
-    return false;
+    return true;
 
   if (hadUnknownUsers && arrayInsts)
     arrayInsts->clear();
 
-  return true;
+  return false;
 }

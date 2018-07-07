@@ -71,10 +71,11 @@ public:
   /// all of the instructions relevant to the definition of this array into
   /// the set.  If decoding fails, then the contents of this set is undefined.
   ///
-  static bool decodeAllocUninitializedArray(ApplyInst *apply,
-                                            uint64_t numElements,
-                                            SmallVectorImpl<SILValue> &elements,
-                                   SmallPtrSet<SILInstruction*, 8> *arrayInsts);
+  static bool
+  decodeAllocUninitializedArray(ApplyInst *apply,
+                                uint64_t numElements,
+                                SmallVectorImpl<SILValue> &elements,
+                                SmallPtrSet<SILInstruction*, 8> *arrayInsts);
 };
 
 } // end namespace tf
