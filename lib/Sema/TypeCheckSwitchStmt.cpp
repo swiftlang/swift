@@ -68,7 +68,7 @@ namespace {
   /// Luc Maranget.
   ///
   /// The main algorithm centers around the computation of the difference and
-  /// the intersection of the "Spaces" given in each case, which reduces the
+  /// the containment of the "Spaces" given in each case, which reduces the
   /// definition of exhaustiveness to checking if the difference of the space
   /// 'S' of the user's written patterns and the space 'T' of the pattern
   /// condition is empty.
@@ -470,155 +470,6 @@ namespace {
         }
       }
 
-      // Returns the intersection of this space with another.  The intersection
-      // is the largest shared subspace occupied by both arguments.
-      Space intersect(const Space &other, TypeChecker &TC,
-                      const DeclContext *DC) const {
-        // The intersection of an empty space is empty.
-        if (this->isEmpty() || other.isEmpty()) {
-          return Space();
-        }
-
-        switch (PairSwitch(getKind(), other.getKind())) {
-        PAIRCASE (SpaceKind::Empty, SpaceKind::Disjunct):
-        PAIRCASE (SpaceKind::Type, SpaceKind::Disjunct):
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::Disjunct):
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Disjunct):
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Disjunct):
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Disjunct): {
-          // S & (S1 || ... || Sn) iff (S & S1) && ... && (S & Sn)
-          SmallVector<Space, 4> intersectedCases;
-          std::transform(
-              other.getSpaces().begin(), other.getSpaces().end(),
-              std::back_inserter(intersectedCases),
-              [&](const Space &s) { return this->intersect(s, TC, DC); });
-          return Space::forDisjunct(intersectedCases);
-        }
-
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Empty):
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Type):
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::Constructor):
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::BooleanConstant):
-        PAIRCASE (SpaceKind::Disjunct, SpaceKind::UnknownCase): {
-          // (S1 || ... || Sn) & S iff (S & S1) && ... && (S & Sn)
-          return other.intersect(*this, TC, DC);
-        }
-        PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
-          // Optimization: The intersection of equal types is that type.
-          if (this->getType()->isEqual(other.getType())) {
-            return other;
-          } else if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
-          } else if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
-          } else {
-            return other;
-          }
-        }
-        PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
-          if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
-          } else {
-            return other;
-          }
-        }
-        PAIRCASE (SpaceKind::Type, SpaceKind::UnknownCase):
-          // Note: This is not technically correct for decomposable types, but
-          // you'd only get "typeSpace - unknownCaseSpace" if you haven't tried
-          // to match any of the decompositions of the space yet. In that case,
-          // we'd rather not expand the type, because it might be infinitely
-          // decomposable.
-          return *this;
-
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::Type):
-          return *this;
-
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::UnknownCase): {
-          SmallVector<Space, 4> newSubSpaces;
-          std::transform(this->getSpaces().begin(), this->getSpaces().end(),
-                         std::back_inserter(newSubSpaces),
-                         [&](const Space &subSpace) {
-                           return subSpace.intersect(other, TC, DC);
-                         });
-          return Space::forConstructor(this->getType(), this->getHead(),
-                                       this->canDowngradeToWarning(),
-                                       newSubSpaces);
-        }
-
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
-          // Optimization: If the heads don't match, the intersection of
-          // the constructor spaces is empty.
-          if (this->getHead() != other.Head) {
-            return Space();
-          }
-          
-          // Special Case: Short circuit patterns without payloads.  Their
-          // intersection is the whole space.
-          if (other.getSpaces().empty()) {
-            return *this;
-          }
-
-          SmallVector<Space, 4> paramSpace;
-          auto i = this->getSpaces().begin();
-          auto j = other.getSpaces().begin();
-          for (; i != this->getSpaces().end() && j != other.getSpaces().end();
-               ++i, ++j) {
-            auto result = i->intersect(*j, TC, DC);
-            // If at least one of the constructor sub-spaces is empty,
-            // it makes the whole space empty as well.
-            if (result.isEmpty()) {
-              return Space();
-            }
-            paramSpace.push_back(result);
-          }
-
-          return Space::forDisjunct(paramSpace);
-        }
-
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Type):
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::Constructor):
-          return other.intersect(*this, TC, DC);
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::UnknownCase):
-          if (other.isAllowedButNotRequired())
-            return other;
-          return *this;
-
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::BooleanConstant):
-          return this->getBoolValue() == other.getBoolValue() ? *this : Space();
-
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Type): {
-          if (other.getType()->isBool()) {
-            return this->getKind() == SpaceKind::BooleanConstant ? *this : Space();
-          }
-
-          if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
-          }
-          return Space();
-        }
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Empty):
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::Constructor):
-        PAIRCASE (SpaceKind::BooleanConstant, SpaceKind::UnknownCase):
-          return Space();
-
-        PAIRCASE (SpaceKind::Type, SpaceKind::BooleanConstant): {
-          return other.intersect(*this, TC, DC);
-        }
-
-        PAIRCASE (SpaceKind::Empty, SpaceKind::BooleanConstant):
-        PAIRCASE (SpaceKind::Constructor, SpaceKind::BooleanConstant):
-        PAIRCASE (SpaceKind::UnknownCase, SpaceKind::BooleanConstant):
-          return Space();
-
-        default:
-          llvm_unreachable("Uncovered pair found while computing intersect?");
-        }
-      }
-
       // Returns the result of subtracting the other space from this space.  The
       // result is empty if the other space completely covers this space, or
       // non-empty if there were any uncovered cases.  The difference of spaces
@@ -645,17 +496,10 @@ namespace {
 
         switch (PairSwitch(this->getKind(), other.getKind())) {
         PAIRCASE (SpaceKind::Type, SpaceKind::Type): {
-          // Optimization: Are the types equal?  If so, the space is covered.
           if (this->getType()->isEqual(other.getType())) {
             return Space();
-          } else if (canDecompose(this->getType(), DC)) {
-            auto decomposition = decompose(TC, DC, this->getType());
-            return decomposition.intersect(other, TC, DC);
-          } else if (canDecompose(other.getType(), DC)) {
-            auto decomposition = decompose(TC, DC, other.getType());
-            return this->intersect(decomposition, TC, DC);
           }
-          return Space();
+          return *this;
         }
         PAIRCASE (SpaceKind::Type, SpaceKind::Constructor): {
           if (canDecompose(this->getType(), DC)) {
@@ -742,11 +586,6 @@ namespace {
                ++i, ++j, ++idx) {
             auto &s1 = *i;
             auto &s2 = *j;
-            // If the intersection of each subspace is ever empty then the
-            // two spaces are disjoint and their difference is the first space.
-            if (s1.intersect(s2, TC, DC).isEmpty()) {
-              return *this;
-            }
 
             // If one constructor parameter doesn't cover the other then we've
             // got to report the uncovered cases in a user-friendly way.
