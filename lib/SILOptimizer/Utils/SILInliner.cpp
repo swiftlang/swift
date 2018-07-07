@@ -248,6 +248,10 @@ void SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
   assert(CallSiteScope && "call site has no scope");
   assert(CallSiteScope->getParentFunction() == &F);
 
+  // Increment the ref count for the inlined function, so it doesn't
+  // get deleted before we can emit abstract debug info for it.
+  CalleeFunction->setInlined();
+
   // If the caller's BB is not the last BB in the calling function, then keep
   // track of the next BB so we always insert new BBs before it; otherwise,
   // we just leave the new BBs at the end as they are by default.
@@ -428,20 +432,12 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
   if (it != InlinedScopeCache.end())
     return it->second;
 
-  auto &M = getBuilder().getModule();
+  auto &M = getBuilder().getFunction().getModule();
   auto InlinedAt =
       getOrCreateInlineScope(CalleeScope->InlinedCallSite);
-
-  auto *ParentFunction = CalleeScope->Parent.dyn_cast<SILFunction *>();
-  if (ParentFunction)
-    ParentFunction = remapParentFunction(
-        M, ParentFunction, SubsMap,
-        CalleeFunction->getLoweredFunctionType()->getGenericSignature(),
-        ForInlining);
-
-  auto *ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
+  auto ParentScope = CalleeScope->Parent.dyn_cast<const SILDebugScope *>();
   auto *InlinedScope = new (M) SILDebugScope(
-      CalleeScope->Loc, ParentFunction,
+      CalleeScope->Loc, CalleeScope->Parent.dyn_cast<SILFunction *>(),
       ParentScope ? getOrCreateInlineScope(ParentScope) : nullptr, InlinedAt);
   InlinedScopeCache.insert({CalleeScope, InlinedScope});
   return InlinedScope;

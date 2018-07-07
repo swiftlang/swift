@@ -70,9 +70,23 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
 
+  /// Used for caching SILDebugScopes without inline information.
+  using LocalScopeHash = std::pair<const void *, const void *>;
+  struct LocalScope : public LocalScopeHash {
+    LocalScope(const SILDebugScope *DS)
+        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
+                          // If there is no parent SIL function use the scope
+                          // pointer as a unique id instead. This is safe
+                          // because such a function could also never have been
+                          // SIL-inlined.
+                          DS->Parent.getOpaqueValue()
+                              ? DS->Parent.getOpaqueValue()
+                              : DS}) {}
+  };
+
   /// Various caches.
   /// @{
-  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
@@ -1634,7 +1648,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     return MainFile;
 
   // Try to find it in the cache first.
-  auto CachedScope = ScopeCache.find(DS);
+  auto CachedScope = ScopeCache.find(LocalScope(DS));
   if (CachedScope != ScopeCache.end())
     return cast<llvm::DIScope>(CachedScope->second);
 
@@ -1646,7 +1660,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     if (!FnScope)
       SILFn->setDebugScope(DS);
 
-    auto CachedScope = ScopeCache.find(FnScope);
+    auto CachedScope = ScopeCache.find(LocalScope(FnScope));
     if (CachedScope != ScopeCache.end())
       return cast<llvm::DIScope>(CachedScope->second);
 
@@ -1658,7 +1672,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
     auto *SP = emitFunction(*SILFn, Fn);
 
     // Cache it.
-    ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
+    ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(SP);
     return SP;
   }
 
@@ -1675,7 +1689,7 @@ llvm::DIScope *IRGenDebugInfoImpl::getOrCreateScope(const SILDebugScope *DS) {
   auto *DScope = DBuilder.createLexicalBlock(Parent, File, L.Line, L.Column);
 
   // Cache it.
-  ScopeCache[DS] = llvm::TrackingMDNodeRef(DScope);
+  ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(DScope);
   return DScope;
 }
 
@@ -1707,7 +1721,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
                                  SILFunctionTypeRepresentation Rep,
                                  SILType SILTy, DeclContext *DeclCtx,
                                  GenericEnvironment *GE) {
-  auto Cached = ScopeCache.find(DS);
+  auto Cached = ScopeCache.find(LocalScope(DS));
   if (Cached != ScopeCache.end()) {
     auto SP = cast<llvm::DISubprogram>(Cached->second);
     // If we created the DISubprogram for a forward declaration,
@@ -1830,7 +1844,7 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   if (!DS)
     return nullptr;
 
-  ScopeCache[DS] = llvm::TrackingMDNodeRef(SP);
+  ScopeCache[LocalScope(DS)] = llvm::TrackingMDNodeRef(SP);
   return SP;
 }
 
@@ -1861,8 +1875,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  // We cannot yet represent opened existentials.
-  if (DbgTy.Type->hasOpenedExistential())
+  // Currently, the DeclContext is needed to mangle archetypes. Bail out if
+  // it's missing.
+  if (DbgTy.Type->hasArchetype() && !DbgTy.DeclCtx)
     return;
 
   if (!DbgTy.size)

@@ -351,7 +351,6 @@ private:
     case Node::Kind::GenericSpecialization:
     case Node::Kind::GenericSpecializationNotReAbstracted:
     case Node::Kind::GenericSpecializationParam:
-    case Node::Kind::InlinedGenericFunction:
     case Node::Kind::GenericTypeMetadataPattern:
     case Node::Kind::Getter:
     case Node::Kind::Global:
@@ -1181,9 +1180,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::GenericSpecializationNotReAbstracted:
     printSpecializationPrefix(Node, "generic not re-abstracted specialization");
-    return nullptr;
-  case Node::Kind::InlinedGenericFunction:
-    printSpecializationPrefix(Node, "inlined generic function");
     return nullptr;
   case Node::Kind::SpecializationIsFragile:
     Printer << "preserving fragile attribute";
