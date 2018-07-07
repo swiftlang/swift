@@ -3934,6 +3934,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
                     Optional<ProtocolConformanceRef> witnessMethodConformance) {
   assert(coroutineKind == SILCoroutineKind::None || normalResults.empty());
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
+  assert(!ext.isPseudogeneric() || genericSig);
 
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee,

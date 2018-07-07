@@ -1011,7 +1011,9 @@ static CanSILFunctionType getSILFunctionType(
   if (extInfo.hasContext())
     calleeConvention = conventions.getCallee();
 
-  bool pseudogeneric = (constant ? isPseudogeneric(*constant) : false);
+  bool pseudogeneric = genericSig && constant
+    ? isPseudogeneric(*constant)
+    : false;
 
   // NOTE: SILFunctionType::ExtInfo doesn't track everything that
   // AnyFunctionType::ExtInfo tracks. For example: 'throws' or 'auto-closure'
@@ -2374,8 +2376,12 @@ public:
       witnessMethodConformance =
           conformance->subst(selfType, Subst, Conformances);
     }
+    
+    // The substituted type is no longer generic, so it'd never be
+    // pseudogeneric.
+    auto extInfo = origType->getExtInfo().withIsPseudogeneric(false);
 
-    return SILFunctionType::get(nullptr, origType->getExtInfo(),
+    return SILFunctionType::get(nullptr, extInfo,
                                 origType->getCoroutineKind(),
                                 origType->getCalleeConvention(), substParams,
                                 substYields, substResults, substErrorResult,
