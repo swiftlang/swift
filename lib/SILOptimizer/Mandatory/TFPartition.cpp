@@ -2801,27 +2801,10 @@ SILFunction *PartitionCloner::lookupSendReceiveFunction(StringRef fnName,
   return fn;
 }
 
-/// A wrapper over SwitchEnumInst, which treats its optional default case just
-/// like the other cases.
-class SwitchEnumCaseIterator {
-public:
-    SwitchEnumCaseIterator(SwitchEnumInst *inst) : inst(inst) {}
-
-    unsigned getNumCases() const {
-      return inst->hasDefault() ? inst->getNumCases() + 1 : inst->getNumCases();
-    }
-
-    SILBasicBlock *getCaseBB(unsigned i) const {
-      assert(i < getNumCases());
-      if (i < inst->getNumCases()) return inst->getCase(i).second;
-
-      assert(inst->hasDefault());
-      return inst->getDefaultBB();
-    }
-
-private:
-  SwitchEnumInst *const inst;
-};
+static SILBasicBlock *getLastSuccessorBlock(TermInst *inst) {
+  auto lastIt = inst->getSuccessorBlocks().end();
+  return *--lastIt;
+}
 
 /// The partitioned code is illustrated by the snippet below:
 ///
@@ -2868,10 +2851,9 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
                    "from Swift to TensorFlow.");
 
   // Create the host->accelerator sends in the host code.
-  // If the optional default case exists, we handle it like any other case.
-  SwitchEnumCaseIterator caseIt(inst);
-  for (unsigned i = 0, e = caseIt.getNumCases(); i != e; ++i) {
-    auto *caseBB = caseIt.getCaseBB(i);
+  unsigned caseId = 0;
+  for (auto *caseBB : inst->getSuccessorBlocks()) {
+    // auto *caseBB = caseEntry.value();
     SILBuilder BH(caseBB); // Builder for host.
 
     // The send is at the beginning of each caseBB.
@@ -2879,11 +2861,13 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
     auto loc = caseBB->front().getLoc();
     // `caseId` must be of a type conforming to `AccelerableByTensorFlow`, so we
     // chose Int64 here.
-    auto caseId = createSomeIntegerValue(i, BH, loc, intDecl);
+    auto caseIdInst =
+        createSomeIntegerValue(caseId /*caseEntry.index()*/, BH, loc, intDecl);
 
-    createHostSend(BH, loc, caseId, tensorComputation, nextSendID,
+    createHostSend(BH, loc, caseIdInst, tensorComputation, nextSendID,
                    tensorFlowModule, FP.hostFn.getModule(),
                    createScalarTensorFn, sendFn);
+    ++caseId;
   }
 
   // In accelerator, first recv the caseId from host, and then dispatch to the
@@ -2908,13 +2892,14 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
 
   // Let K be the total # cases (including the optional default case). Create a
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
-  for (unsigned i = 0, e = caseIt.getNumCases() - 1; i != e; ++i) {
+  caseId = 0;
+  for (auto *caseBB : inst->getSuccessorBlocks()) {
     // Create a scalar const tensor i, to compare with case id.
     SILValue constTensorWithCaseId;
     {
       std::string constOpName = "Const";
       SmallVector<GraphOperationAttribute, 2> attributes;
-      createConstTensorAttrsOnAccel(i, intFieldSILType, loc, ctx, BA,
+      createConstTensorAttrsOnAccel(caseId, intFieldSILType, loc, ctx, BA,
                                     constOpName, attributes);
       FP.configuration.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
@@ -2960,23 +2945,30 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
       condBrOperand = getSingleValueResult(condBrInst);
     }
 
-    // For case `i`, the true branch dispatches to the corresponding enum
+    // For case `caseId`, the true branch dispatches to the corresponding enum
     // caseBB. For the false branch:
-    // - When `i` is not `e` - 1 (recall `e` points to the last case), we create
-    // a new BB for it, which evaluates the next cond_br on case `i` + 1
-    // - Otherwise, the false branch dispatches to the last enum caseBB.
-    auto *falseBB = i < e - 1 ? BA.getFunction().createBasicBlock()
-                              : getOpBasicBlock(caseIt.getCaseBB(e));
+    // - When `caseId` is the second to last case, the false branch dispatches
+    // to the last case.
+    // - Otherwise, we create a new BB for it, which evaluates the next cond_br
+    // on case `caseId` + 1
+    auto isSecondToLastBlock = (caseId == inst->getNumSuccessors() - 2);
+    auto *falseBB = isSecondToLastBlock
+                        ? getOpBasicBlock(getLastSuccessorBlock(inst))
+                        : BA.getFunction().createBasicBlock();
     //
     // The args for the true and false BBs are always sent from host to
     // accelerator, so no BB args for them here.
-    BA.createCondBranch(loc, condBrOperand,
-                        getOpBasicBlock(caseIt.getCaseBB(i)),
+    BA.createCondBranch(loc, condBrOperand, getOpBasicBlock(caseBB),
                         /*TrueArgs*/ OperandValueArrayRef(), falseBB,
                         /*FalseArgs*/ OperandValueArrayRef(), ProfileCounter(),
                         ProfileCounter());
-    if (i < e - 1)
-      BA.setInsertionPoint(falseBB);
+
+    // We've covered all cases that we want to  dispatch to.
+    if (isSecondToLastBlock)
+      break;
+
+    BA.setInsertionPoint(falseBB);
+    ++caseId;
   }
 
   ++nextSendID;
