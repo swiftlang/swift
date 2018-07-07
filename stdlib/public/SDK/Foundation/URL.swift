@@ -295,10 +295,10 @@ public struct URLResourceValues {
     public var volumeLocalizedFormatDescription : String? { return _get(.volumeLocalizedFormatDescriptionKey) }
     
     /// Total volume capacity in bytes.
-    public var volumeTotalCapacity : Int? { return _get(.volumeTotalCapacityKey) }
+    public var volumeTotalCapacity : Int64? { return _get(.volumeTotalCapacityKey) }
     
     /// Total free space in bytes.
-    public var volumeAvailableCapacity : Int? { return _get(.volumeAvailableCapacityKey) }
+    public var volumeAvailableCapacity : Int64? { return _get(.volumeAvailableCapacityKey) }
     
 #if os(macOS) || os(iOS)
     /// Total available capacity in bytes for "Important" resources, including space expected to be cleared by purging non-essential and cached resources. "Important" means something that the user or application clearly expects to be present on the local system, but is ultimately replaceable. This would include items that the user has explicitly requested via the UI, and resources that an application requires in order to provide functionality.
@@ -362,7 +362,7 @@ public struct URLResourceValues {
     public var volumeIsBrowsable : Bool? { return _get(.volumeIsBrowsableKey) }
 
     /// The largest file size (in bytes) supported by this file system, or nil if this cannot be determined. 
-    public var volumeMaximumFileSize : Int? { return _get(.volumeMaximumFileSizeKey) }
+    public var volumeMaximumFileSize : Int64? { return _get(.volumeMaximumFileSizeKey) }
 
     /// true if the volume's media is ejectable from the drive mechanism under software control. 
     public var volumeIsEjectable : Bool? { return _get(.volumeIsEjectableKey) }
@@ -495,22 +495,22 @@ public struct URLResourceValues {
     /// Total file size in bytes
     ///
     /// - note: Only applicable to regular files.
-    public var fileSize : Int? { return _get(.fileSizeKey) }
+    public var fileSize : Int64? { return _get(.fileSizeKey) }
     
     /// Total size allocated on disk for the file in bytes (number of blocks times block size)
     ///
     /// - note: Only applicable to regular files.
-    public var fileAllocatedSize : Int? { return _get(.fileAllocatedSizeKey) }
+    public var fileAllocatedSize : Int64? { return _get(.fileAllocatedSizeKey) }
     
     /// Total displayable size of the file in bytes (this may include space used by metadata), or nil if not available.
     ///
     /// - note: Only applicable to regular files.
-    public var totalFileSize : Int? { return _get(.totalFileSizeKey) }
+    public var totalFileSize : Int64? { return _get(.totalFileSizeKey) }
     
     /// Total allocated size of the file in bytes (this may include space used by metadata), or nil if not available. This can be less than the value returned by `totalFileSize` if the resource is compressed.
     ///
     /// - note: Only applicable to regular files.
-    public var totalFileAllocatedSize : Int? { return _get(.totalFileAllocatedSizeKey) }
+    public var totalFileAllocatedSize : Int64? { return _get(.totalFileAllocatedSizeKey) }
 
     /// true if the resource is a Finder alias file or a symlink, false otherwise
     ///
