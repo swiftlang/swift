@@ -74,13 +74,11 @@ std::string SpecializationMangler::finalize() {
 //                           Generic Specialization
 //===----------------------------------------------------------------------===//
 
-std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
+std::string GenericSpecializationMangler::mangle() {
   beginMangling();
-
-  if (!Sig) {
-    SILFunctionType *FTy = Function->getLoweredFunctionType();
-    Sig = FTy->getGenericSignature();
-  }
+  
+  SILFunctionType *FTy = Function->getLoweredFunctionType();
+  CanGenericSignature Sig = FTy->getGenericSignature();
 
   bool First = true;
   for (auto ParamType : Sig->getSubstitutableParams()) {
@@ -88,11 +86,8 @@ std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
     appendListSeparator(First);
   }
   assert(!First && "no generic substitutions");
-
-  if (isInlined)
-    appendSpecializationOperator("Ti");
-  else
-    appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
+  
+  appendSpecializationOperator(isReAbstracted ? "Tg" : "TG");
   return finalize();
 }
 
