@@ -178,8 +178,7 @@ public func test_bool_param(cond: Bool, // expected-warning {{'cond' implicitly 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}test_bool_param{{.*}}
 // CHECK: sil private @{{.*}}test_bool_param{{.*}} : $@callee_owned (TensorHandle<Builtin.Int1>, TensorHandle<Float>, TensorHandle<Float>) -> TensorHandle<Float>
 // CHECK: bb0(%0 : $TensorHandle<Builtin.Int1>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Float>):
-// CHECK: %3 = builtin "tf_tensor_to_i1"(%0 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK: cond_br %3, bb2, bb1
+// CHECK: cond_br %0, bb2, bb1
 
 
 // CHECK-LABEL: --- TFPartition Host Result: {{.*}}test_bool_param{{.*}}
@@ -213,8 +212,7 @@ public func test_bool_param2(cond: Bool, // expected-warning {{'cond' implicitly
 // CHECK: sil private @{{.*}}test_bool_param2{{.*}}
 // CHECK: bb0(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, %2 : $TensorHandle<Builtin.Int1>):
 // CHECK:         builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
-// CHECK-NEXT:    [[BOOL:%.*]] = builtin "tf_tensor_to_i1"(%2 : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK-NEXT:    cond_br [[BOOL]]
+// CHECK-NEXT:    cond_br %2
 // ...
 // CHECK: }
 
@@ -277,15 +275,13 @@ public func test_while1(maxCount: Int,  // expected-warning {{'maxCount' implici
 // CHECK-NEXT: integer_literal $Builtin.Int32, 9
 // CHECK:      builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
 // CHECK:      builtin "__tfop_Add,$in,$in,T,__device"(%0 : $TensorHandle<Float>, %1 : $TensorHandle<Float>
-// CHECK-NEXT: builtin "tf_tensor_to_i1"(
 // CHECK-NEXT: cond_br {{.*}}, bb2, bb1
 
 // CHECK: bb3([[A:%.*]] : $TensorHandle<Float>, [[COUNT:%.*]] : $TensorHandle<Builtin.Int64>):
 // CHECK:       [[NEXTA:%.*]] = builtin "__tfop_Sub,$in,$in,T,__device"([[A]] : $TensorHandle<Float>, %1 : $TensorHandle<Float>, {{.*}}) : $TensorHandle<Float>
 // CHECK:       [[NEXTCOUNT:%.*]] = builtin "__tfop_Add,$in,$in,__device"([[COUNT]] : $TensorHandle<Builtin.Int64>,
 // CHECK:       [[CONDT:%.*]] = builtin "__tfop_Less,$in,$in,__device"([[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>,
-// CHECK-NEXT:   [[COND:%.*]] = builtin "tf_tensor_to_i1"([[CONDT]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
-// CHECK-NEXT:   cond_br [[COND]], bb5, bb4
+// CHECK-NEXT:   cond_br [[CONDT]], bb5, bb4
 
 // CHECK: bb5:
 // CHECK-NEXT: br bb3([[NEXTA]] : $TensorHandle<Float>, [[NEXTCOUNT]] : $TensorHandle<Builtin.Int64>)

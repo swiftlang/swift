@@ -282,6 +282,10 @@ private:
   /// serialization.
   bool WasDeserializedCanonical = false;
 
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// True if this function is to be lowered to Accelerator.
+  bool isAcceleratorFn;
+
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
@@ -289,7 +293,9 @@ private:
               ProfileCounter entryCount, IsThunk_t isThunk,
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
               EffectsKind E, SILFunction *insertBefore,
-              const SILDebugScope *debugScope);
+              const SILDebugScope *debugScope,
+              /// SWIFT_ENABLE_TENSORFLOW
+              bool isAcceleratorFn = false);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
@@ -301,7 +307,9 @@ private:
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
-         const SILDebugScope *DebugScope = nullptr);
+         const SILDebugScope *DebugScope = nullptr,
+         /// SWIFT_ENABLE_TENSORFLOW
+         bool isAcceleratorFn = false);
 
 public:
   ~SILFunction();
@@ -882,6 +890,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Miscellaneous
   //===--------------------------------------------------------------------===//
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  bool getIsAcceleratorFn() const { return isAcceleratorFn; }
 
   /// verify - Run the IR verifier to make sure that the SILFunction follows
   /// invariants.

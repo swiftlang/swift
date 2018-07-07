@@ -542,7 +542,9 @@ public:
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
-      SubclassScope subclassScope = SubclassScope::NotApplicable);
+      SubclassScope subclassScope = SubclassScope::NotApplicable,
+      /// SWIFT_ENABLE_TENSORFLOW
+      bool isAcceleratorFn = false);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.

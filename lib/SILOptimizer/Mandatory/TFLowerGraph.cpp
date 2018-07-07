@@ -817,11 +817,6 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
 //===----------------------------------------------------------------------===//
 
 GLStatus TFGraphLowering::visitBuiltinInst(BuiltinInst *inst) {
-  // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
-  // the only user of it are things that take conditional branches, and they
-  // handle it directly.
-  if (inst->getName().str() == "tf_tensor_to_i1")
-    return GLStatus::Success;
   if (inst->getName().str().startswith(
           "__tfop_tfc.makeIteratorGetNextWithDatasets"))
     return visitTFDataset(inst);
@@ -1653,12 +1648,6 @@ bool TFGraphLowering::copyGraphFunctions(const std::vector<char> &graphDefProto,
 /// Lower a graph_op into the TensorFlow op node.
 ///
 GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
-  // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
-  // the only user of it are things that take conditional branches, and they
-  // handle it directly.
-  if (inst->getName().str() == "tf_tensor_to_i1")
-    return GLStatus::Success;
-
   auto &graphFn = getCurrentGraphFunction();
 
   // Decode information about the graph_op.
@@ -2350,22 +2339,6 @@ GLStatus TFGraphLowering::lowerSequenceRegion(SequenceSESERegion *r) {
 static TF_Output getCondition(CondBranchInst *condBr,
                               TFGraphLowering &lowering) {
   auto cond = condBr->getCondition();
-  SILInstruction *tensorToI1 = nullptr;
-  // TODO: remove the case of BuiltinInst.
-  if (auto *builtinInst = dyn_cast<BuiltinInst>(cond)) {
-    assert(builtinInst->getName().str() == "tf_tensor_to_i1");
-    tensorToI1 = builtinInst;
-  } else {
-    auto *graphOpResult = cast<GraphOperationResult>(cond);
-    auto *graphOpInst = graphOpResult->getParent();
-    assert(graphOpInst->getNumResults() == 1);
-    assert(graphOpInst->getName().str() == "tf_tensor_to_i1");
-    tensorToI1 = graphOpInst;
-  }
-  assert(tensorToI1->getNumOperands() == 1 &&
-         "unexpected branch condition in graph lowering");
-  cond = tensorToI1->getOperand(0);
-
   // Get the graph node that corresponds to the condition.
   return lowering.getOperandValue(cond);
 }
@@ -2642,8 +2615,8 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   GLStatus S = lowerBasicBlock(r->getBranchBB(), /*skipTerminator:*/ true);
   if (S != GLStatus::Success) return S;
 
-  // The branch block should end with a conditional branch on a tf_tensor_to_i1
-  // invocation.
+  // The branch block should end with a conditional branch on an operand of type
+  // TensorHandle<Bool> or TensorHandle<Builtin.i1>.
   auto condBr = cast<CondBranchInst>(r->getBranchBB()->getTerminator());
   auto loc = condBr->getDebugLocation();
 

@@ -147,9 +147,8 @@ class DevicePartitionCloner
       return;
     }
 
-    // Other kinds of builtins such as "tf_tensor_to_i1" are cloned over
-    // directly.
-    SILClonerWithScopes::visitBuiltinInst(inst);
+    inst->dump();
+    llvm_unreachable("The above tfop inst cannot be decoded.");
   }
 
   // These get special handling, they are only used as operands to tfops.
@@ -270,12 +269,6 @@ class DevicePartitionCloner
 }  // end anonymous namespace
 
 void DevicePartitionCloner::visitGraphOperationInst(GraphOperationInst *inst) {
-  // TODO: try and remove this special case.
-  if (inst->getName().str() == "tf_tensor_to_i1") {
-    SILClonerWithScopes::visitGraphOperationInst(inst);
-    return;
-  }
-
   // TODO: visitTensorTransferInst?
 
   GraphOperationInfo decoder(inst);
@@ -618,7 +611,11 @@ class DevicePartitionerImpl
                                ".device_partition";
     auto resultFn = srcFn.getModule().getOrCreateFunction(
         srcFn.getLocation(), resultFnName, SILLinkage::Private, newFnType,
-        /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized);
+        /*What's this*/ IsBare, IsNotTransparent, IsNotSerialized,
+        /*entryCount*/ ProfileCounter(),
+        /*isThunk*/ IsNotThunk,
+        /*subclassScope*/ SubclassScope::NotApplicable,
+        /*isAcceleratorFn*/ true);
 
     DevicePartitionCloner PC(srcFn, configuration, deviceType,
                              instByDevice[(unsigned)deviceType], *resultFn);
@@ -633,10 +630,6 @@ class DevicePartitionerImpl
   void visitBuiltinInst(BuiltinInst *inst) {
     if (auto tfopInfo = SILTensorOpInfo::decode(inst))
       return visitTFOpInst(inst, tfopInfo.getValue());
-
-    // For this magic builtin, it will be handled in graph lowering directly.
-    if (inst->getName().str() == "tf_tensor_to_i1")
-      return;
 
     inst->dump();
     llvm_unreachable(
@@ -656,10 +649,6 @@ class DevicePartitionerImpl
   }
 
   void visitGraphOperationInst(GraphOperationInst *inst) {
-    // For this magic builtin, it will be handled in graph lowering directly.
-    if (inst->getName().str() == "tf_tensor_to_i1")
-      return;
-
     auto deviceType = GraphOperationInfo(inst).getDeviceType();
     markInstForDevice(deviceType, inst);
 
