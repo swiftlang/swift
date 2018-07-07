@@ -492,6 +492,9 @@ private:
     static Type decodeArrayElements(SILValue value,
                                     SmallVectorImpl<SILValue> &elements,
                         SmallPtrSet<SILInstruction*, 8> *arrayInsts = nullptr);
+
+  private:
+    void assertWithDump(bool cond, const char *assertMsg) const;
   };
 
   //===--------------------------------------------------------------------===//

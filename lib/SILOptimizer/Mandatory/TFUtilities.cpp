@@ -1620,8 +1620,16 @@ canonicalizeOperands(GraphGlobalConfiguration &configuration) {
 /// exist.
 StringRef GraphOperationInfo::getDeviceString() const {
   auto attr = inst->getAttribute(DEVICE_ATTR);
-  assert(attr.hasValue() && "Tensor op instruction has no device string");
+  assertWithDump(attr.hasValue(), "Tensor op instruction has no device string");
   return attr.getValue().getStringValue();
+}
+
+void GraphOperationInfo::assertWithDump(bool cond,
+                                        const char *assertMsg) const {
+  if (cond)
+    return;
+  inst->dump();
+  llvm_unreachable(assertMsg);
 }
 
 /// Decode the name of a graph_op into its TensorFlow op name and a list of
@@ -1636,14 +1644,15 @@ decodeName(SmallVectorImpl<InputMarker> &inputInfo) {
     name = name.drop_front(pos+1);
     pos = name.find(',');
     auto letter = name.substr(0, pos);
-    assert(letter.size() == 1 && "malformed graph_op instruction");
+    assertWithDump(letter.size() == 1, "malformed graph_op instruction");
     InputMarker kind;
     switch (letter[0]) {
     case 's': kind = InputMarker::IM_Scalar; break;
     case 'i': kind = InputMarker::IM_Normal; break;
     case 'L': kind = InputMarker::IM_InputList; break;
     case 'e': kind = InputMarker::IM_InputListElt; break;
-    default: assert(0 && "malformed graph_op instruction");
+    default:
+      assertWithDump(false, "malformed graph_op instruction");
     }
     inputInfo.push_back(kind);
   }

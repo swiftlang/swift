@@ -2321,7 +2321,7 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
 /// `operands` with the attributes of that const tensor inst, which caller will
 /// then use to finish creating the inst.
 // TODO: migrate to the new graph op inst.
-static void createConstTensorAttrsOnAccel(
+static void createConstTensorAttrsOnAccelLegacy(
     SingleValueInstruction *hostLiteralInst, SILLocation loc, ASTContext &ctx,
     SILBuilder &B, std::string &opName, SmallVectorImpl<SILValue> &operands) {
   // Literals take attributes specifying the dtype and value.
@@ -2336,6 +2336,19 @@ static void createConstTensorAttrsOnAccel(
   auto ourCst = hostLiteralInst->clone(dtypeCst);
   ourCst->setDebugLocation(B.getSILDebugLocation(loc));
   operands.push_back(ourCst);
+}
+
+static void createConstTensorAttrsOnAccel(
+    unsigned constVal, SILType valTy, SILLocation loc, ASTContext &ctx,
+    SILBuilder &B, std::string &opName,
+    SmallVectorImpl<GraphOperationAttribute> &attributes) {
+  // Literals take attributes specifying the dtype and value.
+  attributes.push_back(
+      {ctx.getIdentifier("dtype$dtype"),
+       SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
+  attributes.push_back({ctx.getIdentifier("value$tensor"),
+                        SymbolicValue::getInteger(APInt(/*width*/ 32, constVal),
+                                                  ctx.getAllocator())});
 }
 
 /// Given a primitive scalar instruction like a literal or an LLVM IR
@@ -2393,7 +2406,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     opName += ",$in,$in";
     break;
   case PromotedScalarKind::Literal: {
-    createConstTensorAttrsOnAccel(inst, loc, ctx, B, opName, operands);
+    createConstTensorAttrsOnAccelLegacy(inst, loc, ctx, B, opName, operands);
     break;
   }
   case PromotedScalarKind::Conversion: {
@@ -2546,6 +2559,11 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
   return B.createBuiltin(loc, name, valueTy, subMap, operands);
 }
 
+static SILValue getSingleValueResult(GraphOperationInst *inst) {
+  assert(inst->getNumResults() == 1);
+  return inst->getResults()[0];
+}
+
 static SILValue createAcceleratorReceiveViaGraphOp(
     SILBuilder &B, SILLocation loc, SILType valueTy, bool isScalar,
     unsigned idNumber, GraphGlobalConfiguration &configuration) {
@@ -2565,8 +2583,7 @@ static SILValue createAcceleratorReceiveViaGraphOp(
 
   auto *inst = B.createGraphOperation(loc, ctx.getIdentifier(instName),
                                       /*operands*/ {}, attributes, {valueTy});
-  assert(inst->getNumResults() == 1);
-  return inst->getResult(0);
+  return getSingleValueResult(inst);
 }
 
 static void
@@ -2872,11 +2889,11 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   // In accelerator, first recv the caseId from host, and then dispatch to the
   // right BB. An example SIL snippet is:
   //
-  // %caseId = builtin "__tfop_tfc.RecvFromHost,tensorId...
-  // %zeroScalarTensor = builtin "__tfop_Const,...
+  // %caseId = graph_op "tfc.RecvFromHost"() {tensorId: i32 0...
+  // %zeroScalarTensor = graph_op "Const"...
   // Both operands have type $TensorHandle<Builtin.Int64>
-  // %eq = builtin "__tfop_Equal,$in,$in(%caseId, %zeroScalarTensor)
-  // %cond = builtin "tf_tensor_to_i1"(%eq : $TensorHandle<Builtin.Int1>)
+  // %eq = graph_op "Equal,i,i"(%caseId, %zeroScalarTensor)
+  // %cond = graph_op "tf_tensor_to_i1"(%eq : $TensorHandle<Builtin.Int1>)
   // cond_br %cond, bb1, bb2
   auto BA = getBuilder(); // Builder for accelerator.
   auto loc = remapLocation(getUserSourceLocation(inst->getDebugLocation()));
@@ -2893,48 +2910,54 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
   // chain of K-1 BB's with cond_br, to dispatch to the K cases.
   for (unsigned i = 0, e = caseIt.getNumCases() - 1; i != e; ++i) {
     // Create a scalar const tensor i, to compare with case id.
-    BuiltinInst *constTensorWithCaseId = nullptr;
+    SILValue constTensorWithCaseId;
     {
-      auto *caseIdIntInst = BA.createIntegerLiteral(loc, intFieldSILType, i);
-      SmallVector<SILValue, 4> operands;
-      std::string constOpName = "__tfop_Const";
-      createConstTensorAttrsOnAccel(caseIdIntInst, loc, ctx, BA, constOpName,
-                                    operands);
+      std::string constOpName = "Const";
+      SmallVector<GraphOperationAttribute, 2> attributes;
+      createConstTensorAttrsOnAccel(i, intFieldSILType, loc, ctx, BA,
+                                    constOpName, attributes);
       FP.configuration.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          operands, constOpName);
-      auto subMap = getSingleSubstitutionMapForElementType(
-          intFieldSILType.getASTType(), ctx);
+          attributes);
       auto tensorHandleInt64Ty =
           convertElementTypeToTensorValueType(intFieldSILType);
-      constTensorWithCaseId =
-          BA.createBuiltin(loc, ctx.getIdentifier(constOpName),
-                           tensorHandleInt64Ty, subMap, operands);
+      auto *caseIdInst = BA.createGraphOperation(
+          loc, ctx.getIdentifier(constOpName),
+          /*operands*/ {}, attributes, {tensorHandleInt64Ty});
+      constTensorWithCaseId = getSingleValueResult(caseIdInst);
     }
 
-    // Cast to a TensorHandle<Builtin.Int1> value
-    BuiltinInst *condBrOperand = nullptr;
+    // Compare caseId to a constant and get a Tensorhandle<Builtin.Int1> value.
+    SILValue condBrOperand;
     {
       // Omit the metatype attr T for simplicity, and TF graphDef compiler can
       // infer the type.
-      std::string equalOpName = "__tfop_Equal,$in,$in";
+      std::string equalOpName = "Equal";
+      equalOpName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      equalOpName +=
+          GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+      SmallVector<SILValue, 4> operands = {receivedCaseId,
+                                           constTensorWithCaseId};
+
       auto boolFieldSILType =
           extractBuiltinTypeFromStdlibNumericType(ctx.getBoolDecl());
       auto tensorHandleI1Ty =
           convertElementTypeToTensorValueType(boolFieldSILType);
-      SmallVector<SILValue, 4> operands = {receivedCaseId,
-                                           constTensorWithCaseId};
+
+      SmallVector<GraphOperationAttribute, 2> attributes;
       FP.configuration.handleDevicePlacement(
           "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
-          operands, equalOpName);
-      auto subMap = getSingleSubstitutionMapForElementType(
-          boolFieldSILType.getASTType(), ctx);
+          attributes);
+
       auto *equalComparisonInst =
-          BA.createBuiltin(loc, ctx.getIdentifier(equalOpName),
-                           tensorHandleI1Ty, subMap, operands);
-      condBrOperand =
-          BA.createBuiltin(loc, ctx.getIdentifier("tf_tensor_to_i1"),
-                           boolFieldSILType, {}, {equalComparisonInst});
+          BA.createGraphOperation(loc, ctx.getIdentifier(equalOpName), operands,
+                                  attributes, {tensorHandleI1Ty});
+      auto *condBrInst = BA.createGraphOperation(
+          loc, ctx.getIdentifier("tf_tensor_to_i1"),
+          /*operands*/ {getSingleValueResult(equalComparisonInst)},
+          /*attributes*/ {}, {boolFieldSILType});
+      condBrOperand = getSingleValueResult(condBrInst);
     }
 
     // For case `i`, the true branch dispatches to the corresponding enum
