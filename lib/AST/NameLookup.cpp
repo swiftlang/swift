@@ -60,9 +60,7 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
-    if (TypeResolver)
-      TypeResolver->resolveAccessControl(D);
-    if (D->isInvalid() && !D->hasAccess())
+    if (D->isInvalid())
       return;
     if (!D->isAccessibleFrom(DC))
       return;
@@ -1779,9 +1777,6 @@ bool DeclContext::lookupQualified(Type type,
 
     // Check access.
     if (!(options & NL_IgnoreAccessControl)) {
-      if (typeResolver)
-        typeResolver->resolveAccessControl(decl);
-
       return decl->isAccessibleFrom(this);
     }
 

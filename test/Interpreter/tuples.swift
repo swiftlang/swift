@@ -1,11 +1,11 @@
-// RUN: %target-run-simple-swift-swift3 | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
 
 typealias Interval = (lo: Int, hi: Int)
 
-infix operator <+> {}
-infix operator <-> {}
-infix operator <+>= {}
+infix operator <+>
+infix operator <->
+infix operator <+>=
 
 func <+>(a: Interval, b: Interval) -> Interval {
   return (a.lo + b.lo, a.hi + b.hi)

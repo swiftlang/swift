@@ -130,7 +130,6 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
 
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
-    TypeResolver->resolveAccessControl(Member);
   }
 
   // Check access when relevant.
@@ -615,8 +614,7 @@ static void lookupVisibleMemberDeclsImpl(
   // Lookup module references, as on some_module.some_member.  These are
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer,
-                                                  TypeResolver);
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
     MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
@@ -816,7 +814,6 @@ public:
 
     if (TypeResolver) {
       TypeResolver->resolveDeclSignature(VD);
-      TypeResolver->resolveAccessControl(VD);
     }
 
     if (VD->isInvalid()) {
