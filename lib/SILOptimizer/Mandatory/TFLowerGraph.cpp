@@ -139,16 +139,16 @@ namespace {
     /// solely of another conditional region (an inner if). In that case,
     /// `outputs` is not filled in after the graph function of the inner if is
     /// completed. To handle this case, when lowering the conditional region, we
-    /// always set the `tentative_outputs` of the graph function, so that we can
+    /// always set the `tentativeOutputs` of the graph function, so that we can
     /// upgrade them to `outputs` in the above case when needed. On the other
-    /// case, the `tentative_outputs` is simply discarded, if after lowering the
+    /// case, the `tentativeOutputs` is simply discarded, if after lowering the
     /// conditional region, the graph function construction moves on to lower a
     /// subsequent region.
     ///
     /// Invariant: At the completion of constructing a graph function, only one
-    /// of `output` and `tentative_outputs` should be set -- the former is set
+    /// of `output` and `tentativeOutputs` should be set -- the former is set
     /// in cases #1, #3, #4 above. The latter is set in case #2 described above.
-    SmallVector<std::pair<SILArgument *, TF_Output>, 4> tentative_outputs;
+    SmallVector<std::pair<SILArgument *, TF_Output>, 4> tentativeOutputs;
 
     /// If this graph has any side-effecting operations, this is the most
     /// recently emitted operation that had side effects.  Otherwise, it is
@@ -2274,7 +2274,7 @@ GLStatus TFGraphLowering::visitReturnInst(ReturnInst *inst) {
 
   // The return is either using a single value or a tuple of values (which
   // could be empty).  These become the results of the graph.
-  graphFn.tentative_outputs.clear();
+  graphFn.tentativeOutputs.clear();
   if (auto *ti = dyn_cast<TupleInst>(inst->getOperand())) {
     for (auto &operand : ti->getAllOperands()) {
       auto result = getOperandValue(operand.get());
@@ -2305,7 +2305,7 @@ GLStatus TFGraphLowering::visitBranchInst(BranchInst *inst) {
   // Walk the BB arguments of the branch - each one is an output of the
   // enclosing graph function that we're building.  Match up the output values
   // with the BB argument being computed.
-  graphFn.tentative_outputs.clear();
+  graphFn.tentativeOutputs.clear();
   for (unsigned i = 0, e = inst->getNumArgs(); i != e; ++i) {
     auto result = getOperandValue(inst->getArg(i));
     if (!result.oper) return GLStatus::Error;
@@ -2502,7 +2502,7 @@ GLStatus TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   assert(loopBodyFn.outputs.size() == headerBB->getArguments().size() &&
          "loop body result values didn't get lowered properly");
 
-  loopBodyFn.tentative_outputs.clear();
+  loopBodyFn.tentativeOutputs.clear();
   for (unsigned i = loopBodyFn.outputs.size(), e = loopBodyFn.inputs.size();
        i != e; ++i) {
     auto result =
@@ -2569,7 +2569,7 @@ GLStatus TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     }
 
     // The result of the function is our condition value.
-    graphFn.tentative_outputs.clear();
+    graphFn.tentativeOutputs.clear();
     graphFn.outputs.push_back({ /*SILArgument*/nullptr, condValue });
   });
   if (S != GLStatus::Success) return S;
@@ -2747,10 +2747,10 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // be in different orders.  Canonicalize the false region to match the true
   // region, and keep track of the output types for later consumption.
   if (trueCodeFn.outputs.empty()) {
-      trueCodeFn.outputs.swap(trueCodeFn.tentative_outputs);
+    trueCodeFn.outputs.swap(trueCodeFn.tentativeOutputs);
   }
   if (falseCodeFn.outputs.empty()) {
-    falseCodeFn.outputs.swap(falseCodeFn.tentative_outputs);
+    falseCodeFn.outputs.swap(falseCodeFn.tentativeOutputs);
   }
   assert(trueCodeFn.outputs.size() == falseCodeFn.outputs.size() &&
          "True and false region should produce same set of result values");
@@ -2816,12 +2816,12 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
 
   // Remember each of the results so that any references to the SIL BBArguments
   // that got defined end up referring to this node.
-  graphFn.tentative_outputs.clear();
+  graphFn.tentativeOutputs.clear();
   for (int i = 0, e = trueCodeFn.outputs.size(); i != e; ++i) {
     TF_Output outputNode = {result, i};
     // TODO: should we use 0 or i below?
     addValueMapping({trueCodeFn.outputs[i].first, 0}, outputNode);
-    graphFn.tentative_outputs.push_back(
+    graphFn.tentativeOutputs.push_back(
         {trueCodeFn.outputs[i].first, outputNode});
   }
 
