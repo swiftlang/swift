@@ -3689,7 +3689,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
 
-  validateAccessControl(D);
+  (void) D->getFormalAccess();
 
   // Validate the context.
   auto dc = D->getDeclContext();
@@ -3850,7 +3850,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           aliasDecl->getUnderlyingTypeLoc().setType(Type());
           aliasDecl->setInterfaceType(Type());
 
-          validateAccessControl(aliasDecl);
+          (void) aliasDecl->getFormalAccess();
 
           // Check generic parameters, if needed.
           bool validated = aliasDecl->hasValidationStarted();
@@ -4596,8 +4596,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *EED = cast<EnumElementDecl>(D);
 
     checkDeclAttributesEarly(EED);
-    validateAccessControl(EED);
-
     validateAttributes(*this, EED);
 
     EED->setIsBeingValidated(true);
@@ -4684,7 +4682,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     for (auto paramDecl : *gp)
       paramDecl->setDepth(depth);
 
-    validateAccessControl(proto);
+    (void) proto->getFormalAccess();
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
@@ -4712,7 +4710,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     if (assocType->hasInterfaceType())
       return;
     assocType->computeType();
-    validateAccessControl(assocType);
+    (void) assocType->getFormalAccess();
     break;
   }
   case DeclKind::TypeAlias: {
@@ -4728,7 +4726,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
         typealias->setIsBeingValidated();
         SWIFT_DEFER { typealias->setIsBeingValidated(false); };
 
-        validateAccessControl(typealias);
+        (void) typealias->getFormalAccess();
 
         ProtocolRequirementTypeResolver resolver;
         TypeResolutionOptions options =
@@ -4897,10 +4895,6 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
     auto storage = cast<AbstractStorageDecl>(decl);
     finalizeAbstractStorageDecl(*this, storage);
   }
-}
-
-void TypeChecker::validateAccessControl(ValueDecl *D) {
-  (void) D->getFormalAccess();
 }
 
 bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {

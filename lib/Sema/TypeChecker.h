@@ -1004,9 +1004,6 @@ public:
   /// Perform just enough validation for looking up names using the Decl.
   void validateDeclForNameLookup(ValueDecl *D);
 
-  /// Resolves the access control of the given declaration.
-  void validateAccessControl(ValueDecl *D);
-
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
@@ -1237,10 +1234,6 @@ public:
 
   /// Check the default arguments that occur within this value decl.
   void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
-
-  virtual void resolveAccessControl(ValueDecl *VD) override {
-    validateAccessControl(VD);
-  }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);
