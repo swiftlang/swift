@@ -375,7 +375,9 @@ class SILVerifier : public SILVerifierBase<SILVerifier> {
   SILFunctionConventions fnConv;
   Lowering::TypeConverter &TC;
   SILOpenedArchetypesTracker OpenedArchetypes;
-  SmallVector<StringRef, 16> DebugVars;
+  SmallVector<StringRef, 16> DebugArgs;
+  llvm::SmallDenseMap<std::pair<Decl *, SILFunction *>, SILType, 16>
+      DebugVars;
   const SILInstruction *CurInstruction = nullptr;
   DominanceInfo *Dominance = nullptr;
 
@@ -799,31 +801,57 @@ public:
     // that accidentally remove inline information (stored in the SILDebugScope)
     // from debug-variable-carrying instructions.
     if (!DS->InlinedCallSite) {
+      SILType SILTy;
+      Decl *VarDecl;
       Optional<SILDebugVariable> VarInfo;
-      if (auto *DI = dyn_cast<AllocStackInst>(I))
+      if (auto *DI = dyn_cast<AllocStackInst>(I)) {
+        VarDecl = DI->getDecl();
+        SILTy = DI->getElementType().getAddressType();
         VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<AllocBoxInst>(I))
+      } else if (auto *DI = dyn_cast<AllocBoxInst>(I)) {
+        VarDecl = DI->getDecl();
+        SILTy = DI->getBoxType()->getFieldType(F.getModule(), 0);
         VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueInst>(I))
+      } else if (auto *DI = dyn_cast<DebugValueInst>(I)) {
+        VarDecl = DI->getDecl();
+        SILTy = DI->getOperand()->getType().getAddressType();
         VarInfo = DI->getVarInfo();
-      else if (auto *DI = dyn_cast<DebugValueAddrInst>(I))
+      } else if (auto *DI = dyn_cast<DebugValueAddrInst>(I)) {
+        VarDecl = DI->getDecl();
+        SILTy = DI->getOperand()->getType();
         VarInfo = DI->getVarInfo();
+      }
 
-      if (VarInfo)
+      if (VarInfo) {
+        // Verify that no unique variables share an argno.
         if (unsigned ArgNo = VarInfo->ArgNo) {
           // It is a function argument.
-          if (ArgNo < DebugVars.size() && !DebugVars[ArgNo].empty()) {
+          if (ArgNo < DebugArgs.size() && !DebugArgs[ArgNo].empty()) {
             require(
-                DebugVars[ArgNo] == VarInfo->Name,
+                DebugArgs[ArgNo] == VarInfo->Name,
                 "Scope contains conflicting debug variables for one function "
                 "argument");
           } else {
             // Reserve enough space.
-            while (DebugVars.size() <= ArgNo) {
-              DebugVars.push_back(StringRef());
+            while (DebugArgs.size() <= ArgNo) {
+              DebugArgs.push_back(StringRef());
             }
           }
-          DebugVars[ArgNo] = VarInfo->Name;
+          DebugArgs[ArgNo] = VarInfo->Name;
+        }
+
+        // Verify that each unique variable has only one unique SILType.
+        if (VarDecl) {
+          SILFunction *InlinedFn = I->getDebugScope()->getInlinedFunction();
+          auto &VarType = DebugVars[{VarDecl, InlinedFn}];
+          if (VarType)
+            // When this happens a previous pass should have created a new
+            // zombie SILFunction as it was rewriting the type of the variable.
+            require(VarType == SILTy,
+                    "function contains conflicting types for one variable");
+          else
+            VarType = SILTy;
+        }
       }
     }
 
