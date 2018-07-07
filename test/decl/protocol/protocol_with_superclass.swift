@@ -196,3 +196,68 @@ func usesProtoRefinesProtoWithClass2<T : ProtoRefinesProtoWithClass>(_ t: T) {
   let _: Generic<String> = t
   // expected-error@-1 {{cannot convert value of type 'T' to specified type 'Generic<String>'}}
 }
+
+class ClassWithInits<T> {
+  init(notRequiredInit: ()) {}
+  // expected-note@-1 6{{selected non-required initializer 'init(notRequiredInit:)'}}
+
+  required init(requiredInit: ()) {}
+}
+
+protocol ProtocolWithClassInits : ClassWithInits<Int> {}
+
+func useProtocolWithClassInits1() {
+  _ = ProtocolWithClassInits(notRequiredInit: ())
+  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+
+  _ = ProtocolWithClassInits(requiredInit: ())
+  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolWithClassInits'}}
+}
+
+func useProtocolWithClassInits2(_ t: ProtocolWithClassInits.Type) {
+  _ = t.init(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'ProtocolWithClassInits' with a metatype value must use a 'required' initializer}}
+
+  let _: ProtocolWithClassInits = t.init(requiredInit: ())
+}
+
+func useProtocolWithClassInits3<T : ProtocolWithClassInits>(_ t: T.Type) {
+  _ = T(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'T' with a metatype value must use a 'required' initializer}}
+
+  let _: T = T(requiredInit: ())
+
+  _ = t.init(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'T' with a metatype value must use a 'required' initializer}}
+
+  let _: T = t.init(requiredInit: ())
+}
+
+protocol ProtocolRefinesClassInits : ProtocolWithClassInits {}
+
+func useProtocolRefinesClassInits1() {
+  _ = ProtocolRefinesClassInits(notRequiredInit: ())
+  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+
+  _ = ProtocolRefinesClassInits(requiredInit: ())
+  // expected-error@-1 {{member 'init' cannot be used on type 'ProtocolRefinesClassInits'}}
+}
+
+func useProtocolRefinesClassInits2(_ t: ProtocolRefinesClassInits.Type) {
+  _ = t.init(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'ProtocolRefinesClassInits' with a metatype value must use a 'required' initializer}}
+
+  let _: ProtocolRefinesClassInits = t.init(requiredInit: ())
+}
+
+func useProtocolRefinesClassInits3<T : ProtocolRefinesClassInits>(_ t: T.Type) {
+  _ = T(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'T' with a metatype value must use a 'required' initializer}}
+
+  let _: T = T(requiredInit: ())
+
+  _ = t.init(notRequiredInit: ())
+  // expected-error@-1 {{constructing an object of class type 'T' with a metatype value must use a 'required' initializer}}
+
+  let _: T = t.init(requiredInit: ())
+}
