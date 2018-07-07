@@ -44,7 +44,6 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringSet.h"
 #include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
 #include "llvm/Config/config.h"
@@ -966,9 +965,7 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::SDKPathLayout SDKPath(Out);
         options_block::XCCLayout XCC(Out);
 
-        SDKPath.emit(ScratchRecord,
-                     options.DebugPrefixMap.remapPath(
-                         M->getASTContext().SearchPathOpts.SDKPath));
+        SDKPath.emit(ScratchRecord, M->getASTContext().SearchPathOpts.SDKPath);
         auto &Opts = options.ExtraClangOptions;
         for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) { 
           // FIXME: This is a hack and calls for a better design.
@@ -986,23 +983,6 @@ void Serializer::writeHeader(const SerializationOptions &options) {
               continue;
             }
           }
-          // Remap the absolute working directory path that the driver adds to
-          // the Clang arguments.
-          if (StringRef(*Arg) == "-working-directory") {
-            XCC.emit(ScratchRecord, *Arg);
-            auto Next = std::next(Arg);
-            if (Next != E) {
-              XCC.emit(ScratchRecord, options.DebugPrefixMap.remapPath(*Next));
-              ++Arg;
-              continue;
-            }
-          }
-          // Filter out any -fdebug-prefix-map flags, since they can't be
-          // meaningfully remapped. They're only needed during codegen, not when
-          // the module is loaded for debugging.
-          if (StringRef(*Arg).startswith("-fdebug-prefix-map="))
-            continue;
-
           XCC.emit(ScratchRecord, *Arg);
         }
       }
@@ -1093,33 +1073,14 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::SearchPathLayout SearchPath(Out);
 
   if (options.SerializeOptionsForDebugging) {
-    // Remapping the paths can result in duplicates when the same path is passed
-    // to the compiler that is also loaded from an imported module; the
-    // compilation invocation will contain the unmapped path but the loaded
-    // module will have the remapped path. We uniquify the paths before writing
-    // to prevent this.
-    llvm::StringSet<> FrameworkPathsSeen;
-    llvm::StringSet<> ImportPathsSeen;
-
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
     // Put the framework search paths first so that they'll be preferred upon
     // deserialization.
-    for (auto &framepath : searchPathOpts.FrameworkSearchPaths) {
-      auto remapped = options.DebugPrefixMap.remapPath(framepath.Path);
-      if (FrameworkPathsSeen.find(remapped) == FrameworkPathsSeen.end()) {
-        SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
-                        remapped);
-        FrameworkPathsSeen.insert(remapped);
-      }
-    }
-    for (auto &path : searchPathOpts.ImportSearchPaths) {
-      auto remapped = options.DebugPrefixMap.remapPath(path);
-      if (ImportPathsSeen.find(remapped) == ImportPathsSeen.end()) {
-        SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false,
-                        remapped);
-        ImportPathsSeen.insert(remapped);
-      }
-    }
+    for (auto &framepath : searchPathOpts.FrameworkSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/true, framepath.IsSystem,
+                      framepath.Path);
+    for (auto &path : searchPathOpts.ImportSearchPaths)
+      SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
   // FIXME: Having to deal with private imports as a superset of public imports

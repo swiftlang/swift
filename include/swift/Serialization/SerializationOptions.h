@@ -14,7 +14,6 @@
 #define SWIFT_SERIALIZATION_SERIALIZATIONOPTIONS_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/PathRemapper.h"
 
 namespace swift {
 
@@ -35,7 +34,6 @@ namespace swift {
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
     ArrayRef<std::string> ExtraClangOptions;
-    PathRemapper DebugPrefixMap;
 
     bool AutolinkForceLoad = false;
     bool EnableNestedTypeLookupTable = false;
