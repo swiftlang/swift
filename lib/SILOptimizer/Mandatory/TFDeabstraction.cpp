@@ -149,8 +149,10 @@ void TFDeabstraction::logCurrentState(const char *name, bool isDetailed) {
 static bool isArrayUninitialized(SILInstruction *call) {
   auto *apply = dyn_cast<ApplyInst>(call);
   if (!apply) return false;
-  auto semantics = ArraySemanticsCall(apply, "array.uninitialized");
-  return semantics.getKind() == ArrayCallKind::kArrayUninitialized;
+
+  if (auto fn = apply->getCalleeFunction())
+    return fn->hasSemanticsAttr("array.uninitialized");
+  return false;
 }
 
 /// Scan the function looking for call sites that should be inlined to expose

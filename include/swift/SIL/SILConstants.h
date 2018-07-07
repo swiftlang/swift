@@ -326,6 +326,11 @@ public:
   void dump() const;
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
+  val.print(os);
+  return os;
+}
+
 /// SWIFT_ENABLE_TENSORFLOW
 /// A graph operation attribute, used by GraphOperationInst.
 /// Attributes have a name and a constant value.

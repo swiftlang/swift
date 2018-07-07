@@ -89,11 +89,22 @@ CHECK:   return %1 : $TensorHandle<Float>
 CHECK-LABEL: ----
 */
 
+public func stringAttributes() {
+  let str = "abc"
+  // expected-error @+1 {{op named 'foo' is not registered in TensorFlow}}
+  let _ : TensorHandle<Float> = #tfop("foo", attr1: String(), attr2: str)
+}
+/*
+CHECK-LABEL: --- INPUT FUNCTION {{.*}}stringAttributes
+ CHECK: graph_op "foo"() {attr1: "", attr2: "abc", __device: "/device:CPU:0"}
+*/
 
 #if false
+
+
 // FIXME: Constexpr propagation of tensorshape should handle this.
 public func tensorShape() -> Tensor<Float> {
-  let shape : TensorShape = [2]
+  let shape : TensorShape = [2,1]
   // xpected-error @+1 {{attribute 'value' requires a constant argument}}
   return Tensor(handle: #tfop("Const", dtype: Float.self, value$tensor: [1.0, 2.0], value$shape: shape))
 }

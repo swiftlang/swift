@@ -28,8 +28,8 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
-  class SingleValueInstruction;
-  class SILBuilder;
+  class ApplyInst;
+  class SILInstruction;
   class SILModule;
   class SILValue;
   class SymbolicValue;
@@ -61,6 +61,20 @@ public:
   /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+
+  /// Try to decode the specified apply of the _allocateUninitializedArray
+  /// function in the standard library.  This attempts to figure out what the
+  /// resulting elements will be.  This fills in the elements result and returns
+  /// true on success.
+  ///
+  /// If arrayInsts is non-null and if decoding succeeds, this function adds
+  /// all of the instructions relevant to the definition of this array into
+  /// the set.  If decoding fails, then the contents of this set is undefined.
+  ///
+  static bool decodeAllocUninitializedArray(ApplyInst *apply,
+                                            uint64_t numElements,
+                                            SmallVectorImpl<SILValue> &elements,
+                                   SmallPtrSet<SILInstruction*, 8> *arrayInsts);
 };
 
 } // end namespace tf

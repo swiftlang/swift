@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "TFUtilities"
 #include "TFUtilities.h"
+#include "TFConstExpr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -340,7 +341,7 @@ static bool isArrayAllocUninit(SILValue op, SILValue &numElements) {
   auto calleeName = callee->getReferencedFunction()->getName();
   // FIXME: Gross hack because this is specialized by perf optimizer.  Remove
   // when deabstraction does arrays.
-  if (!calleeName.contains("_allocateUninitialized"))
+  if (!calleeName.contains("_allocateUninitializedArray"))
     return false;
 
   numElements = getValueInsideStructInst(apply->getOperand(1));
@@ -1669,37 +1670,6 @@ GraphOperationInfo::decodeAttributeName(Identifier name) {
   return { nameStr.substr(0, dollarLoc), opClass };
 }
 
-/// Analyze the array users of an _allocateUninitialized call, to see if they
-/// are all simple things we can remove.  If so, add them all to arrayInsts and
-/// return false.  If not, return true.
-static bool analyzeArrayInitUses(SILValue v,
-                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
-  for (auto *use : v->getUses()) {
-    auto *user = use->getUser();
-
-    // We can always remove retain/release instructions and debug_value.
-    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
-        isa<DebugValueInst>(user)) {
-      if (arrayInsts) arrayInsts->insert(user);
-      continue;
-    }
-
-    // We can look through unpacking and repacking of structs that eventually
-    // turn into a retain or release.
-    if (isa<StructExtractInst>(user) || isa<StructInst>(user)) {
-      if (arrayInsts) arrayInsts->insert(user);
-      if (analyzeArrayInitUses(user->getResults()[0], arrayInsts))
-        return true;
-      continue;
-    }
-
-    // Oops we found an unknown use!
-    return true;
-  }
-  return false;
-}
-
-
 /// Given a SILValue that may be an array literal, attempt to decode it into the
 /// values that make up its elements.  If this fails or if the value is not an
 /// array, this returns a null Type.  Otherwise it decodes the array, returns
@@ -1714,13 +1684,14 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
   auto elementType = getArrayElementType(value->getType().getASTType());
   if (!elementType) return Type();
 
-  // The only pattern we support involves a call to _allocateUninitialized.
-  // The array value will be a tuple extract from the 0's result of the call.
+  // The only pattern we support involves a call to _allocateUninitializedArray.
+  // The array value will be a tuple extract from the 0th result of the call.
   auto *teiValue = dyn_cast<TupleExtractInst>(value);
   if (!teiValue || teiValue->getFieldNo() != 0 ||
       !isa<ApplyInst>(teiValue->getOperand()))
     return Type();
 
+  // Figure out the number of elements, which must be a constant integer.
   auto *apply = cast<ApplyInst>(teiValue->getOperand());
 
   // Verify we have a call to _allocateUninitializedArray.
@@ -1731,83 +1702,13 @@ decodeArrayElements(SILValue value, SmallVectorImpl<SILValue> &elements,
   uint64_t numElements =
     cast<IntegerLiteralInst>(numElementsVal)->getValue().getLimitedValue();
 
-  elements.resize(numElements);
 
-  // The apply is part of the call.
-  if (arrayInsts) arrayInsts->insert(apply);
-
-  // Keep track of whether we have any unknown users.  If so, the caller cannot
-  // remove the initializer.
-  bool hadUnknownUsers = false;
-
-  // The call has a tuple return type, see if we can walk all uses of them to
-  // analyze them and find the stores to the elements.
-  for (auto *use : apply->getUses()) {
-    auto *user = use->getUser();
-
-    auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
-    if (!tupleExtract)
-      return Type();
-    if (arrayInsts) arrayInsts->insert(tupleExtract);
-
-    // If this is the array result of _allocateUninitialized, try to determine
-    // whether there is anything that would prevent removing the allocation.
-    if (tupleExtract->getFieldNo() == 0) {
-      hadUnknownUsers |= analyzeArrayInitUses(tupleExtract, arrayInsts);
-      continue;
-    }
-
-    // Otherwise, it must be the pointer result.
-    assert(tupleExtract->getFieldNo() == 1 && "allocUninit has two results");
-
-    // Look through pointer_to_address
-    auto pointer2addr =
-      tupleExtract->getSingleUserOfType<PointerToAddressInst>();
-    if (!pointer2addr)
-      return Type();
-    if (arrayInsts) arrayInsts->insert(pointer2addr);
-
-    // Okay, process the use list of the pointer_to_address, each user is
-    // something that should result in a store of an element.
-    for (auto *use : pointer2addr->getUses()) {
-      auto *user = use->getUser();
-
-      uint64_t index = 0;
-      if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-        if (arrayInsts) arrayInsts->insert(iai);
-
-        auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
-        if (!ili)
-          return Type();
-
-        index = ili->getValue().getLimitedValue();
-        user = iai->getSingleUserOfType<StoreInst>();
-      }
-
-      // Check to see if we have a store to a valid index that hasn't been
-      // stored to yet.
-      auto *store = dyn_cast_or_null<StoreInst>(user);
-      if (!store || index >= elements.size() || elements[index] != SILValue())
-        return Type();
-
-      if (arrayInsts) arrayInsts->insert(store);
-
-      // If we got a store to a valid index, it must be our element.
-      elements[index] = store->getOperand(0);
-
-      // Track how many elements we see so we can know if we got them all.
-      --numElements;
-    }
-  }
-
-  // Make sure that all of the elements were found.
-  if (numElements != 0)
-    return Type();
-
-  if (hadUnknownUsers && arrayInsts)
-    arrayInsts->clear();
-
-  return elementType;
+  if (tf::ConstExprEvaluator::decodeAllocUninitializedArray(apply,
+                                                            numElements,
+                                                            elements,
+                                                            arrayInsts))
+    return elementType;
+  return Type();
 }
 
 

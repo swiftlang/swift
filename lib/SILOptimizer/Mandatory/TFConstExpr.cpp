@@ -49,17 +49,30 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // with an attribute put on the standard library that captures this info.
 enum class WellKnownFunction {
   Unknown,
-  StringInitEmpty,  // String.init()
-  AssertionFailure, // _assertionFailure(_:_:file:line:flags:)
+  // String.init()
+  StringInitEmpty,
+  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  StringMakeUTF8,
+  // _assertionFailure(_:_:file:line:flags:)
+  AssertionFailure,
+  // Array._allocateUninitializedArray
+  AllocateUninitializedArray,
 };
 
 
-static WellKnownFunction classifyFunction(StringRef mangledName) {
+static WellKnownFunction classifyFunction(SILFunction *fn) {
+  if (fn->hasSemanticsAttr("string.makeUTF8"))
+    return WellKnownFunction::StringMakeUTF8;
+
+  StringRef mangledName = fn->getName();
   if (mangledName == "$SS2SycfC")
     return WellKnownFunction::StringInitEmpty;
 
   if (mangledName.contains("_assertionFailure"))
     return WellKnownFunction::AssertionFailure;
+
+  if (mangledName.contains("_allocateUninitializedArray"))
+    return WellKnownFunction::AllocateUninitializedArray;
   return WellKnownFunction::Unknown;
 }
 
@@ -183,6 +196,13 @@ void AddressValue::dump() const {
 // ConstExprFunctionState implementation.
 //===----------------------------------------------------------------------===//
 
+/// Return true if the specified SIL type is considered to be a pointer that
+/// we track an address for.  This is true for SIL address types as well as the
+/// Builtin.RawPointer type.
+static bool isPointer(SILType ty) {
+  return ty.isAddress() || ty.is<BuiltinRawPointerType>();
+}
+
 namespace {
   /// This type represents the state of computed values within a function
   /// as evaluation happens.  A separate instance of this is made for each
@@ -220,7 +240,7 @@ namespace {
     llvm::DenseMap<SILValue, AddressValue> addressValues;
 
     void setAddress(SILValue addr, AddressValue addrVal) {
-      assert(addr->getType().isAddress() && "values are tracked separately");
+      assert(isPointer(addr->getType()) && "values are tracked separately");
       addressValues.insert({addr, addrVal});
     }
 
@@ -233,7 +253,7 @@ namespace {
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
-      assert(!value->getType().isAddress() &&
+      assert(!isPointer(value->getType()) &&
              "addresses are tracked separately");
       calculatedValues.insert({ value, symVal });
     }
@@ -570,7 +590,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       }
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
     }
-
+#if 0
     case BuiltinValueKind::PtrToInt: {
       auto resultType = inst->getType().castTo<BuiltinIntegerType>();
       // The only ptrtoint case we handle is from a string value to Word type,
@@ -580,6 +600,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
         break;
       return operand;
     }
+#endif
     }
   }
 
@@ -787,8 +808,7 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
                                      UnknownReason::Trap);
   }
   
-  if (classifyFunction(callee->getName()) ==
-      WellKnownFunction::AssertionFailure) {
+  if (classifyFunction(callee) == WellKnownFunction::AssertionFailure) {
     // TODO: Actually get the message out of fatalError.  We can literally get
     // its string and file/line/col info and propagate it up!
     return SymbolicValue::getUnknown((SILInstruction*)apply,
@@ -838,15 +858,73 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
   // FIXME: This should be based on the SILFunction carrying a
   // @constexprSemantics sort of attribute that indicates it is well known,
   // just like the existing SemanticsAttr thing.
-  switch (classifyFunction(callee->getName())) {
+  switch (classifyFunction(callee)) {
   default: break;
   case WellKnownFunction::StringInitEmpty: {  // String.init()
     assert(conventions.getNumDirectSILResults() == 1 &&
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected String.init() signature");
     auto result = SymbolicValue::getString("", evaluator.getAllocator());
-    setValue(apply->getResults()[0], result);
+    setValue(apply, result);
     return None;
+  }
+  case WellKnownFunction::StringMakeUTF8: {
+    // String.init(_builtinStringLiteral start: Builtin.RawPointer,
+    //             utf8CodeUnitCount: Builtin.Word,
+    //             isASCII: Builtin.Int1)
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 4 &&
+           "unexpected signature");
+    auto *literal = dyn_cast<StringLiteralInst>(apply->getOperand(1));
+    if (!literal) break;
+    auto byteCount = getConstantValue(apply->getOperand(2));
+    if (byteCount.getKind() != SymbolicValue::Integer ||
+        byteCount.getIntegerValue().getLimitedValue() !=
+          literal->getValue().size())
+      break;
+    setValue(apply, SymbolicValue::getConstantInst(literal));
+    return None;
+  }
+  case WellKnownFunction::AllocateUninitializedArray: {
+    // We evaluate _allocateUninitialized in the flow-insensitive case because
+    // we otherwise won't find the stores to initialize the array elements.
+    // Collect them here and pretend that the array was initialized atomically.
+    if (fn)
+      break;  // Analyze flow sensitive case normally.
+
+    // This function has this signature:
+    //   func _allocateUninitializedArray<Element>(_ builtinCount: Builtin.Word)
+    //     -> (Array<Element>, Builtin.RawPointer)
+
+    // Figure out the allocation size.
+    auto numElements = getConstantValue(apply->getOperand(1));
+    if (!numElements.isConstant())
+      return numElements;
+
+    SmallVector<SILValue, 8> elements;
+    if (!ConstExprEvaluator::decodeAllocUninitializedArray(apply,
+                            numElements.getIntegerValue().getLimitedValue(),
+                                                           elements,
+                                                       /*arrayInsts*/nullptr))
+      return SymbolicValue::getUnknown((SILInstruction*)apply,
+                                       UnknownReason::Default);
+
+    // Okay, we were able to decode the array.  See if we can fold all of the
+    // elements we found.
+    SmallVector<SymbolicValue, 8> elementConstants;
+    for (auto elt : elements) {
+      auto eltCst = getConstantValue(elt);
+      if (!eltCst.isConstant())
+        return eltCst;
+      elementConstants.push_back(eltCst);
+    }
+
+    auto v = SymbolicValue::getAggregate(elementConstants,
+                                         evaluator.getAllocator());
+    //llvm::errs() << "Got it: " << v;
+    (void)v;
+    break;
   }
   }
 
@@ -859,7 +937,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // call.
     auto op = apply->getOperand(applyParamBaseIndex+i);
     SymbolicValue argValue;
-    if (op->getType().isObject())
+    if (!isPointer(op->getType()))
       argValue = getConstantValue(op);
     else
       argValue = computeLoadResult(op);
@@ -948,7 +1026,15 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 /// Return the SymbolicValue for the specified SIL value, lazily computing
 /// it if needed.
 SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
-  assert(!value->getType().isAddress() && "Shouldn't be used for addresses");
+  // Builtin.RawPointer is modeled as an address for tracking, but we allow
+  // getConstantValue to be called for them because they can appear as arguments
+  // to functions and other unpredictable places.
+  if (value->getType().is<BuiltinRawPointerType>()) {
+    DEBUG(llvm::dbgs() << "ConstExpr Unknown pointer: " << *value << "\n");
+    return SymbolicValue::getUnknown(value, UnknownReason::Default);
+  }
+
+  assert(!isPointer(value->getType()) && "Shouldn't be used for pointers");
 
   // Check to see if we already have an answer.
   auto it = calculatedValues.find(value);
@@ -1244,7 +1330,7 @@ AddressValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
 /// Return the AddressValue for the specified SIL address, lazily computing
 /// it if needed.
 AddressValue ConstExprFunctionState::getAddressValue(SILValue addr) {
-  assert(addr->getType().isAddress() && "Should be used for addresses");
+  assert(isPointer(addr->getType()) && "Should be used for pointers");
 
   // Check to see if we already have an answer.
   auto it = addressValues.find(addr);
@@ -1331,7 +1417,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this fails, then we fail.
   if (inst->getNumResults() != 0) {
     auto oneResultVal = inst->getResults()[0];
-    if (oneResultVal->getType().isObject()) {
+    if (!isPointer(oneResultVal->getType())) {
       auto result = getConstantValue(oneResultVal);
       if (!result.isConstant())
         return result;
@@ -1352,7 +1438,6 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this is an unknown instruction with no results then bail out.
   return SymbolicValue::getUnknown(inst, UnknownReason::Default);
 }
-
 
 /// Evaluate a call to the specified function as if it were a constant
 /// expression, returning None and filling in `results` on success, or
@@ -1388,7 +1473,7 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 
   for (auto argSymVal : arguments) {
     auto argVal = argList[nextBBArg++];
-    if (argVal->getType().isAddress())
+    if (isPointer(argVal->getType()))
       state.createMemoryObject(argVal, argSymVal);
     else
       state.setValue(argVal, argSymVal);
@@ -1556,4 +1641,134 @@ computeConstantValues(ArrayRef<SILValue> values,
     // at.  We don't want lots of constants folded to trigger a limit.
     numInstEvaluated = 0;
   }
+}
+
+/// Analyze the array users of an _allocateUninitialized call, to see if they
+/// are all simple things we can remove.  If so, add them all to arrayInsts and
+/// return false.  If not, return true.
+static bool analyzeArrayInitUses(SILValue v,
+                                 SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  for (auto *use : v->getUses()) {
+    auto *user = use->getUser();
+
+    // We can always remove retain/release instructions and debug_value.
+    if (isa<StrongRetainInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<DebugValueInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      continue;
+    }
+
+    // We can look through unpacking and repacking of structs that eventually
+    // turn into a retain or release.
+    if (isa<StructExtractInst>(user) || isa<StructInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      if (analyzeArrayInitUses(user->getResults()[0], arrayInsts))
+        return true;
+      continue;
+    }
+
+    // Oops we found an unknown use!
+    return true;
+  }
+  return false;
+}
+
+/// Try to decode the specified apply of the _allocateUninitializedArray
+/// function in the standard library.  This attempts to figure out what the
+/// resulting elements will be.  This fills in the elements result and returns
+/// true on success.
+///
+/// If arrayInsts is non-null and if decoding succeeds, this function adds
+/// all of the instructions relevant to the definition of this array into
+/// the set.  If decoding fails, then the contents of this set is undefined.
+///
+bool ConstExprEvaluator::
+decodeAllocUninitializedArray(ApplyInst *apply,
+                              uint64_t numElements,
+                              SmallVectorImpl<SILValue> &elements,
+                              SmallPtrSet<SILInstruction*, 8> *arrayInsts) {
+  elements.resize(numElements);
+
+  // The apply is part of the call.
+  if (arrayInsts) arrayInsts->insert(apply);
+
+  // Keep track of whether we have any unknown users.  If so, the caller cannot
+  // remove the initializer.
+  bool hadUnknownUsers = false;
+
+  // The call has a tuple return type, see if we can walk all uses of them to
+  // analyze them and find the stores to the elements.
+  for (auto *use : apply->getUses()) {
+    auto *user = use->getUser();
+
+    // Ignore these users.
+    if (isa<RetainValueInst>(user) || isa<ReleaseValueInst>(user) ||
+        isa<DebugValueInst>(user)) {
+      if (arrayInsts) arrayInsts->insert(user);
+      continue;
+    }
+
+    auto *tupleExtract = dyn_cast<TupleExtractInst>(user);
+    if (!tupleExtract)
+      return false;
+    if (arrayInsts) arrayInsts->insert(tupleExtract);
+
+    // If this is the array result of _allocateUninitialized, try to determine
+    // whether there is anything that would prevent removing the allocation.
+    if (tupleExtract->getFieldNo() == 0) {
+      hadUnknownUsers |= analyzeArrayInitUses(tupleExtract, arrayInsts);
+      continue;
+    }
+
+    // Otherwise, it must be the pointer result.
+    assert(tupleExtract->getFieldNo() == 1 && "allocUninit has two results");
+
+    // Look through pointer_to_address
+    auto pointer2addr =
+    tupleExtract->getSingleUserOfType<PointerToAddressInst>();
+    if (!pointer2addr)
+      return false;
+    if (arrayInsts) arrayInsts->insert(pointer2addr);
+
+    // Okay, process the use list of the pointer_to_address, each user is
+    // something that should result in a store of an element.
+    for (auto *use : pointer2addr->getUses()) {
+      auto *user = use->getUser();
+
+      uint64_t index = 0;
+      if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+        if (arrayInsts) arrayInsts->insert(iai);
+
+        auto *ili = dyn_cast<IntegerLiteralInst>(iai->getOperand(1));
+        if (!ili)
+          return false;
+
+        index = ili->getValue().getLimitedValue();
+        user = iai->getSingleUserOfType<StoreInst>();
+      }
+
+      // Check to see if we have a store to a valid index that hasn't been
+      // stored to yet.
+      auto *store = dyn_cast_or_null<StoreInst>(user);
+      if (!store || index >= elements.size() || elements[index] != SILValue())
+        return false;
+
+      if (arrayInsts) arrayInsts->insert(store);
+
+      // If we got a store to a valid index, it must be our element.
+      elements[index] = store->getOperand(0);
+
+      // Track how many elements we see so we can know if we got them all.
+      --numElements;
+    }
+  }
+
+  // Make sure that all of the elements were found.
+  if (numElements != 0)
+    return false;
+
+  if (hadUnknownUsers && arrayInsts)
+    arrayInsts->clear();
+
+  return true;
 }
