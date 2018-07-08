@@ -44,6 +44,28 @@ LoopsTests.testAllBackends("simpleCounterLoop_ab") {
   expectEqual(98, a.scalar)
 }
 
+LoopsTests.testAllBackends("SR8164") {
+  func SR8164(count: Int32, expectedVal: Int32) {
+    var a = Tensor<Int32>(count)
+    let b = Tensor<Int32>(count)
+    if (count == 100) {
+      a += b
+    } else {
+      if (count <= 50) {
+        a -= b
+      } else {
+        a += b
+      }
+    }
+    a -= b
+    expectEqualWithScalarTensor(expectedVal, a)
+  }
+
+  SR8164(count: 100, expectedVal: 100)
+  SR8164(count: 30, expectedVal: -30)
+  SR8164(count: 70, expectedVal: 70)
+}
+
 // FIXME: Compiler bug (b/73607740)
 // error: internal error generating TensorFlow graph:
 // GraphGen cannot lower a 'send' to the host yet
