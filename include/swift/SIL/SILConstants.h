@@ -109,11 +109,16 @@ class SymbolicValue {
 
     /// This value is an enum with no payload.
     RK_Enum,
+
     /// This value is an enum with a payload.
     RK_EnumWithPayload,
-  };
 
-  RepresentationKind representationKind : 8;
+    /// This represents a direct reference to the address of a memory object.
+    RK_DirectAddress,
+
+    /// This represents an index *into* a memory object.
+    RK_DerivedAddress,
+  };
 
   union {
     /// When the value is Unknown, this contains the value that was the
@@ -157,10 +162,24 @@ class SymbolicValue {
     /// When this SymbolicValue is of "EnumWithPayload" kind, this pointer
     /// stores information about the enum case type and its payload.
     EnumWithPayloadSymbolicValue *enumValWithPayload;
+
+    /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
+    /// information about the objectID and access path of the access.
+    unsigned *derivedAddress;
   } value;
 
+  RepresentationKind representationKind : 8;
+
   union {
-    UnknownReason unknown_reason;
+    /// This is the reason code for RK_Unknown values.
+    UnknownReason unknown_reason : 32;
+
+    /// This is the object ID referenced by something of RK_DirectAddress kind.
+    unsigned directAddress_objectID;
+
+    /// This stores the number of entries in a RK_DerivedAddress array of
+    /// values.
+    unsigned derivedAddress_numEntries;
 
     //unsigned integer_bitwidth;
     // ...
@@ -196,8 +215,12 @@ public:
 
     /// This is an enum without payload.
     Enum,
+
     /// This is an enum with payload (formally known as "associated value").
     EnumWithPayload,
+
+    /// This value represents the address of, or into, a memory object.
+    Address,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -313,6 +336,32 @@ public:
 
   SymbolicValue getEnumPayloadValue() const;
 
+
+  /// Return a symbolic value that represents the address of a memory object.
+  static SymbolicValue getAddress(unsigned objectID) {
+    SymbolicValue result;
+    result.representationKind = RK_DirectAddress;
+    result.aux.directAddress_objectID = objectID;
+    return result;
+  }
+
+  /// Return a symbolic value that represents the address of a memory object
+  /// indexed by a path.
+  static SymbolicValue getAddress(unsigned objectID, ArrayRef<unsigned> indices,
+                                  llvm::BumpPtrAllocator &allocator);
+
+  /// Return the object ID of an address value.
+  unsigned getAddressValueObjectID() const {
+    if (representationKind == RK_DirectAddress)
+      return aux.directAddress_objectID;
+    assert(representationKind == RK_DerivedAddress);
+    return value.derivedAddress[0];
+  }
+
+  /// Return the memory object of this reference along with any access path
+  /// indices involved.
+  unsigned getAddressValue(SmallVectorImpl<unsigned> &accessPath) const;
+
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some
   /// reason, we fall back to using the specified location.
@@ -325,6 +374,9 @@ public:
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
 };
+
+static_assert(sizeof(SymbolicValue) == 2*sizeof(void*),
+              "SymbolicValue should stay small and POD");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
   val.print(os);
