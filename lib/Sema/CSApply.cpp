@@ -320,6 +320,9 @@ static bool isNonFinalClass(Type type) {
     if (auto super = archetype->getSuperclass())
       return isNonFinalClass(super);
 
+  if (type->isExistentialType())
+    return true;
+
   return false;
 }
 
