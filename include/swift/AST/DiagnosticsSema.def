@@ -2128,6 +2128,8 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
+ERROR(objc_protocol_with_superclass,none,
+  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,none,

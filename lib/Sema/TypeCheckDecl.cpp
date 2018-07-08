@@ -413,6 +413,18 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
+      // @objc protocols cannot have superclass constraints.
+      if (layout.explicitSuperclass) {
+        if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+          if (protoDecl->isObjC()) {
+            diagnose(protoDecl,
+                    diag::objc_protocol_with_superclass,
+                    protoDecl->getName());
+            continue;
+          }
+        }
+      }
+
       // Protocols, generic parameters and associated types can inherit
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
@@ -492,6 +504,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
           .highlight(superclassRange);
         inherited.setInvalidType(Context);
         continue;
+      }
+
+      // @objc protocols cannot have superclass constraints.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+        if (protoDecl->isObjC()) {
+          diagnose(protoDecl,
+                   diag::objc_protocol_with_superclass,
+                   protoDecl->getName());
+          continue;
+        }
       }
 
       // If the declaration we're looking at doesn't allow a superclass,
