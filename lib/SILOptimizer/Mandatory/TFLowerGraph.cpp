@@ -808,9 +808,15 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
                                    dtypeSize * totalElements);
 
   // Set up its contents, element-wise.
+  // FIXME: This will need a byte swap for big endian hosts.
   auto *ptr = (char *)TF_TensorData(tensor);
   for (auto elt : elts) {
-    // FIXME: This will need a byte swap for big endian hosts.
+    if (dtype == TF_BOOL) {
+      // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is 1
+      // byte or more.
+      elt = elt.zext(dtypeSize * 8);
+    }
+    assert(elt.getBitWidth() == dtypeSize * 8);
     memcpy(ptr, elt.getRawData(), dtypeSize);
     ptr += dtypeSize;
   }
@@ -1741,6 +1747,13 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
   }
 
   // Process all of the attributes.
+  // For an inst like:
+  //   graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i1 0
+  // We will use the `dtype` attr value to lower the `value` attr, so we
+  // remember the dtype info here.
+  // We use unsigned instead of TF_DataType, to express the invalid initial
+  // value 0.
+  unsigned dtypeAttr = 0;
   for (auto attr : inst->getAttributes()) {
     auto attrInfo = GraphOperationInfo::decodeAttributeName(attr.name);
     auto attrValue = attr.value;
@@ -1828,25 +1841,34 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       break;
     case SILTensorOpInfo::OperandClass::DType: {
       auto swiftType = attrValue.getMetatypeValue();
-      auto tfType = convertSwiftTypeToTF(swiftType);
-      TF_SetAttrType(op, name.data(), (TF_DataType)tfType);
+      dtypeAttr = convertSwiftTypeToTF(swiftType);
+      TF_SetAttrType(op, name.data(), (TF_DataType)dtypeAttr);
       break;
     }
     case SILTensorOpInfo::OperandClass::Tensor: {
+      if (!dtypeAttr) {
+        inst->dump();
+        llvm_unreachable("dtype attr must have been processed!");
+      }
       // Tensor can support two cases: an array case (not yet implemented), and
       // a scalar case.
-      TF_DataType dtype;
       SmallVector<APInt, 4> elements;
       SmallVector<int64_t, 4> shape;
-      if (attrValue.getKind() != SymbolicValue::Integer) {
+      // The scalar case is very simple, the shape of a scalar is 0d, and the
+      // data type comes from an attr that should already be processed.
+      if (attrValue.getKind() == SymbolicValue::Integer) {
+        auto intVal = attrValue.getIntegerValue();
+        elements.push_back(intVal);
+      }
+      else if (attrValue.getKind() == SymbolicValue::Float) {
+        auto castedIntVal = attrValue.getFloatValue().bitcastToAPInt();
+        elements.push_back(castedIntVal);
+      } else {
         llvm_unreachable("FIXME: Tensor-typed attr is not yet handled");
       }
-      // The scalar case is very simple, the shape of a scalar is 0d, and the
-      // data type is int32.
-      dtype = TF_INT32;
-      elements.push_back(attrValue.getIntegerValue());
       // Set the tensor as the attribute on the graph node.
-      auto tensor = convertValuesToTensor(elements, shape, dtype);
+      auto tensor =
+          convertValuesToTensor(elements, shape, (TF_DataType)dtypeAttr);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc()))

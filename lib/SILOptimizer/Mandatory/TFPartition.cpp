@@ -33,6 +33,9 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/BitVector.h"
+#ifdef SWIFT_ENABLE_TENSORFLOW
+#include "tensorflow/c/c_api.h"
+#endif
 
 #undef DEBUG_TYPE
 #include "llvm/Support/GenericDomTreeConstruction.h"
@@ -2330,26 +2333,27 @@ void PartitionCloner::visitOpInst(SingleValueInstruction *inst,
   ValueMap[inst] = result;
 }
 
-/// Create the operands a const tensor inst in accelerator code via `B` at
-/// `loc`, based on the literal in `hostLiteralInst`.  Extend `opName` and
-/// `operands` with the attributes of that const tensor inst, which caller will
-/// then use to finish creating the inst.
-// TODO: migrate to the new graph op inst.
-static void createConstTensorAttrsOnAccelLegacy(
-    SingleValueInstruction *hostLiteralInst, SILLocation loc, ASTContext &ctx,
-    SILBuilder &B, std::string &opName, SmallVectorImpl<SILValue> &operands) {
+/// Create the attributes of a const tensor inst in accelerator code, where
+/// `constVal` and `valTy` respectively specify the value and data type.  Extend
+/// `attributes` with the attributes of that const tensor inst, which caller
+/// will then use to finish creating the inst.
+///
+/// For an integer, `constVal` is an APInt. For a float, `constVal` is an
+/// APFloat. See convertValuesToTensor() in graph lowering on how the
+/// constructed const tensor inst get lowered.
+static void createConstTensorAttrsOnAccel(
+    SymbolicValue constVal, SILType valTy, ASTContext &ctx,
+    SmallVectorImpl<GraphOperationAttribute> &attributes) {
   // Literals take attributes specifying the dtype and value.
-  opName += ",dtype$dtype,value$tensor";
+  attributes.push_back(
+      {ctx.getIdentifier("dtype$dtype"),
+       SymbolicValue::getMetatype(valTy.getASTType()->getCanonicalType())});
+  attributes.push_back({ctx.getIdentifier("value$tensor"), constVal});
+}
 
-  auto dtype = convertSwiftTypeToTF(hostLiteralInst->getType().getASTType());
-  auto dtypeCst = B.createIntegerLiteral(
-      loc, SILType::getBuiltinIntegerType(32, ctx), dtype);
-  operands.push_back(dtypeCst);
-
-  // The value attribute is specified by a clone of the literal itself.
-  auto ourCst = hostLiteralInst->clone(dtypeCst);
-  ourCst->setDebugLocation(B.getSILDebugLocation(loc));
-  operands.push_back(ourCst);
+static SILValue getSingleValueResult(GraphOperationInst *inst) {
+  assert(inst->getNumResults() == 1);
+  return inst->getResults()[0];
 }
 
 static void createConstTensorAttrsOnAccel(
@@ -2384,7 +2388,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
     return;
   }
 
-  std::string opName = "__tfop_" + std::string(opInfo.first);
+  std::string opName = opInfo.first;
 
   // Start remapping the operand list.
   auto operandRange = inst->getAllOperands();
@@ -2410,6 +2414,7 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
 
   auto &B = getBuilder();
   auto &ctx = B.getASTContext();
+  SmallVector<GraphOperationAttribute, 2> attributes;
 
   // Handle opKind-specific issues.
   switch (opKind) {
@@ -2417,20 +2422,42 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   case PromotedScalarKind::TensorToScalar: assert(0 && "Handled above");
   case PromotedScalarKind::Binary:
   case PromotedScalarKind::OverflowingBinary:
-    opName += ",$in,$in";
+    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
     break;
   case PromotedScalarKind::Literal: {
-    createConstTensorAttrsOnAccelLegacy(inst, loc, ctx, B, opName, operands);
+    SymbolicValue constVal;
+    unsigned bitWidth = 0;
+    if (auto *ILI = dyn_cast<IntegerLiteralInst>(inst)) {
+      auto intVal = ILI->getValue();
+      constVal = SymbolicValue::getInteger(intVal, ctx.getAllocator());
+      bitWidth = intVal.getBitWidth();  // For sanity-check only.
+    } else if (auto *FLI = dyn_cast<FloatLiteralInst>(inst)) {
+      auto floatVal = FLI->getValue();
+      constVal = SymbolicValue::getFloat(floatVal, ctx.getAllocator());
+      bitWidth = floatVal.bitcastToAPInt().getBitWidth();
+    } else {
+      llvm_unreachable("Cannot promoted the above inst to tensor");
+    }
+#ifndef NDEBUG
+    auto dtype = convertSwiftTypeToTF(inst->getType().getASTType());
+    assert(dtype);
+    auto dtypeSize = TF_DataTypeSize((TF_DataType)dtype);
+    // Swift/LLVM uses a 1-bit APInt to represent a bool, but TF_BOOL is 1 byte
+    // or more.
+    assert((TF_DataType)dtype == TF_BOOL || bitWidth == dtypeSize * 8);
+#endif // NDEBUG
+    (void)bitWidth;
+    createConstTensorAttrsOnAccel(constVal, inst->getType(), ctx, attributes);
     break;
   }
   case PromotedScalarKind::Conversion: {
     // Conversions get an attribute specifying the result dtype, named "DstT".
-    opName += ",$in,DstT$dtype";
-    auto dtype = convertSwiftTypeToTF(inst->getType().getASTType());
-    auto dtypeCst =
-      B.createIntegerLiteral(loc, SILType::getBuiltinIntegerType(32, ctx),
-                             dtype);
-    operands.push_back(dtypeCst);
+    opName += GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    attributes.push_back(
+        {ctx.getIdentifier("DstT$dtype"),
+         SymbolicValue::getMetatype(
+             inst->getType().getASTType()->getCanonicalType())});
     break;
   }
   }
@@ -2439,12 +2466,13 @@ void PartitionCloner::visitScalarInst(SingleValueInstruction *inst) {
   // should get pruned away in the later graph lowering pass.
   FP.configuration.handleDevicePlacement(
       opInfo.first, /*opDevice*/ getDeviceString(DeviceType::ALL), B, loc,
-      operands, opName);
+      attributes);
 
-  auto result =
-    B.createBuiltin(loc, B.getASTContext().getIdentifier(opName),
-                    remapType(resultType), /*substitutionlist*/{}, operands);
-  ValueMap[inst] = result;
+  auto *result =
+      B.createGraphOperation(loc, ctx.getIdentifier(opName), operands,
+                             attributes, {remapType(resultType)});
+
+  ValueMap[inst] = getSingleValueResult(result);
 }
 
 void PartitionCloner::visitTupleExtractInst(TupleExtractInst *inst) {
@@ -2571,11 +2599,6 @@ createAcceleratorReceive(SILBuilder &B, SILLocation loc, SILType valueTy,
     getSingleSubstitutionMapForElementType(valueTy.getASTType(), ctx);
   auto name = ctx.getIdentifier(instName);
   return B.createBuiltin(loc, name, valueTy, subMap, operands);
-}
-
-static SILValue getSingleValueResult(GraphOperationInst *inst) {
-  assert(inst->getNumResults() == 1);
-  return inst->getResults()[0];
 }
 
 static SILValue createAcceleratorReceiveViaGraphOp(
@@ -2912,8 +2935,10 @@ void PartitionCloner::handleSwitchEnum(SwitchEnumInst *inst) {
     {
       std::string constOpName = "Const";
       SmallVector<GraphOperationAttribute, 2> attributes;
-      createConstTensorAttrsOnAccel(caseId, int32SILType, loc, ctx, BA,
-                                    constOpName, attributes);
+      createConstTensorAttrsOnAccel(
+          SymbolicValue::getInteger(APInt(/*width*/ 32, caseId),
+                                    ctx.getAllocator()),
+          int32SILType, ctx, attributes);
       FP.configuration.handleDevicePlacement(
           "Const", /*opDevice*/ getDeviceString(DeviceType::ALL), BA, loc,
           attributes);
