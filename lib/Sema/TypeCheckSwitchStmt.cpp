@@ -240,11 +240,22 @@ namespace {
         return Space(C);
       }
       static Space forDisjunct(ArrayRef<Space> SP) {
-        SmallVector<Space, 4> spaces(SP.begin(), SP.end());
-        spaces.erase(
-            std::remove_if(spaces.begin(), spaces.end(),
-                           [](const Space &space) { return space.isEmpty(); }),
-            spaces.end());
+        SmallVector<Space, 4> spaces;
+        for (const Space &space : SP) {
+          switch (space.getKind()) {
+          case SpaceKind::Empty:
+            break;
+          case SpaceKind::Disjunct:
+            spaces.append(space.getSpaces().begin(), space.getSpaces().end());
+            break;
+          case SpaceKind::Type:
+          case SpaceKind::Constructor:
+          case SpaceKind::BooleanConstant:
+          case SpaceKind::UnknownCase:
+            spaces.push_back(space);
+            break;
+          }
+        }
 
         if (spaces.empty())
           return Space();
