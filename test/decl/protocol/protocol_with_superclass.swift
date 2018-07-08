@@ -261,3 +261,55 @@ func useProtocolRefinesClassInits3<T : ProtocolRefinesClassInits>(_ t: T.Type) {
 
   let _: T = t.init(requiredInit: ())
 }
+
+// Make sure that we don't require 'mutating' when the protocol has a superclass
+// constraint.
+protocol HasMutableProperty : Concrete {
+  var mutableThingy: Any? { get set }
+}
+
+extension HasMutableProperty {
+  func mutateThingy() {
+    mutableThingy = nil
+  }
+}
+
+// Some pathological examples -- just make sure they don't crash.
+
+protocol RecursiveSelf : Generic<Self> {}
+// expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self>' is recursive}}
+
+protocol RecursiveAssociatedType : Generic<Self.X> {
+  // expected-error@-1 {{superclass constraint 'Self' : 'Generic<Self.X>' is recursive}}
+  associatedtype X
+}
+
+protocol BaseProtocol {
+  typealias T = Int
+}
+
+class BaseClass : BaseProtocol {}
+
+protocol RefinedProtocol : BaseClass {
+  func takesT(_: T)
+}
+
+class RefinedClass : BaseClass, RefinedProtocol {
+  func takesT(_: T) {
+    _ = T.self
+  }
+}
+
+class LoopClass : LoopProto {}
+protocol LoopProto : LoopClass {}
+
+class FirstClass {}
+protocol FirstProtocol : FirstClass {}
+class SecondClass : FirstClass {}
+protocol SecondProtocol : SecondClass, FirstProtocol {}
+
+class FirstConformer : FirstClass, SecondProtocol {}
+// expected-error@-1 {{'SecondProtocol' requires that 'FirstConformer' inherit from 'SecondClass'}}
+// expected-note@-2 {{requirement specified as 'Self' : 'SecondClass' [with Self = FirstConformer]}}
+
+class SecondConformer : SecondClass, SecondProtocol {}
