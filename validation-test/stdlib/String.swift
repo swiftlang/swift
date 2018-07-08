@@ -10,6 +10,7 @@
 // RUN: %target-run %t/String
 // REQUIRES: executable_test
 // XFAIL: interpret
+// <rdar://problem/41372546> Migrate validation-test/stdlib/String.swift off Swift 3
 
 import StdlibUnittest
 import StdlibCollectionUnittest
