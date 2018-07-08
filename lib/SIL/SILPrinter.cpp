@@ -1242,6 +1242,7 @@ public:
       return;
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
+    case SymbolicValue::Address:
       llvm_unreachable("Unimplemented SymbolicValue case");
     }
   }

@@ -97,6 +97,17 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     getEnumPayloadValue().print(os, indent);
     return;
   }
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
+    SmallVector<unsigned, 4> accessPath;
+    unsigned objectID = getAddressValue(accessPath);
+    os << "Address[#" << objectID << "] ";
+    interleave(accessPath.begin(), accessPath.end(),
+               [&](unsigned idx) { os << idx; },
+               [&]() { os << ", "; });
+    os << "\n";
+    break;
+  }
   }
 }
 
@@ -128,6 +139,9 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
     return Float;
   case RK_String:
     return String;
+  case RK_DirectAddress:
+  case RK_DerivedAddress:
+    return Address;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -143,20 +157,20 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// version.  This only works for valid constants.
 SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   switch (getKind()) {
-  case SymbolicValue::Unknown:
-  case SymbolicValue::UninitMemory:
-    assert(0 && "These are not constants!");
-  case SymbolicValue::Metatype:
-  case SymbolicValue::Function:
+  case Unknown:
+  case UninitMemory:
+  case Metatype:
+  case Function:
+  case Enum:
     // These have trivial inline storage, just return a copy.
     return *this;
-  case SymbolicValue::Integer:
+  case Integer:
     return SymbolicValue::getInteger(getIntegerValue(), allocator);
-  case SymbolicValue::Float:
+  case Float:
     return SymbolicValue::getFloat(getFloatValue(), allocator);
-  case SymbolicValue::String:
+  case String:
     return SymbolicValue::getString(getStringValue(), allocator);
-  case SymbolicValue::Aggregate: {
+  case Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
@@ -164,11 +178,13 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
       results.push_back(elt.cloneInto(allocator));
     return getAggregate(results, allocator);
   }
-  case SymbolicValue::Enum:
-    return SymbolicValue::getEnum(getEnumValue());
-  case SymbolicValue::EnumWithPayload:
-    return SymbolicValue::getEnumWithPayload(getEnumValue(),
-                                             getEnumPayloadValue(), allocator);
+  case EnumWithPayload:
+    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
+  case Address: {
+    SmallVector<unsigned, 4> accessPath;
+    unsigned objectID = getAddressValue(accessPath);
+    return getAddress(objectID, accessPath, allocator);
+  }
   }
 }
 
@@ -485,6 +501,7 @@ private:
     assert(payload.isConstant());
   }
 };
+} // end namespace swift
 
 /// This returns a constant Symbolic value for the enum case in `decl`.
 SymbolicValue SymbolicValue::getEnum(EnumElementDecl *decl) {
@@ -521,7 +538,51 @@ SymbolicValue SymbolicValue::getEnumPayloadValue() const {
   return value.enumValWithPayload->getPayload();
 }
 
-} // end namespace swift
+//===----------------------------------------------------------------------===//
+// Addresses
+//===----------------------------------------------------------------------===//
+
+/// Return a symbolic value that represents the address of a memory object
+/// indexed by a path.
+SymbolicValue SymbolicValue::
+getAddress(unsigned objectID, ArrayRef<unsigned> indices,
+           llvm::BumpPtrAllocator &allocator) {
+  if (indices.empty())
+    return getAddress(objectID);
+
+  // Allocate the indices list into the bump pointer.
+  auto newIndices = allocator.Allocate<unsigned>(indices.size()+1);
+
+  // The first entry is the objectID.
+  newIndices[0] = objectID;
+
+  // The rest are the access path.
+  std::uninitialized_copy(indices.begin(), indices.end(), newIndices+1);
+
+  SymbolicValue result;
+  result.representationKind = RK_DerivedAddress;
+  result.value.derivedAddress = newIndices;
+  result.aux.derivedAddress_numEntries = indices.size()+1;
+  return result;
+}
+
+/// Return the memory object of this reference along with any access path
+/// indices involved.
+unsigned SymbolicValue::
+getAddressValue(SmallVectorImpl<unsigned> &accessPath) const {
+  assert(getKind() == Address);
+
+  accessPath.clear();
+  if (representationKind == RK_DirectAddress)
+    return aux.directAddress_objectID;
+  assert(representationKind == RK_DerivedAddress);
+
+  // The first entry is the object ID, the rest are indices in the accessPath.
+  accessPath.append(value.derivedAddress+1,
+                    value.derivedAddress+aux.derivedAddress_numEntries);
+  return value.derivedAddress[0];
+}
+
 
 //===----------------------------------------------------------------------===//
 // Higher level code
