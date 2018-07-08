@@ -3,10 +3,10 @@
 #gradient(foo, withRespectTo:) // expected-error {{use 'wrt:' to specify parameters to differentiate with respect to}}
 
 #gradient(foo) // okay
-#gradient(foo, wrt: 1) // expected-error {{expected a parameter, which can be }}
-#gradient(foo, wrt: 0) // expected-error {{expected a parameter, which can be }}
-#gradient(foo, wrt: .0) // okay
-#gradient(foo, wrt: .0, .1, self) // okay
+#gradient(foo, wrt: 1) // expected-error {{expected a parameter, which must be }}
+#gradient(foo, wrt: 0) // expected-error {{expected a parameter, which must be }}
+#gradient(foo, wrt: .0, self) // expected-error {{expected a parameter, which must be }}
+#gradient(foo, wrt: .0, .1) // okay
 
 #valueAndGradient(foo, wrt: .0, .1) // okay
 

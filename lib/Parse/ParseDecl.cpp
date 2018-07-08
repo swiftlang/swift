@@ -881,7 +881,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       switch (Tok.getKind()) {
       case tok::period_prefix: {
         SyntaxParsingContext IndexParamContext(
-            SyntaxContext, SyntaxKind::DifferentiableAttributeIndexParam);
+            SyntaxContext, SyntaxKind::DifferentiationIndexParam);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,

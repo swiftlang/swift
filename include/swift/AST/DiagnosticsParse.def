@@ -1669,8 +1669,8 @@ ERROR(expr_expected_label,none,
 ERROR(expr_expected_function_to_differentiate,none,
       "expected a function to be differentiated", ())
 ERROR(gradient_expr_expected_parameter,none,
-      "expected a parameter, which can be the index of a function parameter "
-      "with a leading dot (e.g. '.0'), or 'self'", ())
+      "expected a parameter, which must be the index of a function parameter "
+      "with a leading dot (e.g. '.0')", ())
 ERROR(autodiff_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 

@@ -123,6 +123,12 @@ SYNTAX_TOKENS = [
     # SWIFT_ENABLE_TENSORFLOW
     Token('PoundTensorFlowOp', 'pound_tfop', text='#tfop',
           is_keyword=True),
+    Token('PoundGradient', 'pound_gradient', text='#gradient',
+          is_keyword=True),
+    Token('PoundValueAndGradient', 'pound_valueAndGradient',
+          text='#valueAndGradient', is_keyword=True),
+    Token('PoundAdjoint', 'pound_adjoint', text='#adjoint',
+          is_keyword=True),
     Token('PoundAssert', 'pound_assert', text='#assert',
           is_keyword=True),
     Token('Arrow', 'arrow', text='->'),
