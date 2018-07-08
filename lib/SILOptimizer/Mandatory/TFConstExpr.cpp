@@ -119,15 +119,6 @@ namespace {
     /// In addition to the current value, we track the type of the whole object.
     SmallVector<std::pair<SymbolicValue, Type>, 8> memoryObjects;
 
-    /// Each SIL address gets an entry in this mapping, indicating which memory
-    /// object it is addressing and any indices into that object.
-    llvm::DenseMap<SILValue, SymbolicValue> addressValues;
-
-    void setAddress(SILValue addr, SymbolicValue addrVal) {
-      assert(isPointer(addr->getType()) && "values are tracked separately");
-      addressValues.insert({addr, addrVal});
-    }
-
   public:
     ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
                            SubstitutionMap substitutionMap,
@@ -137,38 +128,25 @@ namespace {
     }
 
     void setValue(SILValue value, SymbolicValue symVal) {
-      assert(!isPointer(value->getType()) &&
-             "addresses are tracked separately");
       calculatedValues.insert({ value, symVal });
     }
 
-    /// Invariant: Before the call, `addressValues` must not contain `addr` as a
-    /// key, unless `initialValue` is an unknown value, representing a failure in
-    /// compiler-time evaluation.
-    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue) {
-      assert(initialValue.isUnknown() || !addressValues.count(addr));
+    /// Invariant: Before the call, `calculatedValues` must not contain `addr`
+    /// as a key.
+    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue){
+      assert(!calculatedValues.count(addr));
       unsigned objectID = memoryObjects.size();
       auto objectType = simplifyType(addr->getType().getASTType());
       memoryObjects.push_back({initialValue, objectType});
 
       auto result = SymbolicValue::getAddress(objectID);
-      setAddress(addr, result);
+      setValue(addr, result);
       return result;
-    }
-
-    /// In failure cases computing addresses, we want to return an address
-    /// pointing to a reason address computation failed.
-    SymbolicValue getUnknownAddress(SILValue addr, UnknownReason reason) {
-      return createMemoryObject(addr, SymbolicValue::getUnknown(addr, reason));
     }
 
     /// Return the SymbolicValue for the specified SIL value, lazily computing
     /// it if needed.
     SymbolicValue getConstantValue(SILValue value);
-
-    /// Return the AddressValue for the specified SIL address, lazily computing
-    /// it if needed.
-    SymbolicValue getAddressValue(SILValue addr);
 
     /// Evaluate the specified instruction in a flow sensitive way, for use by
     /// the constexpr function evaluator.  This does not handle control flow
@@ -191,8 +169,6 @@ namespace {
     SymbolicValue computeLoadResult(SILValue addr);
     llvm::Optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
                                                  SILValue dest);
-
-    SymbolicValue computeAddressValue(SILValue addr);
   };
 } // end anonymous namespace
 
@@ -277,6 +253,29 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getAggregate(elts, evaluator.getAllocator());
   }
 
+  // If this is a struct or tuple element addressor, compute a more derived
+  // address.
+  if (isa<StructElementAddrInst>(value) || isa<TupleElementAddrInst>(value)) {
+    auto inst = cast<SingleValueInstruction>(value);
+    auto baseAddr = getConstantValue(inst->getOperand(0));
+    if (!baseAddr.isConstant())
+      return baseAddr;
+
+    SmallVector<unsigned, 4> accessPath;
+    unsigned objectID = baseAddr.getAddressValue(accessPath);
+
+    // Add our index onto the next of the list.
+    unsigned index;
+    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
+      index = sea->getFieldNo();
+    else
+      index = cast<TupleElementAddrInst>(inst)->getFieldNo();
+    accessPath.push_back(index);
+    return SymbolicValue::getAddress(objectID, accessPath,
+                                     evaluator.getAllocator());
+  }
+
+
   // If this is a load, then we either have computed the value of the memory
   // already (when analyzing the body of a constexpr) or this should be a by-ref
   // result of a call.  Either way, we ask for the value of the pointer: in the
@@ -334,6 +333,19 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
                                                evaluator.getAllocator());
   }
+
+  // This one returns the address of its enum payload.
+  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(value)) {
+    auto enumVal = computeLoadResult(dai->getOperand());
+    if (!enumVal.isConstant())
+      return enumVal;
+    return createMemoryObject(value, enumVal.getEnumPayloadValue());
+  }
+
+  // This instruction is a marker that returns its first operand.
+  if (auto *bai = dyn_cast<BeginAccessInst>(value))
+    return getConstantValue(bai->getOperand());
+
 
   DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -911,19 +923,19 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 /// Return the SymbolicValue for the specified SIL value, lazily computing
 /// it if needed.
 SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
-  // Builtin.RawPointer is modeled as an address for tracking, but we allow
-  // getConstantValue to be called for them because they can appear as arguments
-  // to functions and other unpredictable places.
-  if (value->getType().is<BuiltinRawPointerType>()) {
-    DEBUG(llvm::dbgs() << "ConstExpr Unknown pointer: " << *value << "\n");
-    return SymbolicValue::getUnknown(value, UnknownReason::Default);
-  }
-
-  assert(!isPointer(value->getType()) && "Shouldn't be used for pointers");
-
   // Check to see if we already have an answer.
   auto it = calculatedValues.find(value);
   if (it != calculatedValues.end()) return it->second;
+
+  // If the client is asking for the value of a stack object that hasn't been
+  // computed, then we are in top level code, and the stack object must be a
+  // single store value.  Since this is a very different computation, split it
+  // out to its own path.
+  if (!fn && value->getType().isAddress()) {
+    SymbolicValue result = computeSingleStoreAddressValue(value);
+    setValue(value, result);
+    return result;
+  }
 
   // Compute the value of a normal instruction based on its operands.
   auto result = computeConstantValue(value);
@@ -936,8 +948,6 @@ SymbolicValue ConstExprFunctionState::getConstantValue(SILValue value) {
 
   return calculatedValues[value] = result;
 }
-
-
 
 
 /// Given an aggregate value like {{1, 2}, 3} and an access path like [0,1], and
@@ -1010,18 +1020,19 @@ static bool updateIndexedElement(SymbolicValue &aggregate,
 /// finding the temporary stack value that they were stored into and analyzing
 /// the single store that should exist into that memory (there are a few forms).
 ///
-/// Invariant: Before the call, `addressValues` must not contain `addr` as a
+/// Invariant: Before the call, `calculatedValues` must not contain `addr` as a
 /// key.
 SymbolicValue
 ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   // The only value we can otherwise handle is an alloc_stack instruction.
   auto alloc = dyn_cast<AllocStackInst>(addr);
   if (!alloc)
-    return getUnknownAddress(addr, UnknownReason::Default);
+    return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
   // Keep track of the value found for the first constant store.
   unsigned objectID =
-    createMemoryObject(alloc, SymbolicValue::getUninitMemory()).getAddressValueObjectID();
+    createMemoryObject(alloc,
+                   SymbolicValue::getUninitMemory()).getAddressValueObjectID();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
@@ -1048,7 +1059,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
         // we don't support multiple assignment.
         if (memoryObjects[objectID].first.getKind()
             != SymbolicValue::UninitMemory)
-          return getUnknownAddress(alloc, UnknownReason::Default);
+          return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
         auto result = getConstantValue(si->getOperand(0));
         memoryObjects[objectID].first = result;
@@ -1074,7 +1085,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
       // Otherwise this is a write.  If we have already found a value for this
       // stack slot then we're done: we don't support multiple assignment.
       if (memoryObjects[objectID].first.getKind() !=SymbolicValue::UninitMemory)
-        return getUnknownAddress(alloc, UnknownReason::Default);
+        return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
       // The callee needs to be a direct call to a constant expression.
       auto callResult = computeCallResult(apply);
@@ -1098,7 +1109,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 
     // If this is some other user that we don't know about, then we should
     // treat it conservatively, because it could store into the address.
-    return getUnknownAddress(addr, UnknownReason::Default);
+    return SymbolicValue::getUnknown(addr, UnknownReason::Default);
   }
 
   // If we found a store of a constant, then return that value!
@@ -1106,13 +1117,15 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
     return SymbolicValue::getAddress(objectID);
 
   // Otherwise, return unknown.
-  return getUnknownAddress(addr, UnknownReason::Default);
+  return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 }
 
 
 /// Given the operand to a load, resolve it to a constant if possible.
 SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
-  auto addr = getAddressValue(addrVal);
+  auto addr = getConstantValue(addrVal);
+  if (!addr.isConstant())
+    return addr;
 
   SmallVector<unsigned, 4> accessPath;
   unsigned objectID = addr.getAddressValue(accessPath);
@@ -1144,8 +1157,9 @@ SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
 llvm::Optional<SymbolicValue>
 ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   // Only update existing memory locations that we're tracking.
-  auto it = addressValues.find(dest);
-  if (it == addressValues.end())
+  auto it = calculatedValues.find(dest);
+  if (it == calculatedValues.end() ||
+      !it->second.isConstant())
     return SymbolicValue::getUnknown(dest, UnknownReason::Default);
 
   SmallVector<unsigned, 4> accessPath;
@@ -1169,76 +1183,6 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
   memoryObjects[objectID].first = objectVal;
   return None;
 }
-
-/// Invariant: Before the call, `addressValues` must not contain `addr` as a
-/// key.
-SymbolicValue ConstExprFunctionState::computeAddressValue(SILValue addr) {
-  assert(!addressValues.count(addr));
-  // If this is a struct or tuple element addressor, compute a more derived
-  // address.
-  if (isa<StructElementAddrInst>(addr) || isa<TupleElementAddrInst>(addr)) {
-    auto inst = cast<SingleValueInstruction>(addr);
-    auto baseAddr = getAddressValue(inst->getOperand(0));
-
-    SmallVector<unsigned, 4> accessPath;
-    unsigned objectID = baseAddr.getAddressValue(accessPath);
-
-    // Add our index onto the next of the list.
-    unsigned index;
-    if (auto sea = dyn_cast<StructElementAddrInst>(inst))
-      index = sea->getFieldNo();
-    else
-      index = cast<TupleElementAddrInst>(inst)->getFieldNo();
-    accessPath.push_back(index);
-    return SymbolicValue::getAddress(objectID, accessPath,
-                                     evaluator.getAllocator());
-  }
-
-  // These instructions are markers that return their first operand.
-  if (auto *bai = dyn_cast<BeginAccessInst>(addr))
-    return getAddressValue(bai->getOperand());
-
-  // This one returns the address of its enum payload.
-  if (auto *dai = dyn_cast<UncheckedTakeEnumDataAddrInst>(addr)) {
-    auto enumAddr = dai->getOperand();
-    auto enumVal = computeLoadResult(enumAddr);
-    if (enumVal.isConstant())
-      return createMemoryObject(addr, enumVal.getEnumPayloadValue());
-  }
-
-  DEBUG(llvm::dbgs() << "ConstExpr Unknown simple addr: " << *addr << "\n");
-
-  // Otherwise, we don't know how to handle this.
-  return getUnknownAddress(addr, UnknownReason::Default);
-}
-
-
-/// Return the AddressValue for the specified SIL address, lazily computing
-/// it if needed.
-SymbolicValue ConstExprFunctionState::getAddressValue(SILValue addr) {
-  assert(isPointer(addr->getType()) && "Should be used for pointers");
-
-  // Check to see if we already have an answer.
-  auto it = addressValues.find(addr);
-  if (it != addressValues.end())
-    return it->second;
-
-  // If the client is asking for the value of a stack object that hasn't been
-  // computed, then we are in top level code, and the stack object must be a
-  // single store value.  Since this is a very different computation, split it
-  // out to its own path.
-  if (!fn) {
-    SymbolicValue result = computeSingleStoreAddressValue(addr);
-    addressValues.insert({addr, result});
-    return result;
-  }
-
-  // Compute the value of a normal instruction based on its operands.
-  SymbolicValue result = computeAddressValue(addr);
-  addressValues.insert({addr, result});
-  return result;
-}
-
 
 /// Evaluate the specified instruction in a flow sensitive way, for use by
 /// the constexpr function evaluator.  This does not handle control flow
@@ -1264,7 +1208,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // remove the memory from the set.  We don't *have* to do this, but it seems
   // useful for hygiene.
   if (isa<DeallocStackInst>(inst)) {
-    addressValues.erase(inst->getOperand(0));
+    calculatedValues.erase(inst->getOperand(0));
     return None;
   }
 
@@ -1303,20 +1247,10 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this fails, then we fail.
   if (inst->getNumResults() != 0) {
     auto oneResultVal = inst->getResults()[0];
-    if (!isPointer(oneResultVal->getType())) {
-      auto result = getConstantValue(oneResultVal);
-      if (!result.isConstant())
-        return result;
-      DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
-    } else {
-      auto result = getAddressValue(oneResultVal);
-      // If the address could not be resolved, puts the 'unknown' code into
-      // the referenced memory object.
-      auto memVal = memoryObjects[result.getAddressValueObjectID()].first;
-      if (memVal.isUnknown())
-        return memVal;
-      DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
-    }
+    auto result = getConstantValue(oneResultVal);
+    if (!result.isConstant())
+      return result;
+    DEBUG(llvm::dbgs() << "  RESULT: ";  result.dump());
     return None;
   }
 
