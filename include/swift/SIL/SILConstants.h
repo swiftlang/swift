@@ -355,6 +355,8 @@ public:
     if (representationKind == RK_DirectAddress)
       return aux.directAddress_objectID;
     assert(representationKind == RK_DerivedAddress);
+    assert(aux.derivedAddress_numEntries != 0 &&
+           "should always have space for the object ID");
     return value.derivedAddress[0];
   }
 
