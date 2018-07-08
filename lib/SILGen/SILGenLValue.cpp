@@ -688,19 +688,22 @@ namespace {
   /// A physical path component which force-projects the address of
   /// the value of an optional l-value.
   class ForceOptionalObjectComponent : public PhysicalPathComponent {
+    bool isImplicitUnwrap;
   public:
-    ForceOptionalObjectComponent(LValueTypeData typeData)
-      : PhysicalPathComponent(typeData, OptionalObjectKind) {}
+    ForceOptionalObjectComponent(LValueTypeData typeData,
+                                 bool isImplicitUnwrap)
+      : PhysicalPathComponent(typeData, OptionalObjectKind),
+        isImplicitUnwrap(isImplicitUnwrap) {}
     
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       // Assert that the optional value is present and return the projected out
       // payload.
-      return SGF.emitPreconditionOptionalHasValue(loc, base);
+      return SGF.emitPreconditionOptionalHasValue(loc, base, isImplicitUnwrap);
     }
 
     void dump(raw_ostream &OS, unsigned indent) const override {
-      OS.indent(indent) << "ForceOptionalObjectComponent()\n";
+      OS.indent(indent) << "ForceOptionalObjectComponent(" << isImplicitUnwrap << ")\n";
     }
   };
 
@@ -3004,7 +3007,9 @@ LValue SILGenLValue::visitForceValueExpr(ForceValueExpr *e,
   LValue lv = visitRec(e->getSubExpr(), accessKind,
                        options.forComputedBaseLValue());
   LValueTypeData typeData = getOptionalObjectTypeData(SGF, lv.getTypeData());
-  lv.add<ForceOptionalObjectComponent>(typeData);
+  bool isImplicitUnwrap = e->isImplicit() &&
+    e->isForceOfImplicitlyUnwrappedOptional(); 
+  lv.add<ForceOptionalObjectComponent>(typeData, isImplicitUnwrap);
   return lv;
 }
 

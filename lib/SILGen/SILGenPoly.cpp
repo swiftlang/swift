@@ -398,7 +398,10 @@ ManagedValue Transform::transform(ManagedValue v,
   // optional or Any, force it.
   if (inputIsOptional && !outputIsOptional &&
       !outputSubstType->isExistentialType()) {
+    // isImplicitUnwrap is hardcoded false because this method is never
+    // used to generate code from a ForceValueExpr.
     v = SGF.emitCheckedGetOptionalValueFrom(Loc, v,
+                                            /*isImplicitUnwrap*/ false, 
                                             SGF.getTypeLowering(v.getType()),
                                             SGFContext());
 
