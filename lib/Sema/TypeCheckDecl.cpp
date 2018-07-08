@@ -288,9 +288,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
-
-    validateExtension(ext);
-    if (ext->isInvalid())
+    if (!ext->getExtendedType())
       return;
 
     inheritedClause = ext->getInherited();
@@ -408,8 +406,6 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     }
     inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
-    // If this is a protocol or protocol composition type, record the
-    // protocols.
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
 
@@ -429,8 +425,8 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
       //
-      // Classes can only inherit from subclass existentials that do not
-      // have a superclass term.
+      // Extensions, structs and enums can only inherit from protocol
+      // compositions that do not contain AnyObject or class members.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
