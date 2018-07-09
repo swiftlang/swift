@@ -228,18 +228,21 @@ struct TestConfig {
 
   mutating func findTestsToRun() {
     registeredBenchmarks.sort()
-    let benchmarkNames = Set(filters)
+    let indices = Dictionary(uniqueKeysWithValues:
+      zip(registeredBenchmarks.map{$0.name}, 1...))
+    let benchmarkNamesOrIndices = Set(filters)
     // needed so we don't capture an ivar of a mutable inout self.
     let (_tags, _skipTags) = (tags, skipTags)
 
     tests = registeredBenchmarks.filter { benchmark in
-      if benchmarkNames.isEmpty {
+      if benchmarkNamesOrIndices.isEmpty {
         return benchmark.tags.isSuperset(of: _tags) &&
           benchmark.tags.isDisjoint(with: _skipTags)
       } else {
-        return benchmarkNames.contains(benchmark.name)
+        return benchmarkNamesOrIndices.contains(benchmark.name) ||
+          benchmarkNamesOrIndices.contains(String(indices[benchmark.name]!))
       }
-    }.enumerated().map { Test(benchInfo: $0.element, index: $0.offset + 1) }
+    }.map { Test(benchInfo: $0, index: indices[$0.name]!) }
   }
 }
 
@@ -478,9 +481,9 @@ public func main() {
       fatalError("\(msg)")
     case .listTests:
       config.findTestsToRun()
-      print("Enabled Tests\(config.delim)Tags")
+      print("#\(config.delim)Test\(config.delim)[Tags]")
       for t in config.tests {
-        print("\(t.name)\(config.delim)\(t.tags)")
+        print("\(t.index)\(config.delim)\(t.name)\(config.delim)\(t.tags)")
       }
     case .run:
       config.findTestsToRun()

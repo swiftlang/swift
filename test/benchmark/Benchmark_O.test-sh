@@ -41,9 +41,9 @@
 // ORSKIPTAGS-NOT: RomanNumbers
 
 // RUN: %Benchmark_O  --list | %FileCheck %s --check-prefix LISTPRECOMMIT
-// LISTPRECOMMIT: Enabled Tests,Tags
+// LISTPRECOMMIT: #,Test,[Tags]
 // LISTPRECOMMIT-NOT: Ackermann
-// LISTPRECOMMIT: AngryPhonebook
+// LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
 
 // RUN: %Benchmark_O  --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
 // LISTALL: Ackermann
