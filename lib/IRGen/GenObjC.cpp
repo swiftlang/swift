@@ -1159,7 +1159,9 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   /// The first element is the selector.
   selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding.
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
   atEncoding = getObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
   
@@ -1349,9 +1351,13 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   Selector selector(declRef);
   auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
-  /// The second element is the type @encoding, which is always "@?"
-  /// for a function type.
-  auto atEncoding = IGM.getAddrOfGlobalString("@?");
+  /// The second element is the method signature. A method signature is made of
+  /// the return type @encoding and every parameter type @encoding, glued with
+  /// numbers that used to represent stack offsets for each of these elements.
+  auto ptrSize = IGM.getPointerSize().getValue();
+  llvm::SmallString<8> signature;
+  signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
+  auto atEncoding = IGM.getAddrOfGlobalString(signature);
 
   /// The third element is the method implementation pointer.
   auto impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
