@@ -313,7 +313,8 @@ internal final class _DataStorage {
         case .swift: fallthrough
         case .immutable: fallthrough
         case .mutable:
-            block(UnsafeBufferPointer<UInt8>(start: _bytes?.advanced(by: range.lowerBound - _offset).assumingMemoryBound(to: UInt8.self), count: Swift.min(range.count, _length)), 0, &stopv)
+            let len = Swift.min(range.count, _length)
+            block(UnsafeBufferPointer<UInt8>(start: _bytes?.advanced(by: range.lowerBound - _offset).bindMemory(to: UInt8.self, capacity: len), count: len), 0, &stopv)
             return
         case .customReference(let d):
             data = d
@@ -329,8 +330,8 @@ internal final class _DataStorage {
             if region.lowerBound < range.lowerBound {
                 regionAdjustment = range.lowerBound - (region.lowerBound - _offset)
             }
-            let bytePtr  = ptr.advanced(by: regionAdjustment).assumingMemoryBound(to: UInt8.self)
             let effectiveLength = Swift.min((region.location - _offset) + region.length, range.upperBound) - (region.location - _offset)
+            let bytePtr  = ptr.advanced(by: regionAdjustment).bindMemory(to: UInt8.self, capacity: effectiveLength)
             block(UnsafeBufferPointer(start: bytePtr, count: effectiveLength - regionAdjustment), region.location + regionAdjustment - _offset, &stopv)
             if stopv {
                 stop.pointee = true
