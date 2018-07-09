@@ -206,16 +206,4 @@
 // so changing this value is not sufficient.
 #define SWIFT_DEFAULT_LLVM_CC llvm::CallingConv::C
 
-// These are temporary macros during the +0 cc exploration to cleanly support
-// both +0 and +1 in the runtime.
-#ifndef SWIFT_RUNTIME_ENABLE_GUARANTEED_NORMAL_ARGUMENTS
-#define SWIFT_NS_RELEASES_ARGUMENT NS_RELEASES_ARGUMENT
-#define SWIFT_CC_PLUSONE_GUARD(...) do { __VA_ARGS__ ; } while (0)
-#define SWIFT_CC_PLUSZERO_GUARD(...)
-#else
-#define SWIFT_NS_RELEASES_ARGUMENT
-#define SWIFT_CC_PLUSONE_GUARD(...)
-#define SWIFT_CC_PLUSZERO_GUARD(...)  do { __VA_ARGS__ ; } while (0)
-#endif
-
 #endif // SWIFT_RUNTIME_CONFIG_H
