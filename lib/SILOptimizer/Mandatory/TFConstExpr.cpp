@@ -129,20 +129,18 @@ namespace {
 
     /// Invariant: Before the call, `calculatedValues` must not contain `addr`
     /// as a key.
-    SymbolicValue createMemoryObject(SILValue addr) {
+    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue){
       assert(!calculatedValues.count(addr));
       auto type = simplifyType(addr->getType().getASTType());
       auto *memObject =
-        SymbolicValueMemoryObject::create(type, evaluator.getAllocator());
+        SymbolicValueMemoryObject::create(type, initialValue,
+                                          evaluator.getAllocator());
       auto result = SymbolicValue::getAddress(memObject);
       setValue(addr, result);
       return result;
     }
-    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue){
-      auto result = createMemoryObject(addr);
-      auto memObject = result.getAddressValueMemoryObject();
-      memObject->setValue(initialValue);
-      return result;
+    SymbolicValue createMemoryObject(SILValue addr) {
+      return createMemoryObject(addr, SymbolicValue::getUninitMemory());
     }
 
     /// Return the SymbolicValue for the specified SIL value, lazily computing
@@ -382,7 +380,6 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     }
   }
 
-
   // Unary operations.
   if (inst->getNumOperands() == 1) {
     auto operand = getConstantValue(inst->getOperand(0));
@@ -432,6 +429,10 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
 
     switch (builtin.ID) {
     default: break;
+    case BuiltinValueKind::PtrToInt:
+    case BuiltinValueKind::IntToPtr:
+      // These are semantically just copies, they exist to change SIL types.
+      return operand;
     case BuiltinValueKind::SToSCheckedTrunc:
       return IntCheckedTruncFn(true, true);
     case BuiltinValueKind::UToSCheckedTrunc:
@@ -487,17 +488,6 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       }
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
     }
-#if 0  // TODO: Revisit now that the pointer representation is fixed.
-    case BuiltinValueKind::PtrToInt: {
-      auto resultType = inst->getType().castTo<BuiltinIntegerType>();
-      // The only ptrtoint case we handle is from a string value to Word type,
-      // which happens in the wrapping up of strings.
-      if (operand.getKind() != SymbolicValue::String ||
-          !resultType->getWidth().isPointerWidth())
-        break;
-      return operand;
-    }
-#endif
     }
   }
 
@@ -773,14 +763,15 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
            conventions.getNumIndirectSILResults() == 0 &&
            conventions.getNumParameters() == 4 &&
            "unexpected signature");
-    auto *literal = dyn_cast<StringLiteralInst>(apply->getOperand(1));
-    if (!literal) break;
+    auto literal = getConstantValue(apply->getOperand(1));
+    if (literal.getKind() != SymbolicValue::String) break;
+    auto literalVal = literal.getStringValue();
+
     auto byteCount = getConstantValue(apply->getOperand(2));
     if (byteCount.getKind() != SymbolicValue::Integer ||
-        byteCount.getIntegerValue().getLimitedValue() !=
-          literal->getValue().size())
+        byteCount.getIntegerValue().getLimitedValue() != literalVal.size())
       break;
-    setValue(apply, SymbolicValue::getConstantInst(literal));
+    setValue(apply, literal);
     return None;
   }
   case WellKnownFunction::AllocateUninitializedArray: {

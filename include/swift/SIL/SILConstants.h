@@ -397,21 +397,19 @@ struct SymbolicValueMemoryObject {
   void setValue(SymbolicValue newValue) { value = newValue; }
 
   /// Create a new memory object whose overall type is as specified.
-  static SymbolicValueMemoryObject *create(Type type,
-                                           llvm::BumpPtrAllocator &allocator);
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
+                                           llvm::BumpPtrAllocator &allocator);
+  static SymbolicValueMemoryObject *create(Type type,
                                            llvm::BumpPtrAllocator &allocator) {
-    auto result = create(type, allocator);
-    result->value = value;
-    return result;
+    return create(type, SymbolicValue::getUninitMemory(), allocator);
   }
 
 private:
   const Type type;
   SymbolicValue value;
 
-  SymbolicValueMemoryObject(Type type)
-    : type(type), value(SymbolicValue::getUninitMemory()) {}
+  SymbolicValueMemoryObject(Type type, SymbolicValue value)
+    : type(type), value(value) {}
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject&) = delete;
   void operator=(const SymbolicValueMemoryObject&) = delete;
 };

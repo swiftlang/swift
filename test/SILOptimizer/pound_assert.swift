@@ -7,21 +7,19 @@ func trapsAndOverflows() {
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert(Int8(123231) > 42)
-  // FIXME: xpected-note @-1 {{trap detected}}
+  // expected-note @-1 {{trap detected}}
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert(Int8(124) + 8 > 42)
-  // FIXME: xpected-note @-1 {{integer overflow detected}}
+  // expected-note @-1 {{integer overflow detected}}
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert({ () -> Int in fatalError(String()) }() > 42)
-  // expected-note @-1 {{could not fold operation}}
-  // FIXME: xpected-note @-1 {{trap detected}}
+  // expected-note @-1 {{trap detected}}
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert({ () -> Int in fatalError("") }() > 42)
-  // expected-note @-1 {{could not fold operation}}
-  // TODO: xpected-note @-1 {{trap detected}}
+  // expected-note @-1 {{trap detected}}
 }
 
 func isOne(_ x: Int) -> Bool {
@@ -66,7 +64,7 @@ func loops1(a: Int) -> Int {
 // @constexpr
 func loops2(a: Int) -> Int {
   var x = 42
-  for i in 0 ... a {  // expected-note {{could not fold operation}}
+  for i in 0 ... a {
     x += i
   }
   return x

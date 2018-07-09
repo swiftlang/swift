@@ -196,10 +196,10 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
 //===----------------------------------------------------------------------===//
 
 SymbolicValueMemoryObject *
-SymbolicValueMemoryObject::create(Type type,
+SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
                                   llvm::BumpPtrAllocator &allocator) {
   auto result = allocator.Allocate<SymbolicValueMemoryObject>();
-  new (result) SymbolicValueMemoryObject(type);
+  new (result) SymbolicValueMemoryObject(type, value);
   return result;
 }
 
