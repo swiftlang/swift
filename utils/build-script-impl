@@ -632,9 +632,9 @@ function set_build_options_for_host() {
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
-                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
-                -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
+                -DCOMPILER_RT_ENABLE_IOS:BOOL="$(device_or_sim_enabled IOS)"
+                -DCOMPILER_RT_ENABLE_WATCHOS:BOOL="$(device_or_sim_enabled WATCHOS)"
+                -DCOMPILER_RT_ENABLE_TVOS:BOOL="$(device_or_sim_enabled TVOS)"
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
             )
@@ -986,6 +986,16 @@ function cmake_needs_to_specify_standard_computed_defaults() {
         echo "TRUE"
     else
         echo "FALSE"
+    fi
+}
+
+function device_or_sim_enabled() {
+    local device_var="SKIP_BUILD_${1}_DEVICE"
+    local simulator_var="SKIP_BUILD_${1}_SIMULATOR"
+    if [[ "${!device_var}" && "${!simulator_var}" ]]; then
+        echo "FALSE"
+    else
+        echo "TRUE"
     fi
 }
 
