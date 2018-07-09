@@ -1620,7 +1620,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
                 }
             }
-            hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.bindMemory(to: UInt8.self, capacity: hashRange.count), hashRange.count))
+            // we are sending this directly to C – CFHashBytes takes a `uint8_t *` (and perhaps should have taken a `void *` but we probably cant change that at this point
+            // so it is "safe" to use `assumingMemoryBound(to:)` and perhaps safer than binding the memory directly
+            hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.assumingMemoryBound(to: UInt8.self), hashRange.count))
         }
         return hashValue
     }
