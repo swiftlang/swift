@@ -1241,7 +1241,105 @@ namespace {
         return false;
       }
     }
-    
+
+    /// Estimate how big is the search space that exhaustivity
+    /// checker needs to cover, based on the total space and information
+    /// from the `switch` statement itself. Some of the easy situations
+    /// like `case .foo(let bar)` don't really contribute to the complexity
+    /// of the search so their sub-space sizes could be excluded from
+    /// consideration.
+    ///
+    /// \param total The total space to check.
+    /// \param covered The space covered by the `case` statements in the switch.
+    ///
+    /// \returns The size of the search space exhastivity checker has to check.
+    size_t estimateSearchSpaceSize(const Space &total, const Space &covered) {
+      switch (PairSwitch(total.getKind(), covered.getKind())) {
+      PAIRCASE(SpaceKind::Type, SpaceKind::Type): {
+        return total.getType()->isEqual(covered.getType())
+                    ? 0
+                    : total.getSize(TC, DC);
+      }
+      PAIRCASE(SpaceKind::Type, SpaceKind::Disjunct):
+      PAIRCASE(SpaceKind::Type, SpaceKind::Constructor): {
+        if (!Space::canDecompose(total.getType(), DC))
+          break;
+
+        SmallVector<Space, 4> spaces;
+        Space::decompose(TC, DC, total.getType(), spaces);
+        return estimateSearchSpaceSize(Space::forDisjunct(spaces), covered);
+      }
+
+      PAIRCASE(SpaceKind::Disjunct, SpaceKind::Disjunct):
+      PAIRCASE(SpaceKind::Disjunct, SpaceKind::Constructor): {
+        auto &spaces = total.getSpaces();
+        return std::accumulate(spaces.begin(), spaces.end(), 0,
+                               [&](size_t totalSize, const Space &space) {
+                                 return totalSize + estimateSearchSpaceSize(
+                                                        space, covered);
+                               });
+      }
+
+      // Search space size computation is not commutative, because it
+      // tries to check if space on right-hand side is covering any
+      // portion of the "total" space on the left.
+      PAIRCASE(SpaceKind::Constructor, SpaceKind::Disjunct): {
+        for (const auto &space : covered.getSpaces()) {
+          // enum E { case foo }
+          // func bar(_ lhs: E, _ rhs: E) {
+          //   switch (lhs, rhs) {
+          //     case (_, _): break
+          // }
+          if (total == space)
+            return 0;
+
+          if (!space.isSubspace(total, TC, DC))
+            continue;
+
+          if (estimateSearchSpaceSize(total, space) == 0)
+            return 0;
+        }
+        break;
+      }
+
+      PAIRCASE(SpaceKind::Constructor, SpaceKind::Constructor): {
+        if (total.getHead() != covered.getHead())
+          break;
+
+        auto &lhs = total.getSpaces();
+        auto &rhs = covered.getSpaces();
+
+        if (std::distance(lhs.begin(), lhs.end()) !=
+            std::distance(rhs.begin(), rhs.end()))
+          return total.getSize(TC, DC);
+
+        auto i = lhs.begin();
+        auto j = rhs.begin();
+
+        size_t totalSize = 0;
+        for (; i != lhs.end() && j != rhs.end(); ++i, ++j) {
+          // The only light-weight checking we can do
+          // is when sub-spaces on both sides are types
+          // otherwise we'd have to decompose, which
+          // is too heavy, so let's just return total
+          // space size if such situation is detected.
+          if (i->getKind() != SpaceKind::Type ||
+              j->getKind() != SpaceKind::Type)
+            return total.getSize(TC, DC);
+
+          totalSize += estimateSearchSpaceSize(*i, *j);
+        }
+
+        return totalSize;
+      }
+
+      default:
+        break;
+      }
+
+      return total.getSize(TC, DC);
+    }
+
     void checkExhaustiveness(bool limitedChecking) {
       // If the type of the scrutinee is uninhabited, we're already dead.
       // Allow any well-typed patterns through.
@@ -1308,16 +1406,17 @@ namespace {
       Space totalSpace = Space::forType(subjectType, Identifier());
       Space coveredSpace = Space::forDisjunct(spaces);
 
-      const size_t totalSpaceSize = totalSpace.getSize(TC, DC);
-      if (totalSpaceSize > Space::getMaximumSize()) {
-        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+      const size_t searchSpaceSizeEstimate =
+          estimateSearchSpaceSize(totalSpace, coveredSpace);
+      if (searchSpaceSizeEstimate > Space::getMaximumSize()) {
+        diagnoseCannotCheck(sawRedundantPattern, totalSpace, coveredSpace,
                             unknownCase);
         return;
       }
       unsigned minusCount = 0;
       auto diff = totalSpace.minus(coveredSpace, TC, DC, &minusCount);
       if (!diff) {
-        diagnoseCannotCheck(sawRedundantPattern, totalSpaceSize, coveredSpace,
+        diagnoseCannotCheck(sawRedundantPattern, totalSpace, coveredSpace,
                             unknownCase);
         return;
       }
@@ -1369,7 +1468,7 @@ namespace {
     };
     
     void diagnoseCannotCheck(const bool sawRedundantPattern,
-                             const size_t totalSpaceSize,
+                             const Space &totalSpace,
                              const Space &coveredSpace,
                              const CaseStmt *unknownCase) {
       // Because the space is large or the check is too slow,
@@ -1381,7 +1480,7 @@ namespace {
       // a 'default' to be inserted.
       // FIXME: Do something sensible for non-frozen enums.
       if (!sawRedundantPattern &&
-          coveredSpace.getSize(TC, DC) >= totalSpaceSize)
+          coveredSpace.getSize(TC, DC) >= totalSpace.getSize(TC, DC))
         return;
       diagnoseMissingCases(RequiresDefault::SpaceTooLarge, Space(),
                            unknownCase);
