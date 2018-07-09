@@ -115,10 +115,6 @@ namespace {
     /// by getConstantValue.  This does not hold SIL address values.
     llvm::DenseMap<SILValue, SymbolicValue> calculatedValues;
 
-    /// Memory objects tracked by the evaluator each get an entry in this array.
-    /// In addition to the current value, we track the type of the whole object.
-    SmallVector<std::pair<SymbolicValue, Type>, 8> memoryObjects;
-
   public:
     ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
                            SubstitutionMap substitutionMap,
@@ -133,14 +129,19 @@ namespace {
 
     /// Invariant: Before the call, `calculatedValues` must not contain `addr`
     /// as a key.
-    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue){
+    SymbolicValue createMemoryObject(SILValue addr) {
       assert(!calculatedValues.count(addr));
-      unsigned objectID = memoryObjects.size();
-      auto objectType = simplifyType(addr->getType().getASTType());
-      memoryObjects.push_back({initialValue, objectType});
-
-      auto result = SymbolicValue::getAddress(objectID);
+      auto type = simplifyType(addr->getType().getASTType());
+      auto *memObject =
+        SymbolicValueMemoryObject::create(type, evaluator.getAllocator());
+      auto result = SymbolicValue::getAddress(memObject);
       setValue(addr, result);
+      return result;
+    }
+    SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue){
+      auto result = createMemoryObject(addr);
+      auto memObject = result.getAddressValueMemoryObject();
+      memObject->setValue(initialValue);
       return result;
     }
 
@@ -262,7 +263,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       return baseAddr;
 
     SmallVector<unsigned, 4> accessPath;
-    unsigned objectID = baseAddr.getAddressValue(accessPath);
+    auto *memObject = baseAddr.getAddressValue(accessPath);
 
     // Add our index onto the next of the list.
     unsigned index;
@@ -271,7 +272,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     else
       index = cast<TupleElementAddrInst>(inst)->getFieldNo();
     accessPath.push_back(index);
-    return SymbolicValue::getAddress(objectID, accessPath,
+    return SymbolicValue::getAddress(memObject, accessPath,
                                      evaluator.getAllocator());
   }
 
@@ -486,7 +487,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       }
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
     }
-#if 0
+#if 0  // TODO: Revisit now that the pointer representation is fixed.
     case BuiltinValueKind::PtrToInt: {
       auto resultType = inst->getType().castTo<BuiltinIntegerType>();
       // The only ptrtoint case we handle is from a string value to Word type,
@@ -827,21 +828,13 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
 
   // Verify that we can fold all of the arguments to the call.
   SmallVector<SymbolicValue, 4> paramConstants;
-  unsigned applyParamBaseIndex = 1+conventions.getNumIndirectSILResults();
-  auto paramInfos = conventions.getParameters();
-  for (unsigned i = 0, e = paramInfos.size(); i != e; ++i) {
+  for (unsigned i = 0, e = apply->getNumOperands()-1; i != e; ++i) {
     // If any of the arguments is a non-constant value, then we can't fold this
     // call.
-    auto op = apply->getOperand(applyParamBaseIndex+i);
-    SymbolicValue argValue;
-    if (!isPointer(op->getType()))
-      argValue = getConstantValue(op);
-    else
-      argValue = computeLoadResult(op);
-
+    auto op = apply->getOperand(i+1);
+    SymbolicValue argValue = getConstantValue(op);
     if (!argValue.isConstant())
       return argValue;
-
     paramConstants.push_back(argValue);
   }
 
@@ -877,7 +870,6 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                                         apply->getSubstitutionMap());
     }
 
-
     // The substitution map for the callee is the composition of the callers
     // substitution map (which is always type/conformance to a concrete type
     // or conformance, with the mapping introduced by the call itself.  This
@@ -903,14 +895,6 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // TODO: unclear when this happens, is this for tuple result values?
     assert(numNormalResults == 1 && "Multiple results aren't supported?");
     setValue(apply->getResults()[0], results[nextResult]);
-    ++nextResult;
-  }
-
-  // Handle indirect results as well.
-  for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i){
-    auto error = computeFSStore(results[nextResult], apply->getOperand(1+i));
-    if (error.hasValue())
-      return error;
     ++nextResult;
   }
 
@@ -1030,9 +1014,8 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
     return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
   // Keep track of the value found for the first constant store.
-  unsigned objectID =
-    createMemoryObject(alloc,
-                   SymbolicValue::getUninitMemory()).getAddressValueObjectID();
+  auto *memoryObject =
+    createMemoryObject(alloc).getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
@@ -1057,14 +1040,13 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 
         // If we have already found a value for this stack slot then we're done:
         // we don't support multiple assignment.
-        if (memoryObjects[objectID].first.getKind()
-            != SymbolicValue::UninitMemory)
+        if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
           return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
         auto result = getConstantValue(si->getOperand(0));
-        memoryObjects[objectID].first = result;
-        if (result.isUnknown())
-          return SymbolicValue::getAddress(objectID);
+        if (!result.isConstant())
+          return SymbolicValue::getUnknown(addr, UnknownReason::Default);
+        memoryObject->setValue(result);
         continue;
       }
     }
@@ -1084,7 +1066,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 
       // Otherwise this is a write.  If we have already found a value for this
       // stack slot then we're done: we don't support multiple assignment.
-      if (memoryObjects[objectID].first.getKind() !=SymbolicValue::UninitMemory)
+      if (memoryObject->getValue().getKind() != SymbolicValue::UninitMemory)
         return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
       // The callee needs to be a direct call to a constant expression.
@@ -1092,17 +1074,16 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 
       // If the call failed, we're done.
       if (callResult.hasValue()) {
-        memoryObjects[objectID].first = callResult.getValue();
-        return SymbolicValue::getAddress(objectID);
+        memoryObject->setValue(callResult.getValue());
+        return SymbolicValue::getAddress(memoryObject);
       }
 
       // computeCallResult will have figured out the result and cached it for
       // us.
-      assert(memoryObjects[objectID].first.isConstant() &&
+      assert(memoryObject->getValue().isConstant() &&
              "Should have found a constant result value");
       continue;
     }
-
 
     DEBUG(llvm::dbgs() << "Unknown SingleStore ConstExpr user: "
                        << *user << "\n");
@@ -1113,8 +1094,8 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
   }
 
   // If we found a store of a constant, then return that value!
-  if (memoryObjects[objectID].first.isConstant())
-    return SymbolicValue::getAddress(objectID);
+  if (memoryObject->getValue().isConstant())
+    return SymbolicValue::getAddress(memoryObject);
 
   // Otherwise, return unknown.
   return SymbolicValue::getUnknown(addr, UnknownReason::Default);
@@ -1128,11 +1109,11 @@ SymbolicValue ConstExprFunctionState::computeLoadResult(SILValue addrVal) {
     return addr;
 
   SmallVector<unsigned, 4> accessPath;
-  unsigned objectID = addr.getAddressValue(accessPath);
+  auto *memoryObject = addr.getAddressValue(accessPath);
 
   // If this is a derived address, then we are digging into an aggregate
   // value.
-  auto objectVal = memoryObjects[objectID].first;
+  auto objectVal = memoryObject->getValue();
 
   // Try digging through the aggregate to get to our value.
   unsigned idx = 0, end = accessPath.size();
@@ -1163,24 +1144,24 @@ ConstExprFunctionState::computeFSStore(SymbolicValue storedCst, SILValue dest) {
     return SymbolicValue::getUnknown(dest, UnknownReason::Default);
 
   SmallVector<unsigned, 4> accessPath;
-  unsigned objectID = it->second.getAddressValue(accessPath);
+  auto *memoryObject = it->second.getAddressValue(accessPath);
 
   // If this is a direct store to tracked memory object, just update it.
   if (accessPath.empty()) {
-    memoryObjects[objectID].first = storedCst;
+    memoryObject->setValue(storedCst);
     return None;
   }
 
   // Otherwise, this is a store to a derived address, update the element of
   // the base value.
-  auto objectVal = memoryObjects[objectID].first;
-  auto objectType = memoryObjects[objectID].second;
+  auto objectVal = memoryObject->getValue();
+  auto objectType = memoryObject->getType();
 
   if (updateIndexedElement(objectVal, accessPath, storedCst, objectType,
                            evaluator.getAllocator()))
     return SymbolicValue::getUnknown(dest, UnknownReason::Default);
 
-  memoryObjects[objectID].first = objectVal;
+  memoryObject->setValue(objectVal);
   return None;
 }
 
@@ -1200,7 +1181,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
   if (auto asi = dyn_cast<AllocStackInst>(inst)) {
-    createMemoryObject(asi, SymbolicValue::getUninitMemory());
+    createMemoryObject(asi);
     return None;
   }
 
@@ -1287,20 +1268,10 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
         llvm::dbgs().resetColor()
         << "\n");
 
-  for (unsigned i = 0, e = conventions.getNumIndirectSILResults(); i != e; ++i)
-    state.createMemoryObject(argList[nextBBArg++],
-                             SymbolicValue::getUninitMemory());
-
-  for (auto argSymVal : arguments) {
-    auto argVal = argList[nextBBArg++];
-    if (isPointer(argVal->getType()))
-      state.createMemoryObject(argVal, argSymVal);
-    else
-      state.setValue(argVal, argSymVal);
-  }
-
-  assert(fn.front().getNumArguments() == nextBBArg &&
-         "argument count mismatch");
+  assert(arguments.size() == argList.size() &&
+         "incorrect # arguments passed");
+  for (auto argSymVal : arguments)
+    state.setValue(argList[nextBBArg++], argSymVal);
 
   // Keep track of which blocks we've already visited.  We don't support loops
   // and this allows us to reject them.
@@ -1342,14 +1313,6 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
         auto elts = val.getAggregateValue();
         assert(elts.size() == numNormalResults && "result list mismatch!");
         results.append(results.begin(), results.end());
-      }
-
-      for (unsigned i = 0, e = conventions.getNumIndirectSILResults();
-           i != e; ++i) {
-        auto result = state.computeLoadResult(argList[i]);
-        if (!result.isConstant())
-          return result;
-        results.push_back(result);
       }
 
       // TODO: Handle caching of results.
