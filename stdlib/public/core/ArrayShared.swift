@@ -83,22 +83,6 @@ internal func _makeCollectionDescription<C: Collection>
   return result
 }
 
-@usableFromInline
-internal func _initializeMemory<C: Collection>(
-  from newValues: C
-) -> ((UnsafeMutablePointer<C.Element>, Int) -> ()) {
-  return { rawMemory, count in
-    var p = rawMemory
-    var q = newValues.startIndex
-    for _ in 0..<count {
-      p.initialize(to: newValues[q])
-      newValues.formIndex(after: &q)
-      p += 1
-    }
-    _expectEnd(of: newValues, is: q)
-  }
-}
-
 extension _ArrayBufferProtocol {
   @inlinable // FIXME @useableFromInline https://bugs.swift.org/browse/SR-7588
   @inline(never)
@@ -114,9 +98,17 @@ extension _ArrayBufferProtocol {
       newCount: newCount, requiredCapacity: newCount)
 
     _arrayOutOfPlaceUpdate(
-      &newBuffer,
-      bounds.lowerBound - startIndex, insertCount,
-      _initializeMemory(from: newValues)
+      &newBuffer, bounds.lowerBound - startIndex, insertCount,
+      { rawMemory, count in
+        var p = rawMemory
+        var q = newValues.startIndex
+        for _ in 0..<count {
+          p.initialize(to: newValues[q])
+          newValues.formIndex(after: &q)
+          p += 1
+        }
+        _expectEnd(of: newValues, is: q)
+      }
     )
   }
 }
@@ -216,6 +208,10 @@ extension _ArrayBufferProtocol {
 
     _sanityCheck(headCount >= 0)
     _sanityCheck(newCount >= 0)
+    
+    let initializeNewElements = initializeNewElements ?? { ptr, count in
+      _sanityCheck(count == 0)
+    }
 
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
@@ -246,7 +242,7 @@ extension _ArrayBufferProtocol {
       // Destroy unused source items
       oldStart.deinitialize(count: oldCount)
 
-      initializeNewElements?(newStart, newCount)
+      initializeNewElements(newStart, newCount)
 
       // Move the tail items
       newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
@@ -264,7 +260,7 @@ extension _ArrayBufferProtocol {
       let newStart = _copyContents(
         subRange: headStart..<headEnd,
         initializing: destStart)
-      initializeNewElements?(newStart, newCount)
+      initializeNewElements(newStart, newCount)
       let tailStart = headEnd + oldCount
       let tailEnd = endIndex
       _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
