@@ -107,11 +107,16 @@ Using the Benchmark Driver
 
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
-The regular `--list` option does not provide these, but you can run:
-* `$ ./Benchmark_O --list --run-all | tail -n +2 | nl`
-You can use ordinal numbers instead of test names like this:
+These are printed out together with benchmark names and tags using the
+`--list` parameter. For a complete list of all available performance tests run
+* `$ ./Benchmark_O --list --skip-tags=`
+
+You can use test numbers instead of test names like this:
 * `$ ./Benchmark_O 1 42`
 * `$ ./Benchmark_Driver run 1 42`
+
+Test numbers are not stable in the long run, adding and removing tests from the
+benchmark suite will reorder them, but they are stable for a given build.
 
 Using the Harness Generator
 ---------------------------
