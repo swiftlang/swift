@@ -39,3 +39,12 @@
 // ORSKIPTAGS-NOT: DictOfArraysToArrayOfDicts
 // ORSKIPTAGS: Fibonacci
 // ORSKIPTAGS-NOT: RomanNumbers
+
+// RUN: %Benchmark_O  --list | %FileCheck %s --check-prefix LISTPRECOMMIT
+// LISTPRECOMMIT: Enabled Tests,Tags
+// LISTPRECOMMIT-NOT: Ackermann
+// LISTPRECOMMIT: AngryPhonebook
+
+// RUN: %Benchmark_O  --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
+// LISTALL: Ackermann
+// LISTALL: AngryPhonebook
