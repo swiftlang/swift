@@ -1038,8 +1038,9 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       // `thisBB`, processed via `worklist`} would form a cycle, with no "escape
       // edges" to some exit block (e.g. the block containing tensor end
       // point). That would not be a valid CFG.
-      // This is a case where BB is control-dependent on itself,
-      // and we need to mark its term inst (a cond_br).
+      // When `BB` and `pred` are the same block, we know the tensor ops in the
+      // block are control-dependent on the term inst of the block (a cond_br),
+      // so we need to mark that term inst.
       // Example CFG: bb0 -> bb1 -> {bb2, bb3}; bb2 -> bb1
       // Here bb1 is the loop header, bb2 the loop body.
       // `BB` and `pred` can both be bb1, with `thisBB` being bb2.
