@@ -2387,13 +2387,25 @@ static void detectRename(NodePtr L, NodePtr R) {
   }
 }
 
+static bool isOwnershipEquivalent(ReferenceOwnership Left,
+                                  ReferenceOwnership Right) {
+  if (Left == Right)
+    return true;
+  if (Left == ReferenceOwnership::Unowned && Right == ReferenceOwnership::Weak)
+    return true;
+  if (Left == ReferenceOwnership::Weak && Right == ReferenceOwnership::Unowned)
+    return true;
+  return false;
+}
+
 static void detectDeclChange(NodePtr L, NodePtr R) {
   assert(L->getKind() == R->getKind());
   if (auto LD = dyn_cast<SDKNodeDecl>(L)) {
     auto *RD = R->getAs<SDKNodeDecl>();
     if (LD->isStatic() ^ RD->isStatic())
       L->annotate(NodeAnnotation::StaticChange);
-    if (LD->getReferenceOwnership() != RD->getReferenceOwnership())
+    if (!isOwnershipEquivalent(LD->getReferenceOwnership(),
+                               RD->getReferenceOwnership()))
       L->annotate(NodeAnnotation::OwnershipChange);
     detectRename(L, R);
   }
