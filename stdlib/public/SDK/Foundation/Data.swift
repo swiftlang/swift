@@ -539,16 +539,16 @@ internal final class _DataStorage {
         case .swift: fallthrough
         case .immutable: fallthrough
         case .mutable:
-            return _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
+            return _bytes!.load(fromByteOffset: index - _offset, as: UInt8.self)
         case .customReference(let d):
             if __NSDataIsCompact(d) {
-                return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
+                return d.bytes.load(fromByteOffset: index - _offset, as: UInt8.self)
             } else {
                 var byte: UInt8 = 0
                 d.enumerateBytes { (ptr, range, stop) in
                     if NSLocationInRange(index, range) {
                         let offset = index - range.location - _offset
-                        byte = ptr.advanced(by: offset).assumingMemoryBound(to: UInt8.self).pointee
+                        byte = ptr.load(fromByteOffset: offset, as: UInt8.self)
                         stop.pointee = true
                     }
                 }
@@ -556,13 +556,13 @@ internal final class _DataStorage {
             }
         case .customMutableReference(let d):
             if __NSDataIsCompact(d) {
-                return d.bytes.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee
+                return d.bytes.load(fromByteOffset: index - _offset, as: UInt8.self)
             } else {
                 var byte: UInt8 = 0
                 d.enumerateBytes { (ptr, range, stop) in
                     if NSLocationInRange(index, range) {
                         let offset = index - range.location - _offset
-                        byte = ptr.advanced(by: offset).assumingMemoryBound(to: UInt8.self).pointee
+                        byte = ptr.load(fromByteOffset: offset, as: UInt8.self)
                         stop.pointee = true
                     }
                 }
@@ -577,7 +577,7 @@ internal final class _DataStorage {
         case .swift:
             fallthrough
         case .mutable:
-            _bytes!.advanced(by: index - _offset).assumingMemoryBound(to: UInt8.self).pointee = value
+            _bytes!.storeBytes(of: value, toByteOffset: index - _offset, as: UInt8.self)
         default:
             var theByte = value
             let range = NSRange(location: index, length: 1)
@@ -1551,7 +1551,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         _validateRange(subrange)
         let totalCount: Int = numericCast(newElements.count)
         _withStackOrHeapBuffer(totalCount) { conditionalBuffer in
-            let buffer = UnsafeMutableBufferPointer(start: conditionalBuffer.pointee.memory.assumingMemoryBound(to: UInt8.self), count: totalCount)
+            let buffer = UnsafeMutableBufferPointer(start: conditionalBuffer.pointee.memory.bindMemory(to: UInt8.self, capacity: totalCount), count: totalCount)
             var (iterator, index) = newElements._copyContents(initializing: buffer)
             while let byte = iterator.next() {
                 buffer[index] = byte
@@ -1620,7 +1620,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     memcpy(buffer.pointee.memory, $0.baseAddress!, hashRange.count)
                 }
             }
-            hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.assumingMemoryBound(to: UInt8.self), hashRange.count))
+            hashValue = Int(bitPattern: CFHashBytes(buffer.pointee.memory.bindMemory(to: UInt8.self, capacity: hashRange.count), hashRange.count))
         }
         return hashValue
     }
@@ -1777,7 +1777,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             defer { _idx += 1 }
             let bufferSize = MemoryLayout.size(ofValue: _buffer)
             return withUnsafeMutablePointer(to: &_buffer) { ptr_ in
-                let ptr = UnsafeMutableRawPointer(ptr_).assumingMemoryBound(to: UInt8.self)
+                let ptr = UnsafeMutableRawPointer(ptr_).bindMemory(to: UInt8.self, capacity: bufferSize)
                 let bufferIdx = (_idx - _data.startIndex) % bufferSize
                 if bufferIdx == 0 {
                     // populate the buffer
