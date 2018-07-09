@@ -570,7 +570,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
   }
 
   size_t numInputsFromPrevious = 0;
-  for (auto &inputPair : inputs) {
+  for (auto &inputPair : inputs.typesAndArgs) {
     auto iter = previousInputs.find(inputPair.second->getValue());
     if (iter == previousInputs.end()) {
       map[inputPair.second] = InputInfo::makeNewlyAdded();
@@ -587,7 +587,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     // FIXME: Can we do better?
     if (ShowIncrementalBuildDecisions) {
       llvm::StringSet<> inputArgs;
-      for (auto &inputPair : inputs) {
+      for (auto &inputPair : inputs.typesAndArgs) {
         inputArgs.insert(inputPair.second->getValue());
       }
 
@@ -727,8 +727,8 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
     OptType = OptA->getSpelling();
   }
   StringRef InputName;
-  if (Inputs.size() == 1) {
-    InputName = Inputs[0].second->getSpelling();
+  if (Inputs.typesAndArgs.size() == 1) {
+    InputName = Inputs.typesAndArgs[0].second->getSpelling();
   }
   StringRef OutputType = file_types::getExtension(OI.CompilerOutputType);
   return llvm::make_unique<UnifiedStatsReporter>("swift-driver",
@@ -1204,7 +1204,7 @@ void Driver::buildInputs(const ToolChain &TC,
       }
 
       if (checkInputExistence(*this, Args, Diags, Value))
-        Inputs.push_back(std::make_pair(Ty, A));
+        Inputs.typesAndArgs.push_back(std::make_pair(Ty, A));
 
       if (Ty == file_types::TY_Swift) {
         StringRef Basename = llvm::sys::path::filename(Value);
@@ -1232,7 +1232,7 @@ static bool maybeBuildingExecutable(const OutputInfo &OI,
 
   if (Args.hasArg(options::OPT_parse_as_library, options::OPT_parse_stdlib))
     return false;
-  return Inputs.size() == 1;
+  return Inputs.typesAndArgs.size() == 1;
 }
 
 static void diagnoseOutputModeArg(DiagnosticEngine &diags, const Arg *arg,
@@ -1515,8 +1515,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       // Chop off a "lib" prefix if we're building a library.
       OI.ModuleName.erase(0, strlen("lib"));
     }
-  } else if (Inputs.size() == 1) {
-    OI.ModuleName = llvm::sys::path::stem(Inputs.front().second->getValue());
+  } else if (Inputs.typesAndArgs.size() == 1) {
+    OI.ModuleName = llvm::sys::path::stem(
+        Inputs.typesAndArgs.front().second->getValue());
   }
 
   if (!Lexer::isIdentifier(OI.ModuleName) ||
@@ -1649,7 +1650,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   const DerivedArgList &Args = C.getArgs();
   ArrayRef<InputPair> Inputs = C.getInputFiles();
 
-  if (!SuppressNoInputFilesError && Inputs.empty()) {
+  if (!SuppressNoInputFilesError && !C.hasInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
   }
@@ -1838,8 +1839,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     llvm_unreachable("Batch mode should not be used to build actions");
   }
   case OutputInfo::Mode::Immediate: {
-    if (Inputs.empty())
-      return;
+    assert(C.hasInputs() && "Immediate mode should always have inputs");
 
     assert(OI.CompilerOutputType == file_types::TY_Nothing);
     auto *CA = C.createAction<InterpretJobAction>();

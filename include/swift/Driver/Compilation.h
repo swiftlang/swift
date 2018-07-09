@@ -280,7 +280,8 @@ public:
   }
 
   const llvm::opt::DerivedArgList &getArgs() const { return *TranslatedArgs; }
-  ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes; }
+  ArrayRef<InputPair> getInputFiles() const { return InputFilesWithTypes.typesAndArgs; }
+  bool hasInputs() const { return !InputFilesWithTypes.empty(); }
 
   OutputFileMap &getDerivedOutputFileMap() { return DerivedOutputFileMap; }
   const OutputFileMap &getDerivedOutputFileMap() const {

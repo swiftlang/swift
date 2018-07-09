@@ -29,7 +29,10 @@ namespace driver {
   /// An input argument from the command line and its inferred type.
   using InputPair = std::pair<file_types::ID, const llvm::opt::Arg *>;
   /// Type used for a list of input arguments.
-  using InputFileList = SmallVector<InputPair, 16>;
+  struct InputFileList {
+    SmallVector<InputPair, 16> typesAndArgs;
+    bool empty() const { return typesAndArgs.empty(); }
+  };
 
   enum class LinkKind {
     None,
