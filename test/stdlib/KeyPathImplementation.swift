@@ -216,7 +216,7 @@ struct TestKeyPathBuilder {
   mutating func addStructComponent(offset: Int,
                                    forceOverflow: Bool = false,
                                    endsReferencePrefix: Bool = false) {
-    addOffsetComponent(offset: offset, kindMask: 0,
+    addOffsetComponent(offset: offset, kindMask: 0x0100_0000,
                        forceOverflow: forceOverflow,
                        endsReferencePrefix: endsReferencePrefix)
   }
@@ -224,7 +224,7 @@ struct TestKeyPathBuilder {
   mutating func addClassComponent(offset: Int,
                                   forceOverflow: Bool = false,
                                   endsReferencePrefix: Bool = false) {
-    addOffsetComponent(offset: offset, kindMask: 0x0200_0000,
+    addOffsetComponent(offset: offset, kindMask: 0x0300_0000,
                        forceOverflow: forceOverflow,
                        endsReferencePrefix: endsReferencePrefix)
   }
@@ -237,7 +237,7 @@ struct TestKeyPathBuilder {
     endsReferencePrefix: Bool = false
   ) {
     assert(state == .component, "not expecting a component")
-    push(0x0108_0000 | (endsReferencePrefix ? 0x8000_0000 : 0))
+    push(0x0208_0000 | (endsReferencePrefix ? 0x8000_0000 : 0))
     pushWord(id)
     pushWord(getter)
     pushWord(args.count)
