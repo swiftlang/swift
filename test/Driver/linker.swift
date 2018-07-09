@@ -77,6 +77,7 @@
 // CHECK: -o [[OBJECTFILE:.*]]
 
 // CHECK-NEXT: bin/ld{{"? }}
+// CHECK-DAG: lib/darwin/libclang_rt.osx.a
 // CHECK-DAG: [[OBJECTFILE]]
 // CHECK-DAG: -L [[STDLIB_PATH:[^ ]+/lib/swift/macosx]]
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
@@ -87,7 +88,7 @@
 
 // SIMPLE: bin/ld{{"? }}
 // SIMPLE-NOT: -syslibroot
-// SIMPLE-DAG: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
+// SIMPLE: -macosx_version_min 10.{{[0-9]+}}.{{[0-9]+}}
 // SIMPLE-NOT: -syslibroot
 // SIMPLE: -o linker
 
@@ -97,6 +98,7 @@
 
 // SIMPLE_STATIC-NEXT: bin/ld{{"? }}
 // SIMPLE_STATIC: [[OBJECTFILE]]
+// SIMPLE_STATIC: lib/darwin/libclang_rt.osx.a
 // SIMPLE_STATIC: -lobjc
 // SIMPLE_STATIC: -lSystem
 // SIMPLE_STATIC: -arch x86_64
@@ -118,6 +120,7 @@
 // IOS_SIMPLE-DAG: -lSystem
 // IOS_SIMPLE-DAG: -arch x86_64
 // IOS_SIMPLE-DAG: -ios_simulator_version_min 7.1.{{[0-9]+}}
+// IOS_SIMPLE-DAG: lib/darwin/libclang_rt.ios.a
 // IOS_SIMPLE: -o linker
 
 
@@ -130,6 +133,7 @@
 // tvOS_SIMPLE-DAG: -lSystem
 // tvOS_SIMPLE-DAG: -arch x86_64
 // tvOS_SIMPLE-DAG: -tvos_simulator_version_min 9.0.{{[0-9]+}}
+// tvOS_SIMPLE-DAG: lib/darwin/libclang_rt.tvos.a
 // tvOS_SIMPLE: -o linker
 
 
@@ -142,6 +146,7 @@
 // watchOS_SIMPLE-DAG: -lSystem
 // watchOS_SIMPLE-DAG: -arch i386
 // watchOS_SIMPLE-DAG: -watchos_simulator_version_min 2.0.{{[0-9]+}}
+// watchOS_SIMPLE-DAG: lib/darwin/libclang_rt.watchos.a
 // watchOS_SIMPLE: -o linker
 
 
@@ -312,11 +317,11 @@
 
 
 // FILELIST: bin/ld{{"? }}
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -filelist {{"?[^-]}}
-// FILELIST-NOT: .o
-// FILELIST: /a.o
-// FILELIST-NOT: .o
+// FILELIST-NOT: .o{{"? }}
+// FILELIST: /a.o{{"? }}
+// FILELIST-NOT: .o{{"? }}
 // FILELIST: -o linker
 
 

@@ -84,22 +84,29 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 }
 
 static StringRef
-getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple) {
+getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
+                                    bool distinguishSimulator = true) {
   switch (getDarwinPlatformKind(triple)) {
   case DarwinPlatformKind::MacOS:
     return "osx";
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    if (distinguishSimulator)
+      return "iossim";
+    LLVM_FALLTHROUGH;
   case DarwinPlatformKind::IPhoneOS:
     return "ios";
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    return "iossim";
+  case DarwinPlatformKind::TvOSSimulator:
+    if (distinguishSimulator)
+      return "tvossim";
+    LLVM_FALLTHROUGH;
   case DarwinPlatformKind::TvOS:
     return "tvos";
-  case DarwinPlatformKind::TvOSSimulator:
-    return "tvossim";
+  case DarwinPlatformKind::WatchOSSimulator:
+    if (distinguishSimulator)
+      return "watchossim";
+    LLVM_FALLTHROUGH;
   case DarwinPlatformKind::WatchOS:
     return "watchos";
-  case DarwinPlatformKind::WatchOSSimulator:
-    return "watchossim";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
@@ -260,6 +267,13 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   assert(Triple.isOSDarwin());
+
+  // Always link the regular compiler_rt.
+  addLinkRuntimeLib(context.Args, Arguments,
+                    (Twine("libclang_rt.") +
+                     getDarwinLibraryNameSuffixForTriple(Triple,
+                                                         /*simulator*/false) +
+                     ".a").str());
 
   // FIXME: If we used Clang as a linker instead of going straight to ld,
   // we wouldn't have to replicate Clang's logic here.
