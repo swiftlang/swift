@@ -4608,8 +4608,14 @@ static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
     return false;
 
   const Expr *expr = argExpr;
-  if (auto *tupleArgs = dyn_cast<TupleExpr>(argExpr))
+  if (auto *tupleArgs = dyn_cast<TupleExpr>(argExpr)) {
     expr = tupleArgs->getElement(bestMatchIndex);
+  } else if (auto *misplacedLoad = dyn_cast<LoadExpr>(argExpr)) {
+    // If there are multiple possible overloads for a single-argument call
+    // expression, the partially-typed-checked AST may have a load around the
+    // call parentheses instead of inside them.
+    expr = misplacedLoad->getSubExpr();
+  }
   expr = expr->getValueProvidingExpr();
 
   auto parameters = bestMatchCandidate->getParameters();

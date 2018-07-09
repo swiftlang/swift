@@ -168,6 +168,19 @@ func sr8150(bar: Bar) {
   // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Bar'}} {{18-18=Bar(rawValue: }} {{21-21=)}}
 }
 
+class SR8150Box {
+  var bar: Bar
+  init(bar: Bar) { self.bar = bar }
+}
+// Bonus problem with mutable values being passed.
+func sr8150_mutable(obj: SR8150Box) {
+  sr8150_helper1(obj.bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{25-25=.rawValue}}
+
+  var bar = obj.bar
+  sr8150_helper1(bar)
+  // expected-error@-1 {{cannot convert value of type 'Bar' to expected argument type 'Double'}} {{18-18=}} {{21-21=.rawValue}}
+}
 
 struct NotEquatable { }
 
