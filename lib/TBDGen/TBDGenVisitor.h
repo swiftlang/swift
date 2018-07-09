@@ -29,6 +29,8 @@
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
 
+#include "tapi/InterfaceFile.h"
+
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
 
@@ -40,8 +42,10 @@ namespace tbdgen {
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
-  StringSet &Symbols;
-  const llvm::Triple &Triple;
+  tapi::internal::InterfaceFile &Symbols;
+  tapi::internal::ArchitectureSet Archs;
+  StringSet *StringSymbols;
+
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   TBDGenOptions &Opts;
@@ -49,36 +53,25 @@ public:
 private:
   bool FileHasEntryPoint = false;
 
-  void addSymbol(StringRef name) {
-    auto isNewValue = Symbols.insert(name).second;
-    (void)isNewValue;
-    assert(isNewValue && "already inserted");
-  }
+  void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
+                                     tapi::internal::SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
-  void addSymbol(LinkEntity entity) {
-    auto linkage =
-        LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
-
-    auto externallyVisible =
-        llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
-        linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
-
-    if (externallyVisible)
-      addSymbol(linkage.getName());
-  }
+  void addSymbol(LinkEntity entity);
 
   void addConformances(DeclContext *DC);
 
   void addDispatchThunk(SILDeclRef declRef);
 
 public:
-  TBDGenVisitor(StringSet &symbols, const llvm::Triple &triple,
+  TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
+                tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
                 ModuleDecl *swiftModule, TBDGenOptions &opts)
-      : Symbols(symbols), Triple(triple), UniversalLinkInfo(universalLinkInfo),
-        SwiftModule(swiftModule), Opts(opts) {}
+      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
+        UniversalLinkInfo(universalLinkInfo), SwiftModule(swiftModule),
+        Opts(opts) {}
 
   void setFileHasEntryPoint(bool hasEntryPoint) {
     FileHasEntryPoint = hasEntryPoint;

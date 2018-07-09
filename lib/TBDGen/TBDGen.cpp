@@ -29,13 +29,21 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/YAMLTraits.h"
 
 #include "TBDGenVisitor.h"
+#include "tapi/Architecture.h"
+#include "tapi/InterfaceFile.h"
+#include "tapi/Platform.h"
+#include "tapi/TextStub_v3.h"
+#include "tapi/YAMLReaderWriter.h"
 
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
 using StringSet = llvm::StringSet<>;
+using SymbolKind = tapi::internal::SymbolKind;
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
@@ -56,12 +64,34 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   }
 }
 
+void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
+  Symbols.addSymbol(kind, name, Archs);
+
+  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
+    auto isNewValue = StringSymbols->insert(name).second;
+    (void)isNewValue;
+    assert(isNewValue && "symbol appears twice");
+  }
+}
+
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
   auto linkage = effectiveLinkageForClassMember(
     declRef.getLinkage(ForDefinition),
     declRef.getSubclassScope());
   if (linkage == SILLinkage::Public)
     addSymbol(declRef.mangle());
+}
+
+void TBDGenVisitor::addSymbol(LinkEntity entity) {
+  auto linkage =
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
+
+  auto externallyVisible =
+      llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
+      linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
+
+  if (externallyVisible)
+    addSymbol(linkage.getName());
 }
 
 void TBDGenVisitor::addDispatchThunk(SILDeclRef declRef) {
@@ -371,14 +401,26 @@ void TBDGenVisitor::addFirstFileSymbols() {
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
-                                           StringSet &symbols,
+                                           StringSet *symbols,
                                            llvm::raw_ostream *os,
                                            TBDGenOptions &opts) {
   auto isWholeModule = singleFile == nullptr;
   const auto &target = M->getASTContext().LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, isWholeModule);
 
-  TBDGenVisitor visitor(symbols, target, linkInfo, M, opts);
+  tapi::internal::InterfaceFile file;
+  file.setFileType(tapi::internal::FileType::TBD_V3);
+  file.setInstallName(opts.InstallName);
+  // FIXME: proper version
+  file.setCurrentVersion(tapi::internal::PackedVersion(1, 0, 0));
+  // FIXME: pull this out of moduleformat?
+  file.setSwiftABIVersion(5);
+  file.setPlatform(tapi::internal::mapToSinglePlatform(target));
+  auto arch = tapi::internal::getArchType(target.getArchName());
+  file.setArch(arch);
+  file.setInstallAPI();
+
+  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
@@ -404,29 +446,27 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   }
 
   if (os) {
-    // The correct TBD formatting code is temporarily non-open source, so this
-    // is just a list of the symbols.
-    std::vector<StringRef> sorted;
-    for (auto &symbol : symbols)
-      sorted.push_back(symbol.getKey());
-    std::sort(sorted.begin(), sorted.end());
-    for (const auto &symbol : sorted) {
-      *os << symbol << "\n";
-    }
+    tapi::internal::YAMLWriter writer;
+    writer.add(
+        llvm::make_unique<tapi::internal::stub::v3::YAMLDocumentHandler>());
+
+    assert(writer.canWrite(&file) &&
+           "YAML writer should be able to write TBD v3");
+    llvm::cantFail(writer.writeFile(*os, &file),
+                   "YAML writing should be error-free");
   }
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
                                    TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, symbols,
+  enumeratePublicSymbolsAndWrite(file->getParentModule(), file, &symbols,
                                  nullptr, opts);
 }
 void swift::enumeratePublicSymbols(ModuleDecl *M, StringSet &symbols,
                                    TBDGenOptions &opts) {
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, nullptr, opts);
+  enumeratePublicSymbolsAndWrite(M, nullptr, &symbols, nullptr, opts);
 }
 void swift::writeTBDFile(ModuleDecl *M, llvm::raw_ostream &os,
                          TBDGenOptions &opts) {
-  StringSet symbols;
-  enumeratePublicSymbolsAndWrite(M, nullptr, symbols, &os, opts);
+  enumeratePublicSymbolsAndWrite(M, nullptr, nullptr, &os, opts);
 }
