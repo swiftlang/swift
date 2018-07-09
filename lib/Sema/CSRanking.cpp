@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -746,7 +746,7 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
   if (decl1Better == decl2Better)
     return Comparison::Unordered;
 
-  return decl1Better? Comparison::Better : Comparison::Worse;
+  return decl1Better ? Comparison::Better : Comparison::Worse;
 }
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
@@ -872,22 +872,22 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     case OverloadChoiceKind::DynamicMemberLookup:
       break;
     }
-    
-    // Determine whether one declaration is more specialized than the other.
-    bool firstAsSpecializedAs = false;
-    bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl1, decl2)) {
+
+    auto declComparison = tc.compareDeclarations(cs.DC, decl1, decl2);
+    switch (declComparison) {
+    case Comparison::Better:
       score1 += weight;
-      firstAsSpecializedAs = true;
-    }
-    if (isDeclAsSpecializedAs(tc, cs.DC, decl2, decl1)) {
+      break;
+    case Comparison::Worse:
       score2 += weight;
-      secondAsSpecializedAs = true;
+      break;
+    case Comparison::Unordered:
+      break;
     }
 
     // If each is as specialized as the other, and both are constructors,
     // check the constructor kind.
-    if (firstAsSpecializedAs && secondAsSpecializedAs) {
+    if (declComparison == Comparison::Unordered) {
       if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
         if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
           if (ctor1->getInitKind() != ctor2->getInitKind()) {
