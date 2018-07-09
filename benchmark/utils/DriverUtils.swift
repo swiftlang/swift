@@ -227,39 +227,19 @@ struct TestConfig {
   }
 
   mutating func findTestsToRun() {
-    let benchmarkNameFilter = Set(filters)
+    registeredBenchmarks.sort()
+    let benchmarkNames = Set(filters)
+    // needed so we don't capture an ivar of a mutable inout self.
+    let (_tags, _skipTags) = (tags, skipTags)
 
-    // t is needed so we don't capture an ivar of a mutable inout self.
-    let t = tags
-    let st = skipTags
-    let filteredTests = Array(registeredBenchmarks.filter { benchInfo in
-      if !t.isSubset(of: benchInfo.tags) {
-        return false
+    tests = registeredBenchmarks.filter { benchmark in
+      if benchmarkNames.isEmpty {
+        return benchmark.tags.isSuperset(of: _tags) &&
+          benchmark.tags.isDisjoint(with: _skipTags)
+      } else {
+        return benchmarkNames.contains(benchmark.name)
       }
-
-      if !st.isDisjoint(with: benchInfo.tags) {
-        return false
-      }
-
-      // If the user did not specified a benchmark name filter and our tags are
-      // a subset of the specified tags by the user, return true. We want to run
-      // this test.
-      if benchmarkNameFilter.isEmpty {
-        return true
-      }
-
-      // Otherwise, we need to check if our benchInfo's name is in the benchmark
-      // name filter list. If it isn't, then we shouldn't process it.
-      return benchmarkNameFilter.contains(benchInfo.name)
-    }).sorted()
-
-    if (filteredTests.isEmpty) {
-      return
-    }
-
-    tests = filteredTests.enumerated().map {
-      Test(benchInfo: $0.element, index: $0.offset + 1)
-    }
+    }.enumerated().map { Test(benchInfo: $0.element, index: $0.offset + 1) }
   }
 }
 

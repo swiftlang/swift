@@ -17,10 +17,7 @@
 // Should run benchmark by name, even if its tags match the default skip-tags
 // (unstable,skip). Ackermann is marked unstable
 // RUN: %Benchmark_O Ackermann | %FileCheck %s --check-prefix NAMEDSKIP
-// NAMEDSKIP-NOT: Ackermann
-// RUN: %Benchmark_O Ackermann --skip-tags=  \
-// RUN:             | %FileCheck %s --check-prefix NAMEDSKIPWORKAROUND
-// NAMEDSKIPWORKAROUND: Ackermann
+// NAMEDSKIP: Ackermann
 
 // RUN: %Benchmark_O --list --tags=Dictionary,Array \
 // RUN:             | %FileCheck %s --check-prefix ANDTAGS

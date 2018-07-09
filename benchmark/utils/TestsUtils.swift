@@ -123,7 +123,7 @@ public struct BenchmarkInfo {
   /// A set of category tags that describe this benchmark. This is used by the
   /// harness to allow for easy slicing of the set of benchmarks along tag
   /// boundaries, e.x.: run all string benchmarks or ref count benchmarks, etc.
-  public var tags: [BenchmarkCategory]
+  public var tags: Set<BenchmarkCategory>
 
   /// The platforms that this benchmark supports. This is an OptionSet.
   private var unsupportedPlatforms: BenchmarkPlatformSet
@@ -158,7 +158,7 @@ public struct BenchmarkInfo {
               unsupportedPlatforms: BenchmarkPlatformSet = []) {
     self.name = name
     self._runFunction = runFunction
-    self.tags = tags
+    self.tags = Set(tags)
     self._setUpFunction = setUpFunction
     self._tearDownFunction = tearDownFunction
     self.unsupportedPlatforms = unsupportedPlatforms

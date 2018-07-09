@@ -86,13 +86,24 @@ Using the Benchmark Driver
 * `--num-samples`
     * Control the number of samples to take for each test
 * `--list`
-    * Print a list of available tests
+    * Print a list of available tests matching specified criteria
+* `--tags`
+    * Run tests that are labeled with specified [tags](https://github.com/apple/swift/blob/master/benchmark/utils/TestsUtils.swift#L19)
+     (comma separated list); multiple tags are interpreted as logical AND, i.e.
+     run only test that are labeled with all the supplied tags
+* `--skip-tags`
+    * Don't run tests that are labeled with any of the specified tags (comma
+      separated list); default value: `skip,unstable`; to get complete list of
+      tests, specify empty `--skip-tags=`
+
 
 ### Examples
 
 * `$ ./Benchmark_O --num-iters=1 --num-samples=1`
 * `$ ./Benchmark_Onone --list`
 * `$ ./Benchmark_Osize Ackermann`
+* `$ ./Benchmark_O --tags=Dictionary`
+* `$ ./Benchmark_O --skip-tags=unstable,skip,validation`
 
 ### Note
 As a shortcut, you can also refer to benchmarks by their ordinal numbers.
