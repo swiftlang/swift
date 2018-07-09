@@ -2448,7 +2448,10 @@ where Self.RawSignificand : FixedWidthInteger {
       let significandCount = Self.significandBitCount + 1
       let maxSignificand: Self.RawSignificand = 1 << significandCount
 %     if 'Closed' not in Range:
-      rand = generator.next(upperBound: maxSignificand)
+      // Rather than use .next(upperBound:), which has to work with arbitrary
+      // upper bounds, and therefore does extra work to avoid bias, we can take
+      // a shortcut because we know that maxSignificand is a power of two.
+      rand = generator.next() & (maxSignificand - 1)
 %     else:
       rand = generator.next(upperBound: maxSignificand + 1)
       if rand == maxSignificand {
@@ -2456,7 +2459,7 @@ where Self.RawSignificand : FixedWidthInteger {
       }
 %     end
     }
-    let unitRandom = Self.init(rand) * Self.ulpOfOne / 2
+    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
     let randFloat = delta * unitRandom + range.lowerBound
 %   if 'Closed' not in Range:
     if randFloat == range.upperBound {
