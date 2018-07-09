@@ -422,12 +422,16 @@ public:
     return PDI.dominates(getNode(dominator), getNode(dominatee));
   }
 
+  bool properlyPostDominates(SILBasicBlock *dominator,
+                             SILBasicBlock *dominatee) {
+    return PDI.properlyDominates(getNode(dominator), getNode(dominatee));
+  }
+
   SILBasicBlock *findNearestCommonPostDominator(SILBasicBlock *B1,
                                                 SILBasicBlock *B2) {
     auto res = PDI.findNearestCommonDominator(getNode(B1), getNode(B2));
     return res ? res->BB : nullptr;
   }
-
 
   SILBasicBlock *getPostIDom(SILBasicBlock *BB) {
     auto PDINode = PDI[getNode(BB)]->getIDom();
@@ -513,7 +517,7 @@ void BlocksReachingTensorCode::compute(ArrayRef<SILInstruction*> ops) {
   SmallVector<SILBasicBlock*, 8> worklist;
 
   // We seed the worklist with the blocks that the operations occur in, along
-  // with the blocks containing all uses of the operands.  These uses may not
+  // with the blocks containing all uses of the results.  These uses may not
   // themselves be tensor results that we partition: but they may be the send
   // operations that cause copy out or function results.
   for (auto *i : ops) {
@@ -964,10 +968,10 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
   SmallVector<SILBasicBlock*, 8> worklist;
   worklist.push_back(BB);
 
-  // The visited set keeps track of blocks that have been added to the worklist,
-  // to ensure we don't process something more than once.
-  SmallPtrSet<SILBasicBlock*, 32> visited;
-  visited.insert(BB);
+  // The addedToList set keeps track of blocks that have been added to the
+  // worklist, to ensure we don't process something more than once.
+  SmallPtrSet<SILBasicBlock*, 32> addedToList;
+  addedToList.insert(BB);
 
   // Walk up the CFG looking for terminators we are control-dependent on.
   while (!worklist.empty()) {
@@ -983,7 +987,9 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
     // Check the predecessors of this block.  If any of them have multiple
     // successors, then we may be control-dependent on that conditional.
     for (auto pred : thisBB->getPredecessorBlocks()) {
-      // Count the number of successors of this block which are tensor related.
+      // Count the number of successors of this block which are tensor related,
+      // for sanity-check purposes.
+      //
       // If we see successors that are not tensor related, we'll remember that
       // so we can insert a kill of the tensor program.
       unsigned numTensorSuccs = 0;
@@ -997,27 +1003,26 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
         }
       }
 
-      // Check to see if pred is already visited or if its terminator is already
-      // marked then we don't need to reprocess it.
-      if (visited.count(pred) ||
-          markedInstructions.count(pred->getTerminator()))
-        continue;
-
-      // If the predecessor has a single tensor-related successor (us) then we
-      // aren't control-dependent on it.  It may be control-dependent on
-      // something though.
       if (numTensorSuccs == 1) {
-        assert(tensorCodeBlocks.postDominates(thisBB, pred));
-        assert(tensorCodeBlocks.postDominates(BB, pred));
-        worklist.push_back(pred);
+        // Some sanity checks.
+        assert(tensorCodeBlocks.properlyPostDominates(thisBB, pred));
+        assert(tensorCodeBlocks.properlyPostDominates(BB, pred));
+      }
+      // We aren't control-dependent on `pred`, if `pred` is just another block
+      // post-dominated by `BB`. This includes the case where `pred` has a
+      // single tensor-related successor (us).
+      // In those cases, continue walking `pred` if we haven't processed it,
+      // since it may be control-dependent on something.
+      if (tensorCodeBlocks.properlyPostDominates(BB, pred)) {
+        if (addedToList.insert(pred).second)
+          worklist.push_back(pred);
         continue;
       }
 
-      // Otherwise, we already know by construction that BB post-dominates
-      // thisBB -- now we check to see if BB also post-dominates pred. If not,
-      // pred is the post dominance frontier for BB, and that means that the
-      // terminator in pred controls whether BB is executed, so it must be
-      // marked.  For example, BB is control-dependent on pred in this CFG:
+      // When BB does not properly post-dominate pred, pred is the post
+      // dominance frontier for BB, and that means that the terminator in pred
+      // controls whether BB is executed, so it must be marked.
+      // For example, BB is control-dependent on pred in this CFG:
       //
       //    pred
       //    /  \
@@ -1026,29 +1031,38 @@ void TFFunctionPartition::markBlock(SILBasicBlock *BB) {
       //    ..  BB
       //      \ |
       //       ..
-      if (!tensorCodeBlocks.postDominates(BB, pred)) {
-        auto predTerm = pred->getTerminator();
-        if (isa<BranchInst>(predTerm) || isa<CondBranchInst>(predTerm)) {
-          markInstruction(*predTerm, Marking::Copy);
-          continue;
-        }
+      //
+      // There is a special case when `BB` and `pred` are the same block. In
+      // that case we sanity-check that `BB` must have multiple successors,
+      // since otherwise the {list of nodes post-dominated by `BB` up to
+      // `thisBB`, processed via `worklist`} would form a cycle, with no "escape
+      // edges" to some exit block (e.g. the block containing tensor end
+      // point). That would not be a valid CFG.
+      // When `BB` and `pred` are the same block, we know the tensor ops in the
+      // block are control-dependent on the term inst of the block (a cond_br),
+      // so we need to mark that term inst.
+      // Example CFG: bb0 -> bb1 -> {bb2, bb3}; bb2 -> bb1
+      // Here bb1 is the loop header, bb2 the loop body.
+      // `BB` and `pred` can both be bb1, with `thisBB` being bb2.
+      assert(BB != pred || numTensorSuccs > 1);
 
-        if (isa<SwitchEnumInst>(predTerm)) {
-          // We intend for `predTerm` to still run on host (and thus did not
-          // mark its parent block), but send its result to accelerator.
-          markedInstructions.insert({predTerm, Marking::Send});
-          continue;
-        }
-
-        predTerm->dump();
-        assert(0 && "FIXME: Handle non-branch terminators like try_apply, which"
-               "cannot (in general) be moved to the accelerator");
+      auto predTerm = pred->getTerminator();
+      if (isa<BranchInst>(predTerm) || isa<CondBranchInst>(predTerm)) {
+        markInstruction(*predTerm, Marking::Copy);
+        continue;
       }
 
-      // Otherwise, the predecessor is just another block post-dominated by BB,
-      // continue walking it.
-      worklist.push_back(pred);
-      visited.insert(pred);
+      if (isa<SwitchEnumInst>(predTerm)) {
+        // We intend for `predTerm` to still run on host (and thus did not
+        // mark its parent block), but send its result to accelerator.
+        markedInstructions.insert({predTerm, Marking::Send});
+        continue;
+      }
+
+      // TODO: support other term inst types.
+      predTerm->dump();
+      assert(0 && "FIXME: Handle non-branch terminators like try_apply, which"
+                  "cannot (in general) be moved to the accelerator");
     }
   }
 }

@@ -64,6 +64,7 @@ public func lowerGraphCrash(x: Tensor<Int32>) {
 
   _ = x*x  // expected-note {{value used here}}
   for _ in 0..<1000 {
+    // expected-error @+1{{FIXME: cannot lower a Host->TF tensor transfer in a loop header}}
     _ = x+someGlobal // expected-warning {{value implicitly copied to the accelerator}}
   }
 }
@@ -290,3 +291,18 @@ public func testStructExtractBBArg(x: Tensor<Float>) -> Tensor<Int32> {
   return Tensor<Int32>(globalThing)
 }
 
+public func SR8191() {
+  let t = Tensor<Float>(1.0)
+  var i = 0
+  repeat {
+    let y = t + t // expected-warning {{value implicitly copied to the host}}
+    print(y)
+    i += 1
+  } while i < 10
+}
+
+// CHECK-LABEL: --- XLA CFG Canonicalize: {{.*}}SR8191{{.*}}
+// CHECK:    [sequence
+// CHECK:      <while Preheader: bb0, Header: bb1, exit: bb3
+// CHECK:        block bb2>
+// CHECK:      block bb3]
