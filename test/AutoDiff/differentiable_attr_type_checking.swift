@@ -71,7 +71,7 @@ func foo5() -> Float {
   return 1
 }
 
-@differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
+@differentiable(reverse, wrt: (self, .0, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
 func meow1(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
@@ -104,32 +104,32 @@ struct C {
 }
 
 struct S {
-  @differentiable(reverse, withRespectTo: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
+  @differentiable(reverse, wrt: (self, .0), adjoint: dmeow1_out_of_S(_:_:_:_:)) // expected-error {{'dmeow1_out_of_S' is not defined in the current type context}}
   func meow1(_ x: Float) -> Float {
     return x + 1
   }
 
-  @differentiable(reverse, withRespectTo: (.1, self, .2), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter must come first in the parameter list}}
+  @differentiable(reverse, wrt: (.1, self, .2), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter must come first in the parameter list}}
   func meow1_not_ok(_ x: Float, _: Float, _: Float) -> Float {
     return 1 + x
   }
 
-  @differentiable(reverse, withRespectTo: (self, .0), adjoint: dmeow1_in_S(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
+  @differentiable(reverse, wrt: (self, .0), adjoint: dmeow1_in_S(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
   static func meow1(_ x: Float) -> Float {
     return x + 1
   }
 
-  @differentiable(reverse, withRespectTo: (self, .0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
+  @differentiable(reverse, wrt: (self, .0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
   static func + (lhs: S, rhs: S) -> S {
     return lhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'dPlus' is not defined in the current type context}}
+  @differentiable(reverse, wrt: (.0, .1), adjoint: dPlus(_:_:_:_:)) // expected-error {{'dPlus' is not defined in the current type context}}
   static func - (lhs: S, rhs: S) -> S {
     return lhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dPlus_curried(_:)) // expected-error {{'dPlus_curried' is not defined in the current type context}}
+  @differentiable(reverse, wrt: (.0, .1), adjoint: dPlus_curried(_:)) // expected-error {{'dPlus_curried' is not defined in the current type context}}
   static func try_plus_curried_adjoint(lhs: S, rhs: S) -> S {
     return lhs
   }
@@ -138,28 +138,28 @@ struct S {
     return (lhs, rhs)
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dMul) // ok
+  @differentiable(reverse, wrt: (.0, .1), adjoint: dMul) // ok
   static func * (lhs: Int, rhs: S) -> S {
     return rhs
   }
 
-  @differentiable(reverse, withRespectTo: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (Int, S, S, S) -> (Int, S)'}}
+  @differentiable(reverse, wrt: (.0, .1), adjoint: dMul) // expected-error {{'dMul' does not have expected type '(S) -> (Int, S, S, S) -> (Int, S)'}}
   func instance_mul(lhs: Int, rhs: S) -> S {
     return rhs
   }
 }
 
-@differentiable(reverse, withRespectTo: (.1, .2), adjoint: dmeow2(_:_:_:_:_:)) // ok
+@differentiable(reverse, wrt: (.1, .2), adjoint: dmeow2(_:_:_:_:_:)) // ok
 func meow2(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, withRespectTo: (.2, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{parameter indices must be ascending}}
+@differentiable(reverse, wrt: (.2, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{parameter indices must be ascending}}
 func meow3(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
 
-@differentiable(reverse, withRespectTo: (.2, self, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
+@differentiable(reverse, wrt: (.2, self, .1), adjoint: dmeow1(_:_:_:_:)) // expected-error {{'self' parameter is only applicable to instance methods}}
 func meow4(_ x: Float, _: Float, _: Float) -> Float {
   return 1 + x
 }
@@ -253,17 +253,17 @@ extension E5 where T == Float {
 // with respect to self.
 struct E6<T> {}
 extension E6 {
-  @differentiable(reverse, withRespectTo: (self), adjoint: adjoint_wrt_self)
+  @differentiable(reverse, wrt: (self), adjoint: adjoint_wrt_self)
   func original(x: Float) -> Float {
     return x
   }
 
-  @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed)
+  @differentiable(reverse, wrt: (self), primal: primal, adjoint: adjoint_checkpointed)
   func original2(x: Float) -> Float {
     return x
   }
 
-  @differentiable(reverse, withRespectTo: (self), primal: primal, adjoint: adjoint_checkpointed_mismatch)
+  @differentiable(reverse, wrt: (self), primal: primal, adjoint: adjoint_checkpointed_mismatch)
   // expected-error @-1 {{'adjoint_checkpointed_mismatch' does not have expected type '<T> (E6<T>) -> (Float, E6<T>.Checkpoints, Float, Float) -> E6<T>'}}
   func original3(x: Float) -> Float {
     return x

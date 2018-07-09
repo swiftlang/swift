@@ -1303,8 +1303,7 @@ public:
 /// Attribute that marks a function differentiable and specifies the adjoint
 /// of the function. For example:
 ///   @differentiable(reverse, adjoint: foo(_:_:seed:) where T : FloatingPoint)
-///   @differentiable(reverse, withRespectTo: (self, .0, .1),
-///                   gradient: bar(_:_:_:seed:))
+///   @differentiable(reverse, wrt: (self, .0, .1), adjoint: bar(_:_:_:seed:))
 class DifferentiableAttr : public DeclAttribute {
 public:
   struct FunctionSpecifier {
@@ -1315,7 +1314,7 @@ private:
   /// Differentiation mode (forward or reverse).
   AutoDiffMode Mode;
   SourceLoc ModeLoc;
-  /// The number of parameters specified in 'withRespectTo:'.
+  /// The number of parameters specified in 'wrt:'.
   unsigned NumParameters;
   /// The primal function.
   Optional<FunctionSpecifier> Primal;
@@ -1357,7 +1356,7 @@ public:
   }
 
   /// The differentiation parameters, i.e. the list of parameters specified in
-  /// 'withRespectTo:'.
+  /// 'wrt:'.
   ArrayRef<AutoDiffParameter> getParameters() const;
   MutableArrayRef<AutoDiffParameter> getParameters() {
     return { getParametersData(), NumParameters };

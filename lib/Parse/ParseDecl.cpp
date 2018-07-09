@@ -848,14 +848,22 @@ bool Parser::parseDifferentiableAttributeArguments(
              /*isDeclModifier=*/false);
 
   // Parse optional differentiation parameters, starting with the
-  // 'withRespectTo:' label.
+  // 'wrt:' label.
+  // If 'withRespectTo' is used, make the user change it to 'wrt'.
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+    SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
+    diagnose(Tok, diag::autodiff_use_wrt_not_withrespectto)
+      .highlight(withRespectToRange)
+      .fixItReplace(withRespectToRange, "wrt:");
+    return errorAndSkipToEnd();
+  }
+  if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
     SyntaxParsingContext DiffParamsContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeDiffParams);
     consumeToken(tok::identifier);
     if (!consumeIf(tok::colon)) {
       diagnose(Tok, diag::attr_differentiable_expected_colon_after_label,
-               "withRespectTo");
+               "wrt");
       return errorAndSkipToEnd();
     }
     SourceLoc leftLoc;
@@ -873,7 +881,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       switch (Tok.getKind()) {
       case tok::period_prefix: {
         SyntaxParsingContext IndexParamContext(
-            SyntaxContext, SyntaxKind::DifferentiableAttributeIndexParam);
+            SyntaxContext, SyntaxKind::DifferentiationIndexParam);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,

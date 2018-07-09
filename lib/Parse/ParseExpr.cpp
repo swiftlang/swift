@@ -3645,9 +3645,11 @@ ParserResult<Expr> Parser::parseExprTypeOf() {
 ///   expr-gradient-param-list:
 ///     expr-gradient-param-index (',' expr-gradient-param-index)*
 ///   expr-gradient-param-index:
-///     'self' | '.' [0-9]+
+///     '.' [0-9]+
 ///
 ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
+  SyntaxParsingContext GradientContext(SyntaxContext, SyntaxKind::GradientExpr);
+
   assert(Tok.is(tok::pound_gradient) || Tok.is(tok::pound_valueAndGradient));
   auto poundGradLoc = consumeToken();
   SourceLoc lParenLoc;
@@ -3665,11 +3667,9 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     llvm_unreachable("Not a reverse AD expression");
   }
 
-  auto errorAndSkipToEnd = [&](unsigned parenDepth = 1) -> ParserResult<Expr> {
-    for (unsigned i = 0; i < parenDepth; ++i) {
-      skipUntilDeclStmtRBrace(tok::r_paren);
-      parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName);
-    }
+  auto errorAndSkipToEnd = [&]() -> ParserResult<Expr> {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    rParenLoc = Tok.is(tok::r_paren) ? consumeToken() : PreviousLoc;
     return makeParserResult<Expr>(
       new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
   };
@@ -3686,15 +3686,18 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
     return makeParserCodeCompletionResult<Expr>();
   if (originalFnParseResult.isParseError())
     return errorAndSkipToEnd();
-  // If found comma, parse 'withRespectTo:'.
-  SmallVector<AutoDiffParameter, 8> params;
+  // If found comma, parse 'wrt:'.
+  SmallVector<AutoDiffIndexParameter, 8> params;
   if (consumeIf(tok::comma)) {
-    // Parse 'wrt' ':'.
     // If 'withRespectTo' is used, make the user change it to 'wrt'.
     if (Tok.getText() == "withRespectTo") {
-      diagnose(Tok, diag::gradient_expr_use_wrt_not_withrespectto);
+      SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
+      diagnose(Tok, diag::autodiff_use_wrt_not_withrespectto)
+        .highlight(withRespectToRange)
+        .fixItReplace(withRespectToRange, "wrt:");
       return errorAndSkipToEnd();
     }
+    // Parse 'wrt' ':'.
     if (parseSpecificIdentifier("wrt",
                                 diag::expr_expected_label,
                                 exprName, "wrt:") ||
@@ -3702,39 +3705,43 @@ ParserResult<Expr> Parser::parseExprGradientBody(ExprKind kind) {
       return errorAndSkipToEnd();
     // Function that parses one parameter.
     auto parseParam = [&]() -> bool {
+      SyntaxParsingContext DiffParamContext(
+          SyntaxContext, SyntaxKind::GradientExprDiffParam);
       SourceLoc paramLoc;
       switch (Tok.getKind()) {
-      case tok::period_prefix:
+      case tok::period_prefix: {
+        SyntaxParsingContext IndexParamContext(
+            SyntaxContext, SyntaxKind::DifferentiationIndexParam);
         consumeToken(tok::period_prefix);
         unsigned index;
         if (parseUnsignedInteger(index, paramLoc,
                                  diag::gradient_expr_expected_parameter))
           return true;
-        params.push_back(
-          AutoDiffParameter::getIndexParameter(paramLoc, index));
+        params.push_back({ paramLoc, index });
         break;
-      case tok::kw_self:
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(AutoDiffParameter::getSelfParameter(paramLoc));
-        break;
+      }
       default:
         diagnose(Tok, diag::gradient_expr_expected_parameter);
         return true;
       }
+      if (Tok.isNot(tok::r_paren))
+        return parseToken(tok::comma, diag::attr_expected_comma, exprName,
+                          /*isDeclModifier=*/false);
       return false;
     };
-    // Parse first parameter.
+    // Parse first parameter. At least one is required.
     if (parseParam())
       return errorAndSkipToEnd();
-    // Parse the remaining parameters, ending with ')'.
-    while (consumeIf(tok::comma))
+    // Parse remaining parameters until ')'.
+    while (Tok.isNot(tok::r_paren))
       if (parseParam())
         return errorAndSkipToEnd();
+    SyntaxContext->collectNodesInPlace(SyntaxKind::GradientExprParamList);
   }
   // Parse the closing ')'.
   if (parseToken(tok::r_paren, rParenLoc, diag::expr_expected_rparen, exprName))
     return makeParserResult<Expr>(
-      new (Context) ErrorExpr(SourceRange(poundGradLoc, rParenLoc)));
+      new (Context) ErrorExpr(SourceRange(poundGradLoc, PreviousLoc)));
 
   // Successfully parsed a reverse autodiff expression.
   Expr *result = nullptr;
@@ -3770,9 +3777,11 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                                    DeclNameLoc &nameLoc) {
   // If the current token is an identifier or `Self` or `Any`, then attempt to
   // parse the base type. Otherwise, base type is null.
-  auto currentPosition = P.getParserPosition();
-  bool canParseBaseType = P.canParseTypeIdentifier();
-  P.backtrackToPosition(currentPosition);
+  bool canParseBaseType = false;
+  {
+    Parser::BacktrackingScope backtrack(P);
+    canParseBaseType = P.canParseTypeIdentifier();
+  }
   if (canParseBaseType)
     baseType =
       P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true).getPtrOrNull();
@@ -3799,8 +3808,10 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// parseExprAdjoint
-///   expr-adjoint: '#adjoint' '(' expr ')'
+///   expr-adjoint: '#adjoint' '(' qualified-decl-name ')'
 ParserResult<Expr> Parser::parseExprAdjoint() {
+  SyntaxParsingContext AdjointContext(SyntaxContext, SyntaxKind::AdjointExpr);
+
   SourceLoc poundLoc = consumeToken(tok::pound_adjoint);
   SourceLoc lParenLoc, rParenLoc;
 
@@ -3833,6 +3844,9 @@ ParserResult<Expr> Parser::parseExprAdjoint() {
 /// expr-pound-assert:
 ///   '#assert' '(' expr ',' string_literal ')'
 ParserResult<Expr> Parser::parseExprPoundAssert() {
+  SyntaxParsingContext AssertContext(SyntaxContext,
+      SyntaxKind::PoundAssertExpr);
+
   SourceLoc startLoc = consumeToken(tok::pound_assert);
   SourceLoc endLoc;
 

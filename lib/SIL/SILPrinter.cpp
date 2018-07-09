@@ -1230,8 +1230,19 @@ public:
       });
       *this << "]";
       return;
+    case SymbolicValue::Enum:
+      *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
+      return;
+    case SymbolicValue::EnumWithPayload:
+      *this << "(";
+      *this << SILDeclRef(v.getEnumValue(), SILDeclRef::Kind::EnumElement);
+      *this << ", ";
+      visitSymbolicValue(v.getEnumPayloadValue());
+      *this << ")";
+      return;
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
+    case SymbolicValue::Address:
       llvm_unreachable("Unimplemented SymbolicValue case");
     }
   }

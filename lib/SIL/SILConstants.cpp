@@ -83,6 +83,31 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os.indent(indent) << "]\n";
     return;
   }
+  case RK_Enum: {
+    auto *decl = getEnumValue();
+    os << "enum: ";
+    decl->print(os);
+    return;
+  }
+  case RK_EnumWithPayload: {
+    auto *decl = getEnumValue();
+    os << "enum: ";
+    decl->print(os);
+    os <<", payload: ";
+    getEnumPayloadValue().print(os, indent);
+    return;
+  }
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
+    SmallVector<unsigned, 4> accessPath;
+    SymbolicValueMemoryObject *memObject = getAddressValue(accessPath);
+    os << "Address[" << memObject->getType() << "] ";
+    interleave(accessPath.begin(), accessPath.end(),
+               [&](unsigned idx) { os << idx; },
+               [&]() { os << ", "; });
+    os << "\n";
+    break;
+  }
   }
 }
 
@@ -94,14 +119,29 @@ void SymbolicValue::dump() const {
 /// multiple forms for efficiency, but provide a simpler interface to clients.
 SymbolicValue::Kind SymbolicValue::getKind() const {
   switch (representationKind) {
-  case RK_UninitMemory: return UninitMemory;
-  case RK_Unknown:      return Unknown;
-  case RK_Metatype:     return Metatype;
-  case RK_Function:     return Function;
-  case RK_Aggregate:    return Aggregate;
-  case RK_Integer:      return Integer;
-  case RK_Float:        return Float;
-  case RK_String:       return String;
+  case RK_UninitMemory:
+    return UninitMemory;
+  case RK_Unknown:
+    return Unknown;
+  case RK_Metatype:
+    return Metatype;
+  case RK_Function:
+    return Function;
+  case RK_Aggregate:
+    return Aggregate;
+  case RK_Enum:
+    return Enum;
+  case RK_EnumWithPayload:
+    return EnumWithPayload;
+  case RK_Integer:
+    return Integer;
+  case RK_Float:
+    return Float;
+  case RK_String:
+    return String;
+  case RK_DirectAddress:
+  case RK_DerivedAddress:
+    return Address;
   case RK_Inst:
     auto *inst = value.inst;
     if (isa<IntegerLiteralInst>(inst))
@@ -117,20 +157,20 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// version.  This only works for valid constants.
 SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
   switch (getKind()) {
-  case SymbolicValue::Unknown:
-  case SymbolicValue::UninitMemory:
-    assert(0 && "These are not constants!");
-  case SymbolicValue::Metatype:
-  case SymbolicValue::Function:
+  case Unknown:
+  case UninitMemory:
+  case Metatype:
+  case Function:
+  case Enum:
     // These have trivial inline storage, just return a copy.
     return *this;
-  case SymbolicValue::Integer:
+  case Integer:
     return SymbolicValue::getInteger(getIntegerValue(), allocator);
-  case SymbolicValue::Float:
+  case Float:
     return SymbolicValue::getFloat(getFloatValue(), allocator);
-  case SymbolicValue::String:
+  case String:
     return SymbolicValue::getString(getStringValue(), allocator);
-  case SymbolicValue::Aggregate: {
+  case Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
@@ -138,7 +178,29 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
       results.push_back(elt.cloneInto(allocator));
     return getAggregate(results, allocator);
   }
+  case EnumWithPayload:
+    return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
+  case Address: {
+    SmallVector<unsigned, 4> accessPath;
+    auto *memObject = getAddressValue(accessPath);
+    auto *newMemObject =
+      SymbolicValueMemoryObject::create(memObject->getType(),
+                                        memObject->getValue(), allocator);
+    return getAddress(newMemObject, accessPath, allocator);
   }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// SymbolicValueMemoryObject implementation
+//===----------------------------------------------------------------------===//
+
+SymbolicValueMemoryObject *
+SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
+                                  llvm::BumpPtrAllocator &allocator) {
+  auto result = allocator.Allocate<SymbolicValueMemoryObject>();
+  new (result) SymbolicValueMemoryObject(type, value);
+  return result;
 }
 
 
@@ -419,9 +481,153 @@ ArrayRef<SymbolicValue> SymbolicValue::getAggregateValue() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Higher level code
+// Enums
 //===----------------------------------------------------------------------===//
 
+namespace swift {
+
+/// This is the representation of a constant enum value with payload.
+struct EnumWithPayloadSymbolicValue final {
+  /// The enum case.
+  EnumElementDecl *enumDecl;
+  SymbolicValue payload;
+
+  EnumWithPayloadSymbolicValue(EnumElementDecl *decl, SymbolicValue payload)
+    : enumDecl(decl), payload(payload) {
+  }
+
+private:
+  EnumWithPayloadSymbolicValue() = delete;
+  EnumWithPayloadSymbolicValue(const EnumWithPayloadSymbolicValue &) = delete;
+};
+} // end namespace swift
+
+/// This returns a constant Symbolic value for the enum case in `decl` with a
+/// payload.
+SymbolicValue
+SymbolicValue::getEnumWithPayload(EnumElementDecl *decl, SymbolicValue payload,
+                                  llvm::BumpPtrAllocator &allocator) {
+  assert(decl && payload.isConstant());
+  auto rawMem = allocator.Allocate<EnumWithPayloadSymbolicValue>();
+  auto enumVal = ::new (rawMem) EnumWithPayloadSymbolicValue(decl, payload);
+
+  SymbolicValue result;
+  result.representationKind = RK_EnumWithPayload;
+  result.value.enumValWithPayload = enumVal;
+  return result;
+}
+
+EnumElementDecl *SymbolicValue::getEnumValue() const {
+  if (representationKind == RK_Enum)
+    return value.enumVal;
+
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->enumDecl;
+}
+
+SymbolicValue SymbolicValue::getEnumPayloadValue() const {
+  assert(representationKind == RK_EnumWithPayload);
+  return value.enumValWithPayload->payload;
+}
+
+//===----------------------------------------------------------------------===//
+// Addresses
+//===----------------------------------------------------------------------===//
+
+namespace swift {
+
+/// This is the representation of a derived address.  A derived address refers
+/// to a memory object along with an access path that drills into it.
+struct DerivedAddressValue final
+: private llvm::TrailingObjects<DerivedAddressValue, unsigned> {
+  friend class llvm::TrailingObjects<DerivedAddressValue, unsigned>;
+
+  SymbolicValueMemoryObject *memoryObject;
+
+  /// This is the number of indices in the derived address.
+  const unsigned numElements;
+
+  static DerivedAddressValue *create(SymbolicValueMemoryObject *memoryObject,
+                                     ArrayRef<unsigned> elements,
+                                     llvm::BumpPtrAllocator &allocator) {
+    auto byteSize =
+      DerivedAddressValue::totalSizeToAlloc<unsigned>(elements.size());
+    auto rawMem = allocator.Allocate(byteSize, alignof(DerivedAddressValue));
+
+    //  Placement initialize the object.
+    auto dav = ::new (rawMem) DerivedAddressValue(memoryObject,
+                                                  elements.size());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            dav->getTrailingObjects<unsigned>());
+    return dav;
+  }
+
+  /// Return the element constants for this aggregate constant.  These are
+  /// known to all be constants.
+  ArrayRef<unsigned> getElements() const {
+    return { getTrailingObjects<unsigned>(), numElements };
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<unsigned>) const {
+    return numElements;
+  }
+private:
+  DerivedAddressValue() = delete;
+  DerivedAddressValue(const AggregateSymbolicValue &) = delete;
+  DerivedAddressValue(SymbolicValueMemoryObject *memoryObject,
+                      unsigned numElements)
+   : memoryObject(memoryObject), numElements(numElements) {}
+};
+} // end namespace swift
+
+
+
+/// Return a symbolic value that represents the address of a memory object
+/// indexed by a path.
+SymbolicValue SymbolicValue::
+getAddress(SymbolicValueMemoryObject *memoryObject, ArrayRef<unsigned> indices,
+           llvm::BumpPtrAllocator &allocator) {
+  if (indices.empty())
+    return getAddress(memoryObject);
+
+  auto dav = DerivedAddressValue::create(memoryObject, indices, allocator);
+  SymbolicValue result;
+  result.representationKind = RK_DerivedAddress;
+  result.value.derivedAddress = dav;
+  return result;
+}
+
+/// Return the memory object of this reference along with any access path
+/// indices involved.
+SymbolicValueMemoryObject *SymbolicValue::
+getAddressValue(SmallVectorImpl<unsigned> &accessPath) const {
+  assert(getKind() == Address);
+
+  accessPath.clear();
+  if (representationKind == RK_DirectAddress)
+    return value.directAddress;
+  assert(representationKind == RK_DerivedAddress);
+
+  auto *dav = value.derivedAddress;
+
+  // The first entry is the object ID, the rest are indices in the accessPath.
+  accessPath.assign(dav->getElements().begin(), dav->getElements().end());
+  return dav->memoryObject;
+}
+
+/// Return just the memory object for an address value.
+SymbolicValueMemoryObject *SymbolicValue::getAddressValueMemoryObject() const {
+  if (representationKind == RK_DirectAddress)
+    return value.directAddress;
+  assert(representationKind == RK_DerivedAddress);
+  return value.derivedAddress->memoryObject;
+}
+
+
+//===----------------------------------------------------------------------===//
+// Higher level code
+//===----------------------------------------------------------------------===//
 
 /// The SIL location for operations we process are usually deep in the bowels
 /// of inlined code from opaque libraries, which are all implementation details
@@ -494,5 +700,3 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
            diag::tf_op_misuse_note, error)
     .highlight(loc.getSourceRange());
 }
-
-

@@ -149,8 +149,10 @@ void TFDeabstraction::logCurrentState(const char *name, bool isDetailed) {
 static bool isArrayUninitialized(SILInstruction *call) {
   auto *apply = dyn_cast<ApplyInst>(call);
   if (!apply) return false;
-  auto semantics = ArraySemanticsCall(apply, "array.uninitialized");
-  return semantics.getKind() == ArrayCallKind::kArrayUninitialized;
+
+  if (auto fn = apply->getCalleeFunction())
+    return fn->hasSemanticsAttr("array.uninitialized");
+  return false;
 }
 
 /// Scan the function looking for call sites that should be inlined to expose
@@ -293,16 +295,6 @@ void TFDeabstraction::inlineCalls() {
     //
     // TODO: Build infra to find unused witness tables and remove them.
     if (callee->getRefCount() != 0) {
-
-      // FIXME: As a super hack, disable all optimization of the inlined
-      // methods that are defined and kept alive by the DifferentiableModule
-      // abstraction in the TensorFlow module.  These don't get removed because
-      // of the witness tables for DifferentiableModule, but we know that they
-      // don't matter.  Don't burn time optimizing them.
-      if (callee->getName().contains("adjoint3for4with") || //adjoint(for:with:
-          callee->getName().contains("6primal3for")) // primal(for:)
-        callee->setOptimizationMode(OptimizationMode::NoOptimization);
-
       continue;
     }
 
@@ -1506,9 +1498,12 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   switch (symVal.getKind()) {
   case SymbolicValue::Unknown:
   case SymbolicValue::UninitMemory:
+  case SymbolicValue::Address:
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
   case SymbolicValue::Function:
+  case SymbolicValue::Enum:
+  case SymbolicValue::EnumWithPayload:
     // TODO: Unsupported right now.
     return nullptr;
 
@@ -1996,23 +1991,13 @@ formGraphOp(SILTensorOpInfo &opInfo,
         elt = eltVal;
 
         opName += elementMarker;
-
-        // graph_op notationally takes its tensor operands at +1, so we need to
-        // retain them.
-        // TODO: move to a +0 model like the rest of Swift some day.
-        B.createStrongRetain(opInfo.inst->getLoc(), elt,
-                             Atomicity::Atomic);
         inputs.push_back(elt);
       }
 
-      // Okay, now that we updated this operand, try to remove the array.  If
-      // we can't remove it entirely, just emit a destroy_value to balance the
-      // former +1 use.
-      // TODO: When builtin's start using values as +0, this can go away.
-      if (arrayInsts.empty()) {
-        SILBuilder B2(++SILBasicBlock::iterator(opInfo.inst));
-        B2.emitDestroyValueOperation(opInfo.inst->getLoc(), operand);
-      } else {
+      // Okay, now that we updated this operand, try to remove the array
+      // entirely  If we can't, then we just leave it alone: we were using it as
+      // a +0 value, so we can just drop the use.
+      if (!arrayInsts.empty()) {
         // If we can remove it, drop all inter-dependent references.
         for (auto inst : arrayInsts)
           inst->dropAllReferences();

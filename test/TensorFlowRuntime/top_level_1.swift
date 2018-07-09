@@ -12,7 +12,7 @@ import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")
 
-TopLevelTests.testCPU("TopLevel") {
+TopLevelTests.testCPUOrGPU("TopLevel") {
   var x = Tensor<Int8>([1,2,3])*2
   x = x + x
   expectEqual(x.array, ShapedArray(shape: [3], scalars: [4, 8, 12]))

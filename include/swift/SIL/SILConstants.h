@@ -30,6 +30,9 @@ struct APIntSymbolicValue;
 struct APFloatSymbolicValue;
 struct StringSymbolicValue;
 struct AggregateSymbolicValue;
+struct EnumWithPayloadSymbolicValue;
+struct DerivedAddressValue;
+struct SymbolicValueMemoryObject;
 
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
@@ -103,13 +106,21 @@ class SymbolicValue {
     RK_String,
 
     /// This value is an array, struct, or tuple of constants.  This is
-    /// tracked by the "aggregate" member of the value union.  Note that we
-    /// cheat and represent single-element structs as the value of their
-    /// element (since they are so common).
+    /// tracked by the "aggregate" member of the value union.
     RK_Aggregate,
-  };
 
-  RepresentationKind representationKind : 8;
+    /// This value is an enum with no payload.
+    RK_Enum,
+
+    /// This value is an enum with a payload.
+    RK_EnumWithPayload,
+
+    /// This represents a direct reference to the address of a memory object.
+    RK_DirectAddress,
+
+    /// This represents an index *into* a memory object.
+    RK_DerivedAddress,
+  };
 
   union {
     /// When the value is Unknown, this contains the value that was the
@@ -143,12 +154,31 @@ class SymbolicValue {
     StringSymbolicValue *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements, count, and element type.
+    /// information about the array elements and count.
     AggregateSymbolicValue *aggregate;
+
+    /// When this SymbolicValue is of "Enum" kind, this pointer stores
+    /// information about the enum case type.
+    EnumElementDecl *enumVal;
+
+    /// When this SymbolicValue is of "EnumWithPayload" kind, this pointer
+    /// stores information about the enum case type and its payload.
+    EnumWithPayloadSymbolicValue *enumValWithPayload;
+
+    /// When the representationKind is "DirectAddress", this pointer is the
+    /// memory object referenced.
+    SymbolicValueMemoryObject *directAddress;
+
+    /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
+    /// information about the memory object and access path of the access.
+    DerivedAddressValue *derivedAddress;
   } value;
 
+  RepresentationKind representationKind : 8;
+
   union {
-    UnknownReason unknown_reason;
+    /// This is the reason code for RK_Unknown values.
+    UnknownReason unknown_reason : 32;
 
     //unsigned integer_bitwidth;
     // ...
@@ -181,6 +211,15 @@ public:
 
     /// This can be an array, struct, tuple, etc.
     Aggregate,
+
+    /// This is an enum without payload.
+    Enum,
+
+    /// This is an enum with payload (formally known as "associated value").
+    EnumWithPayload,
+
+    /// This value represents the address of, or into, a memory object.
+    Address,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -285,6 +324,48 @@ public:
 
   ArrayRef<SymbolicValue> getAggregateValue() const;
 
+  /// This returns a constant Symbolic value for the enum case in `decl`, which
+  /// must not have an associated value.
+  static SymbolicValue getEnum(EnumElementDecl *decl) {
+    assert(decl);
+    SymbolicValue result;
+    result.representationKind = RK_Enum;
+    result.value.enumVal = decl;
+    return result;
+  }
+
+  /// `payload` must be a constant.
+  static SymbolicValue getEnumWithPayload(EnumElementDecl *decl,
+                                          SymbolicValue payload,
+                                          llvm::BumpPtrAllocator &allocator);
+
+  EnumElementDecl *getEnumValue() const;
+
+  SymbolicValue getEnumPayloadValue() const;
+
+
+  /// Return a symbolic value that represents the address of a memory object.
+  static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject) {
+    SymbolicValue result;
+    result.representationKind = RK_DirectAddress;
+    result.value.directAddress = memoryObject;
+    return result;
+  }
+
+  /// Return a symbolic value that represents the address of a memory object
+  /// indexed by a path.
+  static SymbolicValue getAddress(SymbolicValueMemoryObject *memoryObject,
+                                  ArrayRef<unsigned> indices,
+                                  llvm::BumpPtrAllocator &allocator);
+
+  /// Return the memory object of this reference along with any access path
+  /// indices involved.
+  SymbolicValueMemoryObject *
+  getAddressValue(SmallVectorImpl<unsigned> &accessPath) const;
+
+  /// Return just the memory object for an address value.
+  SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
+
   /// Given that this is an 'Unknown' value, emit diagnostic notes providing
   /// context about what the problem is.  If there is no location for some
   /// reason, we fall back to using the specified location.
@@ -297,6 +378,42 @@ public:
   void print(llvm::raw_ostream &os, unsigned indent = 0) const;
   void dump() const;
 };
+
+static_assert(sizeof(SymbolicValue) == 2*sizeof(void*),
+              "SymbolicValue should stay small and POD");
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
+  val.print(os);
+  return os;
+}
+
+/// This is a representation of a memory object referred to be an address.
+/// Memory objects may be mutated over their lifetime, but their overall type
+/// remains the same.
+struct SymbolicValueMemoryObject {
+  Type getType() const { return type; }
+
+  SymbolicValue getValue() const { return value; }
+  void setValue(SymbolicValue newValue) { value = newValue; }
+
+  /// Create a new memory object whose overall type is as specified.
+  static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
+                                           llvm::BumpPtrAllocator &allocator);
+  static SymbolicValueMemoryObject *create(Type type,
+                                           llvm::BumpPtrAllocator &allocator) {
+    return create(type, SymbolicValue::getUninitMemory(), allocator);
+  }
+
+private:
+  const Type type;
+  SymbolicValue value;
+
+  SymbolicValueMemoryObject(Type type, SymbolicValue value)
+    : type(type), value(value) {}
+  SymbolicValueMemoryObject(const SymbolicValueMemoryObject&) = delete;
+  void operator=(const SymbolicValueMemoryObject&) = delete;
+};
+
 
 /// SWIFT_ENABLE_TENSORFLOW
 /// A graph operation attribute, used by GraphOperationInst.

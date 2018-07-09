@@ -19,7 +19,7 @@ func trapsAndOverflows() {
 
   // expected-error @+1 {{#assert condition not constant}}
   #assert({ () -> Int in fatalError("") }() > 42)
-  // TODO: xpected-note @-1 {{trap detected}}
+  // expected-note @-1 {{trap detected}}
 }
 
 func isOne(_ x: Int) -> Bool {
@@ -137,5 +137,41 @@ func testGenericThunk() {
   #assert(myTransform.fn(42) > 1)
   // expected-note @-1{{could not fold operation}}
 }
+
+//===----------------------------------------------------------------------===//
+// Enums and optionals.
+//===----------------------------------------------------------------------===//
+
+func isNil(_ x: Int?) -> Bool {
+  return x == nil
+}
+
+#assert(isNil(nil))
+#assert(!isNil(3))
+
+public enum Pet {
+  case bird
+  case cat(Int)
+  case dog(Int, Int)
+  case fish
+}
+
+public func weighPet(pet: Pet) -> Int {
+  switch pet {
+  case .bird: return 3
+  case let .cat(weight): return weight
+  case let .dog(w1, w2): return w1+w2
+  default: return 1
+  }
+}
+
+#assert(weighPet(pet: .bird) == 3)
+#assert(weighPet(pet: .fish) == 1)
+#assert(weighPet(pet: .cat(2)) == 2)
+// expected-error @+1 {{assertion failed}}
+#assert(weighPet(pet: .cat(2)) == 3)
+
+#assert(weighPet(pet: .dog(9, 10)) == 19)
+
 
 //===----------------------------------------------------------------------===//

@@ -83,17 +83,20 @@ func testSendsInALoop() {
 }
 SendsRecvsTests.testAllBackends("testSendsInALoop", testSendsInALoop)
 
+// b(111123797): Renable the test when TPU/XlA supports running target nodes.
 @inline(never)
 func testSendsInALoopWithNoResultTensor() {
+#if !TPU
   let maxCount = 10
   var count = 1
   var a = Tensor<Float>(1.0)
   while count < maxCount {
-    a += a
+    a = _addScalarTensorsWithShape(a, a)
     // One send.
     print(a.toHost())
     count += 1
   }
+#endif // !TPU
 }
 SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
                                 testSendsInALoopWithNoResultTensor)
@@ -102,8 +105,8 @@ SendsRecvsTests.testAllBackends("testSendsInALoopWithNoResultTensor",
 // Utilities.swift in TensorFlow stdlib.
 @inline(__always)
 func _scalarTensorWithShapeOnCPU<T>(_ x: Tensor<T>) -> Tensor<T> {
-  let ret : Tensor<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
-  return ret
+  let ret: TensorHandle<T> = #tfop("Identity", x, __shapes: [TensorShape()], __device: "/device:CPU:0")
+  return Tensor<T>(handle: ret)
 }
 
 func test1RecvFloatScalar() {
@@ -127,7 +130,7 @@ func test1RecvIntScalar() {
 SendsRecvsTests.testAllBackends("test1RecvIntScalar", test1RecvIntScalar)
 
 @inline(never)
-func atariSimFloat(_ a: Tensor<Float>) -> Tensor<Float> {
+func atariSim<T>(_ a: Tensor<T>) -> Tensor<T> {
   return a
 }
 
@@ -136,8 +139,7 @@ func test1RecvFloatTensor() {
   // One send.
   printT(a.toHost())
   // One recv.
-  var b = atariSimFloat(a).toAccelerator()
-  let b_cpu = atariSimFloat(a).toAccelerator()
+  let b_cpu = atariSim(a).toAccelerator()
   var b_tpu = _scalarTensorWithShapeOnCPU(b_cpu)
   b_tpu += a
   printT("final b = \(b_tpu.toHost())")
@@ -145,17 +147,12 @@ func test1RecvFloatTensor() {
 }
 SendsRecvsTests.testAllBackends("test1RecvFloatTensor", test1RecvFloatTensor)
 
-@inline(never)
-func atariSimInt(_ a: Tensor<Int64>) -> Tensor<Int64> {
-  return a
-}
-
 func test1RecvIntTensor() {
   let a = Tensor<Int64>(1)
   // One send.
   printT(a.toHost())
   // One recv.
-  let b_cpu = atariSimInt(a).toAccelerator()
+  let b_cpu = atariSim(a).toAccelerator()
   var b_tpu = _scalarTensorWithShapeOnCPU(b_cpu)
   b_tpu += a
   printT("final b = \(b_tpu.toHost())")

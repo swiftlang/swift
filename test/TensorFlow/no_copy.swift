@@ -55,7 +55,7 @@ public func testEmptyScalarsArray() {
  */
 
 // This tests the attributes necessary to get arrays of integers and strings going.
-public func testConvolution(x : Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
+public func testConvolution(x: Tensor<Float>, filter: Tensor<Float>) -> Tensor<Float> {
   return x.toAccelerator().convolved2D(withFilter: filter.toAccelerator(),
                        strides: (1, 2, 3, 4), padding: .same)
 }
@@ -134,7 +134,7 @@ public func randomUniformHoisting() -> Tensor<Float> {
 // scalar back to a tensor.  This checks to make sure that tf-partition can pull
 // this whole mess in graph without leaving anything on the host that will cause
 // a send/receive.
-public func tensorToScalarToTensor(a : Tensor<Int32>) -> Tensor<Int32> {
+public func tensorToScalarToTensor(a: Tensor<Int32>) -> Tensor<Int32> {
   let scalar = a.toAccelerator().mean()
   let b = Tensor(scalar)
   return (b+b).toHost()
@@ -237,9 +237,9 @@ public func testMultiOutputs() {
   let c = Tensor<Bool>(false)
   let (x1, y1): (TensorHandle<Float>, TensorHandle<Float>) = #tfop("Switch", d, c)
   // FIXME: Remove the uses of Identity nodes here.
-  let x : Tensor<Float> = #tfop("Identity", x1)
-  let y : Tensor<Float> = #tfop("Identity", y1)
-  print(x.array.scalars[0])
-  print(y.array.scalars[0])
+  let x: TensorHandle<Float> = #tfop("Identity", x1)
+  let y: TensorHandle<Float> = #tfop("Identity", y1)
+  _hostOp(x)
+  _hostOp(y)
 }
 

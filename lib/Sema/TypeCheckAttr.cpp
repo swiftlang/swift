@@ -2393,8 +2393,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Compute the return type of the adjoint function.
   auto wrtParams = attr->getParameters();
   Type retTy;
-  // When 'withRespectTo:' is not specified, the adjoint's return type is the
-  // type of all of original's parameters.
+  // When 'wrt:' is not specified, the adjoint's return type is the type of all
+  // of original's parameters.
   if (wrtParams.empty()) {
     if (originalParams.size() > 1) {
       // It is a tuple if there is more than 1 parameter.
@@ -2406,14 +2406,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       retTy = originalParams[0]->getInterfaceType();
     }
   }
-  // If 'withRespectTo:' is specified, make sure it's valid and compute the
-  // corresponding adjoint return type.
+  // If 'wrt:' is specified, make sure it's valid and compute the corresponding
+  // adjoint return type.
   else {
     SmallVector<TupleTypeElt, 8> retElts;
     // This helps determine if the parameter indices are ascending.
     int lastIndex = -1;
-    // Verify each parameter in 'withRespectTo:' list and collect return types
-    // to `retElts`.
+    // Verify each parameter in 'wrt:' list and collect return types to
+    // `retElts`.
     for (size_t i = 0; i < wrtParams.size(); i++) {
       auto paramLoc = wrtParams[i].getLoc();
       switch (wrtParams[i].getKind()) {
@@ -2651,6 +2651,11 @@ void AttributeChecker::visitTensorFlowGraphAttr(TensorFlowGraphAttr *attr) {
   // The function must be top-level.
   if (FD->getImplicitSelfDecl()) {
     diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_top_level_only);
+    return;
+  }
+  // Generic functions are not supported.
+  if (FD->isGeneric()) {
+    diagnoseAndRemoveAttr(attr, diag::tf_graph_attr_no_generic_functions);
     return;
   }
   // Only functions taking and returning TensorFlow values are permitted.

@@ -3,13 +3,13 @@ import TensorFlow
 
 public func testDatasetWithFakeData() {
   TensorFlow.enableTPU(infeed: true)
-  let x: Tensor<Float> = #tfop(
+  let x: TensorHandle<Float> = #tfop(
     "tfc.makeIteratorGetNextWithDatasets",
     dataSource: "fake",
     filePath: "dummy_path",
     batchSize: 1,
     outputShapes: [TensorShape()])
-  let y = x + 1
+  let y = Tensor<Float>(handle: x) + 1
   print(y.array.scalars[0])
 }
 
@@ -27,11 +27,11 @@ public func testDatasetWithMNIST() {
     filePath: "some_path",
     batchSize: 64,
     output_shapes: [TensorShape(64,224,224,3), TensorShape(64)])
-  let images : Tensor<Float> = #tfop("Identity", images1)
-  let labels : Tensor<Int32> = #tfop("Identity", labels1)
+  let images : TensorHandle<Float> = #tfop("Identity", images1)
+  let labels : TensorHandle<Int32> = #tfop("Identity", labels1)
   // Confirm we can add more nodes to the graph.
-  let imagesMod = images + 1
-  let labelsMod = labels + 2
+  let imagesMod = Tensor<Float>(handle: images) + 1
+  let labelsMod = Tensor<Int32>(handle: labels) + 2
   print(imagesMod.array.scalars[0])
   print(labelsMod.array.scalars[0])
 }
@@ -105,10 +105,10 @@ public func model() {
   //   .Output("components: output_types")
   //   .Attr("output_types: list(type) >= 1")
   //   .Attr("output_shapes: list(shape) >= 1")
-  let one: Tensor<Float> = #tfop("IteratorGetNext",
-                                 iterator,
-                                 output_types: [Float.self],
-                                 output_shapes: [TensorShape()])
+  let one: TensorHandle<Float> = #tfop("IteratorGetNext",
+                                       iterator,
+                                       output_types: [Float.self],
+                                       output_shapes: [TensorShape()])
   _hostOp(one)
 }
 
