@@ -1298,7 +1298,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - warning: The byte pointer argument should not be stored and used outside of the lifetime of the call to the closure.
     public func withUnsafeBytes<ResultType, ContentType>(_ body: (UnsafePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         return try _backing.withUnsafeBytes(in: _sliceRange) {
-            return try body($0.baseAddress?.assumingMemoryBound(to: ContentType.self) ?? UnsafePointer<ContentType>(bitPattern: 0xBAD0)!)
+            return try body($0.baseAddress?.bindMemory(to: ContentType.self, capacity: $0.count / MemoryLayout<ContentType>.size) ?? UnsafePointer<ContentType>(bitPattern: 0xBAD0)!)
         }
     }
     
@@ -1312,7 +1312,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             _backing = _backing.mutableCopy(_sliceRange)
         }
         return try _backing.withUnsafeMutableBytes(in: _sliceRange) {
-            return try body($0.baseAddress?.assumingMemoryBound(to: ContentType.self) ?? UnsafeMutablePointer<ContentType>(bitPattern: 0xBAD0)!)
+            return try body($0.baseAddress?.bindMemory(to: ContentType.self, capacity: $0.count / MemoryLayout<ContentType>.size) ?? UnsafeMutablePointer<ContentType>(bitPattern: 0xBAD0)!)
         }
     }
     
