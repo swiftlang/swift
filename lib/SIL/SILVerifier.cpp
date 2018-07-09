@@ -4781,6 +4781,14 @@ public:
       // map and go on.
       auto *DS = SI.getDebugScope();
       assert(DS && "Each instruction should have a debug scope");
+
+      // SWIFT_ENABLE_TENSORFLOW
+      // If debug scope has an inlined call site, skip it.
+      // TODO: Inlined call sites should be verified to ensure that the inliner
+      // handles scopes correctly.
+      if (DS->InlinedCallSite)
+        continue;
+
       if (!AlreadySeenScopes.count(DS)) {
         AlreadySeenScopes.insert(DS);
         LastSeenScope = DS;
