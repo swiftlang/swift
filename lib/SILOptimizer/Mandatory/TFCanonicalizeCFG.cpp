@@ -363,7 +363,6 @@ SILValue createTFHandleFromElement(SILBuilder &builder, SILLocation location,
                                /*substitutionlist*/ {}, operands);
 }
 
-
 /// Creates a TF handle of the appropriate integer type for the given bitwith
 /// that is initialized to the given value.
 SILValue createTFIntegerConst(SILBuilder &builder, SILLocation location,
@@ -402,12 +401,12 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
 
   // Identify the set of values that escape the loop.
   llvm::SmallPtrSet<SILValue, 8> escapingValues;
-  for (const SILBasicBlock* bb : loop->getBlocks()) {
+  for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in escapingValues set.
     auto save_escaping = [this, &loop, &escapingValues](const SILValue &value) {
       for (const auto *use : value->getUses()) {
         const SILInstruction *use_inst = use->getUser();
-        if (LI.getLoopFor(use_inst->getParent()) != loop) {
+        if (!loop->contains(use_inst->getParent())) {
           escapingValues.insert(value);
           break;
         }
@@ -435,11 +434,11 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   }
 
   SILBuilder builder(header);
-  ASTContext& context = builder.getASTContext();
+  ASTContext &context = builder.getASTContext();
 
   // Create a new header for the loop.
   //
-  SILBasicBlock* newHeader = currentFn->createBasicBlock();
+  SILBasicBlock *newHeader = currentFn->createBasicBlock();
   loop->addBasicBlockToLoop(newHeader, LI.getBase()); // Should be done first.
   // Clone arguments and change all uses to the new header's arguments.
   newHeader->cloneArgumentList(header);
@@ -467,7 +466,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
                                ValueOwnershipKind::Trivial);
 
   // Create a new latch block.
-  SILBasicBlock* latchBlock = currentFn->createBasicBlock();
+  SILBasicBlock *latchBlock = currentFn->createBasicBlock();
   latchBlock->cloneArgumentList(newHeader);
   {
     builder.setInsertionPoint(latchBlock);
@@ -480,7 +479,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
         newHeader, latchArgs);
   }
 
-  llvm::DenseMap<SILBasicBlock*, intmax_t> exitIndices;
+  llvm::DenseMap<SILBasicBlock *, intmax_t> exitIndices;
   // As a simplification, simply 0 as exit index for edges to the header
   // even though header is not an exit block.
   exitIndices.insert({header, 0});
@@ -501,7 +500,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
     }
     SILBuilder builder(src->getTerminator());
     SILLocation location(
-      getUserSourceLocation(src->getTerminator()->getDebugLocation()));
+        getUserSourceLocation(src->getTerminator()->getDebugLocation()));
     // Find an appropriate value to use for each escaping value.
     unsigned argIndex = oldHeaderNumArgs;
     for (const SILValue &escapingValue : escapingValues) {
@@ -511,7 +510,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
         // if src is not the preheader than new header arguments are available.
         newArgs.push_back(newHeader->getArgument(argIndex));
       } else {
-        newArgs.push_back(getUndef(escapingValue->getType() ));
+        newArgs.push_back(getUndef(escapingValue->getType()));
       }
       ++argIndex;
     }
@@ -528,18 +527,26 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   }
 
   // Create a new exit block.
-  SILBasicBlock* newExitBlock = currentFn->createBasicBlock();
+  auto createBlockOutsideLoop = [this, loop, &currentFn]() {
+    SILBasicBlock *newBlock = currentFn->createBasicBlock();
+    SILLoop *parentLoop = loop->getParentLoop();
+    if (parentLoop) {
+      parentLoop->addBasicBlockToLoop(newBlock, LI.getBase());
+    }
+    return newBlock;
+  };
+  SILBasicBlock *newExitBlock = createBlockOutsideLoop();
 
-  // Build a demuxing if..then..else block that can be used as a single exit
-  // block. This will not have any effect if there is a single exit block
-  // already.
+  // Build a demuxing if..then..else block that can be used as a single
+  // exit block. This will not have any effect if there is a single exit
+  // block already.
   auto curBlockIter = exitBlocks.rbegin();
   SILBasicBlock *demuxBlock = *curBlockIter++;
   SILLocation headerLocation =
       getUserSourceLocation(header->getTerminator()->getDebugLocation());
 
   while (curBlockIter != exitBlocks.rend()) {
-    SILBasicBlock *newBlock = currentFn->createBasicBlock();
+    SILBasicBlock *newBlock = createBlockOutsideLoop();
     SILBasicBlock *trueBlock = *curBlockIter++;
     builder.setInsertionPoint(newBlock);
     SILValue condTensor = builder.createBuiltin(
@@ -554,8 +561,8 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
                                      StringLiteralInst::Encoding::UTF8)});
     SILValue condValue = builder.createBuiltin(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        SILType::getBuiltinIntegerType(1, context), /*SubstitutionMap*/ {},
-        {condTensor});
+        SILType::getBuiltinIntegerType(1, context),
+        /*SubstitutionMap*/ {}, {condTensor});
     builder.createCondBranch(headerLocation, condValue, trueBlock, demuxBlock);
     demuxBlock = newBlock;
   }
@@ -567,9 +574,10 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   {
     SILValue loopExitCond = builder.createBuiltin(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        SILType::getBuiltinIntegerType(1, context), /*SubstitutionMap*/ {},
-        {newHeader->getArguments().back()});
-    builder.createCondBranch(headerLocation, loopExitCond, header, newExitBlock);
+        SILType::getBuiltinIntegerType(1, context),
+        /*SubstitutionMap*/ {}, {newHeader->getArguments().back()});
+    builder.createCondBranch(headerLocation, loopExitCond, header,
+                             newExitBlock);
   }
   loop->moveToHeader(newHeader);
   loop->addBasicBlockToLoop(latchBlock, LI.getBase());
