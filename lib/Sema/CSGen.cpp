@@ -1394,11 +1394,12 @@ namespace {
     Type visitTypeExpr(TypeExpr *E) {
       Type type;
       // If this is an implicit TypeExpr, don't validate its contents.
-      if (auto *rep = E->getTypeRepr()) {
-        type = resolveTypeReferenceInExpression(rep);
-      } else {
+      if (E->getTypeLoc().wasValidated()) {
         type = E->getTypeLoc().getType();
+      } else if (auto *rep = E->getTypeRepr()) {
+        type = resolveTypeReferenceInExpression(rep);
       }
+
       if (!type || type->hasError()) return Type();
       
       auto locator = CS.getConstraintLocator(E);

@@ -1858,13 +1858,14 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
     return nullptr;
 
   Type type;
-  if (auto *rep = typeExpr->getTypeRepr()) {
+  if (typeExpr->getTypeLoc().wasValidated()) {
+    type = typeExpr->getTypeLoc().getType();
+  } else if (auto *rep = typeExpr->getTypeRepr()) {
     TypeResolutionOptions options;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
     options |= TypeResolutionFlags::InExpression;
     type = TC.resolveType(rep, DC, options);
-  } else {
-    type = typeExpr->getTypeLoc().getType();
+    typeExpr->getTypeLoc().setType(type);
   }
 
   if (!type)

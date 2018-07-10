@@ -116,9 +116,9 @@ _ = Array<Int!>() // expected-error {{'!' is not allowed here; perhaps '?' was i
 let _: Array<Int!> = [1] // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{17-18=?}}
 _ = [Int!]() // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{9-10=?}}
 let _: [Int!] = [1] // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{12-13=?}}
-_ = Optional<Int!>(nil) // expected-error 2 {{'!' is not allowed here; perhaps '?' was intended?}}{{17-18=?}}
+_ = Optional<Int!>(nil) // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{17-18=?}}
 let _: Optional<Int!> = nil // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{20-21=?}}
-_ = Int!?(0) // expected-error 3 {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
+_ = Int!?(0) // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{8-9=?}}
 let _: Int!? = 0 // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{11-12=?}}
 _ = (
   Int!, // expected-error {{'!' is not allowed here; perhaps '?' was intended?}}{{6-7=?}}
