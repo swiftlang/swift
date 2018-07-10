@@ -236,3 +236,21 @@ func autoclosure1<T>(_: [T], _: X) { }
 func test_autoclosure1(ia: [Int]) {
   autoclosure1(ia, X()) // okay: resolves to the second function
 }
+
+// Ensure that we select the (T?, T) -> T overload of '??' in coalesce() below.
+func apply<T>(_ fn: () -> T) -> T { return fn() }
+func opt(x: String) -> String { return x }
+func opt() -> String? { return "hi" }
+
+func coalesce() {
+  let _ = apply{
+    _ = opt()
+    return opt()
+  } ?? ""
+}
+
+// Ensure that we do not select the (T?, T) -> T version of ??, which
+// would result in a warning about RHS never being selected.
+func rdar19748710(_ value: Int?) -> Int? {
+  return value ?? value
+}

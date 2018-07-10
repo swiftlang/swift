@@ -1657,6 +1657,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       auto *typeVar = typeVar1 ? typeVar1 : typeVar2;
       auto type = typeVar1 ? type2 : type1;
 
+      if (type->getOptionalObjectType()) {
+        if (auto *typeVarLocator = typeVar->getImpl().getLocator()) {
+          auto path = typeVarLocator->getPath();
+          if (!path.empty() &&
+              path.back().getKind() == ConstraintLocator::Archetype) {
+            increaseScore(SK_BindOptionalToArchetype);
+          }
+        }
+      }
+
       return matchTypesBindTypeVar(typeVar, type, kind, flags, locator,
                                    formUnsolvedResult);
     }
