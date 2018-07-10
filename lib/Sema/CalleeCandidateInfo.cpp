@@ -884,7 +884,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
 CalleeCandidateInfo &CalleeCandidateInfo::
 operator=(const CalleeCandidateInfo &CCI) {
   if (this != &CCI) {
-    // If the reference member (i.e., CS) is identical, just copy the rest
+    // If the reference member (i.e., CS) is identical, just copy remaining
     // members; otherwise, reconstruct the object.
     if (&CS == &CCI.CS) {
       declName = CCI.declName;
