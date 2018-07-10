@@ -3591,10 +3591,12 @@ ${assignmentOperatorComment(x.operator, True)}
   /// to find an absolute value. In addition, because `abs(_:)` always returns
   /// a value of the same type, even in a generic context, using the function
   /// instead of the `magnitude` property is encouraged.
-  @_transparent
   public var magnitude: U${Self} {
-    let base = U${Self}(_value)
-    return self < (0 as ${Self}) ? ~base + 1 : base
+    @inline(__always)
+    get {
+      let base = U${Self}(_value)
+      return self < (0 as ${Self}) ? ~base + 1 : base
+    }
   }
 % end
 

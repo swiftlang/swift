@@ -3621,6 +3621,36 @@ namespace {
 
       auto &tc = cs.getTypeChecker();
 
+      // Since this is literal initialization, we don't
+      // really need to keep wrapping coercion around.
+      if (expr->isLiteralInit()) {
+        auto *literalInit = expr->getSubExpr();
+        // If literal got converted into constructor call
+        // lets put proper source information in place.
+        if (auto *call = dyn_cast<CallExpr>(literalInit)) {
+          call->getFn()->forEachChildExpr([&](Expr *subExpr) -> Expr * {
+            auto *TE = dyn_cast<TypeExpr>(subExpr);
+            if (!TE)
+              return subExpr;
+
+            auto type = TE->getInstanceType(
+                [&](const Expr *expr) { return cs.hasType(expr); },
+                [&](const Expr *expr) { return cs.getType(expr); });
+
+            assert(!type->hasError());
+
+            if (!type->isEqual(toType))
+              return subExpr;
+
+            return cs.cacheType(new (tc.Context)
+                                    TypeExpr(expr->getCastTypeLoc()));
+          });
+        }
+
+        literalInit->setImplicit(false);
+        return literalInit;
+      }
+
       // Turn the subexpression into an rvalue.
       auto rvalueSub = cs.coerceToRValue(expr->getSubExpr());
       expr->setSubExpr(rvalueSub);

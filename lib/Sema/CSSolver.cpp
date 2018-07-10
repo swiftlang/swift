@@ -1004,7 +1004,7 @@ void ConstraintSystem::shrink(Expr *expr) {
 
     // Counts the number of overload sets present in the tree so far.
     // Note that the traversal is depth-first.
-    llvm::SmallVector<std::pair<ApplyExpr *, unsigned>, 4> ApplyExprs;
+    llvm::SmallVector<std::pair<Expr *, unsigned>, 4> ApplyExprs;
 
     // A collection of original domains of all of the expressions,
     // so they can be restored in case of failure.
@@ -1031,6 +1031,8 @@ void ConstraintSystem::shrink(Expr *expr) {
       }
 
       if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
+        if (coerceExpr->isLiteralInit())
+          ApplyExprs.push_back({coerceExpr, 1});
         visitCoerceExpr(coerceExpr);
         return {false, expr};
       }
