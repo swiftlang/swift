@@ -427,6 +427,7 @@ TypeChecker::prepareGenericParamList(GenericParamList *gp,
 
   unsigned depth = gp->getDepth();
   for (auto paramDecl : *gp) {
+    checkDeclAttributesEarly(paramDecl);
     paramDecl->setDepth(depth);
     if (!paramDecl->hasAccess())
       paramDecl->setAccess(access);
