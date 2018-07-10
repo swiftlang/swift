@@ -115,7 +115,8 @@ public:
 #if SWIFT_HAS_OPAQUE_ISAS
     // The ISA is opaque so masking it will not return a pointer.  We instead
     // need to call the objc runtime to get the class.
-    return reinterpret_cast<const ClassMetadata*>(object_getClass((id)object));
+    id idObject = reinterpret_cast<id>(const_cast<void *>(object));
+    return reinterpret_cast<const ClassMetadata*>(object_getClass(idObject));
 #else
     // Load the isa field.
     uintptr_t bits = *reinterpret_cast<const uintptr_t*>(object);
