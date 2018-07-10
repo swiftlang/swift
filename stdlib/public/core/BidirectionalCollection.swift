@@ -139,6 +139,11 @@ extension BidirectionalCollection {
 
   @inlinable // protocol-only
   public func index(_ i: Index, offsetBy n: Int) -> Index {
+    return _index(i, offsetBy: n)
+  }
+
+  @inlinable // protocol-only
+  internal func _index(_ i: Index, offsetBy n: Int) -> Index {
     if n >= 0 {
       return _advanceForward(i, by: n)
     }
@@ -151,6 +156,13 @@ extension BidirectionalCollection {
 
   @inlinable // protocol-only
   public func index(
+    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+  ) -> Index? {
+    return _index(i, offsetBy: n, limitedBy: limit)
+  }
+
+  @inlinable // protocol-only
+  internal func _index(
     _ i: Index, offsetBy n: Int, limitedBy limit: Index
   ) -> Index? {
     if n >= 0 {
@@ -168,6 +180,11 @@ extension BidirectionalCollection {
 
   @inlinable // protocol-only
   public func distance(from start: Index, to end: Index) -> Int {
+    return _distance(from: start, to: end)
+  }
+
+  @inlinable // protocol-only
+  internal func _distance(from start: Index, to end: Index) -> Int {
     var start = start
     var count = 0
 
