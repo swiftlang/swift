@@ -660,8 +660,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        auto defaultMap = computeDefaultMap(params2, decl2,
-            decl2->getDeclContext()->isTypeContext());
+        auto defaultMap = computeDefaultMap(
+            params2, decl2, decl2->getDeclContext()->isTypeContext());
         auto params2ForMatching = params2;
         if (compareTrailingClosureParamsSeparately) {
           --numParams1;
@@ -1365,12 +1365,13 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-    const llvm::SmallBitVector &defaultValueMap) :
-    NumSkippedParameters(0), DefaultValueMap(defaultValueMap), Params(params) {
-}
+                           const llvm::SmallBitVector &defaultValueMap)
+    : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
+      Params(params) {}
 
-InputMatcher::Result InputMatcher::match(int numInputs,
-    std::function<bool(unsigned, unsigned)> pairMatcher) {
+InputMatcher::Result
+InputMatcher::match(int numInputs,
+                    std::function<bool(unsigned, unsigned)> pairMatcher) {
 
   int inputIdx = 0;
   int numParams = Params.size();
@@ -1402,13 +1403,15 @@ InputMatcher::Result InputMatcher::match(int numInputs,
     }
 
     // Call custom function to match the input-parameter pair.
-    if (!pairMatcher(inputIdx, i)) return IM_CustomPairMatcherFailed;
+    if (!pairMatcher(inputIdx, i))
+      return IM_CustomPairMatcherFailed;
 
     // claim the input as used.
     ++inputIdx;
   }
 
-  if (inputIdx < numInputs) return IM_HasUnclaimedInput;
+  if (inputIdx < numInputs)
+    return IM_HasUnclaimedInput;
 
   return IM_Succeeded;
 }

@@ -3487,7 +3487,6 @@ public:
   }
 };
 
-
 /// \brief Matches array of function parameters to candidate inputs,
 /// which can be anything suitable (e.g., parameters, arguments).
 ///
@@ -3516,19 +3515,18 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-      const llvm::SmallBitVector &defaultValueMap);
+               const llvm::SmallBitVector &defaultValueMap);
 
   /// Matching a given array of inputs.
   ///
   /// \param numInputs The number of inputs.
   /// \param pairMatcher Custom matching behavior of an input-parameter pair.
   /// \return the matching result.
-  Result match(int numInputs,
-      std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
+  Result
+  match(int numInputs,
+        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
 
-  size_t getNumSkippedParameters() const {
-    return NumSkippedParameters;
-  }
+  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 } // end namespace swift
 

@@ -5672,7 +5672,8 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
   for (unsigned i = 0; i < CCI.size(); ++i) {
     auto &&cand = CCI[i];
     auto funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
-    if (!funcDecl) continue;
+    if (!funcDecl)
+      continue;
 
     auto params = cand.getParameters();
     bool hasVariadicParameter = false;
@@ -5684,7 +5685,8 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
     auto defaultMap = computeDefaultMap(params, funcDecl, cand.level);
     InputMatcher IM(params, defaultMap);
     auto result = IM.match(numArgs, pairMatcher);
-    if (result == InputMatcher::IM_Succeeded) return true;
+    if (result == InputMatcher::IM_Succeeded)
+      return true;
     if (result == InputMatcher::IM_HasUnclaimedInput && hasVariadicParameter)
       return true;
   }

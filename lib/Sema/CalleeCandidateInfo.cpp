@@ -880,7 +880,6 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     declName = candidates[0].getDecl()->getBaseName().userFacingName();
 }
 
-
 CalleeCandidateInfo &CalleeCandidateInfo::
 operator=(const CalleeCandidateInfo &CCI) {
   if (this != &CCI) {
