@@ -2041,7 +2041,7 @@ namespace {
       AddressPoint = B.getNextOffsetFromGlobal();
     }
 
-    void addSuperClass() {
+    void addSuperclass() {
       // If this is a root class, use SwiftObject as our formal parent.
       if (!Target->hasSuperclass()) {
         // This is only required for ObjC interoperation.
@@ -3246,7 +3246,7 @@ namespace {
 
     void noteStartOfSuperClass() { }
 
-    void addSuperClass() {
+    void addSuperclass() {
       auto superclassDecl = Target->getSuperclassDecl();
       if (!superclassDecl || !superclassDecl->isForeign()) {
         B.addNullPointer(IGM.TypeMetadataPtrTy);
