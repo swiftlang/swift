@@ -73,3 +73,9 @@ class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
 }
+
+protocol SelfDotTest {
+  func f(_: Self.Class)
+  class Class {}
+  // expected-error@-1{{type 'Class' cannot be nested in protocol 'SelfDotTest'}}
+}

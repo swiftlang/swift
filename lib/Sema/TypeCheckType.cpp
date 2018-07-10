@@ -3035,16 +3035,22 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(member)) {
+    // If the base type is not a nominal type, we might be looking up a
+    // nominal member of a generic parameter. This is not supported right
+    // now, but at least don't crash.
+    if (member->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
+      return nominalDecl->getDeclaredType();
+
     if (!isa<ProtocolDecl>(nominalDecl) &&
         nominalDecl->getGenericParams()) {
       return UnboundGenericType::get(
           nominalDecl, baseTy,
           nominalDecl->getASTContext());
-    } else {
-      return NominalType::get(
-          nominalDecl, baseTy,
-          nominalDecl->getASTContext());
     }
+    
+    return NominalType::get(
+        nominalDecl, baseTy,
+        nominalDecl->getASTContext());
   }
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);
