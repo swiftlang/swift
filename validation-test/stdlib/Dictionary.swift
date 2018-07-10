@@ -3429,9 +3429,7 @@ DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
 // Key type and value type are bridged non-verbatim.
 //===---
 
-DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged")
-  .skip(.always("rdar://problem/41871587"))
-  .code {
+DictionaryTestSuite.test("BridgedToObjC.KeyValue_ValueTypesCustomBridged") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
   let enumerator = d.keyEnumerator()
 
@@ -3545,9 +3543,7 @@ func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
   return bridged
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged")
-  .skip(.always("rdar://problem/41871587"))
-  .code {
+DictionaryTestSuite.test("BridgedToObjC.Key_ValueTypeCustomBridged") {
   let d = getBridgedNSDictionaryOfKey_ValueTypeCustomBridged()
   let enumerator = d.keyEnumerator()
 
