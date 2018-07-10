@@ -310,6 +310,31 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
   // Note that we are resolving within a requirement.
   options |= TypeResolutionFlags::GenericRequirement;
 
+  // Protocol where clauses cannot add conformance and superclass constraints
+  // to 'Self', because we need to be able to resolve inherited protocols and
+  // protocol superclasses before computing the protocol requirement signature.
+  if (options & TypeResolutionFlags::ProtocolWhereClause) {
+    if (req.getKind() == RequirementReprKind::TypeConstraint ||
+        req.getKind() == RequirementReprKind::LayoutConstraint) {
+      if (auto *subjectTyR = req.getSubjectLoc().getTypeRepr()) {
+        if (auto *componentTyR = dyn_cast<ComponentIdentTypeRepr>(subjectTyR)) {
+          if (componentTyR->getIdentifier() == Context.Id_Self) {
+            diagnose(req.getSubjectLoc().getLoc(),
+                     diag::protocol_where_clause_self_requirement);
+
+            req.getSubjectLoc().setType(ErrorType::get(Context));
+
+            if (req.getKind() == RequirementReprKind::TypeConstraint)
+              req.getConstraintLoc().setType(ErrorType::get(Context));
+
+            req.setInvalid();
+            return true;
+          }
+        }
+      }
+    }
+  }
+
   switch (req.getKind()) {
   case RequirementReprKind::TypeConstraint: {
     // Validate the types.

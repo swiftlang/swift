@@ -262,8 +262,12 @@ protocol AProtocol {
   // CHECK-NEXT: RelChild | protocol/Swift | AProtocol | s:14swift_ide_test9AProtocolP
 }
 
-protocol Q where Self: AProtocol {}
-// CHECK: [[@LINE-1]]:24 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
+protocol QBase {
+  associatedtype A
+}
+
+protocol Q : QBase where Self.A: AProtocol {}
+// CHECK: [[@LINE-1]]:34 | protocol/Swift | AProtocol | [[AProtocol_USR]] | Ref | rel: 0
 
 class ASubClass : AClass, AProtocol {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ASubClass | s:14swift_ide_test9ASubClassC | Def | rel: 0

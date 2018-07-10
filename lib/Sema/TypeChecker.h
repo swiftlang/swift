@@ -552,6 +552,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement = 1 << 26,
+
+  /// Whether we are in a protocol's where clause
+  ProtocolWhereClause = 1 << 27,
 };
 
 /// Option set describing how type resolution should work.

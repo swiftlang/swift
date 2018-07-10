@@ -38,7 +38,7 @@ public:
     super::layout();
     asImpl().addNominalTypeDescriptor();
     asImpl().noteStartOfSuperClass();
-    asImpl().addSuperClass();
+    asImpl().addSuperclass();
     asImpl().addReservedWord();
     asImpl().addReservedWord();
     asImpl().addReservedWord();
@@ -70,7 +70,7 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addSuperClass() { addPointer(); }
+  void addSuperclass() { addPointer(); }
   void addReservedWord() { addPointer(); }
 
 private:
