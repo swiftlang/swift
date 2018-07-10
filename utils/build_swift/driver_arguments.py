@@ -181,7 +181,7 @@ def _apply_default_arguments(args):
         args.test = True
 
     # SWIFT_ENABLE_TENSORFLOW
-    if args.build_tensorflow or \
+    if args.build_tensorflow or args.enable_tensorflow_gpu or \
        args.tensorflow_host_lib_dir is not None or \
        args.tensorflow_host_include_dir is not None or \
        args.tensorflow_target_lib_dir is not None or \
@@ -935,6 +935,9 @@ def create_argument_parser():
     option('--enable-tensorflow', toggle_true,
            default=False,
            help='If true, build Swift with TensorFlow support.')
+    option('--enable-tensorflow-gpu', toggle_true,
+           default=False,
+           help='If true, build Swift with TensorFlow GPU support.')
     option('--tensorflow-host-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '

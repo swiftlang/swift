@@ -189,6 +189,7 @@ EXPECTED_DEFAULTS = {
     'watchos_all': False,
     # SWIFT_ENABLE_TENSORFLOW
     'enable_tensorflow': False,
+    'enable_tensorflow_gpu': False,
     'build_tensorflow': False,
     'tensorflow_host_lib_dir': None,
     'tensorflow_host_include_dir': None,
@@ -562,6 +563,7 @@ EXPECTED_OPTIONS = [
 
     # SWIFT_ENABLE_TENSORFLOW
     EnableOption('--enable-tensorflow'),
+    EnableOption('--enable-tensorflow-gpu'),
     EnableOption('--build-tensorflow'),
     PathOption('--tensorflow-host-lib-dir'),
     PathOption('--tensorflow-host-include-dir'),

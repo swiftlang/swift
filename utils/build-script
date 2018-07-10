@@ -304,6 +304,23 @@ class BuildScriptInvocation(object):
                 diagnostics.fatal(
                     "invalid file specified for --tensorflow-swift-bindings "
                     "(was '{}')".format(args.tensorflow_swift_bindings))
+        if args.enable_tensorflow_gpu:
+            os.environ['TF_NEED_CUDA'] = '1'
+            if '--config=cuda' not in args.tensorflow_bazel_options:
+                args.tensorflow_bazel_options += ['--config=cuda']
+
+            # Warn if TensorFlow GPU support environmental variable is not
+            # specified.
+            def warn_unspecified_tensorflow_env_var(name):
+                if name not in os.environ:
+                    diagnostics.note(
+                        "'{}' environment variable was not specified; "
+                        "TensorFlow configure script default will be used"
+                        .format(name))
+            warn_unspecified_tensorflow_env_var('TF_CUDA_VERSION')
+            warn_unspecified_tensorflow_env_var('TF_CUDNN_VERSION')
+            warn_unspecified_tensorflow_env_var('CUDA_TOOLKIT_PATH')
+            warn_unspecified_tensorflow_env_var('CUDNN_INSTALL_PATH')
 
 
     @staticmethod
@@ -365,6 +382,9 @@ class BuildScriptInvocation(object):
             args.build_android = False
 
         # SWIFT_ENABLE_TENSORFLOW
+        if args.enable_tensorflow_gpu:
+           args.enable_tensorflow = True
+
         if args.enable_tensorflow:
             if args.tensorflow_host_lib_dir is None and \
                args.tensorflow_host_include_dir is None:
