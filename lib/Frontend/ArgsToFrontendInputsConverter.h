@@ -45,6 +45,9 @@ class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
 
+  /// The code provided in -e switches.
+  std::shared_ptr<llvm::MemoryBuffer> LinesToExecute;
+
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
 

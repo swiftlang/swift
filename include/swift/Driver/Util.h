@@ -31,7 +31,10 @@ namespace driver {
   /// Type used for a list of input arguments.
   struct InputFileList {
     SmallVector<InputPair, 16> typesAndArgs;
-    bool empty() const { return typesAndArgs.empty(); }
+    bool hasLinesToExecute = false;
+    bool empty() const {
+      return !hasLinesToExecute && typesAndArgs.empty();
+    }
   };
 
   enum class LinkKind {

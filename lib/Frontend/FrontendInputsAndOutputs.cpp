@@ -37,6 +37,7 @@ FrontendInputsAndOutputs::FrontendInputsAndOutputs(
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  LinesToExecute = other.LinesToExecute;
 }
 
 FrontendInputsAndOutputs &FrontendInputsAndOutputs::
@@ -45,6 +46,7 @@ operator=(const FrontendInputsAndOutputs &other) {
   for (InputFile input : other.AllInputs)
     addInput(input);
   IsSingleThreadedWMO = other.IsSingleThreadedWMO;
+  LinesToExecute = other.LinesToExecute;
   return *this;
 }
 

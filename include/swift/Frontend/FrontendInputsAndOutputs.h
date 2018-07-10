@@ -46,6 +46,10 @@ class FrontendInputsAndOutputs {
   /// Punt where needed to enable batch mode experiments.
   bool AreBatchModeChecksBypassed = false;
 
+  /// Contents of -e switches (empty if none). (Used for lifetime
+  /// management; the buffer is accessed through an InputFile.)
+  std::shared_ptr<llvm::MemoryBuffer> LinesToExecute;
+
 public:
   bool areBatchModeChecksBypassed() const { return AreBatchModeChecksBypassed; }
   void setBypassBatchModeChecks(bool bbc) { AreBatchModeChecksBypassed = bbc; }

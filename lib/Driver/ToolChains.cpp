@@ -172,6 +172,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  inputArgs.AddAllArgs(arguments, options::OPT_e);
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
 

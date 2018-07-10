@@ -1184,7 +1184,9 @@ void Driver::buildInputs(const ToolChain &TC,
   llvm::StringMap<StringRef> SourceFileNames;
 
   for (Arg *A : Args) {
-    if (A->getOption().getKind() == Option::InputClass) {
+    if (A->getOption().matches(options::OPT_e)) {
+      Inputs.hasLinesToExecute = true;
+    } else if (A->getOption().getKind() == Option::InputClass) {
       StringRef Value = A->getValue();
       file_types::ID Ty = file_types::TY_INVALID;
 

@@ -171,6 +171,9 @@ def tools_directory : Separate<["-"], "tools-directory">,
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
 
+def e : Separate<["-"], "e">, Flags<[FrontendOption]>,
+  HelpText<"Specify a line of source code in the command line itself (usable multiple times)">;
+
 def F : JoinedOrSeparate<["-"], "F">, Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Add directory to framework search path">;
 def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,

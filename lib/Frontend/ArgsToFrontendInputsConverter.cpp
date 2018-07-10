@@ -97,6 +97,14 @@ bool ArgsToFrontendInputsConverter::readInputFilesFromCommandLine() {
        Args.filtered(options::OPT_INPUT, options::OPT_primary_file)) {
     hadDuplicates = addFile(A->getValue()) || hadDuplicates;
   }
+  if (Args.hasArgNoClaim(options::OPT_e)) {
+    SmallString<256> lines;
+    for (StringRef line : Args.getAllArgValues(options::OPT_e)) {
+      lines += line;
+      lines += "\n";
+    }
+    LinesToExecute = llvm::MemoryBuffer::getMemBufferCopy(lines, "-e");
+  }
   return false; // FIXME: Don't bail out for duplicates, too many tests depend
   // on it.
 }
@@ -158,6 +166,15 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
   bool hasAnyPrimaryFiles = !primaryFiles.empty();
 
   FrontendInputsAndOutputs result;
+  if (LinesToExecute) {
+    bool isPrimary = primaryFiles.count("-e") > 0;
+    result.addInput(InputFile("-e", isPrimary, LinesToExecute.get()));
+    if (isPrimary)
+      primaryFiles.erase("-e");
+
+    Files.remove("-e");
+    result.LinesToExecute = LinesToExecute;
+  }
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
     result.addInput(InputFile(file, isPrimary));
