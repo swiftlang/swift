@@ -348,7 +348,13 @@ void HoistAllocStack::collectHoistableInstructions() {
           FunctionExits.push_back(Term);
         continue;
       }
-
+      // Don't perform alloc_stack hoisting in functions with availability.
+      if (auto *Apply = dyn_cast<ApplyInst>(&Inst)) {
+        if (Apply->hasSemantics("availability.osversion")) {
+          AllocStackToHoist.clear();
+          return;
+        }
+      }
       auto *ASI = dyn_cast<AllocStackInst>(&Inst);
       if (!ASI) {
         continue;
