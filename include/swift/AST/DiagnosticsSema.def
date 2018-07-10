@@ -1833,6 +1833,10 @@ WARNING(protocol_composition_with_postfix,none,
         "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
 
+ERROR(protocol_where_clause_self_requirement,none,
+      "constraint with subject type of 'Self' is not supported; "
+      "consider adding requirement to protocol inheritance clause instead", ())
+
 ERROR(invalid_protocol_composition_member,none,
       "non-protocol, non-class type %0 cannot be used within a "
       "protocol-constrained type", (Type))
