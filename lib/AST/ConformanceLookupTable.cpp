@@ -319,6 +319,10 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           return;
         llvm::SaveAndRestore<bool> visiting(VisitingSuperclass, true);
 
+        // Don't update our own lookup table if we inherit from ourselves.
+        if (classDecl == superclassDecl)
+          break;
+
         // Resolve the conformances of the superclass.
         superclassDecl->prepareConformanceTable();
         superclassDecl->ConformanceTable->updateLookupTable(
