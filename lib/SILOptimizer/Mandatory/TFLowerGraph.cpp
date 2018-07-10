@@ -133,28 +133,6 @@ namespace {
     ///     live-in values used within the loop (with no SILArgument specified).
     SmallVector<std::pair<SILArgument*, TF_Output>, 4> outputs;
 
-    /// Track whether `outputs` have been set, and if yes who set them. This
-    /// helps maintain the following invariants:
-    /// 1. When `outputs` are read, the enum value must not be NONE.
-    /// 2. When `outputs` are set in any context other than lowering a
-    /// conditional SESE region, it can only be set exactly once. e.g. each
-    /// graph function can have at most one return or branch inst.
-    /// 3. When `outputs` are set when lowering a conditional SESE region, it
-    /// can be set again in another context. e.g. if we are lowering a sequence
-    /// of conditional SESE regions into the same graph function.
-    enum OutputSetter {
-      /// `outputs` are not yet set.
-      NONE,
-
-      /// `outputs` are set in some context other than lowering a conditional
-      /// region. e.g. When lowering a branch or a return inst.
-      NOT_COND_REGION,
-
-      /// `outputs` are set in the context of lowering a conditional
-      /// region.
-      COND_REGION,
-    } outputSetter = NONE;
-
     /// If this graph has any side-effecting operations, this is the most
     /// recently emitted operation that had side effects.  Otherwise, it is
     /// null.
@@ -2297,10 +2275,8 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *inst) {
 
 GLStatus TFGraphLowering::visitReturnInst(ReturnInst *inst) {
   auto &graphFn = getCurrentGraphFunction();
-  assert(graphFn.outputSetter != GraphFunctionBody::NOT_COND_REGION &&
-         "Should only have one return / exitbranch per graph function");
-  graphFn.outputs.clear();
-  graphFn.outputSetter = GraphFunctionBody::NOT_COND_REGION;
+  assert(graphFn.outputs.empty() &&
+         "Should only have one return per graph function");
 
   // The return is either using a single value or a tuple of values (which
   // could be empty).  These become the results of the graph.
@@ -2324,10 +2300,8 @@ GLStatus TFGraphLowering::visitReturnInst(ReturnInst *inst) {
 
 GLStatus TFGraphLowering::visitBranchInst(BranchInst *inst) {
   auto &graphFn = getCurrentGraphFunction();
-  assert(graphFn.outputSetter != GraphFunctionBody::NOT_COND_REGION &&
-         "Should only have one return / exit branch per graph function");
-  graphFn.outputs.clear();
-  graphFn.outputSetter = GraphFunctionBody::NOT_COND_REGION;
+  assert(graphFn.outputs.empty() &&
+         "Should only have one exit branch per graph function");
 
   if (inst->getNumArgs() == 0) return GLStatus::Success;
 
@@ -2350,7 +2324,8 @@ GLStatus TFGraphLowering::visitBranchInst(BranchInst *inst) {
 /// Lower all of the instructions in the specified basic block.  If
 /// skipTerminator is set to true, then the terminator instruction isn't
 /// lowered.
-GLStatus TFGraphLowering::lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator) {
+GLStatus TFGraphLowering::lowerBasicBlock(SILBasicBlock *bb,
+                                          bool skipTerminator) {
   // Visit all of the instructions other than the terminator.
   auto I = bb->begin(), E = bb->end();
 
@@ -2370,6 +2345,9 @@ GLStatus TFGraphLowering::lowerBasicBlock(SILBasicBlock *bb, bool skipTerminator
 
 GLStatus TFGraphLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   for (auto &child : r->getNodes()) {
+    // The outputs for a sequence corresponds to the outputs of the last region
+    // in the sequence. Hence, clear outputs for the current function if any.
+    getCurrentGraphFunction().outputs.clear();
     GLStatus S = lowerRegion(child.get());
     if (S != GLStatus::Success) return S;
   }
@@ -2529,7 +2507,6 @@ GLStatus TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
   // have all of the live inputs added as inputs to the function.  XLA While
   // loops require a T->T function, so we need to add the live inputs as outputs
   // as well.
-  assert(loopBodyFn.outputSetter != GraphFunctionBody::NONE);
   assert(loopBodyFn.outputs.size() == headerBB->getArguments().size() &&
          "loop body result values didn't get lowered properly");
 
@@ -2599,8 +2576,6 @@ GLStatus TFGraphLowering::lowerWhileLoopRegion(WhileLoopSESERegion *r) {
     }
 
     // The result of the function is our condition value.
-    assert(graphFn.outputSetter == GraphFunctionBody::NONE);
-    graphFn.outputSetter = GraphFunctionBody::NOT_COND_REGION;
     graphFn.outputs.push_back({ /*SILArgument*/nullptr, condValue });
   });
   if (S != GLStatus::Success) return S;
@@ -2688,10 +2663,6 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     if (auto trueRegion = r->getTrue()) {
       S = lowerRegion(trueRegion);
       if (S != GLStatus::Success) return;
-    } else {
-      auto &graphFn = functionStack.back();
-      assert(graphFn.outputSetter == GraphFunctionBody::NONE);
-      graphFn.outputSetter = GraphFunctionBody::NOT_COND_REGION;
     }
   });
   if (S != GLStatus::Success) return S;
@@ -2702,10 +2673,6 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
     if (auto falseRegion = r->getFalse()) {
       S = lowerRegion(falseRegion);
       if (S != GLStatus::Success) return;
-    } else {
-      auto &graphFn = functionStack.back();
-      assert(graphFn.outputSetter == GraphFunctionBody::NONE);
-      graphFn.outputSetter = GraphFunctionBody::NOT_COND_REGION;
     }
   });
   if (S != GLStatus::Success) return S;
@@ -2785,8 +2752,6 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // being filled in by the conditional region.  That said, the lists could
   // be in different orders.  Canonicalize the false region to match the true
   // region, and keep track of the output types for later consumption.
-  assert(trueCodeFn.outputSetter != GraphFunctionBody::NONE);
-  assert(falseCodeFn.outputSetter != GraphFunctionBody::NONE);
   assert(trueCodeFn.outputs.size() == falseCodeFn.outputs.size() &&
          "True and false region should produce same set of result values");
   for (unsigned i = 0, e = trueCodeFn.outputs.size(); i != e; ++i) {
@@ -2853,9 +2818,6 @@ GLStatus TFGraphLowering::lowerConditionalRegion(ConditionalSESERegion *r) {
   // that got defined end up referring to this node.
   // Also set the graph function outputs. Note they may have been set by the
   // lowering of a prior conditional region.
-  assert(graphFn.outputSetter != GraphFunctionBody::NOT_COND_REGION);
-  graphFn.outputs.clear();
-  graphFn.outputSetter = GraphFunctionBody::COND_REGION;
   for (int i = 0, e = trueCodeFn.outputs.size(); i != e; ++i) {
       TF_Output outputNode = {result, i};
       addValueMapping({trueCodeFn.outputs[i].first, 0}, outputNode);
@@ -3141,7 +3103,6 @@ bool TFGraphLowering::buildGraphFunction(
     const GraphFunctionBody &graphBody, StringRef funcName,
     bool &hasSideEffects, SmallVectorImpl<TF_DataType> *inputTypes,
     SmallVectorImpl<TF_DataType> *outputTypes) {
-  assert(graphBody.outputSetter != GraphFunctionBody::NONE);
   // Inform our callers whether this function contains side effects or not.
   hasSideEffects = graphBody.controlDependenceValue != nullptr;
 
