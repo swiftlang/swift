@@ -17,8 +17,7 @@ public func implicitDeviceConfig() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}implicitDeviceConfig{{.*}}
-// CHECK: string_literal utf8 "ALL_DEVICES"
-// CHECK: builtin "__tfop_Const,dtype$dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 public func explicitDeviceConfigGPU() {
   TensorFlow.enableGPU()
@@ -27,8 +26,7 @@ public func explicitDeviceConfigGPU() {
 }
 
 // CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}explicitDeviceConfigGPU{{.*}}
-// CHECK: string_literal utf8 "ALL_DEVICES"
-// CHECK: builtin "__tfop_Const,dtype$dtype,value$tensor,__device
+// CHECK: graph_op "Const"() {dtype$dtype: $Builtin.FPIEEE32, value$tensor: f32 0x3F800000 /* 1 */, __device: "ALL_DEVICES"
 
 // Check that in the TF graph, both the function node itself, and ops in the
 // function, are placed on GPU.

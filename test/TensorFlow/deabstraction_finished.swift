@@ -34,15 +34,15 @@ public func constexprCall(a: Tensor<Float>, idx: Tensor<Int32>) -> Tensor<Float>
 
 /*
  CHECK-LABEL: --- TFPartition Accelerator Result: {{.*}}constexprCall
- CHECK: [[A:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
- CHECK: [[AC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,__device"([[A]] : $TensorHandle<Builtin.Int64>
- CHECK: [[B:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
- CHECK: [[BC:%.*]] = builtin "__tfop_Cast,$in,DstT$dtype,__device"([[B]] : $TensorHandle<Builtin.Int64>
- CHECK: [[C:%.*]] = builtin "__tfop_Const,dtype$dtype,value$tensor,__device"(
- CHECK: [[CX:%.*]] = unchecked_ref_cast [[C]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32> // user: %22
- CHECK: [[BX:%.*]] = unchecked_ref_cast [[BC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // user: %22
- CHECK: [[AX:%.*]] = unchecked_ref_cast [[AC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float> // user: %22
- CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float> // user: %23
+ CHECK: [[A:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.Int64, value$tensor: i64 0
+ CHECK: [[AC:%.*]] = graph_op "Cast,i"
+ CHECK: [[B:%.*]] = graph_op "Const"
+ CHECK: [[BC:%.*]] = graph_op "Cast,i"
+ CHECK: [[C:%.*]] = graph_op "Const"
+ CHECK: [[CX:%.*]] = unchecked_ref_cast [[C]] : $TensorHandle<Builtin.Int32> to $TensorHandle<Int32>
+ CHECK: [[BX:%.*]] = unchecked_ref_cast [[BC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+ CHECK: [[AX:%.*]] = unchecked_ref_cast [[AC]] : $TensorHandle<Builtin.FPIEEE32> to $TensorHandle<Float>
+ CHECK: [[RESULT:%.*]] = graph_op "OneHot,i,i,i,i"(%0 : $TensorHandle<Int32>, [[CX]] : $TensorHandle<Int32>, [[BX]] : $TensorHandle<Float>, [[AX]] : $TensorHandle<Float>) {T: $Float, TI: $Int32, axis: i64 1, __device: "/device:CPU:0"} : $TensorHandle<Float>
   CHECK: return [[RESULT]]
 */
 

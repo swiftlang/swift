@@ -217,7 +217,7 @@ public func test1RecvScalarCPU() {
 // Ideally this generic type should be changed to TensorHandle<Float>
 // CHECK:      [[X2:%.*]] = graph_op "tfc.RecvFromHost
 // the promoted tensor add on "x.scalar! + 2.0"
-// CHECK:      builtin "__tfop_Add,$in,$in,__device"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
+// CHECK:      graph_op "Add,i,i"([[X2]] : $TensorHandle<Builtin.FPIEEE32>, {{.*}} : $TensorHandle<Builtin.FPIEEE32>
 // z + z
 // CHECK:      builtin "__tfop_Add,$in,$in,T,__device"
 
@@ -281,7 +281,7 @@ public func test1RecvScalarTPU() {
 // CHECK:      [[X_SCALAR_CPU:%.*]] = builtin "__tfop_tfc.RecvFromHost,tensorId,__device,__shapes$shapearray,$shape
 // CHECK:      [[X_SCALAR_TPU:%.*]] = builtin "__tfop_tfc.TensorTransfer,$in,transferId,srcDevice,destDevice,__shapes$shapearray,$shape"{{.*}}([[X_SCALAR_CPU]] : $TensorHandle
 // This is the promoted scalar add that computes x.scalar! + 2
-// CHECK-NEXT: builtin "__tfop_Add{{.*}}"([[X_SCALAR_TPU]] : $TensorHandle
+// CHECK-NEXT: graph_op "Add,i,i"([[X_SCALAR_TPU]] : $TensorHandle
 // This is z + z
 // CHECK:      [[RESULT:%.*]] = builtin "__tfop_Add
 // CHECK-NEXT: return [[RESULT]]
