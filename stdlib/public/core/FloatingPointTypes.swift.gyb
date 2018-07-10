@@ -1583,8 +1583,18 @@ extension ${Self} {
 % for self_ty in all_integer_types(word_bits):
 %   That = self_ty.stdlib_name
 %   ThatBuiltinName = self_ty.builtin_name
-%   srcBits = self_ty.bits
 %   sign = 's' if self_ty.is_signed else 'u'
+%   srcBits = self_ty.bits
+%   maxExponent = (1 << (ExponentBitCount - 1)) - 1
+%   maxBitLength = SignificandBitCount + 1 # implicit leading one
+%   if self_ty.is_signed:
+%     # The magnitude of the minimum value of a signed integer type is always
+%     # representable in floating point (assuming a large enough exponent)
+%     # because only one bit is set. All other possible magnitudes can be
+%     # represented using one bit less than the original source type.
+%     maxBitLength += 1
+%   end
+
   /// Creates the closest representable value to the given integer.
   ///
   /// - Parameter value: The integer to represent as a floating-point value.
@@ -1599,20 +1609,28 @@ extension ${Self} {
   /// can't be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to represent as a floating-point value.
-%   if srcBits < SignificandBitCount:
+%   if srcBits <= maxBitLength and srcBits - 1 <= maxExponent:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
 %   end
   @inlinable // FIXME(sil-serialize-all)
   @inline(__always)
   public init?(exactly value: ${That}) {
-    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
-
-%   if srcBits >= SignificandBitCount:
-    guard let roundTrip = ${That}(exactly: self),
-      roundTrip == value else {
+%   if srcBits - 1 > maxExponent:
+    // Check that the exponent will be in range.
+    guard value.magnitude >> ${maxExponent} <= 1 else {
       return nil
     }
 %   end
+%   if srcBits > maxBitLength:
+    // The magnitude of the integer must be representable by the significand.
+    // Omit trailing zeros that can be encoded by the exponent.
+    let mask: ${That}.Magnitude = ~((1 << (${SignificandBitCount} + 1)) - 1)
+    let absolute = value.magnitude
+    guard (absolute >> absolute.trailingZeroBitCount) & mask == 0 else {
+      return nil
+    }
+%   end
+    _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(value._value)
   }
 % end # all_integer_types
 }
