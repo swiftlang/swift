@@ -54,6 +54,9 @@ NOTE(previous_decldef,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
+NOTE(defer_stmt_at_blockend,none,
+     "defer statement at the end of block is pointless", ())
+
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())

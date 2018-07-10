@@ -313,6 +313,9 @@ public:
   /// expressions are not discarded.
   bool IsREPL;
 
+  /// Used to distinguish the frist BraceStmt that starts a TopLevelCodeDecl
+  bool IsBraceStmtFromTopLevelDecl;
+
   struct AddLabeledStmt {
     StmtChecker &SC;
     AddLabeledStmt(StmtChecker &SC, LabeledStmt *LS) : SC(SC) {
@@ -352,13 +355,13 @@ public:
   };
 
   StmtChecker(TypeChecker &TC, AbstractFunctionDecl *AFD)
-    : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false) { }
+    : TC(TC), TheFunc(AFD), DC(AFD), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) { }
 
   StmtChecker(TypeChecker &TC, ClosureExpr *TheClosure)
-    : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false) { }
+    : TC(TC), TheFunc(TheClosure), DC(TheClosure), IsREPL(false), IsBraceStmtFromTopLevelDecl(false) { }
 
   StmtChecker(TypeChecker &TC, DeclContext *DC)
-    : TC(TC), TheFunc(), DC(DC), IsREPL(false) {
+    : TC(TC), TheFunc(), DC(DC), IsREPL(false), IsBraceStmtFromTopLevelDecl(true) {
     if (const SourceFile *SF = DC->getParentSourceFile())
       if (SF->Kind == SourceFileKind::REPL)
         IsREPL = true;
@@ -550,7 +553,7 @@ public:
     Expr *theCall = DS->getCallExpr();
     TC.typeCheckExpression(theCall, DC);
     DS->setCallExpr(theCall);
-    
+
     return DS;
   }
   
@@ -1397,6 +1400,19 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
 
 Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   const SourceManager &SM = TC.Context.SourceMgr;
+
+  // Diagnose defer statement being last one in block ( Only if
+  // BraceStmt does not start a TopLevelDecl )
+  if (IsBraceStmtFromTopLevelDecl) {
+    IsBraceStmtFromTopLevelDecl = false;
+  } else if (BS->getNumElements() > 0) {
+    if (auto stmt = BS->getElement(BS->getNumElements() - 1).dyn_cast<Stmt*>()) {
+      if (auto deferStmt = dyn_cast<DeferStmt>(stmt)) {
+        TC.diagnose(deferStmt->getStartLoc(), diag::defer_stmt_at_blockend);
+      }
+    }
+  }
+
   for (auto &elem : BS->getElements()) {
     if (auto *SubExpr = elem.dyn_cast<Expr*>()) {
       SourceLoc Loc = SubExpr->getStartLoc();
@@ -1452,7 +1468,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
     TC.typeCheckDecl(SubDecl);
   }
-  
+
   return BS;
 }
 
