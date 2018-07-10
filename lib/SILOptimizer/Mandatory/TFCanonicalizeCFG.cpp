@@ -483,6 +483,17 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   // As a simplification, simply 0 as exit index for edges to the header
   // even though header is not an exit block.
   exitIndices.insert({header, 0});
+  // Identify the exit from the header and also set it to zero index.
+  SILBasicBlock* headerExit = nullptr;
+  for (SILBasicBlock* succ : header->getSuccessorBlocks()) {
+    if (loop->contains(succ))  continue;
+    assert(headerExit == nullptr && "Loop header has more than one exit node.");
+    headerExit = succ;
+  }
+  if (headerExit != nullptr) {
+    exitIndices.insert({headerExit, 0});
+  }
+  unsigned nextExitIndex = 1;
   for (const auto &edge : edgesToFix) {
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
@@ -516,7 +527,12 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
     }
     // `exitIndex` to identify the block to which we exit from the loop.
     // (insert a new value or get the old key value pair.)
-    auto kvPair = *exitIndices.try_emplace(tgt, exitIndices.size()).first;
+    auto emplaceResult = exitIndices.try_emplace(tgt, nextExitIndex);
+    if (emplaceResult.second) {
+      // Increment index as we inserted a new entry into the table.
+      ++nextExitIndex;
+    }
+    auto kvPair = *(emplaceResult.first);
     newArgs.push_back(createTFIntegerConst(builder, location,
                                            /*bitwidth*/ 32,
                                            /*exitIndex*/ kvPair.second));
@@ -535,8 +551,12 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
     }
     return newBlock;
   };
-  SILBasicBlock *newExitBlock = createBlockOutsideLoop();
 
+  // FIXME: We can avoid creating an additional block and instead connect the
+  // header directly to the demuxBlock created in the loop below. Alternatively,
+  // we can also use contractUncondBranches in TFParititon.cpp to remove this
+  // block later.
+  SILBasicBlock *newExitBlock = createBlockOutsideLoop();
   // Build a demuxing if..then..else block that can be used as a single
   // exit block. This will not have any effect if there is a single exit
   // block already.
