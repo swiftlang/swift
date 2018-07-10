@@ -2423,7 +2423,9 @@ where Self.RawSignificand : FixedWidthInteger {
   /// - Parameters:
   ///   - range: The range in which to create a random value.
 %   if Range == 'Range':
-  ///     `range` must not be empty and finite.
+  ///     `range` must be non-empty and finite.
+%   else:
+  ///     `range` must be finite.
 %   end
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
@@ -2506,7 +2508,9 @@ where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
-  ///   `range` must not be empty and finite.
+  ///   `range` must be non-empty and finite.
+%   else:
+  ///   `range` must be finite.
 %   end
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
