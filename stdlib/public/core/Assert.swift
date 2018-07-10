@@ -85,7 +85,7 @@ public func precondition(
   _ message: @autoclosure () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
-  // Only check in debug and release mode.  In release mode just trap.
+  // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_branchHint(condition(), expected: true) {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
