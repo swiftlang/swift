@@ -522,7 +522,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   bool hasClassConstraint = layout.requiresClass();
   bool hasClassConstraintByProtocol = false;
 
-  bool hasSuperclassConstraint = bool(layout.getSuperclass());
+  bool hasSuperclassConstraint = bool(layout.explicitSuperclass);
 
   for (auto protoTy : layout.getProtocols()) {
     auto *protoDecl = protoTy->getDecl();
@@ -581,9 +581,17 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   // Note that destInstanceType is always an existential type, so calling
   // getSuperclass() returns the superclass constraint of the existential,
   // not the superclass of some concrete class.
-  bool checkSuperclassConstraint =
-    hasSuperclassConstraint &&
-    !destInstanceType->getSuperclass()->isExactSuperclassOf(srcInstanceType);
+  bool checkSuperclassConstraint = false;
+  if (hasSuperclassConstraint) {
+    Type srcSuperclassType = srcInstanceType;
+    if (srcSuperclassType->isExistentialType())
+      srcSuperclassType = srcSuperclassType->getSuperclass();
+    if (srcSuperclassType) {
+      checkSuperclassConstraint =
+        !destInstanceType->getSuperclass()->isExactSuperclassOf(
+          srcSuperclassType);
+    }
+  }
 
   if (checkSuperclassConstraint)
     checkClassConstraint = true;
@@ -739,7 +747,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   args.push_back(metadataValue);
 
   if (checkSuperclassConstraint)
-    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.getSuperclass())));
+    args.push_back(IGF.emitTypeMetadataRef(CanType(layout.explicitSuperclass)));
 
   for (auto proto : witnessTableProtos)
     args.push_back(proto);
