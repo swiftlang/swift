@@ -1052,7 +1052,8 @@ extension Collection {
   ///   empty, the method returns `nil`.
   @inlinable
   public func randomElement() -> Element? {
-    return randomElement(using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return randomElement(using: &g)
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.

@@ -2602,7 +2602,8 @@ extension FixedWidthInteger {
   /// - Returns: A random value within the bounds of `range`.
   @inlinable
   public static func random(in range: ${Range}<Self>) -> Self {
-    return Self.random(in: range, using: &Random.default)
+    var g = SystemRandomNumberGenerator()
+    return Self.random(in: range, using: &g)
   }
 }
 
