@@ -144,3 +144,9 @@ let x: () = ()
 !(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
+
+func sr8202_foo(@NSApplicationMain x: Int) {} // expected-error {{@NSApplicationMain may only be used on 'class' declarations}}
+func sr8202_bar(@available(iOS, deprecated: 0) x: Int) {} // expected-error {{'@availability' attribute cannot be applied to this declaration}}
+func sr8202_baz(@discardableResult x: Int) {} // expected-error {{'@discardableResult' attribute cannot be applied to this declaration}}
+func sr8202_qux(@objcMembers x: String) {} // expected-error {{@objcMembers may only be used on 'class' declarations}}
+func sr8202_quux(@weak x: String) {} // expected-error {{'weak' is a declaration modifier, not an attribute}} expected-error {{'weak' may only be used on 'var' declarations}}

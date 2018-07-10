@@ -430,7 +430,7 @@ mapParsedParameters(Parser &parser,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),
                                      parser.CurDeclContext);
-
+    param->getAttrs() = paramInfo.Attrs;
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
     // If we're not parsing an enum case, lack of a SourceLoc for both

@@ -265,7 +265,7 @@ DECL_ATTR(__raw_doc_comment, RawDocComment,
   RejectByParser |
   NotSerialized, 48)
 CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
-  OnVar | OnParam |
+  OnVar |
   DeclModifier |
   NotSerialized, 49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
