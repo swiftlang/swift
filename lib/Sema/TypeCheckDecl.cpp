@@ -3723,6 +3723,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       return;
   }
 
+  // Validating the parent may have triggered validation of this declaration,
+  // so just return if that was the case.
+  if (D->hasValidationStarted()) {
+    assert(D->hasValidSignature());
+    return;
+  }
+
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;
 
