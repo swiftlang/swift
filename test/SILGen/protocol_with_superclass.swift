@@ -1,4 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | tee /tmp/xxx | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -enable-sil-ownership %s
 
 // Protocols with superclass-constrained Self.
 
@@ -233,7 +234,7 @@ func useProtocolRefinesClassInits2<T : ProtocolRefinesClassInits>(_ t: T.Type) {
 }
 
 class ClassWithDefault<T> {
-  func makeT() -> T { }
+  func makeT() -> T { while true {} }
 }
 
 protocol SillyDefault : ClassWithDefault<Int> {

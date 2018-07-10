@@ -216,6 +216,8 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                                        GenericTypeResolver *resolver) {
   TypeResolutionOptions options;
 
+  options |= TypeResolutionFlags::ProtocolWhereClause;
+
   if (auto whereClause = protocol->getTrailingWhereClause()) {
     revertGenericRequirements(whereClause->getRequirements());
     validateRequirements(whereClause->getWhereLoc(),
@@ -290,9 +292,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
-
-    validateExtension(ext);
-    if (ext->isInvalid())
+    if (!ext->getExtendedType())
       return;
 
     inheritedClause = ext->getInherited();
@@ -410,17 +410,27 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     }
     inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
-    // If this is a protocol or protocol composition type, record the
-    // protocols.
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
+
+      // @objc protocols cannot have superclass constraints.
+      if (layout.explicitSuperclass) {
+        if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+          if (protoDecl->isObjC()) {
+            diagnose(protoDecl,
+                    diag::objc_protocol_with_superclass,
+                    protoDecl->getName());
+            continue;
+          }
+        }
+      }
 
       // Protocols, generic parameters and associated types can inherit
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
       //
-      // Classes can only inherit from subclass existentials that do not
-      // have a superclass term.
+      // Extensions, structs and enums can only inherit from protocol
+      // compositions that do not contain AnyObject or class members.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
@@ -494,6 +504,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
           .highlight(superclassRange);
         inherited.setInvalidType(Context);
         continue;
+      }
+
+      // @objc protocols cannot have superclass constraints.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+        if (protoDecl->isObjC()) {
+          diagnose(protoDecl,
+                   diag::objc_protocol_with_superclass,
+                   protoDecl->getName());
+          continue;
+        }
       }
 
       // If the declaration we're looking at doesn't allow a superclass,

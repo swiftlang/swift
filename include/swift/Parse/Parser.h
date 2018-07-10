@@ -414,7 +414,7 @@ public:
     BacktrackingScope(Parser &P)
         : P(P), PP(P.getParserPosition()), DT(P.Diags) {
       SynContext.emplace(P.SyntaxContext);
-      SynContext->setDiscard();
+      SynContext->setBackTracking();
     }
 
     ~BacktrackingScope();

@@ -1012,3 +1012,20 @@ struct X10 : P10 {
 extension X10 {
   subscript(d: Double) -> Double { return d }
 }
+
+protocol Empty1 {}
+protocol Empty2 {}
+
+struct Concrete1 {}
+extension Concrete1 : Empty1 & Empty2 {}
+
+typealias T = Empty1 & Empty2
+struct Concrete2 {}
+extension Concrete2 : T {}
+
+func f<T : Empty1 & Empty2>(_: T) {}
+
+func useF() {
+  f(Concrete1())
+  f(Concrete2())
+}
