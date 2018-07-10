@@ -1461,6 +1461,7 @@ public:
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeAfterPound(CodeCompletionExpr *E, StmtKind ParentKind) override;
   void completeGenericParams(TypeLoc TL) override;
+  void completeAfterIfStmt(bool hasElse) override;
   void addKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody);
 
   void doneParsing() override;
@@ -4844,6 +4845,15 @@ void CodeCompletionCallbacksImpl::completeAfterPound(CodeCompletionExpr *E,
   ParentStmtKind = ParentKind;
 }
 
+void CodeCompletionCallbacksImpl::completeAfterIfStmt(bool hasElse) {
+  CurDeclContext = P.CurDeclContext;
+  if (hasElse) {
+    Kind = CompletionKind::AfterIfStmtElse;
+  } else {
+    Kind = CompletionKind::StmtOrExpr;
+  }
+}
+
 void CodeCompletionCallbacksImpl::completeGenericParams(TypeLoc TL) {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::GenericParams;
@@ -4999,6 +5009,10 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::NominalMemberBeginning:
     addDeclKeywords(Sink);
     addLetVarKeywords(Sink);
+    break;
+
+  case CompletionKind::AfterIfStmtElse:
+    addKeyword(Sink, "if", CodeCompletionKeywordKind::kw_if);
     break;
   }
 }
@@ -5557,6 +5571,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         }
       }
     }
+    break;
+  case CompletionKind::AfterIfStmtElse:
+    // Handled earlier by keyword completions.
     break;
   }
 
