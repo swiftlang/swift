@@ -309,7 +309,7 @@ Type TypeChecker::resolveTypeInContext(
   
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
-                                 selfType);
+                                 selfType, resolver->usesArchetypes());
 }
 
 static TypeResolutionOptions
@@ -3017,14 +3017,15 @@ Type TypeResolver::buildProtocolType(
 
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
-                                          Type baseTy) {
+                                          Type baseTy,
+                                          bool useArchetypes) {
   Type sugaredBaseTy = baseTy;
 
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
           ->getAsClassOrClassExtensionContext()) {
-    baseTy = baseTy->getSuperclassForDecl(ownerClass);
+    baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
   }
 
   if (baseTy->is<ModuleType>()) {

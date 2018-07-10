@@ -767,9 +767,12 @@ public:
 
   /// \brief Retrieve the superclass of this type.
   ///
+  /// \param useArchetypes Whether to use context archetypes for outer generic
+  /// parameters if the class is nested inside a generic function.
+  ///
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
-  Type getSuperclass();
+  Type getSuperclass(bool useArchetypes = true);
   
   /// \brief True if this type is the exact superclass of another type.
   ///
@@ -797,7 +800,11 @@ public:
   ///
   /// Calling `C<String, NSObject>`->getSuperclassForDecl(`A`) will return
   /// `A<Int, NSObject>`.
-  Type getSuperclassForDecl(const ClassDecl *classDecl);
+  ///
+  /// \param useArchetypes Whether to use context archetypes for outer generic
+  /// parameters if the class is nested inside a generic function.
+  Type getSuperclassForDecl(const ClassDecl *classDecl,
+                            bool useArchetypes = true);
 
   /// \brief Whether this type or its superclasses has some form of generic
   /// context.
