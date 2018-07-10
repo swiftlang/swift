@@ -3350,6 +3350,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto underlyingType = typeAlias->getUnderlyingTypeLoc();
   if (underlyingType.isNull()) {
+    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
     typeAlias->setInterfaceType(ErrorType::get(tc.Context));
     typeAlias->setInvalid();
     return;
@@ -4726,8 +4727,14 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       if (!typealias->getGenericParams()) {
         if (typealias->isBeingValidated()) return;
 
-        typealias->setIsBeingValidated();
-        SWIFT_DEFER { typealias->setIsBeingValidated(false); };
+        bool validated = typealias->hasValidationStarted();
+
+        if (!validated)
+          typealias->setIsBeingValidated();
+        SWIFT_DEFER {
+          if (!validated)
+            typealias->setIsBeingValidated(false);
+        };
 
         (void) typealias->getFormalAccess();
 
