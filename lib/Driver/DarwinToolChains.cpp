@@ -268,15 +268,23 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   assert(Triple.isOSDarwin());
 
-  // Always link the regular compiler_rt.
-  addLinkRuntimeLib(context.Args, Arguments,
-                    (Twine("libclang_rt.") +
-                     getDarwinLibraryNameSuffixForTriple(Triple,
-                                                         /*simulator*/false) +
-                     ".a").str());
-
   // FIXME: If we used Clang as a linker instead of going straight to ld,
-  // we wouldn't have to replicate Clang's logic here.
+  // we wouldn't have to replicate a bunch of Clang's logic here.
+
+  // Always link the regular compiler_rt if it's present.
+  //
+  // Note: Normally we'd just add this unconditionally, but it's valid to build
+  // Swift and use it as a linker without building compiler_rt.
+  SmallString<128> CompilerRTPath;
+  getClangLibraryPath(context.Args, CompilerRTPath);
+  llvm::sys::path::append(
+      CompilerRTPath,
+      Twine("libclang_rt.") +
+        getDarwinLibraryNameSuffixForTriple(Triple, /*simulator*/false) +
+        ".a");
+  if (llvm::sys::fs::exists(CompilerRTPath))
+    Arguments.push_back(context.Args.MakeArgString(CompilerRTPath));
+
   bool wantsObjCRuntime = false;
   if (Triple.isiOS())
     wantsObjCRuntime = Triple.isOSVersionLT(9);
@@ -389,9 +397,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(RuntimeLibPath);
-    llvm::sys::path::remove_filename(LibProfile); // remove platform name
-    llvm::sys::path::append(LibProfile, "clang", "lib", "darwin");
+    SmallString<128> LibProfile;
+    getClangLibraryPath(context.Args, LibProfile);
 
     StringRef RT;
     if (Triple.isiOS()) {
