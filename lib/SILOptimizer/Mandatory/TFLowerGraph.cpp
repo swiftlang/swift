@@ -758,9 +758,10 @@ TF_DataType TFGraphLowering::getTensorFlowDataType(SILType type,
 // Helpers to create TensorFlow graph nodes.
 //===----------------------------------------------------------------------===//
 
-static TF_Tensor *convertValuesToTensor(ArrayRef<SingleValueInstruction*> elts,
-                                        ArrayRef<int64_t> shape,
-                                        TF_DataType dtype) {
+// TODO: remove this function once we complete the migration to graph op inst.
+static TF_Tensor *
+convertValuesToTensorLegacy(ArrayRef<SingleValueInstruction *> elts,
+                            ArrayRef<int64_t> shape, TF_DataType dtype) {
   assert(dtype != TF_DataType() && "Expected to get a type!");
   auto dtypeSize = TF_DataTypeSize(dtype);
 
@@ -785,6 +786,32 @@ static TF_Tensor *convertValuesToTensor(ArrayRef<SingleValueInstruction*> elts,
 
     // FIXME: This will need a byte swap for big endian hosts.
     memcpy(ptr, value.getRawData(), dtypeSize);
+    ptr += dtypeSize;
+  }
+
+  return tensor;
+}
+
+static TF_Tensor *convertValuesToTensor(ArrayRef<APInt> elts,
+                                        ArrayRef<int64_t> shape,
+                                        TF_DataType dtype) {
+  assert(dtype != TF_DataType() && "Expected to get a type!");
+  auto dtypeSize = TF_DataTypeSize(dtype);
+
+  // Compute the total memory size of the tensor value.
+  unsigned totalElements = 1;
+  for (auto dim : shape)
+    totalElements *= dim;
+
+  // Make an uninitialized tensor that is big enough for our value.
+  auto *tensor = TF_AllocateTensor(dtype, shape.data(), shape.size(),
+                                   dtypeSize * totalElements);
+
+  // Set up its contents, element-wise.
+  auto *ptr = (char *)TF_TensorData(tensor);
+  for (auto elt : elts) {
+    // FIXME: This will need a byte swap for big endian hosts.
+    memcpy(ptr, elt.getRawData(), dtypeSize);
     ptr += dtypeSize;
   }
 
@@ -1632,6 +1659,12 @@ bool TFGraphLowering::copyGraphFunctions(const std::vector<char> &graphDefProto,
 /// Lower a graph_op into the TensorFlow op node.
 ///
 GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
+  // If this is the magic tf_tensor_to_i1 builtin, then we completely ignore it.
+  // the only user of it are things that take conditional branches, and they
+  // handle it directly.
+  if (inst->getName().str() == "tf_tensor_to_i1")
+    return GLStatus::Success;
+
   auto &graphFn = getCurrentGraphFunction();
 
   // Decode information about the graph_op.
@@ -1794,12 +1827,32 @@ GLStatus TFGraphLowering::visitGraphOperationInst(GraphOperationInst *inst) {
       // Done with normal attributes.
       break;
     case SILTensorOpInfo::OperandClass::DType: {
-      // This integer value is a dtype.
-      auto val = attrValue.getIntegerValue();
-      TF_SetAttrType(op, name.data(), (TF_DataType)val.getLimitedValue());
+      auto swiftType = attrValue.getMetatypeValue();
+      auto tfType = convertSwiftTypeToTF(swiftType);
+      TF_SetAttrType(op, name.data(), (TF_DataType)tfType);
       break;
     }
-    case SILTensorOpInfo::OperandClass::Tensor:
+    case SILTensorOpInfo::OperandClass::Tensor: {
+      // Tensor can support two cases: an array case (not yet implemented), and
+      // a scalar case.
+      TF_DataType dtype;
+      SmallVector<APInt, 4> elements;
+      SmallVector<int64_t, 4> shape;
+      if (attrValue.getKind() != SymbolicValue::Integer) {
+        llvm_unreachable("FIXME: Tensor-typed attr is not yet handled");
+      }
+      // The scalar case is very simple, the shape of a scalar is 0d, and the
+      // data type is int32.
+      dtype = TF_INT32;
+      elements.push_back(attrValue.getIntegerValue());
+      // Set the tensor as the attribute on the graph node.
+      auto tensor = convertValuesToTensor(elements, shape, dtype);
+      TF_SetAttrTensor(op, name.c_str(), tensor, status);
+      TF_DeleteTensor(tensor);
+      if (checkStatus(inst->getLoc()))
+        return GLStatus::Error;
+      break;
+    }
     case SILTensorOpInfo::OperandClass::Shape:
     case SILTensorOpInfo::OperandClass::ShapeArray:
     case SILTensorOpInfo::OperandClass::Array:
@@ -2039,7 +2092,7 @@ GLStatus TFGraphLowering::visitTFOpInst(BuiltinInst *inst) {
       }
 
       // Set the tensor as the attribute on the graph node.
-      auto tensor = convertValuesToTensor(elements, shape, dtype);
+      auto tensor = convertValuesToTensorLegacy(elements, shape, dtype);
       TF_SetAttrTensor(op, name.c_str(), tensor, status);
       TF_DeleteTensor(tensor);
       if (checkStatus(inst->getLoc())) return GLStatus::Error;
@@ -2301,14 +2354,23 @@ GLStatus TFGraphLowering::lowerSequenceRegion(SequenceSESERegion *r) {
   return GLStatus::Success;
 }
 
-
 /// Given a conditional branch, produce the TF_Output for its branch condition.
 static TF_Output getCondition(CondBranchInst *condBr,
                               TFGraphLowering &lowering) {
   auto cond = condBr->getCondition();
-  auto tensorToI1 = cast<BuiltinInst>(cond);
-  assert(tensorToI1->getName().str() == "tf_tensor_to_i1" &&
-         tensorToI1->getNumOperands() == 1 &&
+  SILInstruction *tensorToI1 = nullptr;
+  // TODO: remove the case of BuiltinInst.
+  if (auto *builtinInst = dyn_cast<BuiltinInst>(cond)) {
+    assert(builtinInst->getName().str() == "tf_tensor_to_i1");
+    tensorToI1 = builtinInst;
+  } else {
+    auto *graphOpResult = cast<GraphOperationResult>(cond);
+    auto *graphOpInst = graphOpResult->getParent();
+    assert(graphOpInst->getNumResults() == 1);
+    assert(graphOpInst->getName().str() == "tf_tensor_to_i1");
+    tensorToI1 = graphOpInst;
+  }
+  assert(tensorToI1->getNumOperands() == 1 &&
          "unexpected branch condition in graph lowering");
   cond = tensorToI1->getOperand(0);
 
