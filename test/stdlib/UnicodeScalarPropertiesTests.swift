@@ -81,6 +81,8 @@ UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
   expectBooleanProperty(\.changesWhenCaseFolded, trueFor: "A", falseFor: "!")
   expectBooleanProperty(\.changesWhenCaseMapped, trueFor: "A", falseFor: "!")
   expectBooleanProperty(\.changesWhenNFKCCaseFolded, trueFor: "A", falseFor: "!")
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // U+2708 AIRPLANE
   expectBooleanProperty(\.isEmoji, trueFor: "\u{2708}", falseFor: "A")
   // U+231A WATCH
@@ -89,6 +91,7 @@ UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
   expectBooleanProperty(\.isEmojiModifier, trueFor: "\u{1F3FD}", falseFor: "A")
   // U+270B RAISED HAND
   expectBooleanProperty(\.isEmojiModifierBase, trueFor: "\u{270B}", falseFor: "A")
+#endif
 }
 
 UnicodeScalarPropertiesTests.test("properties.lowercaseMapping") {
