@@ -203,15 +203,13 @@ extension _ArrayBufferProtocol {
     _ headCount: Int, // Count of initial source elements to copy/move
     _ newCount: Int,  // Number of new elements to insert
     _ initializeNewElements: 
-        ((UnsafeMutablePointer<Element>, _ count: Int) -> ())? = nil
+        ((UnsafeMutablePointer<Element>, _ count: Int) -> ()) = { ptr, count in
+      _sanityCheck(count == 0)
+    }
   ) {
 
     _sanityCheck(headCount >= 0)
     _sanityCheck(newCount >= 0)
-    
-    let initializeNewElements = initializeNewElements ?? { ptr, count in
-      _sanityCheck(count == 0)
-    }
 
     // Count of trailing source elements to copy/move
     let sourceCount = self.count
