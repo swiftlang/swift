@@ -143,12 +143,6 @@ void _stdlib_setErrno(int value);
 SWIFT_READNONE SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_size_t _stdlib_malloc_size(const void *ptr);
 
-// Random number <random>
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937(void);
-SWIFT_RUNTIME_STDLIB_INTERNAL
-__swift_uint32_t _stdlib_cxx11_mt19937_uniform(__swift_uint32_t upper_bound);
-
 // Random number for stdlib
 SWIFT_RUNTIME_STDLIB_INTERNAL
 void _stdlib_random(void *buf, __swift_size_t nbytes);
