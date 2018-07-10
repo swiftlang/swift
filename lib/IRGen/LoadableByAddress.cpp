@@ -300,9 +300,7 @@ bool LargeSILTypeMapper::shouldTransformResults(GenericEnvironment *genEnv,
   if (loweredTy->getNumResults() != 1) {
     auto resultType = loweredTy->getAllResultsType();
     auto newResultType = getNewSILType(genEnv, resultType, Mod);
-    bool hasFuncSig = containsFunctionSignature(genEnv, Mod,
-                                                resultType, newResultType);
-    return hasFuncSig;
+    return resultType != newResultType;
   }
 
   auto singleResult = loweredTy->getSingleResult();
