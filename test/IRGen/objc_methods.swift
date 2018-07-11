@@ -25,12 +25,12 @@ class Foo: Fooable {
   @IBAction func garply(_: AnyObject?) {}
   @objc func block(_: (Int) -> Int) {}
   @objc func block2(_: (Int,Int) -> Int) {}
-  
+
   @objc func takesString(_ x: String) -> String { return x }
   @objc func takesArray(_ x: [AnyObject]) -> [AnyObject] { return x }
   @objc func takesDict(_ x: [NSObject: AnyObject]) -> [NSObject: AnyObject] { return x }
   @objc func takesSet(_ x: Set<NSObject>) -> Set<NSObject> { return x }
-  
+
   @objc func fail() throws {}
 }
 
@@ -42,7 +42,7 @@ class ObjcDestructible: NSObject {
   }
 }
 
-// CHECK: [[IMPLICIT_PARAMS_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
+// CHECK: [[NO_ARGS_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 // CHECK: [[GARPLY_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[BLOCK_SIGNATURE_TRAD:@.*]] = private unnamed_addr constant [12 x i8] c"v24@0:8@?16\00"
 // CHECK-macosx: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"c24@0:8^@16\00"
@@ -53,7 +53,7 @@ class ObjcDestructible: NSObject {
 // CHECK:   i32 9,
 // CHECK:   [9 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(baz)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[IMPLICIT_PARAMS_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[NO_ARGS_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @"$S12objc_methods3FooC3bazyyFTo" to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(garply:)", i64 0, i64 0),
@@ -79,7 +79,7 @@ class ObjcDestructible: NSObject {
 // CHECK:   i32 2,
 // CHECK:   [2 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[IMPLICIT_PARAMS_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[NO_ARGS_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (%6*, i8*)* @"$S12objc_methods16ObjcDestructibleCfETo" to i8*) }]
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
