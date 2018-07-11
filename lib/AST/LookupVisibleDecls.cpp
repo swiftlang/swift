@@ -215,7 +215,7 @@ static void doGlobalExtensionLookup(Type BaseType,
   }
 
   // Handle shadowing.
-  removeShadowedDecls(FoundDecls, CurrDC->getParentModule(), TypeResolver);
+  removeShadowedDecls(FoundDecls, CurrDC->getParentModule());
 }
 
 /// \brief Enumerate immediate members of the type \c LookupType and its
