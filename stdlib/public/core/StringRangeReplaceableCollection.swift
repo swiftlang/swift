@@ -65,17 +65,6 @@ extension String : StringProtocol, RangeReplaceableCollection {
     self = other.description
   }
 
-  // The defaulted argument prevents this initializer from satisfies the
-  // LosslessStringConvertible conformance.  You can satisfy a protocol
-  // requirement with something that's not yet available, but not with
-  // something that has become unavailable. Without this, the code won't
-  // compile as Swift 4.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "String.init(_:String) is no longer failable")
-  public init?(_ other: String, obsoletedInSwift4: () = ()) {
-    self.init(other._guts)
-  }
-
   /// The position of the first character in a nonempty string.
   ///
   /// In an empty string, `startIndex` is equal to `endIndex`.
@@ -309,7 +298,6 @@ extension String {
   ///   to allocate.
   ///
   /// - Complexity: O(*n*)
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func reserveCapacity(_ n: Int) {
     _guts.reserveCapacity(n)
   }
@@ -324,7 +312,6 @@ extension String {
   ///     // Prints "Globe 🌍"
   ///
   /// - Parameter c: The character to append to the string.
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(_ c: Character) {
     if let small = c._smallUTF16 {
       _guts.append(contentsOf: small)
@@ -334,12 +321,10 @@ extension String {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: String) {
     append(newElements)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public mutating func append(contentsOf newElements: Substring) {
     _guts.append(
       newElements._wholeString._guts,
@@ -459,11 +444,8 @@ extension String {
 
   @inlinable // FIXME(sil-serialize-all)
   internal func _stride(of i: Index) -> Int {
-    if case .character(let stride) = i._cache {
-      // TODO: should _fastPath the case somehow
-      _sanityCheck(stride > 0)
-      return Int(stride)
-    }
+    if let stride = i.characterStride { return stride }
+
     let offset = i.encodedOffset
     return _visitGuts(_guts, args: offset,
       ascii: { ascii, offset in
@@ -513,7 +495,6 @@ extension String {
 extension String {
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func max<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.max(x,y)
@@ -521,44 +502,12 @@ extension String {
 
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func min<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.min(x,y)
   }
 }
 
-//===----------------------------------------------------------------------===//
-// The following overloads of flatMap are carefully crafted to allow the code
-// like the following:
-//   ["hello"].flatMap { $0 }
-// return an array of strings without any type context in Swift 3 mode, at the
-// same time allowing the following code snippet to compile:
-//   [0, 1].flatMap { x in
-//     if String(x) == "foo" { return "bar" } else { return nil }
-//   }
-// Note that the second overload is declared on a more specific protocol.
-// See: test/stdlib/StringFlatMap.swift for tests.
-extension Sequence {
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public func flatMap(
-    _ transform: (Element) throws -> String
-  ) rethrows -> [String] {
-    return try map(transform)
-  }
-}
-
-extension Collection {
-  @available(swift, deprecated: 4.1, renamed: "compactMap(_:)",
-    message: "Please use compactMap(_:) for the case where closure returns an optional value")
-  @inline(__always)
-  public func flatMap(
-    _ transform: (Element) throws -> String?
-  ) rethrows -> [String] {
-    return try _compactMap(transform)
-  }
-}
 //===----------------------------------------------------------------------===//
 
 extension Sequence where Element == String {

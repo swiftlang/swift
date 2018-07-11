@@ -1179,7 +1179,44 @@ namespace {
       auto protocol = CS.getTypeChecker().getLiteralProtocol(expr);
       if (!protocol)
         return nullptr;
-      
+
+      // Make sure that MaxIntegerType is defined if it would used later
+      // during constraint solving (CSApply).
+      if (isa<IntegerLiteralExpr>(expr) ||
+          (isa<MagicIdentifierLiteralExpr>(expr) &&
+           dyn_cast<MagicIdentifierLiteralExpr>(expr)->isColumn())) {
+
+        auto maxIntType = CS.TC.getMaxIntegerType(CS.DC);
+        if (maxIntType.isNull()) {
+          CS.TC.diagnose(expr->getLoc(), diag::no_MaxBuiltinIntegerType_found);
+          return nullptr;
+        }
+
+        // In the case of integer literal, make sure that the literal value
+        // will fit within the bit width of the maximum integer type.
+        if (IntegerLiteralExpr *intLit = dyn_cast<IntegerLiteralExpr>(expr)) {
+          unsigned maxWidth =
+              maxIntType->castTo<BuiltinIntegerType>()->getGreatestWidth();
+          APInt magnitude = intLit->getRawMagnitude();
+          unsigned magWidth = magnitude.getActiveBits();
+          bool isNegative = intLit->isNegative();
+
+          // Compute the literal bit width in the signed two's complement form.
+          // This is generally one more than the magnitude width, but is the
+          // same when the literal is of the form -2^i (for some Nat `i`).
+          unsigned signedLitWidth =
+              (isNegative && (magnitude.countTrailingZeros() == magWidth - 1))
+                  ? magWidth
+                  : (magWidth + 1);
+
+          if (signedLitWidth > maxWidth) { // overflow?
+            CS.TC.diagnose(expr->getLoc(),
+                           diag::integer_literal_overflows_maxwidth, maxWidth,
+                           signedLitWidth);
+            return nullptr;
+          }
+        }
+      }
 
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                       TVO_PrefersSubtypeBinding);
@@ -1450,12 +1487,12 @@ namespace {
       // If there is an argument, apply it.
       if (auto arg = expr->getArgument()) {
         // The result type of the function must be convertible to the base type.
-        // TODO: we definitely want this to include ImplicitlyUnwrappedOptional; does it
-        // need to include everything else in the world?
+        // TODO: we definitely want this to include ImplicitlyUnwrappedOptional;
+        // does it need to include everything else in the world?
         auto outputTy = CS.createTypeVariable(
             CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult));
         CS.addConstraint(ConstraintKind::Conversion, outputTy, baseTy,
-          CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+          CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
 
         // The function/enum case must be callable with the given argument.
         auto funcTy = FunctionType::get(CS.getType(arg), outputTy);
@@ -1468,7 +1505,7 @@ namespace {
 
       // Otherwise, the member needs to be convertible to the base type.
       CS.addConstraint(ConstraintKind::Conversion, memberTy, baseTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+        CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
       
       // The member type also needs to be convertible to the context type, which
       // preserves lvalue-ness.
@@ -1555,8 +1592,8 @@ namespace {
                         false)
               .highlight(SourceRange(expr->getLAngleLoc(),
                                      expr->getRAngleLoc()));
-            tc.diagnose(bgt->getDecl(), diag::generic_type_declared_here,
-                        bgt->getDecl()->getName());
+            tc.diagnose(bgt->getDecl(), diag::kind_identifier_declared_here,
+                        DescriptiveDeclKind::GenericType, bgt->getDecl()->getName());
             return Type();
           }
 
@@ -2008,28 +2045,26 @@ namespace {
           }
         }
 
-        auto ROK = ReferenceOwnership::Strong; // The default.
+        auto ROK = ReferenceOwnership::Strong;
         if (auto *OA = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
           ROK = OA->get();
 
-        switch (ROK) {
-        case ReferenceOwnership::Strong:
-        case ReferenceOwnership::Unowned:
-        case ReferenceOwnership::Unmanaged:
-          if (ty)
-            return ty;
-          return CS.createTypeVariable(CS.getConstraintLocator(locator));
-        case ReferenceOwnership::Weak:
-          // For weak variables, use Optional<T>.
+        switch (optionalityOf(ROK)) {
+        case ReferenceOwnershipOptionality::Required:
           if (ty && ty->getOptionalObjectType())
             return ty; // Already Optional<T>.
           // Create a fresh type variable to handle overloaded expressions.
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator));
           return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+        case ReferenceOwnershipOptionality::Allowed:
+        case ReferenceOwnershipOptionality::AllowedIfImporting:
+        case ReferenceOwnershipOptionality::Disallowed:
+          break;
         }
-
-        llvm_unreachable("Unhandled ReferenceOwnership kind");
+        if (ty)
+          return ty;
+        return CS.createTypeVariable(CS.getConstraintLocator(locator));
       }
 
       case PatternKind::Typed: {
@@ -2351,7 +2386,7 @@ namespace {
       auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr));
       CS.addConstraint(ConstraintKind::DynamicTypeOf, tv,
                        CS.getType(expr->getBase()),
-           CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
+           CS.getConstraintLocator(expr, ConstraintLocator::RValueAdjustment));
       return tv;
     }
 
@@ -2762,8 +2797,8 @@ namespace {
       auto locator = CS.getConstraintLocator(expr);
       auto projectedTy = CS.createTypeVariable(locator,
                                                TVO_CanBindToLValue);
-      CS.addKeyPathApplicationConstraint(expr->getKeyPath()->getType(),
-                                         expr->getBase()->getType(),
+      CS.addKeyPathApplicationConstraint(CS.getType(expr->getKeyPath()),
+                                         CS.getType(expr->getBase()),
                                          projectedTy,
                                          locator);
       return projectedTy;
@@ -2771,6 +2806,10 @@ namespace {
     
     Type visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       return CS.getASTContext().getBoolDecl()->getDeclaredType();
+    }
+
+    Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
+      return expr->getType();
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {

@@ -114,11 +114,22 @@ std::unique_ptr<Job> ToolChain::constructJob(
     }
   }
 
+  const char *responseFilePath = nullptr;
+  const char *responseFileArg = nullptr;
+  if (invocationInfo.allowsResponseFiles &&
+      !llvm::sys::commandLineFitsWithinSystemLimits(
+          executablePath, invocationInfo.Arguments)) {
+    responseFilePath = context.getTemporaryFilePath("arguments", "resp");
+    responseFileArg = C.getArgs().MakeArgString(Twine("@") + responseFilePath);
+  }
+
   return llvm::make_unique<Job>(JA, std::move(inputs), std::move(output),
                                 executablePath,
                                 std::move(invocationInfo.Arguments),
                                 std::move(invocationInfo.ExtraEnvironment),
-                                std::move(invocationInfo.FilelistInfos));
+                                std::move(invocationInfo.FilelistInfos),
+                                responseFilePath,
+                                responseFileArg);
 }
 
 std::string
@@ -286,6 +297,7 @@ sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
     auto R =
         jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
     assert(R.second);
+    (void)R;
   }
   for (const InputPair &P : C.getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -300,6 +312,7 @@ sortJobsToMatchCompilationInputs(ArrayRef<const Job *> unsortedJobs,
 /// on \p BatchJob, to build the \c InvocationInfo.
 std::unique_ptr<Job>
 ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
+                             Job::PID &NextQuasiPID,
                              Compilation &C) const {
   if (unsortedJobs.empty())
     return nullptr;
@@ -329,5 +342,5 @@ ToolChain::constructBatchJob(ArrayRef<const Job *> unsortedJobs,
       *batchCJA, inputJobs.takeVector(), std::move(output), executablePath,
       std::move(invocationInfo.Arguments),
       std::move(invocationInfo.ExtraEnvironment),
-      std::move(invocationInfo.FilelistInfos), sortedJobs);
+      std::move(invocationInfo.FilelistInfos), sortedJobs, NextQuasiPID);
 }

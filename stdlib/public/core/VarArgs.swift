@@ -32,6 +32,11 @@
 /// arguments. C functions that use the `...` syntax for variadic arguments
 /// are not imported, and therefore can't be called using `CVarArg` arguments.
 ///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
+///
 /// - Note: Declaring conformance to the `CVarArg` protocol for types defined
 ///   outside the standard library is not supported.
 public protocol CVarArg {
@@ -88,10 +93,14 @@ internal let _registerSaveWords = _countGPRegisters
 #endif
 
 #if arch(s390x)
+@usableFromInline
 internal typealias _VAUInt = CUnsignedLongLong
+@usableFromInline
 internal typealias _VAInt  = Int64
 #else
+@usableFromInline
 internal typealias _VAUInt = CUnsignedInt
+@usableFromInline
 internal typealias _VAInt  = Int32
 #endif
 
@@ -101,6 +110,11 @@ internal typealias _VAInt  = Int32
 /// The pointer passed as an argument to `body` is valid only during the
 /// execution of `withVaList(_:_:)`. Do not store or return the pointer for
 /// later use.
+///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
 ///
 /// - Parameters:
 ///   - args: An array of arguments to convert to a C `va_list` pointer.
@@ -142,6 +156,11 @@ internal func _withVaList<R>(
 /// You should prefer `withVaList(_:_:)` instead of this function. In some
 /// uses, such as in a `class` initializer, you may find that the language
 /// rules do not allow you to use `withVaList(_:_:)` as intended.
+///
+/// If you need to pass an optional pointer as a `CVarArg` argument, use the
+/// `Int(bitPattern:)` initializer to interpret the optional pointer as an
+/// `Int` value, which has the same C variadic calling conventions as a pointer
+/// on all supported platforms.
 ///
 /// - Parameter args: An array of arguments to convert to a C `va_list`
 ///   pointer.

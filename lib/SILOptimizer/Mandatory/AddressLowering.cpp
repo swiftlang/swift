@@ -981,7 +981,7 @@ void ApplyRewriter::convertApplyWithIndirectResults() {
   switch (origCallInst->getKind()) {
   case SILInstructionKind::ApplyInst:
     newCallInst = callBuilder.createApply(
-        loc, apply.getCallee(), apply.getSubstitutions(), newCallArgs,
+        loc, apply.getCallee(), apply.getSubstitutionMap(), newCallArgs,
         cast<ApplyInst>(origCallInst)->isNonThrowing(), nullptr);
     break;
   case SILInstructionKind::TryApplyInst:

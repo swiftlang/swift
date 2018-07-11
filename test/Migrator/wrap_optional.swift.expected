@@ -37,7 +37,7 @@ class MyExtraCities : ExtraCities {
 
 typealias IntAnd<T> = (Int, T)
 class Outer {
-  typealias Inner = (String?, String) -> String!
+  typealias Inner = (String?, String) -> String?
 }
 
 class MyExtraCitiesWithAliases : ExtraCities {
@@ -46,9 +46,9 @@ class MyExtraCitiesWithAliases : ExtraCities {
 }
 
 typealias OptString = String?
-typealias ImplicitlyUnwrapped<T> = T!
+typealias OptGeneric<T> = T?
 
 class MyExtraCitiesWithMoreAliases : ExtraCities {
   func blibli(x: ((OptString, String) -> String?)?) {}
-  func currimundi(x: ImplicitlyUnwrapped<(Int, (Int, Int))>) {}
+  func currimundi(x: OptGeneric<(Int, (Int, Int))>) {}
 }

@@ -5,6 +5,7 @@
 // RUN: ls %t/Swift.o
 // RUN: %target-clang -x c -c %S/Inputs/RuntimeStubs.c -o %t/RuntimeStubs.o
 // RUN: %target-build-swift -I %t -module-name main -o %t/hello %S/Inputs/main.swift %t/Swift.o %t/RuntimeStubs.o
+// RUN: %target-codesign %t/hello
 // RUN: %target-run %t/hello | %FileCheck %s
 // REQUIRES: executable_test
 // CHECK: Hello

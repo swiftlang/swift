@@ -372,6 +372,10 @@ static bool paramIsIUO(Decl *decl, int paramNum) {
     auto *param = paramList->get(paramNum);
     return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
   }
+  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
+    auto *param = ee->getParameterList()->get(paramNum);
+    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  }
 
   auto *subscript = cast<SubscriptDecl>(decl);
   auto *index = subscript->getIndices()->get(paramNum);
@@ -602,9 +606,8 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         auto funcTy2 = openedType2->castTo<FunctionType>();
         auto params1 = funcTy1->getParams();
         auto params2 = funcTy2->getParams();
-        SmallVector<bool, 4> defaultMapType2;
-        computeDefaultMap(params2, decl2, outerDC2->isTypeContext(),
-                          defaultMapType2);
+        llvm::SmallBitVector defaultMapType2 =
+          computeDefaultMap(params2, decl2, outerDC2->isTypeContext());
 
         unsigned numParams1 = params1.size();
         unsigned numParams2 = params2.size();

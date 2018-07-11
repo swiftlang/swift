@@ -168,17 +168,17 @@ class HostSpecificConfiguration(object):
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
-                # FIXME: This probably should respect `args.benchmark`, but
-                # a typo in build-script-impl meant we always would do this.
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-" + name)
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-" + name)
 
             if build_external_benchmarks:
                 # Add support for the external benchmarks.
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-{}-external".format(name))
-                self.swift_benchmark_run_targets.append(
-                    "check-swift-benchmark-{}-external".format(name))
+                if args.benchmark:
+                    self.swift_benchmark_run_targets.append(
+                        "check-swift-benchmark-{}-external".format(name))
             if test:
                 if test_host_only:
                     suffix = "-non-executable"

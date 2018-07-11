@@ -21,7 +21,7 @@ class Foo: NSObject {
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
 
-  dynamic var dynamic: Bar { fatalError() }
+  @objc dynamic var dynamic: Bar { fatalError() }
 
   let storedLet = LifetimeTracked(0)
 }

@@ -122,6 +122,12 @@ protected:
     std::vector<std::pair<const char *, const char *>> ExtraEnvironment;
     std::vector<FilelistInfo> FilelistInfos;
 
+    // Not all platforms and jobs support the use of response files, so assume
+    // "false" by default. If the executable specified in the InvocationInfo
+    // constructor supports response files, this can be overridden and set to
+    // "true".
+    bool allowsResponseFiles = false;
+
     InvocationInfo(const char *name, llvm::opt::ArgStringList args = {},
                    decltype(ExtraEnvironment) extraEnv = {})
         : ExecutableName(name), Arguments(std::move(args)),
@@ -197,6 +203,12 @@ protected:
                                           const llvm::opt::ArgList &args,
                                           StringRef extraEntry = "") const;
 
+  /// Specific toolchains should override this to provide additional conditions
+  /// under which the compiler invocation should be written into debug info. For
+  /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
+  /// set to match the behavior of Clang.
+  virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
+
 public:
   virtual ~ToolChain() = default;
 
@@ -234,8 +246,11 @@ public:
   /// Construct a \c BatchJob that subsumes the work of a set of Jobs. Any pair
   /// of elements in \p Jobs are assumed to satisfy the equivalence relation \c
   /// jobsAreBatchCombinable, i.e. they should all be "the same" job in in all
-  /// ways other than their choices of inputs.
+  /// ways other than their choices of inputs. The provided \p NextQuasiPID
+  /// should be a negative number that persists between calls; this method will
+  /// decrement it to assign quasi-PIDs to each of the \p Jobs passed.
   std::unique_ptr<Job> constructBatchJob(ArrayRef<const Job *> Jobs,
+                                         int64_t &NextQuasiPID,
                                          Compilation &C) const;
 
   /// Return the default language type to use for the given extension.

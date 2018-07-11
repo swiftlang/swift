@@ -206,7 +206,9 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (IID == llvm::Intrinsic::instrprof_increment) {
     // If we import profiling intrinsics from a swift module but profiling is
     // not enabled, ignore the increment.
-    if (!IGF.getSILModule().getOptions().GenerateProfile) {
+    SILModule &SILMod = IGF.getSILModule();
+    const auto &Opts = SILMod.getOptions();
+    if (!Opts.GenerateProfile) {
       (void)args.claimAll();
       return;
     }
@@ -246,6 +248,15 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
+
+    if (Opts.EmitProfileCoverageMapping) {
+      // Update the associated coverage mapping: it's now safe to emit, because
+      // a symtab entry for this function is guaranteed (r://39146527).
+      auto &coverageMaps = SILMod.getCoverageMaps();
+      auto CovMapIt = coverageMaps.find(PGOFuncName);
+      if (CovMapIt != coverageMaps.end())
+        CovMapIt->second->setSymtabEntryGuaranteed();
+    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {

@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
@@ -71,7 +72,8 @@ extern int swift_format_main(ArrayRef<const char *> Args, const char *Argv0,
 /// \returns True if running as a subcommand.
 static bool shouldRunAsSubcommand(StringRef ExecName,
                                   SmallString<256> &SubcommandName,
-                                  SmallVectorImpl<const char *> &Args) {
+                                  const ArrayRef<const char *> Args,
+                                  bool &isRepl) {
   assert(!Args.empty());
 
   // If we are not run as 'swift', don't do anything special. This doesn't work
@@ -94,12 +96,13 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
   // Otherwise, we should have some sort of subcommand. Get the subcommand name
   // and remove it from the program arguments.
   StringRef Subcommand = Args[1];
-  Args.erase(&Args[1]);
 
   // If the subcommand is the "built-in" 'repl', then use the
   // normal driver.
-  if (Subcommand == "repl")
+  if (Subcommand == "repl") {
+    isRepl = true;
     return false;
+  }
 
   // Form the subcommand name.
   SubcommandName.assign("swift-");
@@ -110,63 +113,8 @@ static bool shouldRunAsSubcommand(StringRef ExecName,
 
 extern int apinotes_main(ArrayRef<const char *> Args);
 
-int main(int argc_, const char **argv_) {
-  PROGRAM_START(argc_, argv_);
-
-  SmallVector<const char *, 256> argv;
-  llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
-  std::error_code EC = llvm::sys::Process::GetArgumentVector(
-      argv, llvm::ArrayRef<const char *>(argv_, argc_), ArgAllocator);
-  if (EC) {
-    llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
-    return 1;
-  }
-
-  // Expand any response files in the command line argument vector - arguments
-  // may be passed through response files in the event of command line length
-  // restrictions.
-  llvm::BumpPtrAllocator Allocator;
-  llvm::StringSaver Saver(Allocator);
-  llvm::cl::ExpandResponseFiles(
-      Saver,
-      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
-      llvm::cl::TokenizeWindowsCommandLine :
-      llvm::cl::TokenizeGNUCommandLine,
-      argv);
-
-  // Check if this invocation should execute a subcommand.
-  StringRef ExecName = llvm::sys::path::stem(argv[0]);
-  SmallString<256> SubcommandName;
-  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv)) {
-    // We are running as a subcommand, try to find the subcommand adjacent to
-    // the executable we are running as.
-    SmallString<256> SubcommandPath(
-      llvm::sys::path::parent_path(getExecutablePath(argv[0])));
-    llvm::sys::path::append(SubcommandPath, SubcommandName);
-
-    // If we didn't find the tool there, let the OS search for it.
-    if (!llvm::sys::fs::exists(SubcommandPath)) {
-      // Search for the program and use the path if found. If there was an
-      // error, ignore it and just let the exec fail.
-      auto result = llvm::sys::findProgramByName(SubcommandName);
-      if (!result.getError())
-        SubcommandPath = *result;
-    }
-
-    // Rewrite the program argument.
-    argv[0] = SubcommandPath.c_str();
-    
-    // Execute the subcommand.
-    argv.push_back(nullptr);
-    ExecuteInPlace(SubcommandPath.c_str(), argv.data());
-
-    // If we reach here then an error occurred (typically a missing path).
-    std::string ErrorString = llvm::sys::StrError();
-    llvm::errs() << "error: unable to invoke subcommand: " << argv[0]
-                 << " (" << ErrorString << ")\n";
-    return 2;
-  }
-
+static int run_driver(StringRef ExecName,
+                       const ArrayRef<const char *> argv) {
   // Handle integrated tools.
   if (argv.size() > 1) {
     StringRef FirstArg(argv[1]);
@@ -219,12 +167,87 @@ int main(int argc_, const char **argv_) {
 
   std::unique_ptr<Compilation> C =
       TheDriver.buildCompilation(*TC, std::move(ArgList));
+
   if (Diags.hadAnyError())
     return 1;
 
   if (C) {
-    return C->performJobs();
+    std::unique_ptr<sys::TaskQueue> TQ = TheDriver.buildTaskQueue(*C);
+    return C->performJobs(std::move(TQ));
   }
 
   return 0;
+}
+
+int main(int argc_, const char **argv_) {
+  SmallVector<const char *, 256> argv;
+  llvm::SpecificBumpPtrAllocator<char> ArgAllocator;
+  std::error_code EC = llvm::sys::Process::GetArgumentVector(
+      argv, llvm::ArrayRef<const char *>(argv_, argc_), ArgAllocator);
+  if (EC) {
+    llvm::errs() << "error: couldn't get arguments: " << EC.message() << '\n';
+    return 1;
+  }
+
+  // Expand any response files in the command line argument vector - arguments
+  // may be passed through response files in the event of command line length
+  // restrictions.
+  llvm::BumpPtrAllocator Allocator;
+  llvm::StringSaver Saver(Allocator);
+  llvm::cl::ExpandResponseFiles(
+      Saver,
+      llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows() ?
+      llvm::cl::TokenizeWindowsCommandLine :
+      llvm::cl::TokenizeGNUCommandLine,
+      argv);
+
+  // Initialize the stack trace using the parsed argument vector with expanded
+  // response files.
+  PROGRAM_START(argv.size(), argv.data());
+
+  // Check if this invocation should execute a subcommand.
+  StringRef ExecName = llvm::sys::path::stem(argv[0]);
+  SmallString<256> SubcommandName;
+  bool isRepl = false;
+  if (shouldRunAsSubcommand(ExecName, SubcommandName, argv, isRepl)) {
+    // Preserve argv for the stack trace.
+    SmallVector<const char *, 256> subCommandArgs(argv.begin(), argv.end());
+    subCommandArgs.erase(&subCommandArgs[1]);
+    // We are running as a subcommand, try to find the subcommand adjacent to
+    // the executable we are running as.
+    SmallString<256> SubcommandPath(
+      llvm::sys::path::parent_path(getExecutablePath(argv[0])));
+    llvm::sys::path::append(SubcommandPath, SubcommandName);
+
+    // If we didn't find the tool there, let the OS search for it.
+    if (!llvm::sys::fs::exists(SubcommandPath)) {
+      // Search for the program and use the path if found. If there was an
+      // error, ignore it and just let the exec fail.
+      auto result = llvm::sys::findProgramByName(SubcommandName);
+      if (!result.getError())
+        SubcommandPath = *result;
+    }
+
+    // Rewrite the program argument.
+    subCommandArgs[0] = SubcommandPath.c_str();
+
+    // Execute the subcommand.
+    subCommandArgs.push_back(nullptr);
+    ExecuteInPlace(SubcommandPath.c_str(), subCommandArgs.data());
+
+    // If we reach here then an error occurred (typically a missing path).
+    std::string ErrorString = llvm::sys::StrError();
+    llvm::errs() << "error: unable to invoke subcommand: " << subCommandArgs[0]
+                 << " (" << ErrorString << ")\n";
+    return 2;
+  }
+
+  if (isRepl) {
+    // Preserve argv for the stack trace.
+    SmallVector<const char *, 256> replArgs(argv.begin(), argv.end());
+    replArgs.erase(&replArgs[1]);
+    return run_driver(ExecName, replArgs);
+  } else {
+    return run_driver(ExecName, argv);
+  }
 }

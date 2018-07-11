@@ -63,6 +63,8 @@ NODE_ANNOTATION(NowThrowing)
 NODE_ANNOTATION(NowMutating)
 NODE_ANNOTATION(StaticChange)
 NODE_ANNOTATION(OwnershipChange)
+NODE_ANNOTATION(RawTypeLeft)
+NODE_ANNOTATION(RawTypeRight)
 
 NODE_ANNOTATION_CHANGE_KIND(ImplicitOptionalToOptional)
 NODE_ANNOTATION_CHANGE_KIND(OptionalToImplicitOptional)
@@ -71,22 +73,28 @@ NODE_ANNOTATION_CHANGE_KIND(WrapImplicitOptional)
 NODE_ANNOTATION_CHANGE_KIND(UnwrapOptional)
 NODE_ANNOTATION_CHANGE_KIND(GetterToProperty)
 NODE_ANNOTATION_CHANGE_KIND(SetterToProperty)
-NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
-NODE_ANNOTATION_CHANGE_KIND(ModernizeEnum)
-NODE_ANNOTATION_CHANGE_KIND(UnwrapUnmanaged)
-NODE_ANNOTATION_CHANGE_KIND(Rename)
 NODE_ANNOTATION_CHANGE_KIND(DictionaryKeyUpdate)
 NODE_ANNOTATION_CHANGE_KIND(OptionalDictionaryKeyUpdate)
 NODE_ANNOTATION_CHANGE_KIND(ArrayMemberUpdate)
 NODE_ANNOTATION_CHANGE_KIND(OptionalArrayMemberUpdate)
 NODE_ANNOTATION_CHANGE_KIND(SimpleStringRepresentableUpdate)
 NODE_ANNOTATION_CHANGE_KIND(SimpleOptionalStringRepresentableUpdate)
+NODE_ANNOTATION_CHANGE_KIND(TypeAliasDeclToRawRepresentable)
+NODE_ANNOTATION_CHANGE_KIND(RevertTypeAliasDeclToRawRepresentable)
+
 NODE_ANNOTATION_CHANGE_KIND(RevertDictionaryKeyUpdate)
 NODE_ANNOTATION_CHANGE_KIND(RevertOptionalDictionaryKeyUpdate)
 NODE_ANNOTATION_CHANGE_KIND(RevertArrayMemberUpdate)
 NODE_ANNOTATION_CHANGE_KIND(RevertOptionalArrayMemberUpdate)
 NODE_ANNOTATION_CHANGE_KIND(RevertSimpleStringRepresentableUpdate)
 NODE_ANNOTATION_CHANGE_KIND(RevertSimpleOptionalStringRepresentableUpdate)
+
+NODE_ANNOTATION_CHANGE_KIND(ModernizeEnum)
+NODE_ANNOTATION_CHANGE_KIND(UnwrapUnmanaged)
+NODE_ANNOTATION_CHANGE_KIND(Rename)
+
+// Keep type rewritten the last one.
+NODE_ANNOTATION_CHANGE_KIND(TypeRewritten)
 
 DECL_ATTR(deprecated)
 DECL_ATTR(fixedLayout)
@@ -120,6 +128,7 @@ KNOWN_TYPE(Function)
 KNOWN_TYPE(Dictionary)
 KNOWN_TYPE(String)
 KNOWN_TYPE(Array)
+KNOWN_TYPE(Int)
 
 KNOWN_PROTOCOL(RawRepresentable)
 
@@ -163,6 +172,7 @@ SPECIAL_CASE_ID(StaticAbsToSwiftAbs)
 SPECIAL_CASE_ID(NSOpenGLGetVersion)
 SPECIAL_CASE_ID(ToIntMax)
 SPECIAL_CASE_ID(ToUIntMax)
+SPECIAL_CASE_ID(UIApplicationMain)
 
 #undef SPECIAL_CASE_ID
 #undef DIFF_ITEM_KEY_KIND_INT

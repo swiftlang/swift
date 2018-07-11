@@ -335,13 +335,9 @@ public:
       SubstitutionMap ArraySubMap = ArrayType.getASTType()
         ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
       
-      GenericSignature *Sig = NTD->getGenericSignature();
-      assert(Sig && "Array type must have generic signature");
-      SmallVector<Substitution, 4> Subs;
-      Sig->getSubstitutions(ArraySubMap, Subs);
-      
       AppendContentsOf.replaceByAppendingValues(M, AppendFn, ReserveFn,
-                                                Repl.ReplacementValues, Subs);
+                                                Repl.ReplacementValues,
+                                                ArraySubMap);
     }
     return true;
   }

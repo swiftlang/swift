@@ -949,6 +949,7 @@ void LargeValueVisitor::visitDeallocInst(DeallocStackInst *instr) {
     assert(pass.allocToApplyRetMap.find(opAsInstr) !=
                pass.allocToApplyRetMap.end() &&
            "Unexpected dealloc instr!");
+    (void)opAsInstr;
   }
 }
 
@@ -1377,6 +1378,7 @@ void LoadableStorageAllocation::convertApplyResults() {
                  "Expected SILFunctionType or Optional for the result type");
           assert(optionalType.is<SILFunctionType>() &&
                  "Expected a SILFunctionType inside the optional Type");
+          (void)optionalType;
         }
         continue;
       }
@@ -2018,6 +2020,8 @@ static void rewriteFunction(StructLoweringState &pass,
     assert(srcType && "Expected an address-type source");
     assert(tgtType.isAddress() && "Expected an address-type target");
     assert(srcType == tgtType && "Source and target type do not match");
+    (void)srcType;
+    (void)tgtType;
 
     SILBuilderWithScope copyBuilder(instr);
     createOutlinedCopyCall(copyBuilder, src, tgt, pass);
@@ -2086,7 +2090,8 @@ static void rewriteFunction(StructLoweringState &pass,
       auto *convInstr = cast<BeginAccessInst>(instr);
       newInstr = resultTyBuilder.createBeginAccess(
           Loc, convInstr->getOperand(), convInstr->getAccessKind(),
-          convInstr->getEnforcement(), convInstr->hasNoNestedConflict());
+          convInstr->getEnforcement(), convInstr->hasNoNestedConflict(),
+          convInstr->isFromBuiltin());
       break;
     }
     case SILInstructionKind::EnumInst: {
@@ -2374,7 +2379,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<ApplyInst>(applyInst);
     SILValue newApply =
       applyBuilder.createApply(castedApply->getLoc(), callee,
-                               applySite.getSubstitutions(),
+                               applySite.getSubstitutionMap(),
                                callArgs, castedApply->isNonThrowing());
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2383,7 +2388,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto *castedApply = cast<TryApplyInst>(applyInst);
     applyBuilder.createTryApply(
         castedApply->getLoc(), callee,
-        applySite.getSubstitutions(), callArgs,
+        applySite.getSubstitutionMap(), callArgs,
         castedApply->getNormalBB(), castedApply->getErrorBB());
     break;
   }
@@ -2391,7 +2396,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     auto oldApply = cast<BeginApplyInst>(applyInst);
     auto newApply =
       applyBuilder.createBeginApply(oldApply->getLoc(), callee,
-                                    applySite.getSubstitutions(), callArgs,
+                                    applySite.getSubstitutionMap(), callArgs,
                                     oldApply->isNonThrowing());
 
     // Use the new token result.
@@ -2405,6 +2410,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
     assert(oldYields.size() == newYields.size() &&
            oldYields.size() == oldYieldedValues.size() &&
            newYields.size() == newYieldedValues.size());
+    (void)newYields;
     for (auto i : indices(oldYields)) {
       SILValue oldValue = oldYieldedValues[i];
       SILValue newValue = newYieldedValues[i];
@@ -2437,7 +2443,7 @@ void LoadableByAddress::recreateSingleApply(SILInstruction *applyInst) {
 
     auto newApply =
       applyBuilder.createPartialApply(castedApply->getLoc(), callee,
-                                      applySite.getSubstitutions(), callArgs,
+                                      applySite.getSubstitutionMap(), callArgs,
                                       partialApplyConvention);
     castedApply->replaceAllUsesWith(newApply);
     break;
@@ -2647,7 +2653,7 @@ void LoadableByAddress::run() {
   for (auto &F : *getModule())
     runOnFunction(&F);
 
-  if (modFuncs.empty()) {
+  if (modFuncs.empty() && modApplies.empty()) {
     return;
   }
 

@@ -62,17 +62,17 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
   switch (AI.getInstruction()->getKind()) {
   case SILInstructionKind::ApplyInst:
     NAI = Builder.createApply(AI.getLoc(), AI.getCallee(),
-                                   AI.getSubstitutions(),
-                                   Ret,
-                                   cast<ApplyInst>(AI)->isNonThrowing());
+                              AI.getSubstitutionMap(),
+                              Ret,
+                              cast<ApplyInst>(AI)->isNonThrowing());
     break;
   case SILInstructionKind::TryApplyInst: {
     auto *TryApplyI = cast<TryApplyInst>(AI.getInstruction());
     NAI = Builder.createTryApply(AI.getLoc(), AI.getCallee(),
-                                      AI.getSubstitutions(),
-                                      Ret,
-                                      TryApplyI->getNormalBB(),
-                                      TryApplyI->getErrorBB());
+                                 AI.getSubstitutionMap(),
+                                 Ret,
+                                 TryApplyI->getNormalBB(),
+                                 TryApplyI->getErrorBB());
     }
     break;
   default:
@@ -209,7 +209,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
       Args.push_back(Arg);
     }
     FullApplySite NewVirtAI = Builder.createTryApply(VirtAI.getLoc(), VirtAI.getCallee(),
-        VirtAI.getSubstitutions(),
+        VirtAI.getSubstitutionMap(),
         Args, NormalBB, ErrorBB);
     VirtAI.getInstruction()->eraseFromParent();
     VirtAI = NewVirtAI;

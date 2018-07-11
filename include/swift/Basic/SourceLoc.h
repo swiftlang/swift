@@ -68,7 +68,8 @@ public:
   void print(raw_ostream &OS, const SourceManager &SM,
              unsigned &LastBufferID) const;
 
-  void printLineAndColumn(raw_ostream &OS, const SourceManager &SM) const;
+  void printLineAndColumn(raw_ostream &OS, const SourceManager &SM,
+                          unsigned BufferID = 0) const;
 
   void print(raw_ostream &OS, const SourceManager &SM) const {
     unsigned Tmp = ~0U;

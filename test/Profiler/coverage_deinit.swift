@@ -11,5 +11,5 @@ public class Derived: NSString {
   }
 }
 
-// CHECK-LABEL: sil_coverage_map "{{.*}}coverage_deinit.swift" $S15coverage_deinit7DerivedCfD
+// CHECK-LABEL: sil_coverage_map "{{.*}}coverage_deinit.swift" "$S15coverage_deinit7DerivedCfD"
 // CHECK-NEXT: [[@LINE-5]]:10 -> [[@LINE-4]]:4 : 0

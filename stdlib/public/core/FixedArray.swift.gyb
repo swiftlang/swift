@@ -60,6 +60,7 @@ extension _FixedArray${N} {
 }
 
 extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+  @usableFromInline
   internal typealias Index = Int
 
   @inlinable // FIXME(sil-serialize-all)
@@ -183,3 +184,7 @@ extension _FixedArray${N} {
 }
 
 % end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

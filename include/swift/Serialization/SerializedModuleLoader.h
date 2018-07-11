@@ -29,6 +29,8 @@ private:
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
   std::vector<LoadedModulePair> LoadedModuleFiles;
 
+  SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> OrphanedMemoryBuffers;
+
   explicit SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker);
 
 public:

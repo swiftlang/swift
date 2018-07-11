@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -32,6 +32,7 @@ import BinaryFloatingPointProperties
 import BitCount
 import ByteSwap
 import COWTree
+import COWArrayGuaranteedParameterOverhead
 import CString
 import CSVParsing
 import Calculator
@@ -52,6 +53,7 @@ import DictTest3
 import DictTest4
 import DictTest4Legacy
 import DictionaryBridge
+import DictionaryBridgeToObjC
 import DictionaryCopy
 import DictionaryGroup
 import DictionaryKeysContains
@@ -91,11 +93,14 @@ import NopDeinit
 import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
+#if !(SWIFT_PACKAGE || Xcode)
 import ObjectiveCNoBridgingStubs
+#endif
 import ObserverClosure
 import ObserverForwarderStruct
 import ObserverPartiallyAppliedMethod
 import ObserverUnappliedMethod
+import OpaqueConsumingUsers
 import OpenClose
 import PartialApplyDynamicType
 import Phonebook
@@ -112,6 +117,9 @@ import ProtocolDispatch2
 import Queue
 import RC4
 import RGBHistogram
+import Radix2CooleyTukey
+import RandomShuffle
+import RandomValues
 import RangeAssignment
 import RangeIteration
 import RangeReplaceableCollectionPlusDefault
@@ -182,6 +190,7 @@ registerBenchmark(BinaryFloatingPointPropertiesUlp)
 registerBenchmark(BitCount)
 registerBenchmark(ByteSwap)
 registerBenchmark(COWTree)
+registerBenchmark(COWArrayGuaranteedParameterOverhead)
 registerBenchmark(CString)
 registerBenchmark(CSVParsing)
 registerBenchmark(CSVParsingAlt)
@@ -207,6 +216,7 @@ registerBenchmark(Dictionary3)
 registerBenchmark(Dictionary4)
 registerBenchmark(Dictionary4Legacy)
 registerBenchmark(DictionaryBridge)
+registerBenchmark(DictionaryBridgeToObjC)
 registerBenchmark(DictionaryCopy)
 registerBenchmark(DictionaryGroup)
 registerBenchmark(DictionaryKeysContains)
@@ -246,11 +256,14 @@ registerBenchmark(NopDeinit)
 registerBenchmark(ObjectAllocation)
 registerBenchmark(ObjectiveCBridging)
 registerBenchmark(ObjectiveCBridgingStubs)
+#if !(SWIFT_PACKAGE || Xcode)
 registerBenchmark(ObjectiveCNoBridgingStubs)
+#endif
 registerBenchmark(ObserverClosure)
 registerBenchmark(ObserverForwarderStruct)
 registerBenchmark(ObserverPartiallyAppliedMethod)
 registerBenchmark(ObserverUnappliedMethod)
+registerBenchmark(OpaqueConsumingUsers)
 registerBenchmark(OpenClose)
 registerBenchmark(PartialApplyDynamicType)
 registerBenchmark(Phonebook)
@@ -268,6 +281,9 @@ registerBenchmark(QueueGeneric)
 registerBenchmark(QueueConcrete)
 registerBenchmark(RC4Test)
 registerBenchmark(RGBHistogram)
+registerBenchmark(Radix2CooleyTukey)
+registerBenchmark(RandomShuffle)
+registerBenchmark(RandomValues)
 registerBenchmark(RangeAssignment)
 registerBenchmark(RangeIteration)
 registerBenchmark(RangeReplaceableCollectionPlusDefault)
@@ -291,6 +307,7 @@ registerBenchmark(StringBuilder)
 registerBenchmark(StringComparison)
 registerBenchmark(StringEdits)
 registerBenchmark(StringEnum)
+registerBenchmark(StringHashing)
 registerBenchmark(StringInterpolation)
 registerBenchmark(StringInterpolationSmall)
 registerBenchmark(StringInterpolationManySmallSegments)

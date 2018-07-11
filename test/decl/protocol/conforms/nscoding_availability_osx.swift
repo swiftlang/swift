@@ -17,6 +17,6 @@ class CodingI : NSObject, NSCoding {
 
 @available(OSX 10.51, *)
 class OuterCodingJ {
-  // CHECK-NOT: class_decl "NestedJ"{{.*}}@_staticInitializeObjCMetadata
+  // CHECK-NOT: class_decl{{.*}}"NestedJ"{{.*}}@_staticInitializeObjCMetadata
   class NestedJ : CodingI { }
 }

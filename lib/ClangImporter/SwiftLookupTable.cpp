@@ -961,6 +961,7 @@ namespace {
       if (key.Kind == DeclBaseName::Kind::Normal) {
         keyLength += key.Name.size(); // The name's length
       }
+      assert(keyLength == static_cast<uint16_t>(keyLength));
 
       // # of entries
       uint32_t dataLength = sizeof(uint16_t);
@@ -982,7 +983,7 @@ namespace {
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -999,6 +1000,7 @@ namespace {
 
       // # of entries
       writer.write<uint16_t>(data.size());
+      assert(data.size() == static_cast<uint16_t>(data.size()));
 
       bool isModule = Writer.getLangOpts().isCompilingModule();
       for (auto &fullEntry : data) {
@@ -1066,10 +1068,12 @@ namespace {
       uint32_t keyLength = 1;
       if (SwiftLookupTable::contextRequiresName(key.first))
         keyLength += key.second.size();
+      assert(keyLength == static_cast<uint16_t>(keyLength));
 
       // # of entries
       uint32_t dataLength =
         sizeof(uint16_t) + sizeof(uint64_t) * data.size();
+      assert(dataLength == static_cast<uint16_t>(dataLength));
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
@@ -1225,7 +1229,7 @@ namespace {
     static std::pair<unsigned, unsigned>
     ReadKeyDataLength(const uint8_t *&data) {
       unsigned keyLength = endian::readNext<uint16_t, little, unaligned>(data);
-      unsigned dataLength = endian::readNext<uint16_t, little, unaligned>(data);
+      unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
       return { keyLength, dataLength };
     }
 
@@ -1602,7 +1606,8 @@ SwiftNameLookupExtension::hashExtension(llvm::hash_code code) const {
   return llvm::hash_combine(code, StringRef("swift.lookup"),
                             SWIFT_LOOKUP_TABLE_VERSION_MAJOR,
                             SWIFT_LOOKUP_TABLE_VERSION_MINOR,
-                            inferImportAsMember);
+                            inferImportAsMember,
+                            version::getSwiftFullVersion());
 }
 
 void importer::addEntryToLookupTable(SwiftLookupTable &table,
@@ -1633,37 +1638,30 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
-  if (auto importedName = nameImporter.importName(named, currentVersion)) {
-    SmallPtrSet<DeclName, 8> distinctNames;
-    distinctNames.insert(importedName.getDeclName());
-    table.addEntry(importedName.getDeclName(), named,
-                   importedName.getEffectiveContext());
+  auto failed = nameImporter.forEachDistinctImportName(
+      named, currentVersion,
+      [&](ImportedName importedName, ImportNameVersion version) {
+        table.addEntry(importedName.getDeclName(), named,
+                       importedName.getEffectiveContext());
 
-    // Also add the subscript entry, if needed.
-    if (importedName.isSubscriptAccessor())
-      table.addEntry(DeclName(nameImporter.getContext(),
-                              DeclBaseName::createSubscript(),
-                              ArrayRef<Identifier>()),
-                     named, importedName.getEffectiveContext());
+        // Also add the subscript entry, if needed.
+        if (version == currentVersion && importedName.isSubscriptAccessor()) {
+          table.addEntry(DeclName(nameImporter.getContext(),
+                                  DeclBaseName::createSubscript(),
+                                  {Identifier()}),
+                         named, importedName.getEffectiveContext());
+        }
 
-    currentVersion.forEachOtherImportNameVersion(
-        [&](ImportNameVersion alternateVersion) {
-      auto alternateName = nameImporter.importName(named, alternateVersion);
-      if (!alternateName)
+        return true;
+      });
+  if (failed) {
+    if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
+      // If the category is invalid, don't add it.
+      if (category->isInvalidDecl())
         return;
-      // FIXME: What if the DeclNames are the same but the contexts are
-      // different?
-      if (distinctNames.insert(alternateName.getDeclName()).second) {
-        table.addEntry(alternateName.getDeclName(), named,
-                       alternateName.getEffectiveContext());
-      }
-    });
-  } else if (auto category = dyn_cast<clang::ObjCCategoryDecl>(named)) {
-    // If the category is invalid, don't add it.
-    if (category->isInvalidDecl())
-      return;
 
-    table.addCategory(category);
+      table.addCategory(category);
+    }
   }
 
   // Walk the members of any context that can have nested members.
@@ -1864,4 +1862,3 @@ SwiftNameLookupExtension::createExtensionReader(
   // Return the new reader.
   return std::move(tableReader);
 }
-

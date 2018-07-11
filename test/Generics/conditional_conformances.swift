@@ -217,6 +217,8 @@ struct InheritEqual<T> {}
 extension InheritEqual: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual<T>
 // CHECK-NEXT:  (normal_conformance type=InheritEqual<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritEqual<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P1)
 extension InheritEqual: P5 where T: P1 {}
 func inheritequal_good<U: P1>(_: U) {
@@ -249,6 +251,8 @@ struct InheritMore<T> {}
 extension InheritMore: P2 where T: P1 {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore<T>
 // CHECK-NEXT:  (normal_conformance type=InheritMore<T> protocol=P5
+// CHECK-NEXT:    (normal_conformance type=InheritMore<T> protocol=P2
+// CHECK-NEXT:      conforms_to: T P1)
 // CHECK-NEXT:    conforms_to: T P4)
 extension InheritMore: P5 where T: P4 {}
 func inheritequal_good_good<U: P4>(_: U) {

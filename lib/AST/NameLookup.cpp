@@ -15,17 +15,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/Basic/Statistic.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -59,9 +60,7 @@ void DebuggerClient::anchor() {}
 void AccessFilteringDeclConsumer::foundDecl(ValueDecl *D,
                                             DeclVisibilityKind reason) {
   if (D->getASTContext().LangOpts.EnableAccessControl) {
-    if (TypeResolver)
-      TypeResolver->resolveAccessControl(D);
-    if (D->isInvalid() && !D->hasAccess())
+    if (D->isInvalid())
       return;
     if (!D->isAccessibleFrom(DC))
       return;
@@ -80,7 +79,7 @@ static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
 }
 
 bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
-  if (decls.empty())
+  if (decls.size() < 2)
     return false;
 
   llvm::SmallPtrSet<ValueDecl*, 8> overridden;
@@ -281,20 +280,40 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
         // module.
         // FIXME: This is a hack. We should query a (lazily-built, cached)
         // module graph to determine shadowing.
-        if ((firstModule == curModule) == (secondModule == curModule))
-          continue;
+        if ((firstModule == curModule) != (secondModule == curModule)) {
+          // If the first module is the current module, the second declaration
+          // is shadowed by the first.
+          if (firstModule == curModule) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
 
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
-          shadowed.insert(secondDecl);
-          continue;
+          // Otherwise, the first declaration is shadowed by the second. There is
+          // no point in continuing to compare the first declaration to others.
+          shadowed.insert(firstDecl);
+          break;
         }
 
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
+        // Prefer declarations in an overlay to similar declarations in
+        // the Clang module it customizes.
+        if (firstDecl->hasClangNode() != secondDecl->hasClangNode()) {
+          auto clangLoader = ctx.getClangModuleLoader();
+          if (!clangLoader) continue;
+
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                firstDecl->getDeclContext(),
+                                                secondDecl->getDeclContext())) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+
+          if (clangLoader->isInOverlayModuleForImportedModule(
+                                                 secondDecl->getDeclContext(),
+                                                 firstDecl->getDeclContext())) {
+            shadowed.insert(firstDecl);
+            break;
+          }
+        }
       }
     }
   }
@@ -1692,12 +1711,24 @@ bool DeclContext::lookupQualified(Type type,
   SmallVector<NominalTypeDecl *, 4> stack;
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
+  // Note that we don't have to visit the superclass of a protocol.
+  // If we started with an archetype or existential, we'll visit the
+  // superclass because we will have added it to the stack upfront.
+  //
+  // If we started with a concrete class conforming to a protocol
+  // with a superclass, we will visit the superclass from the
+  // concrete type.
+  bool checkProtocolSuperclass = false;
+
   // Handle nominal types.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
+
+    if (isa<ProtocolDecl>(nominal))
+      checkProtocolSuperclass = true;
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {
@@ -1707,8 +1738,8 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(proto);
 
     // Look into the superclasses of this archetype.
-    if (auto superclassTy = archetypeTy->getSuperclass())
-      if (auto superclassDecl = superclassTy->getAnyNominal())
+    if (auto superclass = archetypeTy->getSuperclass())
+      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
         if (visited.insert(superclassDecl).second)
           stack.push_back(superclassDecl);
   }
@@ -1726,10 +1757,10 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(protoDecl);
     }
 
-    if (layout.superclass) {
-      auto *nominalDecl = layout.superclass->getAnyNominal();
-      if (visited.insert(nominalDecl).second)
-        stack.push_back(nominalDecl);
+    if (auto superclass = layout.explicitSuperclass) {
+      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      if (visited.insert(superclassDecl).second)
+        stack.push_back(superclassDecl);
     }
   } else {
     llvm_unreachable("Bad type for qualified lookup");
@@ -1739,13 +1770,6 @@ bool DeclContext::lookupQualified(Type type,
   // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, ValueDecl *decl) -> bool {
-    // If the decl is currently being type checked, then we have something
-    // cyclic going on.  Instead of poking at parts that are potentially not
-    // set up, just assume it is acceptable.  This will make sure we produce an
-    // error later.
-    if (!decl->hasValidSignature())
-      return true;
-    
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -1764,8 +1788,9 @@ bool DeclContext::lookupQualified(Type type,
     }
 
     // Check access.
-    if (!(options & NL_IgnoreAccessControl))
+    if (!(options & NL_IgnoreAccessControl)) {
       return decl->isAccessibleFrom(this);
+    }
 
     return true;
   };
@@ -1807,11 +1832,6 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
-      // Resolve the declaration signature when we find the
-      // declaration.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
-
       if (isAcceptableDecl(current, decl))
         decls.push_back(decl);
     }
@@ -1830,10 +1850,9 @@ bool DeclContext::lookupQualified(Type type,
       }
 
       if (visitSuperclass) {
-        if (auto superclassType = classDecl->getSuperclass())
-          if (auto superclassDecl = superclassType->getClassOrBoundGenericClass())
-            if (visited.insert(superclassDecl).second)
-              stack.push_back(superclassDecl);
+        if (auto superclassDecl = classDecl->getSuperclassDecl())
+          if (visited.insert(superclassDecl).second)
+            stack.push_back(superclassDecl);
       }
     }
 
@@ -1842,6 +1861,15 @@ bool DeclContext::lookupQualified(Type type,
     // step.
     if (!wantProtocolMembers && !currentIsProtocol)
       continue;
+
+    if (checkProtocolSuperclass) {
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(current)) {
+        if (auto superclassDecl = protoDecl->getSuperclassDecl()) {
+          visited.insert(superclassDecl);
+          stack.push_back(superclassDecl);
+        }
+      }
+    }
 
     SmallVector<ProtocolDecl *, 4> protocols;
     for (auto proto : current->getAllProtocols()) {
@@ -1876,17 +1904,17 @@ bool DeclContext::lookupQualified(Type type,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
+      // If the declaration is not @objc, it cannot be called dynamically.
       if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
+        typeResolver->resolveIsObjC(decl);
+
+      if (!decl->isObjC())
+        continue;
 
       // If the declaration has an override, name lookup will also have
       // found the overridden method. Skip this declaration, because we
       // prefer the overridden method.
       if (decl->getOverriddenDecl())
-        continue;
-
-      // If the declaration is not @objc, it cannot be called dynamically.
-      if (!decl->isObjC())
         continue;
 
       auto dc = decl->getDeclContext();

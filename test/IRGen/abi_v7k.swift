@@ -38,7 +38,8 @@ func addFDF(x: Float, y: Double, z: Float) -> Float {
 // CHECK: fadd double
 // CHECK: ret double
 // V7K-LABEL: _$S8test_v7k8addStack
-// V7K: vldr d16, [sp]
+// V7K: sub     sp, #72
+// V7K: vldr d16, [sp, #72]
 // V7K: vadd.f64 d0, d6, d16
 // a is assigned to d6, c is passed via stack
 func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
@@ -49,8 +50,9 @@ func addStack(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK-LABEL: define hidden swiftcc float @"$S8test_v7k9addStack{{.*}}"(double, double, double, double, double, double, double, float, double, float)
 // CHECK: fadd float
 // V7K-LABEL: _$S8test_v7k9addStack
-// V7K: vldr s0, [sp, #8]
-// V7K: vadd.f32 s0, s14, s0
+// V7K: sub     sp, #80
+// V7K: vldr s15, [sp, #88]
+// V7K: vadd.f32 s0, s14, s15
 // a is assigned to s14, b is via stack, c is via stack since it can't be back-filled to s15
 func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double, 
                d5: Double, d6: Double, a: Float, b: Double, c: Float) -> Float {
@@ -61,8 +63,7 @@ func addStack2(d0: Double, d1: Double, d2: Double, d3: Double, d4: Double,
 // CHECK-LABEL: define hidden swiftcc void @"$S8test_v7k0A5Empty{{.*}}"()
 // V7K-LABEL: _$S8test_v7k0A5Empty
 enum Empty {}
-func testEmpty(x: Empty) -> Empty {
-  return x
+func testEmpty(x: Empty) -> () {
 }
 
 // CHECK-LABEL: define hidden swiftcc i32 @"$S8test_v7k0A6Single{{.*}}"()
@@ -114,8 +115,8 @@ func testClike2(x: CLike2) -> Int {
 // CHECK: [[ID:%[0-9]+]] = phi i32 [ -1, {{.*}} ], [ 1, {{.*}} ]
 // CHECK: ret i32 [[ID]]
 // V7K-LABEL: _$S8test_v7k0A6Clike8
-// V7K: sxtb r1, r1
-// V7K: cmp r1, #0
+// V7K: sxtb r0, r1
+// V7K: cmp r0, #0
 // V7K: movs r0, #1
 // V7K: mvn r0, #0
 enum CLike8 {

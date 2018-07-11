@@ -165,3 +165,12 @@ func dontCrash3() -> String? {
   return bundle.path(forResource: resource, ofType: "png")
       ?? bundle.path(forResource: resource, ofType: "apng")
 }
+
+extension Operation {
+  func dontCrash4() {
+    if completionBlock != nil {
+      completionBlock = { }
+    }
+  }
+}
+

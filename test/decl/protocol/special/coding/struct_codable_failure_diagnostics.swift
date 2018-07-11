@@ -89,3 +89,13 @@ struct S5 : Codable {
     case c
   }
 }
+
+struct NotCodable {}
+struct S6 {
+    var x: NotCodable = NotCodable()
+    // expected-note@-1 {{cannot automatically synthesize 'Encodable' because 'NotCodable' does not conform to 'Encodable'}}
+    // expected-note@-2 {{cannot automatically synthesize 'Decodable' because 'NotCodable' does not conform to 'Decodable'}}
+}
+extension S6: Codable {}
+// expected-error@-1 {{type 'S6' does not conform to protocol 'Encodable'}}
+// expected-error@-2 {{type 'S6' does not conform to protocol 'Decodable'}}

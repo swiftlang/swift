@@ -475,8 +475,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
   d[TestObjCKeyTy(20)] = TestObjCValueTy(1020)
   d[TestObjCKeyTy(30)] = TestObjCValueTy(1030)
 
-  let bridged =
-    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+  let bridged = convertDictionaryToNSDictionary(d)
 
   assert(isNativeNSDictionary(bridged))
 
@@ -486,8 +485,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
 func getBridgedEmptyNSDictionary() -> NSDictionary {
   let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
-  let bridged =
-    unsafeBitCast(convertDictionaryToNSDictionary(d), to: NSDictionary.self)
+  let bridged = convertDictionaryToNSDictionary(d)
   assert(isNativeNSDictionary(bridged))
 
   return bridged
@@ -874,7 +872,7 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
   for i in 0..<3 {
     var actualContents = [ExpectedDictionaryElement]()
     let sink: (AnyObjectTuple2) -> Void = {
-      (key, value) in
+      let (key, value) = $0
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
         value: convertValue(value),

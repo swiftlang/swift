@@ -280,9 +280,9 @@ import gizmo
 
 @requires_stored_property_inits
 class SwiftGizmo : Gizmo {
-  var x = Int()
+  @objc var x = Int()
 
-  func getX() -> Int {
+  @objc func getX() -> Int {
     return x
   }
 
@@ -294,13 +294,13 @@ class SwiftGizmo : Gizmo {
     super.init(bellsOn:0)
   }
 
-  init(int i: Int, string str : String) {
+  @objc init(int i: Int, string str : String) {
     super.init(bellsOn:i)
   }
 
   deinit { var x = 10 }
 
-  var enabled: Bool {
+  @objc var enabled: Bool {
     @objc(isEnabled) get {
       return true
     }
@@ -311,9 +311,9 @@ class SwiftGizmo : Gizmo {
 }
 
 class GenericGizmo<T> : Gizmo {
-  func foo() {}
+  @objc func foo() {}
 
-  var x : Int {
+  @objc var x : Int {
     return 0
   }
 
@@ -326,7 +326,7 @@ sg.duplicate()
 
 @_objc_non_lazy_realization
 class SwiftGizmo2 : Gizmo {
-  var sg : SwiftGizmo
+  @objc var sg : SwiftGizmo
 
   override init() {
     sg = SwiftGizmo()

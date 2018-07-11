@@ -13,6 +13,8 @@
 //
 // FIXME: <rdar://problem/39193272> A false negative that happens only in REPL
 
+import StdlibUnittest
+
 func testArithmeticOverflow_Int_32bit() {
   do {
     // Literals.
@@ -229,4 +231,11 @@ func testArithmeticOverflow_UInt_32bit() {
     var _ : UInt = (0x7fff_ffff) | (0x4000_0000 << 1)
     var _ : UInt = (0x7fff_ffff) | 0x8000_0000
   }
+}
+
+func testIntToFloatConversion() {
+  // No warnings are emitted for conversion through explicit constructor calls.
+  // Note that the error here is because of an implicit conversion of the input
+  // literal to 'Int', which is 32 bits in arch32.
+  _blackHole(Double(9_007_199_254_740_993)) // expected-error {{integer literal '9007199254740993' overflows when stored into 'Int'}}
 }

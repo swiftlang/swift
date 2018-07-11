@@ -116,7 +116,8 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
   for (auto &name : InputNames) {
     auto OF = llvm::object::ObjectFile::createObjectFile(name);
     if (!OF) {
-      llvm::outs() << name << " is not an object file.\n";
+      llvm::outs() << "error: " << name << " "
+                   << errorToErrorCode(OF.takeError()).message() << "\n";
       return false;
     }
     auto *Obj = OF->getBinary();
@@ -191,6 +192,9 @@ int main(int argc, char **argv) {
   llvm::cl::opt<std::string> DumpTypeFromMangled(
       "type-from-mangled", llvm::cl::desc("dump type from mangled names list"));
 
+  llvm::cl::opt<std::string> ResourceDir("resource-dir",
+      llvm::cl::desc("The directory that holds the compiler resource files"));
+
   llvm::cl::ParseCommandLineOptions(argc, argv);
   // Unregister our options so they don't interfere with the command line
   // parsing in CodeGen/BackendUtil.cpp.
@@ -213,9 +217,6 @@ int main(int argc, char **argv) {
     return true;
   };
 
-  for (auto &InputFilename : InputNames)
-    if (!validateInputFile(InputFilename))
-      return 1;
   if (!validateInputFile(DumpTypeFromMangled))
     return 1;
   if (!validateInputFile(DumpDeclFromMangled))
@@ -255,6 +256,10 @@ int main(int argc, char **argv) {
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+  if (!ResourceDir.empty()) {
+    Invocation.setRuntimeResourcePath(ResourceDir);
+  }
 
   if (CI.setup(Invocation))
     return 1;

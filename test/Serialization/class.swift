@@ -48,8 +48,8 @@ p.second = 5.0
 
 struct Int {}
 
-var gc = GenericCtor<Int>()
-gc.doSomething()
+var gc = GenericCtor<Int>(42)
+gc.doSomething(42)
 
 
 a = StillEmpty()

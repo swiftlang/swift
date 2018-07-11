@@ -30,10 +30,12 @@ using namespace Lowering;
 // SILGenFunction Class implementation
 //===----------------------------------------------------------------------===//
 
-SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F)
-    : SGM(SGM), F(F), silConv(SGM.M), StartOfPostmatter(F.end()),
-      B(*this), OpenedArchetypesTracker(&F),
+SILGenFunction::SILGenFunction(SILGenModule &SGM, SILFunction &F,
+                               DeclContext *DC)
+    : SGM(SGM), F(F), silConv(SGM.M), FunctionDC(DC),
+      StartOfPostmatter(F.end()), B(*this), OpenedArchetypesTracker(&F),
       CurrentSILLoc(F.getLocation()), Cleanups(*this) {
+  assert(DC && "creating SGF without a DeclContext?");
   B.setInsertionPoint(createBasicBlock());
   B.setCurrentDebugScope(F.getDebugScope());
   B.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
@@ -130,7 +132,7 @@ std::tuple<ManagedValue, SILType>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
-                                     const SubstitutionMap &subMap) {
+                                     SubstitutionMap subMap) {
   SILValue methodValue;
 
   // If the method is dynamic, access it through runtime-hookable virtual
@@ -303,7 +305,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
-                                 SubstitutionList subs) {
+                                 SubstitutionMap subs) {
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
@@ -326,7 +328,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     // If we have a closure expression in generic context, Sema won't give
     // us substitutions, so we just use the forwarding substitutions from
     // context.
-    subs = getForwardingSubstitutions();
+    subs = getForwardingSubstitutionMap();
   }
 
   bool wasSpecialized = false;
@@ -496,6 +498,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // Fix up the string parameters to have the right type.
     SILType nameArgTy = fnConv.getSILArgumentType(3);
     assert(nameArgTy == fnConv.getSILArgumentType(2));
+    (void)nameArgTy;
     auto managedName = ManagedValue::forUnmanaged(optName);
     SILValue nilValue;
     assert(optName->getType() == nameArgTy);
@@ -658,7 +661,6 @@ void SILGenFunction::emitProfilerIncrement(ASTNode N) {
       B.createIntegerLiteral(Loc, Int32Ty, CounterIt->second)};
   B.createBuiltin(Loc, C.getIdentifier("int_instrprof_increment"),
                   SGM.Types.getEmptyTupleType(), {}, Args);
-  SP->recordCounterUpdate();
 }
 
 ProfileCounter SILGenFunction::loadProfilerCount(ASTNode Node) const {

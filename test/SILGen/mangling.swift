@@ -46,7 +46,7 @@ prefix func +- <T>(_: (a: T, b: T)) {}
 // CHECK-LABEL: sil hidden @$S8mangling2psoPyyx1a_x1bt_tlF
 postfix func +- <T>(_: (a: T, b: T)) {}
 
-infix operator «+» {}
+infix operator «+»
 
 // CHECK-LABEL: sil hidden @$S8mangling007p_qcaDcoiyS2i_SitF
 func «+»(a: Int, b: Int) -> Int { return a + b }
@@ -71,10 +71,6 @@ class Zim<T> {
   // CHECK-LABEL: sil hidden @$S8mangling3ZimC4zungyyqd___xtlF
   func zung<U>(_: U, _: T) {}
 }
-
-// Don't crash mangling single-protocol "composition" types.
-// CHECK-LABEL: sil hidden @$S8mangling27single_protocol_composition1xyAA3Foo_p_tF
-func single_protocol_composition(x: protocol<Foo>) {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>

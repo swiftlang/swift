@@ -55,11 +55,11 @@ struct Struct2<T : Pub & Bar> { }
 struct Struct3<T : Pub & Bar & P3> { } // expected-error {{use of undeclared type 'P3'}}
 struct Struct4<T> where T : Pub & Bar {}
 
-struct Struct5<T : protocol<Pub, Bar>> { } // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
-struct Struct6<T> where T : protocol<Pub, Bar> {} // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+struct Struct5<T : protocol<Pub, Bar>> { } // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
+struct Struct6<T> where T : protocol<Pub, Bar> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
 
 typealias T1 = Pub & Bar
-typealias T2 = protocol<Pub , Bar> // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
+typealias T2 = protocol<Pub , Bar> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
 
 // rdar://problem/20593294
 protocol HasAssoc {

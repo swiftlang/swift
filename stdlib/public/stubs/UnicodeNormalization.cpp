@@ -25,6 +25,7 @@ extern "C" {
 
 // Types
 typedef struct UBreakIterator UBreakIterator;
+typedef struct UText UText;
 typedef struct UBreakIterator UNormalizer2;
 typedef enum UBreakIteratorType {} UBreakIteratorType;
 typedef enum UErrorCode {} UErrorCode;
@@ -40,6 +41,10 @@ UBreakIterator *ubrk_open(UBreakIteratorType, const char *, const UChar *,
 int32_t ubrk_preceding(UBreakIterator *, int32_t);
 int32_t ubrk_following(UBreakIterator *, int32_t);
 void ubrk_setText(UBreakIterator *, const UChar *, int32_t, UErrorCode *);
+void ubrk_setUText(UBreakIterator *, UText *, UErrorCode *);
+
+UText *utext_openUTF8(UText *, const char *, int64_t, UErrorCode *);
+UText *utext_openUChars(UText *, const UChar *, int64_t, UErrorCode *);
 
 // Comparison, normalization, and character property APIs
 int32_t unorm2_spanQuickCheckYes(const UNormalizer2 *, const UChar *, int32_t,
@@ -77,31 +82,6 @@ UBool u_isdefined(UChar32);
 #include <algorithm>
 #include <mutex>
 #include <assert.h>
-
-static const UCollator *MakeRootCollator() {
-  UErrorCode ErrorCode = U_ZERO_ERROR;
-  UCollator *root = ucol_open("", &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_open: Failure setting up default collation.");
-  }
-  ucol_setAttribute(root, UCOL_NORMALIZATION_MODE, UCOL_ON, &ErrorCode);
-  ucol_setAttribute(root, UCOL_STRENGTH, UCOL_TERTIARY, &ErrorCode);
-  ucol_setAttribute(root, UCOL_NUMERIC_COLLATION, UCOL_OFF, &ErrorCode);
-  ucol_setAttribute(root, UCOL_CASE_LEVEL, UCOL_OFF, &ErrorCode);
-  if (U_FAILURE(ErrorCode)) {
-    swift::crash("ucol_setAttribute: Failure setting up default collation.");
-  }
-  return root;
-}
-
-// According to this thread in the ICU mailing list, it should be safe
-// to assume the UCollator object is thread safe so long as you're only
-// passing it to functions that take a const pointer to it. So, we make it
-// const here to make sure we don't misuse it.
-// http://sourceforge.net/p/icu/mailman/message/27427062/
-static const UCollator *GetRootCollator() {
-  return SWIFT_LAZY_CONSTANT(MakeRootCollator());
-}
 
 /// Convert the unicode string to uppercase. This function will return the
 /// required buffer length as a result. If this length does not match the
@@ -187,6 +167,32 @@ void swift::__swift_stdlib_ubrk_setText(
     __swift_int32_t textLength, __swift_stdlib_UErrorCode *status) {
   return ubrk_setText(ptr_cast<UBreakIterator>(bi), ptr_cast<UChar>(text),
                       textLength, ptr_cast<UErrorCode>(status));
+}
+
+void swift::__swift_stdlib_ubrk_setUText(
+    swift::__swift_stdlib_UBreakIterator *bi, __swift_stdlib_UText *text,
+    __swift_stdlib_UErrorCode *status) {
+  return ubrk_setUText(ptr_cast<UBreakIterator>(bi), ptr_cast<UText>(text),
+                       ptr_cast<UErrorCode>(status));
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE swift::__swift_stdlib_UText *
+swift::__swift_stdlib_utext_openUTF8(__swift_stdlib_UText *ut,
+                              const char *s, int64_t len,
+                              __swift_stdlib_UErrorCode *status) {
+  return ptr_cast<__swift_stdlib_UText>(
+    utext_openUTF8(ptr_cast<UText>(ut), s, len,
+                   ptr_cast<UErrorCode>(status)));
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE swift::__swift_stdlib_UText *
+swift::__swift_stdlib_utext_openUChars(__swift_stdlib_UText *ut,
+                                       const __swift_stdlib_UChar *s,
+                                       int64_t len,
+                                       __swift_stdlib_UErrorCode *status) {
+  return ptr_cast<__swift_stdlib_UText>(
+    utext_openUChars(ptr_cast<UText>(ut), ptr_cast<UChar>(s), len,
+                     ptr_cast<UErrorCode>(status)));
 }
 
 swift::__swift_stdlib_UBool swift::__swift_stdlib_unorm2_hasBoundaryBefore(

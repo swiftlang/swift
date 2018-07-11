@@ -426,8 +426,7 @@ public:
 
   void addOptionalMethodCallTail() {
     addChunkWithTextNoCopy(
-        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "!");
-    getLastChunk().setIsAnnotation();
+        CodeCompletionString::Chunk::ChunkKind::OptionalMethodCallTail, "?");
   }
 
   void addTypeAnnotation(StringRef Type) {

@@ -1,5 +1,12 @@
-// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
-// RUN: %target-swift-frontend -enable-resilience -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing
+
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -O
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing -O
+// RUN: %target-swift-frontend -enable-resilience -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=missing %s -enable-testing -O
 
 public protocol Public {
     func publicMethod()

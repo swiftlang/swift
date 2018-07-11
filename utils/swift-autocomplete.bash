@@ -20,7 +20,7 @@ _swift_complete()
     # Don't know how to get the help for llvm options automatically.
     # So we use a grep'ed static list.
     COMPREPLY=( $(compgen -W "\
-      -disable-llvm-arc-opts \
+      -disable-swift-specific-llvm-optzns \
       -stack-promotion-limit \
       -view-cfg-max-columns \
       -view-cfg-long-line-behavior \

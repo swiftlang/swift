@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -module-name alias -emit-module -o %t %S/Inputs/alias.swift
+// RUN: %target-build-swift -I %t %s -module-name typealias -emit-module-path %t/typealias.swiftmodule -o %t/typealias.o
 // RUN: llvm-bcanalyzer %t/alias.swiftmodule | %FileCheck %s
 // RUN: %target-build-swift -I %t %s -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck -check-prefix=OUTPUT %s
@@ -39,8 +40,8 @@ print("\(monadic(i))\n", terminator: "")
 
 // OUTPUT: -42
 
-func subtract(x: MyInt64, y: MyInt64) -> MyInt64 {
-  return x - y
+func subtract(_ t : (x: MyInt64, y: MyInt64)) -> MyInt64 {
+  return t.x - t.y
 }
 var dyadic : TwoIntFunction = subtract
 print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")
@@ -53,3 +54,5 @@ func check(_: BaseAlias) {
 
 let x: GG<Int> = 0
 let x2: GInt = 1
+
+public typealias TestUnbound = UnboundAlias

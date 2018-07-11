@@ -209,8 +209,9 @@ func logical_struct_in_reftype_set(_ value: inout Val, z1: Int) {
   // CHECK: [[T0:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 0
   // CHECK: [[OPT_CALLBACK:%.*]] = tuple_extract [[MAT_RESULT]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>), 1  
   // CHECK: [[T1:%[0-9]+]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Val
-  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
+  // CHECK: [[T2:%.*]] = mark_dependence [[T1]] : $*Val on [[VAL_REF]]
   // CHECK: end_borrow [[VAL_REF_BORROWED]] from [[VAL_REF]]
+  // CHECK: [[VAL_REF_VAL_PROP_MAT:%.*]] = begin_access [modify] [unsafe] [[T2]] : $*Val
   // -- val.ref.val_prop.z_tuple
   // CHECK: [[V_R_VP_Z_TUPLE_MAT:%[0-9]+]] = alloc_stack $(Int, Int)
   // CHECK: [[LD:%[0-9]+]] = load_borrow [[VAL_REF_VAL_PROP_MAT]]
@@ -998,7 +999,7 @@ func genericPropsInGenericContext<U>(_ x: GenericClass<U>) {
 // <rdar://problem/18275556> 'let' properties in a class should be implicitly final
 class ClassWithLetProperty {
   let p = 42
-  dynamic let q = 97
+  @objc dynamic let q = 97
 
   // We shouldn't have any dynamic dispatch within this method, just load p.
   func ReturnConstant() -> Int { return p }
@@ -1215,12 +1216,12 @@ protocol NonmutatingProtocol {
 // CHECK-NEXT:   [[C_FIELD_PAYLOAD:%.*]] = open_existential_addr immutable_access [[C_FIELD_BOX]] : $*NonmutatingProtocol to $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   [[C_FIELD_COPY:%.*]] = alloc_stack $@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   copy_addr [[C_FIELD_PAYLOAD]] to [initialization] [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
+// CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
+// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   [[GETTER:%.*]] = witness_method $@opened("{{.*}}") NonmutatingProtocol, #NonmutatingProtocol.x!getter.1 : <Self where Self : NonmutatingProtocol> (Self) -> () -> Int, [[C_FIELD_PAYLOAD]] : $*@opened("{{.*}}") NonmutatingProtocol : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   [[RESULT_VALUE:%.*]] = apply [[GETTER]]<@opened("{{.*}}") NonmutatingProtocol>([[C_FIELD_COPY]]) : $@convention(witness_method: NonmutatingProtocol) <τ_0_0 where τ_0_0 : NonmutatingProtocol> (@in_guaranteed τ_0_0) -> Int
 // CHECK-NEXT:   assign [[RESULT_VALUE]] to [[UNINIT]] : $*Int
 // CHECK-NEXT:   destroy_addr [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
-// CHECK-NEXT:   destroy_addr [[C_FIELD_BOX]] : $*NonmutatingProtocol
-// CHECK-NEXT:   destroy_value [[C]] : $ReferenceType
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_COPY]] : $*@opened("{{.*}}") NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[C_FIELD_BOX]] : $*NonmutatingProtocol
 // CHECK-NEXT:   dealloc_stack [[RESULT]] : $*Int

@@ -45,7 +45,6 @@ namespace swift {
   class ProtocolConformance;
   class SILFunction;
   class Stmt;
-  class Substitution;
   class TypeVariableType;
   class TypeBase;
   class TypeDecl;

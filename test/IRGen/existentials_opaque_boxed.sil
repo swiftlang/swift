@@ -41,7 +41,7 @@ entry(%0 : $*T):
 // CHECK:  [[CAST:%.*]] = bitcast %swift.type* [[METATYPE]]
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:  [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:  [[FLAG_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:  [[FLAG_WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:  [[FLAG_WITNESS:%.*]] = load i8*, i8** [[FLAG_WITNESS_ADDR]]
 // CHECK:  [[FLAGS:%.*]] = ptrtoint i8* [[FLAG_WITNESS]]
 // CHECK:  [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -115,7 +115,7 @@ entry:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[META]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** %3, {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[MASKED:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -132,7 +132,7 @@ entry:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[META]] to i8***
 // CHECK:   [[VWT_ADDR2:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT2:%.*]] = load i8**, i8*** [[VWT_ADDR2]]
-// CHECK:   [[VW_ADDR2:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 9
+// CHECK:   [[VW_ADDR2:%.*]] = getelementptr inbounds i8*, i8** [[VWT2]], i32 8
 // CHECK:   [[VW2:%.*]] = load i8*, i8** [[VW_ADDR2]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[VW2]] to {{(i64|i32)}}
 // CHECK:   [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
@@ -164,7 +164,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -207,7 +207,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %1 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -244,7 +244,7 @@ bb0(%0 : $*Existential):
 // CHECK:  [[CAST:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
 // CHECK:  [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:  [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:  [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:  [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:  [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:  [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:  [[ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -301,7 +301,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 10
+// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
 // CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[VW]] to {{(i64|i32)}}
 // CHECK:   [[MASKED:%.*]] = and {{(i64|i32)}} [[FLAGS]], 131072
@@ -339,7 +339,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[DEST_TYPE]] to i8***
 // CHECK:   [[DEST_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[DEST_VWT:%.*]] = load i8**, i8*** [[DEST_VWT_ADDR]]
-// CHECK:   [[DEST_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[DEST_VWT]], i32 10
+// CHECK:   [[DEST_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[DEST_VWT]], i32 9
 // CHECK:   [[DEST_VW:%.*]] = load i8*, i8** [[DEST_VW_ADDR]]
 // CHECK:   [[DEST_FLAGS:%.*]] = ptrtoint i8* [[DEST_VW]] to {{(i64|i32)}}
 // CHECK:   [[DEST_ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[DEST_FLAGS]], 131072
@@ -347,7 +347,7 @@ bb0(%0 : $*Existential):
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* [[SRC_TYPE]] to i8***
 // CHECK:   [[SRC_VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{(i64|i32)}} -1
 // CHECK:   [[SRC_VWT:%.*]] = load i8**, i8*** [[SRC_VWT_ADDR]]
-// CHECK:   [[SRC_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SRC_VWT]], i32 10
+// CHECK:   [[SRC_VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[SRC_VWT]], i32 9
 // CHECK:   [[SRC_VW:%.*]] = load i8*, i8** [[SRC_VW_ADDR]]
 // CHECK:   [[SRC_FLAGS:%.*]] = ptrtoint i8* [[SRC_VW]] to {{(i64|i32)}}
 // CHECK:   [[SRC_ISNOTINLINE:%.*]] = and {{(i64|i32)}} [[SRC_FLAGS]], 131072
@@ -443,25 +443,11 @@ bb0(%0 : $*Existential):
   return %t : $()
 }
 
-// CHECK: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
-// CHECK:   [[METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 1
-// CHECK:   [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]
-// CHECK:   [[LOCAL_METADATA_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 1
-// CHECK:   store %swift.type* [[METADATA]], %swift.type** [[LOCAL_METADATA_ADDR]]
-// CHECK:   [[PWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 2
-// CHECK:   [[PWT:%.*]] = load i8**, i8*** [[PWT_ADDR]]
-// CHECK:   [[LOCAL_PWT_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 2
-// CHECK:   store i8** [[PWT]], i8*** [[LOCAL_PWT_ADDR]]
-// CHECK:   [[BUFFER_ARG_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %0, i32 0, i32 0
-// CHECK:   [[BUFFER_LOCAL_ADDR:%.*]] = getelementptr inbounds %T25existentials_opaque_boxed11ExistentialP, %T25existentials_opaque_boxed11ExistentialP* %1, i32 0, i32 0
-// CHECK:   [[CAST_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
-// CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST_ADDR]], {{(i64|i32)}} -1
-// CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 6
-// CHECK:   [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
-// CHECK:   [[INITWITHTAKEBUFFER:%.*]] = bitcast i8* [[VW]]
-// CHECK:     call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[BUFFER_LOCAL_ADDR]], {{.*}} [[BUFFER_ARG_ADDR]], %swift.type* [[METADATA]])
-// CHECK:   ret %T25existentials_opaque_boxed11ExistentialP* %1
+// CHECK-LABEL: define linkonce_odr hidden %T25existentials_opaque_boxed11ExistentialP* @"$S25existentials_opaque_boxed11Existential_pWOb"(%T25existentials_opaque_boxed11ExistentialP*, %T25existentials_opaque_boxed11ExistentialP*)
+// CHECK:  %2 = bitcast %T25existentials_opaque_boxed11ExistentialP* %1 to i8*
+// CHECK:  %3 = bitcast %T25existentials_opaque_boxed11ExistentialP* %0 to i8*
+// CHECK:  call void @llvm.memcpy.p0i8.p0i8.{{(i64|i32)}}(i8* %2, i8* %3, {{(i64 40|i32 20)}}, {{(i32 8|i32 4)}}, i1 false)
+// CHECK:  ret %T25existentials_opaque_boxed11ExistentialP* %1
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_initWithTake_existential_addr(%T25existentials_opaque_boxed11ExistentialP*
 // CHECK:   [[LOCAL:%.*]] = alloca %T25existentials_opaque_boxed11ExistentialP

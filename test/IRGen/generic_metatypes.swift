@@ -16,6 +16,15 @@
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM
 
+enum Never {}
+
+func never() -> Never { return never() }
+
+@_semantics("typechecker.type(of:)")
+public func type<T, Metatype>(of value: T) -> Metatype {
+  never()
+}
+
 // CHECK: define hidden swiftcc %swift.type* [[GENERIC_TYPEOF:@"\$S17generic_metatypes0A6TypeofyxmxlF"]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(_ x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]], i1 false)

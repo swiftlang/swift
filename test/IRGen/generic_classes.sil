@@ -264,7 +264,7 @@ entry:
 // RootGeneric.x has fixed layout
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]], [[ROOTGENERIC]]* %0, i32 0, i32 1
-sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> RootGeneric<F> -> UInt8 {
+sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> (RootGeneric<F>) -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.x
   %x = load_borrow %p : $*UInt8
@@ -306,7 +306,7 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
 // CHECK:   bitcast i8* [[Z_ADDR]] to %Ts5UInt8V*
-sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> RootGeneric<F> -> UInt8 {
+sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> (RootGeneric<F>) -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
@@ -317,7 +317,7 @@ entry(%c : $RootGeneric<F>):
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %0, i32 0, i32 4
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, %Ts5UInt8V* [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, i8* [[T0]], align
-sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $RootGeneric<Int> -> UInt8 {
+sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $(RootGeneric<Int>) -> UInt8 {
 entry(%c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.z
   %z = load_borrow %p : $*UInt8
@@ -389,7 +389,7 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   [[T0:%.*]] = bitcast %swift.type* [[B_CHECKED]] to i8***
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK:   [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK:   [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[FIELDS_ADDR]], i32 0
 // CHECK:   store i8** [[T0]], i8*** [[T1]], align 8
 // CHECK:   call void @swift_initClassMetadata(%swift.type* [[METADATA]], i64 0, i64 1, i8*** [[FIELDS_ADDR]], i64* [[OFFSETS]])

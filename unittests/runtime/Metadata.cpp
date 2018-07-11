@@ -507,7 +507,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(5 * sizeof(void*), ex1->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex1->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex1->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex1->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex1->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex1->getSuperclassConstraint());
       return ex1;
@@ -525,7 +525,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(6 * sizeof(void*), ex2->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex2->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex2->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex2->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex2->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex2->getSuperclassConstraint());
       return ex2;
@@ -543,7 +543,7 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
       EXPECT_EQ(7 * sizeof(void*), ex3->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex3->getValueWitnesses()->getAlignment());
       EXPECT_FALSE(ex3->getValueWitnesses()->isPOD());
-      EXPECT_FALSE(ex3->getValueWitnesses()->isBitwiseTakable());
+      EXPECT_TRUE(ex3->getValueWitnesses()->isBitwiseTakable());
       EXPECT_EQ(nullptr,
                 ex3->getSuperclassConstraint());
       return ex3;
@@ -657,48 +657,6 @@ namespace swift {
   void installCommonValueWitnesses(const TypeLayout &layout,
                                    ValueWitnessTable *vwtable);
 } // namespace swift
-
-
-TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
-  ValueWitnessTable testTable;
-  FullMetadata<Metadata> testMetadata{{&testTable}, {MetadataKind::Opaque}};
-
-  // rdar://problem/21375421 - pod_indirect_initializeBufferWithTakeOfBuffer
-  // should move ownership of a fixed-size buffer.
-
-  testTable.size = sizeof(ValueBuffer) + 1;
-  testTable.flags = ValueWitnessFlags()
-    .withAlignment(alignof(ValueBuffer))
-    .withPOD(true)
-    .withBitwiseTakable(true)
-    .withInlineStorage(false);
-  testTable.stride = sizeof(ValueBuffer) + alignof(ValueBuffer);
-
-  installCommonValueWitnesses(*testTable.getTypeLayout(), &testTable);
-
-  // Replace allocateBuffer and destroyBuffer with logging versions.
-  struct {
-    ValueBuffer buffer;
-    uintptr_t canary;
-  } buf1{{}, 0x5A5A5A5AU}, buf2{{}, 0xA5A5A5A5U};
-  testMetadata.allocateBoxForExistentialIn(&buf1.buffer);
-
-  testTable.initializeBufferWithTakeOfBuffer(&buf2.buffer, &buf1.buffer,
-                                             &testMetadata);
-
-  // The existential's box reference should be copied.
-  EXPECT_EQ(buf1.buffer.PrivateData[0], buf2.buffer.PrivateData[0]);
-
-  // Ownership of the box should have been transferred.
-  auto *reference = reinterpret_cast<HeapObject *>(buf2.buffer.PrivateData[0]);
-  EXPECT_TRUE(swift_isUniquelyReferencedOrPinned_nonNull_native(reference));
-
-  EXPECT_EQ(buf1.canary, (uintptr_t)0x5A5A5A5AU);
-  EXPECT_EQ(buf2.canary, (uintptr_t)0xA5A5A5A5U);
-
-  // Release the buffer.
-  swift_release(reference);
-}
 
 // We cannot construct RelativeDirectPointer instances, so define
 // a "shadow" struct for that purpose

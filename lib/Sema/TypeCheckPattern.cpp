@@ -17,6 +17,7 @@
 
 #include "TypeChecker.h"
 #include "GenericTypeResolver.h"
+#include "TypeCheckAvailability.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -34,7 +35,7 @@ using namespace swift;
 static EnumElementDecl *
 extractEnumElement(TypeChecker &TC, DeclContext *DC, SourceLoc UseLoc,
                    const VarDecl *constant) {
-  TC.diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
+  diagnoseExplicitUnavailability(constant, UseLoc, DC, nullptr);
 
   const FuncDecl *getter = constant->getGetter();
   if (!getter)
@@ -463,8 +464,7 @@ public:
     // See if the repr resolves to a type.
     Type ty = TC.resolveIdentifierType(DC, repr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                       /*diagnoseErrors*/false, &resolver,
-                                       nullptr);
+                                       /*diagnoseErrors*/false, &resolver);
     
     auto *enumDecl = dyn_cast_or_null<EnumDecl>(ty->getAnyNominal());
     if (!enumDecl)
@@ -582,8 +582,7 @@ public:
       // See first if the entire repr resolves to a type.
       Type enumTy = TC.resolveIdentifierType(DC, prefixRepr,
                                       TypeResolutionFlags::AllowUnboundGenerics,
-                                             /*diagnoseErrors*/false, &resolver,
-                                             nullptr);
+                                      /*diagnoseErrors*/false, &resolver);
       if (!dyn_cast_or_null<EnumDecl>(enumTy->getAnyNominal()))
         return nullptr;
 
@@ -798,7 +797,7 @@ static bool validateParameterType(ParamDecl *decl, DeclContext *DC,
   }
 
   if (hadError)
-    TL.setType(ErrorType::get(TC.Context), /*validated*/true);
+    TL.setInvalidType(TC.Context);
 
   return hadError;
 }
@@ -962,12 +961,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
-    // If this is the top level of a function input list, peel off the
-    // ImmediateFunctionInput marker and install a FunctionInput one instead.
-    auto elementOptions = withoutContext(options);
-    if (options & TypeResolutionFlags::ImmediateFunctionInput)
-      elementOptions |= TypeResolutionFlags::FunctionInput;
-
+    const auto elementOptions = withoutContext(options);
     bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
@@ -1503,6 +1497,7 @@ recur:
       } else {
         auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
         assert(parenTy && "Associated value type is neither paren nor tuple?");
+        (void)parenTy;
         
         auto *subPattern = new (Context) AnyPattern(SourceLoc());
         elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
@@ -1525,7 +1520,7 @@ recur:
     // Ensure that the type of our TypeLoc is fully resolved. If an unbound
     // generic type was spelled in the source (e.g. `case Optional.None:`) this
     // will fill in the generic parameters.
-    EEP->getParentType().setType(enumTy, /*validated*/ true);
+    EEP->getParentType().setType(enumTy);
     
     // If we needed a cast, wrap the pattern in a cast pattern.
     if (castKind) {

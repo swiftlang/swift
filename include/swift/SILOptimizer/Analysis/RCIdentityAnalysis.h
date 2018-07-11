@@ -50,9 +50,19 @@ public:
   SILValue getRCIdentityRoot(SILValue V);
 
   /// Return all recursive users of V, looking through users which propagate
-  /// RCIdentity. *NOTE* This ignores obvious ARC escapes where the a potential
+  /// RCIdentity.
+  ///
+  /// *NOTE* This ignores obvious ARC escapes where the a potential
   /// user of the RC is not managed by ARC. For instance
   /// unchecked_trivial_bit_cast.
+  void getRCUses(SILValue V, llvm::SmallVectorImpl<Operand *> &Uses);
+
+  /// A helper method that calls getRCUses and then maps each operand to the
+  /// operands user and then uniques the list.
+  ///
+  /// *NOTE* The routine asserts that the passed in Users array is empty for
+  /// simplicity. If needed this can be changed, but it is not necessary given
+  /// current uses.
   void getRCUsers(SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users);
 
   void handleDeleteNotification(SILNode *node) {

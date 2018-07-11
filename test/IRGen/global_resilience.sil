@@ -1,5 +1,8 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -I %S/../Inputs -enable-source-import -emit-ir -enable-resilience -O %s
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-resilience -emit-module -emit-module-path %t/resilient_struct.swiftmodule
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-resilience -I %t -emit-ir -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 
@@ -125,7 +128,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 10
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
 // CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072
@@ -136,7 +139,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 9
+// CHECK:   [[SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
 // CHECK:   [[SIZEWITNESS:%.*]] = load i8*, i8** [[SIZE_ADDR]]
 // CHECK:   [[SIZE:%.*]] = ptrtoint i8* [[SIZEWITNESS]]
 // CHECK:   [[ALIGN:%.*]] = and {{.*}} [[FLAGS]], 65535
@@ -155,7 +158,7 @@ bb0:
 // CHECK:   [[CAST:%.*]] = bitcast %swift.type* %0 to i8***
 // CHECK:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], {{.*}} -1
 // CHECK:   [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 10
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** %.valueWitnesses, i32 9
 // CHECK:   [[FLAGSWITNESS:%.*]] = load i8*, i8** [[FLAGS_ADDR]]
 // CHECK:   [[FLAGS:%.*]] = ptrtoint i8* [[FLAGSWITNESS]] to i{{.*}}
 // CHECK:   [[ISNOTINLINE:%.*]] = and {{.*}} [[FLAGS]], 131072

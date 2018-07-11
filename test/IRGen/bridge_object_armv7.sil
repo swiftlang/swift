@@ -28,7 +28,7 @@ entry(%c : $C, %w : $Builtin.Word):
 // CHECK:         [[BOBITS:%.*]] = ptrtoint [[BRIDGE:%swift.bridge\*]] %0 to i32
 // CHECK:         [[MASKED_BITS:%.*]] = and i32 [[BOBITS]], -4
 // CHECK:         inttoptr i32 [[MASKED_BITS]] to [[C:%objc_object\*]]
-sil @convert_from_bridge_object : $Builtin.BridgeObject -> (ObjC, Builtin.Word) {
+sil @convert_from_bridge_object : $(Builtin.BridgeObject) -> (ObjC, Builtin.Word) {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $ObjC
   %w = bridge_object_to_word %b : $Builtin.BridgeObject to $Builtin.Word
@@ -36,7 +36,7 @@ entry(%b : $Builtin.BridgeObject):
   return %t : $(ObjC, Builtin.Word)
 }
 
-sil @convert_from_native_bridge_object : $Builtin.BridgeObject -> C {
+sil @convert_from_native_bridge_object : $(Builtin.BridgeObject) -> C {
 entry(%b : $Builtin.BridgeObject):
   %c = bridge_object_to_ref %b : $Builtin.BridgeObject to $C
   return %c : $C

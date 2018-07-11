@@ -474,6 +474,14 @@ public:
   void setOptRecordStream(std::unique_ptr<llvm::yaml::Output> &&Stream,
                           std::unique_ptr<llvm::raw_ostream> &&RawStream);
 
+  // This is currently limited to VarDecl because the visibility of global
+  // variables and class properties is straightforward, while the visibility of
+  // class methods (ValueDecls) depends on the subclass scope. "Visiblity" has
+  // a different meaning when vtable layout is at stake.
+  bool isVisibleExternally(const VarDecl *decl) {
+    return isPossiblyUsedExternally(getDeclSILLinkage(decl), isWholeModule());
+  }
+
   PropertyListType &getPropertyList() { return properties; }
   const PropertyListType &getPropertyList() const { return properties; }
   
@@ -631,6 +639,14 @@ public:
   void setPGOReader(std::unique_ptr<llvm::IndexedInstrProfReader> IPR) {
     PGOReader = std::move(IPR);
   }
+
+  /// Can value operations (copies and destroys) on the given lowered type
+  /// be performed in this module?
+  bool isTypeABIAccessible(SILType type);
+
+  /// Can type metadata for the given formal type be fetched in
+  /// the given module?
+  bool isTypeMetadataAccessible(CanType type);
 
   /// \brief Run the SIL verifier to make sure that all Functions follow
   /// invariants.

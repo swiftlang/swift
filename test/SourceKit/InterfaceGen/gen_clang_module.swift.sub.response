@@ -469,13 +469,14 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubEnum1X",
     key.offset: 273,
     key.length: 37,
     key.typename: "FooSubEnum1",
     key.nameoffset: 277,
     key.namelength: 12,
+    key.bodyoffset: 304,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 266,
@@ -487,13 +488,14 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubEnum1Y",
     key.offset: 318,
     key.length: 37,
     key.typename: "FooSubEnum1",
     key.nameoffset: 322,
     key.namelength: 12,
+    key.bodyoffset: 349,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 311,
@@ -505,13 +507,14 @@ public var FooSubUnnamedEnumeratorA1: Int { get }
   {
     key.kind: source.lang.swift.decl.var.global,
     key.accessibility: source.lang.swift.accessibility.public,
-    key.setter_accessibility: source.lang.swift.accessibility.public,
     key.name: "FooSubUnnamedEnumeratorA1",
     key.offset: 364,
     key.length: 42,
     key.typename: "Int",
     key.nameoffset: 368,
     key.namelength: 25,
+    key.bodyoffset: 400,
+    key.bodylength: 5,
     key.attributes: [
       {
         key.offset: 357,

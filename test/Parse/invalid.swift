@@ -58,7 +58,7 @@ func testNotCoveredCase(x: Int) {
 // rdar://18926814
 func test4() {
   let abc = 123
-  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}  expected-error {{extra tokens after interpolated string expression}}
+  _ = " >> \( abc } ) << " // expected-error {{expected ',' separator}} {{18-18=,}}  expected-error {{expected expression in list of expressions}}
 
 }
 
@@ -140,7 +140,7 @@ struct Weak<T: class> { // expected-error {{'class' constraint can only appear o
 }
 
 let x: () = ()
-!() // expected-error {{missing argument for parameter #1 in call}}
+!() // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(()) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !(x) // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}
 !x // expected-error {{cannot convert value of type '()' to expected argument type 'Bool'}}

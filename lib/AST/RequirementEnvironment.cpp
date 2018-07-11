@@ -86,7 +86,7 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
       proto->getSelfInterfaceType()->getCanonicalType());
 
-  reqToSyntheticEnvMap = reqSig->getSubstitutionMap(
+  reqToSyntheticEnvMap = SubstitutionMap::get(reqSig,
     [selfType, substConcreteType, depth, covariantSelf, &ctx]
     (SubstitutableType *type) -> Type {
       // If the conforming type is a class, the protocol 'Self' maps to
@@ -110,10 +110,8 @@ RequirementEnvironment::RequirementEnvironment(
       return substGenericParam;
     },
     [selfType, substConcreteType, conformance, conformanceDC, &ctx](
-        CanType type, Type replacement, ProtocolType *protoType)
+        CanType type, Type replacement, ProtocolDecl *proto)
           -> Optional<ProtocolConformanceRef> {
-      auto proto = protoType->getDecl();
-
       // The protocol 'Self' conforms concretely to the conforming type.
       if (type->isEqual(selfType)) {
         ProtocolConformance *specialized = conformance;

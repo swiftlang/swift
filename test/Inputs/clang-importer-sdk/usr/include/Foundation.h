@@ -94,14 +94,19 @@ __attribute__((availability(ios,introduced=8.0)))
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray<ObjectType> : NSObject
+- (instancetype)initWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                          count:(NSUInteger)cnt NS_DESIGNATED_INITIALIZER;
 - (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
-+ (instancetype)arrayWithObjects:(const ObjectType _Nonnull[_Nullable])objects
-                           count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
 - (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject withObject:(nullable ObjectType)anotherObject;
 - (nonnull NSMutableArray<ObjectType> *)mutableCopy;
+@end
+
+@interface NSArray<ObjectType>(NSArrayCreation)
++ (instancetype)arrayWithObjects:(const ObjectType _Nonnull [_Nullable])objects
+                           count:(NSUInteger)cnt;
 @end
 
 @interface NSArray (AddingObject)
@@ -1153,11 +1158,12 @@ void takeNullableId(_Nullable id);
 @interface I
 @end
 
-@protocol OptionalMethods
+@protocol OptionalRequirements
 @optional
 - (Coat *)optional;
+@property NSString *name;
 @end
 
 @interface IUOProperty
-@property (readonly) id<OptionalMethods> iuo;
+@property (readonly) id<OptionalRequirements> iuo;
 @end

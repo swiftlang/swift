@@ -147,9 +147,12 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+  case SILInstructionKind::Name##RetainInst: \
+  case SILInstructionKind::StrongRetain##Name##Inst: \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
-  case SILInstructionKind::StrongRetainUnownedInst:
-  case SILInstructionKind::UnownedRetainInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocRefInst:

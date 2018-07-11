@@ -183,7 +183,8 @@ public:
     if (genericParams.size() != args.size())
       return Type();
 
-    auto subMap = genericSig->getSubstitutionMap(
+    auto subMap = SubstitutionMap::get(
+        genericSig,
         [&](SubstitutableType *t) -> Type {
           for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
             if (t->isEqual(genericParams[i]))
@@ -411,23 +412,13 @@ public:
     return Type();
   }
 
-  Type createUnownedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnownedStorageType::get(base, Ctx);
+#define REF_STORAGE(Name, ...) \
+  Type create##Name##StorageType(Type base) { \
+    if (!base->allowsOwnership()) \
+      return Type(); \
+    return Name##StorageType::get(base, Ctx); \
   }
-
-  Type createUnmanagedStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return UnmanagedStorageType::get(base, Ctx);
-  }
-
-  Type createWeakStorageType(Type base) {
-    if (!base->allowsOwnership())
-      return Type();
-    return WeakStorageType::get(base, Ctx);
-  }
+#include "swift/AST/ReferenceStorage.def"
 
   Type createSILBoxType(Type base) {
     return SILBoxType::get(base->getCanonicalType());
@@ -753,7 +744,17 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {
-        Result = cast<NominalTypeDecl>(decl);
+        // A synthesized type from the Clang importer may resolve to a
+        // compatibility alias.
+        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
+          if (resultAlias->isCompatibilityAlias()) {
+            Result = resultAlias->getUnderlyingTypeLoc().getType()
+                                ->getAnyNominal();
+          }
+        } else {
+          Result = dyn_cast<NominalTypeDecl>(decl);
+        }
+        HadError |= !Result;
       } else {
         HadError = true;
         Result = nullptr;

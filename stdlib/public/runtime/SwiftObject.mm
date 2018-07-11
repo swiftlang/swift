@@ -183,7 +183,7 @@ NSString *swift_stdlib_getDescription(OpaqueValue *value,
 
 NSString *swift::getDescription(OpaqueValue *value, const Metadata *type) {
   auto result = swift_stdlib_getDescription(value, type);
-  SWIFT_CC_PLUSZERO_GUARD(type->vw_destroy(value));
+  type->vw_destroy(value);
   return [result autorelease];
 }
 
@@ -1142,16 +1142,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::ForeignClass:
+  default:
     swift_dynamicCastFailure(type, nameForMetadata(type).c_str(),
                              protocols[0], protocol_getName(protocols[0]));
 
@@ -1188,16 +1179,7 @@ const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
     break;
 
   // Other kinds of type can never conform to ObjC protocols.
-  case MetadataKind::Struct:
-  case MetadataKind::Enum:
-  case MetadataKind::Optional:
-  case MetadataKind::Opaque:
-  case MetadataKind::Tuple:
-  case MetadataKind::Function:
-  case MetadataKind::Existential:
-  case MetadataKind::Metatype:
-  case MetadataKind::ExistentialMetatype:
-  case MetadataKind::ForeignClass:
+  default:
     return nullptr;
 
   case MetadataKind::HeapLocalVariable:

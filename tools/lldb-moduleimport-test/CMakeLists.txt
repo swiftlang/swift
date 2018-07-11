@@ -4,6 +4,6 @@ add_swift_host_tool(lldb-moduleimport-test
     swiftASTSectionImporter swiftFrontend swiftClangImporter
   LLVM_COMPONENT_DEPENDS
     DebugInfoCodeView
-  SWIFT_COMPONENT testsuite-tools
+  SWIFT_COMPONENT tools
 )
 

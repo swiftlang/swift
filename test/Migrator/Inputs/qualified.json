@@ -30,5 +30,37 @@
     "OldTypeName": "Cities.CityKind",
     "NewPrintedName": "NewTown",
     "NewTypeName": "NewCityKind"
-  }
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6CitiesAAC8CityKindV7VillageSivpZ",
+    "OldPrintedName": "Village",
+    "OldTypeName": "Cities.CityKind",
+    "NewPrintedName": "GlobalCityKindVillage",
+    "NewTypeName": ""
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "s:6Cities12ToplevelTypeC",
+    "OldPrintedName": "ToplevelType",
+    "OldTypeName": "",
+    "NewPrintedName": "internalType",
+    "NewTypeName": "ToplevelWrapper"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedMemberSame",
+    "OldPrintedName": "orderedMemberSame",
+    "OldTypeName": "FooComparisonResult",
+    "NewPrintedName": "orderedMemberSame",
+    "NewTypeName": "NewFooComparisonResult.Nested"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@E@FooComparisonResult@FooOrderedMovedToGlobal",
+    "OldPrintedName": "orderedMovedToGlobal",
+    "OldTypeName": "FooComparisonResult",
+    "NewPrintedName": "orderedMovedToGlobal",
+    "NewTypeName": ""
+  },
 ]

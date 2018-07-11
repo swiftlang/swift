@@ -583,11 +583,8 @@ static void deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl) {
   // binding.
   auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                 /*implicit=*/true);
-  auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                 StaticSpellingKind::None,
-                                                 SourceLoc(),
-                                                 containerPattern, callExpr,
-                                                 funcDC);
+  auto *bindingDecl = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, containerPattern, callExpr, funcDC);
   statements.push_back(bindingDecl);
   statements.push_back(containerDecl);
 
@@ -851,11 +848,8 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl) {
     // binding.
     auto *containerPattern = new (C) NamedPattern(containerDecl,
                                                   /*implicit=*/true);
-    auto *bindingDecl = PatternBindingDecl::create(C, SourceLoc(),
-                                                   StaticSpellingKind::None,
-                                                   SourceLoc(),
-                                                   containerPattern, tryExpr,
-                                                   funcDC);
+    auto *bindingDecl = PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, containerPattern, tryExpr, funcDC);
     statements.push_back(bindingDecl);
     statements.push_back(containerDecl);
 
@@ -1166,15 +1160,16 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       } else {
         auto *initializer =
           cast<ConstructorDecl>(result.front().getValueDecl());
+        auto conformanceDC = derived.getConformanceContext();
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
           tc.diagnose(initializer,
                       diag::decodable_super_init_not_designated_here,
                       requirement->getFullName(), memberName);
           return false;
-        } else if (!initializer->isAccessibleFrom(classDecl)) {
+        } else if (!initializer->isAccessibleFrom(conformanceDC)) {
           // Cannot call an inaccessible method.
-          auto accessScope = initializer->getFormalAccessScope(classDecl);
+          auto accessScope = initializer->getFormalAccessScope(conformanceDC);
           tc.diagnose(initializer, diag::decodable_inaccessible_super_init_here,
                       requirement->getFullName(), memberName,
                       accessScope.accessLevelForDiagnostics());
@@ -1238,8 +1233,8 @@ ValueDecl *DerivedConformance::deriveEncodable(ValueDecl *requirement) {
   // synthesizing Encodable, we can cancel the transaction and get rid of the
   // fake failures.
   auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
-  TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
-              getProtocolType());
+  TC.diagnose(ConformanceDecl, diag::type_does_not_conform,
+              Nominal->getDeclaredType(), getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses, diag::RequirementKind::Func,
               requirement->getFullName(), getProtocolType(),
               /*AddFixIt=*/false);
@@ -1274,8 +1269,8 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
   // them in the right order -- see the comment in deriveEncodable for
   // background on this transaction.
   auto diagnosticTransaction = DiagnosticTransaction(TC.Context.Diags);
-  TC.diagnose(Nominal, diag::type_does_not_conform, Nominal->getDeclaredType(),
-              getProtocolType());
+  TC.diagnose(ConformanceDecl->getLoc(), diag::type_does_not_conform,
+              Nominal->getDeclaredType(), getProtocolType());
   TC.diagnose(requirement, diag::no_witnesses,
               diag::RequirementKind::Constructor, requirement->getFullName(),
               getProtocolType(), /*AddFixIt=*/false);

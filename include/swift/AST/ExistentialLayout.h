@@ -37,8 +37,8 @@ struct ExistentialLayout {
   ExistentialLayout(ProtocolType *type);
   ExistentialLayout(ProtocolCompositionType *type);
 
-  /// The superclass constraint, if any.
-  Type superclass;
+  /// The explicit superclass constraint, if any.
+  Type explicitSuperclass;
 
   /// Whether the existential contains an explicit '& AnyObject' constraint.
   bool hasExplicitAnyObject : 1;
@@ -50,7 +50,9 @@ struct ExistentialLayout {
 
   bool isObjC() const {
     // FIXME: Does the superclass have to be @objc?
-    return ((superclass || hasExplicitAnyObject || !getProtocols().empty()) &&
+    return ((explicitSuperclass ||
+             hasExplicitAnyObject ||
+             !getProtocols().empty()) &&
             !containsNonObjCProtocol);
   }
 
@@ -58,11 +60,16 @@ struct ExistentialLayout {
   /// '& AnyObject' member or because of a superclass or protocol constraint.
   bool requiresClass() const;
 
-  // Does this existential contain the Error protocol?
+  /// Returns the existential's superclass, if any; this is either an explicit
+  /// superclass term in a composition type, or the superclass of one of the
+  /// protocols.
+  Type getSuperclass() const;
+
+  /// Does this existential contain the Error protocol?
   bool isExistentialWithError(ASTContext &ctx) const;
 
-  // Does this existential consist of an Error protocol only with no other
-  // constraints?
+  /// Does this existential consist of an Error protocol only with no other
+  /// constraints?
   bool isErrorExistential() const;
 
   static inline ProtocolType *getProtocolType(const Type &Ty) {

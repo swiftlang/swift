@@ -83,7 +83,7 @@ func callWotsit(_ w: Wotsit) {
 
 extension Base {
   // note: does not have a vtable slot, because it is from an extension
-  func identify() -> Int {
+  @objc func identify() -> Int {
     return 0
   }
 }

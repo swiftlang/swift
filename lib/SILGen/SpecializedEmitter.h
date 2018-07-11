@@ -26,7 +26,6 @@ class Expr;
 struct SILDeclRef;
 class SILLocation;
 class SILModule;
-class Substitution;
   
 namespace Lowering {
 class ManagedValue;

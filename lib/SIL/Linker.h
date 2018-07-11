@@ -68,7 +68,7 @@ public:
   void visitFunctionRefInst(FunctionRefInst *FRI);
   void visitProtocolConformance(ProtocolConformanceRef C,
                                 const Optional<SILDeclRef> &Member);
-  void visitApplySubstitutions(const SubstitutionMap &subs);
+  void visitApplySubstitutions(SubstitutionMap subs);
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {
     visitProtocolConformance(WMI->getConformance(), WMI->getMember());
   }

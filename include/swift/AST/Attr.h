@@ -111,19 +111,16 @@ public:
     return getOwnership() != ReferenceOwnership::Strong;
   }
   ReferenceOwnership getOwnership() const {
-    if (has(TAK_sil_weak))
-      return ReferenceOwnership::Weak;
-    if (has(TAK_sil_unowned))
-      return ReferenceOwnership::Unowned;
-    if (has(TAK_sil_unmanaged))
-      return ReferenceOwnership::Unmanaged;
+#define REF_STORAGE(Name, name, ...) \
+    if (has(TAK_sil_##name)) return ReferenceOwnership::Name;
+#include "swift/AST/ReferenceStorage.def"
     return ReferenceOwnership::Strong;
   }
   
   void clearOwnership() {
-    clearAttribute(TAK_sil_weak);
-    clearAttribute(TAK_sil_unowned);
-    clearAttribute(TAK_sil_unmanaged);
+#define REF_STORAGE(Name, name, ...) \
+    clearAttribute(TAK_sil_##name);
+#include "swift/AST/ReferenceStorage.def"
   }
 
   bool hasOpenedID() const { return OpenedID.hasValue(); }
@@ -1385,7 +1382,7 @@ public:
   /// Retrieve the first attribute of the given attribute class.
   template <typename ATTR>
   const ATTR *getAttribute(bool AllowInvalid = false) const {
-    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>();
+    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>(AllowInvalid);
   }
 
   template <typename ATTR>

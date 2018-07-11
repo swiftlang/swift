@@ -77,4 +77,24 @@ VisitorTests.test("SyntaxRewriter.visitAny") {
   })
 }
 
+VisitorTests.test("SyntaxRewriter.visitCollection") {
+  class VisitCollections: SyntaxVisitor {
+    var numberOfCodeBlockItems = 0
+
+    override func visit(_ items: CodeBlockItemListSyntax) {
+      numberOfCodeBlockItems += items.count
+      super.visit(items)
+    }
+  }
+
+  expectDoesNotThrow({
+    let parsed = try SourceFileSyntax.decodeSourceFileSyntax(
+      try SwiftLang.parse(getInput("nested-blocks.swift"))
+    )
+    let visitor = VisitCollections()
+    visitor.visit(parsed)
+    expectEqual(4, visitor.numberOfCodeBlockItems)
+  })
+}
+
 runAllTests()

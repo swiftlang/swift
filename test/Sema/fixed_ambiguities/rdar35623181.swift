@@ -1,4 +1,3 @@
-
 // RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s
 
 extension Sequence where Element == String {

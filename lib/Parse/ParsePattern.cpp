@@ -57,7 +57,7 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
 }
 
 void Parser::DefaultArgumentInfo::setFunctionContext(
-    DeclContext *DC, MutableArrayRef<ParameterList *> paramList){
+    DeclContext *DC, ArrayRef<ParameterList *> paramList){
   for (auto context : ParsedContexts) {
     context->changeFunction(DC, paramList);
   }
@@ -240,23 +240,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
     if (startsParameterName(*this, isClosure)) {
       // identifier-or-none for the first name
-      if (Tok.is(tok::kw__)) {
-        param.FirstNameLoc = consumeToken();
-      } else {
-        assert(Tok.canBeArgumentLabel() && "startsParameterName() lied");
-        Tok.setKind(tok::identifier);
-        param.FirstName = Context.getIdentifier(Tok.getText());
-        param.FirstNameLoc = consumeToken();
-      }
+      param.FirstNameLoc = consumeArgumentLabel(param.FirstName);
 
       // identifier-or-none? for the second name
-      if (Tok.canBeArgumentLabel()) {
-        if (!Tok.is(tok::kw__)) {
-          param.SecondName = Context.getIdentifier(Tok.getText());
-          Tok.setKind(tok::identifier);
-        }
-        param.SecondNameLoc = consumeToken();
-      }
+      if (Tok.canBeArgumentLabel())
+        param.SecondNameLoc = consumeArgumentLabel(param.SecondName);
 
       // Operators, closures, and enum elements cannot have API names.
       if ((paramContext == ParameterContextKind::Operator ||
@@ -437,7 +425,7 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(paramInfo.SpecifierKind,
+    auto param = new (ctx) ParamDecl(VarDecl::Specifier::Default,
                                      paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName, Type(),

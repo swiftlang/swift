@@ -40,49 +40,9 @@ namespace swift {
 /// In addition of caller information this analysis also provides information
 /// about partial applies of a function.
 class CallerAnalysis : public SILAnalysis {
-
 public:
+  class FunctionInfo;
 
-  /// NOTE: this can be extended to contain the callsites of the function.
-  class FunctionInfo {
-    friend class CallerAnalysis;
-
-    /// A list of all the functions this function calls or partially applies.
-    llvm::SetVector<SILFunction *> Callees;
-    /// A list of all the callers this function has.
-    llvm::SmallSet<SILFunction *, 4> Callers;
-
-    /// The number of partial applied arguments of this function.
-    ///
-    /// Specifically, it stores the minimum number of partial applied arguments
-    /// of each function which contain one or multiple partial_applys of this
-    /// function.
-    /// This is a little bit off-topic because a partial_apply is not really
-    /// a "call" of this function.
-    llvm::DenseMap<SILFunction *, int> PartialAppliers;
-
-  public:
-    /// Returns true if this function has at least one caller.
-    bool hasCaller() const {
-      return !Callers.empty();
-    }
-
-    /// Returns non zero if this function is partially applied anywhere.
-    ///
-    /// The return value is the minimum number of partially applied arguments.
-    /// Usually all partial applies of a function partially apply the same
-    /// number of arguments anyway.
-    int getMinPartialAppliedArgs() const {
-      int minArgs = 0;
-      for (auto Iter : PartialAppliers) {
-        int numArgs = Iter.second;
-        if (minArgs == 0 || numArgs < minArgs)
-          minArgs = numArgs;
-      }
-      return minArgs;
-    }
-  };
-  
 private:
   /// Current module we are analyzing.
   SILModule &Mod;
@@ -164,6 +124,44 @@ public:
     // list.
     processRecomputeFunctionList();
     return FuncInfos[F];
+  }
+};
+
+/// NOTE: this can be extended to contain the callsites of the function.
+class CallerAnalysis::FunctionInfo {
+  friend class CallerAnalysis;
+
+  /// A list of all the functions this function calls or partially applies.
+  llvm::SetVector<SILFunction *> Callees;
+  /// A list of all the callers this function has.
+  llvm::SmallSet<SILFunction *, 4> Callers;
+
+  /// The number of partial applied arguments of this function.
+  ///
+  /// Specifically, it stores the minimum number of partial applied arguments
+  /// of each function which contain one or multiple partial_applys of this
+  /// function.
+  /// This is a little bit off-topic because a partial_apply is not really
+  /// a "call" of this function.
+  llvm::DenseMap<SILFunction *, int> PartialAppliers;
+
+public:
+  /// Returns true if this function has at least one caller.
+  bool hasCaller() const { return !Callers.empty(); }
+
+  /// Returns non zero if this function is partially applied anywhere.
+  ///
+  /// The return value is the minimum number of partially applied arguments.
+  /// Usually all partial applies of a function partially apply the same
+  /// number of arguments anyway.
+  int getMinPartialAppliedArgs() const {
+    int minArgs = 0;
+    for (auto Iter : PartialAppliers) {
+      int numArgs = Iter.second;
+      if (minArgs == 0 || numArgs < minArgs)
+        minArgs = numArgs;
+    }
+    return minArgs;
   }
 };
 

@@ -212,10 +212,13 @@ endforeach()
 #
 # User-configurable Darwin-specific options.
 #
-
 option(SWIFT_EMBED_BITCODE_SECTION
     "If non-empty, embeds LLVM bitcode binary sections in the standard library and overlay binaries for supported platforms"
     FALSE)
+
+option(SWIFT_EMBED_BITCODE_SECTION_HIDE_SYMBOLS
+  "If non-empty, when embedding the LLVM bitcode binary sections into the relevant binaries, pass in -bitcode_hide_symbols. Does nothing if SWIFT_EMBED_BITCODE_SECTION is set to false."
+  FALSE)
 
 option(SWIFT_RUNTIME_CRASH_REPORTER_CLIENT
     "Whether to enable CrashReporter integration"
@@ -892,6 +895,8 @@ if(HAVE_EL_WGETS)
   set(HAVE_UNICODE_LIBEDIT 1)
 endif()
 cmake_pop_check_state()
+
+check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
 if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")

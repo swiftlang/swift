@@ -507,7 +507,7 @@ CodeBlockSyntax getCannedBody() {
     SyntaxFactory::makeReturnKeyword(Trivia::newlines(1) + Trivia::spaces(2),
                                      {});
   auto Return = SyntaxFactory::makeReturnStmt(ReturnKW, One);
-  auto ReturnItem = SyntaxFactory::makeCodeBlockItem(Return, None);
+  auto ReturnItem = SyntaxFactory::makeCodeBlockItem(Return, None, None);
 
   auto Stmts = SyntaxFactory::makeCodeBlockItemList({ReturnItem});
 

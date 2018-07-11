@@ -18,7 +18,7 @@ class Foo: NSObject {
   @objc subscript(x: Int) -> Foo { return self }
   @objc subscript(x: Bar) -> Foo { return self }
 
-  dynamic var dyn: String { fatalError() }
+  @objc dynamic var dyn: String { fatalError() }
 }
 
 class Bar: NSObject {

@@ -102,6 +102,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       HasCReferences(false), IsWeakLinked(false),
       OptMode(OptimizationMode::NotSet), EffectsKindAttr(E),
       EntryCount(entryCount) {
+  validateSubclassScope(classSubclassScope, isThunk, nullptr);
+
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else
@@ -480,18 +482,6 @@ void SILFunction::convertToDeclaration() {
   assert(isDefinition() && "Can only convert definitions to declarations");
   dropAllReferences();
   getBlocks().clear();
-}
-
-SubstitutionList SILFunction::getForwardingSubstitutions() {
-  if (ForwardingSubs)
-    return *ForwardingSubs;
-
-  auto *env = getGenericEnvironment();
-  if (!env)
-    return {};
-
-  ForwardingSubs = env->getForwardingSubstitutions();
-  return *ForwardingSubs;
 }
 
 SubstitutionMap SILFunction::getForwardingSubstitutionMap() {

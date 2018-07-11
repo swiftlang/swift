@@ -1,0 +1,166 @@
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+//
+// Tests that check constant-folding of conversions of floating point values
+// to integer types.
+
+import Swift
+import Builtin
+
+sil @foldFPToInt8 : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0xC060000000000000 // -128
+%1 = builtin "fptosi_FPIEEE64_Int8"(%0 : $Builtin.FPIEEE64) : $Builtin.Int8
+return %1 : $Builtin.Int8
+
+// CHECK-LABEL: sil @foldFPToInt8
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int8, -128
+// CHECK-NEXT: return [[RES]] : $Builtin.Int8
+}
+
+sil @foldFPFractionToInt8 : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0xC060100000000000 // -128.5
+%1 = builtin "fptosi_FPIEEE64_Int8"(%0 : $Builtin.FPIEEE64) : $Builtin.Int8
+return %1 : $Builtin.Int8
+
+// CHECK-LABEL: sil @foldFPFractionToInt8
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int8, -128
+// CHECK-NEXT: return [[RES]] : $Builtin.Int8
+}
+
+sil @foldFPToInt8Unsigned : $@convention(thin) () -> Builtin.Int8 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x406FFCCCCCCCCCCD // 255.9
+%1 = builtin "fptoui_FPIEEE64_Int8"(%0 : $Builtin.FPIEEE64) : $Builtin.Int8
+return %1 : $Builtin.Int8
+
+// CHECK-LABEL: sil @foldFPToInt8Unsigned
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int8, -1
+// CHECK-NEXT: return [[RES]] : $Builtin.Int8
+}
+
+sil @foldFPToInt16 : $@convention(thin) () -> Builtin.Int16 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x40DFFFF99999999A // 32767.900000000001
+%1 = builtin "fptosi_FPIEEE64_Int16"(%0 : $Builtin.FPIEEE64) : $Builtin.Int16
+return %1 : $Builtin.Int16
+
+// CHECK-LABEL: sil @foldFPToInt16
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int16, 32767
+// CHECK-NEXT: return [[RES]] : $Builtin.Int16
+}
+
+sil @foldFP2ToInt16 : $@convention(thin) () -> Builtin.Int16 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0xC0E0001FFF2E48E9 // -32768.999900000003
+%1 = builtin "fptosi_FPIEEE64_Int16"(%0 : $Builtin.FPIEEE64) : $Builtin.Int16
+return %1 : $Builtin.Int16
+
+// CHECK-LABEL: sil @foldFP2ToInt16
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int16, -32768
+// CHECK-NEXT: return [[RES]] : $Builtin.Int16
+}
+
+sil @foldFPToInt16Unsigned : $@convention(thin) () -> Builtin.Int16 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x40EFFFE000000000 // 65535
+%1 = builtin "fptoui_FPIEEE64_Int16"(%0 : $Builtin.FPIEEE64) : $Builtin.Int16
+return %1 : $Builtin.Int16
+
+// CHECK-LABEL: sil @foldFPToInt16Unsigned
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int16, -1
+// CHECK-NEXT: return [[RES]] : $Builtin.Int16
+}
+
+sil @foldFPToInt32 : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x41DFFFFFFFFFFFFF // 2147483647.9999998
+%1 = builtin "fptosi_FPIEEE64_Int32"(%0 : $Builtin.FPIEEE64) : $Builtin.Int32
+return %1 : $Builtin.Int32
+
+// CHECK-LABEL: sil @foldFPToInt32
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int32, 2147483647
+// CHECK-NEXT: return [[RES]] : $Builtin.Int32
+}
+
+sil @foldFPToInt32Unsigned : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x41EFFFFFFFFFFFFF // 4294967295.9999995
+%1 = builtin "fptoui_FPIEEE64_Int32"(%0 : $Builtin.FPIEEE64) : $Builtin.Int32
+return %1 : $Builtin.Int32
+
+// CHECK-LABEL: sil @foldFPToInt32Unsigned
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int32, -1
+// CHECK-NEXT: return [[RES]] : $Builtin.Int32
+}
+
+sil @foldFPToInt64 : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64,   0xC3E0000000000000 // close under approx. of -9223372036854775807
+%1 = builtin "fptosi_FPIEEE64_Int64"(%0 : $Builtin.FPIEEE64) : $Builtin.Int64
+return %1 : $Builtin.Int64
+
+// CHECK-LABEL: sil @foldFPToInt64
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, -9223372036854775808
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+sil @foldFPToInt64Unsigned : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x431A36E2EB1C432C // 1844674407370955 (close under approx. of 18446744073709551615)
+%1 = builtin "fptoui_FPIEEE64_Int64"(%0 : $Builtin.FPIEEE64) : $Builtin.Int64
+return %1 : $Builtin.Int64
+
+// CHECK-LABEL: sil @foldFPToInt64Unsigned
+// CHECK-NOT: float_literal
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 1844674407370955
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+// The following tests check folding of FPTrunc instructions.
+
+sil @foldDoubleToFloat: $@convention(thin) () -> Builtin.FPIEEE32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x47D2CED32A16A1B1 // 9.9999999999999997E+37
+%1 = builtin "fptrunc_FPIEEE64_FPIEEE32"(%0 : $Builtin.FPIEEE64) : $Builtin.FPIEEE32
+return %1 : $Builtin.FPIEEE32
+
+// CHECK-LABEL: sil @foldDoubleToFloat
+// CHECK-NOT: float_literal $Builtin.FPIEEE64
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE32, 0x7E967699 // 9.99999968E+37
+// CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE32
+}
+
+sil @foldDoubleToFloat2: $@convention(thin) () -> Builtin.FPIEEE32 {
+bb0:
+%0 = float_literal $Builtin.FPIEEE64, 0x3841039D428A8B8F // 1.0000000000000001E-37
+%1 = builtin "fptrunc_FPIEEE64_FPIEEE32"(%0 : $Builtin.FPIEEE64) : $Builtin.FPIEEE32
+return %1 : $Builtin.FPIEEE32
+
+// CHECK-LABEL: sil @foldDoubleToFloat2
+// CHECK-NOT: float_literal $Builtin.FPIEEE64
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = float_literal $Builtin.FPIEEE32, 0x2081CEA // 9.99999991E-38
+// CHECK-NEXT: return [[RES]] : $Builtin.FPIEEE32
+}

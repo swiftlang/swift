@@ -131,6 +131,28 @@ DECL_NODES = [
              Child('RightParen', kind='RightParenToken')
          ]),
 
+    Node('PoundSourceLocation', kind='Decl', 
+         traits=['Parenthesized'],
+         children=[
+             Child('PoundSourceLocation', kind='PoundSourceLocationToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Args', kind='PoundSourceLocationArgs', is_optional=True),
+             Child('RightParen', kind='RightParenToken')
+         ]),
+
+    Node('PoundSourceLocationArgs', kind='Syntax',
+         children=[
+             Child('FileArgLabel', kind='IdentifierToken', 
+                   text_choices=['file']),
+             Child('FileArgColon', kind='ColonToken'),
+             Child('FileName', kind='StringLiteralToken'),
+             Child('Comma', kind='CommaToken'),
+             Child('LineArgLabel', kind='IdentifierToken', 
+                   text_choices=['line']),
+             Child('LineArgColon', kind='ColonToken'),
+             Child('LineNumber', kind='IntegerLiteralToken'),
+         ]),
+
     Node('DeclModifier', kind='Syntax',
          children=[
              Child('Name', kind='Token',

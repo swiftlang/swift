@@ -497,19 +497,37 @@ static bool isNonOverlappingTrivialAccess(SILValue value) {
   return false;
 }
 
+void RCIdentityFunctionInfo::getRCUsers(
+    SILValue V, llvm::SmallVectorImpl<SILInstruction *> &Users) {
+  // We assume that Users is empty.
+  assert(Users.empty() && "Expected an empty out variable.");
+
+  // First grab our RC uses.
+  llvm::SmallVector<Operand *, 32> TmpUsers;
+  getRCUses(V, TmpUsers);
+
+  // Then map our operands out of TmpUsers into Users.
+  transform(TmpUsers, std::back_inserter(Users),
+            [](Operand *Op) { return Op->getUser(); });
+
+  // Finally sort/unique our users array.
+  sortUnique(Users);
+}
+
 /// Return all recursive users of V, looking through users which propagate
 /// RCIdentity. *NOTE* This ignores obvious ARC escapes where the a potential
 /// user of the RC is not managed by ARC.
 ///
 /// We only use the instruction analysis here.
-void RCIdentityFunctionInfo::getRCUsers(
-    SILValue InputValue, llvm::SmallVectorImpl<SILInstruction *> &Users) {
+void RCIdentityFunctionInfo::getRCUses(SILValue InputValue,
+                                       llvm::SmallVectorImpl<Operand *> &Uses) {
+
   // Add V to the worklist.
   llvm::SmallVector<SILValue, 8> Worklist;
   Worklist.push_back(InputValue);
 
-  // A set used to ensure we only visit users once.
-  llvm::SmallPtrSet<SILInstruction *, 8> VisitedInsts;
+  // A set used to ensure we only visit uses once.
+  llvm::SmallPtrSet<Operand *, 8> VisitedOps;
 
   // Then until we finish the worklist...
   while (!Worklist.empty()) {
@@ -518,11 +536,11 @@ void RCIdentityFunctionInfo::getRCUsers(
 
     // For each user of V...
     for (auto *Op : V->getUses()) {
-      SILInstruction *User = Op->getUser();
-
       // If we have already visited this user, continue.
-      if (!VisitedInsts.insert(User).second)
+      if (!VisitedOps.insert(Op).second)
         continue;
+
+      auto *User = Op->getUser();
 
       if (auto *SVI = dyn_cast<SingleValueInstruction>(User)) {
         // Otherwise attempt to strip off one layer of RC identical instructions
@@ -533,17 +551,19 @@ void RCIdentityFunctionInfo::getRCUsers(
         // it must still be RC identical to InputValue, so transitively search
         // for more users.
         if (StrippedRCID == V) {
-          Worklist.push_back(SVI);
+          Worklist.push_back(SILValue(SVI));
           continue;
         }
+
         // If the user is extracting a trivial field of an aggregate structure
         // that does not overlap with the ref counted part of the aggregate, we
         // can ignore it.
         if (isNonOverlappingTrivialAccess(SVI))
           continue;
       }
-      // Otherwise, stop searching and report this RC user.
-      Users.push_back(User);
+
+      // Otherwise, stop searching and report this RC operand.
+      Uses.push_back(Op);
     }
   }
 }

@@ -44,7 +44,7 @@ CURSOR_REFACTORING(LocalizeString, "Localize String", localize.string)
 
 CURSOR_REFACTORING(SimplifyNumberLiteral, "Simplify Long Number Literal", simplify.long.number.literal)
 
-CURSOR_REFACTORING(CollapseNestedIfExpr, "Collapse Nested If Expression", collapse.nested.if.expr)
+CURSOR_REFACTORING(CollapseNestedIfStmt, "Collapse Nested If Statements", collapse.nested.ifstmt)
 
 CURSOR_REFACTORING(ConvertToDoCatch, "Convert To Do/Catch", convert.do.catch)
 

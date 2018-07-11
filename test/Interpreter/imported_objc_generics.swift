@@ -111,7 +111,7 @@ ImportedObjCGenerics.test("ClassConstraints") {
   expectEqual("woof", makeContainedAnimalMakeNoise(x: petCarrier))
 }
 
-class ClassWithMethodsUsingObjCGenerics: NSObject {
+@objc @objcMembers class ClassWithMethodsUsingObjCGenerics: NSObject {
   func copyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString> {
     return x
   }

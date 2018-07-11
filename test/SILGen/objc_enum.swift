@@ -45,7 +45,7 @@ _ = NSFungingMask.toTheMax
 // CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: Hashable module gizmo
 // CHECK-DAG: sil_witness_table shared [serialized] NSFungingMask: RawRepresentable module gizmo
 
-// CHECK-DAG: sil shared [transparent] [serialized] [thunk] @$SSo16NSRuncingOptionsVs16RawRepresentableSCsACP{{[_0-9a-zA-Z]*}}fCTW
+// CHECK-DAG: sil shared [transparent] [serialized] [thunk] @$SSo16NSRuncingOptionsVSYSCSY8rawValuexSg03RawD0Qz_tcfCTW
 
 // Extension conformances get linkage according to the protocol's accessibility, as normal.
 // CHECK-DAG: sil_witness_table hidden NSRuncingOptions: Bub module objc_enum

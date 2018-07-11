@@ -17,7 +17,6 @@
 #ifndef _SWIFT_RUNTIME_DEBUG_HELPERS_
 #define _SWIFT_RUNTIME_DEBUG_HELPERS_
 
-#include <llvm/Support/Compiler.h>
 #include <cstdarg>
 #include <cstdio>
 #include <stdint.h>
@@ -41,23 +40,23 @@ struct crashreporter_annotations_t {
 };
 
 extern "C" {
-LLVM_LIBRARY_VISIBILITY
+SWIFT_RUNTIME_LIBRARY_VISIBILITY
 extern struct crashreporter_annotations_t gCRAnnotations;
 }
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void CRSetCrashLogMessage(const char *message) {
   gCRAnnotations.message = reinterpret_cast<uint64_t>(message);
 }
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline const char *CRGetCrashLogMessage() {
   return reinterpret_cast<const char *>(gCRAnnotations.message);
 }
 
 #else
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 static inline void CRSetCrashLogMessage(const char *) {}
 
 #endif
@@ -73,25 +72,18 @@ using Metadata = TargetMetadata<InProcess>;
 // swift::crash() halts with a crash log message, 
 // but otherwise tries not to disturb register state.
 
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
 static inline void crash(const char *message) {
   CRSetCrashLogMessage(message);
 
-  LLVM_BUILTIN_TRAP;
+  SWIFT_RUNTIME_BUILTIN_TRAP;
   swift_runtime_unreachable("Expected compiler to crash.");
-}
-
-/// Report a corrupted type object.
-LLVM_ATTRIBUTE_NORETURN
-LLVM_ATTRIBUTE_ALWAYS_INLINE // Minimize trashed registers
-static inline void _failCorruptType(const Metadata *type) {
-  swift::crash("Corrupt Swift type object");
 }
 
 // swift::fatalError() halts with a crash log message, 
 // but makes no attempt to preserve register state.
-LLVM_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 extern void
 fatalError(uint32_t flags, const char *format, ...);
 
@@ -101,7 +93,7 @@ warning(uint32_t flags, const char *format, ...);
 
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
-LLVM_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 void
 swift_dynamicCastFailure(const Metadata *sourceType,
                          const Metadata *targetType,
@@ -109,7 +101,7 @@ swift_dynamicCastFailure(const Metadata *sourceType,
 
 // swift_dynamicCastFailure halts using fatalError()
 // with a description of a failed cast's types.
-LLVM_ATTRIBUTE_NORETURN
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 void
 swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
                          const void *targetType, const char *targetName, 
@@ -119,19 +111,19 @@ SWIFT_RUNTIME_EXPORT
 void swift_reportError(uint32_t flags, const char *message);
 
 // Halt due to an overflow in swift_retain().
-LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortRetainOverflow();
 
 // Halt due to reading an unowned reference to a dead object.
-LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortRetainUnowned(const void *object);
 
 // Halt due to an overflow in swift_unownedRetain().
-LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortUnownedRetainOverflow();
 
 // Halt due to an overflow in incrementWeak().
-LLVM_ATTRIBUTE_NORETURN LLVM_ATTRIBUTE_NOINLINE
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortWeakRetainOverflow();
 
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
@@ -141,7 +133,7 @@ void swift_abortWeakRetainOverflow();
 void dumpStackTraceEntry(unsigned index, void *framePC,
                          bool shortOutput = false);
 
-LLVM_ATTRIBUTE_NOINLINE
+SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void printCurrentBacktrace(unsigned framesToSkip = 1);
 
 /// Debugger breakpoint ABI. This structure is passed to the debugger (and needs
@@ -228,7 +220,7 @@ SWIFT_RUNTIME_STDLIB_SPI
 bool _swift_shouldReportFatalErrorsToDebugger();
 
 
-LLVM_ATTRIBUTE_ALWAYS_INLINE
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE
 inline static int swift_asprintf(char **strp, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);

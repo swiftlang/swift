@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// REQUIRES: objc_interop
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // CHECK: [[SELECTOR:@.*]] = private global {{.*}} c"fooWithX:\00"
 

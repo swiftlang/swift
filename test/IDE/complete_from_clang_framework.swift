@@ -44,6 +44,7 @@ struct SwiftStruct {
 func testSwiftCompletions(foo: SwiftStruct) {
   foo.#^SWIFT_COMPLETIONS^#
 // SWIFT_COMPLETIONS: Begin completions
+// SWIFT_COMPLETIONS-NEXT: Keyword[self]/CurrNominal: self[#SwiftStruct#]; name=self
 // SWIFT_COMPLETIONS-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // SWIFT_COMPLETIONS-NEXT: End completions
 }
@@ -227,6 +228,7 @@ func testCompleteFunctionCall1() {
   fooFunc1#^FUNCTION_CALL_1^#
 // FUNCTION_CALL_1: Begin completions
 // FUNCTION_CALL_1-NEXT: Pattern/CurrModule: ({#(a): Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_1-NEXT: End completions
 }
 
@@ -234,6 +236,7 @@ func testCompleteFunctionCall2() {
   fooFunc1AnonymousParam#^FUNCTION_CALL_2^#
 // FUNCTION_CALL_2: Begin completions
 // FUNCTION_CALL_2-NEXT: Pattern/CurrModule: ({#Int32#})[#Int32#]{{; name=.+$}}
+// FUNCTION_CALL_2-NEXT: Keyword[self]/CurrNominal: .self[#(Int32) -> Int32#]; name=self
 // FUNCTION_CALL_2-NEXT: End completions
 }
 
@@ -242,6 +245,7 @@ func testCompleteStructMembers1() {
 // CLANG_STRUCT_MEMBERS_1: Begin completions
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ()[#FooStruct1#]{{; name=.+$}}
 // CLANG_STRUCT_MEMBERS_1-NEXT: Decl[Constructor]/CurrNominal: ({#x: Int32#}, {#y: Double#})[#FooStruct1#]{{; name=.+$}}
+// CLANG_STRUCT_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooStruct1.Type#]; name=self
 // CLANG_STRUCT_MEMBERS_1-NEXT: End completions
 }
 
@@ -267,6 +271,7 @@ func testCompleteClassMembers1() {
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[StaticMethod]/CurrNominal:     ._internalMeth1()[#Any!#]
 // CLANG_CLASS_MEMBERS_1-NEXT: Decl[InstanceMethod]/CurrNominal:   ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
+// CLANG_CLASS_MEMBERS_1-NEXT: Keyword[self]/CurrNominal: .self[#FooClassBase.Type#]; name=self
 // CLANG_CLASS_MEMBERS_1-NEXT: End completions
 }
 
@@ -299,6 +304,7 @@ func testCompleteClassMembers2() {
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         .nonInternalMeth({#self: FooClassBase#})[#() -> Any?#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[StaticMethod]/Super:           ._internalMeth1()[#Any!#]
 // CLANG_CLASS_MEMBERS_2-NEXT: Decl[InstanceMethod]/Super:         ._internalMeth1({#self: FooClassBase#})[#() -> Any?#]
+// CLANG_CLASS_MEMBERS_2-NEXT: Keyword[self]/CurrNominal: .self[#FooClassDerived.Type#]; name=self
 // CLANG_CLASS_MEMBERS_2-NEXT: End completions
 }
 

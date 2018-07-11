@@ -169,7 +169,10 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   SourceManager SrcMgr;
   LangOptions LangOpts;
   LangOpts.Target = Invocation.getTargetTriple();
-  ASTContext ASTCtx(LangOpts, SearchPathOpts, SrcMgr, Instance.getDiags());
+  ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
+                                        Instance.getDiags());
+  registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
+  
   ClangImporterOptions ClangImporterOpts;
   ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
                          true);

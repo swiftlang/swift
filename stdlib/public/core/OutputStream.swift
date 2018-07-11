@@ -415,7 +415,7 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 ///
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
-@inline(never) @effects(readonly)
+@inline(never) @_effects(readonly)
 @usableFromInline
 internal func _toStringReadOnlyStreamable<
   T : TextOutputStreamable
@@ -425,7 +425,7 @@ internal func _toStringReadOnlyStreamable<
   return result
 }
 
-@inline(never) @effects(readonly)
+@inline(never) @_effects(readonly)
 @usableFromInline
 internal func _toStringReadOnlyPrintable<
   T : CustomStringConvertible

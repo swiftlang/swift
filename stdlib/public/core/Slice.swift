@@ -467,27 +467,3 @@ extension Slice
     }
   }
 }
-
-@available(*, deprecated, renamed: "Slice")
-public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias RandomAccessSlice<T> = Slice<T> where T : RandomAccessCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableSlice<T> = Slice<T> where T : RangeReplaceableCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T : RangeReplaceableCollection & BidirectionalCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T : RangeReplaceableCollection & RandomAccessCollection
-
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableSlice<T> = Slice<T> where T : MutableCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & BidirectionalCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RandomAccessCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & BidirectionalCollection
-@available(*, deprecated, renamed: "Slice")
-public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & RandomAccessCollection
