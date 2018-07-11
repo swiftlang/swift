@@ -898,3 +898,205 @@ bb0( %0 : $Int):
   %7 = tuple ()
   return %7 : $()
 }
+
+// 4.2 fails to diagnose this conflict.
+sil private @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int):
+  %access = begin_access [read] [unknown] %1 : $*Int
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// 4.2 fails to diagnose this conflict.
+sil hidden @directPartialApplyTakingInout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, @inout_aliasable Int) -> ()
+  %nepa = convert_escape_to_noescape %pa : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+// 4.2 fails to diagnose this conflict.
+sil private @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
+  %access = begin_access [read] [unknown] %2 : $*Int
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+// 4.2 fails to diagnose this conflict.
+sil hidden @directPartialApplyChain : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %box = alloc_box ${ var Int }, var, name "i"
+  %boxadr = project_box %box : ${ var Int }, 0
+  store %0 to [trivial] %boxadr : $*Int
+  %f = function_ref @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f(%boxadr) : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %pa1(%0) : $@callee_guaranteed (@inout Int, Int) -> ()
+  %nepa = convert_escape_to_noescape %pa2 : $@callee_guaranteed (@inout Int) -> () to $@noescape @callee_guaranteed (@inout Int) -> ()
+  %access = begin_access [modify] [unknown] %boxadr : $*Int
+  %call = apply %nepa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
+  end_access %access : $*Int
+  destroy_value %box : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+
+/*
+// This SIL pattern is unsupported on the 4.2 branch. It will assert in checkForViolationWithCall.
+// It is handled post 4.2. We haven't seen a source level test that exposes this pre-4.2.
+sil private @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+bb0(%0 : $Int, %1 : $*Int):
+  %access = begin_access [read] [unknown] %1 : $*Int
+  %val = load [trivial] %access : $*Int
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}
+
+sil hidden @partialApplyArgChain : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %2 = alloc_box ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = function_ref @takesInoutAndNoEscapeClosure : $@convention(thin) (@inout Int, @noescape @owned @callee_owned () -> ()) -> ()
+  %5 = function_ref @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %6 = partial_apply %5(%3) : $@convention(thin) (Int, @inout_aliasable Int) -> ()
+  %7 = partial_apply %6(%0) : $@callee_owned (Int) -> ()
+  %conv = convert_escape_to_noescape %7 : $@callee_owned () -> () to $@callee_owned @noescape () -> ()
+  %8 = begin_access [modify] [unknown] %3 : $*Int
+  %9 = apply %4(%8, %conv) : $@convention(thin) (@inout Int, @noescape @owned @callee_owned () -> ()) -> ()
+  end_access %8: $*Int
+  destroy_value %2 : ${ var Int }
+  %v = tuple ()
+  return %v : $()
+}
+*/
+
+class SomeClass {}
+
+// LLDB uses mark_uninitialized [var] in an unsupported way via an address to
+// pointer. LLDB shouldn't do this, but until it is removed and validated we
+// need a test for this.
+//
+// Check that this doesn't trigger the DiagnoseStaticExclusivity
+// assert that all accesses have a valid AccessedStorage source.
+sil @lldb_unsupported_markuninitialized_testcase : $@convention(thin) (UnsafeMutablePointer<Any>) -> () {
+bb0(%0 : $UnsafeMutablePointer<Any>):
+  %2 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
+  %3 = integer_literal $Builtin.Int64, 8
+  %4 = index_raw_pointer %2 : $Builtin.RawPointer, %3 : $Builtin.Int64
+  %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %6 = load [trivial] %5 : $*Builtin.RawPointer
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*Error
+  %8 = mark_uninitialized [var] %7 : $*Error
+  %9 = struct_extract %0 : $UnsafeMutablePointer<Any>, #UnsafeMutablePointer._rawValue
+  %10 = integer_literal $Builtin.Int64, 0
+  %11 = index_raw_pointer %9 : $Builtin.RawPointer, %10 : $Builtin.Int64
+  %12 = pointer_to_address %11 : $Builtin.RawPointer to [strict] $*Builtin.RawPointer
+  %13 = load [trivial] %12 : $*Builtin.RawPointer
+  %14 = pointer_to_address %13 : $Builtin.RawPointer to [strict] $*@thick SomeClass.Type
+  %15 = mark_uninitialized [var] %14 : $*@thick SomeClass.Type
+  %16 = metatype $@thick SomeClass.Type
+  %17 = begin_access [modify] [unsafe] %15 : $*@thick SomeClass.Type
+  assign %16 to %17 : $*@thick SomeClass.Type
+  end_access %17 : $*@thick SomeClass.Type
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+
+// An addressor produces an unsafely accessed RawPointer. Pass the
+// address to an inout can result in an enforced (unknown) access on
+// the unsafe address. We need to handle this case without asserting.
+sil @addressorAccess : $@convention(thin) (@guaranteed ClassWithStoredProperty, Int32) -> () {
+bb0(%0 : $ClassWithStoredProperty, %1 : $Int32):
+  %f = function_ref @addressor : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+  %up = apply %f() : $@convention(thin) () -> UnsafeMutablePointer<Int32>
+  %o = unchecked_ref_cast %0 : $ClassWithStoredProperty to $Builtin.NativeObject
+  %ptr = struct_extract %up : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
+  %adr = pointer_to_address %ptr : $Builtin.RawPointer to [strict] $*Int32
+  %dep = mark_dependence %adr : $*Int32 on %o : $Builtin.NativeObject
+  %a1 = begin_access [modify] [unsafe] %dep : $*Int32
+  %a2 = begin_access [modify] [static] %a1 : $*Int32
+  store %1 to [trivial] %a2 : $*Int32
+  end_access %a2 : $*Int32
+  end_access %a1 : $*Int32
+  %v = tuple ()
+  return %v : $()
+}
+
+// <rdar://problem/41976355> [SR-8201]: Swift 4.2 Crash in DiagnoseStaticExclusivity (llvm_unreachable)
+// mutatingNoescapeWithThunk and mutatingNoescapeConflictWithThunk.
+// Test that noescape closure verification allows a closure with @inout_aliasable argument convention,
+// which may only be used as a nonescaping closure, can be passed to a reabstraction thunk
+// without the @noescape function-type argument convention.
+
+sil @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
+bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
+  %up = unchecked_enum_data %0 : $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1
+  %p = struct_extract %up : $UnsafePointer<Int32>, #UnsafePointer._rawValue
+  %adr = pointer_to_address %p : $Builtin.RawPointer to [strict] $*Int32
+  %val = load [trivial] %adr : $*Int32
+  %access = begin_access [modify] [unknown] %1 : $*Int32 // expected-note {{conflicting access is here}}
+  store %val to [trivial] %access : $*Int32
+  end_access %access : $*Int32
+  %v = tuple ()
+  return %v : $()
+}
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()):
+  %e = enum $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1, %0 : $UnsafePointer<Int32>
+  %c = apply %1(%e) : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+
+// A (mutating) closure taking an @inout_aliasable argument may be
+// passed to a reabstraction_thunk as an escaping function type. This
+// is valid as long as the thunk is only used as a @nosecape type.
+sil @mutatingNoescapeWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
+  %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %thunk = function_ref @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %thunk(%pa1) : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %closure = convert_escape_to_noescape [not_guaranteed] %pa2 : $@callee_guaranteed (UnsafePointer<Int32>) -> () to $@noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()
+  %f2 = function_ref @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %call = apply %f2<Int32>(%0, %closure) : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+
+sil @mutatingNoescapeConflictWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
+  %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %thunk = function_ref @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %thunk(%pa1) : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %closure = convert_escape_to_noescape [not_guaranteed] %pa2 : $@callee_guaranteed (UnsafePointer<Int32>) -> () to $@noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()
+  %f2 = function_ref @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %access = begin_access [modify] [unknown] %1 : $*Int32  // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %f2<Int32>(%access, %0, %closure) : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  end_access %access : $*Int32
+  %v = tuple ()
+  return %v : $()
+}
