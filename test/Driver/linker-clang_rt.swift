@@ -1,6 +1,5 @@
-// REQUIRES: OS=macosx
-// Note: This is really about the /host/ environment, but since there are RUN
-// lines for multiple targets anyway it doesn't make a huge difference.
+// Make sure that the platform-appropriate clang_rt library (found relative to
+// the compiler) is included when using Swift as a linker (with Apple targets).
 
 // We use hard links to make sure the Swift driver really thinks it's been
 // moved.
@@ -26,6 +25,9 @@
 
 // RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix WATCHOS %s
 // RUN: %t/bin/swiftc -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix WATCHOS %s
+
+// Clean up the test executable because hard links are expensive.
+// RUN: rm -f %t/bin/swiftc
 
 // CHECK: bin/ld{{"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt

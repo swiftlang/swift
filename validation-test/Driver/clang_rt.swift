@@ -4,7 +4,7 @@
 
 // Just make sure we can build and link successfully.
 
-if testNewOS() {
+if isRunningOnFairlyRecentOS() {
   print("new!")
 } else {
   print("old...")
