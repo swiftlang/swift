@@ -2244,6 +2244,8 @@ class ValueDecl : public Decl {
     unsigned hasOverridden : 1;
   } LazySemanticInfo;
 
+  friend class OverriddenDeclsRequest;
+
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2468,18 +2470,15 @@ public:
   ValueDecl *getOverriddenDecl() const;
 
   /// Retrieve the declarations that this declaration overrides, if any.
-  ArrayRef<ValueDecl *> getOverriddenDecls() const;
+  SmallVector<ValueDecl *, 1> getOverriddenDecls() const;
 
   /// Set the declaration that this declaration overrides.
   void setOverriddenDecl(ValueDecl *overridden) {
-    (void)setOverriddenDecls(overridden);
+    setOverriddenDecls(overridden);
   }
 
   /// Set the declarations that this declaration overrides.
-  ///
-  /// \returns the ASTContext-allocated version of the array of overridden
-  /// declarations.
-  ArrayRef<ValueDecl *> setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
+  void setOverriddenDecls(ArrayRef<ValueDecl *> overridden);
 
   /// Whether the overridden declarations have already been computed.
   bool overriddenDeclsComputed() const;
@@ -2884,11 +2883,7 @@ public:
 
   /// Retrieve the set of associated types overridden by this associated
   /// type.
-  CastArrayRefView<ValueDecl *, AssociatedTypeDecl>
-  getOverriddenDecls() const {
-    return CastArrayRefView<ValueDecl *, AssociatedTypeDecl>(
-        AbstractTypeParamDecl::getOverriddenDecls());
-  }
+  SmallVector<AssociatedTypeDecl *, 1> getOverriddenDecls() const;
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;

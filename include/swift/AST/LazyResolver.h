@@ -60,9 +60,6 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the "overridden" declaration of the given declaration.
-  virtual void resolveOverriddenDecl(ValueDecl *VD) = 0;
-
   /// Resolve the "is Objective-C" bit for the given declaration.
   virtual void resolveIsObjC(ValueDecl *VD) = 0;
 

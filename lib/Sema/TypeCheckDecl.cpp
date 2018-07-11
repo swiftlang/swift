@@ -2382,7 +2382,7 @@ public:
       }
     }
 
-    if (!checkOverrides(TC, VD)) {
+    if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
       // anything, complain.
       auto overridden = VD->getOverriddenDecl();
@@ -2540,7 +2540,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, SD);
     UsableFromInlineChecker::checkUsableFromInline(TC, SD);
 
-    if (!checkOverrides(TC, SD)) {
+    if (!checkOverrides(SD)) {
       // If a subscript has an override attribute but does not override
       // anything, complain.
       if (auto *OA = SD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -3042,7 +3042,7 @@ public:
     AccessControlChecker::checkAccessControl(TC, FD);
     UsableFromInlineChecker::checkUsableFromInline(TC, FD);
 
-    if (!checkOverrides(TC, FD)) {
+    if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
       if (auto *OA = FD->getAttrs().getAttribute<OverrideAttr>()) {
@@ -3183,7 +3183,7 @@ public:
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
-    if (!checkOverrides(TC, CD)) {
+    if (!checkOverrides(CD)) {
       // If an initializer has an override attribute but does not override
       // anything or overrides something that doesn't need an 'override'
       // keyword (e.g., a convenience initializer), complain.

@@ -2022,6 +2022,18 @@ CanType ValueDecl::getOverloadSignatureType() const {
   return CanType();
 }
 
+SmallVector<ValueDecl *, 1> ValueDecl::getOverriddenDecls() const {
+  ASTContext &ctx = getASTContext();
+  return ctx.evaluator(OverriddenDeclsRequest{const_cast<ValueDecl *>(this)});
+}
+
+void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
+  SmallVector<ValueDecl *, 1> overriddenVec(overridden.begin(),
+                                            overridden.end());
+  OverriddenDeclsRequest request{const_cast<ValueDecl *>(this)};
+  request.cacheResult(overriddenVec);
+}
+
 bool ValueDecl::isObjC() const {
   if (LazySemanticInfo.isObjCComputed)
     return LazySemanticInfo.isObjC;
@@ -2864,6 +2876,15 @@ SourceRange AssociatedTypeDecl::getSourceRange() const {
     endLoc = getNameLoc();
   }
   return SourceRange(KeywordLoc, endLoc);
+}
+
+SmallVector<AssociatedTypeDecl *, 1>
+AssociatedTypeDecl::getOverriddenDecls() const {
+  SmallVector<AssociatedTypeDecl *, 1> assocTypes;
+  for (auto decl : AbstractTypeParamDecl::getOverriddenDecls()) {
+    assocTypes.push_back(cast<AssociatedTypeDecl>(decl));
+  }
+  return assocTypes;
 }
 
 AssociatedTypeDecl *AssociatedTypeDecl::getAssociatedTypeAnchor() const {
