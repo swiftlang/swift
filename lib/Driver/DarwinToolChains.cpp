@@ -86,27 +86,24 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
 static StringRef
 getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
                                     bool distinguishSimulator = true) {
-  switch (getDarwinPlatformKind(triple)) {
+  const DarwinPlatformKind kind = getDarwinPlatformKind(triple);
+  const DarwinPlatformKind effectiveKind =
+      distinguishSimulator ? kind : getNonSimulatorPlatform(kind);
+  switch (effectiveKind) {
   case DarwinPlatformKind::MacOS:
     return "osx";
-  case DarwinPlatformKind::IPhoneOSSimulator:
-    if (distinguishSimulator)
-      return "iossim";
-    LLVM_FALLTHROUGH;
   case DarwinPlatformKind::IPhoneOS:
     return "ios";
-  case DarwinPlatformKind::TvOSSimulator:
-    if (distinguishSimulator)
-      return "tvossim";
-    LLVM_FALLTHROUGH;
+  case DarwinPlatformKind::IPhoneOSSimulator:
+    return "iossim";
   case DarwinPlatformKind::TvOS:
     return "tvos";
-  case DarwinPlatformKind::WatchOSSimulator:
-    if (distinguishSimulator)
-      return "watchossim";
-    LLVM_FALLTHROUGH;
+  case DarwinPlatformKind::TvOSSimulator:
+    return "tvossim";
   case DarwinPlatformKind::WatchOS:
     return "watchos";
+  case DarwinPlatformKind::WatchOSSimulator:
+    return "watchossim";
   }
   llvm_unreachable("Unsupported Darwin platform");
 }
