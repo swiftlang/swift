@@ -105,8 +105,8 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Complexity: O(*n* + *m*), where *n* is length of this collection and
   ///   *m* is the length of `newElements`. If the call to this method simply
-  ///   appends the contents of `newElements` to the collection, the complexity
-  ///   is O(*m*).
+  ///   appends the contents of `newElements` to the collection, this method is
+  ///   equivalent to `append(contentsOf:)`.
   mutating func replaceSubrange<C>(
     _ subrange: Range<Index>,
     with newElements: C
@@ -164,8 +164,8 @@ public protocol RangeReplaceableCollection : Collection
   ///
   /// - Parameter newElement: The element to append to the collection.
   ///
-  /// - Complexity: O(1) on average, over many additions to the same
-  ///   collection.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same collection.
   mutating func append(_ newElement: __owned Element)
 
   /// Adds the elements of a sequence or collection to the end of this
@@ -413,8 +413,8 @@ extension RangeReplaceableCollection {
   ///
   /// - Parameter newElement: The element to append to the collection.
   ///
-  /// - Complexity: O(1) on average, over many additions to the same
-  ///   collection.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same collection.
   @inlinable
   public mutating func append(_ newElement: Element) {
     insert(newElement, at: endIndex)

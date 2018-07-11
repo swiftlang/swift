@@ -154,6 +154,10 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
 
   /// The position of the first element in a nonempty array.
   ///
+  /// `ArraySlice` instances are not always indexed from zero. Use `startIndex`
+  /// and `endIndex` as the bounds for any element access, instead of `0` and
+  /// `count`.
+  ///
   /// If the array is empty, `startIndex` is equal to `endIndex`.
   @inlinable
   public var startIndex: Int {
@@ -248,16 +252,17 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
   ///     print(numbers[i])
   ///     // Prints "50"
   ///
-  /// The value passed as `distance` must not offset `i` beyond the bounds of the
-  /// collection.
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
   ///   - distance: The distance to offset `i`.
-  /// - Returns: An index offset by `distance` from the index `i`. If `distance` is positive,
-  ///   this is the same value as the result of `distance` calls to `index(after:)`.
-  ///   If `distance` is negative, this is the same value as the result of `-distance` calls
-  ///   to `index(before:)`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `-distance` calls to
+  ///   `index(before:)`.
   @inlinable
   public func index(_ i: Int, offsetBy distance: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -294,19 +299,22 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
   ///     print(j)
   ///     // Prints "nil"
   ///
-  /// The value passed as `distance` must not offset `i` beyond the bounds of the
-  /// collection, unless the index passed as `limit` prevents offsetting
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
   /// beyond those bounds.
   ///
   /// - Parameters:
   ///   - i: A valid index of the array.
   ///   - distance: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `distance < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
-  /// - Returns: An index offset by `distance` from the index `i`, unless that index
-  ///   would be beyond `limit` in the direction of movement. In that case,
-  ///   the method returns `nil`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` has no effect if it is less than `i`.
+  ///     Likewise, if `distance < 0`, `limit` has no effect if it is greater
+  ///     than `i`.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1)
   @inlinable
   public func index(
     _ i: Int, offsetBy distance: Int, limitedBy limit: Int
@@ -365,8 +373,9 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
   ///   greater than or equal to `startIndex` and less than `endIndex`.
   ///
   /// - Complexity: Reading an element from an array is O(1). Writing is O(1)
-  ///   unless the array's storage is shared with another array, in which case
-  ///   writing is O(*n*), where *n* is the length of the array.
+  ///   unless the array's storage is shared with another array or uses a
+  ///   bridged `NSArray` instance as its storage, in which case writing is
+  ///   O(*n*), where *n* is the length of the array.
   @inlinable
   public subscript(index: Int) -> Element {
     get {
@@ -931,7 +940,8 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: O(1) on average, over many additions to the same array.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same array.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -955,7 +965,8 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*m*) on average, where *m* is the length of
-  ///   `newElements`, over many additions to the same array.
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -1060,7 +1071,8 @@ extension ArraySlice: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)
@@ -1319,9 +1331,10 @@ extension ArraySlice {
   ///     a subrange must be valid indices of the array.
   ///   - newElements: The new elements to add to the array.
   ///
-  /// - Complexity: O(`subrange.count`) if you are replacing a suffix of the
-  ///   array with an empty collection; otherwise, O(*n*), where *n* is the
-  ///   length of the array.
+  /// - Complexity: O(*n* + *m*), where *n* is length of the array and
+  ///   *m* is the length of `newElements`. If the call to this method simply
+  ///   appends the contents of `newElements` to the array, this method is
+  ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(

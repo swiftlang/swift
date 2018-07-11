@@ -1142,7 +1142,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: O(1) on average, over many additions to the same array.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same array.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -1166,7 +1167,8 @@ extension Array: RangeReplaceableCollection, ArrayProtocol {
   /// - Parameter newElements: The elements to append to the array.
   ///
   /// - Complexity: O(*m*) on average, where *m* is the length of
-  ///   `newElements`, over many additions to the same array.
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -1583,8 +1585,8 @@ extension Array {
   ///
   /// - Complexity: O(*n* + *m*), where *n* is length of the array and
   ///   *m* is the length of `newElements`. If the call to this method simply
-  ///   appends the contents of `newElements` to the array, the complexity
-  ///   is O(*m*).
+  ///   appends the contents of `newElements` to the array, this method is
+  ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(

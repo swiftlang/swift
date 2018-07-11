@@ -172,8 +172,6 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   ///   `distance` calls to `index(after:)`. If `distance` is negative, this
   ///   is the same value as the result of `-distance` calls to
   ///   `index(before:)`.
-  ///
-  /// - Complexity: O(1)
   @inlinable
   public func index(_ i: Int, offsetBy distance: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -217,9 +215,10 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   /// - Parameters:
   ///   - i: A valid index of the array.
   ///   - distance: The distance to offset `i`.
-  ///   - limit: A valid index of the collection to use as a limit. If `distance > 0`,
-  ///     `limit` has no effect if it is less than `i`. Likewise, if `distance < 0`,
-  ///     `limit` has no effect if it is greater than `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, `limit` has no effect if it is less than `i`.
+  ///     Likewise, if `distance < 0`, `limit` has no effect if it is greater
+  ///     than `i`.
   /// - Returns: An index offset by `distance` from the index `i`, unless that
   ///   index would be beyond `limit` in the direction of movement. In that
   ///   case, the method returns `nil`.
@@ -248,8 +247,6 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
   ///   - end: Another valid index of the collection. If `end` is equal to
   ///     `start`, the result is zero.
   /// - Returns: The distance between `start` and `end`.
-  ///
-  /// - Complexity: O(1)
   @inlinable
   public func distance(from start: Int, to end: Int) -> Int {
     // NOTE: this is a manual specialization of index movement for a Strideable
@@ -847,7 +844,8 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElement: The element to append to the array.
   ///
-  /// - Complexity: O(1) on average, over many additions to the same array.
+  /// - Complexity: O(1) on average, over many calls to `append(_:)` on the
+  ///   same array.
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: Element) {
@@ -870,7 +868,9 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   ///
   /// - Parameter newElements: The elements to append to the array.
   ///
-  /// - Complexity: O(*m*), where *m* is the length of `newElements`.
+  /// - Complexity: O(*m*) on average, where *m* is the length of
+  ///   `newElements`, over many calls to `append(contentsOf:)` on the same
+  ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
   public mutating func append<S: Sequence>(contentsOf newElements: S)
@@ -975,10 +975,8 @@ extension ContiguousArray: RangeReplaceableCollection, ArrayProtocol {
   ///   `index` must be a valid index of the array or equal to its `endIndex`
   ///   property.
   ///
-  /// - Complexity: O(*n*), where *n* is the length of the array. If the
-  ///   call to this method appends `newElement` to the array, the
-  ///   complexity is O(1) on average, over many additions to the same
-  ///   array.
+  /// - Complexity: O(*n*), where *n* is the length of the array. If
+  ///   `i == endIndex`, this method is equivalent to `append(_:)`.
   @inlinable
   public mutating func insert(_ newElement: Element, at i: Int) {
     _checkIndex(i)
@@ -1240,8 +1238,8 @@ extension ContiguousArray {
   ///
   /// - Complexity: O(*n* + *m*), where *n* is length of the array and
   ///   *m* is the length of `newElements`. If the call to this method simply
-  ///   appends the contents of `newElements` to the array, the complexity
-  ///   is O(*m*).
+  ///   appends the contents of `newElements` to the array, this method is
+  ///   equivalent to `append(contentsOf:)`.
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func replaceSubrange<C>(
