@@ -879,7 +879,9 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     ApplySite apply(PAI);
     if (llvm::any_of(range(apply.getNumArguments()),
                      [apply](unsigned argIdx) {
-                       return apply.getArgumentConvention(argIdx)
+                       unsigned calleeIdx =
+                         apply.getCalleeArgIndexOfFirstAppliedArg() + argIdx;
+                       return apply.getArgumentConvention(calleeIdx)
                          == SILArgumentConvention::Indirect_InoutAliasable;
                      })) {
       checkNoEscapePartialApply(PAI);
@@ -990,6 +992,28 @@ static void checkNoEscapePartialApply(PartialApplyInst *PAI) {
     if (EnumInst *EI = dyn_cast<EnumInst>(user)) {
       uses.append(EI->getUses().begin(), EI->getUses().end());
       continue;
+    }
+    // Recurse through partial_apply to handle special cases before handling
+    // ApplySites in general below.
+    if (PartialApplyInst *PAI = dyn_cast<PartialApplyInst>(user)) {
+      // Use the same logic as checkForViolationAtApply applied to a def-use
+      // traversal.
+      //
+      // checkForViolationAtApply recurses through partial_apply chains.
+      if (oper->get() == PAI->getCallee()) {
+        uses.append(PAI->getUses().begin(), PAI->getUses().end());
+        continue;
+      }
+      // checkForViolationAtApply also uses findClosureForAppliedArg which in
+      // turn checks isPartialApplyOfReabstractionThunk.
+      //
+      // A closure with @inout_aliasable arguments may be applied to a
+      // thunk as "escaping", but as long as the thunk is only used as a
+      // '@noescape" type then it is safe.
+      if (isPartialApplyOfReabstractionThunk(PAI)) {
+        uses.append(PAI->getUses().begin(), PAI->getUses().end());
+        continue;
+      }
     }
     if (isa<ApplySite>(user)) {
       SILValue arg = oper->get();
