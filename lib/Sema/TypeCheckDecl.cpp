@@ -603,23 +603,6 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
   return { };
 }
 
-// Break the inheritance cycle for a protocol by removing all inherited
-// protocols.
-//
-// FIXME: Just remove the problematic inheritance?
-static void breakInheritanceCycle(ProtocolDecl *proto) {
-}
-
-/// Break the inheritance cycle for a class by removing its superclass.
-static void breakInheritanceCycle(ClassDecl *classDecl) {
-  classDecl->setSuperclass(Type());
-}
-
-/// Break the inheritance cycle for an enum by removing its raw type.
-static void breakInheritanceCycle(EnumDecl *enumDecl) {
-  enumDecl->setRawType(Type());
-}
-
 /// Check for circular inheritance.
 template<typename T>
 static void checkCircularity(TypeChecker &tc, T *decl,
@@ -649,9 +632,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   circularDiag,
                   path.back()->getName());
 
-      decl->setInvalid();
-      decl->setInterfaceType(ErrorType::get(tc.Context));
-      breakInheritanceCycle(decl);
       break;
     }
 
@@ -663,10 +643,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   declKind, (*i)->getName());
     }
 
-    // Set this declaration as invalid, then break the cycle somehow.
-    decl->setInvalid();
-    decl->setInterfaceType(ErrorType::get(tc.Context));
-    breakInheritanceCycle(decl);
     break;
   }
 
@@ -3374,6 +3350,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto underlyingType = typeAlias->getUnderlyingTypeLoc();
   if (underlyingType.isNull()) {
+    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
     typeAlias->setInterfaceType(ErrorType::get(tc.Context));
     typeAlias->setInvalid();
     return;
@@ -3721,6 +3698,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateExtension(ext);
     if (!ext->hasValidSignature())
       return;
+  }
+
+  // Validating the parent may have triggered validation of this declaration,
+  // so just return if that was the case.
+  if (D->hasValidationStarted()) {
+    assert(D->hasValidSignature());
+    return;
   }
 
   if (Context.Stats)
@@ -4743,8 +4727,14 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       if (!typealias->getGenericParams()) {
         if (typealias->isBeingValidated()) return;
 
-        typealias->setIsBeingValidated();
-        SWIFT_DEFER { typealias->setIsBeingValidated(false); };
+        bool validated = typealias->hasValidationStarted();
+
+        if (!validated)
+          typealias->setIsBeingValidated();
+        SWIFT_DEFER {
+          if (!validated)
+            typealias->setIsBeingValidated(false);
+        };
 
         (void) typealias->getFormalAccess();
 

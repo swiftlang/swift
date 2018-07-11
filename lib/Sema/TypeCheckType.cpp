@@ -309,7 +309,7 @@ Type TypeChecker::resolveTypeInContext(
   
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
-                                 selfType);
+                                 selfType, resolver->usesArchetypes());
 }
 
 static TypeResolutionOptions
@@ -3017,14 +3017,15 @@ Type TypeResolver::buildProtocolType(
 
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
-                                          Type baseTy) {
+                                          Type baseTy,
+                                          bool useArchetypes) {
   Type sugaredBaseTy = baseTy;
 
   // For type members of a base class, make sure we use the right
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
           ->getAsClassOrClassExtensionContext()) {
-    baseTy = baseTy->getSuperclassForDecl(ownerClass);
+    baseTy = baseTy->getSuperclassForDecl(ownerClass, useArchetypes);
   }
 
   if (baseTy->is<ModuleType>()) {
@@ -3035,16 +3036,22 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // The declared interface type for a generic type will have the type
   // arguments; strip them off.
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(member)) {
+    // If the base type is not a nominal type, we might be looking up a
+    // nominal member of a generic parameter. This is not supported right
+    // now, but at least don't crash.
+    if (member->getDeclContext()->getAsProtocolOrProtocolExtensionContext())
+      return nominalDecl->getDeclaredType();
+
     if (!isa<ProtocolDecl>(nominalDecl) &&
         nominalDecl->getGenericParams()) {
       return UnboundGenericType::get(
           nominalDecl, baseTy,
           nominalDecl->getASTContext());
-    } else {
-      return NominalType::get(
-          nominalDecl, baseTy,
-          nominalDecl->getASTContext());
     }
+    
+    return NominalType::get(
+        nominalDecl, baseTy,
+        nominalDecl->getASTContext());
   }
 
   auto *aliasDecl = dyn_cast<TypeAliasDecl>(member);

@@ -1193,3 +1193,9 @@ func badTypes() {
   // expected-error@-1 {{type of expression is ambiguous without more context}}
   // FIXME: terrible diagnostic
 }
+
+// rdar://34357545
+func unresolvedTypeExistential() -> Bool {
+  return (Int.self==_{})
+  // expected-error@-1 {{ambiguous reference to member '=='}}
+}

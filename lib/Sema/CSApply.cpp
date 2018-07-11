@@ -5484,9 +5484,11 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   Type toInstanceType = toType;
 
   // Look through metatypes
-  while (fromInstanceType->is<AnyMetatypeType>() &&
+  while ((fromInstanceType->is<UnresolvedType>() ||
+          fromInstanceType->is<AnyMetatypeType>()) &&
          toInstanceType->is<ExistentialMetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
+    if (!fromInstanceType->is<UnresolvedType>())
+      fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
     toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
   }
 
