@@ -1233,12 +1233,18 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
         void (*bodySynthesizer)(AbstractFunctionDecl *);
-        if (ED->isObjC())
+        if (ED->hasClangNode() ||
+            (ED->isObjC() && ED->hasRawType() &&
+             !ED->getInherited().front().isError())) {
+          // The checks for the raw type help avoid superfluous diagnostics in
+          // invalid code.
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
-        else if (ED->hasOnlyCasesWithoutAssociatedValues())
+        } else if (ED->hasOnlyCasesWithoutAssociatedValues()) {
           bodySynthesizer = deriveBodyHashable_enum_noAssociatedValues_hashInto;
-        else
-          bodySynthesizer=deriveBodyHashable_enum_hasAssociatedValues_hashInto;
+        } else {
+          bodySynthesizer =
+              deriveBodyHashable_enum_hasAssociatedValues_hashInto;
+        }
         return deriveHashable_hashInto(*this, bodySynthesizer);
       } else if (isa<StructDecl>(Nominal))
         return deriveHashable_hashInto(*this,
