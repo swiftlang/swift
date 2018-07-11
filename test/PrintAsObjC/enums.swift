@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
-// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include Foundation.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include ctypes.h -include CoreFoundation.h
 
 // REQUIRES: objc_interop
 
