@@ -382,14 +382,13 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
 
   let sampler = SampleRunner()
   for s in 0..<c.numSamples {
+    test.setUpFunction?()
     let time_per_sample: UInt64 = 1_000_000_000 * UInt64(c.iterationScale)
 
     var scale : UInt
     var elapsed_time : UInt64 = 0
     if c.fixedNumIters == 0 {
-      test.setUpFunction?()
       elapsed_time = sampler.run(test.name, fn: testFn, num_iters: 1)
-      test.tearDownFunction?()
 
       if elapsed_time > 0 {
         scale = UInt(time_per_sample / elapsed_time)
@@ -413,9 +412,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
       if c.verbose {
         print("    Measuring with scale \(scale).")
       }
-      test.setUpFunction?()
       elapsed_time = sampler.run(test.name, fn: testFn, num_iters: scale)
-      test.tearDownFunction?()
     } else {
       scale = 1
     }
@@ -424,6 +421,7 @@ func runBench(_ test: Test, _ c: TestConfig) -> BenchResults? {
     if c.verbose {
       print("    Sample \(s),\(samples[s])")
     }
+    test.tearDownFunction?()
   }
 
   let (mean, sd) = internalMeanSD(samples)
