@@ -353,8 +353,6 @@ Other substitutions:
 
 * ``%clang-importer-sdk``: FIXME.
 
-* ``%clang-importer-sdk-frameworks``: absolute path of the directory where mock frameworks are stored.
-
 * ``%clang_apinotes``: run ``clang -cc1apinotes`` using the locally-built
   clang.
 
