@@ -231,7 +231,7 @@ namespace driver {
     DriverTimers;
 
     void noteBuilding(const Job *cmd, StringRef reason) {
-      if (!Comp.ShowIncrementalBuildDecisions)
+      if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
         return;
@@ -254,7 +254,7 @@ namespace driver {
     /// its inputs are in FinishedCommands.
     void scheduleCommandIfNecessaryAndPossible(const Job *Cmd) {
       if (ScheduledCommands.count(Cmd)) {
-        if (Comp.ShowJobLifecycle) {
+        if (Comp.getShowJobLifecycle()) {
           llvm::outs() << "Already scheduled: " << LogJob(Cmd) << "\n";
         }
         return;
@@ -262,7 +262,7 @@ namespace driver {
 
       if (auto Blocking = findUnfinishedJob(Cmd->getInputs())) {
         BlockingCommands[Blocking].push_back(Cmd);
-        if (Comp.ShowJobLifecycle) {
+        if (Comp.getShowJobLifecycle()) {
           llvm::outs() << "Blocked by: " << LogJob(Blocking)
                        << ", now blocking jobs: "
                        << LogJobArray(BlockingCommands[Blocking]) << "\n";
@@ -283,13 +283,13 @@ namespace driver {
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
       bool success =
-          writeFilelistIfNecessary(Cmd, *Comp.TranslatedArgs.get(), Comp.Diags);
+          writeFilelistIfNecessary(Cmd, Comp.getArgs(), Comp.getDiags());
       assert(success && "failed to write filelist");
       (void)success;
 
       assert(Cmd->getExtraEnvironment().empty() &&
              "not implemented for compilations with multiple jobs");
-      if (Comp.ShowJobLifecycle)
+      if (Comp.getShowJobLifecycle())
         llvm::outs() << "Added to TaskQueue: " << LogJob(Cmd) << "\n";
       TQ->addTask(Cmd->getExecutable(), Cmd->getArgumentsForTaskExecution(),
                   llvm::None, (void *)Cmd);
@@ -297,14 +297,14 @@ namespace driver {
 
     /// When a task finishes, check other Jobs that may be blocked.
     void markFinished(const Job *Cmd, bool Skipped=false) {
-      if (Comp.ShowJobLifecycle) {
+      if (Comp.getShowJobLifecycle()) {
         llvm::outs() << "Job "
                      << (Skipped ? "skipped" : "finished")
                      << ": " << LogJob(Cmd) << "\n";
       }
       FinishedCommands.insert(Cmd);
-      if (Comp.Stats) {
-          auto &D = Comp.Stats->getDriverCounters();
+      if (auto *Stats = Comp.getStatsReporter()) {
+          auto &D = Stats->getDriverCounters();
           if (Skipped)
             D.NumDriverJobsSkipped++;
           else
@@ -313,7 +313,7 @@ namespace driver {
       auto BlockedIter = BlockingCommands.find(Cmd);
       if (BlockedIter != BlockingCommands.end()) {
         auto AllBlocked = std::move(BlockedIter->second);
-        if (Comp.ShowJobLifecycle) {
+        if (Comp.getShowJobLifecycle()) {
           llvm::outs() << "Scheduling maybe-unblocked jobs: "
                        << LogJobArray(AllBlocked) << "\n";
         }
@@ -333,7 +333,7 @@ namespace driver {
       // TODO: properly handle task began.
       const Job *BeganCmd = (const Job *)Context;
 
-      if (Comp.ShowDriverTimeCompilation) {
+      if (Comp.getShowDriverTimeCompilation()) {
         llvm::SmallString<128> TimerName;
         llvm::raw_svector_ostream OS(TimerName);
         OS << LogJob(BeganCmd);
@@ -345,7 +345,7 @@ namespace driver {
         DriverTimers[BeganCmd]->startTimer();
       }
 
-      switch (Comp.Level) {
+      switch (Comp.getOutputLevel()) {
       case OutputLevel::Normal:
         break;
         // For command line or verbose output, print out each command as it
@@ -369,10 +369,10 @@ namespace driver {
     /// disable incremental logic and schedule all existing deferred commands.
     void
     dependencyLoadFailed(StringRef DependenciesFile, bool Warn=true) {
-      if (Warn && Comp.ShowIncrementalBuildDecisions)
-        Comp.Diags.diagnose(SourceLoc(),
-                            diag::warn_unable_to_load_dependencies,
-                            DependenciesFile);
+      if (Warn && Comp.getShowIncrementalBuildDecisions())
+        Comp.getDiags().diagnose(SourceLoc(),
+                                 diag::warn_unable_to_load_dependencies,
+                                 DependenciesFile);
       Comp.disableIncrementalBuild();
       for (const Job *Cmd : DeferredCommands)
         scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -497,11 +497,11 @@ namespace driver {
     TaskFinishedResponse
     unpackAndFinishBatch(int ReturnCode, StringRef Output,
                          StringRef Errors, const BatchJob *B) {
-      if (Comp.ShowJobLifecycle)
+      if (Comp.getShowJobLifecycle())
         llvm::outs() << "Batch job finished: " << LogJob(B) << "\n";
       auto res = TaskFinishedResponse::ContinueExecution;
       for (const Job *J : B->getCombinedJobs()) {
-        if (Comp.ShowJobLifecycle)
+        if (Comp.getShowJobLifecycle())
           llvm::outs() << "  ==> Unpacked batch constituent finished: "
                        << LogJob(J) << "\n";
         auto r = taskFinished(
@@ -546,11 +546,11 @@ namespace driver {
 
       if (Pid != llvm::sys::ProcessInfo::InvalidPid) {
 
-        if (Comp.ShowDriverTimeCompilation) {
+        if (Comp.getShowDriverTimeCompilation()) {
           DriverTimers[FinishedCmd]->stopTimer();
         }
 
-        switch (Comp.Level) {
+        switch (Comp.getOutputLevel()) {
         case OutputLevel::PrintJobs:
           // Only print the jobs, not the outputs
           break;
@@ -592,17 +592,18 @@ namespace driver {
 
         if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
             ReturnCode != EXIT_FAILURE) {
-          Comp.Diags.diagnose(SourceLoc(), diag::error_command_failed,
-                              FinishedCmd->getSource().getClassName(),
-                              ReturnCode);
+          Comp.getDiags().diagnose(SourceLoc(), diag::error_command_failed,
+                                   FinishedCmd->getSource().getClassName(),
+                                   ReturnCode);
         }
 
         // See how ContinueBuildingAfterErrors gets set up in Driver.cpp for
         // more info.
-        assert((Comp.ContinueBuildingAfterErrors || !Comp.EnableBatchMode) &&
+        assert((Comp.getContinueBuildingAfterErrors() ||
+                !Comp.getBatchModeEnabled()) &&
                "batch mode diagnostics require ContinueBuildingAfterErrors");
 
-        return Comp.ContinueBuildingAfterErrors ?
+        return Comp.getContinueBuildingAfterErrors() ?
           TaskFinishedResponse::ContinueExecution :
           TaskFinishedResponse::StopExecution;
       }
@@ -626,11 +627,11 @@ namespace driver {
                                        TaskProcessInformation ProcInfo) {
       const Job *SignalledCmd = (const Job *)Context;
 
-      if (Comp.ShowDriverTimeCompilation) {
+      if (Comp.getShowDriverTimeCompilation()) {
         DriverTimers[SignalledCmd]->stopTimer();
       }
 
-      if (Comp.Level == OutputLevel::Parseable) {
+      if (Comp.getOutputLevel() == OutputLevel::Parseable) {
         // Parseable output was requested.
         SignalledCmd->forEachContainedJobAndPID(Pid, [&](const Job *J,
                                                          Job::PID P) {
@@ -644,17 +645,19 @@ namespace driver {
           llvm::errs() << Output;
       }
       if (!ErrorMsg.empty())
-        Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
-                            ErrorMsg);
+        Comp.getDiags().diagnose(SourceLoc(),
+                                 diag::error_unable_to_execute_command,
+                                 ErrorMsg);
 
       if (Signal.hasValue()) {
-        Comp.Diags.diagnose(SourceLoc(), diag::error_command_signalled,
-                            SignalledCmd->getSource().getClassName(),
-                            Signal.getValue());
+        Comp.getDiags().diagnose(SourceLoc(), diag::error_command_signalled,
+                                 SignalledCmd->getSource().getClassName(),
+                                 Signal.getValue());
       } else {
-        Comp.Diags.diagnose(SourceLoc(),
-                            diag::error_command_signalled_without_signal_number,
-                            SignalledCmd->getSource().getClassName());
+        Comp.getDiags()
+            .diagnose(SourceLoc(),
+                      diag::error_command_signalled_without_signal_number,
+                      SignalledCmd->getSource().getClassName());
       }
 
       // Since the task signalled, unconditionally set result to -2.
@@ -666,9 +669,9 @@ namespace driver {
 
   public:
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
-      : Comp(Comp), ActualIncrementalTracer(Comp.Stats.get()),
+      : Comp(Comp), ActualIncrementalTracer(Comp.getStatsReporter()),
         TQ(std::move(TaskQueue)) {
-      if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
+      if (Comp.getShowIncrementalBuildDecisions() || Comp.getStatsReporter())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
@@ -747,7 +750,7 @@ namespace driver {
         for (StringRef dependency : DepGraph.getExternalDependencies()) {
           llvm::sys::fs::file_status depStatus;
           if (!llvm::sys::fs::status(dependency, depStatus))
-            if (depStatus.getLastModificationTime() < Comp.LastBuildTime)
+            if (depStatus.getLastModificationTime() < Comp.getLastBuildTime())
               continue;
 
           // If the dependency has been modified since the oldest built file,
@@ -775,7 +778,7 @@ namespace driver {
     template <typename Container>
     void transferJobsToTaskQueue(Container &Cmds, StringRef Kind) {
       for (const Job *Cmd : Cmds) {
-        if (Comp.ShowJobLifecycle)
+        if (Comp.getShowJobLifecycle())
           llvm::outs() << "Adding " << Kind
                        << " job to task queue: "
                        << LogJob(Cmd) << "\n";
@@ -791,11 +794,11 @@ namespace driver {
                                  CommandSetVector &NonBatchable) {
       for (const Job *Cmd : PendingExecution) {
         if (Comp.getToolChain().jobIsBatchable(Comp, Cmd)) {
-          if (Comp.ShowJobLifecycle)
+          if (Comp.getShowJobLifecycle())
             llvm::outs() << "Batchable: " << LogJob(Cmd) << "\n";
           Batchable.insert(Cmd);
         } else {
-          if (Comp.ShowJobLifecycle)
+          if (Comp.getShowJobLifecycle())
             llvm::outs() << "Not batchable: " << LogJob(Cmd) << "\n";
           NonBatchable.insert(Cmd);
         }
@@ -810,7 +813,7 @@ namespace driver {
                                    std::vector<const Job *> const &Batch) {
       if (Batch.empty())
         return;
-      if (Comp.ShowJobLifecycle)
+      if (Comp.getShowJobLifecycle())
         llvm::outs() << "Forming batch job from "
                      << Batch.size() << " constituents\n";
       auto const &TC = Comp.getToolChain();
@@ -838,8 +841,8 @@ namespace driver {
         size_t FillCount = TargetSize + ((P < Remainder) ? 1 : 0);
         std::fill_n(std::back_inserter(PartitionIndex), FillCount, P);
       }
-      if (Comp.BatchSeed != 0) {
-        std::minstd_rand gen(Comp.BatchSeed);
+      if (Comp.getBatchSeed() != 0) {
+        std::minstd_rand gen(Comp.getBatchSeed());
         std::shuffle(PartitionIndex.begin(), PartitionIndex.end(), gen);
       }
       assert(PartitionIndex.size() == NumJobs);
@@ -851,7 +854,7 @@ namespace driver {
     /// nonzero value, pseudo-randomly (but determinstically and nearly-evenly).
     void partitionIntoBatches(std::vector<const Job *> Batchable,
                               BatchPartition &Partition) {
-      if (Comp.ShowJobLifecycle) {
+      if (Comp.getShowJobLifecycle()) {
         llvm::outs() << "Found " << Batchable.size() << " batchable jobs\n";
         llvm::outs() << "Forming into " << Partition.size() << " batches\n";
       }
@@ -865,14 +868,14 @@ namespace driver {
           assert(Idx < Partition.size());
           std::vector<const Job*> &P = Partition[Idx];
           if (P.empty() || TC.jobsAreBatchCombinable(Comp, P[0], Cmd)) {
-            if (Comp.ShowJobLifecycle)
+            if (Comp.getShowJobLifecycle())
               llvm::outs() << "Adding " << LogJob(Cmd)
                            << " to batch " << Idx << '\n';
             P.push_back(Cmd);
           } else {
             // Strange but theoretically possible that we have a batchable job
             // that's not combinable with others; tack a new batch on for it.
-            if (Comp.ShowJobLifecycle)
+            if (Comp.getShowJobLifecycle())
               llvm::outs() << "Adding " << LogJob(Cmd)
                            << " to new batch " << Partition.size() << '\n';
             Partition.push_back(std::vector<const Job*>());
@@ -930,8 +933,8 @@ namespace driver {
         return;
       }
 
-      size_t NumPartitions = (Comp.BatchCount.hasValue() ?
-                              Comp.BatchCount.getValue() :
+      size_t NumPartitions = (Comp.getBatchCount().hasValue() ?
+                              Comp.getBatchCount().getValue() :
                               TQ->getNumberOfParallelTasks());
       CommandSetVector Batchable, NonBatchable;
       std::vector<const Job *> Batches;
@@ -984,8 +987,9 @@ namespace driver {
             // exit / signal (or else a poll failed); unfortunately the task
             // causing it was dropped on the floor and we have no way to recover
             // it here, so we report a very poor, generic error.
-            Comp.Diags.diagnose(SourceLoc(), diag::error_unable_to_execute_command,
-                                "<unknown>");
+            Comp.getDiags().diagnose(SourceLoc(),
+                                     diag::error_unable_to_execute_command,
+                                     "<unknown>");
             Result = -2;
             AnyAbnormalExit = true;
             return;
@@ -1008,7 +1012,7 @@ namespace driver {
         // If we got here, all the queued and pending work we know about is
         // done; mark anything still in deferred state as skipped.
         for (const Job *Cmd : DeferredCommands) {
-          if (Comp.Level == OutputLevel::Parseable) {
+          if (Comp.getOutputLevel() == OutputLevel::Parseable) {
             // Provide output indicating this command was skipped if parseable
             // output was requested.
             parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
@@ -1104,7 +1108,7 @@ namespace driver {
 
     int getResult() {
       if (Result == 0)
-        Result = Comp.Diags.hadAnyError();
+        Result = Comp.getDiags().hadAnyError();
       return Result;
     }
 
