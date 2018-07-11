@@ -218,10 +218,6 @@ static AccessorDecl *createGetterPrototype(TypeChecker &TC,
   if (storage->isStatic())
     getter->setStatic();
 
-  if (auto *overridden = storage->getOverriddenDecl())
-    if (auto *overriddenAccessor = overridden->getGetter())
-      getter->setOverriddenDecl(overriddenAccessor);
-
   // Always add the getter to the context immediately after the storage.
   addMemberToContextIfNeeded(getter, storage->getDeclContext(), storage);
 
@@ -273,14 +269,6 @@ static AccessorDecl *createSetterPrototype(TypeChecker &TC,
 
   if (isStatic)
     setter->setStatic();
-
-  if (auto *overridden = storage->getOverriddenDecl()) {
-    auto *overriddenAccessor = overridden->getSetter();
-    if (overriddenAccessor &&
-        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
-      setter->setOverriddenDecl(overriddenAccessor);
-    }
-  }
 
   // Always add the setter to the context immediately after the getter.
   if (!getter) getter = storage->getGetter();
@@ -427,14 +415,6 @@ createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   // materializeForSet is final if the storage is.
   if (storage->isFinal())
     makeFinal(ctx, materializeForSet);
-
-  if (auto *overridden = storage->getOverriddenDecl()) {
-    auto *overriddenAccessor = overridden->getMaterializeForSetFunc();
-    if (overriddenAccessor && !overriddenAccessor->hasForcedStaticDispatch() &&
-        overridden->isSetterAccessibleFrom(storage->getDeclContext())) {
-      materializeForSet->setOverriddenDecl(overriddenAccessor);
-    }
-  }
 
   // If the storage is dynamic or ObjC-native, we can't add a dynamically-
   // dispatched method entry for materializeForSet, so force it to be
