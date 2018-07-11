@@ -1081,9 +1081,8 @@ static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1097,9 +1096,8 @@ tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
@@ -1617,9 +1615,8 @@ static unsigned pod_direct_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto getExtraInhabitantIndex =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->getExtraInhabitantIndex);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
   return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                      numExtraInhabitants,
@@ -1633,9 +1630,8 @@ static void pod_direct_storeEnumTagSinglePayload(OpaqueValue *enumAddr,
   auto *witnesses = self->getValueWitnesses();
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
-  auto storeExtraInhabitant =
-      (static_cast<const ExtraInhabitantsValueWitnessTable *>(witnesses)
-           ->storeExtraInhabitant);
+  auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(witnesses);
+  auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
   storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self, size,
                                 numExtraInhabitants, storeExtraInhabitant);
