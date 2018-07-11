@@ -2242,44 +2242,6 @@ public:
         }
       }
 
-      // Make sure we consistently set accessor overrides.
-      if (auto *baseASD = getOverriddenDeclIfAvailable(ASD)) {
-        if (ASD->getGetter() && baseASD->getGetter())
-          assert(getOverriddenDeclIfAvailable(ASD->getGetter()) ==
-                   baseASD->getGetter() &&
-                 "Storage overrides but getter does not");
-        if (ASD->getSetter() && baseASD->getSetter() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
-          assert(getOverriddenDeclIfAvailable(ASD->getSetter()) ==
-                   baseASD->getSetter() &&
-                 "Storage overrides but setter does not");
-        if (ASD->getMaterializeForSetFunc() &&
-            baseASD->getMaterializeForSetFunc() &&
-            baseASD->isSetterAccessibleFrom(ASD->getDeclContext())) {
-          if (baseASD->getMaterializeForSetFunc()->hasForcedStaticDispatch()) {
-            assert(getOverriddenDeclIfAvailable(ASD->getMaterializeForSetFunc())
-                     == nullptr
-                   && "Forced static dispatch materializeForSet should not be "
-                   "overridden");
-          } else {
-            assert(getOverriddenDeclIfAvailable(ASD->getMaterializeForSetFunc())
-                     == baseASD->getMaterializeForSetFunc() &&
-                   "Storage override but materializeForSet does not");
-          }
-        }
-      } else {
-        if (ASD->getGetter())
-          assert(!getOverriddenDeclIfAvailable(ASD->getGetter()) &&
-                 "Storage does not override but getter does");
-        if (ASD->getSetter())
-          assert(!getOverriddenDeclIfAvailable(ASD->getSetter()) &&
-                 "Storage does not override but setter does");
-        if (ASD->getMaterializeForSetFunc())
-          assert(!getOverriddenDeclIfAvailable(
-                                            ASD->getMaterializeForSetFunc()) &&
-                 "Storage does not override but materializeForSet does");
-      }
-
       verifyCheckedBase(ASD);
     }
 
