@@ -136,9 +136,20 @@ class AnyRequest {
 
 public:
   AnyRequest(const AnyRequest &other) = default;
-  AnyRequest(AnyRequest &&other) = default;
   AnyRequest &operator=(const AnyRequest &other) = default;
-  AnyRequest &operator=(AnyRequest &&other) = default;
+
+  AnyRequest(AnyRequest &&other)
+      : storageKind(other.storageKind), stored(std::move(other.stored)) {
+    other.storageKind = StorageKind::Empty;
+  }
+
+  AnyRequest &operator=(AnyRequest &&other) {
+    storageKind = other.storageKind;
+    stored = std::move(other.stored);
+    other.storageKind = StorageKind::Empty;
+    other.stored = nullptr;
+    return *this;
+  }
 
   AnyRequest(AnyRequest &other)
     : storageKind(other.storageKind), stored(other.stored) { }
