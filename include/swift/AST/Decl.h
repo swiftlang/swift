@@ -4657,6 +4657,9 @@ public:
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
 
+  /// Retrieve the parameter (local) name for this function parameter.
+  Identifier getParameterName() const { return getName(); }
+
   /// Retrieve the source location of the argument (API) name.
   ///
   /// The resulting source location will be valid if the argument name
