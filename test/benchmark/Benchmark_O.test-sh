@@ -1,0 +1,15 @@
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// REQUIRES: benchmark
+// REQUIRES: CMAKE_GENERATOR=Ninja
+
+// RUN: %Benchmark_O --list | %FileCheck %s --check-prefix LISTTAGS
+// LISTTAGS: AngryPhonebook,[
+// LISTTAGS-SAME: TestsUtils.BenchmarkCategory.
+// LISTTAGS-SAME: String
+// LISTTAGS-SAME: ]
+
+// RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
+// RUN:   | %FileCheck %s --check-prefix NUMITERS1
+// NUMITERS1: AngryPhonebook,1
+// NUMITERS1-SAME: 0,0,0,0,0
