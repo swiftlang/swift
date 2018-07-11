@@ -835,10 +835,10 @@ private struct _UnicodeScalarExceptions {
       guard let scalar = UnicodeScalar(rawValue) else { continue }
 
       // Fast path: skip unassigned code points
-      guard scalar._isDefined else { continue }
+      guard scalar.properties.generalCategory != .unassigned else { continue }
 
       // Fast path: skip unless QC_FCD=no
-      if _fastPath(!scalar._hasFullCompExclusion) {
+      if _fastPath(!scalar.properties.isFullCompositionExclusion) {
         continue
       }
 
