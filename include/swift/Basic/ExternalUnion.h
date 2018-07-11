@@ -194,7 +194,7 @@ public:
     static_assert(typeIndex != -1, "type not in union");
     assert(index == Index(typeIndex) && "current kind is wrong for access");
 
-    return reinterpret_cast<const T &>(Storage);
+    return *reinterpret_cast<const T *>(Storage);
   }
 
   /// Destruct the current union member.
