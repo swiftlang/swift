@@ -405,19 +405,17 @@ TargetFunction("view-cfg-only-for-function", llvm::cl::init(""),
                llvm::cl::desc("Only print out the cfg for this function"));
 #endif
 
-namespace {
-void viewCFGHelper(const SILFunction* F, bool skipBBContents) {
+static void viewCFGHelper(const SILFunction* f, bool skipBBContents) {
 /// When asserts are disabled, this should be a NoOp.
 #ifndef NDEBUG
     // If we have a target function, only print that function out.
-    if (!TargetFunction.empty() && !(F->getName().str() == TargetFunction))
+    if (!TargetFunction.empty() && !(f->getName().str() == TargetFunction))
       return;
 
-    ViewGraph(const_cast<SILFunction *>(F), "cfg" + F->getName().str(),
+    ViewGraph(const_cast<SILFunction *>(f), "cfg" + f->getName().str(),
               /*shortNames=*/skipBBContents);
 #endif
 }
-}  // namespace
 
 void SILFunction::viewCFG() const {
   viewCFGHelper(this, /*skipBBContents=*/false);
