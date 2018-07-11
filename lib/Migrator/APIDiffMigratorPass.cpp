@@ -404,7 +404,27 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         InsertedFunctions.insert(FD->getBaseName().getIdentifier().str());
       }
     }
+
+    // Handle helper functions without wrappees first.
     for (auto &Cur: HelperFuncInfo) {
+      if (Cur.ExpressionToWrap)
+        continue;
+      auto FuncName = Cur.getFuncName();
+      // Avoid inserting the helper function if it's already present.
+      if (!InsertedFunctions.count(FuncName)) {
+        Editor.insert(FileEndLoc, Cur.getFuncDef());
+        InsertedFunctions.insert(FuncName);
+      }
+    }
+
+    // Remove all helper functions that're without expressions to wrap.
+    HelperFuncInfo.erase(std::remove_if(HelperFuncInfo.begin(),
+      HelperFuncInfo.end(), [](const ConversionFunctionInfo& Info) {
+        return !Info.ExpressionToWrap;
+    }), HelperFuncInfo.end());
+
+    for (auto &Cur: HelperFuncInfo) {
+      assert(Cur.ExpressionToWrap);
       // Avoid wrapping nil expression.
       if (isNilExpr(Cur.ExpressionToWrap))
         continue;
@@ -885,9 +905,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return wrapAttributeReference(E, E, false);
   }
 
-  void insertHelperFunction(NodeAnnotation Anno, StringRef RawType,
-                            StringRef NewType, bool FromString,
-                            Expr *Wrappee) {
+  ConversionFunctionInfo &insertHelperFunction(NodeAnnotation Anno,
+                                               StringRef RawType,
+                                               StringRef NewType,
+                                               bool FromString,
+                                               Expr *Wrappee) {
     HelperFuncInfo.emplace_back(Wrappee);
     ConversionFunctionInfo &Info = HelperFuncInfo.back();
     llvm::raw_svector_ostream OS(Info.Buffer);
@@ -959,6 +981,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       OS << "(_ input: " << Segs[3] << ") -> " << Segs[2] << " {\n";
       OS << Segs[5] << "\n}\n";
     }
+    return Info;
   }
 
   void handleStringRepresentableArg(ValueDecl *FD, Expr *Arg, Expr *Call) {
@@ -1106,6 +1129,18 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     return true;
   }
 
+  static void collectParamters(AbstractFunctionDecl *AFD,
+                               SmallVectorImpl<ParamDecl*> &Results) {
+    for (auto PL : AFD->getParameterLists()) {
+      for (auto *PD: *PL) {
+        // Self parameter should not be updated.
+        if (PD->isSelfParameter())
+          continue;
+        Results.push_back(PD);
+      }
+    }
+  }
+
   void handleFuncDeclRename(AbstractFunctionDecl *AFD,
                             CharSourceRange NameRange) {
     bool IgnoreBase = false;
@@ -1114,29 +1149,26 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       if (!IgnoreBase)
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;
-      for (auto PL : AFD->getParameterLists()) {
-        for (auto *PD : *PL) {
-          if (Index == View.argSize())
-            break;
-          // Self parameter should not be updated.
-          if (PD->isSelfParameter())
-            continue;
-          StringRef NewArg = View.args()[Index++];
-          auto ArgLoc = PD->getArgumentNameLoc();
+      SmallVector<ParamDecl*, 4> Params;
+      collectParamters(AFD, Params);
+      for (auto *PD: Params) {
+        if (Index == View.argSize())
+          break;
+        StringRef NewArg = View.args()[Index++];
+        auto ArgLoc = PD->getArgumentNameLoc();
 
-          // Represent empty label with underscore.
-          if (NewArg.empty())
-            NewArg = "_";
+        // Represent empty label with underscore.
+        if (NewArg.empty())
+          NewArg = "_";
 
-          // If the argument name is not specified, add the argument name before
-          // the parameter name.
-          if (ArgLoc.isInvalid())
-            Editor.insertBefore(PD->getNameLoc(),
-                                (llvm::Twine(NewArg) + " ").str());
-          else {
-            // Otherwise, replace the argument name directly.
-            Editor.replaceToken(ArgLoc, NewArg);
-          }
+        // If the argument name is not specified, add the argument name before
+        // the parameter name.
+        if (ArgLoc.isInvalid())
+          Editor.insertBefore(PD->getNameLoc(),
+                              (llvm::Twine(NewArg) + " ").str());
+        else {
+          // Otherwise, replace the argument name directly.
+          Editor.replaceToken(ArgLoc, NewArg);
         }
       }
     }
@@ -1224,6 +1256,49 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
   }
 
+  // When users override a SDK function whose parameter types have been changed,
+  // we should introduce a local variable in the body of the function definition
+  // to shadow the changed parameter. Also, a proper conversion function should
+  // be defined to bridge the parameter to the local variable.
+  void handleLocalParameterBridge(AbstractFunctionDecl *AFD,
+                                  CommonDiffItem *DiffItem) {
+    assert(AFD);
+    assert(DiffItem->isStringRepresentableChange());
+
+    // We only handle top-level parameter type change.
+    if (DiffItem->getChildIndices().size() != 1)
+      return;
+    auto Idx = DiffItem->getChildIndices().front();
+
+    // We don't handle return type change.
+    if (Idx == 0)
+      return;
+    Idx --;
+    SmallVector<ParamDecl*, 4> Params;
+    collectParamters(AFD, Params);
+    if (Params.size() <= Idx)
+      return;
+
+    // Get the internal name of the changed paramter.
+    auto VariableName = Params[Idx]->getParameterName().str();
+
+    // Insert the helper function to convert the type back to raw types.
+    auto &Info = insertHelperFunction(DiffItem->DiffKind, DiffItem->LeftComment,
+      DiffItem->RightComment, /*From String*/false,
+      /*No expression to wrap*/nullptr);
+
+    if (auto *BD = AFD->getBody()) {
+      auto BL = BD->getLBraceLoc();
+      if (BL.isValid()) {
+        // Insert the local variable declaration after the opening brace.
+        Editor.insertAfterToken(BL,
+          (llvm::Twine("\n// Local variable inserted by Swift 4.2 migrator.") +
+           "\nlet " + VariableName + " = " + Info.getFuncName() + "(" +
+           VariableName + ")\n").str());
+      }
+    }
+  }
+
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (D->isImplicit())
       return true;
@@ -1235,6 +1310,8 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
             handleOverridingTypeChange(AFD, DiffItem);
           else if (DiffItem->isToPropertyChange())
             handleOverridingPropertyChange(AFD, DiffItem);
+          else if (DiffItem->isStringRepresentableChange())
+            handleLocalParameterBridge(AFD, DiffItem);
         }
       }
     }
