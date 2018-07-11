@@ -500,6 +500,11 @@ SILCloner<ImplClass>::visitAllocRefInst(AllocRefInst *Inst) {
   doPostProcess(Inst, NewInst);
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitReallocRefInst(ReallocRefInst *Inst) {
+  llvm_unreachable("unimplemented: incomplete realloc_ref implementation");
+}
+
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitAllocRefDynamicInst(AllocRefDynamicInst *Inst) {

@@ -646,6 +646,17 @@ OwnershipCompatibilityUseChecker::visitAllocRefInst(AllocRefInst *I) {
 }
 
 OwnershipUseCheckerResult
+OwnershipCompatibilityUseChecker::visitReallocRefInst(ReallocRefInst *I) {
+  if (getValue() == I->getReallocPointer()) {
+    return {compatibleWithOwnership(ValueOwnershipKind::Owned),
+            UseLifetimeConstraint::MustBeInvalidated};
+  }
+  assert(getValue() == I->getReallocSize());
+  return {compatibleWithOwnership(ValueOwnershipKind::Trivial),
+          UseLifetimeConstraint::MustBeLive};
+}
+
+OwnershipUseCheckerResult
 OwnershipCompatibilityUseChecker::visitAllocRefDynamicInst(
     AllocRefDynamicInst *I) {
   assert(I->getNumOperands() != 0 &&

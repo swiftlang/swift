@@ -353,6 +353,18 @@ void SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
   linkInVTable(D);
 }
 
+void SILLinkerVisitor::visitReallocRefInst(ReallocRefInst *RRI) {
+  if (!isLinkAll())
+    return;
+
+  // Grab the class decl from the alloc ref inst.
+  ClassDecl *D = RRI->getType().getClassOrBoundGenericClass();
+  if (!D)
+    return;
+
+  linkInVTable(D);
+}
+
 void SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
   if (!isLinkAll())
     return;
