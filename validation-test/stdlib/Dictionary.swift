@@ -3422,13 +3422,13 @@ func checkGetObjectsAndKeys(
   withExtendedLifetime(canary) {}
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:")
+  .skip(.always("rdar://problem/41871587"))
+  .code {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
   }
-  expectCrashLater()
-  checkGetObjectsAndKeys(d, count: -1)
 }
 
 //===---
@@ -3529,13 +3529,13 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:")
+  .skip(.always("rdar://problem/41871587"))
+  .code {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
   }
-  expectCrashLater()
-  checkGetObjectsAndKeys(d, count: -1)
 }
 
 func getBridgedNSDictionaryOfKey_ValueTypeCustomBridged() -> NSDictionary {
