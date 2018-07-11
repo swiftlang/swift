@@ -655,6 +655,70 @@ static bool isLoadedLValue(Expr *expr) {
   return false;
 }
 
+static void fixItChangeInoutArgType(const Expr * arg,
+                                    const Type actualType,
+                                    const Type neededType,
+                                    ConstraintSystem &CS) {
+  auto &TC = CS.getTypeChecker();
+  
+  auto *DRE = dyn_cast<DeclRefExpr>(arg);
+  if (!DRE)
+    return;
+  
+  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+  if (!VD)
+    return;
+  
+  // Don't emit for non-local variables.
+  // (But in script-mode files, we consider module-scoped
+  // variables in the same file to be local variables.)
+  auto VDC = VD->getDeclContext();
+  bool isLocalVar = VDC->isLocalContext();
+  if (!isLocalVar && VDC->isModuleScopeContext()) {
+    auto argFile = CS.DC->getParentSourceFile();
+    auto varFile = VDC->getParentSourceFile();
+    isLocalVar = (argFile == varFile && argFile->isScriptMode());
+  }
+  if (!isLocalVar)
+    return;
+  
+  SmallString<32> scratch;
+  SourceLoc endLoc;       // Filled in if we decide to diagnose this
+  SourceLoc startLoc;     // Left invalid if we're inserting
+  
+  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
+    if (auto VP = dyn_cast_or_null<VarPattern>(P))
+      P = VP->getSubPattern();
+    return P && isa<NamedPattern>(P);
+  };
+  
+  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
+  if (typeRange.isValid()) {
+    startLoc = typeRange.Start;
+    endLoc = typeRange.End;
+  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
+    endLoc = VD->getNameLoc();
+    scratch += ": ";
+  }
+  
+  if (endLoc.isInvalid())
+    return;
+  
+  scratch += neededType.getString();
+  
+  // Adjust into the location where we actually want to insert
+  endLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr, endLoc);
+  
+  // Since we already adjusted endLoc, this will turn an insertion
+  // into a zero-character replacement.
+  if (!startLoc.isValid())
+    startLoc = endLoc;
+  
+  TC.diagnose(VD->getLoc(), diag::inout_change_var_type_if_possible,
+              actualType, neededType)
+    .fixItReplaceChars(startLoc, endLoc, scratch);
+}
+
 static void diagnoseSubElementFailure(Expr *destExpr,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
@@ -768,11 +832,24 @@ static void diagnoseSubElementFailure(Expr *destExpr,
   }
 
   if (auto *ICE = dyn_cast<ImplicitConversionExpr>(immInfo.first))
-    if (isa<LoadExpr>(ICE->getSubExpr())) {
-      TC.diagnose(loc, diagID,
-                  "implicit conversion from '" +
-                      CS.getType(ICE->getSubExpr())->getString() + "' to '" +
-                      CS.getType(ICE)->getString() + "' requires a temporary")
+    if (auto *LE = dyn_cast<LoadExpr>(ICE->getSubExpr())) {
+      Type actualType = CS.getType(LE);
+      Type neededType = CS.getType(ICE);
+      
+      if (diagID.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
+        // We have a special diagnostic with tailored wording for this
+        // common case.
+        TC.diagnose(loc, diag::cannot_pass_rvalue_inout_converted,
+                    actualType, neededType)
+          .highlight(ICE->getSourceRange());
+        
+        fixItChangeInoutArgType(LE->getSubExpr(), actualType, neededType, CS);
+      }
+      else
+        TC.diagnose(loc, diagID,
+                    "implicit conversion from '" +
+                    actualType->getString() + "' to '" +
+                    neededType->getString() + "' requires a temporary")
           .highlight(ICE->getSourceRange());
       return;
     }

@@ -227,6 +227,12 @@ ERROR(cannot_subscript_nil_literal,none,
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
+ERROR(cannot_pass_rvalue_inout_converted,none,
+      "inout argument could be set to a value with a type other than %0; "
+      "use a value declared as type %1 instead", (Type, Type))
+NOTE(inout_change_var_type_if_possible,none,
+      "change variable type to %1 if it doesn't need to be declared as %0",
+      (Type, Type))
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))

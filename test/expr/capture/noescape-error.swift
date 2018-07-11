@@ -6,6 +6,5 @@ class D {}
 func f1(f : (inout Int) -> ()) {}
 
 func f2(f : (inout Any) -> ()) {
-    // TODO: Error here is still pretty bad...
-    f1 { f(&$0) } // expected-error{{conversion from 'Int' to 'Any'}}
+    f1 { f(&$0) } // expected-error{{inout argument could be set to a value with a type other than 'Int'; use a value declared as type 'Any' instead}}
 }
