@@ -146,3 +146,16 @@ void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
   enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
 }
+
+//----------------------------------------------------------------------------//
+// Overridden decls computation.
+//----------------------------------------------------------------------------//
+void OverriddenDeclsRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}

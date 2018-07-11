@@ -121,6 +121,35 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Request to determine the set of declarations that were are overridden
+/// by the given declaration.
+class OverriddenDeclsRequest
+  : public SimpleRequest<OverriddenDeclsRequest,
+                         CacheKind::SeparatelyCached,
+                         SmallVector<ValueDecl *, 1>,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend class SimpleRequest;
+
+  // Evaluation.
+  SmallVector<ValueDecl *, 1> evaluate(Evaluator &evaluator,
+                                       ValueDecl *decl) const;
+
+public:
+  // Cycle handling
+  SmallVector<ValueDecl *, 1> breakCycle() const { return { }; }
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<SmallVector<ValueDecl *, 1>> getCachedResult() const;
+  void cacheResult(SmallVector<ValueDecl *, 1> value) const;
+};
+
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
 
