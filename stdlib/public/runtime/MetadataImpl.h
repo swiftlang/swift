@@ -925,10 +925,8 @@ struct NonFixedValueWitnesses :
                                           const Metadata *self) {
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
-    auto getExtraInhabitantIndex =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->getExtraInhabitantIndex);
+    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+    auto getExtraInhabitantIndex = EIVWT ? EIVWT->getExtraInhabitantIndex : nullptr;
 
     return getEnumTagSinglePayloadImpl(enumAddr, numEmptyCases, self, size,
                                        numExtraInhabitants,
@@ -942,10 +940,8 @@ struct NonFixedValueWitnesses :
     auto *payloadWitnesses = self->getValueWitnesses();
     auto size = payloadWitnesses->getSize();
     auto numExtraInhabitants = payloadWitnesses->getNumExtraInhabitants();
-    auto storeExtraInhabitant =
-        (static_cast<const ExtraInhabitantsValueWitnessTable *>(
-             payloadWitnesses)
-             ->storeExtraInhabitant);
+    auto EIVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(payloadWitnesses);
+    auto storeExtraInhabitant = EIVWT ? EIVWT->storeExtraInhabitant : nullptr;
 
     storeEnumTagSinglePayloadImpl(enumAddr, whichCase, numEmptyCases, self,
                                   size, numExtraInhabitants,
