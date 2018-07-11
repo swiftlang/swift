@@ -21,6 +21,7 @@ import SwiftShims
 /// that relies on being able to tell whether this function is called. It does
 /// this using the semantics attribute.
 @_semantics("availability.osversion")
+@inline(never)
 public func _stdlib_isOSVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
