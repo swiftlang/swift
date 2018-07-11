@@ -68,8 +68,6 @@ struct ConcreteExistentialInfo {
   // The existential type of the self argument before it is opened,
   // produced by an init_existential.
   CanType ExistentialType;
-  // The conformances required by the init_existential. `$C : $P & $Q` above.
-  ArrayRef<ProtocolConformanceRef> ExistentialConformances;
   // The concrete type of self from the init_existential. `$C` above.
   CanType ConcreteType;
   // When ConcreteType is itself an opened existential, record the type
