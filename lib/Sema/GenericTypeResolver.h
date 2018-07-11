@@ -36,6 +36,8 @@ class GenericTypeResolver {
 public:
   virtual ~GenericTypeResolver();
 
+  virtual bool usesArchetypes() = 0;
+
   /// Resolve the given interface type to a contextual type if necessary.
   virtual Type mapTypeIntoContext(Type type) = 0;
 
@@ -66,6 +68,8 @@ public:
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
 public:
+  virtual bool usesArchetypes() { return false; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy,
@@ -93,6 +97,8 @@ public:
   explicit GenericTypeToArchetypeResolver(DeclContext *dc)
       : GenericEnv(dc->getGenericEnvironmentOfContext()) { }
 
+  virtual bool usesArchetypes() { return true; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
@@ -111,6 +117,8 @@ public:
 /// protocols.
 class ProtocolRequirementTypeResolver : public GenericTypeResolver {
 public:
+  virtual bool usesArchetypes() { return false; }
+
   virtual Type mapTypeIntoContext(Type type);
 
   virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
@@ -136,6 +144,8 @@ class CompleteGenericTypeResolver : public GenericTypeResolver {
 
 public:
   CompleteGenericTypeResolver(TypeChecker &tc, GenericSignature *genericSig);
+
+  virtual bool usesArchetypes() { return false; }
 
   virtual Type mapTypeIntoContext(Type type);
 

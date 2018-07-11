@@ -1053,31 +1053,6 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   return { valueType, valueType };
 }
 
-static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
-                                       ProtocolDecl *protocol) {
-  do {
-    if (DC->isTypeContext()) {
-      if (protocol == DC->getAsProtocolOrProtocolExtensionContext())
-        return DC->mapTypeIntoContext(DC->getProtocolSelfType());
-
-      auto *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-      auto type = NTD->getDeclaredType();
-
-      ConformanceCheckOptions options;
-      options |= ConformanceCheckFlags::InExpression;
-      options |= ConformanceCheckFlags::SuppressDependencyTracking;
-      options |= ConformanceCheckFlags::SkipConditionalRequirements;
-
-      auto result =
-          TC.conformsToProtocol(type, protocol, NTD->getDeclContext(), options);
-
-      if (result)
-        return DC->getDeclaredTypeInContext();
-    }
-  } while ((DC = DC->getParent()));
-
-  return nullptr;
-}
 /// Bind type variables for archetypes that are determined from
 /// context.
 ///
@@ -1093,10 +1068,10 @@ static Type getInnermostConformingType(TypeChecker &TC, DeclContext *DC,
 ///
 /// A final case we have to handle, even though it is invalid, is
 /// when a type is nested inside another protocol. We bind the
-/// protocol type variable for the protocol Self to its archetype
-/// in protocol context. This of course makes no sense, but we
-/// can't leave the type variable dangling, because then we crash
-/// later.
+/// protocol type variable for the protocol Self to an unresolved
+/// type, since it will conform to anything. This of course makes
+/// no sense, but we can't leave the type variable dangling,
+/// because then we crash later.
 ///
 /// If we ever do want to allow nominal types to be nested inside
 /// protocols, the key is to set their declared type to a
@@ -1117,43 +1092,43 @@ static void bindArchetypesFromContext(
 
   auto *genericEnv = cs.DC->getGenericEnvironmentOfContext();
 
+  auto bindContextArchetype = [&](Type paramTy, Type contextTy) {
+    auto found = replacements.find(cast<GenericTypeParamType>(
+                                     paramTy->getCanonicalType()));
+
+    // We might not have a type variable for this generic parameter
+    // because either we're opening up an UnboundGenericType,
+    // in which case we only want to infer the innermost generic
+    // parameters, or because this generic parameter was constrained
+    // away into a concrete type.
+    if (found != replacements.end()) {
+      auto typeVar = found->second;
+      cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
+                       locatorPtr);
+    }
+  };
+
+  // Find the innermost non-type context.
   for (const auto *parentDC = outerDC;
        !parentDC->isModuleScopeContext();
        parentDC = parentDC->getParent()) {
-    if (parentDC->isTypeContext() &&
-        (parentDC == outerDC ||
-         !parentDC->getAsProtocolOrProtocolExtensionContext()))
+    if (parentDC->isTypeContext()) {
+      if (parentDC != outerDC && parentDC->getAsProtocolOrProtocolExtensionContext()) {
+        auto selfTy = parentDC->getSelfInterfaceType();
+        auto contextTy = cs.TC.Context.TheUnresolvedType;
+        bindContextArchetype(selfTy, contextTy);
+      }
       continue;
+    }
 
+    // If it's not generic, there's nothing to do.
     auto *genericSig = parentDC->getGenericSignatureOfContext();
     if (!genericSig)
       break;
 
     for (auto *paramTy : genericSig->getGenericParams()) {
-      auto found = replacements.find(cast<GenericTypeParamType>(
-                                       paramTy->getCanonicalType()));
-
-      // We might not have a type variable for this generic parameter
-      // because either we're opening up an UnboundGenericType,
-      // in which case we only want to infer the innermost generic
-      // parameters, or because this generic parameter was constrained
-      // away into a concrete type.
-      if (found != replacements.end()) {
-        Type contextTy;
-
-        if (genericEnv) {
-          contextTy = genericEnv->mapTypeIntoContext(paramTy);
-        } else {
-          auto *protocol = parentDC->getAsProtocolOrProtocolExtensionContext();
-          contextTy = getInnermostConformingType(cs.TC, cs.DC, protocol);
-        }
-
-        assert(contextTy);
-
-        auto typeVar = found->second;
-        cs.addConstraint(ConstraintKind::Bind, typeVar, contextTy,
-                         locatorPtr);
-      }
+      Type contextTy = genericEnv->mapTypeIntoContext(paramTy);
+      bindContextArchetype(paramTy, contextTy);
     }
 
     break;

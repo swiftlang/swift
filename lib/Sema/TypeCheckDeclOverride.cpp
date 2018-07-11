@@ -1345,6 +1345,10 @@ static bool diagnoseOverrideForAvailability(ValueDecl *override,
 
 static bool recordOverride(TypeChecker &TC, ValueDecl *override,
                            ValueDecl *base, bool isKnownObjC) {
+  // This can happen with circular inheritance.
+  if (override == base)
+    return true;
+
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
 

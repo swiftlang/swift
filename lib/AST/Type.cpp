@@ -1461,7 +1461,7 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
-Type TypeBase::getSuperclass() {
+Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
 
@@ -1496,7 +1496,9 @@ Type TypeBase::getSuperclass() {
   ModuleDecl *module = classDecl->getModuleContext();
   auto subMap = getContextSubstitutionMap(module,
                                           classDecl,
-                                          classDecl->getGenericEnvironment());
+                                          (useArchetypes
+                                           ? classDecl->getGenericEnvironment()
+                                           : nullptr));
   return superclassTy.subst(subMap);
 }
 
@@ -3220,7 +3222,8 @@ static Type getConcreteTypeForSuperclassTraversing(Type t) {
   return t;
 }
 
-Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
+Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
+                                    bool useArchetypes) {
   Type t = getConcreteTypeForSuperclassTraversing(this);
 
   while (t) {
@@ -3233,7 +3236,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass) {
     if (nominalDecl == baseClass)
       return t;
 
-    t = t->getSuperclass();
+    t = t->getSuperclass(useArchetypes);
   }
   llvm_unreachable("no inheritance relationship between given classes");
 }
