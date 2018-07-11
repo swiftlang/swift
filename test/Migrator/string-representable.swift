@@ -65,3 +65,11 @@ func bar(_ c: Container) {
   let attr: AliasAttribute = ""
   c.add(single: attr)
 }
+
+public class SubContainer: Container {
+  public override func adding(optionalAttributes subname: [String: Any]?) {}
+  public override func adding(attributes myname: [String: Any]) {}
+  public override func adding(attrArray: [String]) {}
+  public override func add(single: String) {}
+  public override func add(singleOptional: String?) {}
+}
