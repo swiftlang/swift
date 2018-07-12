@@ -2749,6 +2749,8 @@ static T* castWithDebugInfo(SILInstruction *inst) {
 /// corresponding stdlib numeric type, such as $Bool.
 /// See extractBuiltinTypeFromStdlibNumericType() on the reverse type
 /// conversion.
+/// This function only supports element data types that are accelerable by
+/// tensorflow (e.g. BuiltinFloatType::IEEE80 and Float80 are not).
 static NominalTypeDecl *
 getStdlibNumericTypeDeclFromBuiltinType(Type ty, ASTContext &ctx) {
   // BuiltinIntegerType doesn't carry sign information, which TensorFlow needs,
