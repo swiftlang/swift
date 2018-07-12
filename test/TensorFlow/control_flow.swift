@@ -285,7 +285,7 @@ public func infLoop1() {
   let maxCount: Int32 = 100
   var a = Tensor<Int32>(0)
   let count: Int32 = 0 
-  while (count < maxCount) {
+  while count < maxCount {
     // expected-error @+1 {{Cannot partition function}}
     a += a
   }
@@ -299,17 +299,17 @@ public func infLoop2(maxCount: Int32) {
   var a = Tensor<Int32>(0)
   var count: Int32 = 0
   // expected-warning @+1 {{implicitly copied to the accelerator}}
-  while (count < maxCount) {
+  while count < maxCount {
     a += a
     count += 1
     if count == 50 {
       let i: Int32 = 0
       // this causes trouble: infinite loop
-      while (i < maxCount) {
+      while i < maxCount {
         count += i
       }  // expected-error {{Cannot partition function}}
       a = Tensor<Int32>(count)
-      break; 
+      break
     }
   }
   a -= a
