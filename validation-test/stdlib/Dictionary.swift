@@ -3385,13 +3385,19 @@ func checkGetObjectsAndKeys(
         values[\(i)] was left unchanged
         """,
         file: file, line: line)
-      expectTrue(
-        value === dictionary.object(forKey: key) as AnyObject,
-        """
-        Inconsistency at offset \(i) with count \(count):
-        values[\(i)] does not match value for keys[\(i)]
-        """,
-        file: file, line: line)
+      if key !== canary, value !== canary {
+        autoreleasepoolIfUnoptimizedReturnAutoreleased {
+          // We need an autorelease pool because objectForKey returns
+          // autoreleased values.
+          expectTrue(
+            value === dictionary.object(forKey: key) as AnyObject,
+            """
+            Inconsistency at offset \(i) with count \(count):
+            values[\(i)] does not match value for keys[\(i)]
+            """,
+            file: file, line: line)
+        }
+      }
     } else {
       expectTrue(
         key === canary,
@@ -3416,9 +3422,7 @@ func checkGetObjectsAndKeys(
   withExtendedLifetime(canary) {}
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:")
-  .skip(.always("rdar://problem/41871587"))
-  .code {
+DictionaryTestSuite.test("BridgedToObjC.Verbatim.getObjects:andKeys:count:") {
   let d = getBridgedNSDictionaryOfRefTypesBridgedVerbatim()
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
@@ -3523,9 +3527,7 @@ DictionaryTestSuite.test("BridgedToObjC.Custom.FastEnumeration_Empty") {
     { ($0 as! TestObjCValueTy).value })
 }
 
-DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:")
-  .skip(.always("rdar://problem/41871587"))
-  .code {
+DictionaryTestSuite.test("BridgedToObjC.Custom.getObjects:andKeys:count:") {
   let d = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged()
   for count in 0 ..< d.count + 2 {
     checkGetObjectsAndKeys(d, count: count)
