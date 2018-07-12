@@ -18,7 +18,7 @@
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/classes.h
 // RUN: not %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h
-// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include Foundation.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
+// RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/classes.h -include CoreFoundation.h -include objc_generics.h -include SingleGenericClass.h -include CompatibilityAlias.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;

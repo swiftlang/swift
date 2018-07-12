@@ -1419,10 +1419,16 @@ static bool isStringCompatiblePointerBaseType(TypeChecker &TC,
 /// Determine whether the first type with the given number of optionals
 /// is potentially more optional than the second type with its number of
 /// optionals.
-static bool isPotentiallyMoreOptionalThan(Type objType1,
-                                          unsigned numOptionals1,
-                                          Type objType2,
-                                          unsigned numOptionals2) {
+static bool isPotentiallyMoreOptionalThan(Type type1, Type type2) {
+
+  SmallVector<Type, 2> optionals1;
+  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
+  auto numOptionals1 = optionals1.size();
+
+  SmallVector<Type, 2> optionals2;
+  type2->lookThroughAllOptionalTypes(optionals2);
+  auto numOptionals2 = optionals2.size();
+
   if (numOptionals1 <= numOptionals2 && !objType1->isTypeVariableOrMember())
     return false;
 
@@ -1434,22 +1440,12 @@ static void enumerateOptionalConversionRestrictions(
                     Type type1, Type type2,
                     ConstraintKind kind, ConstraintLocatorBuilder locator,
                     llvm::function_ref<void(ConversionRestrictionKind)> fn) {
-  SmallVector<Type, 2> optionals1;
-  Type objType1 = type1->lookThroughAllOptionalTypes(optionals1);
-
-  SmallVector<Type, 2> optionals2;
-  Type objType2 = type2->lookThroughAllOptionalTypes(optionals2);
-
-  if (optionals1.empty() && optionals2.empty())
-    return;
-
   // Optional-to-optional.
-  if (!optionals1.empty() && !optionals2.empty())
+  if (type1->getOptionalObjectType() && type2->getOptionalObjectType())
     fn(ConversionRestrictionKind::OptionalToOptional);
 
   // Inject a value into an optional.
-  if (isPotentiallyMoreOptionalThan(objType2, optionals2.size(),
-                                    objType1, optionals1.size())) {
+  if (isPotentiallyMoreOptionalThan(type2, type1)) {
     fn(ConversionRestrictionKind::ValueToOptional);
   }
 }

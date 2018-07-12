@@ -828,6 +828,8 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL, DeclContext *DC,
   bool hadError = false;
   
   for (auto param : *PL) {
+    checkDeclAttributesEarly(param);
+
     auto typeRepr = param->getTypeLoc().getTypeRepr();
     if (!typeRepr &&
         param->hasInterfaceType()) {

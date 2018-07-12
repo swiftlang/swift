@@ -880,6 +880,25 @@ CalleeCandidateInfo::CalleeCandidateInfo(Type baseType,
     declName = candidates[0].getDecl()->getBaseName().userFacingName();
 }
 
+CalleeCandidateInfo &CalleeCandidateInfo::
+operator=(const CalleeCandidateInfo &CCI) {
+  if (this != &CCI) {
+    // If the reference member (i.e., CS) is identical, just copy remaining
+    // members; otherwise, reconstruct the object.
+    if (&CS == &CCI.CS) {
+      declName = CCI.declName;
+      hasTrailingClosure = CCI.hasTrailingClosure;
+      candidates = CCI.candidates;
+      closeness = CCI.closeness;
+      failedArgument = CCI.failedArgument;
+    } else {
+      this->~CalleeCandidateInfo();
+      new (this) CalleeCandidateInfo(CCI);
+    }
+  }
+  return *this;
+}
+
 /// Given a set of parameter lists from an overload group, and a list of
 /// arguments, emit a diagnostic indicating any partially matching overloads.
 void CalleeCandidateInfo::

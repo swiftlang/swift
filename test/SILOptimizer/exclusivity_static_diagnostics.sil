@@ -1044,3 +1044,65 @@ bb0(%0 : $ClassWithStoredProperty, %1 : $Int32):
   %v = tuple ()
   return %v : $()
 }
+
+// <rdar://problem/41976355> [SR-8201]: Swift 4.2 Crash in DiagnoseStaticExclusivity (llvm_unreachable)
+// mutatingNoescapeWithThunk and mutatingNoescapeConflictWithThunk.
+// Test that noescape closure verification allows a closure with @inout_aliasable argument convention,
+// which may only be used as a nonescaping closure, can be passed to a reabstraction thunk
+// without the @noescape function-type argument convention.
+
+sil @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
+bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
+  %up = unchecked_enum_data %0 : $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1
+  %p = struct_extract %up : $UnsafePointer<Int32>, #UnsafePointer._rawValue
+  %adr = pointer_to_address %p : $Builtin.RawPointer to [strict] $*Int32
+  %val = load [trivial] %adr : $*Int32
+  %access = begin_access [modify] [unknown] %1 : $*Int32 // expected-note {{conflicting access is here}}
+  store %val to [trivial] %access : $*Int32
+  end_access %access : $*Int32
+  %v = tuple ()
+  return %v : $()
+}
+
+sil shared [transparent] [serializable] [reabstraction_thunk] @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()):
+  %e = enum $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt.1, %0 : $UnsafePointer<Int32>
+  %c = apply %1(%e) : $@callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+
+// A (mutating) closure taking an @inout_aliasable argument may be
+// passed to a reabstraction_thunk as an escaping function type. This
+// is valid as long as the thunk is only used as a @nosecape type.
+sil @mutatingNoescapeWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
+  %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %thunk = function_ref @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %thunk(%pa1) : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %closure = convert_escape_to_noescape [not_guaranteed] %pa2 : $@callee_guaranteed (UnsafePointer<Int32>) -> () to $@noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()
+  %f2 = function_ref @takeMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %call = apply %f2<Int32>(%0, %closure) : $@convention(thin) <τ_0_0> (UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+
+sil @mutatingNoescapeConflictWithThunk : $@convention(method) (UnsafePointer<Int32>, @inout Int32) -> () {
+bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
+  %f1 = function_ref @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f1(%1) : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> ()
+  %thunk = function_ref @mutatingNoescapeThunk : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %pa2 = partial_apply [callee_guaranteed] %thunk(%pa1) : $@convention(thin) (UnsafePointer<Int32>, @guaranteed @callee_guaranteed (Optional<UnsafePointer<Int32>>) -> ()) -> ()
+  %closure = convert_escape_to_noescape [not_guaranteed] %pa2 : $@callee_guaranteed (UnsafePointer<Int32>) -> () to $@noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()
+  %f2 = function_ref @takeInoutAndMutatingNoescapeClosure : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  %access = begin_access [modify] [unknown] %1 : $*Int32  // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
+  %call = apply %f2<Int32>(%access, %0, %closure) : $@convention(thin) <τ_0_0> (@inout Int32, UnsafePointer<τ_0_0>, @noescape @callee_guaranteed (UnsafePointer<Int32>) -> ()) -> ()
+  end_access %access : $*Int32
+  %v = tuple ()
+  return %v : $()
+}

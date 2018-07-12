@@ -186,12 +186,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
   }
 
   SILModule &M = F->getModule();
-  int UniqueID = 0;
-  std::string MangledName;
-  do {
-    MangledName = Mangler.mangle(UniqueID);
-    ++UniqueID;
-  } while (M.hasFunction(MangledName));
+  auto MangledName = Mangler.mangle();
+  assert(!M.hasFunction(MangledName));
 
   return MangledName;
 }

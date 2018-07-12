@@ -6434,6 +6434,13 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
   return forceBridgeFromObjectiveC(expr, toType);
 }
 
+static Expr *addImplicitLoadExpr(ConstraintSystem &cs, Expr *expr) {
+  auto &tc = cs.getTypeChecker();
+  return tc.addImplicitLoadExpr(
+      expr, [&cs](Expr *expr) { return cs.getType(expr); },
+      [&cs](Expr *expr, Type type) { cs.setType(expr, type); });
+}
+
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator,
                                  Optional<Pattern*> typeFromPattern) {
@@ -6519,25 +6526,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (toType->is<TupleType>() || fromType->is<TupleType>())
         break;
 
-      // Load from the lvalue. If we're loading the result of a force,
-      // swap the order so that we load first and force the result.
-      if (auto *forceExpr = dyn_cast<ForceValueExpr>(expr)) {
-        fromType = cs.getType(forceExpr->getSubExpr())->getRValueType();
-        auto *loadExpr = cs.cacheType(
-            new (tc.Context) LoadExpr(forceExpr->getSubExpr(), fromType));
-        auto *newForceValue = new (tc.Context)
-            ForceValueExpr(loadExpr, forceExpr->getLoc(),
-                           forceExpr->isForceOfImplicitlyUnwrappedOptional());
-        cs.setType(newForceValue,
-                   cs.getType(loadExpr)->getOptionalObjectType());
-        expr = newForceValue;
-      } else {
-        expr = cs.cacheType(new (tc.Context)
-                                LoadExpr(expr, fromType->getRValueType()));
-      }
-
-      // Coerce the result.
-      return coerceToType(expr, toType, locator);
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
     }
 
     case ConversionRestrictionKind::Existential:
@@ -6749,12 +6738,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     if (performLoad) {
-      // Load from the lvalue.
-      expr = cs.cacheType(new (tc.Context)
-                              LoadExpr(expr, fromLValue->getObjectType()));
-
-      // Coerce the result.
-      return coerceToType(expr, toType, locator);
+      return coerceToType(addImplicitLoadExpr(cs, expr), toType, locator);
     }
   }
 
