@@ -1835,6 +1835,8 @@ ASTContext::getSpecializedConformance(Type type,
   auto result
     = new (*this, arena) SpecializedProtocolConformance(type, generic,
                                                         substitutions);
+  auto node = specializedConformances.FindNodeOrInsertPos(id, insertPos);
+  assert(!node);
   specializedConformances.InsertNode(result, insertPos);
   return result;
 }
