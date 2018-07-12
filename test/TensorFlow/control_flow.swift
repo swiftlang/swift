@@ -242,3 +242,30 @@ public func testDynamicMethodBranch(_ obj: AnyObject) {
   b -= 1.0
   _hostOp(b)
 }
+
+//===-------------------------------------------------------------------===//
+// TODO: enable the following tests when relevant compiler crashes are fixed
+//===-------------------------------------------------------------------===//
+/*
+// This generates switch_value, but it requires -Onone that crashes compiler.
+@_optimize(none)
+public func test(_ x: Bool) {
+  var b = Tensor<Float>(2.0)
+  switch (x) {
+    case true: b += 1.0
+    default: break
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// This generates checked_cast_value_br, but it requires -enable-sil-opaque-values that crashes compiler.
+public func foo<T>(_ a: T) {
+  var b = Tensor<Float>(2.0)
+  if let _ : T = 42 as? T {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+*/
