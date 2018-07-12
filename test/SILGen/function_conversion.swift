@@ -665,3 +665,21 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
     return Foo<Klass>.enum1Func(SelfTy.bar)
   }
 }
+
+// CHECK: sil {{.*}} @$SS4SIgggoo_S2Ss11AnyHashableVyps5Error_pIegggrrzo_TR
+// CHECK:  [[TUPLE:%.*]] = apply %4(%2, %3) : $@noescape @callee_guaranteed (@guaranteed String, @guaranteed String) -> (@owned String, @owned String)
+// CHECK:  [[BORROW:%.*]] = begin_borrow [[TUPLE]] : $(String, String)
+// CHECK:  [[FRST:%.*]] = tuple_extract [[BORROW]] : $(String, String), 0
+// CHECK:  [[COPY1:%.*]] = copy_value [[FRST]] : $String
+// CHECK:  [[SND:%.*]] = tuple_extract [[BORROW]] : $(String, String), 1
+// CHECK:  [[COPY2:%.*]] = copy_value [[SND]] : $String
+// CHECK:  end_borrow [[BORROW]] from [[TUPLE]] : $(String, String), $(String, String)
+// CHECK:  destroy_value [[TUPLE]] : $(String, String)
+// CHECK:  [[ADDR:%.*]] = alloc_stack $String
+// CHECK:  store [[COPY1]] to [init] [[ADDR]] : $*String
+// CHECK:  [[CVT:%.*]] = function_ref @$Ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
+// CHECK:  apply [[CVT]]<String>(%0, [[ADDR]])
+func dontCrash() {
+  let userInfo = ["hello": "world"]
+  let d = [AnyHashable: Any](uniqueKeysWithValues: userInfo.map { ($0.key, $0.value) })
+}
