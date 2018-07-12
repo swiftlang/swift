@@ -1826,6 +1826,14 @@ public:
                            expr->setType(type);
                          });
 
+  /// \brief Add implicit load expression to given AST, this is sometimes
+  /// more complicated than simplify wrapping given root in newly created
+  /// `LoadExpr`, because `ForceValueExpr` and `ParenExpr` supposed to appear
+  /// only at certain positions in AST.
+  Expr *addImplicitLoadExpr(Expr *expr,
+                            std::function<Type(Expr *)> getType,
+                            std::function<void(Expr *, Type)> setType);
+
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.
   bool requireOptionalIntrinsics(SourceLoc loc);

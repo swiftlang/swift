@@ -3043,6 +3043,58 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
   return (kind != CheckedCastKind::Unresolved);
 }
 
+Expr *TypeChecker::addImplicitLoadExpr(
+    Expr *expr,
+    std::function<Type(Expr *)> getType,
+    std::function<void(Expr *, Type)> setType) {
+  class LoadAdder : public ASTWalker {
+  private:
+    using GetTypeFn = std::function<Type(Expr *)>;
+    using SetTypeFn = std::function<void(Expr *, Type)>;
+
+    TypeChecker &TC;
+    GetTypeFn getType;
+    SetTypeFn setType;
+
+  public:
+    LoadAdder(TypeChecker &TC, GetTypeFn getType, SetTypeFn setType)
+      : TC(TC), getType(getType), setType(setType) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<ParenExpr>(E) || isa<ForceValueExpr>(E))
+        return { true, E };
+
+      // Since load expression is created by walker,
+      // it's safe to stop as soon as it encounters first one
+      // because it would be the one it just created.
+      if (isa<LoadExpr>(E))
+        return { false, nullptr };
+
+      return { false, createLoadExpr(E) };
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      if (auto *FVE = dyn_cast<ForceValueExpr>(E))
+        setType(E, getType(FVE->getSubExpr())->getOptionalObjectType());
+
+      if (auto *PE = dyn_cast<ParenExpr>(E))
+        setType(E, ParenType::get(TC.Context, getType(PE->getSubExpr())));
+
+      return E;
+    }
+
+  private:
+    LoadExpr *createLoadExpr(Expr *E) {
+      auto objectType = getType(E)->getRValueType();
+      auto *LE = new (TC.Context) LoadExpr(E, objectType);
+      setType(LE, objectType);
+      return LE;
+    }
+  };
+
+  return expr->walk(LoadAdder(*this, getType, setType));
+}
+
 Expr *TypeChecker::coerceToRValue(Expr *expr,
                                llvm::function_ref<Type(Expr *)> getType,
                                llvm::function_ref<void(Expr *, Type)> setType) {
@@ -3065,11 +3117,8 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   }
 
   // Load lvalues.
-  if (auto lvalue = exprTy->getAs<LValueType>()) {
-    auto result = new (Context) LoadExpr(expr, lvalue->getObjectType());
-    setType(result, lvalue->getObjectType());
-    return result;
-  }
+  if (auto lvalue = exprTy->getAs<LValueType>())
+    return addImplicitLoadExpr(expr, getType, setType);
 
   // Walk into parenthesized expressions to update the subexpression.
   if (auto paren = dyn_cast<IdentityExpr>(expr)) {
