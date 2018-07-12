@@ -135,8 +135,13 @@ namespace {
       // automatically gives us the following invariants: loops are guaranteed
       // to have a single preheader, a single backedge block, and exit??
       canonicalizeAllLoops(&DI, &LI);
-      // We need to ensure more invariants as SIL loop canonicalization
-      // transformations don't do everything that we need.
+      // CanonicalizeAllLoops only ensures the following properties:
+      //   - There is a unique preheader block.
+      //   - Exit blocks have only predecessors within the loop.
+      //   - There is a single latch block and a single back edge to the header.
+      // We also need to ensure the following invariants for lowering:
+      //   - The header is the only block from which loop is exited.
+      //   - There is a single exit block.
       if (TFEnsureSingleLoopExit) {
         ensureSingleExitFromLoops();
       }
@@ -148,7 +153,9 @@ namespace {
     void processLoop(SILLoop *loop);
 
   private:
-    bool ensureSingleExitFromLoops();
+    void ensureSingleExitFromLoops();
+    /// Transforms the loop to ensure it has a single exit from the header.
+    /// Returns true if the CFG was changed.
     bool ensureSingleExitFromLoop(SILLoop* loop);
     SILValue getUndef(SILType type);
   };
@@ -261,14 +268,13 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
 /// transforms the loop by introducing a common exit switch block that demuxes
 /// to the appropriate exit block. Updates the Dominanceinfo, PostDominanceinfo,
 /// and LoopInfo as well.
-bool SESERegionBuilder::ensureSingleExitFromLoops() {
-  // TODO: update changed appropriately.
+void SESERegionBuilder::ensureSingleExitFromLoops() {
   // Visit the loop nest hierarchy bottom up.
   bool changed = false;
   llvm::SmallVector<std::pair<SILLoop *, bool>, 16> workList;
   for (auto *L : LI.getTopLevelLoops())
     workList.push_back({L, L->empty()});
-  while (workList.size() != 0) {
+  while (!workList.empty()) {
     SILLoop *loop;
     bool visited;
     std::tie(loop, visited) = workList.pop_back_val();
@@ -288,16 +294,14 @@ bool SESERegionBuilder::ensureSingleExitFromLoops() {
     DI.recalculate(*F);
     PDI.recalculate(*F);
   }
-  return changed;
 }
 
 namespace {
 
 /// Appends the given arguments to the given edge. Deletes the old TermInst
 /// and returns a new TermInst with the appropriate number of args.
-TermInst* appendArguments(TermInst *termInst, SILBasicBlock *target,
-                     ArrayRef<SILValue> newArgs) {
-
+TermInst *appendArguments(TermInst *termInst, SILBasicBlock *target,
+                            ArrayRef<SILValue> newArgs) {
   SILBuilder builder(termInst);
   TermInst *newTermInst = nullptr;
 
@@ -351,16 +355,18 @@ SILValue createTFHandleFromElement(SILBuilder &builder, SILLocation location,
   SILType elementType = element->getType();
   // Literals take attributes specifying the dtype, value, and device.
   std::string opName("__tfop_Const,dtype$dtype,value$tensor,__device");
-  SmallVector<SILValue, 8> operands;
-  operands.push_back(builder.createIntegerLiteral(
-      location, SILType::getBuiltinIntegerType(32, context),
-      convertSwiftTypeToTF(elementType.getASTType())));
-  operands.push_back(element);
-  operands.push_back(builder.createStringLiteral(
-      location, StringRef(ALL_DEVICES), StringLiteralInst::Encoding::UTF8));
-  return builder.createBuiltin(location, context.getIdentifier(opName),
-                               convertElementTypeToTensorValueType(elementType),
-                               /*substitutionlist*/ {}, operands);
+  SILValue operands[] = {
+      builder.createIntegerLiteral(
+          location, SILType::getBuiltinIntegerType(32, context),
+          convertSwiftTypeToTF(elementType.getASTType())),
+      element,
+      builder.createStringLiteral(location, StringRef(ALL_DEVICES),
+                                  StringLiteralInst::Encoding::UTF8)};
+  GraphOperationInst *constNode = builder.createGraphOperation(
+      location, context.getIdentifier(opName), operands,
+      /*attributes*/ {}, {convertElementTypeToTensorValueType(elementType)});
+  assert(constNode->getNumResults() == 1);
+  return constNode->getResults()[0];
 }
 
 /// Creates a TF handle of the appropriate integer type for the given bitwith
@@ -380,7 +386,6 @@ SILValue createTFIntegerConst(SILBuilder &builder, SILLocation location,
 SILValue SESERegionBuilder::getUndef(SILType type) {
   return SILUndef::get(type, F->getModule());
 }
-
 
 bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   // Return if the loop is already in the required form.
@@ -403,32 +408,30 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   llvm::SmallPtrSet<SILValue, 8> escapingValues;
   for (const SILBasicBlock *bb : loop->getBlocks()) {
     // Save the values that are escaping this loop in escapingValues set.
-    auto save_escaping = [this, &loop, &escapingValues](const SILValue &value) {
+    auto saveEscaping = [&loop, &escapingValues](SILValue value) {
       for (const auto *use : value->getUses()) {
-        const SILInstruction *use_inst = use->getUser();
-        if (!loop->contains(use_inst->getParent())) {
+        const SILInstruction *useInst = use->getUser();
+        if (!loop->contains(useInst->getParent())) {
           escapingValues.insert(value);
           break;
         }
       }
     };
     if (bb != header) {
-      llvm::for_each(bb->getArguments(), save_escaping);
+      llvm::for_each(bb->getArguments(), saveEscaping);
     }
     for (const SILInstruction &inst : *bb) {
-      llvm::for_each(inst.getResults(), save_escaping);
+      llvm::for_each(inst.getResults(), saveEscaping);
     }
   }
-  llvm::outs() << "The following are live outside the loop:\n";
-  for (const auto &escapingValue : escapingValues) {
-    escapingValue->dump();
-  }
 
+  // Collect the list of edges that need to rewired to the newHeader or
+  // the new latchBlock as appropriate.
   SmallVector<std::pair<const SILBasicBlock *, const SILBasicBlock *>, 8>
       edgesToFix;
-  // Exiting edges
+  // All the exiting edges need to be rewired.
   loop->getExitEdges(edgesToFix);
-  // Edges to header
+  // All the edges to the header need to be rewired.
   for (SILBasicBlock *headerPred : header->getPredecessorBlocks()) {
     edgesToFix.emplace_back(headerPred, header);
   }
@@ -480,10 +483,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   }
 
   llvm::DenseMap<SILBasicBlock *, intmax_t> exitIndices;
-  // As a simplification, simply 0 as exit index for edges to the header
-  // even though header is not an exit block.
-  exitIndices.insert({header, 0});
-  // Identify the exit from the header and also set it to zero index.
+  // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock* headerExit = nullptr;
   for (SILBasicBlock* succ : header->getSuccessorBlocks()) {
     if (loop->contains(succ))  continue;
@@ -493,11 +493,16 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   if (headerExit != nullptr) {
     exitIndices.insert({headerExit, 0});
   }
+  // edgesToFix also has edges to the header that are not exit edges.
+  // To simplify the code below, simply assign an arbitrary value (say 0)
+  // as the index for header. This would get simplified once we unify the
+  // stayInloop flag and exitIndex into one value.
+  exitIndices.insert({header, 0});
   unsigned nextExitIndex = 1;
   for (const auto &edge : edgesToFix) {
     SILBasicBlock *src = const_cast<SILBasicBlock *>(edge.first);
     SILBasicBlock *tgt = const_cast<SILBasicBlock *>(edge.second);
-    SILBasicBlock *newTgt = loop->contains(src) ? latchBlock : newHeader;
+    SILBasicBlock *newTgt = (src == preheader) ? newHeader : latchBlock;
     bool stayInLoop = loop->contains(tgt);
     replaceBranchTarget(src->getTerminator(), tgt, newTgt,
                         /*preserveArgs=*/stayInLoop);
@@ -518,9 +523,11 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
       if (DI.properlyDominates(escapingValue, src->getTerminator())) {
         newArgs.push_back(escapingValue);
       } else if (src != preheader) {
-        // if src is not the preheader than new header arguments are available.
+        // newHeader arguments are available if src is not the preheader.
         newArgs.push_back(newHeader->getArgument(argIndex));
       } else {
+        // State from within the loop is not available in the preheader.
+        // Simply pass in an undef. This will never be accessed at runtime.
         newArgs.push_back(getUndef(escapingValue->getType()));
       }
       ++argIndex;
@@ -532,7 +539,7 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
       // Increment index as we inserted a new entry into the table.
       ++nextExitIndex;
     }
-    auto kvPair = *(emplaceResult.first);
+    auto kvPair = *emplaceResult.first;
     newArgs.push_back(createTFIntegerConst(builder, location,
                                            /*bitwidth*/ 32,
                                            /*exitIndex*/ kvPair.second));
@@ -569,21 +576,26 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
     SILBasicBlock *newBlock = createBlockOutsideLoop();
     SILBasicBlock *trueBlock = *curBlockIter++;
     builder.setInsertionPoint(newBlock);
-    SILValue condTensor = builder.createBuiltin(
+    GraphOperationInst *condTensorNode = builder.createGraphOperation(
         headerLocation, context.getIdentifier("__tfop_Equal,$in,$in,__device"),
-        convertElementTypeToTensorValueType(
-            SILType::getBuiltinIntegerType(1, context)),
-        /* SubstitutionMap*/ {},
+        /*operands*/
         {exitIndexArg,
          createTFIntegerConst(builder, headerLocation, /*bitwidth*/ 32,
                               exitIndices.lookup(trueBlock)),
          builder.createStringLiteral(headerLocation, StringRef(ALL_DEVICES),
-                                     StringLiteralInst::Encoding::UTF8)});
-    SILValue condValue = builder.createBuiltin(
+                                     StringLiteralInst::Encoding::UTF8)},
+        /*attributes*/ {},
+        {convertElementTypeToTensorValueType(
+            SILType::getBuiltinIntegerType(1, context))});
+    assert(condTensorNode->getNumResults() == 1);
+    SILValue condTensor = condTensorNode->getResults()[0];
+    GraphOperationInst* condValue = builder.createGraphOperation(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        SILType::getBuiltinIntegerType(1, context),
-        /*SubstitutionMap*/ {}, {condTensor});
-    builder.createCondBranch(headerLocation, condValue, trueBlock, demuxBlock);
+        /*operands*/ {condTensor}, /*attributes */ {},
+        {SILType::getBuiltinIntegerType(1, context)});
+    assert(condValue->getNumResults() == 1);
+    builder.createCondBranch(headerLocation, condValue->getResults()[0],
+                             trueBlock, demuxBlock);
     demuxBlock = newBlock;
   }
   builder.setInsertionPoint(newExitBlock);
@@ -592,12 +604,13 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
   // Now connect the newheader to the header and exit block.
   builder.setInsertionPoint(newHeader);
   {
-    SILValue loopExitCond = builder.createBuiltin(
+    GraphOperationInst *loopExitCond = builder.createGraphOperation(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
-        SILType::getBuiltinIntegerType(1, context),
-        /*SubstitutionMap*/ {}, {newHeader->getArguments().back()});
-    builder.createCondBranch(headerLocation, loopExitCond, header,
-                             newExitBlock);
+        /*operands*/ {newHeader->getArguments().back()}, /*attributes*/ {},
+        {SILType::getBuiltinIntegerType(1, context)});
+    assert(loopExitCond->getNumResults() == 1);
+    builder.createCondBranch(headerLocation, loopExitCond->getResults()[0],
+                             header, newExitBlock);
   }
   loop->moveToHeader(newHeader);
   loop->addBasicBlockToLoop(latchBlock, LI.getBase());
