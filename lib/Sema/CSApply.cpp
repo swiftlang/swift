@@ -5737,6 +5737,7 @@ Expr *ExprRewriter::coerceCallArguments(
 
   assert((matchCanFail || !failed) && "Call arguments did not match up?");
   (void)failed;
+  (void)matchCanFail;
 
   // We should either have parentheses or a tuple.
   auto *argTuple = dyn_cast<TupleExpr>(arg);
