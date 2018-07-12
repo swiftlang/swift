@@ -2438,7 +2438,7 @@ public:
            "#endif\n"
            "\n"
            "#pragma clang diagnostic ignored \"-Wauto-import\"\n"
-           "#include <objc/NSObject.h>\n"
+           "#include <Foundation/Foundation.h>\n"
            "#include <stdint.h>\n"
            "#include <stddef.h>\n"
            "#include <stdbool.h>\n"

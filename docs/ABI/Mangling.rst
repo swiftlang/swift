@@ -797,7 +797,7 @@ The type is the function type of the specialized function.
 
 ::
 
-  specialization ::= spec-arg* 'Tf' SPEC-INFO UNIQUE-ID? ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
+  specialization ::= spec-arg* 'Tf' SPEC-INFO ARG-SPEC-KIND* '_' ARG-SPEC-KIND  // Function signature specialization kind
 
 The ``<ARG-SPEC-KIND>`` describes how arguments are specialized.
 Some kinds need arguments, which precede ``Tf``.
@@ -817,8 +817,6 @@ Some kinds need arguments, which precede ``Tf``.
   PASSID ::= '5'                             // GenericSpecializer,
 
   FRAGILE ::= 'q'
-
-  UNIQUE-ID ::= NATURAL                      // Used to make unique function names
 
   ARG-SPEC-KIND ::= 'n'                      // Unmodified argument
   ARG-SPEC-KIND ::= 'c'                      // Consumes n 'type' arguments which are closed over types in argument order
