@@ -306,3 +306,40 @@ public func SR8191() {
 // CHECK:      <while Preheader: bb0, Header: bb1, exit: bb3
 // CHECK:        block bb2>
 // CHECK:      block bb3]
+
+// `a` and `b` are both arguments to the tensor program, which starts at
+// "let _= a + b", and ends in that BB. So the tensor start point and tensor end
+// point should both be in that BB.
+public func SR8226(n: Float, m: Float, cond: Bool, cond2: Bool) {
+  // expected-warning @+1{{implicitly copied to the accelerator}}
+  let a = Tensor<Float>([m, n])
+
+  if cond {
+    // expected-warning @+1{{implicitly copied to the accelerator}}
+    let b = Tensor<Float>([m, n])
+    if cond2 {
+      // expected-note @+2{{value used here}}
+      // expected-note @+1{{value used here}}
+      let _ = a + b
+    }
+  }
+}
+
+// Tensor `b` as a BB arg to the loop header block does not have any important
+// users, and thus get deleted. This will in turn delete the associated
+// retain/release insts on that tensor.
+
+// expected-warning @+1{{implicitly copied to the accelerator}}
+public func SR8228_unusedTensorBBArg(n: Int32, x: Tensor<Float>) {
+  var a = Tensor<Float>(1.0)
+  // expected-warning @+1{{variable 'b' was written to, but never read}}  
+  var b = x
+  var i: Int32 = 0
+  // expected-warning @+2{{implicitly copied to the accelerator}}
+  // expected-note @+1{{value used here}}
+  while i < n {
+    a += a
+    b = a
+    i += 1
+  }
+}
