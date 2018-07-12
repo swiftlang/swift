@@ -269,3 +269,14 @@ public func foo<T>(_ a: T) {
   _hostOp(b)
 }
 */
+
+// TODO: enable this for-loop test once we resolve
+// https://bugs.swift.org/browse/SR-7765:
+/// SESE FIXME: Imperfect loop exits not handled yet!
+// public func foo(n: Int32) {
+//   var a = Tensor<Float>(1.0)
+//   for _ in 0..<n {
+//     a += a
+//   }
+//   _hostOp(a)
+// }
