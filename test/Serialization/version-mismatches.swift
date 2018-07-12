@@ -1,8 +1,7 @@
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs/too-old/ -show-diagnostics-after-fatal 2>&1 | %FileCheck -check-prefix CHECK -check-prefix TOO-OLD %s
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs/too-new/ -show-diagnostics-after-fatal 2>&1 | %FileCheck -check-prefix CHECK -check-prefix TOO-NEW %s
 
-// Update this line when "-swift-version 3" is no longer supported.
-// RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs/too-new-language/ -show-diagnostics-after-fatal -swift-version 3 2>&1 | %FileCheck -check-prefix CHECK -check-prefix LANGUAGE %s
+// Update this line if "-swift-version 4" is no longer supported.
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs/too-new-language/ -show-diagnostics-after-fatal -swift-version 4 2>&1 | %FileCheck -check-prefix CHECK -check-prefix LANGUAGE %s
 // RUN: not %target-swift-frontend %s -typecheck -I %S/Inputs/too-new-language/ -show-diagnostics-after-fatal -swift-version 5 2>&1 | %FileCheck -check-prefix CHECK -check-prefix LANGUAGE %s
 
