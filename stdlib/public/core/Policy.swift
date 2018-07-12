@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -377,8 +377,6 @@ precedencegroup BitwiseShiftPrecedence {
 //===----------------------------------------------------------------------===//
 
 // Standard postfix operators.
-postfix operator ++
-postfix operator --
 postfix operator ...
 
 // Optional<T> unwrapping operator is built into the compiler as a part of
@@ -387,8 +385,6 @@ postfix operator ...
 // postfix operator !
 
 // Standard prefix operators.
-prefix operator ++
-prefix operator --
 prefix operator !
 prefix operator ~
 prefix operator +
