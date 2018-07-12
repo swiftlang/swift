@@ -37,11 +37,8 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //-- Preheader sets up the undefs, exit index, and stayInLoop flag.
 // CHECK: bb0(%0 : $Builtin.Int32):
-// CHECK: {{.*}} = integer_literal $Builtin.Int32, 0
-// CHECK: [[A:%.*]] = integer_literal $Builtin.Int32, 0
-// CHECK: [[PHDR_EXIT:%.*]] = graph_op "__tfop_Const,dtype$dtype,value$tensor,__device"({{.*}}, [[A]] : $Builtin.Int32, {{.*}})
-// CHECK: [[B:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK: [[PHDR_FLAG:%.*]] = graph_op "__tfop_Const,dtype$dtype,value$tensor,__device"({{.*}}, [[B]] : $Builtin.Int1, {{.*}})
+// CHECK: [[PHDR_EXIT:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"}
+// CHECK: [[PHDR_FLAG:%.*]] = graph_op "Const"() {dtype$dtype: $Builtin.Int1, value$tensor: i1 -1, __device: "ALL_DEVICES"} 
 // CHECK: br bb9({{.*}} : $Builtin.Int32, {{.*}} : $Builtin.Int32, undef : $Builtin.Int32, [[PHDR_EXIT]] : $TensorHandle<Builtin.Int32>, [[PHDR_FLAG]] : $TensorHandle<Builtin.Int1>)
 
 //-- Original exiting blocks use appropriate arguments from new header.
@@ -57,9 +54,8 @@ public func loopTest(breakCount:Int32) -> Int32 {
 
 //-- Demuxing Block wires the exit blocks correctly.
 // CHECK: bb12:
-// CHECK:  [[A:%.*]] = integer_literal $Builtin.Int32, 0
-// CHECK:  [[ZERO_INDEX:%.*]] = graph_op "__tfop_Const,dtype$dtype,value$tensor,__device"({{.*}} : $Builtin.Int32, [[A]] : $Builtin.Int32, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Builtin.Int32>
-// CHECK:  [[A:%.*]] = graph_op "__tfop_Equal,$in,$in,__device"([[HDR_EXIT_ARG]] : $TensorHandle<Builtin.Int32>, [[ZERO_INDEX]] : $TensorHandle<Builtin.Int32>, {{.*}} : $Builtin.RawPointer) : $TensorHandle<Builtin.Int1>
+// CHECK:  [[ZERO_INDEX:%.*]] = graph_op  "Const"() {dtype$dtype: $Builtin.Int32, value$tensor: i32 0, __device: "ALL_DEVICES"} : $TensorHandle<Builtin.Int32> 
+// CHECK:  [[A:%.*]] = graph_op "Equal,i,i"([[HDR_EXIT_ARG]] : $TensorHandle<Builtin.Int32>, [[ZERO_INDEX]] : $TensorHandle<Builtin.Int32>) {{.*}} : $TensorHandle<Builtin.Int1>
 // CHECK:  [[B:%.*]] = graph_op "tf_tensor_to_i1"([[A]] : $TensorHandle<Builtin.Int1>) : $Builtin.Int1
 // CHECK:  cond_br [[B]], bb3, bb7
 

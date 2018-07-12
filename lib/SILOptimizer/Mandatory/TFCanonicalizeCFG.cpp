@@ -30,6 +30,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -114,12 +115,16 @@ namespace {
     PostDominanceInfo PDI;
     SILLoopInfo LI;
     SILFunction* F;
+    GraphGlobalConfiguration graphConfiguration;
 
     /// processLoops fills in this mapping: it is keyed by the preheader block
     /// of each loop, and points to the region produced for it.
     llvm::DenseMap<SILBasicBlock*, WhileLoopSESERegion*> loopPreheaders;
   public:
-    SESERegionBuilder(SILFunction *F) : DI(F), PDI(F), LI(F, &DI), F(F) {}
+    SESERegionBuilder(SILFunction *F)
+        : DI(F), PDI(F), LI(F, &DI), F(F),
+          graphConfiguration(GraphGlobalConfiguration::getForFunction(
+              *F, /*removeConfigInst*/ false)) {}
 
     std::unique_ptr<SESERegionTree>
     processAcyclicRegion(SILBasicBlock *startBB, SILBasicBlock *endBB);
@@ -346,39 +351,32 @@ TermInst *appendArguments(TermInst *termInst, SILBasicBlock *target,
   return newTermInst;
 }
 
-/// Creates a TF handle of appropriate type that is initialized to the given
-/// element value.
-SILValue createTFHandleFromElement(SILBuilder &builder, SILLocation location,
-                                   SILValue element) {
-  assert(builder.hasValidInsertionPoint());
+/// Creates a TF handle of the appropriate integer type for the given bitwith
+/// that is initialized to the given value.
+SILValue createTFIntegerConst(GraphGlobalConfiguration &graphConfiguration,
+                              SILBuilder &builder, SILLocation location,
+                              unsigned bitwidth, intmax_t value) {
   ASTContext& context = builder.getASTContext();
-  SILType elementType = element->getType();
+  SILType intType =
+      SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
   // Literals take attributes specifying the dtype, value, and device.
-  std::string opName("__tfop_Const,dtype$dtype,value$tensor,__device");
-  SILValue operands[] = {
-      builder.createIntegerLiteral(
-          location, SILType::getBuiltinIntegerType(32, context),
-          convertSwiftTypeToTF(elementType.getASTType())),
-      element,
-      builder.createStringLiteral(location, StringRef(ALL_DEVICES),
-                                  StringLiteralInst::Encoding::UTF8)};
+  std::string opName("Const");
+  SmallVector<GraphOperationAttribute, 3> attributes;
+  attributes.push_back({context.getIdentifier("dtype$dtype"),
+                        SymbolicValue::getMetatype(intType.getASTType())});
+  attributes.push_back({context.getIdentifier("value$tensor"),
+                        SymbolicValue::getInteger(APInt(bitwidth, value),
+                                                  context.getAllocator())});
+  graphConfiguration.handleDevicePlacement(
+      "Const",
+      /*opDevice*/ getDeviceString(DeviceType::ALL), builder, location,
+      attributes);
   GraphOperationInst *constNode = builder.createGraphOperation(
-      location, context.getIdentifier(opName), operands,
-      /*attributes*/ {}, {convertElementTypeToTensorValueType(elementType)});
+      location, context.getIdentifier(opName), /*operands*/ {}, attributes,
+      {convertElementTypeToTensorValueType(intType)});
   assert(constNode->getNumResults() == 1);
   return constNode->getResults()[0];
 }
-
-/// Creates a TF handle of the appropriate integer type for the given bitwith
-/// that is initialized to the given value.
-SILValue createTFIntegerConst(SILBuilder &builder, SILLocation location,
-                              unsigned bitwidth, intmax_t value) {
-  SILType intType =
-      SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
-  SILValue ourCst = builder.createIntegerLiteral(location, intType, value);
-  return createTFHandleFromElement(builder, location, ourCst);
-}
-
 
 }  // namespace
 
@@ -540,11 +538,13 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
       ++nextExitIndex;
     }
     auto kvPair = *emplaceResult.first;
-    newArgs.push_back(createTFIntegerConst(builder, location,
+    newArgs.push_back(createTFIntegerConst(graphConfiguration, builder,
+                                           location,
                                            /*bitwidth*/ 32,
                                            /*exitIndex*/ kvPair.second));
     // `stayInLoop` flag
-    newArgs.push_back(createTFIntegerConst(builder, location,
+    newArgs.push_back(createTFIntegerConst(graphConfiguration, builder,
+                                           location,
                                            /*bitwidth*/ 1, stayInLoop));
     appendArguments(src->getTerminator(), newTgt, newArgs);
   }
@@ -576,19 +576,28 @@ bool SESERegionBuilder::ensureSingleExitFromLoop(SILLoop* loop) {
     SILBasicBlock *newBlock = createBlockOutsideLoop();
     SILBasicBlock *trueBlock = *curBlockIter++;
     builder.setInsertionPoint(newBlock);
-    GraphOperationInst *condTensorNode = builder.createGraphOperation(
-        headerLocation, context.getIdentifier("__tfop_Equal,$in,$in,__device"),
+
+    // Create a condition to compare exitIndex to a constant
+    std::string equalOpName("Equal");
+    equalOpName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    equalOpName +=
+        GraphOperationInfo::getInputMarker(GraphOperationInfo::IM_Normal);
+    SmallVector<GraphOperationAttribute, 2> attributes;
+    graphConfiguration.handleDevicePlacement(
+        "Equal", /*opDevice*/ getDeviceString(DeviceType::ALL), builder,
+        headerLocation, attributes);
+    GraphOperationInst *condTensorInst = builder.createGraphOperation(
+        headerLocation, context.getIdentifier(equalOpName),
         /*operands*/
         {exitIndexArg,
-         createTFIntegerConst(builder, headerLocation, /*bitwidth*/ 32,
-                              exitIndices.lookup(trueBlock)),
-         builder.createStringLiteral(headerLocation, StringRef(ALL_DEVICES),
-                                     StringLiteralInst::Encoding::UTF8)},
-        /*attributes*/ {},
+         createTFIntegerConst(graphConfiguration, builder, headerLocation,
+                              /*bitwidth*/ 32, exitIndices.lookup(trueBlock))},
+        attributes,
         {convertElementTypeToTensorValueType(
             SILType::getBuiltinIntegerType(1, context))});
-    assert(condTensorNode->getNumResults() == 1);
-    SILValue condTensor = condTensorNode->getResults()[0];
+    assert(condTensorInst->getNumResults() == 1);
+    SILValue condTensor = condTensorInst->getResults()[0];
     GraphOperationInst* condValue = builder.createGraphOperation(
         headerLocation, context.getIdentifier("tf_tensor_to_i1"),
         /*operands*/ {condTensor}, /*attributes */ {},
