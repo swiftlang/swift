@@ -323,12 +323,12 @@ public protocol RangeReplaceableCollection : Collection
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter n: The number of elements to remove from the collection.
-  ///   `n` must be greater than or equal to zero and must not exceed the
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
-  mutating func removeFirst(_ n: Int)
+  mutating func removeFirst(_ k: Int)
 
   /// Removes all elements from the collection.
   ///
@@ -574,18 +574,18 @@ extension RangeReplaceableCollection {
   /// Calling this method may invalidate any existing indices for use with this
   /// collection.
   ///
-  /// - Parameter n: The number of elements to remove from the collection.
-  ///   `n` must be greater than or equal to zero and must not exceed the
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
   @inlinable
-  public mutating func removeFirst(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+  public mutating func removeFirst(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it has")
-    let end = index(startIndex, offsetBy: numericCast(n))
+    let end = index(startIndex, offsetBy: k)
     removeSubrange(startIndex..<end)
   }
 
@@ -680,20 +680,20 @@ extension RangeReplaceableCollection where SubSequence == Self {
   /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
-  /// - Parameter n: The number of elements to remove from the collection.
-  ///   `n` must be greater than or equal to zero and must not exceed the
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the specified
   ///   number of elements.
   @inlinable
-  public mutating func removeFirst(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+  public mutating func removeFirst(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: numericCast(n))..<endIndex]
+    self = self[index(startIndex, offsetBy: k)..<endIndex]
   }
 }
 
@@ -847,22 +847,22 @@ extension RangeReplaceableCollection where Self : BidirectionalCollection {
   /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
-  /// - Parameter n: The number of elements to remove from the collection.
-  ///   `n` must be greater than or equal to zero and must not exceed the
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(*k*), where *k* is the specified number of elements.
   @inlinable
-  public mutating func removeLast(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+  public mutating func removeLast(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    if _customRemoveLast(n) {
+    if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
+    removeSubrange(index(end, offsetBy: -k)..<end)
   }
 }
 
@@ -917,22 +917,22 @@ where Self : BidirectionalCollection, SubSequence == Self {
   /// collection. Do not rely on a previously stored index value after
   /// altering a collection with any operation that can change its length.
   ///
-  /// - Parameter n: The number of elements to remove from the collection.
-  ///   `n` must be greater than or equal to zero and must not exceed the
+  /// - Parameter k: The number of elements to remove from the collection.
+  ///   `k` must be greater than or equal to zero and must not exceed the
   ///   number of elements in the collection.
   ///
   /// - Complexity: O(*k*), where *k* is the specified number of elements.
   @inlinable
-  public mutating func removeLast(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= numericCast(n),
+  public mutating func removeLast(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    if _customRemoveLast(n) {
+    if _customRemoveLast(k) {
       return
     }
     let end = endIndex
-    removeSubrange(index(end, offsetBy: numericCast(-n))..<end)
+    removeSubrange(index(end, offsetBy: -k)..<end)
   }
 }
 

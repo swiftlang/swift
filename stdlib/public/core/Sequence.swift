@@ -439,14 +439,14 @@ public protocol Sequence {
   ///     print(numbers.dropFirst(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop from the beginning of
-  ///   the sequence. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop from the beginning of
+  ///   the sequence. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
   /// - Complexity: O(*k*), where *k* is the number of elements to drop from
   ///   the beginning of the sequence.
-  __consuming func dropFirst(_ n: Int) -> SubSequence
+  __consuming func dropFirst(_ k: Int) -> SubSequence
 
   /// Returns a subsequence containing all but the specified number of final
   /// elements.
@@ -461,12 +461,12 @@ public protocol Sequence {
   ///     print(numbers.dropLast(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop off the end of the
-  ///   sequence. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   sequence. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence leaving off the specified number of elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  __consuming func dropLast(_ n: Int) -> SubSequence
+  __consuming func dropLast(_ k: Int) -> SubSequence
 
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
@@ -683,7 +683,7 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
   }
 
   @inlinable
-  internal func dropFirst(_ n: Int) -> AnySequence<Base.Element> {
+  internal func dropFirst(_ k: Int) -> AnySequence<Base.Element> {
     // If this is already a _DropFirstSequence, we need to fold in
     // the current drop count and drop limit so no data is lost.
     //
@@ -691,7 +691,7 @@ internal struct _DropFirstSequence<Base : IteratorProtocol>
     // [1,2,3,4].dropFirst(2).
     return AnySequence(
       _DropFirstSequence(
-        _iterator: _iterator, limit: _limit + n, dropped: _dropped))
+        _iterator: _iterator, limit: _limit + k, dropped: _dropped))
   }
 }
 
@@ -1211,8 +1211,8 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///     print(numbers.dropFirst(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop from the beginning of
-  ///   the sequence. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop from the beginning of
+  ///   the sequence. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
@@ -1220,10 +1220,10 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///   where *k* is the number of elements to drop from the beginning of
   ///   the sequence.
   @inlinable
-  public func dropFirst(_ n: Int) -> AnySequence<Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
-    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: n))
+  public func dropFirst(_ k: Int) -> AnySequence<Element> {
+    _precondition(k >= 0, "Can't drop a negative number of elements from a sequence")
+    if k == 0 { return AnySequence(self) }
+    return AnySequence(_DropFirstSequence(_iterator: makeIterator(), limit: k))
   }
 
   /// Returns a subsequence containing all but the given number of final
@@ -1245,27 +1245,27 @@ extension Sequence where SubSequence == AnySequence<Element> {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func dropLast(_ n: Int) -> AnySequence<Element> {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
-    if n == 0 { return AnySequence(self) }
+  public func dropLast(_ k: Int) -> AnySequence<Element> {
+    _precondition(k >= 0, "Can't drop a negative number of elements from a sequence")
+    if k == 0 { return AnySequence(self) }
 
     // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
     // Put incoming elements from this sequence in a holding tank, a ring buffer
-    // of size <= n. If more elements keep coming in, pull them out of the
+    // of size <= k. If more elements keep coming in, pull them out of the
     // holding tank into the result, an `Array`. This saves
-    // `n` * sizeof(Element) of memory, because slices keep the entire
+    // `k` * sizeof(Element) of memory, because slices keep the entire
     // memory of an `Array` alive.
     var result: [Element] = []
     var ringBuffer: [Element] = []
     var i = ringBuffer.startIndex
 
     for element in self {
-      if ringBuffer.count < n {
+      if ringBuffer.count < k {
         ringBuffer.append(element)
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = ringBuffer.index(after: i) % n
+        i = ringBuffer.index(after: i) % k
       }
     }
     return AnySequence(result)

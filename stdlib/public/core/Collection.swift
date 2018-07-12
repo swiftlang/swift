@@ -1342,8 +1342,8 @@ extension Collection {
   ///     print(numbers.dropFirst(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop from the beginning of
-  ///   the collection. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop from the beginning of
+  ///   the collection. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence starting after the specified number of
   ///   elements.
   ///
@@ -1351,10 +1351,10 @@ extension Collection {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop from the beginning of the collection.
   @inlinable
-  public func dropFirst(_ n: Int) -> SubSequence {
-    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+  public func dropFirst(_ k: Int) -> SubSequence {
+    _precondition(k >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
-      offsetBy: n, limitedBy: endIndex) ?? endIndex
+      offsetBy: k, limitedBy: endIndex) ?? endIndex
     return self[start..<endIndex]
   }
 
@@ -1370,19 +1370,19 @@ extension Collection {
   ///     print(numbers.dropLast(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop off the end of the
-  ///   collection. `n` must be greater than or equal to zero.
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   collection. `k` must be greater than or equal to zero.
   /// - Returns: A subsequence that leaves off the specified number of elements
   ///   at the end.
   ///
   /// - Complexity: O(1) if the collection conforms to
-  ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
-  ///   elements to drop from the beginning of the collection.
+  ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length of
+  ///   the collection.
   @inlinable
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func dropLast(_ k: Int) -> SubSequence {
     _precondition(
-      n >= 0, "Can't drop a negative number of elements from a collection")
-    let amount = Swift.max(0, count - n)
+      k >= 0, "Can't drop a negative number of elements from a collection")
+    let amount = Swift.max(0, count - k)
     let end = index(startIndex,
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
@@ -1778,7 +1778,7 @@ extension Collection where SubSequence == Self {
   /// Removes the specified number of elements from the beginning of the
   /// collection.
   ///
-  /// - Parameter n: The number of elements to remove. `n` must be greater than
+  /// - Parameter k: The number of elements to remove. `k` must be greater than
   ///   or equal to zero, and must be less than or equal to the number of
   ///   elements in the collection.
   ///
@@ -1786,12 +1786,12 @@ extension Collection where SubSequence == Self {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the specified
   ///   number of elements.
   @inlinable
-  public mutating func removeFirst(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= n,
+  public mutating func removeFirst(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
-    self = self[index(startIndex, offsetBy: n)..<endIndex]
+    self = self[index(startIndex, offsetBy: k)..<endIndex]
   }
 }
 

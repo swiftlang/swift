@@ -244,7 +244,7 @@ extension BidirectionalCollection where SubSequence == Self {
 
   /// Removes the given number of elements from the end of the collection.
   ///
-  /// - Parameter n: The number of elements to remove. `n` must be greater
+  /// - Parameter k: The number of elements to remove. `k` must be greater
   ///   than or equal to zero, and must be less than or equal to the number of
   ///   elements in the collection.
   ///
@@ -252,14 +252,14 @@ extension BidirectionalCollection where SubSequence == Self {
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to remove.
   @inlinable // protocol-only
-  public mutating func removeLast(_ n: Int) {
-    if n == 0 { return }
-    _precondition(n >= 0, "Number of elements to remove should be non-negative")
-    _precondition(count >= n,
+  public mutating func removeLast(_ k: Int) {
+    if k == 0 { return }
+    _precondition(k >= 0, "Number of elements to remove should be non-negative")
+    _precondition(count >= k,
       "Can't remove more items from a collection than it contains")
     // FIXME: using non-_'d `index` incorrectly calls the Collection one for
     // conditional conformances to BidirectionalCollections.
-    self = self[startIndex..<_index(endIndex, offsetBy: -n)]
+    self = self[startIndex..<_index(endIndex, offsetBy: -k)]
   }
 }
 
@@ -276,22 +276,22 @@ extension BidirectionalCollection {
   ///     print(numbers.dropLast(10))
   ///     // Prints "[]"
   ///
-  /// - Parameter n: The number of elements to drop off the end of the
-  ///   collection. `n` must be greater than or equal to zero.
-  /// - Returns: A subsequence that leaves off `n` elements from the end.
+  /// - Parameter k: The number of elements to drop off the end of the
+  ///   collection. `k` must be greater than or equal to zero.
+  /// - Returns: A subsequence that leaves off `k` elements from the end.
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*k*), where *k* is the number of
   ///   elements to drop.
   @inlinable // protocol-only
-  public func dropLast(_ n: Int) -> SubSequence {
+  public func dropLast(_ k: Int) -> SubSequence {
     _precondition(
-      n >= 0, "Can't drop a negative number of elements from a collection")
+      k >= 0, "Can't drop a negative number of elements from a collection")
     // FIXME: using non-_'d `index` incorrectly calls the Collection one for
     // conditional conformances to BidirectionalCollections.
     let end = _index(
       endIndex,
-      offsetBy: -n,
+      offsetBy: -k,
       limitedBy: startIndex) ?? startIndex
     return self[startIndex..<end]
   }

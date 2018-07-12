@@ -150,8 +150,8 @@ extension RandomAccessCollection {
     _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     // FIXME: swift-3-indexing-model: tests.
-    let l = distance(from: i, to: limit)
-    if n > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
+    let l = self.distance(from: i, to: limit)
+    if distance > 0 ? l >= 0 && l < distance : l <= 0 && distance < l {
       return nil
     }
     return index(i, offsetBy: distance)
