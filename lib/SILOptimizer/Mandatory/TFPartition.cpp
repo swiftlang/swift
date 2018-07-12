@@ -1530,6 +1530,7 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
     return markArgument(arg, user);
 
   auto *inst = value->getDefiningInstruction();
+  assert(inst);
   if (markedInstructions.count(inst))
     return;
 
@@ -1573,6 +1574,8 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   if (isBeforeStartPoint ||
       // If we can hoist it above the start point then it can be an argument.
       hoistValueAboveStartPoint(inst, tensorStartPoint, DI)) {
+    // Args to the tensor program cannot be tensor ops.
+    assert(!tensorOpsSet.count(inst));
     markedInstructions.insert({inst, Marking::Argument});
     tensorFnArguments.push_back(value);
 
@@ -1599,18 +1602,18 @@ void TFFunctionPartition::markValue(SILValue value, SILInstruction *user) {
   markBlock(inst->getParent());
 }
 
-/// Given a list of tensor operations, find the nearest common ancestor of those
+/// Given a set of tensor operations, find the nearest common ancestor of those
 /// operations in the [post-]dominator-tree of the CFG.  In addition to finding
 /// the NCA, this also returns the list of ops that are in that block (if any).
 static SILBasicBlock *
-findNCAOfTensorOps(ArrayRef<SILInstruction*> tensorOps,
+findNCAOfTensorOps(const SmallPtrSetImpl<SILInstruction*> &tensorOps,
                    SmallPtrSet<SILInstruction*, 8> &ncaBBOps,
                    ArrayRef<SILBasicBlock*> extraBlocks,
          std::function<SILBasicBlock*(SILBasicBlock*,SILBasicBlock*)> findNCA) {
   assert(!tensorOps.empty() && "expect at least one tensor op");
 
   // Pick an arbitrary starting point.
-  auto ncaBlock = tensorOps[0]->getParent();
+  auto ncaBlock = (*tensorOps.begin())->getParent();
 
   // If there are extra blocks to consider, process them first.
   for (auto extraBB : extraBlocks)
@@ -1931,7 +1934,7 @@ bool TFFunctionPartition::markFunction() {
   // point".  This is where we will start the tensor computation, sending over
   // argument values defined outside the scope of the computation.
   SmallPtrSet<SILInstruction*, 8> bbOps;
-  auto startBB = findNCAOfTensorOps(tensorOps, bbOps, /*no extra blocks*/{},
+  auto startBB = findNCAOfTensorOps(tensorOpsSet, bbOps, /*no extra blocks*/{},
                                     [&] (SILBasicBlock *B1,
                                          SILBasicBlock *B2) -> SILBasicBlock* {
     return DI.findNearestCommonDominator(B1, B2);
@@ -1967,6 +1970,16 @@ bool TFFunctionPartition::markFunction() {
   // to the host.
   markTensorBBArgumentsForDeletion();
 
+  if (isAcceleratorOnly(hostFn))
+    for (auto markInfo : markedInstructions)
+      if (markInfo.second == Marking::Copy ||
+          markInfo.second == Marking::Send) {
+        diagnose(hostFn.getASTContext(),
+                 markInfo.first->getLoc().getSourceLoc(),
+                 diag::tf_convention_tf_host_code_not_allowed);
+        return false;
+      }
+
   // Not that we know all of the instructions we'll be moving over, find the end
   // point by finding the nearest common post dominating ancestor of the marked
   // instructions.
@@ -1974,22 +1987,17 @@ bool TFFunctionPartition::markFunction() {
   // As we walk through all markings, if there's any Copy/Send while the
   // function is @convention(tensorflow), we emit an error.
   bbOps.clear();
-  SmallVector<SILInstruction*, 16> instrsToCheck;
+  SmallPtrSet<SILInstruction*, 16> instrsToCheck;
   SmallVector<SILBasicBlock*, 16> extraBlocksToCheck;
-  bool foundError = false;
-  for (auto markInfo : markedInstructions) {
-    if (isAcceleratorOnly(hostFn) &&
-        (markInfo.second == Marking::Copy ||
-         markInfo.second == Marking::Send)) {
-      diagnose(hostFn.getASTContext(), markInfo.first->getLoc().getSourceLoc(),
-               diag::tf_convention_tf_host_code_not_allowed);
-      foundError = true;
-    }
 
-    // Ignore instructions that will be deleted.
-    if (markInfo.second == Marking::Delete) continue;
+  for (auto markInfo : markedInstructions) {
+    // Ignore instructions that will be deleted or are input arguments to the
+    // tensor program.
+    if (markInfo.second == Marking::Delete ||
+        markInfo.second == Marking::Argument)
+      continue;
     auto *inst = markInfo.first;
-    instrsToCheck.push_back(inst);
+    instrsToCheck.insert(inst);
 
     // If the marked instruction is a terminator, then make sure that the
     // successor blocks are considered as part of our NCA evaluation as well.
@@ -1999,8 +2007,6 @@ bool TFFunctionPartition::markFunction() {
       for (auto &succ : ti->getSuccessors())
         extraBlocksToCheck.push_back(succ.getBB());
   }
-
-  if (foundError) return false;
 
   auto endBB = findNCAOfTensorOps(instrsToCheck, bbOps, extraBlocksToCheck,
     [&](SILBasicBlock *B1, SILBasicBlock *B2) -> SILBasicBlock* {
@@ -2066,6 +2072,8 @@ bool TFFunctionPartition::markFunction() {
     *outs << "---- END OF ANALYSIS STATE FOR FUNCTION ----------\n";
     outs->flush();
   }
+
+  assert(DI.dominates(startBB, endBB));
 
   return true;
 }
@@ -3417,9 +3425,19 @@ bool PartitionCloner::finalizeOriginal() {
   // Next, add sends back of any values that are used by the host code, and
   // remove the original instruction.
   for (auto inst : instructionsToRemove) {
-    // These insts cannot contain types like unconditional branch, which do not
-    // have getResults() defined.
-    assert(!isa<NonValueInstruction>(inst));
+    if (isUserIgnoredByPartitioning(inst)) {
+      // TODO: If we are removing retain/release insts over a tensor value `a`,
+      // and `a` has uses in the host code after the tensor program region, we
+      // need to rebalance its retain/release count.
+      inst->eraseFromParent();
+      continue;
+    }
+    // These insts cannot contain types like unconditional branch, which do
+    // not have getResults() defined.
+    if (isa<NonValueInstruction>(inst)) {
+      inst->dump();
+      llvm_unreachable("Cannot remove this inst from host code!");
+    }
     for (auto result : inst->getResults())
       if (!handleHostReferencesOfMovedValue(result,
                                             getUserSourceLocation(inst)))
