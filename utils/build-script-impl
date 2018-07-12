@@ -1717,6 +1717,15 @@ function set_swiftpm_bootstrap_command() {
         --swiftc="${SWIFTC_BIN}"
         --sbt="${LLBUILD_BIN}"
         --build="${build_dir}")
+
+    # Add flags to link llbuild.
+    LLBUILD_BUILD_DIR="$(build_directory ${host} llbuild)"
+    swiftpm_bootstrap_command+=(
+        --link-llbuild
+        --llbuild-source-dir="${LLBUILD_SOURCE_DIR}"
+        --llbuild-build-dir="${LLBUILD_BUILD_DIR}"
+    )
+
     if [[ ! "${SKIP_BUILD_FOUNDATION}" ]] ; then
         swiftpm_bootstrap_command+=(
             --foundation="${FOUNDATION_BUILD_DIR}/Foundation")
