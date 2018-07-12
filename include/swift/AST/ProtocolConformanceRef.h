@@ -89,6 +89,10 @@ public:
   
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
+                               SubstitutionMap subMap) const;
+
+  /// Apply a substitution to the conforming type.
+  ProtocolConformanceRef subst(Type origType,
                                TypeSubstitutionFn subs,
                                LookupConformanceFn conformances) const;
 
