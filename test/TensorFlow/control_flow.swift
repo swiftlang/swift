@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import TensorFlow
 
@@ -213,6 +213,30 @@ struct SS : P {}
 public func testCheckedCastAddrBranch(_ p: P) {
   var b = Tensor<Float>(2.0)
   if let _ = p as? S {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testDynamicMethodBranch
+// CHECK:       bb0:
+// CHECK:       [Send]    dynamic_method_br {{.*}}, bb1, bb2
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+class DynamicMethodClass {
+  @objc func f() {}
+}
+public func testDynamicMethodBranch(_ obj: AnyObject) {
+  var b = Tensor<Float>(2.0)
+  if let foo = obj.f {
+    foo()
     b += 1.0
   }
   b -= 1.0
