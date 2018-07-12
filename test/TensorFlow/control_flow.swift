@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -tf-dump-intermediates -Xllvm -tf-dump-graph -O -emit-sil %s -verify -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 import TensorFlow
 
@@ -74,3 +74,198 @@ public func weighPetOnlyDefault(pet: Pet) {
 // CHECK-NOT:  bb1
 // CHECK:        return
 // CHECK-NEXT: }  // end sil function
+
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCondBranch
+// CHECK:       bb0:
+// CHECK:       [Copy]    cond_br {{.*}}, bb2, bb1
+// CHECK:       bb1:
+// CHECK-NEXT:  [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+public func testCondBranch(_ a: Bool) { // expected-warning {{'a' implicitly copied to the accelerator}}
+  var b = Tensor<Float>(2.0)
+  if a { // expected-note {{value used here}}
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testSwitchEnum
+// CHECK:       bb0:
+// CHECK:       [Send]    switch_enum {{.*}}, case {{.*}} bb2, case {{.*}} bb1
+// CHECK:       bb1:
+// CHECK-NEXT:  [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+public func testSwitchEnum(_ a: Int?) {
+  var b = Tensor<Float>(2.0)
+  if let _ = a {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testSwitchEnumAddr
+// CHECK:       bb0:
+// CHECK:       [Send]    switch_enum_addr {{.*}}, case {{.*}} bb1, case {{.*}} bb2
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+public protocol P {}
+public struct S: P {}
+public enum EnumAddr {
+  case A
+  case B(P)
+}
+public func testSwitchEnumAddr(_ a: EnumAddr) {
+  var b = Tensor<Float>(2.0)
+  switch a {
+  case .A:
+      b += 1.0
+  default:
+      break
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testTryApply
+// CHECK:       bb0:
+// CHECK:       [Send]    try_apply {{.*}}, normal bb1, error bb3
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb2
+// CHECK:       bb2:
+// CHECK:           return
+// CHECK:       bb3:
+// CHECK:       [Copy]    br bb2
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+public func testTryApply(_ a: Int) {
+  enum MyError : Error {
+    case E(String)
+  }
+  @inline(never)
+  func foo(_ x: Int) throws {
+    if x == 1 {
+      throw MyError.E("err")
+    }
+  }
+
+  var b = Tensor<Float>(2.0)
+  do {
+    try foo(a)
+    b += 1.0
+  } catch { }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCheckedCastBranch
+// CHECK:       bb0:
+// CHECK:       [Send]    checked_cast_br {{.*}}, bb1, bb2
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+class X {}
+class Y {}
+public func testCheckedCastBranch(_ a: AnyObject) {
+  var b = Tensor<Float>(2.0)
+  if a is X {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testCheckedCastAddrBranch
+// CHECK:       bb0:
+// CHECK:       [Send]    checked_cast_addr_br {{.*}}, bb1, bb2
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+struct SS : P {}
+public func testCheckedCastAddrBranch(_ p: P) {
+  var b = Tensor<Float>(2.0)
+  if let _ = p as? S {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// CHECK-LABEL: ---- ANALYSIS STATE FOR FUNCTION {{.*}}testDynamicMethodBranch
+// CHECK:       bb0:
+// CHECK:       [Send]    dynamic_method_br {{.*}}, bb1, bb2
+// CHECK:       bb1:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb2:
+// CHECK:       [Copy]    br bb3
+// CHECK:       bb3:
+// CHECK:           return
+// CHECK-NEXT:  ---- END OF ANALYSIS STATE FOR FUNCTION
+
+class DynamicMethodClass {
+  @objc func f() {}
+}
+public func testDynamicMethodBranch(_ obj: AnyObject) {
+  var b = Tensor<Float>(2.0)
+  if let foo = obj.f {
+    foo()
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+//===-------------------------------------------------------------------===//
+// TODO: enable the following tests when relevant compiler crashes are fixed
+//===-------------------------------------------------------------------===//
+/*
+// This generates switch_value, but it requires -Onone that crashes compiler.
+@_optimize(none)
+public func test(_ x: Bool) {
+  var b = Tensor<Float>(2.0)
+  switch (x) {
+    case true: b += 1.0
+    default: break
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+
+// This generates checked_cast_value_br, but it requires -enable-sil-opaque-values that crashes compiler.
+public func foo<T>(_ a: T) {
+  var b = Tensor<Float>(2.0)
+  if let _ : T = 42 as? T {
+    b += 1.0
+  }
+  b -= 1.0
+  _hostOp(b)
+}
+*/
