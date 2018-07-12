@@ -83,6 +83,14 @@ ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
 
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
+                              SubstitutionMap subMap) const {
+  return subst(origType,
+               QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType,
                               TypeSubstitutionFn subs,
                               LookupConformanceFn conformances) const {
   auto substType = origType.subst(subs, conformances,
@@ -96,8 +104,7 @@ ProtocolConformanceRef::subst(Type origType,
       // If this is a class, we need to traffic in the actual type that
       // implements the protocol, not 'Self' and not any subclasses (with their
       // inherited conformances).
-      substType =
-          substType->eraseDynamicSelfType()->getSuperclassForDecl(classDecl);
+      substType = substType->getSuperclassForDecl(classDecl);
     }
     return ProtocolConformanceRef(
       getConcrete()->subst(substType, subs, conformances));
@@ -739,9 +746,7 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
     SubstitutionMap::getProtocolSubstitutions(getRequirement(),
                                               conformingType, *this);
   auto abstractConf = ProtocolConformanceRef(protocol);
-  return abstractConf.subst(assocType,
-                            QuerySubstitutionMap{subMap},
-                            LookUpConformanceInSubstitutionMap(subMap));
+  return abstractConf.subst(assocType, subMap);
 }
 
 ProtocolConformanceRef
@@ -942,9 +947,7 @@ SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
        ? conformance.getConcrete()->getType()
        : GenericConformance->getAssociatedType(assocType, resolver));
 
-  return conformance.subst(origType,
-                           QuerySubstitutionMap{subMap},
-                           LookUpConformanceInSubstitutionMap(subMap));
+  return conformance.subst(origType, subMap);
 }
 
 ConcreteDeclRef
@@ -1025,6 +1028,14 @@ bool ProtocolConformance::witnessTableAccessorRequiresArguments() const {
 bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   // FIXME: Implement me!
   return true;
+}
+
+ProtocolConformance *
+ProtocolConformance::subst(Type substType,
+                           SubstitutionMap subMap) const {
+  return subst(substType,
+               QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
 }
 
 ProtocolConformance *
