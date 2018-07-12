@@ -815,6 +815,35 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl) {
   hashIntoDecl->setBody(body);
 }
 
+/// Derive the body for the 'hash(into:)' method for an enum by using its raw
+/// value.
+static void
+deriveBodyHashable_enum_rawValue_hashInto(
+  AbstractFunctionDecl *hashIntoDecl
+) {
+  // enum SomeEnum: Int {
+  //   case A, B, C
+  //   @derived func hash(into hasher: inout Hasher) {
+  //     hasher.combine(self.rawValue)
+  //   }
+  // }
+  ASTContext &C = hashIntoDecl->getASTContext();
+
+  // generate: self.rawValue
+  auto *selfRef = DerivedConformance::createSelfDeclRef(hashIntoDecl);
+  auto *rawValueRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
+                                                C.Id_rawValue, DeclNameLoc(),
+                                                /*Implicit=*/true);
+
+  // generate: hasher.combine(discriminator)
+  auto hasherParam = hashIntoDecl->getParameterList(1)->get(0);
+  ASTNode combineStmt = createHasherCombineCall(C, hasherParam, rawValueRef);
+
+  auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
+                                /*implicit*/ true);
+  hashIntoDecl->setBody(body);
+}
+
 /// Derive the body for the 'hash(into:)' method for an enum without associated
 /// values.
 static void
@@ -1184,10 +1213,13 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        auto bodySynthesizer =
-            !ED->hasOnlyCasesWithoutAssociatedValues()
-                ? &deriveBodyHashable_enum_hasAssociatedValues_hashInto
-                : &deriveBodyHashable_enum_noAssociatedValues_hashInto;
+        void (*bodySynthesizer)(AbstractFunctionDecl *);
+        if (ED->isObjC())
+          bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
+        else if (ED->hasOnlyCasesWithoutAssociatedValues())
+          bodySynthesizer = deriveBodyHashable_enum_noAssociatedValues_hashInto;
+        else
+          bodySynthesizer=deriveBodyHashable_enum_hasAssociatedValues_hashInto;
         return deriveHashable_hashInto(*this, bodySynthesizer);
       } else if (isa<StructDecl>(Nominal))
         return deriveHashable_hashInto(*this,

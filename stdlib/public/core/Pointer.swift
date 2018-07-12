@@ -22,7 +22,6 @@ public protocol _Pointer {
 }
 
 /// Derive a pointer argument from a convertible pointer type.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertPointerToPointerArgument<
@@ -33,7 +32,6 @@ func _convertPointerToPointerArgument<
 }
 
 /// Derive a pointer argument from the address of an inout parameter.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertInOutToPointerArgument<
@@ -46,7 +44,6 @@ func _convertInOutToPointerArgument<
 ///
 /// This always produces a non-null pointer, even if the array doesn't have any
 /// storage.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
@@ -69,7 +66,6 @@ func _convertConstArrayToPointerArgument<
 /// Derive a pointer argument from an inout array parameter.
 ///
 /// This always produces a non-null pointer, even if the array's length is 0.
-@inlinable // FIXME(sil-serialize-all)
 @_transparent
 public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<

@@ -3140,7 +3140,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_LLBUILD}" ]] ; then
                     continue
                 fi
-                INSTALL_TARGETS="install-swift-build-tool"
+                INSTALL_TARGETS="install-swift-build-tool install-libllbuildSwift"
                 ;;
             # Products from this here install themselves; they don't fall-through.
             lldb)

@@ -147,3 +147,14 @@ func freeFunction() {
     // expected-error@-1 {{can only be used as a generic constraint because it has Self or associated type requirements}}
   }
 }
+
+// Superclass lookup archetype vs interface type mixup
+class Generic<T> {
+  struct Nested {}
+
+  func outerMethod() {
+    class Inner : Generic<T> { // expected-error {{type 'Inner' cannot be nested in generic function 'outerMethod()'}}
+      func innerMethod() -> Nested {}
+    }
+  }
+}

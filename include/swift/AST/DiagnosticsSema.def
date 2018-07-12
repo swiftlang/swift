@@ -227,6 +227,12 @@ ERROR(cannot_subscript_nil_literal,none,
 ERROR(cannot_pass_rvalue_inout_subelement,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
+ERROR(cannot_pass_rvalue_inout_converted,none,
+      "inout argument could be set to a value with a type other than %0; "
+      "use a value declared as type %1 instead", (Type, Type))
+NOTE(inout_change_var_type_if_possible,none,
+      "change variable type to %1 if it doesn't need to be declared as %0",
+      (Type, Type))
 ERROR(cannot_pass_rvalue_inout,none,
       "cannot pass immutable value of type %0 as inout argument",
       (Type))
@@ -1823,6 +1829,10 @@ WARNING(protocol_composition_with_postfix,none,
         "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
 
+ERROR(protocol_where_clause_self_requirement,none,
+      "constraint with subject type of 'Self' is not supported; "
+      "consider adding requirement to protocol inheritance clause instead", ())
+
 ERROR(invalid_protocol_composition_member,none,
       "non-protocol, non-class type %0 cannot be used within a "
       "protocol-constrained type", (Type))
@@ -2118,6 +2128,8 @@ ERROR(duplicate_inheritance,none,
   "duplicate inheritance from %0", (Type))
 WARNING(duplicate_anyobject_class_inheritance,none,
   "redundant inheritance from 'AnyObject' and Swift 3 'class' keyword", ())
+ERROR(objc_protocol_with_superclass,none,
+  "protocol %0 is '@objc' and cannot have a superclass constraint", (Identifier))
 ERROR(multiple_inheritance,none,
   "multiple inheritance from classes %0 and %1", (Type, Type))
 ERROR(non_class_inheritance,none,

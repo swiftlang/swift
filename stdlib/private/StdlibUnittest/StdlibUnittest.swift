@@ -3010,8 +3010,8 @@ public func expectEqualMethodsForDomain<
   }
 }
 
-public func expectEqualUnicodeScalars(
-  _ expected: [UInt32], _ actual: String,
+public func expectEqualUnicodeScalars<S: StringProtocol>(
+  _ expected: [UInt32], _ actual: S,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,

@@ -214,6 +214,8 @@ void TypeChecker::validateWhereClauses(ProtocolDecl *protocol,
                                        GenericTypeResolver *resolver) {
   TypeResolutionOptions options;
 
+  options |= TypeResolutionFlags::ProtocolWhereClause;
+
   if (auto whereClause = protocol->getTrailingWhereClause()) {
     revertGenericRequirements(whereClause->getRequirements());
     validateRequirements(whereClause->getWhereLoc(),
@@ -288,9 +290,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inheritedClause = type->getInherited();
   } else {
     auto ext = cast<ExtensionDecl>(decl);
-
-    validateExtension(ext);
-    if (ext->isInvalid())
+    if (!ext->getExtendedType())
       return;
 
     inheritedClause = ext->getInherited();
@@ -408,17 +408,27 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     }
     inheritedTypes[inheritedCanTy] = { i, inherited.getSourceRange() };
 
-    // If this is a protocol or protocol composition type, record the
-    // protocols.
     if (inheritedTy->isExistentialType()) {
       auto layout = inheritedTy->getExistentialLayout();
+
+      // @objc protocols cannot have superclass constraints.
+      if (layout.explicitSuperclass) {
+        if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+          if (protoDecl->isObjC()) {
+            diagnose(protoDecl,
+                    diag::objc_protocol_with_superclass,
+                    protoDecl->getName());
+            continue;
+          }
+        }
+      }
 
       // Protocols, generic parameters and associated types can inherit
       // from subclass existentials, which are "exploded" into their
       // corresponding requirements.
       //
-      // Classes can only inherit from subclass existentials that do not
-      // have a superclass term.
+      // Extensions, structs and enums can only inherit from protocol
+      // compositions that do not contain AnyObject or class members.
       if (isa<ProtocolDecl>(decl) ||
           isa<AbstractTypeParamDecl>(decl) ||
           (!layout.hasExplicitAnyObject &&
@@ -492,6 +502,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
           .highlight(superclassRange);
         inherited.setInvalidType(Context);
         continue;
+      }
+
+      // @objc protocols cannot have superclass constraints.
+      if (auto *protoDecl = dyn_cast<ProtocolDecl>(decl)) {
+        if (protoDecl->isObjC()) {
+          diagnose(protoDecl,
+                   diag::objc_protocol_with_superclass,
+                   protoDecl->getName());
+          continue;
+        }
       }
 
       // If the declaration we're looking at doesn't allow a superclass,
@@ -583,23 +603,6 @@ static ArrayRef<EnumDecl *> getInheritedForCycleCheck(TypeChecker &tc,
   return { };
 }
 
-// Break the inheritance cycle for a protocol by removing all inherited
-// protocols.
-//
-// FIXME: Just remove the problematic inheritance?
-static void breakInheritanceCycle(ProtocolDecl *proto) {
-}
-
-/// Break the inheritance cycle for a class by removing its superclass.
-static void breakInheritanceCycle(ClassDecl *classDecl) {
-  classDecl->setSuperclass(Type());
-}
-
-/// Break the inheritance cycle for an enum by removing its raw type.
-static void breakInheritanceCycle(EnumDecl *enumDecl) {
-  enumDecl->setRawType(Type());
-}
-
 /// Check for circular inheritance.
 template<typename T>
 static void checkCircularity(TypeChecker &tc, T *decl,
@@ -629,9 +632,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   circularDiag,
                   path.back()->getName());
 
-      decl->setInvalid();
-      decl->setInterfaceType(ErrorType::get(tc.Context));
-      breakInheritanceCycle(decl);
       break;
     }
 
@@ -643,10 +643,6 @@ static void checkCircularity(TypeChecker &tc, T *decl,
                   declKind, (*i)->getName());
     }
 
-    // Set this declaration as invalid, then break the cycle somehow.
-    decl->setInvalid();
-    decl->setInterfaceType(ErrorType::get(tc.Context));
-    breakInheritanceCycle(decl);
     break;
   }
 
@@ -3354,6 +3350,7 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto underlyingType = typeAlias->getUnderlyingTypeLoc();
   if (underlyingType.isNull()) {
+    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
     typeAlias->setInterfaceType(ErrorType::get(tc.Context));
     typeAlias->setInvalid();
     return;
@@ -3689,7 +3686,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   if (hasEnabledForbiddenTypecheckPrefix())
     checkForForbiddenPrefix(D);
 
-  validateAccessControl(D);
+  (void) D->getFormalAccess();
 
   // Validate the context.
   auto dc = D->getDeclContext();
@@ -3701,6 +3698,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateExtension(ext);
     if (!ext->hasValidSignature())
       return;
+  }
+
+  // Validating the parent may have triggered validation of this declaration,
+  // so just return if that was the case.
+  if (D->hasValidationStarted()) {
+    assert(D->hasValidSignature());
+    return;
   }
 
   if (Context.Stats)
@@ -3850,7 +3854,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           aliasDecl->getUnderlyingTypeLoc().setType(Type());
           aliasDecl->setInterfaceType(Type());
 
-          validateAccessControl(aliasDecl);
+          (void) aliasDecl->getFormalAccess();
 
           // Check generic parameters, if needed.
           bool validated = aliasDecl->hasValidationStarted();
@@ -4596,8 +4600,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto *EED = cast<EnumElementDecl>(D);
 
     checkDeclAttributesEarly(EED);
-    validateAccessControl(EED);
-
     validateAttributes(*this, EED);
 
     EED->setIsBeingValidated(true);
@@ -4684,7 +4686,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     for (auto paramDecl : *gp)
       paramDecl->setDepth(depth);
 
-    validateAccessControl(proto);
+    (void) proto->getFormalAccess();
 
     // Record inherited protocols.
     resolveInheritedProtocols(proto);
@@ -4712,7 +4714,7 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
     if (assocType->hasInterfaceType())
       return;
     assocType->computeType();
-    validateAccessControl(assocType);
+    (void) assocType->getFormalAccess();
     break;
   }
   case DeclKind::TypeAlias: {
@@ -4725,10 +4727,16 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       if (!typealias->getGenericParams()) {
         if (typealias->isBeingValidated()) return;
 
-        typealias->setIsBeingValidated();
-        SWIFT_DEFER { typealias->setIsBeingValidated(false); };
+        bool validated = typealias->hasValidationStarted();
 
-        validateAccessControl(typealias);
+        if (!validated)
+          typealias->setIsBeingValidated();
+        SWIFT_DEFER {
+          if (!validated)
+            typealias->setIsBeingValidated(false);
+        };
+
+        (void) typealias->getFormalAccess();
 
         ProtocolRequirementTypeResolver resolver;
         TypeResolutionOptions options =
@@ -4897,10 +4905,6 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
     auto storage = cast<AbstractStorageDecl>(decl);
     finalizeAbstractStorageDecl(*this, storage);
   }
-}
-
-void TypeChecker::validateAccessControl(ValueDecl *D) {
-  (void) D->getFormalAccess();
 }
 
 bool swift::isPassThroughTypealias(TypeAliasDecl *typealias) {

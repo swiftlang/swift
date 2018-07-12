@@ -1937,8 +1937,7 @@ internal struct _NativeSetBuffer<Element> {
     return _storage.initializedEntries[i]
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func destroyEntry(at i: Int) {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1947,8 +1946,7 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = false
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func initializeKey(_ k: Key, at i: Int) {
     _sanityCheck(!isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
@@ -1957,8 +1955,7 @@ internal struct _NativeSetBuffer<Element> {
     _storage.initializedEntries[i] = true
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func moveInitializeEntry(from: Buffer, at: Int, toEntryAt: Int) {
     _sanityCheck(!isInitializedEntry(at: toEntryAt))
 
@@ -1970,8 +1967,7 @@ internal struct _NativeSetBuffer<Element> {
   }
 
   /// Alias for key(at:) in Sets for better code reuse
-  @inlinable // FIXME(sil-serialize-all)
-  @_transparent
+  @usableFromInline @_transparent
   internal func value(at i: Int) -> Value {
     return key(at: i)
   }

@@ -1415,31 +1415,26 @@ public enum FloatingPointRoundingRule {
 }
 
 extension FloatingPoint {
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func == (lhs: Self, rhs: Self) -> Bool {
     return lhs.isEqual(to: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLess(than: rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func <= (lhs: Self, rhs: Self) -> Bool {
     return lhs.isLessThanOrEqualTo(rhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func > (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLess(than: lhs)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public static func >= (lhs: Self, rhs: Self) -> Bool {
     return rhs.isLessThanOrEqualTo(lhs)
@@ -1668,7 +1663,6 @@ extension FloatingPoint {
   ///
   /// - Parameter rule: The rounding rule to use.
   /// - Returns: The integral value found by rounding using `rule`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded(_ rule: FloatingPointRoundingRule) -> Self {
     var lhs = self
@@ -1698,7 +1692,6 @@ extension FloatingPoint {
   ///
   /// - Returns: The nearest integral value, or, if two integral values are
   ///   equally close, the integral value with greater magnitude.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func rounded() -> Self {
     return rounded(.toNearestOrAwayFromZero)
@@ -1723,7 +1716,6 @@ extension FloatingPoint {
   ///
   /// To specify an alternative rule for rounding, use the `round(_:)` method
   /// instead.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public mutating func round() {
     round(.toNearestOrAwayFromZero)
@@ -1739,7 +1731,6 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public var nextDown: Self {
     return -(-self).nextUp
@@ -1776,7 +1767,6 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1816,7 +1806,6 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
@@ -1838,7 +1827,6 @@ extension FloatingPoint {
   ///     // distance == 5.0
   ///
   /// - Returns: The square root of the value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func squareRoot( ) -> Self {
     var lhs = self
@@ -1859,7 +1847,6 @@ extension FloatingPoint {
   ///   - lhs: One of the values to multiply before adding to this value.
   ///   - rhs: The other value to multiply.
   /// - Returns: The product of `lhs` and `rhs`, added to this value.
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
@@ -2424,7 +2411,7 @@ where Self.RawSignificand : FixedWidthInteger {
   /// - Parameters:
   ///   - range: The range in which to create a random value.
 %   if Range == 'Range':
-  ///     `range` must not be empty.
+  ///     `range` must not be empty and finite.
 %   end
   ///   - generator: The random number generator to use when creating the
   ///     new random value.
@@ -2439,6 +2426,15 @@ where Self.RawSignificand : FixedWidthInteger {
       "Can't get random value with an empty range"
     )
     let delta = range.upperBound - range.lowerBound
+    //  TODO: this still isn't quite right, because the computation of delta
+    //  can overflow (e.g. if .upperBound = .maximumFiniteMagnitude and
+    //  .lowerBound = -.upperBound); this should be re-written with an
+    //  algorithm that handles that case correctly, but this precondition
+    //  is an acceptable short-term fix.
+    _precondition(
+      delta.isFinite,
+      "There is no uniform distribution on an infinite range"
+    )
     let rand: Self.RawSignificand
     if Self.RawSignificand.bitWidth == Self.significandBitCount + 1 {
       rand = generator.next()
@@ -2452,7 +2448,10 @@ where Self.RawSignificand : FixedWidthInteger {
       let significandCount = Self.significandBitCount + 1
       let maxSignificand: Self.RawSignificand = 1 << significandCount
 %     if 'Closed' not in Range:
-      rand = generator.next(upperBound: maxSignificand)
+      // Rather than use .next(upperBound:), which has to work with arbitrary
+      // upper bounds, and therefore does extra work to avoid bias, we can take
+      // a shortcut because we know that maxSignificand is a power of two.
+      rand = generator.next() & (maxSignificand - 1)
 %     else:
       rand = generator.next(upperBound: maxSignificand + 1)
       if rand == maxSignificand {
@@ -2460,7 +2459,7 @@ where Self.RawSignificand : FixedWidthInteger {
       }
 %     end
     }
-    let unitRandom = Self.init(rand) * Self.ulpOfOne / 2
+    let unitRandom = Self.init(rand) * (Self.ulpOfOne / 2)
     let randFloat = delta * unitRandom + range.lowerBound
 %   if 'Closed' not in Range:
     if randFloat == range.upperBound {
@@ -2495,7 +2494,7 @@ where Self.RawSignificand : FixedWidthInteger {
   ///
   /// - Parameter range: The range in which to create a random value.
 %   if Range == 'Range':
-  ///   `range` must not be empty.
+  ///   `range` must not be empty and finite.
 %   end
   /// - Returns: A random value within the bounds of `range`.
   @inlinable

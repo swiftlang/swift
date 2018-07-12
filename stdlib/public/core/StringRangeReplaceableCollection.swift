@@ -495,7 +495,6 @@ extension String {
 extension String {
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func max<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.max(x,y)
@@ -503,7 +502,6 @@ extension String {
 
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
-  @inlinable // FIXME(sil-serialize-all)
   @_transparent
   public func min<T : Comparable>(_ x: T, _ y: T) -> T {
     return Swift.min(x,y)

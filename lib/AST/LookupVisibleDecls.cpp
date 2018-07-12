@@ -130,7 +130,6 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
 
   if (TypeResolver) {
     TypeResolver->resolveDeclSignature(Member);
-    TypeResolver->resolveAccessControl(Member);
   }
 
   // Check access when relevant.
@@ -615,8 +614,7 @@ static void lookupVisibleMemberDeclsImpl(
   // Lookup module references, as on some_module.some_member.  These are
   // special and can't have extensions.
   if (ModuleType *MT = BaseTy->getAs<ModuleType>()) {
-    AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer,
-                                                  TypeResolver);
+    AccessFilteringDeclConsumer FilteringConsumer(CurrDC, Consumer);
     MT->getModule()->lookupVisibleDecls(ModuleDecl::AccessPathTy(),
                                         FilteringConsumer,
                                         NLKind::QualifiedLookup);
@@ -816,7 +814,6 @@ public:
 
     if (TypeResolver) {
       TypeResolver->resolveDeclSignature(VD);
-      TypeResolver->resolveAccessControl(VD);
     }
 
     if (VD->isInvalid()) {
@@ -849,10 +846,6 @@ public:
     }
 
     // Does it make sense to substitute types?
-
-    // Don't pass UnboundGenericType here. If you see this assertion
-    // being hit, fix the caller, don't remove it.
-    assert(IsTypeLookup || !BaseTy->hasUnboundGenericType());
 
     // If the base type is AnyObject, we might be doing a dynamic
     // lookup, so the base type won't match the type of the member's

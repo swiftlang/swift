@@ -552,6 +552,9 @@ enum class TypeResolutionFlags : unsigned {
 
   /// Whether we are in a requirement of a generic declaration
   GenericRequirement = 1 << 26,
+
+  /// Whether we are in a protocol's where clause
+  ProtocolWhereClause = 1 << 27,
 };
 
 /// Option set describing how type resolution should work.
@@ -1004,9 +1007,6 @@ public:
   /// Perform just enough validation for looking up names using the Decl.
   void validateDeclForNameLookup(ValueDecl *D);
 
-  /// Resolves the access control of the given declaration.
-  void validateAccessControl(ValueDecl *D);
-
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
@@ -1103,7 +1103,10 @@ public:
   /// \param member The member whose type projection is being computed.
   /// \param baseTy The base type that will be substituted for the 'Self' of the
   /// member.
-  Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy);
+  /// \param useArchetypes Whether to use context archetypes for outer generic
+  /// parameters if the class is nested inside a generic function.
+  Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member, Type baseTy,
+                              bool useArchetypes = true);
 
   /// \brief Retrieve the superclass type of the given type, or a null type if
   /// the type has no supertype.
@@ -1237,10 +1240,6 @@ public:
 
   /// Check the default arguments that occur within this value decl.
   void checkDefaultArguments(ArrayRef<ParameterList *> params, ValueDecl *VD);
-
-  virtual void resolveAccessControl(ValueDecl *VD) override {
-    validateAccessControl(VD);
-  }
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDeclForNameLookup(VD);

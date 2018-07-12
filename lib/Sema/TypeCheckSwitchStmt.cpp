@@ -319,38 +319,6 @@ namespace {
         return TypeAndVal.getInt();
       }
 
-      // Defines a "usefulness" metric that returns whether the given space
-      // contributes meaningfully to the exhaustiveness of a pattern.
-      bool isUseful() const {
-        auto subspacesUseful = [](const Space &space) {
-          for (auto &subspace : space.getSpaces()) {
-            if (!subspace.isUseful()) {
-              return false;
-            }
-          }
-          return true;
-        };
-
-        switch (getKind()) {
-        case SpaceKind::Empty:
-          return false;
-        case SpaceKind::Type:
-        case SpaceKind::BooleanConstant:
-        case SpaceKind::UnknownCase:
-          return true;
-        case SpaceKind::Disjunct:
-          if (getSpaces().empty()) {
-            return false;
-          }
-          return subspacesUseful(*this);
-        case SpaceKind::Constructor:
-          if (getSpaces().empty()) {
-            return true;
-          }
-          return subspacesUseful(*this);
-        }
-      }
-
       // An optimization that computes if the difference of this space and
       // another space is empty.
       bool isSubspace(const Space &other, TypeChecker &TC,
@@ -436,7 +404,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the constructor heads don't match, subspace is
           // impossible.
-          if (this->Head.compare(other.Head) != 0) {
+          if (this->Head != other.Head) {
             return false;
           }
           
@@ -583,7 +551,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads don't match, the intersection of
           // the constructor spaces is empty.
-          if (this->getHead().compare(other.Head) != 0) {
+          if (this->getHead() != other.Head) {
             return Space();
           }
           
@@ -755,7 +723,7 @@ namespace {
         PAIRCASE (SpaceKind::Constructor, SpaceKind::Constructor): {
           // Optimization: If the heads of the constructors don't match then
           // the two are disjoint and their difference is the first space.
-          if (this->Head.compare(other.Head) != 0) {
+          if (this->Head != other.Head) {
             return *this;
           }
 
@@ -1178,13 +1146,14 @@ namespace {
           Space projection = projectPattern(TC, caseItem.getPattern(),
                                             sawDowngradablePattern);
 
-          if (projection.isUseful()
-                && projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
+          if (!projection.isEmpty() &&
+              projection.isSubspace(Space::forDisjunct(spaces), TC, DC)) {
             sawRedundantPattern |= true;
 
             TC.diagnose(caseItem.getStartLoc(),
                           diag::redundant_particular_case)
               .highlight(caseItem.getSourceRange());
+            continue;
           } else {
             Expr *cachedExpr = nullptr;
             if (checkRedundantLiteral(caseItem.getPattern(), cachedExpr)) {
@@ -1195,6 +1164,7 @@ namespace {
               TC.diagnose(cachedExpr->getLoc(),
                           diag::redundant_particular_literal_case_here)
                 .highlight(cachedExpr->getSourceRange());
+              continue;
             }
           }
           spaces.push_back(projection);

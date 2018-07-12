@@ -3546,7 +3546,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   if (Flags.contains(PD_InProtocol) && !genericParams && !Tok.is(tok::equal)) {
-    TmpCtxt->setDiscard();
+    TmpCtxt->setBackTracking();
     TmpCtxt.reset();
     // If we're in a protocol and don't see an '=' this looks like leftover Swift 2
     // code intending to be an associatedtype.
@@ -4134,7 +4134,7 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags,
       // that the diagnostics point to correct tokens.
       if (BeginParserPosition.isValid()) {
         backtrackToPosition(BeginParserPosition);
-        BacktrackCtxt->setDiscard();
+        BacktrackCtxt->setBackTracking();
         BacktrackCtxt.reset();
         Attributes = DeclAttributes();
       }

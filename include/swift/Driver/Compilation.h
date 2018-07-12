@@ -74,8 +74,6 @@ enum class PreserveOnSignal : bool {
 };
 
 class Compilation {
-  friend class PerformJobsState;
-
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -246,6 +244,10 @@ public:
     return TheOutputInfo;
   }
 
+  DiagnosticEngine &getDiags() const {
+    return Diags;
+  }
+
   UnwrappedArrayView<const Action> getActions() const {
     return llvm::makeArrayRef(Actions);
   }
@@ -299,12 +301,22 @@ public:
     ContinueBuildingAfterErrors = Value;
   }
 
+  bool getShowIncrementalBuildDecisions() const {
+    return ShowIncrementalBuildDecisions;
+  }
   void setShowsIncrementalBuildDecisions(bool value = true) {
     ShowIncrementalBuildDecisions = value;
   }
 
+  bool getShowJobLifecycle() const {
+    return ShowJobLifecycle;
+  }
   void setShowJobLifecycle(bool value = true) {
     ShowJobLifecycle = value;
+  }
+
+  bool getShowDriverTimeCompilation() const {
+    return ShowDriverTimeCompilation;
   }
 
   size_t getFilelistThreshold() const {
@@ -313,6 +325,22 @@ public:
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
+  }
+
+  OutputLevel getOutputLevel() const {
+    return Level;
+  }
+
+  unsigned getBatchSeed() const {
+    return BatchSeed;
+  }
+
+  llvm::sys::TimePoint<> getLastBuildTime() const {
+    return LastBuildTime;
+  }
+
+  Optional<unsigned> getBatchCount() const {
+    return BatchCount;
   }
 
   /// Requests the path to a file containing all input source files. This can
