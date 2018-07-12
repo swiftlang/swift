@@ -56,9 +56,12 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     value.inst->dump();
     return;
   case RK_Integer:
+  case RK_IntegerInline:
     os << "int: " << getIntegerValue() << "\n";
     return;
   case RK_Float:
+  case RK_Float32:
+  case RK_Float64:
     os << "float: ";
     getFloatValue().print(os);
     os << "\n";
@@ -134,8 +137,11 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_EnumWithPayload:
     return EnumWithPayload;
   case RK_Integer:
+  case RK_IntegerInline:
     return Integer;
   case RK_Float:
+  case RK_Float32:
+  case RK_Float64:
     return Float;
   case RK_String:
     return String;
@@ -156,21 +162,39 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
 /// Clone this SymbolicValue into the specified allocator and return the new
 /// version.  This only works for valid constants.
 SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
-  switch (getKind()) {
-  case Unknown:
-  case UninitMemory:
-  case Metatype:
-  case Function:
-  case Enum:
+  auto thisRK = representationKind;
+  // If this is an instruction kind, map onto the thing that will cause a copy.
+  if (thisRK == RK_Inst) {
+    auto *inst = value.inst;
+    if (isa<IntegerLiteralInst>(inst))
+      thisRK = RK_Integer;
+    else if (isa<FloatLiteralInst>(inst))
+      thisRK = RK_Float;
+    else {
+      assert(isa<StringLiteralInst>(inst) && "Unknown ConstantInst kind");
+      thisRK = RK_String;
+    }
+  }
+
+  switch (thisRK) {
+  case RK_Inst: assert(0 && "should be remapped above");
+  case RK_UninitMemory:
+  case RK_Unknown:
+  case RK_Metatype:
+  case RK_Function:
+  case RK_Enum:
+  case RK_IntegerInline:
+  case RK_Float32:
+  case RK_Float64:
     // These have trivial inline storage, just return a copy.
     return *this;
-  case Integer:
+  case RK_Integer:
     return SymbolicValue::getInteger(getIntegerValue(), allocator);
-  case Float:
+    case RK_Float:
     return SymbolicValue::getFloat(getFloatValue(), allocator);
-  case String:
+  case RK_String:
     return SymbolicValue::getString(getStringValue(), allocator);
-  case Aggregate: {
+  case RK_Aggregate: {
     auto elts = getAggregateValue();
     SmallVector<SymbolicValue, 4> results;
     results.reserve(elts.size());
@@ -178,9 +202,10 @@ SymbolicValue SymbolicValue::cloneInto(llvm::BumpPtrAllocator &allocator) const{
       results.push_back(elt.cloneInto(allocator));
     return getAggregate(results, allocator);
   }
-  case EnumWithPayload:
+  case RK_EnumWithPayload:
     return getEnumWithPayload(getEnumValue(), getEnumPayloadValue(), allocator);
-  case Address: {
+  case RK_DirectAddress:
+  case RK_DerivedAddress: {
     SmallVector<unsigned, 4> accessPath;
     auto *memObject = getAddressValue(accessPath);
     auto *newMemObject =
@@ -209,64 +234,42 @@ SymbolicValueMemoryObject::create(Type type, SymbolicValue value,
 // Integers
 //===----------------------------------------------------------------------===//
 
-namespace swift {
-/// This is a representation of an integer value, stored as a trailing array
-/// of words.  Elements of this value are bump-pointer allocated.
-struct alignas(uint64_t) APIntSymbolicValue final
-  : private llvm::TrailingObjects<APIntSymbolicValue, uint64_t> {
-    friend class llvm::TrailingObjects<APIntSymbolicValue, uint64_t>;
-
-  /// The number of words in the trailing array and # bits of the value.
-  const unsigned numWords, numBits;
-
-  static APIntSymbolicValue *create(unsigned numBits,
-                                    ArrayRef<uint64_t> elements,
-                                    llvm::BumpPtrAllocator &allocator) {
-    auto byteSize =
-      APIntSymbolicValue::totalSizeToAlloc<uint64_t>(elements.size());
-    auto rawMem = allocator.Allocate(byteSize, alignof(APIntSymbolicValue));
-
-    //  Placement initialize the APIntSymbolicValue.
-    auto ilv = ::new (rawMem) APIntSymbolicValue(numBits, elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(),
-                            ilv->getTrailingObjects<uint64_t>());
-    return ilv;
-  }
-
-  APInt getValue() const {
-    return APInt(numBits, { getTrailingObjects<uint64_t>(), numWords });
-  }
-
-  // This is used by the llvm::TrailingObjects base class.
-  size_t numTrailingObjects(OverloadToken<uint64_t>) const {
-    return numWords;
-  }
-private:
-  APIntSymbolicValue() = delete;
-  APIntSymbolicValue(const APIntSymbolicValue &) = delete;
-  APIntSymbolicValue(unsigned numBits, unsigned numWords)
-    : numWords(numWords), numBits(numBits) {}
-};
-} // end namespace swift
-
 SymbolicValue SymbolicValue::getInteger(const APInt &value,
                                         llvm::BumpPtrAllocator &allocator) {
-  // TODO: Could store these inline in the union in the common case.
-  auto intValue =
-    APIntSymbolicValue::create(value.getBitWidth(),
-                               { value.getRawData(), value.getNumWords()},
-                               allocator);
-  assert(intValue && "Integer value must be present");
+  // In the common case, we can form an inline representation.
+  unsigned numWords = value.getNumWords();
+  if (numWords == 1) {
+    SymbolicValue result;
+    result.representationKind = RK_IntegerInline;
+    result.value.integerInline = value.getRawData()[0];
+    result.aux.integer_bitwidth = value.getBitWidth();
+    return result;
+  }
+
+  // Copy the integers from the APInt into the bump pointer.
+  auto *words = allocator.Allocate<uint64_t>(numWords);
+  std::uninitialized_copy(value.getRawData(), value.getRawData()+numWords,
+                          words);
+
   SymbolicValue result;
   result.representationKind = RK_Integer;
-  result.value.integer = intValue;
+  result.value.integer = words;
+  result.aux.integer_bitwidth = value.getBitWidth();
   return result;
 }
 
 APInt SymbolicValue::getIntegerValue() const {
   assert(getKind() == Integer);
-  if (representationKind == RK_Integer)
-    return value.integer->getValue();
+  if (representationKind == RK_IntegerInline) {
+    auto numBits = aux.integer_bitwidth;
+    return APInt(numBits, value.integerInline);
+  }
+
+  if (representationKind == RK_Integer) {
+    auto numBits = aux.integer_bitwidth;
+    auto numWords = (numBits+63)/64;
+    return APInt(numBits, { value.integer, numWords });
+  }
 
   assert(representationKind == RK_Inst);
   // TODO: Will eventually support the bump-pointer allocated folded int value.
@@ -325,9 +328,25 @@ private:
 
 SymbolicValue SymbolicValue::getFloat(const APFloat &value,
                                       llvm::BumpPtrAllocator &allocator) {
+  // We have a lot of floats and doubles, store them with an inline
+  // representation.
+  auto &semantics = value.getSemantics();
+  if (&semantics == &APFloat::IEEEsingle()) {
+    SymbolicValue result;
+    result.representationKind = RK_Float32;
+    result.value.float32 = value.convertToFloat();
+    return result;
+  }
+  if (&semantics == &APFloat::IEEEdouble()) {
+    SymbolicValue result;
+    result.representationKind = RK_Float64;
+    result.value.float64 = value.convertToDouble();
+    return result;
+  }
+
+  // Handle exotic formats with general support logic.
   APInt val = value.bitcastToAPInt();
 
-  // TODO: Could store these inline in the union in the common case.
   auto fpValue =
     APFloatSymbolicValue::create(value.getSemantics(),
                                  { val.getRawData(), val.getNumWords()},
@@ -341,6 +360,11 @@ SymbolicValue SymbolicValue::getFloat(const APFloat &value,
 
 APFloat SymbolicValue::getFloatValue() const {
   assert(getKind() == Float);
+
+  if (representationKind == RK_Float32)
+    return APFloat(value.float32);
+  if (representationKind == RK_Float64)
+    return APFloat(value.float64);
 
   if (representationKind == RK_Float)
     return value.floatingPoint->getValue();

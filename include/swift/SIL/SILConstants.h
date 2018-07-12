@@ -92,14 +92,19 @@ class SymbolicValue {
     RK_Inst,
 
     /// This value is represented with a bump-pointer allocated APInt.
-    /// TODO: We could store small integers into the union inline to avoid
-    /// allocations if it ever matters.
     RK_Integer,
 
+    /// This value is represented with an inline integer representation.
+    RK_IntegerInline,
+
     /// This value is represented with a bump-pointer allocated APFloat.
-    /// TODO: We could store small floats into the union inline to avoid
-    /// allocations if it ever matters.
     RK_Float,
+
+    /// This value is representation with an inline float representation.
+    RK_Float32,
+
+    /// This value is representation with an inline double representation.
+    RK_Float64,
 
     /// This value is represented with a bump-pointer allocated char array
     /// representing a UTF-8 encoded string.
@@ -142,12 +147,21 @@ class SymbolicValue {
     SingleValueInstruction *inst;
 
     /// When this SymbolicValue is of "Integer" kind, this pointer stores
-    /// information about the APInt value it holds.
-    APIntSymbolicValue *integer;
+    /// the words of the APInt value it holds.
+    uint64_t *integer;
+
+    /// This holds the bits of an integer for an inline representation.
+    uint64_t integerInline;
 
     /// When this SymbolicValue is of "Float" kind, this pointer stores
     /// information about the APFloat value it holds.
     APFloatSymbolicValue *floatingPoint;
+
+    /// When this is an RK_Float32, this holds the inline representation.
+    float float32;
+
+    /// When this is an RK_Float64, this holds the inline representation.
+    double float64;
 
     /// When this SymbolicValue is of "String" kind, this pointer stores
     /// information about the StringRef value it holds.
@@ -180,8 +194,9 @@ class SymbolicValue {
     /// This is the reason code for RK_Unknown values.
     UnknownReason unknown_reason : 32;
 
-    //unsigned integer_bitwidth;
-    // ...
+    /// This is the number of bits in an RK_Integer or RK_IntegerInline
+    /// representation, which makes the number of entries in the list derivable.
+    unsigned integer_bitwidth;
   } aux;
 
 public:
@@ -399,10 +414,6 @@ struct SymbolicValueMemoryObject {
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
                                            llvm::BumpPtrAllocator &allocator);
-  static SymbolicValueMemoryObject *create(Type type,
-                                           llvm::BumpPtrAllocator &allocator) {
-    return create(type, SymbolicValue::getUninitMemory(), allocator);
-  }
 
 private:
   const Type type;

@@ -139,9 +139,6 @@ namespace {
       setValue(addr, result);
       return result;
     }
-    SymbolicValue createMemoryObject(SILValue addr) {
-      return createMemoryObject(addr, SymbolicValue::getUninitMemory());
-    }
 
     /// Return the SymbolicValue for the specified SIL value, lazily computing
     /// it if needed.
@@ -328,9 +325,10 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
       return SymbolicValue::getEnum(enumVal->getElement());
 
     auto payload = computeConstantValue(enumVal->getOperand());
-    if (payload.isConstant())
-      return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
-                                               evaluator.getAllocator());
+    if (!payload.isConstant())
+      return payload;
+    return SymbolicValue::getEnumWithPayload(enumVal->getElement(), payload,
+                                             evaluator.getAllocator());
   }
 
   // This one returns the address of its enum payload.
@@ -1005,8 +1003,9 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
     return SymbolicValue::getUnknown(addr, UnknownReason::Default);
 
   // Keep track of the value found for the first constant store.
-  auto *memoryObject =
-    createMemoryObject(alloc).getAddressValueMemoryObject();
+  auto memoryAddress = createMemoryObject(alloc,
+                                          SymbolicValue::getUninitMemory());
+  auto *memoryObject = memoryAddress.getAddressValueMemoryObject();
 
   // Okay, check out all of the users of this value looking for semantic stores
   // into the address.  If we find more than one, then this was a var or
@@ -1066,7 +1065,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
       // If the call failed, we're done.
       if (callResult.hasValue()) {
         memoryObject->setValue(callResult.getValue());
-        return SymbolicValue::getAddress(memoryObject);
+        return memoryAddress;
       }
 
       // computeCallResult will have figured out the result and cached it for
@@ -1086,7 +1085,7 @@ ConstExprFunctionState::computeSingleStoreAddressValue(SILValue addr) {
 
   // If we found a store of a constant, then return that value!
   if (memoryObject->getValue().isConstant())
-    return SymbolicValue::getAddress(memoryObject);
+    return memoryAddress;
 
   // Otherwise, return unknown.
   return SymbolicValue::getUnknown(addr, UnknownReason::Default);
@@ -1172,7 +1171,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
   if (auto asi = dyn_cast<AllocStackInst>(inst)) {
-    createMemoryObject(asi);
+    createMemoryObject(asi, SymbolicValue::getUninitMemory());
     return None;
   }
 
