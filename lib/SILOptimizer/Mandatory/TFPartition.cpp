@@ -3044,12 +3044,12 @@ void PartitionCloner::handleSendRecvForTerminator(TermInst *inst) {
 /// Insert a send of values from the specified instruction result(s) to the
 /// accelerator, and insert receives in it.
 void PartitionCloner::insertSend(SILInstruction &inst) {
-  if (auto *Term = dyn_cast<TermInst>(&inst)) {
-    if (shouldMarkSend(Term)) {
-      handleSendRecvForTerminator(Term);
+  if (auto *TI = dyn_cast<TermInst>(&inst)) {
+    if (shouldMarkSend(TI)) {
+      handleSendRecvForTerminator(TI);
       return;
     }
-    Term->dump();
+    TI->dump();
     llvm_unreachable("Cannot handle the above terminator with Marking::Send");
   }
 
