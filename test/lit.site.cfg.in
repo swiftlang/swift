@@ -88,6 +88,9 @@ config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 if "@SWIFT_ENABLE_SOURCEKIT_TESTS@" == "TRUE":
     config.available_features.add('sourcekit')
 
+if "@SWIFT_BUILD_PERF_TESTSUITE@" == "TRUE":
+    config.available_features.add('benchmark')
+
 if "@SWIFT_ENABLE_GUARANTEED_NORMAL_ARGUMENTS@" == "TRUE":
    config.available_features.add('plus_zero_runtime')
 else:
