@@ -692,6 +692,7 @@ public:
   /// not be serialized.
   bool canHaveComment() const;
 
+  LLVM_READONLY
   DeclContext *getDeclContext() const {
     if (auto dc = Context.dyn_cast<DeclContext *>())
       return dc;
@@ -706,9 +707,11 @@ public:
   DeclContext *getInnermostDeclContext() const;
 
   /// \brief Retrieve the module in which this declaration resides.
+  LLVM_READONLY
   ModuleDecl *getModuleContext() const;
 
   /// getASTContext - Return the ASTContext that this decl lives in.
+  LLVM_READONLY
   ASTContext &getASTContext() const {
     if (auto dc = Context.dyn_cast<DeclContext *>())
       return dc->getASTContext();
@@ -851,6 +854,7 @@ public:
 
   /// \brief Retrieve the Clang AST node from which this declaration was
   /// synthesized, if any.
+  LLVM_READONLY
   ClangNode getClangNode() const {
     if (!Bits.Decl.FromClang)
       return ClangNode();
@@ -860,6 +864,7 @@ public:
 
   /// \brief Retrieve the Clang declaration from which this declaration was
   /// synthesized, if any.
+  LLVM_READONLY
   const clang::Decl *getClangDecl() const {
     if (!Bits.Decl.FromClang)
       return nullptr;
@@ -869,6 +874,7 @@ public:
 
   /// \brief Retrieve the Clang macro from which this declaration was
   /// synthesized, if any.
+  LLVM_READONLY
   const clang::MacroInfo *getClangMacro() {
     if (!Bits.Decl.FromClang)
       return nullptr;
@@ -877,6 +883,7 @@ public:
   }
 
   /// \brief Return the GenericContext if the Decl has one.
+  LLVM_READONLY
   const GenericContext *getAsGenericContext() const;
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
@@ -900,6 +907,7 @@ public:
   }
 
   /// Retrieve the diagnostic engine for diagnostics emission.
+  LLVM_READONLY
   DiagnosticEngine &getDiags() const;
 
   // Make vanilla new/delete illegal for Decls.
