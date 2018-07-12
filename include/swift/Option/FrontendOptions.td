@@ -310,10 +310,6 @@ def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
   HelpText<"Infer when a global could be imported as a member">;
 
-def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
-  Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 3 behavior)">;
-
 def disable_swift3_objc_inference :
   Flag<["-"], "disable-swift3-objc-inference">,
   Flags<[FrontendOption, HelpHidden]>,

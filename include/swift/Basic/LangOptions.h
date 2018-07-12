@@ -52,19 +52,6 @@ namespace swift {
     TargetEnvironment,
   };
 
-  /// Describes which Swift 3 Objective-C inference warnings should be
-  /// emitted.
-  enum class Swift3ObjCInferenceWarnings {
-    /// No warnings; this is the default.
-    None,
-    /// "Minimal" warnings driven by uses of declarations that make use of
-    /// the Objective-C entry point directly.
-    Minimal,
-    /// "Complete" warnings that add "@objc" for every entry point that
-    /// Swift 3 would have inferred as "@objc" but Swift 4 will not.
-    Complete,
-  };
-
   /// \brief A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
@@ -231,15 +218,6 @@ namespace swift {
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
-
-    /// Whether to enable Swift 3 @objc inference, e.g., for members of
-    /// Objective-C-derived classes and 'dynamic' members.
-    bool EnableSwift3ObjCInference = false;
-
-    /// Warn about cases where Swift 3 would infer @objc but later versions
-    /// of Swift do not.
-    Swift3ObjCInferenceWarnings WarnSwift3ObjCInference =
-      Swift3ObjCInferenceWarnings::None;
 
     /// Diagnose uses of NSCoding with classes that have unstable mangled names.
     bool EnableNSKeyedArchiverDiagnostics = true;

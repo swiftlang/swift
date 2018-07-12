@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -698,12 +698,6 @@ private:
       printAvailability(AFD);
     }
 
-    if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
-      printSwift3ObjCDeprecatedInference(accessor->getStorage());
-    } else {
-      printSwift3ObjCDeprecatedInference(AFD);
-    }
-
     os << ";\n";
 
     if (makeNewUnavailable) {
@@ -922,37 +916,6 @@ private:
     return hasPrintedAnything;
   }
 
-  void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
-    const LangOptions &langOpts = M.getASTContext().LangOpts;
-    if (!langOpts.EnableSwift3ObjCInference ||
-        langOpts.WarnSwift3ObjCInference == Swift3ObjCInferenceWarnings::None) {
-      return;
-    }
-    auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
-    if (!attr || !attr->isSwift3Inferred())
-      return;
-
-    os << " SWIFT_DEPRECATED_OBJC(\"Swift ";
-    if (isa<VarDecl>(VD))
-      os << "property";
-    else if (isa<SubscriptDecl>(VD))
-      os << "subscript";
-    else if (isa<ConstructorDecl>(VD))
-      os << "initializer";
-    else
-      os << "method";
-    os << " '";
-    auto nominal =
-      VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
-    printEncodedString(nominal->getName().str(), /*includeQuotes=*/false);
-    os << ".";
-    SmallString<32> scratch;
-    printEncodedString(VD->getFullName().getString(scratch),
-                       /*includeQuotes=*/false);
-    os << "' uses '@objc' inference deprecated in Swift 4; add '@objc' to "
-       <<   "provide an Objective-C entrypoint\")";
-  }
-
   void visitFuncDecl(FuncDecl *FD) {
     if (FD->getDeclContext()->isTypeContext())
       printAbstractFunctionAsMethod(FD, FD->isStatic());
@@ -1120,8 +1083,6 @@ private:
       std::tie(objTy, kind) = getObjectTypeAndOptionality(VD, ty);
       print(objTy, kind, objCName);
     }
-
-    printSwift3ObjCDeprecatedInference(VD);
 
     printAvailability(VD);
 

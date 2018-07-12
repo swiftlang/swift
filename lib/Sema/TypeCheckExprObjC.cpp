@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -333,21 +333,6 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
           diagnose(var, diag::make_decl_objc,
                    var->getDescriptiveKind())
-            .fixItInsert(var->getAttributeInsertionLoc(false),
-                         "@objc ");
-        }
-      } else if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
-        // If this attribute was inferred based on deprecated Swift 3 rules,
-        // complain.
-        if (attr->isSwift3Inferred() &&
-            Context.LangOpts.WarnSwift3ObjCInference ==
-              Swift3ObjCInferenceWarnings::Minimal) {
-          diagnose(componentNameLoc, diag::expr_keypath_swift3_objc_inference,
-                   var->getFullName(),
-                   var->getDeclContext()
-                    ->getAsNominalTypeOrNominalTypeExtensionContext()
-                   ->getName());
-          diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
             .fixItInsert(var->getAttributeInsertionLoc(false),
                          "@objc ");
         }

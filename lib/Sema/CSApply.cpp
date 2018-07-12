@@ -1044,26 +1044,6 @@ namespace {
 
         closeExistential(ref, locator, /*force=*/openedExistential);
 
-        // If this attribute was inferred based on deprecated Swift 3 rules,
-        // complain.
-        if (auto attr = member->getAttrs().getAttribute<ObjCAttr>()) {
-          if (attr->isSwift3Inferred() &&
-              tc.Context.LangOpts.WarnSwift3ObjCInference
-                == Swift3ObjCInferenceWarnings::Minimal) {
-            tc.diagnose(memberLoc,
-                        diag::expr_dynamic_lookup_swift3_objc_inference,
-                        member->getDescriptiveKind(),
-                        member->getFullName(),
-                        member->getDeclContext()
-                          ->getAsNominalTypeOrNominalTypeExtensionContext()
-                          ->getName());
-            tc.diagnose(member, diag::make_decl_objc,
-                        member->getDescriptiveKind())
-              .fixItInsert(member->getAttributeInsertionLoc(false),
-                           "@objc ");
-          }
-        }
-
         if (isDynamic) {
           // Rewrite for implicit unwrapping if the solution requires it.
           auto *dynamicLocator =
@@ -4249,23 +4229,6 @@ namespace {
           .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
         return E;
-      } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
-        // If this attribute was inferred based on deprecated Swift 3 rules,
-        // complain.
-        if (attr->isSwift3Inferred() &&
-            tc.Context.LangOpts.WarnSwift3ObjCInference
-              == Swift3ObjCInferenceWarnings::Minimal) {
-          tc.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
-                      foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
-                      foundDecl->getDeclContext()
-                        ->getAsNominalTypeOrNominalTypeExtensionContext()
-                        ->getName())
-            .highlight(subExpr->getSourceRange());
-          tc.diagnose(foundDecl, diag::make_decl_objc,
-                      foundDecl->getDescriptiveKind())
-            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
-                         "@objc ");
-        }
       }
 
       // Note which method we're referencing.
