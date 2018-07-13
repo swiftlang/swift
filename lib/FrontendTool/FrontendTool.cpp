@@ -896,11 +896,14 @@ static bool performCompile(CompilerInstance &Instance,
   if (Invocation.getInputKind() == InputFileKind::IFK_LLVM_IR)
     return compileLLVMIR(Invocation, Instance, Stats);
 
-  if (FrontendOptions::shouldActionOnlyParse(Action))
+  if (FrontendOptions::shouldActionOnlyParse(Action)) {
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules);
-  else
+  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
+    Instance.performParseAndResolveImportsOnly();
+  } else {
     Instance.performSema();
+  }
 
   SWIFT_DEFER {
     // Emit request-evaluator graph via GraphViz, if requested.
@@ -913,8 +916,15 @@ static bool performCompile(CompilerInstance &Instance,
     }
   };
 
+  ASTContext &Context = Instance.getASTContext();
   if (Action == FrontendOptions::ActionType::Parse)
-    return Instance.getASTContext().hadError();
+    return Context.hadError();
+
+  (void)emitMakeDependenciesIfNeeded(Context.Diags,
+                                     Instance.getDependencyTracker(), opts);
+
+  if (Action == FrontendOptions::ActionType::ResolveImports)
+    return Context.hadError();
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);
@@ -929,8 +939,6 @@ static bool performCompile(CompilerInstance &Instance,
     else if (CrashMode == FrontendOptions::DebugCrashMode::CrashAfterParse)
       debugFailWithCrash();
   }
-
-  ASTContext &Context = Instance.getASTContext();
 
   verifyGenericSignaturesIfNeeded(Invocation, Context);
 
@@ -948,9 +956,6 @@ static bool performCompile(CompilerInstance &Instance,
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())
     Context.getClangModuleLoader()->printStatistics();
-
-  (void)emitMakeDependenciesIfNeeded(Context.Diags,
-                                     Instance.getDependencyTracker(), opts);
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 

@@ -27,8 +27,17 @@
 // RUN: not %target-swift-frontend -typecheck -emit-module %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_MODULE %s
 // PARSE_NO_MODULE: error: this mode does not support emitting modules{{$}}
 
+// RUN: not %target-swift-frontend -parse -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_DEPS %s
+// PARSE_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
 // RUN: not %target-swift-frontend -dump-ast -emit-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_DEPS %s
 // DUMP_NO_DEPS: error: this mode does not support emitting dependency files{{$}}
+
+// RUN: not %target-swift-frontend -parse -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_REFERENCE_DEPS %s
+// PARSE_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
+// RUN: not %target-swift-frontend -dump-ast -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_REFERENCE_DEPS %s
+// DUMP_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
+// RUN: not %target-swift-frontend -resolve-imports -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=RESOLVE_IMPORTS_NO_REFERENCE_DEPS %s
+// RESOLVE_IMPORTS_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
 
 // Should not fail with non-zero exit code.
 // RUN: %target-swift-frontend -emit-silgen %S/Inputs/invalid-module-name.swift > /dev/null
