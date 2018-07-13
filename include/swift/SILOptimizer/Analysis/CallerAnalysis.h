@@ -132,7 +132,8 @@ class CallerAnalysis::FunctionInfo {
   friend class CallerAnalysis;
 
   /// A list of all the functions this function calls or partially applies.
-  llvm::SetVector<SILFunction *> Callees;
+  llvm::SmallSetVector<SILFunction *, 4> Callees;
+
   /// A list of all the callers this function has.
   llvm::SmallSet<SILFunction *, 4> Callers;
 
@@ -143,7 +144,7 @@ class CallerAnalysis::FunctionInfo {
   /// function.
   /// This is a little bit off-topic because a partial_apply is not really
   /// a "call" of this function.
-  llvm::DenseMap<SILFunction *, int> PartialAppliers;
+  llvm::SmallMapVector<SILFunction *, int, 1> PartialAppliers;
 
 public:
   /// Returns true if this function has at least one caller.
