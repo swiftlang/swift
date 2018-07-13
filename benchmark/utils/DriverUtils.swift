@@ -74,11 +74,9 @@ struct TestConfig {
       "--verbose", "--delim", "--list", "--sleep",
       "--tags", "--skip-tags", "--help"
     ]
-    let maybeBenchArgs: Arguments? = parseArgs(validOptions)
-    if maybeBenchArgs == nil {
+    guard let benchArgs = parseArgs(validOptions) else {
       return .fail("Failed to parse arguments")
     }
-    let benchArgs = maybeBenchArgs!
 
     filters = benchArgs.positionalArgs
 
