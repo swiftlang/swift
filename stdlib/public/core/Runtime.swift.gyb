@@ -544,30 +544,16 @@ open class _SwiftNativeNSData {
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//
 
-@_fixed_layout // FIXME(sil-serialize-all)
-@usableFromInline // FIXME(sil-serialize-all)
 @objc
 internal class _stdlib_ReturnAutoreleasedDummy {
-  @inlinable // FIXME(sil-serialize-all)
   @objc
   internal init() {}
-
-  @inlinable // FIXME(sil-serialize-all)
-  deinit {}
 
   // Use 'dynamic' to force Objective-C dispatch, which uses the
   // return-autoreleased call sequence.
   @objc
   internal dynamic func returnsAutoreleased(_ x: AnyObject) -> AnyObject {
     return x
-  }
-
-  // Use 'dynamic' to prevent this call to be duplicated into other modules.
-  @objc
-  internal dynamic func initializeReturnAutoreleased() {
-    // On x86_64 it is sufficient to perform one cycle of return-autoreleased
-    // call sequence in order to initialize all required PLT entries.
-    _ = self.returnsAutoreleased(self)
   }
 }
 
@@ -583,11 +569,12 @@ internal class _stdlib_ReturnAutoreleasedDummy {
 /// separate for each dylib.
 ///
 /// Call this function in a fresh autorelease pool.
-@inlinable // FIXME(sil-serialize-all)
 public func _stdlib_initializeReturnAutoreleased() {
-//  _stdlib_initializeReturnAutoreleasedImpl()
 #if arch(x86_64)
-  _stdlib_ReturnAutoreleasedDummy().initializeReturnAutoreleased()
+  // On x86_64 it is sufficient to perform one cycle of return-autoreleased
+  // call sequence in order to initialize all required PLT entries.
+  let dummy = _stdlib_ReturnAutoreleasedDummy()
+  _ = dummy.returnsAutoreleased(dummy)
 #endif
 }
 #else
