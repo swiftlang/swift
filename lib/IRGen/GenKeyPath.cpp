@@ -844,26 +844,28 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
       auto subs = component.getExternalSubstitutions();
-      enumerateGenericSignatureRequirements(
-        componentSig->getCanonicalSignature(),
-        [&](GenericRequirement reqt) {
-          auto substType = reqt.TypeParameter.subst(subs)
-            ->getCanonicalType();
-          if (!reqt.Protocol) {
-            // Type requirement.
-            externalSubArgs.push_back(
-              emitMetadataGeneratorForKeyPath(IGM, substType,
-                                              genericEnv, requirements));
-          } else {
-            // Protocol requirement.
-            auto conformance = subs.lookupConformance(
-                         reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-            externalSubArgs.push_back(
-              emitWitnessTableGeneratorForKeyPath(IGM, substType,
-                                                  *conformance,
-                                                  genericEnv, requirements));
-          }
-        });
+      if (!subs.empty()) {
+        enumerateGenericSignatureRequirements(
+          componentSig->getCanonicalSignature(),
+          [&](GenericRequirement reqt) {
+            auto substType = reqt.TypeParameter.subst(subs)
+              ->getCanonicalType();
+            if (!reqt.Protocol) {
+              // Type requirement.
+              externalSubArgs.push_back(
+                emitMetadataGeneratorForKeyPath(IGM, substType,
+                                                genericEnv, requirements));
+            } else {
+              // Protocol requirement.
+              auto conformance = subs.lookupConformance(
+                           reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
+              externalSubArgs.push_back(
+                emitWitnessTableGeneratorForKeyPath(IGM, substType,
+                                                    *conformance,
+                                                    genericEnv, requirements));
+            }
+          });
+      }
       fields.addInt32(
         KeyPathComponentHeader::forExternalComponent(externalSubArgs.size())
           .getData());
