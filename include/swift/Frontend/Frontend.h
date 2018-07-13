@@ -545,7 +545,7 @@ public:
   ///
   /// Like a parse-only invocation, a single file is required. Unlike a
   /// parse-only invocation, module imports will be processed.
-  void performParseAndNameBindingOnly();
+  void performParseAndResolveImportsOnly();
 
 private:
   SourceFile *

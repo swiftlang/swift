@@ -425,7 +425,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
   return Invocation.getFrontendOptions().isCreatingSIL();
 }
 
-void CompilerInstance::performParseAndNameBindingOnly() {
+void CompilerInstance::performParseAndResolveImportsOnly() {
   performSemaUpTo(SourceFile::NameBound);
 }
 
@@ -473,7 +473,6 @@ void CompilerInstance::performSemaUpTo(SourceFile::ASTStage_t LimitStage) {
 
   parseAndCheckTypesUpTo(implicitImports, LimitStage);
 }
-
 
 CompilerInstance::ImplicitImports::ImplicitImports(CompilerInstance &compiler) {
   kind = compiler.Invocation.getImplicitModuleImportKind();

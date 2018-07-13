@@ -637,8 +637,8 @@ def fixit_all : Flag<["-"], "fixit-all">,
 def parse: Flag<["-"], "parse">,
   HelpText<"Parse input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-def namebind : Flag<["-"], "name-bind">,
-  HelpText<"Parse and perform name binding on input file(s)">, ModeOpt,
+def resolve_imports : Flag<["-"], "resolve-imports">,
+  HelpText<"Parse and resolve imports in input file(s)">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def typecheck : Flag<["-"], "typecheck">,
   HelpText<"Parse and type-check input file(s)">, ModeOpt,

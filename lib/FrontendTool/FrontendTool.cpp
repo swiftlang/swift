@@ -898,8 +898,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules);
-  } else if (Action == FrontendOptions::ActionType::NameBind) {
-    Instance.performParseAndNameBindingOnly();
+  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
+    Instance.performParseAndResolveImportsOnly();
   } else {
     Instance.performSema();
   }
@@ -922,7 +922,7 @@ static bool performCompile(CompilerInstance &Instance,
   (void)emitMakeDependenciesIfNeeded(Context.Diags,
                                      Instance.getDependencyTracker(), opts);
 
-  if (Action == FrontendOptions::ActionType::NameBind)
+  if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
 
   if (observer)

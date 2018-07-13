@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-dependencies-path - -name-bind %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
+// RUN: %target-swift-frontend -emit-dependencies-path - -resolve-imports %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC %s
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -typecheck -primary-file %S/../Inputs/empty\ file.swift | %FileCheck -check-prefix=CHECK-BASIC-YAML %s
 
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %S/../Inputs/empty\ file.swift
@@ -38,7 +38,7 @@
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: :
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -name-bind %s | %FileCheck -check-prefix=CHECK-IMPORT %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path - -typecheck -primary-file %s | %FileCheck -check-prefix=CHECK-IMPORT-YAML %s
 
 // CHECK-IMPORT-LABEL: - :

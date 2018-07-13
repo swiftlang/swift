@@ -322,8 +322,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitImportedModules;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
-  if (Opt.matches(OPT_namebind))
-    return FrontendOptions::ActionType::NameBind;
+  if (Opt.matches(OPT_resolve_imports))
+    return FrontendOptions::ActionType::ResolveImports;
   if (Opt.matches(OPT_typecheck))
     return FrontendOptions::ActionType::Typecheck;
   if (Opt.matches(OPT_dump_parse))
