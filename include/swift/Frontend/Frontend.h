@@ -539,9 +539,13 @@ public:
 
   /// Parses the input file but does no type-checking or module imports.
   /// Note that this only supports parsing an invocation with a single file.
-  ///
-  ///
   void performParseOnly(bool EvaluateConditionals = false);
+
+  /// Parses and performs name binding on all input files.
+  ///
+  /// Like a parse-only invocation, a single file is required. Unlike a
+  /// parse-only invocation, module imports will be processed.
+  void performParseAndResolveImportsOnly();
 
 private:
   SourceFile *
@@ -581,7 +585,9 @@ private:
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
-  void parseAndCheckTypes(const ImplicitImports &implicitImports);
+  void performSemaUpTo(SourceFile::ASTStage_t LimitStage);
+  void parseAndCheckTypesUpTo(const ImplicitImports &implicitImports,
+                              SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
                         const ImplicitImports &implicitImports,
@@ -600,9 +606,10 @@ private:
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
-  void parseAndTypeCheckMainFile(PersistentParserState &PersistentState,
-                                 DelayedParsingCallbacks *DelayedParseCB,
-                                 OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
+                                     PersistentParserState &PersistentState,
+                                     DelayedParsingCallbacks *DelayedParseCB,
+                                     OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
