@@ -439,14 +439,14 @@ func printRunInfo(_ c: TestConfig) {
 }
 
 func runBenchmarks(_ c: TestConfig) {
-  var sumBenchResults = BenchResults()
-  sumBenchResults.sampleCount = 0
   let withUnit = {$0 + "(us)"}
   let header = (
     ["#", "TEST", "SAMPLES"] +
     ["MIN", "MAX", "MEAN", "SD", "MEDIAN"].map(withUnit)
   ).joined(separator: c.delim)
   print(header)
+
+  var testCount = 0
 
   for t in c.tests {
     guard let results = runBench(t, c) else {
@@ -457,18 +457,11 @@ func runBenchmarks(_ c: TestConfig) {
     print("\(t.index)\(c.delim)\(t.name)\(c.delim)\(results.description)")
     fflush(stdout)
 
-    sumBenchResults.min += results.min
-    sumBenchResults.max += results.max
-    sumBenchResults.mean += results.mean
-    sumBenchResults.sampleCount += 1
-    // Don't accumulate SD and Median, as simple sum isn't valid for them.
-    // TODO: Compute SD and Median for total results as well.
-    // sumBenchResults.sd += results.sd
-    // sumBenchResults.median += results.median
+    testCount += 1
   }
 
   print("")
-  print("Totals\(c.delim)\(sumBenchResults.description)")
+  print("Totals\(c.delim)\(testCount)")
 }
 
 public func main() {
