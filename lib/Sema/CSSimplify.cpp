@@ -3546,12 +3546,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   // If the lookup found no hits at all (either viable or unviable), diagnose it
   // as such and try to recover in various ways.
-
-  auto instanceTy = baseObjTy;
-  if (auto MTT = instanceTy->getAs<MetatypeType>())
-    instanceTy = MTT->getInstanceType();
-  
-  // Value member lookup has some hacks too.
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
     
