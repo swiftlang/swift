@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t -module-name Lib -I %S/Inputs/custom-modules -swift-version 4 %s
+// RUN: %target-swift-frontend -emit-module -o %t -module-name Lib -I %S/Inputs/custom-modules -swift-version 5 %s
+
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 5 | %FileCheck %s
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 4 | %FileCheck %s
 
-// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -swift-version 3 | %FileCheck %s
-
-// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 3 -D TEST -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 4 -D TEST -verify
 
 // REQUIRES: objc_interop
 
@@ -16,8 +16,8 @@ import Lib
 func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
-class Sub: Base {} // expected-error {{cannot inherit from class 'Base' (compiled with Swift 4.1.50) because it has overridable members that could not be loaded in Swift 3.4}}
-class Impl: Proto {} // expected-error {{type 'Impl' cannot conform to protocol 'Proto' (compiled with Swift 4.1.50) because it has requirements that could not be loaded in Swift 3.4}}
+class Sub: Base {} // expected-error {{cannot inherit from class 'Base' (compiled with Swift 5.0) because it has overridable members that could not be loaded in Swift 4.1.50}}
+class Impl: Proto {} // expected-error {{type 'Impl' cannot conform to protocol 'Proto' (compiled with Swift 5.0) because it has requirements that could not be loaded in Swift 4.1.50}}
 
 #else // TEST
 
