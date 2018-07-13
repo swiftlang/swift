@@ -245,7 +245,6 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
       processAcyclicRegionExcludingEnd(condBr->getFalseBB(), postidom);
 
     // Finally, form our conditional region.
-
     auto condRegion = new ConditionalSESERegion(startBB, std::move(trueRegion),
                                                 std::move(falseRegion));
     results.push_back(std::unique_ptr<SESERegionTree>(condRegion));
@@ -259,6 +258,33 @@ SESERegionBuilder::processAcyclicRegionExcludingEnd(SILBasicBlock *startBB,
     auto result = new SequenceSESERegion(results);
     return std::unique_ptr<SESERegionTree>(result);
   }
+}
+
+/// Create a TF handle of the appropriate integer type for the given bitwith
+/// that is initialized to the given value.
+SILValue createTFIntegerConst(GraphGlobalConfiguration& graphConfiguration,
+                              SILBuilder &builder, SILLocation location,
+                              unsigned bitwidth, intmax_t value) {
+  ASTContext& context = builder.getASTContext();
+  SILType intType =
+      SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
+  // Literals take attributes specifying the dtype, value, and device.
+  std::string opName("Const");
+  SmallVector<GraphOperationAttribute, 3>  attributes;
+  attributes.push_back({context.getIdentifier("dtype$dtype"),
+                        SymbolicValue::getMetatype(intType.getASTType())});
+  attributes.push_back({context.getIdentifier("value$tensor"),
+                        SymbolicValue::getInteger(APInt(bitwidth, value),
+                                                  context.getAllocator())});
+  graphConfiguration.handleDevicePlacement(
+      "Const",
+      /*opDevice*/ getDeviceString(DeviceType::ALL), builder, location,
+      attributes);
+  GraphOperationInst *constNode = builder.createGraphOperation(
+      location, context.getIdentifier(opName), /*operands*/ {}, attributes,
+      {convertElementTypeToTensorValueType(intType)});
+  assert(constNode->getNumResults() == 1);
+  return constNode->getResults()[0];
 }
 
 // A helper class to transform a loop to have a single exit from the header.
@@ -281,16 +307,18 @@ public:
 private:
   // Helper functions
 
-  /// Remember some information from the loop before it gets transformed.
   void initialize();
 
-  /// Creates a new header for the loop and returns a pari consisting of
+  /// Create a new header for the loop and returns a pair consisting of
   /// the new block and the phi argument corresponding to the exitIndex.
   std::pair<SILBasicBlock *, SILValue> createNewHeader();
 
-  /// Creates a new latch block and clones all the arguments from new header.
+  /// Create a new latch block and clones all the arguments from new header.
   SILBasicBlock *createLatchBlock(SILBasicBlock *newHeader);
 
+  // Patch the edges that go to the header and exit blocks to the new header or
+  // latch block as appropriate. Also, return the map consisting of indices
+  // assigned to the exit blocks.
   llvm::DenseMap<SILBasicBlock *, intmax_t>
   patchEdges(SILBasicBlock *newHeader, SILBasicBlock *latchBlock);
 
@@ -299,21 +327,17 @@ private:
   /// block already.
   ///   \param exitIndices   Map from exit blocks to the assignedindex.
   ///   \param exitIndexArg  SILValue that holds the exitIndex set in the loop.
-  SILBasicBlock *createNewExitBlock(
+  SILBasicBlock *createNewExitBlockWithDemux(
       const llvm::DenseMap<SILBasicBlock *, intmax_t> &exitIndices,
       SILValue exitIndexArg);
 
-  /// Appends the given arguments to the end of the current argument list and
-  /// returns the updated TermInst.
+  /// Replace `termInst` with a new TermInst such that the edge to the target
+  /// consists of the original arguments and the given `newArgs` at the end.
+  /// The old termInst is removed and this returns the newly constructed one.
   TermInst *appendArguments(TermInst *termInst, SILBasicBlock *target,
                             ArrayRef<SILValue> newArgs);
 
-  /// Creates a integer scalar tensor of the appropripate bitwidth and
-  /// initializes it to the givne value.
-  SILValue createTFIntegerConst(SILBuilder &builder, SILLocation location,
-                                unsigned bitwidth, intmax_t value);
-
-  /// Returns an undef value of the given type.
+  /// Return an undef value of the given type.
   SILValue getUndef(SILType type) const {
     return SILUndef::get(type, currentFn->getModule());
   }
@@ -337,42 +361,9 @@ private:
   llvm::SmallPtrSet<SILValue, 8> escapingValues;
 };
 
-/// For loops in the SIL Function with multiple exit block successors,
-/// transforms the loop by introducing a common exit switch block that demuxes
-/// to the appropriate exit block. Updates the Dominanceinfo, PostDominanceinfo,
-/// and LoopInfo as well.
-void SESERegionBuilder::ensureSingleExitFromLoops() {
-  GraphGlobalConfiguration graphConfiguration(
-      GraphGlobalConfiguration::getForFunction(*F, /*removeConfigInst*/ false));
-  // Visit the loop nest hierarchy bottom up.
-  bool changed = false;
-  llvm::SmallVector<std::pair<SILLoop *, bool>, 16> workList;
-  for (auto *L : LI.getTopLevelLoops())
-    workList.push_back({L, L->empty()});
-  while (!workList.empty()) {
-    SILLoop *loop;
-    bool visited;
-    std::tie(loop, visited) = workList.pop_back_val();
-
-    if (!visited) {
-      workList.push_back({loop, true});
-      for (auto *Subloop : loop->getSubLoopRange()) {
-        workList.push_back({Subloop, Subloop->empty()});
-      }
-      continue;
-    }
-    SingleExitLoopTransformer transformer(&graphConfiguration, &LI, &DI, loop);
-    changed |= transformer.transform();
-  }
-  if (changed) {
-    splitAllCondBrCriticalEdgesWithNonTrivialArgs(*F, nullptr, &LI);
-
-    DI.recalculate(*F);
-    PDI.recalculate(*F);
-  }
-}
-
 void SingleExitLoopTransformer::initialize() {
+  // Remember some information from the loop before it gets transformed.
+
   // exit Blocks
   loop->getExitBlocks(exitBlocks);
   // All the exiting edges need to be rewired.
@@ -450,34 +441,6 @@ TermInst *SingleExitLoopTransformer::appendArguments(
   return newTermInst;
 }
 
-/// Creates a TF handle of the appropriate integer type for the given bitwith
-/// that is initialized to the given value.
-SILValue SingleExitLoopTransformer::createTFIntegerConst(SILBuilder &builder,
-                                                         SILLocation location,
-                                                         unsigned bitwidth,
-                                                         intmax_t value) {
-  ASTContext& context = builder.getASTContext();
-  SILType intType =
-      SILType::getBuiltinIntegerType(bitwidth, builder.getASTContext());
-  // Literals take attributes specifying the dtype, value, and device.
-  std::string opName("Const");
-  SmallVector<GraphOperationAttribute, 3> attributes;
-  attributes.push_back({context.getIdentifier("dtype$dtype"),
-                        SymbolicValue::getMetatype(intType.getASTType())});
-  attributes.push_back({context.getIdentifier("value$tensor"),
-                        SymbolicValue::getInteger(APInt(bitwidth, value),
-                                                  context.getAllocator())});
-  graphConfiguration->handleDevicePlacement(
-      "Const",
-      /*opDevice*/ getDeviceString(DeviceType::ALL), builder, location,
-      attributes);
-  GraphOperationInst *constNode = builder.createGraphOperation(
-      location, context.getIdentifier(opName), /*operands*/ {}, attributes,
-      {convertElementTypeToTensorValueType(intType)});
-  assert(constNode->getNumResults() == 1);
-  return constNode->getResults()[0];
-}
-
 std::pair<SILBasicBlock *, SILValue>
 SingleExitLoopTransformer::createNewHeader() {
 
@@ -535,17 +498,23 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   llvm::DenseMap<SILBasicBlock *, intmax_t> exitIndices;
 
-  size_t oldHeaderNumArgs =
+  unsigned oldHeaderNumArgs =
       newHeader->getNumArguments() -
       (escapingValues.size() + /* exitIndex, stayLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
-  SILBasicBlock* headerExit = nullptr;
-  for (SILBasicBlock* succ : header->getSuccessorBlocks()) {
+  SILBasicBlock *headerExit = nullptr;
+  for (SILBasicBlock *succ : header->getSuccessorBlocks()) {
     if (loop->contains(succ))  continue;
     assert(headerExit == nullptr && "Loop header has more than one exit node.");
     headerExit = succ;
   }
+  // Note: headerExit can be a nullptr as header need not be an exiting block.
+  // e.g.,
+  //   while (true) {
+  //     ...
+  //     if ... break;
+  //   }
   if (headerExit != nullptr) {
     exitIndices.insert({headerExit, 0});
   }
@@ -596,11 +565,13 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
       ++nextExitIndex;
     }
     auto kvPair = *emplaceResult.first;
-    newArgs.push_back(createTFIntegerConst(builder, location,
+    newArgs.push_back(createTFIntegerConst(*graphConfiguration, builder,
+                                           location,
                                            /*bitwidth*/ 32,
                                            /*exitIndex*/ kvPair.second));
     // `stayInLoop` flag
-    newArgs.push_back(createTFIntegerConst(builder, location,
+    newArgs.push_back(createTFIntegerConst(*graphConfiguration, builder,
+                                           location,
                                            /*bitwidth*/ 1, stayInLoop));
     appendArguments(src->getTerminator(), newTgt, newArgs);
   }
@@ -610,7 +581,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 /// Build a demuxing if..then..else block that can be used as a single
 /// exit block. This will not have any effect if there is a single exit
 /// block already.
-SILBasicBlock *SingleExitLoopTransformer::createNewExitBlock(
+SILBasicBlock *SingleExitLoopTransformer::createNewExitBlockWithDemux(
     const llvm::DenseMap<SILBasicBlock *, intmax_t> &exitIndices,
     SILValue exitIndexArg) {
   auto createBlockOutsideLoop = [this]() {
@@ -656,7 +627,7 @@ SILBasicBlock *SingleExitLoopTransformer::createNewExitBlock(
         headerLocation, context.getIdentifier(equalOpName),
         /*operands*/
         {exitIndexArg,
-         createTFIntegerConst(builder, headerLocation,
+         createTFIntegerConst(*graphConfiguration, builder, headerLocation,
                               /*bitwidth*/ 32, exitIndices.lookup(trueBlock))},
         attributes,
         {convertElementTypeToTensorValueType(
@@ -700,7 +671,8 @@ bool SingleExitLoopTransformer::transform() {
       patchEdges(newHeader, latchBlock);
 
   // Create a new exit block that demuxes based on exitIndex.
-  SILBasicBlock *newExitBlock = createNewExitBlock(exitIndices, exitIndexArg);
+  SILBasicBlock *newExitBlock =
+      createNewExitBlockWithDemux(exitIndices, exitIndexArg);
 
   // Connect the newheader to the old header and new exit block.
   {
@@ -719,6 +691,42 @@ bool SingleExitLoopTransformer::transform() {
   // Update the loop header to newHeader.
   loop->moveToHeader(newHeader);
   return true;
+}
+
+/// For loops in the SIL Function with multiple exit block successors,
+/// transforms the loop by introducing a common exit switch block that demuxes
+/// to the appropriate exit block. Updates the Dominanceinfo, PostDominanceinfo,
+/// and LoopInfo as well.
+void SESERegionBuilder::ensureSingleExitFromLoops() {
+  GraphGlobalConfiguration graphConfiguration(
+      GraphGlobalConfiguration::getForFunction(*F, /*removeConfigInst*/ false));
+  // Visit the loop nest hierarchy bottom up.
+  bool changed = false;
+  // The bool indicates whether the subloops are already processed.
+  llvm::SmallVector<std::pair<SILLoop *, bool>, 16> workList;
+  for (auto *L : LI.getTopLevelLoops())
+    workList.push_back({L, L->empty()});
+  while (!workList.empty()) {
+    SILLoop *loop;
+    bool subLoopsProcessed;
+    std::tie(loop, subLoopsProcessed) = workList.pop_back_val();
+
+    if (!subLoopsProcessed) {
+      workList.push_back({loop, true});
+      for (auto *Subloop : loop->getSubLoopRange()) {
+        workList.push_back({Subloop, Subloop->empty()});
+      }
+      continue;
+    }
+    SingleExitLoopTransformer transformer(&graphConfiguration, &LI, &DI, loop);
+    changed |= transformer.transform();
+  }
+  if (changed) {
+    splitAllCondBrCriticalEdgesWithNonTrivialArgs(*F, nullptr, &LI);
+
+    DI.recalculate(*F);
+    PDI.recalculate(*F);
+  }
 }
 
 /// Process the specified loop, collapsing it into a SESE region node.  This
