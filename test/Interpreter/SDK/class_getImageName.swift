@@ -65,12 +65,14 @@ testSuite.test("KVO/Simple") {
   // We use object_getClass in this test to not look through KVO's artificial
   // subclass.
   let obj = SimpleNSObject()
-  let observation = obj.observe(\.observableName) { _, _ in }
-  withExtendedLifetime(observation) {
-    let theClass = object_getClass(obj)
-    precondition(theClass !== SimpleNSObject.self, "no KVO subclass?")
-    expectNil(class_getImageName(theClass),
-              "should match what happens with NSObject (below)")
+  autoreleasepool {
+    let observation = obj.observe(\.observableName) { _, _ in }
+    withExtendedLifetime(observation) {
+      let theClass = object_getClass(obj)
+      precondition(theClass !== SimpleNSObject.self, "no KVO subclass?")
+      expectNil(class_getImageName(theClass),
+                "should match what happens with NSObject (below)")
+    }
   }
 }
 
@@ -78,12 +80,14 @@ testSuite.test("KVO/GenericAncestry") {
   // We use object_getClass in this test to not look through KVO's artificial
   // subclass.
   let obj = GenericAncestryNSObject()
-  let observation = obj.observe(\.observableName) { _, _ in }
-  withExtendedLifetime(observation) {
-    let theClass = object_getClass(obj)
-    precondition(theClass !== GenericAncestryNSObject.self, "no KVO subclass?")
-    expectNil(class_getImageName(theClass),
-              "should match what happens with NSObject (below)")
+  autoreleasepool {
+    let observation = obj.observe(\.observableName) { _, _ in }
+    withExtendedLifetime(observation) {
+      let theClass = object_getClass(obj)
+      precondition(theClass !== GenericAncestryNSObject.self, "no KVO subclass?")
+      expectNil(class_getImageName(theClass),
+                "should match what happens with NSObject (below)")
+    }
   }
 }
 
@@ -91,12 +95,14 @@ testSuite.test("KVO/ObjC") {
   // We use object_getClass in this test to not look through KVO's artificial
   // subclass.
   let obj = NSObject()
-  let observation = obj.observe(\.description) { _, _ in }
-  withExtendedLifetime(observation) {
-    let theClass = object_getClass(obj)
-    precondition(theClass !== NSObject.self, "no KVO subclass?")
-    expectNil(class_getImageName(theClass),
-              "should match what happens with the Swift objects (above)")
+  autoreleasepool {
+    let observation = obj.observe(\.description) { _, _ in }
+    withExtendedLifetime(observation) {
+      let theClass = object_getClass(obj)
+      precondition(theClass !== NSObject.self, "no KVO subclass?")
+      expectNil(class_getImageName(theClass),
+                "should match what happens with the Swift objects (above)")
+    }
   }
 }
 
