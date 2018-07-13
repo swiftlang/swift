@@ -139,6 +139,9 @@ extension MyString : StringProtocol {
   func uppercased() -> String {
     return base.uppercased()
   }
+  func caseFolded() -> String {
+    return base.caseFolded()
+  }
 
   init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type

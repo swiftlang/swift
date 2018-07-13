@@ -15,7 +15,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "../SwiftShims/UnicodeShims.h"
+#include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Config.h"
+#include "swift/Runtime/Debug.h"
 
+#include <algorithm>
+#include <mutex>
+#include <assert.h>
 #include <stdint.h>
 
 #if defined(__APPLE__)
@@ -28,7 +34,8 @@ typedef struct UBreakIterator UBreakIterator;
 typedef struct UText UText;
 typedef struct UBreakIterator UNormalizer2;
 typedef enum UBreakIteratorType {} UBreakIteratorType;
-typedef enum UErrorCode {} UErrorCode;
+typedef swift::__swift_stdlib_UErrorCode UErrorCode;
+#define U_FAILURE(x) ((x)>__swift_stdlib_U_ZERO_ERROR)
 typedef enum UCharNameChoice {} UCharNameChoice;
 typedef uint16_t UChar;
 typedef int32_t UChar32;
@@ -67,6 +74,9 @@ int32_t u_strToTitle(UChar *, int32_t, const UChar *, int32_t,
                      UBreakIterator *, const char *, UErrorCode *);
 int32_t u_strToUpper(UChar *, int32_t, const UChar *, int32_t, const char *,
                      UErrorCode *);
+#define U_FOLD_CASE_DEFAULT 0
+int32_t u_strFoldCase(UChar *, int32_t, const UChar *, int32_t, uint32_t,
+                      UErrorCode *);
 double u_getNumericValue(UChar32);
 }
 
@@ -90,14 +100,6 @@ double u_getNumericValue(UChar32);
 #endif
 
 #if !defined(__APPLE__)
-#include "swift/Basic/Lazy.h"
-#include "swift/Runtime/Config.h"
-#include "swift/Runtime/Debug.h"
-
-#include <algorithm>
-#include <mutex>
-#include <assert.h>
-
 /// Convert the unicode string to uppercase. This function will return the
 /// required buffer length as a result. If this length does not match the
 /// 'DestinationCapacity' this function must be called again with a buffer of
@@ -140,6 +142,28 @@ swift::_swift_stdlib_unicode_strToLower(uint16_t *Destination,
   return OutputLength;
 }
 #endif
+
+/// Case-fold the unicode string. This function will return the required buffer
+/// length as a result. If this length does not match the 'DestinationCapacity'
+/// this function must be called again with a buffer of the required length to
+/// get a case-folded version of the string.
+int32_t
+swift::_swift_stdlib_unicode_strFoldCase(uint16_t *Destination,
+                                         int32_t DestinationCapacity,
+                                         const uint16_t *Source,
+                                         int32_t SourceLength) {
+  UErrorCode ErrorCode = static_cast<UErrorCode>(__swift_stdlib_U_ZERO_ERROR);
+  uint32_t OutputLength = u_strFoldCase(reinterpret_cast<UChar *>(Destination),
+                                        DestinationCapacity,
+                                        reinterpret_cast<const UChar *>(Source),
+                                        SourceLength,
+                                        U_FOLD_CASE_DEFAULT, &ErrorCode);
+  if (U_FAILURE(ErrorCode) && ErrorCode !=
+      static_cast<UErrorCode>(__swift_stdlib_U_BUFFER_OVERFLOW_ERROR)) {
+    swift::crash("u_strFoldCase: Unexpected error case-folding unicode string.");
+  }
+  return OutputLength;
+}
 
 namespace {
 template <typename T, typename U> T *ptr_cast(U *p) {

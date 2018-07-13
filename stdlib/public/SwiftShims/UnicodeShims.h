@@ -72,6 +72,11 @@ __swift_int32_t _swift_stdlib_unicode_strToLower(
   __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
   const __swift_uint16_t *Source, __swift_int32_t SourceLength);
 
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_int32_t _swift_stdlib_unicode_strFoldCase(
+  __swift_uint16_t *Destination, __swift_int32_t DestinationCapacity,
+  const __swift_uint16_t *Source, __swift_int32_t SourceLength);
+
 typedef enum __swift_stdlib_UProperty {
   __swift_stdlib_UCHAR_ALPHABETIC = 0,
   __swift_stdlib_UCHAR_BINARY_START = __swift_stdlib_UCHAR_ALPHABETIC,

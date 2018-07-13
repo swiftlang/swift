@@ -557,6 +557,11 @@ extension Substring {
   }
 
   @inlinable // FIXME(sil-serialize-all)
+  public func caseFolded() -> String {
+    return String(self).caseFolded()
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
   public func filter(
     _ isIncluded: (Element) throws -> Bool
   ) rethrows -> String {

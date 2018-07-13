@@ -1199,6 +1199,37 @@ internal func _nativeUnicodeUppercaseString(_ str: String) -> String {
 }
 #endif
 
+@usableFromInline // FIXME(sil-serialize-all)
+internal func _nativeUnicodeCaseFoldString(_ str: String) -> String {
+
+  // TODO (TODO: JIRA): check for small
+
+  let guts = str._guts._extractContiguousUTF16()
+  defer { _fixLifetime(guts) }
+  let utf16 = guts._unmanagedUTF16View
+  var storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+    capacity: utf16.count,
+    count: utf16.count)
+
+  // Try to write it out to the same length.
+  let z = _swift_stdlib_unicode_strFoldCase(
+    storage.start, Int32(storage.capacity), // FIXME: handle overflow case
+    utf16.start, Int32(utf16.count))
+  let correctSize = Int(z)
+
+  // If more space is needed, do it again with the correct buffer size.
+  if correctSize > storage.capacity {
+    storage = _SwiftStringStorage<UTF16.CodeUnit>.create(
+      capacity: correctSize,
+      count: correctSize)
+    _swift_stdlib_unicode_strFoldCase(
+      storage.start, Int32(storage.capacity), // FIXME: handle overflow case
+      utf16.start, Int32(utf16.count))
+  }
+  storage.count = correctSize
+  return String(_largeStorage: storage)
+}
+
 // Unicode algorithms
 extension String {
   // FIXME: implement case folding without relying on Foundation.
@@ -1306,6 +1337,44 @@ extension String {
 #else
     return _nativeUnicodeUppercaseString(self)
 #endif
+  }
+
+  /// Returns a case-folded version of the string using locale-independent
+  /// default case folding.
+  ///
+  /// The main purpose of case folding is to support caseless string matching.
+  /// Although it's related to and based on case conversion operations, case
+  /// folding is language-neutral and omits context-sensitive mappings.
+  /// Therefore, it's not suitable for transforming natural language text for
+  /// human consumption.
+  ///
+  /// Most characters are mapped to their lowercase counterparts. However, a
+  /// case-folded string is not necessarily lowercase. For example, Cherokee
+  /// letters are case-folded to their uppercase counterparts.
+  ///
+  /// - Note: Case folding does not preserve Unicode normalization forms.
+  ///
+  /// - Returns: A case-folded copy of the string.
+  ///
+  /// - Complexity: O(*n*)
+  public func caseFolded() -> String {
+    if _guts.isASCII {
+      var guts = _guts
+      guts.withMutableASCIIStorage(unusedCapacity: 0) { storage in
+        for i in 0..<storage._value.count {
+          // See the comment above in lowercased.
+          let value = storage._value.start[i]
+          let isUpper =
+            _asciiUpperCaseTable &>>
+            UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+          let add = (isUpper & 0x1) &<< 5
+          storage._value.start[i] = value &+ UInt8(truncatingIfNeeded: add)
+        }
+      }
+      return String(guts)
+    }
+
+    return _nativeUnicodeCaseFoldString(self)
   }
 
   /// Creates an instance from the description of a given
