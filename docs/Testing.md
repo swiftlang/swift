@@ -75,6 +75,32 @@ regardless of location.
     % ${LLVM_SOURCE_ROOT}/utils/lit/lit.py -sv --param swift_site_config=${SWIFT_BUILD_DIR}/test-iphonesimulator-i386/lit.site.cfg ${SWIFT_SOURCE_ROOT}/test/Parse/
 ```
 
+An additional form of using lit is to use it directly from the swift build
+directory where one is working by using llvm-lit. This is often times quicker
+and more convenient to write. As an example on macOS with a release debuginfo
+build:
+
+```
+    % cd build/Ninja-RelWithDebInfoAsserts/swift-macosx-x86_64
+
+    # To invoke "normal tests"
+    % ../llvm-macosx-x86_64/bin/llvm-lit -sv test-macosx-x86_64
+
+    # To invoke "validation tests"
+    % ../llvm-macosx-x86_64/bin/llvm-lit -sv validation-test-macosx-x86_64
+
+    # To invoke "normal tests" filtering by a regex.
+    % ../llvm-macosx-x86_64/bin/llvm-lit -sv test-macosx-x86_64 --filter=REGEX
+
+    # To invoke "normal tests" displaying executed command lines whether or
+    # not a failure occurs.
+    % ../llvm-macosx-x86_64/bin/llvm-lit -sv test-macosx-x86_64 -a
+
+    # To invoke lit showing success/fail for each test that fails/success but
+    # not showing the actual command line used.
+    % ../llvm-macosx-x86_64/bin/llvm-lit -v test-macosx-x86_64
+```
+
 For more complicated configuration, copy the invocation from one of the build
 targets mentioned above and modify it as necessary. lit.py also has several
 useful features, like timing tests and providing a timeout. Check these features
