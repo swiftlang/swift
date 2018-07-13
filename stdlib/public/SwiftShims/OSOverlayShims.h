@@ -16,6 +16,7 @@
 #include <os/log.h>
 #include <os/signpost.h>
 #include <stdarg.h>
+#include "Visibility.h"
 
 static inline os_log_t _Nonnull
 _swift_os_log_default(void) {
@@ -36,7 +37,7 @@ _swift_os_signpost_points_of_interest(void) {
 static inline os_signpost_id_t
 _swift_os_signpost_id_exclusive(void) {
   /* OS_SIGNPOST_ID_EXCLUSIVE */
-  return (os_signpost_id_t)0xCABA71571CC0FFEE;
+  return (os_signpost_id_t)0xEEEEB0B5B2B2EEEE;
 }
 
 static inline os_signpost_id_t
@@ -51,9 +52,11 @@ _swift_os_signpost_id_null(void) {
   return (os_signpost_id_t)0;
 }
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
 extern const void * _Nullable
 _swift_os_log_return_address(void);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
 extern void
 _swift_os_log(
     const void * _Nullable dso,
@@ -63,6 +66,7 @@ _swift_os_log(
     const char * _Nonnull fmt,
     va_list args);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
 extern void
 _swift_os_signpost_with_format(
     const void * _Nullable dso,
@@ -74,6 +78,7 @@ _swift_os_signpost_with_format(
     const char * _Nullable fmt,
     va_list args);
 
+SWIFT_RUNTIME_STDLIB_INTERNAL
 extern void
 _swift_os_signpost(
     const void * _Nullable dso,
