@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -o %t/libGetImageNameHelper.dylib -emit-module %S/Inputs/class_getImageName-helper.swift
+// RUN: %target-build-swift -emit-library -o %t/libGetImageNameHelper.dylib -emit-module %S/Inputs/class_getImageName-helper.swift -Xlinker -install_name -Xlinker @executable_path/libGetImageNameHelper.dylib
 // RUN: %target-codesign %t/libGetImageNameHelper.dylib
 
 // RUN: %target-build-swift -g %s -I %t -o %t/main -L %t -lGetImageNameHelper
