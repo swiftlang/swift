@@ -1240,6 +1240,17 @@ public:
       visitSymbolicValue(v.getEnumPayloadValue());
       *this << ")";
       return;
+    case SymbolicValue::Array:
+      // Note, this prints arrays and aggregates as the same value.  We may want
+      // to produce distinguishing syntax at some point.
+      *this << "[";
+      interleave(v.getArrayValue(), [&](SymbolicValue element) {
+        visitSymbolicValue(element);
+      }, [&] {
+        *this << ", ";
+      });
+      *this << "]";
+      return;
     case SymbolicValue::UninitMemory:
     case SymbolicValue::Unknown:
     case SymbolicValue::Address:

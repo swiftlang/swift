@@ -1501,6 +1501,7 @@ emitConstantInst(SymbolicValue symVal, SILType type, SILLocation loc,
   case SymbolicValue::Address:
     assert(0 && "Shouldn't happen");
   case SymbolicValue::Aggregate:
+  case SymbolicValue::Array:
   case SymbolicValue::Function:
   case SymbolicValue::Enum:
   case SymbolicValue::EnumWithPayload:
