@@ -1,4 +1,4 @@
-# Windows Subsystem for Linux (WSL)
+# Swift on the Windows Subsystem for Linux (WSL)
 
 - Note that all compiled Swift binaries are only executable within Bash on
   Windows and are Ubuntu, not Windows, executables (WSL can natively run Ubuntu
