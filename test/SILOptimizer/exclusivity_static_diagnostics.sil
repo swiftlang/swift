@@ -1106,3 +1106,31 @@ bb0(%0 : $UnsafePointer<Int32>, %1 : $*Int32):
   %v = tuple ()
   return %v : $()
 }
+
+// <rdar://problem/41660554> Swift CI (macOS release master, OSS): SIL verification failed: Unknown formal access pattern: storage
+// Test access marker verification of a KeyPath projection with nested @inout access after inlining.
+sil @takeInoutInt : $@convention(thin) (@inout Int) -> ()
+
+// The compiler intrinsic _projectXXXKeyPath returns a tuple of
+// UnsafePointer and Optional AnyObject. After inlining, the unsafe
+// pointer may appear to originate from anywhere, including a phi.
+// There's currently no way to tell that the UnsafePointer originated
+// from a KeyPath projection. This pattern could occur with any
+// addressor. In either case, the nested access is valid but
+// unidentified. Addressors that require enforcement must start a
+// dynamic access within the addressor itself, before returning an
+// UnsafePointer.
+sil @testNestedKeypathAccess : $@convention(thin) (@guaranteed (UnsafeMutablePointer<Int>, Optional<AnyObject>)) -> () {
+bb0(%0 : $(UnsafeMutablePointer<Int>, Optional<AnyObject>)):
+  %up = tuple_extract %0 : $(UnsafeMutablePointer<Int>, Optional<AnyObject>), 0
+  %o = tuple_extract %0 : $(UnsafeMutablePointer<Int>, Optional<AnyObject>), 1
+  %p = struct_extract %up : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
+  %adr = pointer_to_address %p : $Builtin.RawPointer to [strict] $*Int
+  %dep = mark_dependence %adr : $*Int on %o : $Optional<AnyObject>
+  %access = begin_access [modify] [static] %dep : $*Int
+  %f = function_ref @takeInoutInt : $@convention(thin) (@inout Int) -> ()
+  %call = apply %f(%access) : $@convention(thin) (@inout Int) -> ()
+  end_access %access : $*Int
+  %v = tuple ()
+  return %v : $()
+}

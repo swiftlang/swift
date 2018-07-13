@@ -181,6 +181,16 @@ static bool isExternalGlobalAddressor(ApplyInst *AI) {
   return funcRef->isGlobalInit() && funcRef->isExternalDeclaration();
 }
 
+// Return true if the given StructExtractInst extracts the RawPointer from
+// Unsafe[Mutable]Pointer.
+static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
+  assert(isa<BuiltinRawPointerType>(SEI->getType().getASTType()));
+  auto &C = SEI->getModule().getASTContext();
+  auto *decl = SEI->getStructDecl();
+  return decl == C.getUnsafeMutablePointerDecl()
+    || decl == C.getUnsafePointerDecl();
+}
+
 // Given an address base is a block argument, verify that it is actually a box
 // projected from a switch_enum. This is a valid pattern at any SIL stage
 // resulting in a block-type phi. In later SIL stages, the optimizer may form
@@ -248,6 +258,14 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       // Don't currently allow any other calls to return an accessed address.
       return AccessedStorage();
 
+    case ValueKind::StructExtractInst:
+      // Handle nested access to a KeyPath projection. The projection itself
+      // uses a Builtin. However, the returned UnsafeMutablePointer may be
+      // converted to an address and accessed via an inout argument.
+      if (isUnsafePointerExtraction(cast<StructExtractInst>(address)))
+        return AccessedStorage(address, AccessedStorage::Unidentified);
+      return AccessedStorage();
+
     // A block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
     case ValueKind::SILPHIArgument:
@@ -297,8 +315,8 @@ AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
       continue;
 
     // Access to a Builtin.RawPointer. Treat this like the inductive cases
-    // above because some RawPointer's originate from identified locations. See
-    // the special case for global addressors, which return RawPointer above.
+    // above because some RawPointers originate from identified locations. See
+    // the special case for global addressors, which return RawPointer, above.
     //
     // If the inductive search does not find a valid addressor, it will
     // eventually reach the default case that returns in invalid location. This
