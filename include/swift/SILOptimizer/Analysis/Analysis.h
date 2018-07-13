@@ -75,7 +75,7 @@ public:
 
 private:
   /// Stores the kind of derived class.
-  const AnalysisKind Kind;
+  const AnalysisKind kind;
 
   /// A lock that prevents the invalidation of this analysis. When this
   /// variable is set to True then the PassManager should not invalidate
@@ -85,23 +85,23 @@ private:
 public:
 
   /// Returns the kind of derived class.
-  AnalysisKind getKind() const { return Kind; }
+  AnalysisKind getKind() const { return kind; }
 
   /// C'tor.
-  SILAnalysis(AnalysisKind K) : Kind(K), invalidationLock(false) {}
+  SILAnalysis(AnalysisKind k) : kind(k), invalidationLock(false) {}
 
   /// D'tor.
   virtual ~SILAnalysis() {}
   
   /// Can be used to retrieve other analysis passes from \p PM, which this
   /// analysis depends on.
-  virtual void initialize(SILPassManager *PM) { }
+  virtual void initialize(SILPassManager *pm) { }
 
   /// Lock the analysis. This means that invalidation messages are ignored.
-  void lockInvalidation() {invalidationLock = true; }
+  void lockInvalidation() { invalidationLock = true; }
 
   /// Unlock the analysis. This means that invalidation messages are handled.
-  void unlockInvalidation() {invalidationLock = false; }
+  void unlockInvalidation() { invalidationLock = false; }
 
   /// Return True if this analysis is locked and should not be invalidated.
   bool isLocked() { return invalidationLock; }
@@ -110,14 +110,14 @@ public:
   virtual void invalidate() = 0;
 
   /// Invalidate all of the information for a specific function.
-  virtual void invalidate(SILFunction *F, InvalidationKind K) = 0;
+  virtual void invalidate(SILFunction *f, InvalidationKind k) = 0;
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) = 0;
+  virtual void notifyAddFunction(SILFunction *f) = 0;
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) = 0;
+  virtual void notifyDeleteFunction(SILFunction *f) = 0;
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() = 0;
@@ -139,13 +139,13 @@ public:
 
 // RAII helper for locking analyses.
 class AnalysisPreserver {
-  SILAnalysis *Analysis;
+  SILAnalysis *analysis;
   public:
-  AnalysisPreserver(SILAnalysis *A) : Analysis(A) {
-    Analysis->lockInvalidation();
+  AnalysisPreserver(SILAnalysis *a) : analysis(a) {
+    analysis->lockInvalidation();
   }
   ~AnalysisPreserver() {
-    Analysis->unlockInvalidation();
+    analysis->unlockInvalidation();
   }
 };
 
@@ -154,49 +154,50 @@ class AnalysisPreserver {
 template<typename AnalysisTy>
 class FunctionAnalysisBase : public SILAnalysis {
 protected:
-  typedef llvm::DenseMap<SILFunction *, AnalysisTy *> StorageTy;
+  using StorageTy = llvm::DenseMap<SILFunction *, AnalysisTy *>;
 
   /// Maps functions to their analysis provider.
-  StorageTy Storage;
+  StorageTy storage;
 
   /// Construct a new empty analysis for a specific function \p F.
-  virtual AnalysisTy *newFunctionAnalysis(SILFunction *F) = 0;
+  virtual AnalysisTy *newFunctionAnalysis(SILFunction *f) = 0;
 
   /// Return True if the analysis should be invalidated given trait \K is
   /// preserved.
-  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) = 0;
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) = 0;
 
   /// A stub function that verifies the specific AnalysisTy \p A. This is
   /// meant to be overridden by subclasses.
   virtual void verify(AnalysisTy *A) const {}
 
   void deleteAllAnalysisProviders() {
-    for (auto D : Storage)
-      delete D.second;
-    Storage.clear();
+    for (auto iter : storage)
+      delete iter.second;
+    storage.clear();
   }
 
 public:
   /// Returns true if we have an analysis for a specific function \p F without
   /// actually constructing it.
-  bool hasAnalysis(SILFunction *F) const { return Storage.count(F); }
+  bool hasAnalysis(SILFunction *f) const { return storage.count(f); }
 
-  NullablePtr<AnalysisTy> maybeGet(SILFunction *F) {
-    auto Iter = Storage.find(F);
-    if (Iter == Storage.end())
+  /// Attempt to lookup up the information that the analysis has for the given
+  /// function. Returns nullptr upon failure.
+  NullablePtr<AnalysisTy> maybeGet(SILFunction *f) {
+    auto iter = storage.find(f);
+    if (iter == storage.end())
       return nullptr;
-    return Iter->second;
+    return iter->second;
   }
 
   /// Returns an analysis provider for a specific function \p F.
-  AnalysisTy *get(SILFunction *F) {
-
+  AnalysisTy *get(SILFunction *f) {
     // Check that the analysis can handle this function.
-    verifyFunction(F);
+    verifyFunction(f);
 
-    auto &it = Storage.FindAndConstruct(F);
+    auto &it = storage.FindAndConstruct(f);
     if (!it.second)
-      it.second = newFunctionAnalysis(F);
+      it.second = newFunctionAnalysis(f);
     return it.second;
   }
 
@@ -206,38 +207,38 @@ public:
   }
 
   /// Helper function to remove the analysis data for a function.
-  void invalidateFunction(SILFunction *F) {
-    auto &it = Storage.FindAndConstruct(F);
-    if (it.second) {
-      delete it.second;
-      it.second = nullptr;
-    }
+  void invalidateFunction(SILFunction *f) {
+    auto &it = storage.FindAndConstruct(f);
+    if (!it.second)
+      return;
+    delete it.second;
+    it.second = nullptr;
   }
 
   /// Invalidate all of the information for a specific function.
-  virtual void invalidate(SILFunction *F,
-                          SILAnalysis::InvalidationKind K) override {
-    if (shouldInvalidate(K))
-      invalidateFunction(F);
+  virtual void invalidate(SILFunction *f,
+                          SILAnalysis::InvalidationKind k) override {
+    if (shouldInvalidate(k))
+      invalidateFunction(f);
   }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddFunction(SILFunction *f) override {}
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override {
-    invalidateFunction(F);
+  virtual void notifyDeleteFunction(SILFunction *f) override {
+    invalidateFunction(f);
   }
 
   /// Notify the analysis about changed witness or vtables.
-  virtual void invalidateFunctionTables() override { }
+  virtual void invalidateFunctionTables() override {}
 
   FunctionAnalysisBase() {}
   virtual ~FunctionAnalysisBase() {
     deleteAllAnalysisProviders();
   }
-  FunctionAnalysisBase(AnalysisKind K) : SILAnalysis(K), Storage() {}
+  FunctionAnalysisBase(AnalysisKind k) : SILAnalysis(k), storage() {}
   FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
   FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
 
@@ -246,10 +247,10 @@ public:
   /// This is not meant to be overridden by subclasses. See "void
   /// verify(AnalysisTy *A)".
   virtual void verify() const override final {
-    for (auto Iter : Storage) {
-      if (!Iter.second)
+    for (auto iter : storage) {
+      if (!iter.second)
         continue;
-      verify(Iter.second);
+      verify(iter.second);
     }
   }
 
@@ -257,14 +258,14 @@ public:
   /// F.
   ///
   /// This is not meant to be overridden by subclasses. See "void
-  /// verify(AnalysisTy *A)".
-  virtual void verify(SILFunction *F) const override final {
-    auto Iter = Storage.find(F);
-    if (Iter == Storage.end())
+  /// verify(AnalysisTy *analysis)".
+  virtual void verify(SILFunction *f) const override final {
+    auto iter = storage.find(f);
+    if (iter == storage.end())
       return;
-    if (!Iter->second)
+    if (!iter->second)
       return;
-    verify(Iter->second);
+    verify(iter->second);
   }
 };
 
@@ -273,19 +274,19 @@ public:
 /// function info for subsequent requests.
 template <class AnalysisTy, class FunctionInfoTy>
 class LazyFunctionInfo {
-  SILFunction *F;
-  AnalysisTy *A;
-  NullablePtr<FunctionInfoTy> FTy;
+  SILFunction *func;
+  AnalysisTy *analysis;
+  NullablePtr<FunctionInfoTy> funcInfo;
 
 public:
-  LazyFunctionInfo(SILFunction *F, AnalysisTy *A) : F(F), A(A), FTy() {}
+  LazyFunctionInfo(SILFunction *func, AnalysisTy *analysis) : func(func), analysis(analysis), funcInfo() {}
 
   operator FunctionInfoTy *() {
-    if (FTy.isNull()) {
-      FTy = A->get(F);
+    if (funcInfo.isNull()) {
+      funcInfo = analysis->get(func);
     }
 
-    return FTy.get();
+    return funcInfo.get();
   }
 
   FunctionInfoTy *operator->() { return *this; }
