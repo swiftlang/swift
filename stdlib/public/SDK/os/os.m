@@ -161,6 +161,6 @@ _swift_os_signpost(
     const char * _Nonnull spnm,
     os_signpost_id_t spid)
 {
-  va_list x;
+  static va_list x;
   _swift_os_signpost_with_format(dso, ra, h, spty, spnm, spid, NULL, x);
 }
