@@ -787,10 +787,6 @@ enum class ConstraintSystemFlags {
   /// Whether we allow the solver to attempt fixes to the system.
   AllowFixes = 0x01,
   
-  /// Set if the client prefers fixits to be in the form of force unwrapping
-  /// or optional chaining to return an optional.
-  PreferForceUnwrapToOptional = 0x02,
-
   /// If set, this is going to prevent constraint system from erasing all
   /// discovered solutions except the best one.
   ReturnAllDiscoveredSolutions = 0x04,
@@ -991,6 +987,9 @@ private:
 
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
+
+  /// Declaration names used in fixes.
+  std::vector<DeclName> FixedDeclNames;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -3528,6 +3527,15 @@ public:
 
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
+
+/// Diagnose an attempt to recover from a member access into a value of
+/// optional type which needed to be unwrapped for the member to be found.
+///
+/// \returns true if a diagnostic was produced.
+bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
+                                       DeclName memberName,
+                                       SourceRange memberRange);
+
 } // end namespace swift
 
 #endif // LLVM_SWIFT_SEMA_CONSTRAINT_SYSTEM_H

@@ -3554,18 +3554,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   // Value member lookup has some hacks too.
   if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
     // If the base type was an optional, look through it.
-    
-    // Determine whether or not we want to provide an optional chaining fixit or
-    // a force unwrap fixit.
-    bool optionalChain;
-    if (!getContextualType())
-      optionalChain = !(Options & ConstraintSystemFlags::PreferForceUnwrapToOptional);
-    else
-      optionalChain = !getContextualType()->getOptionalObjectType().isNull();
-    auto fixKind = optionalChain ? FixKind::OptionalChaining : FixKind::ForceOptional;
 
-    // Note the fix.
-    if (recordFix(fixKind, locator))
+    // We're unwrapping the base to perform a member access.
+    if (recordFix(Fix::getUnwrapOptionalBase(*this, member), locator))
       return SolutionKind::Error;
     
     // Look through one level of optional.
@@ -4877,8 +4868,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix, Type type1, Type type2,
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
   switch (fix.getKind()) {
   case FixKind::ForceOptional:
-  case FixKind::OptionalChaining: {
-    // Assume that '!' was applied to the first type.
+  case FixKind::UnwrapOptionalBase: {
+    // Assume that we've unwrapped the first type.
     auto result =
         matchTypes(type1->getRValueObjectType()->getOptionalObjectType(), type2,
                    matchKind, subflags, locator);
