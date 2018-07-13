@@ -906,6 +906,15 @@ ERROR(missing_unwrap_optional,none,
       "value of optional type %0 not unwrapped; did you mean to use '!' "
       "or '?'?",
      (Type))
+ERROR(optional_not_unwrapped,none,
+      "value of optional type %0 must be unwrapped to a value of type %1",
+     (Type, Type))
+NOTE(unwrap_with_default_value,none,
+     "coalesce using '?" "?' to provide a default when the optional value "
+     "contains 'nil'", ())
+NOTE(unwrap_with_force_value,none,
+     "force-unwrap using '!' to abort execution if the optional value contains "
+     "'nil'", ())
 ERROR(missing_unwrap_optional_try,none,
       "value of optional type %0 not unwrapped; did you mean to use 'try!' "
       "or chain with '?'?",
