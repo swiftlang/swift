@@ -66,7 +66,7 @@ struct TestConfig {
   var afterRunSleep: Int?
 
   /// The list of tests to run.
-  var tests = [(index: Int, info: BenchmarkInfo)]()
+  var tests = [(index: String, info: BenchmarkInfo)]()
 
   mutating func processArguments() -> TestAction {
     let validOptions = [
@@ -164,7 +164,8 @@ struct TestConfig {
   mutating func findTestsToRun() {
     registeredBenchmarks.sort()
     let indices = Dictionary(uniqueKeysWithValues:
-      zip(registeredBenchmarks.map{$0.name}, 1...))
+      zip(registeredBenchmarks.map{ $0.name },
+          (1...).lazy.map { String($0) } ))
     let benchmarkNamesOrIndices = Set(filters)
     // needed so we don't capture an ivar of a mutable inout self.
     let (_tags, _skipTags) = (tags, skipTags)
@@ -175,7 +176,7 @@ struct TestConfig {
           benchmark.tags.isDisjoint(with: _skipTags)
       } else {
         return benchmarkNamesOrIndices.contains(benchmark.name) ||
-          benchmarkNamesOrIndices.contains(String(indices[benchmark.name]!))
+          benchmarkNamesOrIndices.contains(indices[benchmark.name]!)
       }
     }.map { (index: indices[$0.name]!, info: $0) }
   }
@@ -381,13 +382,13 @@ func runBenchmarks(_ c: TestConfig) {
 
   var testCount = 0
 
-  func report(_ index: Int, _ t: BenchmarkInfo, results: BenchResults?) {
+  func report(_ index: String, _ t: BenchmarkInfo, results: BenchResults?) {
     func values(r: BenchResults) -> [String] {
       return [r.sampleCount, r.min, r.max, r.mean, r.sd, r.median]
         .map { String($0) }
     }
     let benchmarkStats = (
-      [String(index), t.name] + (results.map(values) ?? ["Unsupported"])
+      [index, t.name] + (results.map(values) ?? ["Unsupported"])
     ).joined(separator: c.delim)
 
     print(benchmarkStats)
