@@ -1900,7 +1900,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
   if (Consumer.syntaxTreeEnabled()) {
     std::string SyntaxContent;
     llvm::raw_string_ostream OS(SyntaxContent);
-    json::Output JsonOut(OS, /*PrettyPrint=*/false);
+    json::Output JsonOut(OS, /*UserInfo=*/{}, /*PrettyPrint=*/false);
     auto Root = Impl.SyntaxInfo->getSourceFile().getSyntaxRoot().getRaw();
     JsonOut << *Root;
     Consumer.handleSerializedSyntaxTree(OS.str());
