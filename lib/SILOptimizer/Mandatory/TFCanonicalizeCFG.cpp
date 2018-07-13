@@ -500,7 +500,7 @@ SingleExitLoopTransformer::patchEdges(SILBasicBlock *newHeader,
 
   unsigned oldHeaderNumArgs =
       newHeader->getNumArguments() -
-      (escapingValues.size() + /* exitIndex, stayLoop*/ 2);
+      (escapingValues.size() + /* exitIndex, stayInLoop*/ 2);
 
   // Identify the exit from the header (if any) and assign '0' as its index.
   SILBasicBlock *headerExit = nullptr;
