@@ -3,7 +3,7 @@
 //
 // Python runtime interop tests.
 
-import Python
+import Python2
 import StdlibUnittest
 
 var PythonRuntimeTestSuite = TestSuite("PythonRuntime")

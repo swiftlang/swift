@@ -433,7 +433,13 @@ function(_compile_swift_files
       ${command_create_dirs}
       COMMAND ""
       OUTPUT ${obj_dirs}
-      COMMENT "Generating obj dirs for ${first_output}")
+      COMMENT "Generating obj dirs for ${first_output}"
+      # SWIFT_ENABLE_TENSORFLOW
+      # This change should be committed upstream as well.
+      # Generating a directory should be idempotent; otherwise, calling
+      # `add_swift_library` twice in the same stdlib directory (where source
+      # files are all Swift, no GYB) fails.
+      IDEMPOTENT)
 
   # Generate the api notes if we need them.
   if (apinotes_outputs)

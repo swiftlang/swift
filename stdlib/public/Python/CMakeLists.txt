@@ -14,8 +14,7 @@
 #
 #===----------------------------------------------------------------------===#
 
-find_package(PythonLibs 2.7 EXACT REQUIRED)
-message(STATUS "Building Python.")
+include("../../../cmake/modules/FindPythonLibraries.cmake")
 
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
@@ -25,18 +24,35 @@ if(SWIFT_BUILD_STATIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES STATIC)
 endif()
 
-add_swift_library(swiftPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
-  Python.swift
-  DEPENDS cpython_modulemap
-  TARGET_SDKS OSX CYGWIN FREEBSD LINUX HAIKU
-  SWIFT_MODULE_DEPENDS_IOS Darwin
-  SWIFT_MODULE_DEPENDS_OSX Darwin
-  SWIFT_MODULE_DEPENDS_TVOS Darwin
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin
-  SWIFT_MODULE_DEPENDS_LINUX Glibc
-  SWIFT_MODULE_DEPENDS_FREEBSD Glibc
-  SWIFT_MODULE_DEPENDS_CYGWIN Glibc
-  SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
-  PRIVATE_LINK_LIBRARIES "${PYTHON_LIBRARIES}"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
+foreach(python_version ${PYTHON_INTEROP_VERSIONS})
+  string(SUBSTRING "${python_version}" 0 1 python_version_short)
+  reset_python_variables()
+  if(python_version EQUAL 2.7)
+    find_package(PythonLibs "${python_version}" EXACT REQUIRED)
+    set(PYTHON2_LIBRARIES ${PYTHON_LIBRARIES})
+  else()
+    set(Python_ADDITIONAL_VERSIONS 3.4 3.5 3.6)
+    find_package(PythonLibs "${python_version}" REQUIRED)
+    set(PYTHON3_LIBRARIES ${PYTHON_LIBRARIES})
+  endif()
+  message(STATUS "Building Python (version ${python_version}).")
+
+  set(swift_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
+  list(APPEND swift_compile_flags "-DPYTHON${python_version_short}")
+
+  add_swift_library("swiftPython${python_version_short}" ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    Python.swift
+    DEPENDS "cpython_modulemap${python_version_short}"
+    TARGET_SDKS OSX CYGWIN FREEBSD LINUX HAIKU
+    SWIFT_MODULE_DEPENDS_IOS Darwin
+    SWIFT_MODULE_DEPENDS_OSX Darwin
+    SWIFT_MODULE_DEPENDS_TVOS Darwin
+    SWIFT_MODULE_DEPENDS_WATCHOS Darwin
+    SWIFT_MODULE_DEPENDS_LINUX Glibc
+    SWIFT_MODULE_DEPENDS_FREEBSD Glibc
+    SWIFT_MODULE_DEPENDS_CYGWIN Glibc
+    SWIFT_MODULE_DEPENDS_HAIKU Glibc
+    SWIFT_COMPILE_FLAGS "${swift_compile_flags}"
+    PRIVATE_LINK_LIBRARIES "${PYTHON_LIBRARIES}"
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
+endforeach()

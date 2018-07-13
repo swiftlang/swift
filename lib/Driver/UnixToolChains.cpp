@@ -288,24 +288,30 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     // On Linux, the REPL fails with "Couldn't lookup symbols" errors when:
     // - Linking an external Swift shared library (produced by `swift build`)
     //   and importing the corresponding Swift module.
-    // - Importing the `TensorFlow` and `Python` modules, without manually
-    //   linking `libswiftPython.so` and `libswiftTensorFlow.so`.
+    // - Importing the `TensorFlow` and `Python2`/`Python3` modules, without
+    //   manually linking `libswiftTensorFlow.so` and `libswiftPython2.so` or
+    //   `libswiftPython3.so`.
     //
-    // A manual workaround involves specifying the `-lswiftPython` and
-    // `-lswiftTensorFlow` flags (in that specific order) when invoking the
-    // REPL. Also, `Python` and `TensorFlow` must be imported before the
-    // external Swift module to avoid the error.
+    // A manual workaround involves specifying `-lswiftPython2` or
+    // `-lswiftPython3`, and `-lswiftTensorFlow` (in that specific order) when
+    // invoking the REPL. Also, `Python2`/`Python3` and `TensorFlow` must be
+    // imported before the external Swift module to avoid the error.
     //
     // Conditionally adding the linker flags here seems to solve the issue.
     // This is robust assuming that toolchain artifacts are not manipulated
-    // (so that somehow Python.swiftmodule exists while libswiftPython.so
+    // (so that somehow Python2.swiftmodule exists while libswiftPython2.so
     // doesn't).
     //
     // https://github.com/google/swift/issues/4
-    SmallString<128> swiftPythonLibPath = SharedRuntimeLibPath;
-    llvm::sys::path::append(swiftPythonLibPath, "libswiftPython.so");
-    if (llvm::sys::fs::exists(swiftPythonLibPath))
-      Arguments.push_back("-lswiftPython");
+    SmallString<128> swiftPython2LibPath = SharedRuntimeLibPath;
+    llvm::sys::path::append(swiftPython2LibPath, "libswiftPython2.so");
+    if (llvm::sys::fs::exists(swiftPython2LibPath))
+      Arguments.push_back("-lswiftPython2");
+
+    SmallString<128> swiftPython3LibPath = SharedRuntimeLibPath;
+    llvm::sys::path::append(swiftPython3LibPath, "libswiftPython3.so");
+    if (llvm::sys::fs::exists(swiftPython3LibPath))
+      Arguments.push_back("-lswiftPython3");
 
     SmallString<128> swiftTensorFlowLibPath = SharedRuntimeLibPath;
     llvm::sys::path::append(swiftTensorFlowLibPath, "libswiftTensorFlow.so");

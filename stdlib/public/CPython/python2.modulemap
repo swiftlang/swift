@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-module CPython [system] [extern_c] {
+module CPython2 [system] [extern_c] {
   umbrella header "include/Python.h"
 
   export *
@@ -159,4 +159,6 @@ module CPython [system] [extern_c] {
 
   // Note: missing #include here
   exclude header "include/pyexpat.h"
+
+  link "python2.7"
 }

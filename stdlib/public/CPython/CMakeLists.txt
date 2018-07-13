@@ -15,9 +15,7 @@
 #===----------------------------------------------------------------------===#
 
 include("../../../cmake/modules/SwiftList.cmake")
-
-find_package(PythonLibs 2.7 EXACT REQUIRED)
-message(STATUS "Building CPython.")
+include("../../../cmake/modules/FindPythonLibraries.cmake")
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   set(cmake_symlink_option "copy_directory")
@@ -29,45 +27,58 @@ endif()
 set(TARGET_SDKS "OSX" "CYGWIN" "FREEBSD" "LINUX" "HAIKU")
 list_intersect("${TARGET_SDKS}" "${SWIFT_SDKS}" TARGET_SDKS)
 
-set(cpython_modulemap_target_list)
-foreach(sdk ${TARGET_SDKS})
-  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
-    set(arch_modulemaps_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/modulemaps")
-    set(module_dir "${SWIFTLIB_DIR}/${arch_modulemaps_subdir}")
-    set(output_dir "${module_dir}/CPython")
-    set(outputs)
+foreach(python_version ${PYTHON_INTEROP_VERSIONS})
+  string(SUBSTRING "${python_version}" 0 1 python_version_short)
+  reset_python_variables()
+  if(python_version EQUAL 2.7)
+    find_package(PythonLibs "${python_version}" EXACT REQUIRED)
+  else()
+    set(Python_ADDITIONAL_VERSIONS 3.4 3.5 3.6)
+    find_package(PythonLibs "${python_version}" REQUIRED)
+  endif()
+  message(STATUS "Building CPython for Python version ${python_version}.")
 
-    add_custom_command(
-      OUTPUT "${output_dir}"
-      COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
+  set(cpython_modulemap_target_list)
+  foreach(sdk ${TARGET_SDKS})
+    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+      set(arch_modulemaps_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}/modulemaps")
+      set(module_dir "${SWIFTLIB_DIR}/${arch_modulemaps_subdir}")
+      set(output_dir "${module_dir}/CPython${python_version_short}")
+      set(outputs)
 
-    # Copy Python header files.
-    add_custom_command(
-      OUTPUT "${output_dir}/include"
-      COMMAND
-      "${CMAKE_COMMAND}" "-E" "copy_directory"
-      "${PYTHON_INCLUDE_DIRS}"
-      "${output_dir}/include"
-      COMMENT "Copying Python 2.7 headers into ${output_dir}/include")
-    list(APPEND outputs "${output_dir}/include")
+      add_custom_command(
+        OUTPUT "${output_dir}"
+        COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
 
-    # Copy modulemap.
-    add_custom_command(
-      OUTPUT "${output_dir}/module.modulemap"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
-      COMMAND
-      "${CMAKE_COMMAND}" "-E" "copy_if_different"
-      "${CMAKE_CURRENT_SOURCE_DIR}/module.modulemap"
-      "${output_dir}/module.modulemap")
-    list(APPEND outputs "${output_dir}/module.modulemap")
+      # Copy Python header files.
+      add_custom_command(
+        OUTPUT "${output_dir}/include"
+        COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_directory"
+        "${PYTHON_INCLUDE_DIRS}"
+        "${output_dir}/include"
+        COMMENT "Copying Python ${python_version} headers into ${output_dir}/include")
+      list(APPEND outputs "${output_dir}/include")
 
-    # Put the output dir itself last so that it isn't considered the primary output.
-    list(APPEND outputs "${output_dir}")
-    list(APPEND cpython_modulemap_target_list ${outputs})
+      # Copy modulemap.
+      # In ${output_dir}, the modulemap file should be named "module.modulemap".
+      add_custom_command(
+        OUTPUT "${output_dir}/module.modulemap"
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/python${python_version_short}.modulemap"
+        COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+        "${CMAKE_CURRENT_SOURCE_DIR}/python${python_version_short}.modulemap"
+        "${output_dir}/module.modulemap")
+      list(APPEND outputs "${output_dir}/module.modulemap")
 
-    swift_install_in_component(sdk-overlay
-      DIRECTORY "${output_dir}/"
-      DESTINATION "lib/swift/${arch_modulemaps_subdir}/CPython")
+      # Put the output dir itself last so that it isn't considered the primary output.
+      list(APPEND outputs "${output_dir}")
+      list(APPEND cpython_modulemap_target_list ${outputs})
+
+      swift_install_in_component(sdk-overlay
+        DIRECTORY "${output_dir}/"
+        DESTINATION "lib/swift/${arch_modulemaps_subdir}/CPython${python_version_short}")
+    endforeach()
   endforeach()
+  add_custom_target("cpython_modulemap${python_version_short}" DEPENDS ${cpython_modulemap_target_list})
 endforeach()
-add_custom_target(cpython_modulemap DEPENDS ${cpython_modulemap_target_list})

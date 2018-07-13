@@ -19,7 +19,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-import CPython
+#if PYTHON2
+import CPython2
+#elseif PYTHON3
+import CPython3
+#endif
 
 //===----------------------------------------------------------------------===//
 // `PyReference` definition
@@ -660,7 +664,12 @@ public struct PythonInterface {
   public func updatePath(to path: String) {
     var cStr = path.utf8CString
     cStr.withUnsafeMutableBufferPointer { buffPtr in
+#if PYTHON2
       PySys_SetPath(buffPtr.baseAddress)
+#elseif PYTHON3
+      PySys_SetPath(UnsafePointer(Py_DecodeLocale(buffPtr.baseAddress,
+                    UnsafeMutablePointer(bitPattern: 0))))
+#endif
     }
   }
 
@@ -755,7 +764,11 @@ private func isType(_ object: PythonObject,
   defer { Py_DecRef(pyObject) }
 
   // Anything not equal to `Py_ZeroStruct` is truthy.
+#if PYTHON2
   return !(pyObject == &_Py_ZeroStruct)
+#elseif PYTHON3
+  return !(pyObject == &_Py_FalseStruct)
+#endif
 }
 
 private func == (_ x: UnsafeMutablePointer<PyObject>,
@@ -784,7 +797,12 @@ extension String : PythonConvertible {
     let pyObject = pythonObject.ownedPyObject
     defer { Py_DecRef(pyObject) }
 
-    guard let cString = PyString_AsString(pyObject) else {
+#if PYTHON2
+    let pyStringCastFunction = PyString_AsString
+#elseif PYTHON3
+    let pyStringCastFunction = PyUnicode_AsUTF8
+#endif
+    guard let cString = pyStringCastFunction(pyObject) else {
       PyErr_Clear()
       return nil
     }
@@ -793,10 +811,16 @@ extension String : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
+
+#if PYTHON2
+    let pyStringFunction = PyString_FromStringAndSize
+#elseif PYTHON3
+    let pyStringFunction = PyUnicode_FromStringAndSize
+#endif
     let v = utf8CString.withUnsafeBufferPointer {
       // 1 is subtracted from the C string length to trim the trailing null
       // character (`\0`).
-      PyString_FromStringAndSize($0.baseAddress, $0.count - 1)!
+      return pyStringFunction($0.baseAddress, $0.count - 1)!
     }
     return PythonObject(owning: v)
   }
@@ -828,8 +852,12 @@ extension Int : PythonConvertible {
   public init?(_ pythonObject: PythonObject) {
     // `PyInt_AsLong` return -1 and sets an error if the Python object is not
     // integer compatible.
-    guard let value = pythonObject.converted(withError: -1,
-                                             by: PyInt_AsLong) else {
+#if PYTHON2
+    let pyIntCastFunction = PyInt_AsLong
+#elseif PYTHON3
+    let pyIntCastFunction = PyLong_AsLong
+#endif
+    guard let value = pythonObject.converted(withError: -1, by: pyIntCastFunction) else {
       return nil
     }
     self = value
@@ -837,7 +865,11 @@ extension Int : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
+#if PYTHON2
     return PythonObject(owning: PyInt_FromLong(self))
+#elseif PYTHON3
+    return PythonObject(owning: PyLong_FromLong(self))
+#endif
   }
 }
 
@@ -846,8 +878,13 @@ extension UInt : PythonConvertible {
     // `PyInt_AsUnsignedLongMask` isn't documented as such, but in fact it does
     // return -1 and set an error if the Python object is not integer
     // compatible.
-    guard let value = pythonObject.converted(
-      withError: ~0, by: PyInt_AsUnsignedLongMask) else {
+#if PYTHON2
+    let pyIntCastFunction = PyInt_AsUnsignedLongMask
+#elseif PYTHON3
+    let pyIntCastFunction = PyLong_AsUnsignedLongMask
+#endif
+    guard let value = pythonObject.converted(withError: ~0,
+                                             by: pyIntCastFunction) else {
       return nil
     }
     self = value
@@ -855,7 +892,11 @@ extension UInt : PythonConvertible {
 
   public var pythonObject: PythonObject {
     _ = Python // Ensure Python is initialized.
+#if PYTHON2
     return PythonObject(owning: PyInt_FromSize_t(Int(self)))
+#elseif PYTHON3
+    return PythonObject(owning: PyLong_FromSize_t(Int(self)))
+#endif
   }
 }
 
